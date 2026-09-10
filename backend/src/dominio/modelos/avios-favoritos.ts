@@ -44,8 +44,10 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import { clienteLectura, enTransaccion } from '../../comun/transaccion.js';
 
-import { leerAviosBom, tocarModelo, type ModeloAvioDetalle } from './bom-modelo.js';
+import { leerAviosBom, type ModeloAvioDetalle } from './bom-modelo.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { exigirModelo } from './modelos.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /**
  * Cliente de LECTURA: la sugerencia es un GET y puede correr fuera de transacción, así que sus
@@ -120,9 +122,18 @@ function aFavorito(fila: FilaFavorita, cantidadSugerida: number): AvioFavorito {
   };
 }
 
-/** Ids de los avíos que la receta del modelo YA tiene. */
+/**
+ * Ids de los avíos que la receta del modelo YA tiene.
+ *
+ * ⭐ V1-E9b — «la receta del modelo» es la del modelo del que **se lee** la receta: con un hijo del
+ * linaje 1:N (V1-E9a) es la de su modelo de DESARROLLO. Sin esto, la sugerencia le ofrecería a un
+ * hijo avíos que su receta compartida ya trae.
+ */
 async function idsAviosDelBom(tx: Lector, idModelo: number): Promise<Set<number>> {
-  const filas = await tx.modeloAvio.findMany({ where: { idModelo }, select: { idAvio: true } });
+  const filas = await tx.modeloAvio.findMany({
+    where: { idModelo: await resolverIdRecetaDeModelo(tx, idModelo) },
+    select: { idAvio: true },
+  });
   return new Set(filas.map((f) => f.idAvio));
 }
 
@@ -199,6 +210,12 @@ export async function aceptarAviosFavoritos(
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐⭐ V1-E9b pieza B — ERA LA PEOR DE LAS TRECE PUERTAS, y la creó la pieza A: calculaba los
+    // faltantes contra la receta del PADRE (`idsAviosDelBom` resuelve), los creaba en el HIJO y
+    // devolvía la del padre —sin ellos—. O sea *«se agregaron 5»* y no aparecía ninguno; y al
+    // reintentar, la llave `(idModelo, idAvio)` del hijo daba un 409 falso y PERMANENTE. La receta
+    // del hijo es de solo lectura: aquí no se escribe nada.
+    await exigirRecetaPropia(tx, idModelo);
     const [filas, puestos] = await Promise.all([
       leerFavoritosDelCatalogo(tx),
       idsAviosDelBom(tx, idModelo),
@@ -229,7 +246,7 @@ export async function aceptarAviosFavoritos(
         }
         throw error;
       }
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'avios');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,

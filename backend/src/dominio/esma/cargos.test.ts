@@ -8,7 +8,8 @@ import { listarCargosEsMa, obtenerCargoEsMa, validarCargoEsMa } from './cargos.j
  * Unit del dominio de los CARGOS EsMa (F3-E4) — SIN Postgres. Cubre el guard de permisos
  * (deny-by-default, A4): todo lo de la cola de validación exige `esma.cargo-validar`. La lógica de
  * validación real (propuesto→validado, derivación de la propuesta, estados) se prueba contra
- * Postgres en `recibos.int.test.ts` (el cargo nace de un recibo).
+ * Postgres en `recibos.int.test.ts` (el cargo nace de un recibo o de un servicio sobre la orden —
+ * ver `servicios-orden.int.test.ts`).
  */
 
 const sesionSinNada = () => sesionDePrueba({ permisos: [] });

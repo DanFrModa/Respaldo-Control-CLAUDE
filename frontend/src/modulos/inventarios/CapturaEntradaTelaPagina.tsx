@@ -14,15 +14,17 @@ import {
 } from '@/api/entradas-tela';
 import { useLineasTelaPendientes } from '@/api/compras-lineas-tela';
 import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
+import type { Proveedor } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
-import type { LineaOcPendiente } from './CapturaRenglonesTelaColor';
+import type { EstadoPendientesOc, LineaOcPendiente } from './CapturaRenglonesTelaColor';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
 function hoy(): string {
@@ -32,22 +34,31 @@ function hoy(): string {
 type TipoDocumento = 'factura' | 'remision';
 
 /**
- * CAPTURA de una ENTRADA DE TELA por FACTURA/REMISIÓN, sin orden de compra (etapa B1 — Daniel
- * §Post-F9.9 punto 7). Un documento = una CABECERA (factura|remisión + su número + proveedor +
- * fecha + almacén destino) y N PARTIDAS: cada renglón lleva su color, sus cantidades de cuerpo y
- * complemento (juntas) y sus precios, y al confirmar crea SU partida.
+ * CAPTURA de una ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor (etapa B1). Un documento = una
+ * CABECERA (factura|remisión + su número + proveedor + fecha + almacén destino) y N PARTIDAS: cada
+ * renglón lleva su color, sus cantidades de cuerpo y complemento (juntas) y sus precios, y al
+ * confirmar crea SU partida.
+ *
+ * 🔴 **SIEMPRE CONTRA UNA ORDEN DE COMPRA (§Post-F9.159(a)).** El documento nació como "la vía sin
+ * OC" de §Post-F9.9 punto 7; esa línea quedó SUPERADA por Daniel: *«es imposible. Porque sin OC no
+ * podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*. Lo que se cerró es el
+ * RENGLÓN suelto, no el documento: la factura sigue siendo el soporte (con su número, su PDF y su
+ * CFDI), pero cada renglón se arma pulsando **Capturar** en un pendiente de la orden.
  *
  * El documento se GUARDA en BORRADOR (no toca el inventario): así se le puede adjuntar el PDF de la
  * factura y revisarlo antes de confirmarlo desde la lista. La misma pantalla EDITA un borrador
  * (ruta `…/:id/editar`); una entrada confirmada ya no se edita (D3, lo rechaza el backend).
  * Permiso `inventario-telas.mover`.
  *
- * §Post-F9.15 — DOS puntos de partida, y el bueno es el segundo:
- *  • **desde cero** (menú): la factura de tela SUELTA, sin orden de compra;
+ * §Post-F9.15 — DOS puntos de partida, y los DOS terminan en la orden de compra:
+ *  • **desde cero** (menú): se elige el proveedor y la pantalla enseña TODO lo que ese proveedor
+ *    tiene pendiente de recibir, de donde salen los renglones. (Antes este camino permitía la
+ *    factura "suelta"; desde §Post-F9.159(a) ya no, y por eso se le tuvo que dar el panel: sin él
+ *    el menú llevaba a un muro.)
  *  • **desde la ORDEN DE COMPRA** (deep-link `state.idOrdenCompra`, botón "Dar entrada a la tela"):
- *    llega con el PROVEEDOR FIJO —lo define la orden— y con el panel de lo que falta por recibir de
- *    esa OC, de donde se capturan los renglones con un clic. Es lo que pidió Daniel: *"mejor recibir
- *    las telas a partir de las OC. La buscamos ahí y damos la entrada desde allá"*.
+ *    igual, pero con el PROVEEDOR FIJO —lo define la orden— y el panel acotado a ESA OC. Es lo que
+ *    pidió Daniel: *"mejor recibir las telas a partir de las OC. La buscamos ahí y damos la entrada
+ *    desde allá"*.
  *
  * En ambos casos el buscador de telas se acota a las telas del PROVEEDOR DUEÑO (§Post-F9.15): *"cada
  * proveedor de telas tiene sus telas definidas. No puedo meter una felpa alsatex en el proveedor
@@ -63,6 +74,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('factura');
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [idProveedor, setIdProveedor] = useState<string>('');
+  // El proveedor COMPLETO que eligió el usuario (el combobox lo emite entero): su bandera
+  // `factura` decide si el documento puede ser factura o sólo remisión (§Post-F9.22).
+  const [proveedorElegido, setProveedorElegido] = useState<Proveedor | null>(null);
   const [fecha, setFecha] = useState(hoy());
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [observaciones, setObservaciones] = useState('');
@@ -84,23 +98,38 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
   // el emisor sabe; y queda FIJO, porque cambiarlo dejaría los renglones ligados a otra orden.
   const location = useLocation();
-  const [deepLinkOc] = useState<{ idOrdenCompra: number; idProveedor: number } | null>(() => {
+  const [deepLinkOc] = useState<{
+    idOrdenCompra: number;
+    idProveedor: number;
+    proveedor?: string;
+  } | null>(() => {
     const state: unknown = location.state;
     if (typeof state !== 'object' || state === null) return null;
     const datos = state as Record<string, unknown>;
     const idOrdenCompra = datos.idOrdenCompra;
     const idProveedor = datos.idProveedor;
+    const proveedor = datos.proveedor;
     const entero = (v: unknown): v is number =>
       typeof v === 'number' && Number.isInteger(v) && v > 0;
-    return entero(idOrdenCompra) && entero(idProveedor) ? { idOrdenCompra, idProveedor } : null;
+    return entero(idOrdenCompra) && entero(idProveedor)
+      ? {
+          idOrdenCompra,
+          idProveedor,
+          // El NOMBRE viaja para que el combobox lo pueda MOSTRAR (V1-E7g). Es opcional: un
+          // enlace viejo sin él sigue funcionando, sólo que el campo arranca en blanco.
+          ...(typeof proveedor === 'string' && proveedor !== '' ? { proveedor } : {}),
+        }
+      : null;
   });
   const idOcDeepLink = deepLinkOc?.idOrdenCompra ?? null;
 
+  // Solo almacenes de TELA: el documento de entrada mete tela, y el dominio exige que el destino sea de telas (fila 0.137).
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'TELA',
   });
   // Quien surte la tela: SOLO proveedores con el rol "vende-telas" (petición de Daniel, 7-ago-2026;
   // decisión P.2). Mismo criterio que Producción (Corte lista los de rol "corte"). El filtro lo
@@ -142,12 +171,28 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               for (const aviso of datos.avisos) {
                 toast.warning(aviso, { duration: 10000 });
               }
+              // 🔴 §Post-F9.159(a) — este toast decía *"Captura los renglones a mano"*, que es
+              // EXACTAMENTE lo que se acaba de prohibir: sin orden de compra no se recibe tela.
+              // Ahora dice la salida que sí existe (soltar la factura y capturar desde lo
+              // pendiente de la OC), sin prometer un camino que muere al guardar.
               const conCruce = datos.conceptos.filter((c) => c.sugerencia !== null).length;
-              toast.success(
-                conCruce > 0
-                  ? `Factura leída: ${String(conCruce)} renglón(es) listos para capturar (solo falta el color).`
-                  : 'Factura leída. Captura los renglones a mano: no se pudo cruzar ningún concepto.',
-              );
+              if (conCruce > 0) {
+                toast.success(
+                  `Factura leída: ${String(conCruce)} renglón(es) listos para capturar (solo falta el color).`,
+                );
+              } else {
+                // El DÓNDE MIRAR depende del alcance del panel: llegando desde una OC sólo se
+                // ofrece lo pendiente de ESA orden, así que mandar a «lo que el proveedor tenga
+                // pendiente» apuntaría a una lista que esta pantalla no enseña.
+                toast.warning(
+                  'Factura leída, pero ningún concepto cruzó con un renglón de orden de compra. ' +
+                    'No se puede capturar tela sin OC: suelta la factura y captura desde lo que ' +
+                    (idOcDeepLink === null
+                      ? 'el proveedor tenga pendiente de recibir.'
+                      : 'esta orden de compra tenga pendiente de recibir.'),
+                  { duration: 10000 },
+                );
+              }
             },
             onError: (error) => toast.error(error.message),
           },
@@ -189,9 +234,16 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   /**
    * Lo que el panel de captura ofrece para precargar renglones: los CONCEPTOS de la factura si ya se
    * leyó el XML (con SU cantidad y SU precio — es lo que llegó y lo que se va a pagar), o los
-   * pendientes de la orden de compra si se está capturando a mano desde ella (§Post-F9.15).
+   * renglones de OC pendientes del proveedor elegido (§Post-F9.15). **Es lo OFRECIDO aquí y ahora**
+   * — para saber qué tiene pendiente el proveedor está `estadoPendientesOc`, más abajo.
+   *
+   * 🔴 **§Post-F9.159(a) — ahora se ofrecen SIEMPRE que haya proveedor, no sólo llegando desde una
+   * OC.** Antes, sin deep-link y sin XML esto valía `undefined`: no se pintaba el panel y el único
+   * camino era capturar el renglón a mano… que es justo lo que se acaba de prohibir. Dejarlo así
+   * habría convertido «Nueva entrada de tela» en un muro. Elegir el proveedor ahora ENSEÑA lo que
+   * tiene pendiente, que es el camino que la decisión exige recorrer.
    */
-  const lineasParaCapturar: LineaOcPendiente[] | undefined =
+  const lineasParaCapturar: LineaOcPendiente[] =
     propuesta !== null
       ? propuesta.conceptos
           .filter((c) => c.sugerencia !== null)
@@ -215,9 +267,38 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               pendienteComplemento: s.pendienteComplemento,
             };
           })
-      : idOcDeepLink === null
-        ? undefined
-        : (lineasOc.data ?? []);
+      : (lineasOc.data ?? []);
+
+  /**
+   * 🔴 **EL SEGUNDO EJE, Y VA APARTE A PROPÓSITO** (hallazgo del reviewer de esta etapa): qué tiene
+   * pendiente de recibir el PROVEEDOR sale **sólo de la consulta**, nunca de `lineasParaCapturar`.
+   *
+   * Colapsarlos era un defecto real: por el camino del XML (§Post-F9.20) la lista de arriba son los
+   * conceptos de la factura que CRUZARON, y `cruzarConceptos` puede no cruzar ninguno —el propio
+   * servidor lo avisa— con el proveedor teniendo órdenes abiertas. Con un solo eje, la pantalla
+   * concluía «no tiene nada pendiente» y mandaba a levantar una OC **que ya existía**. Lo mismo si
+   * la consulta FALLA: en TanStack v5 el error deja `isPending` en false y `data` en undefined, así
+   * que la lista vacía se leía como "no hay" cuando en realidad es "no se sabe".
+   */
+  const estadoPendientesOc: EstadoPendientesOc =
+    idProveedor === ''
+      ? 'sin-proveedor'
+      : lineasOc.isError
+        ? 'error'
+        : lineasOc.isPending
+          ? 'consultando'
+          : (lineasOc.data ?? []).length === 0
+            ? // 🔴 EL ALCANCE MANDA, no sólo el estatus (segundo hallazgo del reviewer). Con
+              // deep-link la consulta va ACOTADA a esa OC (`idOcDeepLink`, ver `lineasOc` arriba y
+              // el filtro del servidor), así que su vacío dice «esta orden no tiene nada», jamás
+              // «este proveedor no tiene nada» — que es lo único que `ninguno` autoriza a afirmar.
+              // Y es un caso CORRIENTE: el botón «Dar entrada a la tela» no mira el pendiente, así
+              // que una OC con tela ya recibida y avío abierto (`recibida_parcial`) lo enseña y
+              // trae aquí con la consulta vacía.
+              idOcDeepLink === null
+              ? 'ninguno'
+              : 'ninguno-en-esta-oc'
+            : 'hay';
 
   // Llegando DESDE la OC: el proveedor se fija con el de la orden (una vez, sin pisar lo que ya
   // hubiera en un borrador que se esté editando).
@@ -265,40 +346,88 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const editable = puedeMover && noEditable === null;
 
   // El proveedor ya capturado se RESPETA aunque no traiga el rol "vende-telas" (documento viejo o
-  // proveedor al que le falta la casilla): se conserva como opción en vez de desaparecer del
-  // selector y perder el dato en silencio.
+  // proveedor al que le faltan roles): el combobox lo sigue MOSTRANDO por su nombre en vez de
+  // desaparecer y perder el dato en silencio.
   const listaProveedores = proveedores.data?.datos ?? [];
-  const proveedorFueraDelFiltro =
-    idProveedor !== '' && !listaProveedores.some((p) => String(p.id) === idProveedor);
+  // Nombre a MOSTRAR del proveedor que NO eligió el usuario en el combobox. Con búsqueda
+  // server-side el combobox sólo conoce los 10 de su página, así que quien fijó el id tiene que
+  // pasarle también el nombre o el campo se ve en blanco: la entrada en edición, la orden de
+  // compra en el deep-link, o el CFDI recién leído.
   const nombreProveedorCargado =
     existente.data !== undefined && String(existente.data.idProveedor) === idProveedor
       ? existente.data.proveedor
-      : 'Proveedor actual';
+      : deepLinkOc !== null && String(deepLinkOc.idProveedor) === idProveedor
+        ? deepLinkOc.proveedor
+        : propuesta !== null && String(propuesta.idProveedor) === idProveedor
+          ? // El CFDI puede traer el id sin nombre resuelto: `null` es "no lo sé", no "vacío".
+            (propuesta.proveedor ?? undefined)
+          : undefined;
 
-  // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
-  // casilla vive en el catálogo del proveedor y aquí decide el camino. `undefined` (proveedor sin
-  // elegir, o fuera de la lista cargada) = no se sabe: se deja el flujo completo, no se esconde nada
-  // por una duda.
-  const proveedorElegido = listaProveedores.find((p) => String(p.id) === idProveedor);
-  const proveedorSinFactura = proveedorElegido?.factura === false;
+  // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no.
+  // ⭐ Fila 0.124: quien lo dice es la pregunta única «¿Cómo factura?» (`modalidadFacturacion`) del
+  // catálogo; el `factura` que llega en la respuesta del API es su DERIVADO (`solo_sin` ⇒ false),
+  // no un campo capturable aparte. Aquí decide el camino. `undefined`/`null` (proveedor sin elegir,
+  // fuera de la lista cargada, o migrado sin modalidad) = no se sabe: se deja el flujo completo, no
+  // se esconde nada por una duda.
+  // El proveedor que ELIGIÓ el usuario llega COMPLETO desde el combobox, así que su bandera se
+  // conoce siempre (antes sólo si caía entre los 100 de la página cargada). Para los ids que NO
+  // vienen de elegir —deep-link de la OC, CFDI leído, edición— se sigue resolviendo contra la
+  // página, igual que antes.
+  const proveedorResuelto =
+    proveedorElegido !== null && String(proveedorElegido.id) === idProveedor
+      ? proveedorElegido
+      : listaProveedores.find((p) => String(p.id) === idProveedor);
+  const proveedorSinFactura = proveedorResuelto?.factura === false;
 
-  // El que no factura no ampara con factura: su documento es remisión. Se corrige aquí para que la
-  // pantalla no mande al servidor algo que este va a rechazar.
+  // El que NUNCA factura (modalidad `solo_sin`) no ampara con factura: su documento es remisión. Se
+  // corrige aquí para que la pantalla no mande al servidor algo que este va a rechazar.
   useEffect(() => {
     if (proveedorSinFactura) setTipoDocumento('remision');
   }, [proveedorSinFactura]);
 
   const guardando = crear.isPending || actualizar.isPending;
+
+  /**
+   * 🔴 §Post-F9.159(a) — renglones que NO traen su orden de compra. Capturando no puede pasar (el
+   * panel de renglones ya no deja agregarlos); el caso real es **abrir un BORRADOR VIEJO**, de los
+   * que se guardaron cuando la vía suelta era válida: sus renglones llegan sin liga y el servidor
+   * ya no acepta ni editarlos ni confirmarlos.
+   *
+   * Lo que se hace con él es DECIRLO y apagar Guardar, no repararlo por dentro (REGLA 0-B: lo viejo
+   * se limpia, no se arregla). La salida es cancelarlo y capturarlo desde su OC.
+   */
+  const renglonesSinOc = renglones.filter((r) => r.idOrdenCompraLinea === undefined).length;
+
   const puedeGuardar =
     editable &&
     numeroDocumento.trim().length > 0 &&
     idProveedor !== '' &&
     idAlmacen !== '' &&
     renglones.length > 0 &&
+    renglonesSinOc === 0 &&
     !guardando;
 
   const cuerpo: EntradaTelaCrear | undefined = useMemo(() => {
     if (idProveedor === '' || idAlmacen === '') return undefined;
+    // §Post-F9.159(a): el contrato exige la liga con la OC en CADA renglón. Si falta en alguno NO se
+    // arma el cuerpo (y Guardar queda apagado): así el tipo cuadra sin castings y nunca se manda al
+    // servidor algo que va a rechazar.
+    const lineas: EntradaTelaCrear['lineas'] = [];
+    for (const r of renglones) {
+      const idOrdenCompraLinea = r.idOrdenCompraLinea;
+      if (idOrdenCompraLinea === undefined) return undefined;
+      lineas.push({
+        idTelaColor: r.idTelaColor,
+        cantidad: r.cantidad,
+        idOrdenCompraLinea,
+        ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
+        ...(r.loteProveedor === undefined ? {} : { loteProveedor: r.loteProveedor }),
+        ...(r.precioUnit === undefined ? {} : { precioUnit: r.precioUnit }),
+        ...(r.precioUnitComplemento === undefined
+          ? {}
+          : { precioUnitComplemento: r.precioUnitComplemento }),
+      });
+    }
     return {
       tipoDocumento,
       numeroDocumento: numeroDocumento.trim(),
@@ -312,17 +441,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       fecha,
       idAlmacen: Number(idAlmacen),
       ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
-      lineas: renglones.map((r) => ({
-        idTelaColor: r.idTelaColor,
-        cantidad: r.cantidad,
-        ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
-        ...(r.loteProveedor === undefined ? {} : { loteProveedor: r.loteProveedor }),
-        ...(r.idOrdenCompraLinea === undefined ? {} : { idOrdenCompraLinea: r.idOrdenCompraLinea }),
-        ...(r.precioUnit === undefined ? {} : { precioUnit: r.precioUnit }),
-        ...(r.precioUnitComplemento === undefined
-          ? {}
-          : { precioUnitComplemento: r.precioUnitComplemento }),
-      })),
+      lineas,
     };
   }, [
     tipoDocumento,
@@ -379,8 +498,8 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             {idEditar === undefined ? 'Nueva entrada de tela' : 'Editar entrada de tela'}
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Factura o remisión del proveedor, sin orden de compra · cada renglón es una partida · se
-            guarda en borrador y entra al inventario al confirmarla
+            Factura o remisión del proveedor contra su orden de compra · cada renglón es una partida
+            · se guarda en borrador y entra al inventario al confirmarla
           </p>
         </div>
       </header>
@@ -518,26 +637,29 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             </Field>
             <Field>
               <FieldLabel htmlFor="entrada-proveedor">Proveedor de telas</FieldLabel>
-              <SelectNativo
-                id="entrada-proveedor"
-                value={idProveedor}
-                onChange={(e) => setIdProveedor(e.target.value)}
+              {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER palabra, en el
+                  SERVIDOR. El `<select>` de aquí sólo dejaba teclear el prefijo y topaba en 100. */}
+              <SelectorProveedor
+                rol={COD_ROL_PROVEEDOR.vendeTelas}
+                idSeleccionado={idProveedor === '' ? undefined : Number(idProveedor)}
+                nombreSeleccionado={nombreProveedorCargado}
+                alSeleccionar={(p) => {
+                  setIdProveedor(String(p.id));
+                  setProveedorElegido(p);
+                }}
+                alLimpiar={() => {
+                  setIdProveedor('');
+                  setProveedorElegido(null);
+                }}
                 // Llegando desde la OC el proveedor NO se cambia: lo define la orden. Y con una
                 // factura leída cuyo emisor no está en el catálogo, tampoco: cualquier elección
                 // termina en error al guardar (ver `sinProveedorDelCfdi`).
-                disabled={!editable || idOcDeepLink !== null || sinProveedorDelCfdi}
-                data-testid="entrada-proveedor"
-              >
-                <option value="">Elige el proveedor…</option>
-                {proveedorFueraDelFiltro ? (
-                  <option value={idProveedor}>{nombreProveedorCargado}</option>
-                ) : null}
-                {listaProveedores.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+                deshabilitado={!editable || idOcDeepLink !== null || sinProveedorDelCfdi}
+                placeholder="Elige el proveedor…"
+                etiqueta="Proveedor de telas"
+                idInput="entrada-proveedor"
+                testid="entrada-proveedor"
+              />
               <p className="text-xs text-muted-foreground" data-testid="entrada-proveedor-ayuda">
                 {sinProveedorDelCfdi
                   ? 'Lo define la factura: captúrale el RFC al proveedor y vuelve a leerla.'
@@ -593,13 +715,30 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             soloLectura={!puedeMover}
             conLoteProveedor
             conPrecios
-            // §Post-F9.15: el panel "Pendiente de la orden de compra" solo tiene sentido llegando
-            // desde una OC; en la captura suelta (tela sin orden) no se pinta.
-            {...(lineasParaCapturar === undefined ? {} : { lineasOc: lineasParaCapturar })}
+            // §Post-F9.15 + §Post-F9.159(a): el panel "Pendiente de la orden de compra" es el
+            // ÚNICO camino para armar un renglón, así que se pinta siempre (con lo que esté
+            // pendiente —de TODO el proveedor, o sólo de la OC del deep-link—, o vacío si no hay
+            // nada: eso también es información, y `estadoPendientesOc` dice de qué vacío se trata).
+            lineasOc={lineasParaCapturar}
+            exigirOrdenCompra
+            estadoPendientesOc={estadoPendientesOc}
             // Y el buscador de telas se acota a las del proveedor DUEÑO.
             {...(idProveedor === '' ? {} : { idProveedorTelas: Number(idProveedor) })}
           />
 
+          {/* 🔴 §Post-F9.159(a) — el BORRADOR VIEJO sin orden de compra: se puede ver y se puede
+              cancelar, pero ya no se guarda ni se confirma. Se dice aquí, junto al botón apagado,
+              en vez de dejar que el servidor lo rechace después de teclear. */}
+          {renglonesSinOc > 0 ? (
+            <p className="text-xs text-warn" data-testid="entrada-renglones-sin-oc">
+              {renglonesSinOc === 1
+                ? 'Este borrador tiene un renglón que no viene de ninguna orden de compra'
+                : `Este borrador tiene ${String(renglonesSinOc)} renglones que no vienen de ninguna orden de compra`}
+              , y así ya no se puede guardar: <b>no se recibe tela que no se haya comprado</b>. Se
+              capturó cuando eso todavía se permitía. Cancélalo y vuelve a capturarlo desde lo que
+              tenga pendiente su orden de compra.
+            </p>
+          ) : null}
           <div className="flex items-center justify-end gap-3">
             <Button onClick={guardar} disabled={!puedeGuardar} data-testid="entrada-guardar">
               {guardando ? 'Guardando…' : 'Guardar borrador'}

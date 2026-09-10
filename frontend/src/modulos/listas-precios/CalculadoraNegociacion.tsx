@@ -1,15 +1,16 @@
-import { Loader2Icon } from 'lucide-react';
+import { LockIcon, Loader2Icon } from 'lucide-react';
 
 import { useSimularNegociacion } from '@/api/negociacion';
+import { useSesion } from '@/sesion/useSesion';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 
-/** Formatea un porcentaje con un decimal (ej. 44.4%). */
-function pct(valor: number): string {
-  return `${valor.toFixed(1)}%`;
+/** Formatea un porcentaje con un decimal (ej. 44.4%), o "—" si el servidor lo ocultó. */
+function pct(valor: number | null): string {
+  return valor === null ? '—' : `${valor.toFixed(1)}%`;
 }
 
 /**
@@ -19,6 +20,16 @@ function pct(valor: number): string {
  * objetivo del cliente (verde/rojo). Toda la aritmética la hace el backend (A1: la fórmula NO se
  * duplica aquí); este componente sólo captura, debouncea y pinta. El precio objetivo es un input
  * CONTROLADO para que el flujo de la ronda lo reutilice como su "precio acordado".
+ *
+ * ⭐ **V1-E8b (§Post-F9.125(b)) — sin `listas.aprobar` los NÚMEROS no se piden ni se pintan.** Los
+ * cuatro salían del margen del cliente y lo delataban: `obj. 44.4%` **es** el factor, y el resto se
+ * despeja de ahí. El servidor ya los manda en `null`; aquí además **no se hace la consulta** y se dice
+ * POR QUÉ, en vez de dejar cuatro guiones que parecen un error de carga. Daniel: *"puede hacer sus
+ * cálculos, pero el sistema no le muestra información digerida"*.
+ *
+ * ⚠️ **El INPUT del precio se queda para todos**, y no es un descuido: lo posee el diálogo de la
+ * ronda, que reutiliza su valor como «precio acordado». Quitarlo rompería registrar una ronda —que sí
+ * es trabajo de quien negocia—; lo que se retira es el veredicto del sistema, no la captura.
  */
 export function CalculadoraNegociacion({
   idLinea,
@@ -40,9 +51,13 @@ export function CalculadoraNegociacion({
     precioObjetivo.trim() !== '' && Number.isFinite(objetivoNum) && objetivoNum > 0;
   // Debounce del valor numérico: no golpea el backend en cada tecla (se espera a que el usuario pare).
   const objetivoDebounced = useDebounce(objetivoValido ? objetivoNum : 0, 350);
+  const { tienePermiso } = useSesion();
+  // §Post-F9.125(b): el margen es del dueño. Sin el permiso no se consulta siquiera — el backend lo
+  // devolvería todo en null, y pedirlo sólo para pintar guiones sería ruido.
+  const verMargen = tienePermiso('listas.aprobar');
   const sim = useSimularNegociacion(idLinea, objetivoDebounced, {
     ...(idPrecosto === undefined ? {} : { idPrecosto }),
-    habilitado: objetivoValido,
+    habilitado: objetivoValido && verMargen,
   });
 
   const datos = sim.data;
@@ -71,7 +86,16 @@ export function CalculadoraNegociacion({
         />
       </Field>
 
-      {!objetivoValido ? (
+      {!verMargen ? (
+        <p className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
+          <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {/* Se dice a QUIÉN le toca, no cómo se llama el permiso por dentro (§Post-F9.68). */}
+          <span>
+            El <b>margen</b> y los factores del precio son facultad del <b>dueño</b>: aquí sólo se
+            captura el precio que se acuerde en la mesa.
+          </span>
+        </p>
+      ) : !objetivoValido ? (
         <p className="text-sm text-muted-foreground">
           Captura un precio objetivo para ver el margen en vivo.
         </p>
@@ -87,7 +111,10 @@ export function CalculadoraNegociacion({
       ) : datos ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
           <Dato etiqueta="Costo" valor={formatearMoneda(datos.costo)} />
-          <Dato etiqueta="Precio neto" valor={formatearMoneda(datos.precioNeto)} />
+          <Dato
+            etiqueta="Precio neto"
+            valor={datos.precioNeto === null ? '—' : formatearMoneda(datos.precioNeto)}
+          />
           <div>
             <span className="block text-xs text-muted-foreground">Margen bruto</span>
             <span

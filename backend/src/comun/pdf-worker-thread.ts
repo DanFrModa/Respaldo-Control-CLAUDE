@@ -40,6 +40,9 @@ const REGISTRO_PDF = {
   'traspaso-tela': async () =>
     (await import('../dominio/inventarios/impresos/impreso-traspaso-tela.js'))
       .generarPdfTraspasoTela,
+  // Fila 0.100 — la gemela de la hoja de tela, para producto terminado (§Post-F9.193 decisión 2).
+  'traspaso-pt': async () =>
+    (await import('../dominio/inventarios/impresos/impreso-traspaso-pt.js')).generarPdfTraspasoPt,
 
   // ── Producción / WIP ─────────────────────────────────────────────────────────
   orden: async () =>
@@ -91,12 +94,22 @@ const REGISTRO_PDF = {
   'desarrollo-lista-precios': async () =>
     (await import('../dominio/desarrollo/impresos/impreso-lista-precios.js'))
       .generarPdfListaPrecios,
+  'desarrollo-cotizacion': async () =>
+    (await import('../dominio/desarrollo/impresos/impreso-cotizacion.js')).generarPdfCotizacion,
 
   // ── EsMa (estados de cuenta de maquileros) ───────────────────────────────────
   'esma-estado-cuenta': async () =>
     (await import('../dominio/esma/impresos/impreso-estado-cuenta.js')).generarPdfEstadoCuenta,
   'esma-recibo-pago': async () =>
     (await import('../dominio/esma/impresos/impreso-recibo-pago.js')).generarPdfReciboPago,
+
+  // ── Pagos (el documento para facturar, fila 0.118) ───────────────────────────
+  'documento-facturacion': async () =>
+    (await import('../dominio/pagos/impresos/impreso-documento-facturacion.js'))
+      .generarPdfDocumentoFacturacion,
+  'documentos-facturacion-corrida': async () =>
+    (await import('../dominio/pagos/impresos/impreso-documento-facturacion.js'))
+      .generarPdfDocumentosCorrida,
 
   // ── Indicadores (tableros directivos + hoja de conteo) ───────────────────────
   'kpis-rc': async () => (await import('../dominio/indicadores/impresos/pdf.js')).generarPdfKpisRc,

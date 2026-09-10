@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { ClavePermiso } from '../../contrato/index.js';
+import type { ClavePermiso, RenglonMesa } from '../../contrato/index.js';
 import {
   ErrorConflicto,
   ErrorNoEncontrado,
@@ -24,16 +24,19 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { crearDesarrollo, obtenerDesarrollo } from './desarrollos.js';
+import { actualizarModelo } from '../modelos/modelos.js';
+import { reemplazarTelasBom } from '../modelos/bom-modelo.js';
+import { apagarDesarrollo, crearDesarrollo, obtenerDesarrollo } from './desarrollos.js';
 import { crearProyecto } from './proyectos.js';
 import { congelarVersion, generarPrecosto } from './precostos.js';
 import { guardarFactoresCliente } from './cliente-factores.js';
+import { guardarMesa, registrarRonda } from './negociacion.js';
 import {
   ajustarPrecioLinea,
   aprobarLinea,
-  candidatosParaLista,
   crearLista,
   desgloseCostoLinea,
+  diagnosticoCandidatosLista,
   editarFactoresLista,
   eliminarLista,
   listarListas,
@@ -68,6 +71,8 @@ async function sembrarBase(): Promise<void> {
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
     { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+    // ⭐ V1-E8w: EMPAQUE, la tercera ancla fija — sin él `generarPrecosto` truena.
+    { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
   ];
   for (const c of conceptos) {
     await cliente.conceptoCosto.create({ data: c });
@@ -199,8 +204,9 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
     expect(lista.margenPct).toBe(50);
     expect(lista.lineas).toHaveLength(2);
     for (const linea of lista.lineas) {
-      expect(linea.costoUnit).toBe(40);
-      expect(linea.precioCalculado).toBe(100); // 40/(1-0.5)=80 → 80/(1-0.20)=100
+      // ⭐ V1-E8w: 40 de receta + 2.20 del ancla de EMPAQUE, que nace en todo precosto nuevo.
+      expect(linea.costoUnit).toBe(42.2);
+      expect(linea.precioCalculado).toBe(106); // 42.2/(1-0.5)=84.4 → /(1-0.20)=105.5 → 106 al alza
       expect(linea.precioAprobado).toBeNull();
       expect(linea.aprobado).toBe(false);
     }
@@ -246,6 +252,44 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
     expect(despues.estado).toBe('en-lista');
   });
 
+  it('🔴 rechaza armar una lista NUEVA sobre un departamento DESACTIVADO (absorbido) → ErrorConflicto', async () => {
+    // Guarda GEMELA de la de `proyectos.ts` y `cliente-factores.ts` (V1-E8p, §Post-F9.122a). Apagar
+    // un departamento es *cómo* la fusión retira un duplicado (borrado suave, D3): sin esta guarda se
+    // podía fusionar y acto seguido colgar una lista NUEVA del absorbido, sin error y sin aviso.
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DEPTO-APAGADO');
+    await cliente.clienteDepartamento.update({
+      where: { id: departamento.id },
+      data: { activo: false },
+    });
+
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [id],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorConflicto);
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [id],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/está desactivado; reactívalo/);
+    expect(
+      await cliente.listaPrecios.count({ where: { idClienteDepartamento: departamento.id } }),
+    ).toBe(0);
+  });
+
   it('rechaza con la LISTA de faltantes si algún desarrollo no tiene precosto congelado', async () => {
     await sembrarFactores();
     const bueno = await desarrolloConPrecosto('MOD-OK');
@@ -272,6 +316,19 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         bd(),
       ),
     ).rejects.toThrow(/MOD-SINCONGELAR/);
+    // V1-E8f: el rechazo NOMBRA la versión que se quedó sin congelar y dice el remedio, no sólo que
+    // "falta" algo (§Post-F9.96).
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [bueno, malo],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/v1 sigue en BORRADOR: congélalo/);
   });
 
   it('sin factores capturados → ErrorValidacion claro', async () => {
@@ -309,9 +366,10 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
       { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
       bd(),
     );
-    // Override todo-cero: precio = costo = 40.
+    // Override todo-cero: precio = costo = 42.20 (40 de receta + 2.20 de empaque, V1-E8w), y el
+    // precio sugerido se redondea AL ALZA (D2 #4) → 43.
     expect(lista.margenPct).toBe(0);
-    expect(lista.lineas[0]?.precioCalculado).toBe(40);
+    expect(lista.lineas[0]?.precioCalculado).toBe(43);
   });
 
   it('dedup: el mismo desarrollo dos veces produce UN solo renglón', async () => {
@@ -347,7 +405,10 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         },
         bd(),
       ),
-    ).rejects.toThrow(/ya está en otra lista/);
+      // ⚠️ El mensaje pasó a NEUTRO en la 0.064: `problemasDeCandidatura` lo comparte entre crear una
+      // lista y agregarle renglones, y en el segundo caso «otra» era FALSO — el modelo estaba en la
+      // lista que el usuario tenía enfrente. Aquí (alta) siempre es otra, pero el texto es el mismo.
+    ).rejects.toThrow(/ya está en una lista de precios/);
   });
 
   it('rechaza un desarrollo que no es del cliente/departamento indicado', async () => {
@@ -366,8 +427,17 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
   });
 });
 
-describe('editarFactoresLista — recalcula sin pisar aprobados', () => {
-  it('recalcula precioCalculado de todos los renglones y NO toca los precioAprobado', async () => {
+/**
+ * ⭐ **V1-E8b (§Post-F9.125(a)+(d)).** Esta suite AFIRMABA LO CONTRARIO hasta la 0.038 —«recalcula
+ * sin pisar aprobados»— y se invierte a propósito.
+ *
+ * La regla vieja se escribió como una cortesía (*no pisarle la firma al dueño*) y su efecto era el
+ * contrario del propósito: dejaba un precio APROBADO que ya no correspondía a los factores con que
+ * se calculó, y el sistema lo seguía presentando como firmado. Encima había DOS criterios para el
+ * mismo hecho: `registrarRonda` sí reseteaba el aprobado al cambiar el costo. Hoy son uno.
+ */
+describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (§Post-F9.125)', () => {
+  it('recalcula TODOS los precioCalculado y limpia los precioAprobado que hubiera', async () => {
     await sembrarFactores();
     const idA = await desarrolloConPrecosto('MOD-EA');
     const idB = await desarrolloConPrecosto('MOD-EB');
@@ -384,9 +454,9 @@ describe('editarFactoresLista — recalcula sin pisar aprobados', () => {
     // Aprueba el primer renglón (queda aprobado en 100).
     const idLineaA = lista.lineas[0]!.id;
     const conAprobado = await aprobarLinea(sesion(), idLineaA, bd());
-    expect(conAprobado.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(100);
+    expect(conAprobado.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(106);
 
-    // Edita factores a margen 60 (base 40/0.4=100, suma 20 → 125).
+    // Edita factores a margen 60 (base 42.2/0.4=105.5, suma 20 → 131.875 → 132 al alza).
     const recalc = await editarFactoresLista(
       sesion(),
       lista.id,
@@ -394,11 +464,111 @@ describe('editarFactoresLista — recalcula sin pisar aprobados', () => {
       bd(),
     );
     for (const linea of recalc.lineas) {
-      expect(linea.precioCalculado).toBe(125);
+      expect(linea.precioCalculado).toBe(132);
     }
-    // El aprobado del renglón A NO se movió (sigue 100), el B sigue sin aprobar.
-    expect(recalc.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(100);
+    // 🔴 La firma se CAE: el renglón A vuelve a quedar como uno sin aprobar (no hay estado muerto).
+    const renglonA = recalc.lineas.find((l) => l.id === idLineaA);
+    expect(renglonA?.precioAprobado).toBeNull();
+    expect(renglonA?.aprobado).toBe(false);
+    expect(renglonA?.aprobadoPorId).toBeNull();
+    expect(renglonA?.aprobadoEn).toBeNull();
     expect(recalc.lineas.find((l) => l.id !== idLineaA)?.precioAprobado).toBeNull();
+  });
+
+  it('la firma vieja NO se borra: queda en el evento inmutable del renglón (D3)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EV');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    await editarFactoresLista(
+      sesion(),
+      lista.id,
+      { margenPct: 60, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+      bd(),
+    );
+
+    const eventos = await cliente.negociacionEvento.findMany({
+      where: { idListaLinea: idLinea },
+      orderBy: { id: 'asc' },
+    });
+    expect(eventos).toHaveLength(1);
+    expect(Number(eventos[0]!.precioAnterior)).toBe(106);
+    expect(Number(eventos[0]!.precioNuevo)).toBe(132);
+    // Sin re-costeo: los factores se movieron, el costo no.
+    expect(eventos[0]!.idPrecostoAnterior).toBeNull();
+    expect(eventos[0]!.idPrecostoNuevo).toBeNull();
+    expect(eventos[0]!.acuerdo).toContain('INVALIDÓ');
+
+    // Y se puede volver a aprobar normalmente: no hay estado muerto.
+    const revivida = await aprobarLinea(sesion(), idLinea, bd());
+    expect(revivida.lineas[0]?.precioAprobado).toBe(132);
+  });
+
+  it('guardar los MISMOS factores no tumba ninguna firma', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EI');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    const igual = await editarFactoresLista(
+      sesion(),
+      lista.id,
+      { margenPct: 50, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+      bd(),
+    );
+    expect(igual.lineas[0]?.precioAprobado).toBe(106);
+    expect(await cliente.negociacionEvento.count({ where: { idListaLinea: idLinea } })).toBe(0);
+  });
+
+  it('🔴 (a) sin `listas.aprobar` NO se mueven los factores, aunque se administre la lista', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EP');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    // El perfil de Desarrollo: administra listas y ve importes, pero no aprueba precios.
+    const desarrollo = sesion(['listas.ver', 'listas.administrar', 'consultas.ver-importes']);
+    await expect(
+      editarFactoresLista(
+        desarrollo,
+        lista.id,
+        { margenPct: 60, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorPermiso);
+    // Y no se movió nada.
+    const intacta = await obtenerLista(sesion(), lista.id, bd());
+    expect(intacta.margenPct).toBe(50);
+  });
+
+  it('🔴 (b) a quien ve importes pero no aprueba, los cuatro factores le llegan en null', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EB2');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const desarrollo = sesion(['listas.ver', 'listas.administrar', 'consultas.ver-importes']);
+    const vista = await obtenerLista(desarrollo, lista.id, bd());
+    expect(vista.margenPct).toBeNull();
+    expect(vista.descuentosPct).toBeNull();
+    expect(vista.regaliasPct).toBeNull();
+    expect(vista.costoVentasPct).toBeNull();
+    // Su trabajo sigue: el COSTO y el PRECIO sí los ve (el límite que Daniel aceptó a sabiendas).
+    expect(vista.lineas[0]?.costoUnit).toBe(42.2);
+    expect(vista.lineas[0]?.precioCalculado).toBe(106);
   });
 });
 
@@ -415,7 +585,7 @@ describe('aprobar / ajustar precio de un renglón', () => {
     const s = sesion();
     const aprobada = await aprobarLinea(s, idLinea, bd());
     const linea = aprobada.lineas[0]!;
-    expect(linea.precioAprobado).toBe(100);
+    expect(linea.precioAprobado).toBe(106);
     expect(linea.aprobado).toBe(true);
     expect(linea.aprobadoPorId).toBe(s.id);
     expect(linea.aprobadoEn).not.toBeNull();
@@ -433,7 +603,7 @@ describe('aprobar / ajustar precio de un renglón', () => {
     const ajustada = await ajustarPrecioLinea(sesion(), idLinea, { precio: 137 }, bd());
     const linea = ajustada.lineas[0]!;
     expect(linea.precioAprobado).toBe(137);
-    expect(linea.precioCalculado).toBe(100); // el calculado no cambia
+    expect(linea.precioCalculado).toBe(106); // el calculado no cambia
     expect(linea.aprobado).toBe(true);
   });
 
@@ -496,28 +666,43 @@ describe('aprobar / ajustar precio de un renglón', () => {
   });
 });
 
-describe('candidatosParaLista', () => {
+/**
+ * ⭐ V1-E8y — estas tres probaban `candidatosParaLista`, que **se retiró** en esta etapa: llevaba dos
+ * etapas sin un solo llamador de producción (la ruta usa el diagnóstico completo desde V1-E8f) y su
+ * propio docstring decía que si seguía así se retiraba. Se PORTARON al camino real
+ * (`diagnosticoCandidatosLista(...).candidatos`) en vez de borrarse: lo que verificaban —que la
+ * consulta de verdad traiga al cotizado, con su costo, y deje de traerlo al colocarlo— sigue siendo
+ * la promesa del sistema; la que se fue era la envoltura.
+ */
+describe('los CANDIDATOS que devuelve el diagnóstico', () => {
+  /** Sólo los que SÍ califican, por el camino de producción. */
+  async function candidatos(parametros: {
+    idCliente: number;
+    idClienteDepartamento: number;
+    idProyecto?: number;
+  }) {
+    return (await diagnosticoCandidatosLista(sesion(), parametros, bd())).candidatos;
+  }
+
   it('lista los cotizados sin renglón en una lista y los excluye al meterlos', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-CAND');
-    const antes = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const antes = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(antes.map((c) => c.idDesarrollo)).toContain(id);
-    expect(antes.find((c) => c.idDesarrollo === id)?.costoTotal).toBe(40);
+    expect(antes.find((c) => c.idDesarrollo === id)?.costoTotal).toBe(42.2);
 
     await crearLista(
       sesion(),
       { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
       bd(),
     );
-    const despues = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const despues = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(despues.map((c) => c.idDesarrollo)).not.toContain(id);
   });
 
@@ -528,39 +713,232 @@ describe('candidatosParaLista', () => {
     const idB = await desarrolloConPrecosto('MOD-PROY-B');
     const a = await obtenerDesarrollo(sesion(), idA, bd());
 
-    const todos = await candidatosParaLista(
-      sesion(),
-      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
-      bd(),
-    );
+    const todos = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
     expect(todos.map((c) => c.idDesarrollo)).toEqual(expect.arrayContaining([idA, idB]));
 
-    const soloA = await candidatosParaLista(
-      sesion(),
-      {
-        idCliente: clienteNegocio.id,
-        idClienteDepartamento: departamento.id,
-        idProyecto: a.idProyecto,
-      },
-      bd(),
-    );
+    const soloA = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+      idProyecto: a.idProyecto,
+    });
     expect(soloA.map((c) => c.idDesarrollo)).toEqual([idA]);
   });
 
   it('un desarrollo SIN precosto congelado no es candidato', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-NOCAND', false);
-    const candidatos = await candidatosParaLista(
+    const lista = await candidatos({
+      idCliente: clienteNegocio.id,
+      idClienteDepartamento: departamento.id,
+    });
+    expect(lista.map((c) => c.idDesarrollo)).not.toContain(id);
+  });
+});
+
+/**
+ * ⭐ V1-E8f (§Post-F9.128) — POR QUÉ no hay candidatos. Daniel: *"Justo me sale la leyenda de que no
+ * hay desarrollos disponibles"*. El diagnóstico trae a TODOS los desarrollos del cliente+departamento
+ * (incluidos los apagados y los ya colocados, que el `where` viejo ni veía) y a cada uno le pone su
+ * motivo. Estas pruebas van CONTRA BASE porque lo que se blinda aquí no es la regla (eso es unit, en
+ * `listas-precios-candidatura.test.ts`) sino que la CONSULTA de verdad los traiga.
+ */
+describe('diagnosticoCandidatosLista (V1-E8f)', () => {
+  /** Un desarrollo sin NINGÚN precosto (el helper de arriba siempre genera uno). */
+  async function desarrolloSinPrecosto(codigoModelo: string): Promise<number> {
+    const modelo = await cliente.modelo.create({ data: { codigo: codigoModelo, maquilaBase: 10 } });
+    const proyecto = await crearProyecto(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, nombre: 'Sin costo' },
+      bd(),
+    );
+    const desarrollo = await crearDesarrollo(sesion(), proyecto.id, { idModelo: modelo.id }, bd());
+    return desarrollo.id;
+  }
+
+  /** Motivo con el que salió UN desarrollo (o `undefined` si no está entre los descartados). */
+  function motivoDe(
+    diagnostico: Awaited<ReturnType<typeof diagnosticoCandidatosLista>>,
+    id: number,
+  ): string | undefined {
+    return diagnostico.descartados.find((d) => d.idDesarrollo === id)?.motivo;
+  }
+
+  // ⭐ EL CASO DE DANIEL, de punta a punta: el modelo existe, el precosto existe, pero se quedó en
+  // BORRADOR — y hasta hoy el sistema sólo sabía decir "no hay desarrollos disponibles".
+  it('el precosto en BORRADOR sale como descartado, con su motivo y su nº de versión', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-BORR', false);
+    const diagnostico = await diagnosticoCandidatosLista(
       sesion(),
       { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
       bd(),
     );
-    expect(candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    const descartado = diagnostico.descartados.find((d) => d.idDesarrollo === id);
+    expect(descartado?.motivo).toBe('precosto-borrador');
+    // La versión se NOMBRA: el aviso puede decir "la v1 sigue en borrador", no una generalidad.
+    expect(descartado?.versionPrecosto).toBe(1);
+    expect(descartado?.codigoModelo).toBe('MOD-DIAG-BORR');
+  });
+
+  it('congelar el precosto lo MUEVE de descartado a candidato (la gemela)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-GEMELA', false);
+    const antes = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(motivoDe(antes, id)).toBe('precosto-borrador');
+
+    const precostos = await cliente.precosto.findMany({ where: { idDesarrollo: id } });
+    await congelarVersion(sesion(), precostos[0]?.id ?? 0, bd());
+
+    const despues = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(despues.candidatos.map((c) => c.idDesarrollo)).toContain(id);
+    expect(motivoDe(despues, id)).toBeUndefined();
+  });
+
+  it('sin ningún precosto → «sin-precosto» (remedio distinto: precostear primero)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloSinPrecosto('MOD-DIAG-SIN');
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(motivoDe(diagnostico, id)).toBe('sin-precosto');
+  });
+
+  it('el que YA está en una lista sale con el folio de ESA lista (para poder llevar ahí)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-ENLISTA');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    const descartado = diagnostico.descartados.find((d) => d.idDesarrollo === id);
+    expect(descartado?.motivo).toBe('ya-en-lista');
+    expect(descartado?.idLista).toBe(lista.id);
+    expect(descartado?.folioLista).toBe(lista.folio);
+  });
+
+  it('el APAGADO aparece (antes ni se veía) y gana a cualquier otro motivo', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-APAG');
+    await apagarDesarrollo(sesion(), id, { motivo: 'El cliente lo canceló' }, bd());
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    expect(motivoDe(diagnostico, id)).toBe('apagado');
+  });
+
+  /**
+   * ⭐⭐ V1-E8t (§Post-F9.145) — `faltanFactores`: el SEGUNDO requisito de la lista, contestado
+   * ANTES de apretar el botón. Daniel se topó con el 400 *"…no tiene factores de precio
+   * capturados"* después de elegir sus modelos, **siendo él quien los captura**.
+   *
+   * 🔴 Lo que estas dos aseguran es la GUARDA GEMELA: el aviso y el bloqueo salen de la MISMA
+   * función (`buscarFactoresResueltos`). Por eso la segunda no se conforma con ver la bandera en
+   * `false`: comprueba que `crearLista` —el que de verdad bloquea— ya deja pasar. Si alguien
+   * escribiera un "¿hay factores?" aparte para el aviso, este par lo delataría en cuanto las dos
+   * respuestas dejaran de coincidir.
+   */
+  it('sin factores capturados, el diagnóstico lo dice ANTES de crear (faltanFactores)', async () => {
+    const id = await desarrolloConPrecosto('MOD-DIAG-SIN-FACT');
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    // El modelo SÍ califica —no le falta nada a él—: lo que falta es del cliente.
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).toContain(id);
+    expect(diagnostico.faltanFactores).toBe(true);
+  });
+
+  it('al capturarlos, la bandera baja Y la lista ya se puede crear (la gemela del bloqueo)', async () => {
+    const id = await desarrolloConPrecosto('MOD-DIAG-CON-FACT');
+    await sembrarFactores();
+
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.faltanFactores).toBe(false);
+
+    // Y el que bloquea de verdad coincide con lo que el aviso prometió.
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [id],
+      },
+      bd(),
+    );
+    expect(lista.lineas).toHaveLength(1);
+  });
+
+  it('el OVERRIDE del departamento basta: con él NO faltan factores (la cascada, no sólo el default)', async () => {
+    await desarrolloConPrecosto('MOD-DIAG-OVERRIDE');
+    await guardarFactoresCliente(
+      sesion(),
+      clienteNegocio.id,
+      {
+        idClienteDepartamento: departamento.id,
+        margenPct: 40,
+        descuentosPct: 0,
+        regaliasPct: 0,
+        costoVentasPct: 0,
+      },
+      bd(),
+    );
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.faltanFactores).toBe(false);
+  });
+
+  it('scope por empresa (A9): otra empresa no ve NI candidatos NI descartados', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-A9', false);
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Diagnostico');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesionOtra,
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.candidatos).toHaveLength(0);
+    expect(diagnostico.descartados.map((d) => d.idDesarrollo)).not.toContain(id);
   });
 });
 
 describe('ocultación de importes y scope por empresa (A9)', () => {
-  it('sin consultas.ver-importes, oculta costo/precio y factores', async () => {
+  // ⚠️ Dos rejas DISTINTAS sobre la misma respuesta: los importes se ocultan sin
+  // `consultas.ver-importes`; los cuatro FACTORES, sin `listas.aprobar` (§Post-F9.125(b)). Esta sesión
+  // (`listas.ver` a secas) no tiene ninguna de las dos, así que se apagan las dos cosas. El caso que
+  // de verdad separa las rejas —ver importes pero NO factores— vive en la suite de `editarFactoresLista`.
+  it('sin consultas.ver-importes ni listas.aprobar, oculta costo/precio y factores', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-OCU');
     const lista = await crearLista(
@@ -622,16 +1000,49 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     const idLinea = lista.lineas[0]!.id;
 
     const desglose = await desgloseCostoLinea(sesion(), idLinea, bd());
-    expect(desglose.costoTotal).toBe(40);
-    // Ordenados por el `orden` del catálogo: tela(1) · maquila(3) · corte(8). No hay avíos/bordado.
-    expect(desglose.grupos.map((g) => g.codigo)).toEqual(['tela', 'maquila', 'corte']);
+    expect(desglose.costoTotal).toBe(42.2);
+    // Ordenados por el `orden` del catálogo: tela(1)·maquila(3)·corte(8)·empaque(9). Sin avíos/bordado.
+    expect(desglose.grupos.map((g) => g.codigo)).toEqual(['tela', 'maquila', 'corte', 'empaque']);
     const porCodigo = new Map(desglose.grupos.map((g) => [g.codigo, g.subtotal]));
     expect(porCodigo.get('tela')).toBe(30); // 1.5 × 20
     expect(porCodigo.get('maquila')).toBe(10);
     expect(porCodigo.get('corte')).toBe(0);
+    expect(porCodigo.get('empaque')).toBe(2.2); // ⭐ V1-E8w, la tercera ancla
+
+    /**
+     * ⭐⭐ V1-E8w — **YA NO APLASTA**: cada concepto trae SUS RENGLONES, con `consumo` y `precioUnit`
+     * SEPARADOS. Es lo que Daniel pidió y lo que la mesa no podía ver: *«es importante poner precio
+     * de la tela, y consumo…»* · *«poder abrir el desglose de los costos de los avios… Desglosados»*.
+     * Si el desglose volviera a devolver sólo el subtotal, esto muere.
+     */
+    const tela = desglose.grupos.find((g) => g.codigo === 'tela');
+    expect(tela?.lineas).toHaveLength(1);
+    expect(tela?.lineas[0]?.consumo).toBe(1.5); // ← la perilla del CONSUMO
+    expect(tela?.lineas[0]?.precioUnit).toBe(20); // ← la perilla del PRECIO
+    expect(tela?.lineas[0]?.importe).toBe(30);
+    // Un costo "a secas" no tiene consumo: su precio ES su importe.
+    const maquila = desglose.grupos.find((g) => g.codigo === 'maquila');
+    expect(maquila?.lineas[0]?.consumo).toBeNull();
+    expect(maquila?.lineas[0]?.precioUnit).toBe(10);
   });
 
-  it('sin consultas.ver-importes oculta los subtotales y el total (null), pero da la estructura', async () => {
+  /**
+   * 🔴🔴 **LA REJA DE IMPORTES, RENGLÓN POR RENGLÓN** (ronda de corrección de V1-E8w). El desglose
+   * abierto NO es sólo subtotales desde esta etapa: trae el `precioUnit` y el `importe` de **cada
+   * tela y cada avío**, y ésos son el dato más sensible del módulo. La puerta del endpoint es
+   * `listas.ver`, que en `prisma/seed.ts` lo lleva todo perfil menos `Basico`; el candado del dinero
+   * es `consultas.ver-importes`, que sólo lo llevan Administrador, AdministracionDireccion,
+   * Directivo y Gerencial — o sea que si los ternarios de `desgloseCostoLinea`
+   * se cayeran, el precio de cada material llegaría a Ventas/Logística/Asistente/Secretarial.
+   *
+   * La prueba anterior sólo miraba `costoTotal` y los subtotales: el reviewer quitó los dos
+   * ternarios de los campos NUEVOS y los 2208 tests seguían verdes. Aquí se aseveran los dos lados
+   * de la regla, que es lo que la hace caer por mutación:
+   *   • el DINERO (`precioUnit`/`importe`) sale `null`, y
+   *   • la ESTRUCTURA sí se da (`consumo` NO es null, y las etiquetas se leen) — es deliberado: el
+   *     consumo no es dinero (mismo criterio que el historial de la mesa).
+   */
+  it('sin consultas.ver-importes oculta los subtotales, el total Y el dinero de cada renglón', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-DESG-OCU');
     const lista = await crearLista(
@@ -645,6 +1056,20 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     expect(desglose.costoTotal).toBeNull();
     expect(desglose.grupos.every((g) => g.subtotal === null)).toBe(true);
     expect(desglose.grupos.map((g) => g.codigo)).toContain('tela');
+
+    // 🔴 Ni un solo importe ni un solo precio unitario, en NINGÚN renglón de NINGÚN grupo.
+    const todas = desglose.grupos.flatMap((g) => g.lineas);
+    expect(todas.length).toBeGreaterThan(0);
+    expect(todas.every((l) => l.precioUnit === null)).toBe(true);
+    expect(todas.every((l) => l.importe === null)).toBe(true);
+
+    // …y la ESTRUCTURA sí llega: la tela conserva su consumo (1.5) y su descripción.
+    const tela = desglose.grupos.find((g) => g.codigo === 'tela');
+    expect(tela?.lineas).toHaveLength(1);
+    expect(tela?.lineas[0]?.consumo).toBe(1.5);
+    expect(tela?.lineas[0]?.precioUnit).toBeNull();
+    expect(tela?.lineas[0]?.importe).toBeNull();
+    expect(tela?.lineas[0]?.descripcion).not.toBe('');
   });
 
   it('un renglón de OTRA empresa no existe (A9)', async () => {
@@ -682,6 +1107,46 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
       bd(),
     );
     return { lista, idLinea: lista.lineas[0]!.id, idDesarrollo };
+  }
+
+  /**
+   * ⭐ V1-E8w — una mesa guardada de ejemplo (los mismos números de `negociacion.int.test.ts`): tela
+   * con sus DOS perillas (1.2 × 20) y tres costos a secas ⇒ 34.45.
+   */
+  const MESA_DE_PRUEBA = [
+    {
+      conceptoCodigo: 'tela',
+      conceptoNombre: 'Tela',
+      etiqueta: 'Felpa',
+      consumo: 1.2,
+      precioUnit: 20,
+    },
+    {
+      conceptoCodigo: 'maquila',
+      conceptoNombre: 'Maquila',
+      etiqueta: 'Maquila (estimado: sin cierre)',
+      consumo: null,
+      precioUnit: 5,
+    },
+    {
+      conceptoCodigo: 'avios',
+      conceptoNombre: 'Avíos',
+      etiqueta: 'Jareta más barata',
+      consumo: null,
+      precioUnit: 3.25,
+    },
+    {
+      conceptoCodigo: 'empaque',
+      conceptoNombre: 'Empaque',
+      etiqueta: 'Empaque',
+      consumo: null,
+      precioUnit: 2.2,
+    },
+  ] satisfies RenglonMesa[];
+
+  /** `PERM` NO trae `listas.negociar` (§Post-F9.125 los separa a propósito): guardar la mesa sí. */
+  function sesionQueNegociaListas(): SesionUsuario {
+    return sesion([...PERM, 'listas.negociar']);
   }
 
   it('quitar el renglón LIBERA al desarrollo: ya puede entrar a la lista correcta', async () => {
@@ -772,6 +1237,105 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
     expect(datos.antes.lineas).toHaveLength(1);
   });
 
+  /**
+   * 🔴🔴 **EL DESGLOSE DE LA MESA NO SE PIERDE AL QUITAR EL RENGLÓN** (ronda de corrección de
+   * V1-E8w). `NegociacionEventoCosto` cuelga del evento con `onDelete: Cascade`, así que el borrado
+   * físico del renglón se lo lleva; la bitácora es el ÚNICO sitio donde queda. Fotografiar los
+   * eventos sin sus costos guardaba el total (`costoEstimado: 34.45`) y el comentario, y perdía
+   * *con qué* se llegó a ese total — que es literalmente lo que Daniel pidió que se quedara
+   * (§Post-F9.149: *«Entre los costos que fui dando u los comentarios que voy metiendo es como se
+   * va a armar la nueva receta»*, y *«un total sin desglose no sirve para eso»*).
+   *
+   * ⚠️ MUTACIÓN que la pone roja: quitar el `include: { costos: … }` del `findMany` de
+   * `quitarLineaLista` ⇒ `eventosNegociacion[0].costos` llega `undefined`.
+   */
+  it('🔴 D3: al quitar el renglón, la mesa queda en bitácora CON SU DESGLOSE (no sólo el total)', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-QUITAR-MESA');
+    await guardarMesa(
+      sesionQueNegociaListas(),
+      idLinea,
+      { acuerdo: 'Le quitamos el cierre', renglones: MESA_DE_PRUEBA, precioObjetivo: 92 },
+      bd(),
+    );
+
+    await quitarLineaLista(sesion(), idLinea, bd());
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      eventosNegociacion: {
+        acuerdo: string | null;
+        costoEstimado: number | null;
+        costos?: {
+          conceptoCodigo: string;
+          etiqueta: string;
+          consumo: number | null;
+          precioUnit: number;
+          importe: number;
+        }[];
+      }[];
+    };
+    expect(datos.operacion).toBe('quitar-linea');
+    expect(datos.eventosNegociacion).toHaveLength(1);
+    const evento = datos.eventosNegociacion[0]!;
+    expect(evento.acuerdo).toBe('Le quitamos el cierre');
+    expect(evento.costoEstimado).toBe(34.45); // 1.2×20 + 5 + 3.25 + 2.20
+    // 🔴 EL DESGLOSE, renglón por renglón: sin el `include` esto es `undefined`.
+    expect(evento.costos).toHaveLength(4);
+    expect(evento.costos?.[0]).toMatchObject({
+      conceptoCodigo: 'tela',
+      etiqueta: 'Felpa',
+      consumo: 1.2,
+      precioUnit: 20,
+      importe: 24,
+    });
+    expect(evento.costos?.map((c) => c.etiqueta)).toEqual([
+      'Felpa',
+      'Maquila (estimado: sin cierre)',
+      'Jareta más barata',
+      'Empaque',
+    ]);
+    // Números, no cadenas (los `Decimal` pasan por `aJsonBitacora`).
+    expect(typeof evento.costos?.[0]?.importe).toBe('number');
+    // Y en la base ya no queda nada: la bitácora es el único rastro.
+    expect(await cliente.negociacionEventoCosto.count()).toBe(0);
+  });
+
+  /** El mismo agujero por la otra puerta: borrar la LISTA entera también arrastra los costos. */
+  it('🔴 D3: al BORRAR la lista, la mesa de cada renglón queda con su desglose', async () => {
+    const { lista, idLinea } = await listaConUnRenglon('MOD-BORRAR-MESA');
+    await guardarMesa(
+      sesionQueNegociaListas(),
+      idLinea,
+      { acuerdo: 'Así quedó', renglones: MESA_DE_PRUEBA, precioObjetivo: 92 },
+      bd(),
+    );
+
+    await eliminarLista(sesion(), lista.id, bd());
+
+    const registro = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = registro.datos as {
+      operacion: string;
+      antes: {
+        eventosNegociacion: {
+          costos?: { etiqueta: string; consumo: number | null; importe: number }[];
+        }[];
+      };
+    };
+    expect(datos.operacion).toBe('eliminar-lista');
+    expect(datos.antes.eventosNegociacion).toHaveLength(1);
+    const costos = datos.antes.eventosNegociacion[0]!.costos;
+    expect(costos).toHaveLength(4);
+    expect(costos?.[0]).toMatchObject({ etiqueta: 'Felpa', consumo: 1.2, importe: 24 });
+    expect(await cliente.negociacionEventoCosto.count()).toBe(0);
+  });
+
   it('una lista en estado de CIERRE no se toca (hay que reabrirla primero)', async () => {
     const { lista, idLinea } = await listaConUnRenglon('MOD-CERRADA');
     const cerrada = await cliente.estadoLista.findFirstOrThrow({ where: { codigo: 'cerrada' } });
@@ -801,5 +1365,164 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
 
     await expect(quitarLineaLista(soloVer, idLinea, bd())).rejects.toThrow(ErrorPermiso);
     await expect(eliminarLista(soloVer, lista.id, bd())).rejects.toThrow(ErrorPermiso);
+  });
+});
+
+// ── ⭐ V1-E8d (§Post-F9.127): EL AVISO DE QUE EL COSTO QUEDÓ VIEJO ─────────────────────
+//
+// Daniel: *"Si. Ok. Que me avise."* El renglón guarda un precosto CONGELADO (inmutable, D3), así
+// que cambiar la receta del modelo NO lo mueve: hay que congelar una versión nueva y registrar una
+// ronda, las dos a mano. Estas pruebas recorren el ciclo COMPLETO contra Postgres, por las PUERTAS
+// REALES —el PUT de telas del BOM y el editor del modelo—, porque el agujero sólo aparece
+// recorriéndolas en orden.
+//
+// ⚠️ NO SE CORRIERON EN LOCAL (Docker: regla del proyecto). Viajan al CI, que es el único juez.
+
+describe('⭐ V1-E8d — avisar cuando la receta cambia bajo un precio ya aprobado', () => {
+  /** Sesión que además puede mover la RECETA (el permiso de modelos, distinto del de listas). */
+  function sesionConModelos(): SesionUsuario {
+    return sesion([...PERM, 'modelos.ver', 'modelos.administrar']);
+  }
+
+  /**
+   * Sesión que además puede NEGOCIAR (`listas.negociar`), que es lo que exige `registrarRonda`.
+   *
+   * 🔴 Lo cazó el CI: `PERM` —la sesión "completa" de este archivo— NO lo trae, así que la prueba
+   * del recosteo moría con `ErrorPermiso` **antes** de comprobar que el aviso se apaga. Un fixture
+   * que revienta es una prueba que nunca corrió.
+   *
+   * ⚠️ Va aparte y NO se mete a `PERM`: aprobar un precio y negociarlo son permisos distintos a
+   * propósito (§Post-F9.125 los separa), y ensancharlos a todos borraría esa distinción de los
+   * demás casos de este archivo.
+   */
+  function sesionQueNegocia(): SesionUsuario {
+    return sesion([...PERM, 'listas.negociar']);
+  }
+
+  /** Crea desarrollo + lista con el renglón YA APROBADO. Devuelve los ids que hacen falta. */
+  async function listaAprobada(codigoModelo: string): Promise<{
+    idLista: number;
+    idLinea: number;
+    idModelo: number;
+    idDesarrollo: number;
+  }> {
+    await sembrarFactores();
+    const idDesarrollo = await desarrolloConPrecosto(codigoModelo);
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    const desarrollo = await cliente.desarrollo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { idModelo: true },
+    });
+    return { idLista: lista.id, idLinea, idModelo: desarrollo.idModelo, idDesarrollo };
+  }
+
+  it('⭐ LA PRUEBA DE LA ETAPA: aprobar el precio → tocar la RECETA → el sistema lo dice', async () => {
+    const { idLista, idModelo } = await listaAprobada('MOD-CV1');
+
+    // Antes de tocar nada, el renglón está limpio: el aviso no se enciende solo.
+    const antes = await obtenerLista(sesion(), idLista, bd());
+    expect(antes.lineas[0]!.avisoCostoViejo).toBeNull();
+    expect(antes.lineas[0]!.aprobado).toBe(true);
+
+    // Se le cambia el CONSUMO de la tela por la puerta REAL del BOM (no tocando la columna a mano).
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    const aviso = despues.lineas[0]!.avisoCostoViejo;
+    expect(aviso).not.toBeNull();
+    // Dice QUÉ cambió y que hay una firma en pie sobre ese costo — no un símbolo mudo.
+    expect(aviso).toContain('las TELAS');
+    expect(aviso).toContain('APROBADO');
+    // Y es un AVISO, no un candado: la firma NO se cayó (§Post-F9.127).
+    expect(despues.lineas[0]!.aprobado).toBe(true);
+    expect(despues.lineas[0]!.precioAprobado).toBe(106);
+  });
+
+  it('⭐ SU GEMELA: tocar algo que NO es la receta (renombrar el modelo) NO dispara nada', async () => {
+    // Ésta es la prueba que separa la opción (B) de la (A) y justifica la columna nueva. Con
+    // `Modelo.modificadoEn` —que es `@updatedAt`— esta línea saldría ROJA: renombrar mueve la
+    // fecha igual que cambiar una tela, y el aviso nacería gritando en falso.
+    const { idLista, idModelo } = await listaAprobada('MOD-CV2');
+
+    await actualizarModelo(
+      sesionConModelos(),
+      { id: idModelo, descripcion: 'Jogger felpa — nombre corregido' },
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toBeNull();
+  });
+
+  it('recostear (congelar versión nueva + ronda) APAGA el aviso: no hay estado muerto', async () => {
+    const { idLista, idLinea, idModelo, idDesarrollo } = await listaAprobada('MOD-CV3');
+
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+    expect((await obtenerLista(sesion(), idLista, bd())).lineas[0]!.avisoCostoViejo).not.toBeNull();
+
+    // El camino que el aviso pide: versión nueva congelada + ronda que re-apunta el renglón.
+    const nuevo = await generarPrecosto(sesion(), idDesarrollo, bd());
+    await congelarVersion(sesion(), nuevo.id, bd());
+    await registrarRonda(
+      sesionQueNegocia(),
+      idLinea,
+      { idPrecostoNuevo: nuevo.id, acuerdo: 'Recosteo por cambio de consumo de tela' },
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toBeNull();
+    // Y la ronda hizo lo suyo desde F8-E5: el precio se re-aprueba.
+    expect(despues.lineas[0]!.aprobado).toBe(false);
+  });
+
+  it('un renglón SIN aprobar también avisa, para que no se firme sobre el costo viejo', async () => {
+    await sembrarFactores();
+    const idDesarrollo = await desarrolloConPrecosto('MOD-CV4');
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    const { idModelo } = await cliente.desarrollo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { idModelo: true },
+    });
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), lista.id, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toContain('antes de aprobar');
   });
 });

@@ -33,6 +33,8 @@ const VALORES_INICIALES: DatosEmpresaFormulario = {
   nombre: '',
   razonSocial: '',
   rfc: '',
+  regimenFiscalSat: '',
+  codigoPostalFiscal: '',
   identificador: '',
 };
 
@@ -52,7 +54,9 @@ function texto(valor: string | null): string {
 
 /**
  * Dialogo de alta y edicion de empresa (react-hook-form + Zod). Captura nombre,
- * razon social, RFC (fiscal, F9-E3), identificador (folios) y las banderas
+ * razon social, RFC (fiscal, F9-E3), regimen fiscal y CP fiscal (fila 0.118:
+ * lo que el CFDI 4.0 exige del RECEPTOR, sin lo cual el proveedor no puede
+ * timbrar a su nombre), identificador (folios) y las banderas
  * favorita/IPT/EDR. Si recibe una `empresa` edita (PATCH); si no, da de alta
  * (POST). La validacion de captura es solo UX: el backend re-valida y es la
  * autoridad (A1).
@@ -89,6 +93,8 @@ export function DialogoEmpresa({
         nombre: empresa.nombre,
         razonSocial: texto(empresa.razonSocial),
         rfc: texto(empresa.rfc),
+        regimenFiscalSat: texto(empresa.regimenFiscalSat),
+        codigoPostalFiscal: texto(empresa.codigoPostalFiscal),
         identificador: texto(empresa.identificador),
       });
       setBanderas({
@@ -115,6 +121,11 @@ export function DialogoEmpresa({
     if (datos.rfc.length > 0) {
       cuerpo.rfc = datos.rfc;
     }
+    // ⭐ Van SIEMPRE (aunque vengan vacíos) para que borrar el campo en pantalla lo borre de verdad:
+    // el backend traduce '' a NULL. Si sólo se mandaran con contenido, un dato fiscal capturado por
+    // error no se podría quitar nunca — y este par decide si el documento para facturar se emite.
+    cuerpo.regimenFiscalSat = datos.regimenFiscalSat;
+    cuerpo.codigoPostalFiscal = datos.codigoPostalFiscal;
     if (datos.identificador.length > 0) {
       cuerpo.identificador = datos.identificador;
     }
@@ -215,6 +226,40 @@ export function DialogoEmpresa({
                     Con el que la empresa emite y recibe CFDI (F9).
                   </FieldDescription>
                   <FieldError errors={[errors.rfc]} />
+                </Field>
+
+                {/* ⭐ Fila 0.118: los dos datos que el CFDI 4.0 exige del RECEPTOR. Sin ellos, el
+                    documento para facturar NO se emite y avisa que faltan. */}
+                <Field data-invalid={Boolean(errors.regimenFiscalSat)}>
+                  <FieldLabel htmlFor="empresa-regimen">Régimen fiscal</FieldLabel>
+                  <Input
+                    id="empresa-regimen"
+                    placeholder="Ej. 601"
+                    aria-invalid={Boolean(errors.regimenFiscalSat)}
+                    disabled={guardando}
+                    {...formulario.register('regimenFiscalSat')}
+                  />
+                  <FieldDescription>
+                    Clave del catálogo del SAT. Va en el documento con el que los proveedores nos
+                    facturan.
+                  </FieldDescription>
+                  <FieldError errors={[errors.regimenFiscalSat]} />
+                </Field>
+
+                <Field data-invalid={Boolean(errors.codigoPostalFiscal)}>
+                  <FieldLabel htmlFor="empresa-cp-fiscal">Código postal fiscal</FieldLabel>
+                  <Input
+                    id="empresa-cp-fiscal"
+                    placeholder="Ej. 11000"
+                    inputMode="numeric"
+                    aria-invalid={Boolean(errors.codigoPostalFiscal)}
+                    disabled={guardando}
+                    {...formulario.register('codigoPostalFiscal')}
+                  />
+                  <FieldDescription>
+                    Del domicilio fiscal (5 dígitos). El CFDI 4.0 lo exige del receptor.
+                  </FieldDescription>
+                  <FieldError errors={[errors.codigoPostalFiscal]} />
                 </Field>
               </FieldGroup>
             </FieldSet>

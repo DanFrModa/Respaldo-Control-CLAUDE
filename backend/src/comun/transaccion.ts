@@ -32,6 +32,13 @@ import { prisma, type Prisma, type PrismaClient } from '../datos/index.js';
 export type Tx = Prisma.TransactionClient;
 
 /**
+ * Lo que devuelve {@link clienteLectura}: un cliente que sirve para CONSULTAR, esté o no dentro de
+ * una transacción. Los lectores puros lo piden en vez de `Tx` para no obligar a abrir una
+ * transacción sólo para leer.
+ */
+export type ClienteLectura = Tx | PrismaClient;
+
+/**
  * Contexto de base de datos que aceptan los servicios de dominio como último
  * parámetro (opcional). Permite componer transacciones y apuntar los tests de
  * integración al Postgres efímero sin tocar el singleton.
@@ -88,6 +95,6 @@ export async function enTransaccion<T>(
  * transacción: la transacción del llamador si existe, si no su cliente, si no
  * el singleton. Las escrituras NUNCA usan esto directo — van por `enTransaccion`.
  */
-export function clienteLectura(bd?: ContextoBd): Tx | PrismaClient {
+export function clienteLectura(bd?: ContextoBd): ClienteLectura {
   return bd?.tx ?? bd?.cliente ?? prisma;
 }

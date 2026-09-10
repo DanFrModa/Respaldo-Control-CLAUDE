@@ -69,6 +69,8 @@ async function sembrarConceptos(): Promise<void> {
     { codigo: 'estampado', nombre: 'Estampado', orden: 4, fijo: false },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
     { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+    // ⭐ V1-E8w: EMPAQUE, la tercera ancla fija — sin él `generarPrecosto` truena.
+    { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
   ];
   for (const c of base) {
     await cliente.conceptoCosto.create({ data: c });
@@ -140,8 +142,9 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
 
     expect(precosto.estado).toBe('borrador');
     expect(precosto.version).toBe(1);
-    // 1.5×25 (amarre) + 2×5 (amarre caro) + 8 maquila = 55.5
-    expect(precosto.costoTotal).toBe(55.5);
+    // 1.5×25 (amarre) + 2×5 (amarre caro) + 8 maquila + 2.20 de EMPAQUE (V1-E8w, la tercera ancla
+    // fija: nace en TODO precosto nuevo con el default de la empresa) = 57.70.
+    expect(precosto.costoTotal).toBe(57.7);
 
     const tTela = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
     expect(tTela?.importe).toBe(37.5);
@@ -320,22 +323,31 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     expect(linea?.idAvioProveedor).toBeNull(); // el precio salió de las medidas, no de un proveedor
   });
 
-  it('el avío con FACTOR DE CONVERSIÓN no descuadra precio e importe (la cascada DIVIDE)', async () => {
-    // R1: el avío se compra por caja/rollo y se consume por pieza → la cascada hace `precio ÷ factor`
-    // y devuelve decimales infinitos ($100 la caja de 144 = 0.694444…). El precio se guarda en
-    // `Decimal(12,2)` (0.69), así que el importe TIENE que calcularse con ese 0.69: si se calculara
-    // con el crudo daría 4.17 y la fila mostraría 0.69 × 6 = 4.14 al lado. Tres centavos, y ese
-    // importe entra al `costoTotal` que se persiste al congelar.
+  it('un precio de COLA LARGA no descuadra precio e importe (el promedio de medidas DIVIDE)', async () => {
+    // ⚠️ §Post-F9.97 — De dónde sale hoy la cola larga. Este caso se escribió para el «factor de
+    // conversión» ($100 la caja de 144 = 0.694444…), que se retiró en V1-E8a: todos los precios de
+    // proveedor son `Decimal(12,2)` y la cascada ya no divide por nada. El divisor que SÍ queda vivo
+    // es el PROMEDIO de las medidas del avío "por medida" (R5/B11), y el riesgo es el mismo: el
+    // precio se guarda en `Decimal(12,2)`, así que el importe TIENE que calcularse con el precio YA
+    // redondeado. (1 + 1 + 1.10) / 3 = 1.033333… → 1.03; con consumo 6 el importe es 6.18. Si se
+    // calculara con el crudo daría 6.20 y la fila mostraría 1.03 al lado de 6.20 — dos centavos que
+    // entran al `costoTotal` que se persiste al congelar y de ahí al precio del cliente.
     const avio: Avio = await cliente.avio.create({
-      data: { clave: 'BOT-CAJA', descripcion: 'Botón por caja' },
-    });
-    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Botones por caja' } });
-    await cliente.avioProveedor.create({
-      data: { idAvio: avio.id, idProveedor: proveedor.id, precio: 100, factorConversion: 144 },
+      data: {
+        clave: 'BOT-COLA',
+        descripcion: 'Botón por medida',
+        medidas: {
+          create: [
+            { medida: 'ch', precio: 1 },
+            { medida: 'md', precio: 1 },
+            { medida: 'gd', precio: 1.1 },
+          ],
+        },
+      },
     });
     const modelo = await cliente.modelo.create({
       data: {
-        codigo: 'FACTOR',
+        codigo: 'COLA-LARGA',
         maquilaBase: 0,
         avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 6 }] },
       },
@@ -345,8 +357,8 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
 
     const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
-    expect(linea?.precioUnit).toBe(0.69); // 100 ÷ 144 = 0.694444… → 0.69
-    expect(linea?.importe).toBe(4.14); // 6 × 0.69 — NO 4.17 (que sale del precio crudo)
+    expect(linea?.precioUnit).toBe(1.03); // 3.10 ÷ 3 = 1.033333… → 1.03
+    expect(linea?.importe).toBe(6.18); // 6 × 1.03 — NO 6.20 (que sale del precio crudo)
     expect(linea?.importe).toBe(redondear2((linea?.consumo ?? 0) * (linea?.precioUnit ?? 0)));
   });
 });
@@ -543,7 +555,7 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     });
 
     let precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
-    expect(precosto.costoTotal).toBe(26); // 2×10 tela + 6 maquila
+    expect(precosto.costoTotal).toBe(28.2); // 2×10 tela + 6 maquila + 2.20 empaque (V1-E8w)
 
     // Agrega un manual (estampado) con consumo → importe = consumo × precio.
     precosto = await agregarLineaManual(
@@ -555,13 +567,13 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     const manual = precosto.lineas.find((l) => l.conceptoCodigo === 'estampado');
     expect(manual?.importe).toBe(4);
     expect(manual?.eliminable).toBe(true);
-    expect(precosto.costoTotal).toBe(30);
+    expect(precosto.costoTotal).toBe(32.2); // 28.20 + 4 del estampado manual
 
     // Edita la maquila (renglón fijo, editable).
     const maquila = precosto.lineas.find((l) => l.conceptoCodigo === 'maquila');
     precosto = await editarLinea(sesion(), precosto.id, maquila!.id, { precioUnit: 9 }, bd());
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'maquila')?.importe).toBe(9);
-    expect(precosto.costoTotal).toBe(33); // 20 tela + 9 maquila + 4 estampado
+    expect(precosto.costoTotal).toBe(35.2); // 20 tela + 9 maquila + 4 estampado + 2.20 empaque
 
     // Sube el precio de la tela en catálogo y RECALCULA: el BOM cambia, los manuales sobreviven.
     await cliente.tela.update({ where: { id: tela.id }, data: { precioSugerido: 15 } });
@@ -569,15 +581,17 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.importe).toBe(30); // 2×15
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'maquila')?.importe).toBe(9); // NO pisado
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'estampado')?.importe).toBe(4); // NO pisado
-    expect(precosto.costoTotal).toBe(43); // 30 + 9 + 4
+    // ⭐ V1-E8w: el ancla de EMPAQUE es `manual`, así que recalcular tampoco la pisa.
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(2.2);
+    expect(precosto.costoTotal).toBe(45.2); // 30 + 9 + 4 + 2.20
 
     // Quita el manual (no ancla).
     precosto = await eliminarLinea(sesion(), precosto.id, manual!.id, bd());
     expect(precosto.lineas.some((l) => l.conceptoCodigo === 'estampado')).toBe(false);
-    expect(precosto.costoTotal).toBe(39);
+    expect(precosto.costoTotal).toBe(41.2);
   });
 
-  it('rechaza agregar un manual bajo un concepto ANCLA (maquila/corte); tela/avíos SÍ se pueden (B12)', async () => {
+  it('rechaza agregar un manual bajo un concepto ANCLA (maquila/corte/empaque); tela/avíos SÍ se pueden (B12)', async () => {
     const modelo = await cliente.modelo.create({ data: { codigo: 'B1', maquilaBase: 5 } });
     const idProyecto = await proyectoNuevo();
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
@@ -603,6 +617,18 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
         sesion(),
         precosto.id,
         { idConceptoCosto: conceptoCorte.id, precioUnit: 10 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // ⭐ V1-E8w: EMPAQUE es la TERCERA ancla y se comporta igual que sus dos hermanas.
+    const conceptoEmpaque = await cliente.conceptoCosto.findFirstOrThrow({
+      where: { codigo: 'empaque' },
+    });
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        precosto.id,
+        { idConceptoCosto: conceptoEmpaque.id, precioUnit: 3 },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
@@ -723,6 +749,163 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
   });
 });
 
+/**
+ * ⭐⭐ V1-E8w (§Post-F9.153) — EL COSTO DE EMPAQUE, la TERCERA ancla fija. Daniel, textual:
+ *
+ * > *«nos falto meter el costo del empaque. Es un campo adicional…. como si fuera corte»*
+ * > *«el empaque no es de catalogo…. es simplemente un campo que casi siempre es el mismo costo»*
+ * > *«Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar»*
+ *
+ * Lo que estas pruebas fijan, y que es lo que se le dijo a Daniel: el 2.20 **NO está clavado en el
+ * código** (vive en `ConfiguracionEmpresa`, se cambia sin deploy), y **cambiarlo NO toca ninguna
+ * receta ya hecha** — ni un borrador anterior ni, muchísimo menos, un congelado.
+ */
+describe('⭐ el ancla de EMPAQUE (V1-E8w, §Post-F9.153)', () => {
+  /** Fija (o crea) el costo de empaque de la empresa de pruebas. */
+  async function fijarEmpaqueDeEmpresa(valor: number): Promise<void> {
+    await cliente.configuracionEmpresa.upsert({
+      where: { idEmpresa: empresa.id },
+      create: { idEmpresa: empresa.id, costoEmpaqueBase: valor },
+      update: { costoEmpaqueBase: valor },
+    });
+  }
+
+  it('todo precosto NUEVO nace con su renglón de empaque, editable pero NO eliminable', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'EMP-1', maquilaBase: 10 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const empaque = precosto.lineas.find((l) => l.conceptoCodigo === 'empaque');
+    expect(empaque).toBeDefined();
+    expect(empaque?.origen).toBe('manual');
+    expect(empaque?.descripcion).toBe('Empaque');
+    expect(empaque?.consumo).toBeNull();
+    // Sin fila de configuración manda el default de respaldo, que ES el de la migración.
+    expect(empaque?.importe).toBe(2.2);
+    // Editable pero NO eliminable: exactamente el trato de maquila y corte.
+    expect(empaque?.editable).toBe(true);
+    expect(empaque?.eliminable).toBe(false);
+    await expect(eliminarLinea(sesion(), precosto.id, empaque!.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // Y sí se edita ("y ya si cambia, que se pueda modificar").
+    const editado = await editarLinea(
+      sesion(),
+      precosto.id,
+      empaque!.id,
+      { precioUnit: 3.5 },
+      bd(),
+    );
+    expect(editado.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(3.5);
+  });
+
+  /**
+   * 🔴 **EL 2.20 NO ESTÁ CLAVADO EN EL CÓDIGO.** Si lo estuviera, mover la configuración no cambiaría
+   * nada y esta prueba moriría — que es justo el defecto que se prometió que no existiría.
+   */
+  it('🔴 el default sale de `ConfiguracionEmpresa`, NO del código: se cambia sin deploy', async () => {
+    await fijarEmpaqueDeEmpresa(2.5);
+    const modelo = await cliente.modelo.create({ data: { codigo: 'EMP-2', maquilaBase: 10 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(2.5);
+    expect(precosto.costoTotal).toBe(12.5); // 10 de maquila + 2.50 de empaque
+  });
+
+  /**
+   * 🔴🔴 **CAMBIAR EL DEFAULT NO TOCA NINGUNA RECETA YA HECHA.** Es la promesa exacta que se le hizo
+   * a Daniel, y la que más caro costaría romper: un precosto CONGELADO es la foto de lo que se
+   * cotizó (D3), y un borrador anterior es trabajo en curso que nadie pidió reescribir. Se prueba
+   * con las dos —congelado y borrador— y además con un `recalcularDesdeBom` de por medio, que es
+   * justo la operación que uno sospecharía capaz de pisarlo.
+   */
+  it('🔴 subir el empaque NO mueve un precosto congelado NI un borrador anterior', async () => {
+    await fijarEmpaqueDeEmpresa(2.2);
+    const tela = await cliente.tela.create({ data: { nombre: 'Felpa EMP', precioSugerido: 10 } });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'EMP-3',
+        maquilaBase: 10,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+
+    // v1 CONGELADA con el empaque de $2.20 → 20 + 10 + 2.20 = 32.20.
+    const v1 = await congelarVersion(
+      sesion(),
+      (await generarPrecosto(sesion(), desarrollo.id, bd())).id,
+      bd(),
+    );
+    expect(v1.costoTotal).toBe(32.2);
+
+    // v2 en BORRADOR, también con $2.20.
+    const v2 = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(v2.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(2.2);
+
+    // El empaque SUBE a $2.50 (Daniel lo cambia en Administración › Empresas, sin deploy).
+    await fijarEmpaqueDeEmpresa(2.5);
+
+    // La v1 congelada: intacta, en la BD y en lo que lee el API.
+    const v1EnBd = await cliente.precosto.findUniqueOrThrow({ where: { id: v1.id } });
+    expect(v1EnBd.costoTotal?.toNumber()).toBe(32.2);
+    expect((await obtenerPrecosto(sesion(), v1.id, bd())).costoTotal).toBe(32.2);
+
+    // El borrador v2: tampoco se mueve, ni siquiera recalculando desde el BOM (el recalcular
+    // regenera los renglones de BOM y NUNCA toca los `manual`, que es donde vive el empaque).
+    const v2Recalculado = await recalcularDesdeBom(sesion(), v2.id, bd());
+    expect(v2Recalculado.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(2.2);
+    expect(v2Recalculado.costoTotal).toBe(32.2);
+
+    // Sólo la receta NUEVA estrena el precio nuevo.
+    await congelarVersion(sesion(), v2.id, bd());
+    const v3 = await generarPrecosto(sesion(), desarrollo.id, bd());
+    expect(v3.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe).toBe(2.5);
+  });
+
+  /**
+   * 🔴 **Un borrador que NACIÓ SIN EMPAQUE tiene que poder ponérselo.** Es el caso real de todos los
+   * borradores anteriores a esta versión: la regla vieja vetaba el CONCEPTO, no el duplicado, así
+   * que los habría dejado sin salida (recalcular tampoco los toca). La regla real es "ÚNICO por
+   * precosto", y con ella el hueco se llena y el duplicado se sigue rechazando.
+   */
+  it('🔴 un borrador SIN el ancla puede recibirla a mano; una SEGUNDA se rechaza', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'EMP-4', maquilaBase: 10 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const concepto = await cliente.conceptoCosto.findFirstOrThrow({ where: { codigo: 'empaque' } });
+
+    // Se simula el borrador viejo: se borra su renglón de empaque directo en BD (por dominio no se
+    // puede — es ancla, y eso es justo lo que garantiza que este caso sólo venga del pasado).
+    const empaque = precosto.lineas.find((l) => l.conceptoCodigo === 'empaque')!;
+    await cliente.precostoLinea.delete({ where: { id: empaque.id } });
+
+    const conEmpaque = await agregarLineaManual(
+      sesion(),
+      precosto.id,
+      { idConceptoCosto: concepto.id, descripcion: 'Empaque', precioUnit: 2.2 },
+      bd(),
+    );
+    expect(conEmpaque.lineas.filter((l) => l.conceptoCodigo === 'empaque')).toHaveLength(1);
+
+    // Y la SEGUNDA se sigue rechazando: la regla es ÚNICO por precosto, no "manga ancha".
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        precosto.id,
+        { idConceptoCosto: concepto.id, precioUnit: 2.2 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+});
+
 describe('congelado inmutable + estado del desarrollo', () => {
   it('congelar persiste el costoTotal y bloquea todo cambio posterior; el desarrollo pasa a "cotizado"', async () => {
     const modelo = await cliente.modelo.create({ data: { codigo: 'FRIO', maquilaBase: 7 } });
@@ -738,11 +921,11 @@ describe('congelado inmutable + estado del desarrollo', () => {
     expect(congelado.congelado).toBe(true);
     expect(congelado.congeladoEn).not.toBeNull();
     expect(congelado.congeladoPorId).toBe('usuario-prueba');
-    expect(congelado.costoTotal).toBe(7);
+    expect(congelado.costoTotal).toBe(9.2); // + 2.20 del ancla de EMPAQUE (V1-E8w)
 
     // Persistió en BD.
     const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
-    expect(enBd.costoTotal?.toNumber()).toBe(7);
+    expect(enBd.costoTotal?.toNumber()).toBe(9.2);
 
     // Inmutable: recalcular/editar/agregar/eliminar/congelar de nuevo → ErrorConflicto (los 5).
     const maquila = congelado.lineas.find((l) => l.conceptoCodigo === 'maquila')!;
@@ -797,9 +980,15 @@ describe('congelado inmutable + estado del desarrollo', () => {
     const idProyecto = await proyectoNuevo();
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
     const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    // ⭐ V1-E8w: el ancla de EMPAQUE nace con el default de la empresa (2.20), así que un modelo sin
+    // receta ya NO suma cero por sí solo. Se pone a mano en 0 para reproducir el caso que la guarda
+    // tiene que atajar — que es lo que se está probando, no el default del empaque.
+    const empaque = borrador.lineas.find((l) => l.conceptoCodigo === 'empaque')!;
+    await editarLinea(sesion(), borrador.id, empaque.id, { precioUnit: 0 }, bd());
+    const enCero = await obtenerPrecosto(sesion(), borrador.id, bd());
     // Tiene renglones (las anclas) pero todos en 0: la guarda vieja lo dejaba pasar.
-    expect(borrador.lineas.length).toBeGreaterThan(0);
-    expect(borrador.lineas.every((l) => l.importe === 0)).toBe(true);
+    expect(enCero.lineas.length).toBeGreaterThan(0);
+    expect(enCero.lineas.every((l) => l.importe === 0)).toBe(true);
 
     await expect(congelarVersion(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
@@ -809,6 +998,64 @@ describe('congelado inmutable + estado del desarrollo', () => {
     const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
     expect(enBd.estado).toBe('borrador');
     expect(enBd.congeladoEn).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ EL DEFECTO DE LA 0.060, de punta a punta (candado del 31-ago-2026). Al entrar el EMPAQUE
+   * como tercera ancla, `generarPrecosto` empezó a poner su default ($2.20) en TODO precosto nuevo:
+   * el de un modelo sin receta y sin costos capturados dejó de sumar $0.00 y **la guarda del total
+   * lo dejaba pasar**. Se congelaba INMUTABLE (D3) y de ahí salía el precio al cliente: la prenda
+   * cotizada al costo de su bolsa. Ojo al test de arriba — para reproducir el cero tuvo que poner
+   * el empaque en 0 A MANO; esa gimnasia era justamente la señal de que el caso REAL (el empaque en
+   * su valor de fábrica) se había quedado sin candado.
+   */
+  it('⭐ NO congela un precosto cuyo ÚNICO importe es el ancla AUTOMÁTICA de empaque', async () => {
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'SOLO-EMPAQUE', maquilaBase: 0, corteBase: 0 },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    // NO suma cero —el empaque lo sostiene solito—, así que la guarda del total no lo ataja: el
+    // precosto entero vale lo que su bolsa.
+    const empaque = borrador.lineas.find((l) => l.conceptoCodigo === 'empaque');
+    const importeEmpaque = empaque?.importe ?? 0;
+    expect(importeEmpaque).toBeGreaterThan(0);
+    expect(borrador.costoTotal).toBe(importeEmpaque);
+    expect(borrador.lineas.every((l) => l.conceptoCodigo === 'empaque' || l.importe === 0)).toBe(
+      true,
+    );
+
+    await expect(congelarVersion(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+
+    // Sigue siendo BORRADOR: no quedó nada sellado a medias.
+    const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
+    expect(enBd.estado).toBe('borrador');
+    expect(enBd.congeladoEn).toBeNull();
+  });
+
+  /**
+   * ⚠️ LO QUE NO SE PUEDE ROMPER: hay modelos que se costean POR PROCESO (maquila + corte) y cuya
+   * receta está vacía a propósito — no toda prenda lleva BOM. Ése congela normal: el candado pide
+   * CONTENIDO capturado, no un BOM.
+   */
+  it('maquila y corte capturados SIN receta: el precosto sí congela (costeo por proceso)', async () => {
+    const modelo = await cliente.modelo.create({
+      data: { codigo: 'SIN-BOM', maquilaBase: 18, corteBase: 3.5 },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const importeEmpaque =
+      borrador.lineas.find((l) => l.conceptoCodigo === 'empaque')?.importe ?? 0;
+
+    const congelado = await congelarVersion(sesion(), borrador.id, bd());
+
+    expect(congelado.estado).toBe('congelado');
+    expect(congelado.costoTotal).toBe(redondear2(18 + 3.5 + importeEmpaque));
   });
 
   it('con el costo capturado (aunque sea un centavo), el mismo precosto SÍ congela', async () => {
@@ -822,7 +1069,7 @@ describe('congelado inmutable + estado del desarrollo', () => {
     const congelado = await congelarVersion(sesion(), borrador.id, bd());
 
     expect(congelado.estado).toBe('congelado');
-    expect(congelado.costoTotal).toBe(0.01);
+    expect(congelado.costoTotal).toBe(2.21); // 0.01 de maquila + 2.20 del ancla de EMPAQUE
   });
 });
 
@@ -1056,18 +1303,18 @@ describe('V1-E3e — el precosto valúa con la ÚLTIMA COMPRA REAL (§Post-F9.48
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
     const borrador = await generarPrecosto(sesion(), desarrollo.id, bd());
     const congelado = await congelarVersion(sesion(), borrador.id, bd());
-    expect(congelado.costoTotal).toBe(70); // 2 × 30 + 10 de maquila
+    expect(congelado.costoTotal).toBe(72.2); // 2 × 30 + 10 de maquila + 2.20 de empaque
 
     // Pasa el tiempo y la tela SUBE: nueva compra autorizada, mucho más cara.
     await compra({ idProveedor: prov.id, fecha: '2026-09-09', precio: 55, idTela: tela.id });
 
     // La FOTO no se mueve: ni el total persistido, ni el renglón, ni lo que se lee del API.
     const releido = await obtenerPrecosto(sesion(), borrador.id, bd());
-    expect(releido.costoTotal).toBe(70);
+    expect(releido.costoTotal).toBe(72.2);
     expect(releido.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(30);
     expect(releido.lineas.find((l) => l.conceptoCodigo === 'tela')?.importe).toBe(60);
     const enBd = await cliente.precosto.findUniqueOrThrow({ where: { id: borrador.id } });
-    expect(enBd.costoTotal?.toNumber()).toBe(70);
+    expect(enBd.costoTotal?.toNumber()).toBe(72.2);
     // Y sigue siendo inmutable (D3): recalcularlo con el precio nuevo es imposible.
     await expect(recalcularDesdeBom(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
@@ -1075,7 +1322,7 @@ describe('V1-E3e — el precosto valúa con la ÚLTIMA COMPRA REAL (§Post-F9.48
 
     // La versión NUEVA sí toma el precio nuevo: es exactamente lo que Daniel pidió.
     const v2 = await generarPrecosto(sesion(), desarrollo.id, bd());
-    expect(v2.costoTotal).toBe(120); // 2 × 55 + 10
+    expect(v2.costoTotal).toBe(122.2); // 2 × 55 + 10 + 2.20 de empaque
   });
 
   it('A9: una compra de OTRA empresa no cambia el precosto de ésta', async () => {

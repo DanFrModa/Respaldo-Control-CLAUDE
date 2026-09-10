@@ -24,6 +24,7 @@ import {
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
@@ -52,6 +53,8 @@ export interface AdjuntoDesarrolloConUrl {
   tamanoBytes: number;
   urlDescarga: string;
   subidoPorId: string | null;
+  /** Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo). */
+  nombreSubidoPor: string | null;
   creadoEn: Date;
 }
 
@@ -160,6 +163,12 @@ export async function listarAdjuntos(
     },
   });
 
+  // Los nombres de quienes subieron, en UNA consulta para todos los adjuntos (nunca uno por fila).
+  const nombrePorId = await nombresDeUsuarios(
+    cliente,
+    adjuntos.map((a) => a.archivo.subidoPorId),
+  );
+
   return Promise.all(
     adjuntos.map(async (adjunto) => ({
       idArchivo: adjunto.archivo.id,
@@ -170,6 +179,7 @@ export async function listarAdjuntos(
         nombreDescarga: adjunto.archivo.nombreOriginal,
       }),
       subidoPorId: adjunto.archivo.subidoPorId,
+      nombreSubidoPor: nombreDeUsuario(nombrePorId, adjunto.archivo.subidoPorId),
       creadoEn: adjunto.creadoEn,
     })),
   );

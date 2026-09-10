@@ -18,9 +18,10 @@
 import {
   esquemaModeloCrear,
   esquemaModeloEditar,
-  type DatosModeloCrear,
+  type DatosModeloCrearMigracion,
   type DatosModeloEditar,
 } from '../../contrato/esquemas/modelo.js';
+import type { BaseProrrateo } from '../../contrato/index.js';
 import { Prisma, type Genero, type Modelo } from '../../datos/index.js';
 import { z } from 'zod';
 
@@ -42,7 +43,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { cantidadDeBase, cantidadesDeOrdenes } from '../costos/cantidades.js';
+import { cantidadDeBase, cantidadesDeOrdenes, divisorCongelado } from '../costos/cantidades.js';
 import { redondear2 } from '../costos/decimales.js';
 import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
 import {
@@ -51,6 +52,8 @@ import {
   promoverAProduccionNucleo,
   type ResultadoPromocion,
 } from './nomenclatura.js';
+import { idModeloDeLasFotos } from './fotos-modelo.js';
+import { repartirFilasDeReceta, repartoDeRecetas } from './receta-compartida.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
@@ -66,6 +69,15 @@ export type ModeloConRelaciones = Modelo & {
   tipoProducto: { nombre: string } | null;
   /** Maquilero (costura) cotizado en el desarrollo (R5/B9), o null. */
   maquileroCotizado: { nombre: string } | null;
+  /** Modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+  modeloPadre: { codigo: string } | null;
+  /**
+   * ⭐ V1-E9a — Modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N,
+   * §Post-F9.135) y de quien es su receta, o null = la receta es la suya.
+   */
+  modeloDesarrollo: { codigo: string } | null;
+  /** ⭐ V1-E7d — quien FIRMÓ la revisión de esta versión (§Post-F9.110), o null. */
+  revisadoPor: { nombre: string } | null;
   _count: { fotos: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
@@ -86,7 +98,8 @@ export type ModeloConRelaciones = Modelo & {
   stockPt?: number | null;
   /**
    * Costo UNITARIO del último costeo (F7) del modelo (criterio de la Lista de costos:
-   * `costoTotal / cantidadDeBase`). Solo el LISTADO, y solo con `consultas.ver-importes`.
+   * `costoTotal / cantidadDeBase`). Solo el LISTADO, y solo para quien
+   * {@link puedeVerCostoRealDeModelo} deja pasar (§Post-F9.137: es un costo REAL, no del plan).
    */
   costoActual?: number | null;
 };
@@ -98,8 +111,46 @@ export const incluirRelacionesModelo = {
   genero: { select: { nombre: true } },
   tipoProducto: { select: { nombre: true } },
   maquileroCotizado: { select: { nombre: true } },
+  // Linaje de versiones (V1-E7b): el código del padre, para que la ficha pueda decir "Versión 2
+  // de CYA-26-71-001" con liga. Un `select` de una columna por un índice: no es un N+1.
+  modeloPadre: { select: { codigo: true } },
+  // ⭐ V1-E9a — el código del modelo de DESARROLLO del que nació este modelo de producción (linaje
+  // 1:N), para que la ficha pueda decir de quién es la receta que enseña. Un `select` de una
+  // columna por la PK: no es un N+1.
+  modeloDesarrollo: { select: { codigo: true } },
+  // ⭐ V1-E7d — quién firmó la REVISIÓN de esta versión, por NOMBRE: la ficha dice "aprobada por
+  // Aurora", no un cuid. Un `select` de una columna por la PK de usuarios: no es un N+1.
+  revisadoPor: { select: { nombre: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
+
+/**
+ * Campos de FICHA que un modelo hereda de aquel del que NACE (la receta va aparte, y de otra
+ * manera en cada caso).
+ *
+ * Lo comparten las DOS formas de nacer de otro modelo, y por eso vive aquí y no en una de las dos:
+ *
+ *  • la **VERSIÓN** (`versiones.ts`, V1-E7b), que se lleva una COPIA CONGELADA de la receta, y
+ *  • el **HIJO 1:N de producción** (`nomenclatura.ts` → `derivarModeloDeProduccion`, V1-E9a), que
+ *    **comparte** la receta del padre en vez de copiarla.
+ *
+ * ⚠️ Si cada una llevara su propia lista, la primera columna de ficha que alguien agregue caería en
+ * una y no en la otra, **en silencio**. Una sola lista es lo que hace que eso no pueda pasar.
+ */
+export const CAMPOS_FICHA_HEREDADOS = {
+  descripcion: true,
+  composicion: true,
+  maquilaBase: true,
+  corteBase: true,
+  idTemporada: true,
+  idCurvaTalla: true,
+  idGenero: true,
+  idTipoProducto: true,
+  idMaquileroCotizado: true,
+  numOperaciones: true,
+  secuenciaEstampado: true,
+  llevaArte: true,
+} as const;
 
 /** Parámetros del listado (los reutiliza la ruta REST en su entrada; tipos nativos). */
 const esquemaListarModelosDominio = esquemaPaginacion.extend({
@@ -108,11 +159,15 @@ const esquemaListarModelosDominio = esquemaPaginacion.extend({
   /** Filtra por temporada. */
   idTemporada: z.number().int().positive().optional(),
   /**
-   * Filtro de ORIGEN (§Post-F9.34, V1-E3n). Default `produccion`: Daniel pidió que el catálogo NO
-   * se llene con los modelos de desarrollo que nunca salen. `desarrollo` los enseña solos y
-   * `todos` no filtra.
+   * Filtro de ORIGEN (§Post-F9.34 punto 2, V1-E3n) — ⭐ **default `todos` desde V1-E8j
+   * (§Post-F9.134)**. Antes el default era `produccion`, para que el catálogo no se llenara de los
+   * modelos de desarrollo que nunca salen; junto con que **todo modelo nace en desarrollo** eso
+   * producía la queja de Daniel —*"generé dos modelos en precosteo… y no los veo en modelos"*—:
+   * **la pantalla escondía por defecto justo lo que se acababa de crear.** El motivo viejo sigue
+   * siendo válido y **se sirve con la ETAPA visible en cada renglón**, no escondiendo la mitad. Los
+   * filtros `produccion` y `desarrollo` siguen ahí para quien quiera una sola cara.
    */
-  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('produccion'),
+  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('todos'),
   /** Por omisión solo activos; `true` muestra también los descontinuados. */
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
@@ -269,7 +324,11 @@ async function exigirTipoProductoValido(tx: Tx, idTipoProducto: number): Promise
 }
 
 /** Construye el `data` de los campos opcionales presentes en el alta (solo los definidos). */
-function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
+function datosOpcionalesCrear(
+  // La forma LAXA (`…Migracion`) es la que sirve a las dos puertas del alta: es un supertipo de la
+  // normal —sólo relaja los dos dígitos— y aquí se leen campos que ninguna de las dos exige.
+  datos: DatosModeloCrearMigracion,
+): Partial<Prisma.ModeloUncheckedCreateInput> {
   const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
   // Composición del DESARROLLO (Daniel 24-jul-2026): '' se guarda como null (nunca cadena vacía).
@@ -444,14 +503,250 @@ function aplicarOpcionalesEditar(
 }
 
 /**
- * Crea un modelo (catálogo global) en UNA transacción (A2). Reglas: permiso
- * `modelos.administrar`; `codigo` único global → `ErrorConflicto`; temporada/curva/género
- * (si vienen) existentes y ACTIVAS; nace activo y SIN BOM ni fotos (se capturan aparte);
- * auditoría y bitácora en la misma transacción (A7).
+ * MARCA de nomenclatura con la que un modelo entra al catálogo: en qué mitad vive y qué números
+ * lleva. Es lo ÚNICO que distingue el alta normal del modo migración, y por eso viaja como dato al
+ * núcleo en vez de como bandera: el núcleo no sabe —ni tiene que saber— quién lo llamó.
+ */
+export interface MarcaNomenclaturaModelo {
+  origen: 'desarrollo' | 'produccion';
+  codigoDesarrollo: string | null;
+  numeroProduccion: number | null;
+  /**
+   * ⭐ V1-E9a (§Post-F9.135) — LINAJE 1:N: de qué modelo de DESARROLLO nació este modelo de
+   * PRODUCCIÓN, y por lo tanto de quién es su receta. `null` en todas las altas que no derivan
+   * (= «la receta es la mía»).
+   *
+   * ⚠️ Va en la marca, y no como parámetro suelto del núcleo, **porque es obligatorio**: así una
+   * puerta de alta nueva **no compila** hasta declarar de qué linaje nace lo que crea. Es el mismo
+   * razonamiento por el que `origen` y los dos números viajan juntos aquí en vez de como banderas.
+   */
+  idModeloDesarrollo: number | null;
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — COLOR del que nace este modelo, la otra mitad de la identidad del
+   * hijo del linaje. `null` en todas las altas que no nacen por un color (= todas menos la
+   * derivación por color), y **obligatorio** por la misma razón que `idModeloDesarrollo`: viaja en
+   * la marca para que una puerta de alta nueva **no compile** hasta declararlo.
+   *
+   * ⚠️ Sólo un HIJO puede llevarlo — lo vigila el CHECK `modelos_color_solo_con_linaje_check` — y
+   * junto con el linaje forma la llave `modelos_linaje_color_unico`, que es la que evita estrenar
+   * dos números para la misma prenda.
+   */
+  idColor: number | null;
+}
+
+/** La marca del alta normal (V1-E8j): nace en DESARROLLO, sin nº de producción (§Post-F9.134). */
+export function marcaDesarrollo(codigo: string): MarcaNomenclaturaModelo {
+  return {
+    origen: 'desarrollo',
+    // El código VIGENTE y el de DESARROLLO valen lo mismo mientras el modelo es de desarrollo
+    // (§Post-F9.34 punto 5): cuando la promoción sustituya el código por el número, el que se
+    // tecleó aquí NO se pierde y sigue siendo buscable (D3).
+    codigoDesarrollo: codigo,
+    // El nº lo estrena la promoción, que es la única que toma el lock de la serie.
+    numeroProduccion: null,
+    // Un alta normal no deriva de nadie: su receta es la suya. Y no podría ser de otro modo — el
+    // CHECK `modelos_linaje_desarrollo_solo_produccion_check` prohíbe que un modelo de DESARROLLO
+    // lleve el vínculo, que es lo que hace imposibles las cadenas (V1-E9a).
+    idModeloDesarrollo: null,
+    // Y sin linaje no puede haber color (CHECK `modelos_color_solo_con_linaje_check`, V1-E3): un
+    // modelo de desarrollo es EL modelo, no el de un color.
+    idColor: null,
+  };
+}
+
+/**
+ * ⭐ V1-E8j — LOS DOS DÍGITOS SON OBLIGATORIOS EN EL ALTA (§Post-F9.134).
+ *
+ * El tipo de prenda da el dígito de CONCEPTO y el género el de GÉNERO (§Post-F9.83): con ellos el
+ * sistema arma el nº de producción de 5 dígitos. Desde que **todo modelo nace en desarrollo**, uno
+ * sin ellos es un callejón sin salida — y no uno teórico: **rompía la importación de la OC del
+ * cliente**, porque generar la OP promueve el modelo y `digitosDelModelo` no tenía de dónde
+ * sacarlos; al ser `confirmarImportacion` UNA transacción (A2), se caía el pedido entero.
+ *
+ * No es una regla nueva: el alta de DESARROLLO (`crearDesarrolloConModeloNuevo`) ya exigía las dos
+ * cosas y con el mismo criterio —que el catálogo tenga el dígito capturado, no sólo que se haya
+ * elegido algo—. Esto ALINEA la segunda puerta con la primera.
+ *
+ * ⚠️ **La usan las TRES puertas que pueden dejar un modelo de desarrollo innumerable**, y siempre por
+ * llamada, nunca por copia: el alta (`crearModelo`), la edición (`exigirNoDesnumerar`) y el
+ * versionado (`versiones.ts` → `mintearVersionDeModelo`, que hereda el par del padre). La primera
+ * vez que una de ellas la resumió en vez de llamarla, la copia derivó antes de comitearse.
+ *
+ * ⚠️ Vive aquí, y NO en el núcleo del alta: el modo migración entra por debajo (los ~4,987
+ * modelos del Access no traen género y ya son de producción con su número puesto, así que no hay
+ * nada que numerar). *La misma regla en dos capas deriva; ésta tiene una sola.*
+ */
+export async function exigirDigitosDeNomenclatura(
+  tx: Tx,
+  idTipoProducto: number,
+  idGenero: number,
+): Promise<void> {
+  const [tipo, genero] = await Promise.all([
+    tx.tipoProducto.findUnique({
+      where: { id: idTipoProducto },
+      select: { nombre: true, digitoConcepto: true },
+    }),
+    tx.genero.findUnique({
+      where: { id: idGenero },
+      select: { nombre: true, digitoNomenclatura: true },
+    }),
+  ]);
+  if (tipo !== null && tipo.digitoConcepto === null) {
+    throw new ErrorValidacion(
+      `El tipo de prenda "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él el ` +
+        `modelo no podría recibir su número de producción. Captúralo en su catálogo.`,
+    );
+  }
+  if (genero !== null && genero.digitoNomenclatura === null) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él el modelo ` +
+        `no podría recibir su número de producción. Captúralo en su catálogo.`,
+    );
+  }
+}
+
+/**
+ * ⭐ V1-E8j · H9 — LA PUERTA TAMBIÉN SE CIERRA EN LA EDICIÓN (§Post-F9.134).
+ *
+ * El alta ya no deja NACER un modelo innumerable… pero la edición dejaba **convertir** uno: dos
+ * clics en la ficha y el modelo de desarrollo se quedaba sin sus dos dígitos. El estado final es
+ * idéntico al que esta etapa vino a cerrar — la OP no se puede generar y, como
+ * `confirmarImportacion` es UNA transacción (A2), **se cae el pedido entero de la OC**.
+ *
+ * Y el fallback por `codigoDesarrollo` NO salva: sólo lee los dígitos si el código tiene la forma
+ * `CYA-26-71-001`, y el alta del catálogo admite cualquier texto.
+ *
+ * ⚠️ **La regla es la MISMA que la del alta, y por eso llama a la MISMA función.** La primera
+ * versión de esta guarda era una **copia reducida** de {@link exigirDigitosDeNomenclatura} que sólo
+ * miraba `=== null`, y **derivó antes de comitearse**: dejaba pasar el otro medio caso —elegir un
+ * tipo de prenda que EXISTE y está ACTIVO pero **no tiene dígito capturado**, como la «Ropa
+ * interior» que el seed siembra a propósito— con el que se llegaba exactamente al mismo estado
+ * prohibido. Lo que se compara aquí es el **par RESULTANTE** del PATCH (lo que viene, o lo que ya
+ * había si no viene), y de ahí en adelante decide la función del alta. *Un resumen de una regla es
+ * una regla nueva.*
+ *
+ * ⚠️ **Sólo aplica a los modelos de DESARROLLO.** En los de PRODUCCIÓN se deja vaciar, y ahí está la
+ * razón de la laxitud original: los ~4,987 migrados del Access son `origen: 'produccion'`, no traen
+ * género, y exigírselo bloquearía su ficha entera para corregir cualquier otra cosa. Esa razón
+ * **nunca aplicó a los de desarrollo**, que son justo los que necesitan el número. Hay una prueba
+ * que lo sostiene, para que cerrar esta puerta no acabe cerrándola de más.
+ */
+async function exigirNoDesnumerar(
+  tx: Tx,
+  datos: DatosModeloEditar,
+  actual: Pick<Modelo, 'origen' | 'codigo' | 'idTipoProducto' | 'idGenero'>,
+): Promise<void> {
+  if (actual.origen !== 'desarrollo') {
+    return;
+  }
+  // El par RESULTANTE: lo que el PATCH manda, o lo que el modelo ya tenía si no lo manda
+  // (`undefined` = no tocar, `null` = quitar — la semántica M1 del PATCH parcial).
+  const idTipoProducto =
+    datos.idTipoProducto === undefined ? actual.idTipoProducto : datos.idTipoProducto;
+  const idGenero = datos.idGenero === undefined ? actual.idGenero : datos.idGenero;
+
+  if (idTipoProducto === null) {
+    throw new ErrorValidacion(
+      `No se puede dejar sin tipo de prenda al modelo "${actual.codigo}": es el primer dígito de ` +
+        `su número, y sin él no se le podría dar su número de producción. Elige otro.`,
+    );
+  }
+  if (idGenero === null) {
+    throw new ErrorValidacion(
+      `No se puede dejar sin género al modelo "${actual.codigo}": es el segundo dígito de su ` +
+        `número, y sin él no se le podría dar su número de producción. Elige otro.`,
+    );
+  }
+  // …y la MISMA comprobación del alta: que los dos catálogos tengan su dígito capturado.
+  await exigirDigitosDeNomenclatura(tx, idTipoProducto, idGenero);
+}
+
+/**
+ * NÚCLEO del alta de modelo, compartido por el alta normal (`crearModelo`) y el modo migración
+ * (`migracion.ts` → `crearModeloMigrado`). Mismo patrón que `promoverAProduccionNucleo` y
+ * `ligarOrdenNucleo`: las dos puertas aplican las MISMAS reglas dentro de la MISMA transacción (A2).
+ *
+ * Hace todo lo común —código único global, FKs existentes y activas, la fila, la auditoría y la
+ * bitácora (A7)— y recibe la NOMENCLATURA ya decidida por quien llama. Lo que deliberadamente **no**
+ * hace es exigir los dos dígitos: esa regla es del alta normal y vive en `crearModelo`.
+ */
+export async function crearModeloNucleo(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: DatosModeloCrearMigracion,
+  marca: MarcaNomenclaturaModelo,
+): Promise<ModeloConRelaciones> {
+  await exigirCodigoLibre(tx, datos.codigo);
+  if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
+  if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
+  if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
+  if (datos.idTipoProducto !== undefined) await exigirTipoProductoValido(tx, datos.idTipoProducto);
+  if (datos.idMaquileroCotizado !== undefined)
+    await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
+
+  const modelo = await tx.modelo.create({
+    data: {
+      codigo: datos.codigo,
+      ...marca,
+      ...datosOpcionalesCrear(datos),
+      ...datosCreacion(sesion),
+    },
+  });
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Modelo',
+    idEntidad: modelo.id,
+    accion: 'CREAR',
+    datos: { codigo: modelo.codigo, idTemporada: modelo.idTemporada, origen: marca.origen },
+  });
+
+  return tx.modelo.findUniqueOrThrow({
+    where: { id: modelo.id },
+    include: incluirRelacionesModelo,
+  });
+}
+
+/**
+ * Traduce el choque contra el `@unique` de `codigo` en un `ErrorConflicto` con el mensaje del
+ * negocio. Lo comparten las dos puertas del alta (la carrera residual que `exigirCodigoLibre` no
+ * alcanza a ver la captura la base, y el mensaje tiene que ser el mismo por las dos).
+ */
+export async function conConflictoDeCodigo<T>(codigo: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto(`Ya existe un modelo con el código "${codigo}".`, { causa: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Crea un modelo del catálogo (global) en UNA transacción (A2). Reglas: permiso
+ * `modelos.administrar`; `codigo` único global → `ErrorConflicto`; temporada/curva/género/tipo/
+ * maquilero existentes y ACTIVOS; nace activo y SIN BOM ni fotos (se capturan aparte); auditoría y
+ * bitácora en la misma transacción (A7).
+ *
+ * ⭐ **V1-E8j (§Post-F9.134) — TODO MODELO NACE EN DESARROLLO.** Antes esta función lo dejaba **en
+ * producción** (el default de la columna) y le derivaba su nº del código. Esa puerta se cerró por
+ * decisión de Daniel: *"nunca va a pasar que dé de alta un modelo de producción si no tiene ya una
+ * orden asignada"*. El catálogo de producción se llena por **pasar a producción**
+ * (`nomenclatura.ts` → `promoverAProduccionNucleo`), que es quien asigna el nº de 5 dígitos con su
+ * lock de serie; un modelo que naciera directo en producción se saltaría todo lo que Desarrollo pone
+ * antes (precosteo, receta revisada, precio aprobado, linaje) y llegaría **sin con qué costearse**.
+ *
+ * ⭐ Y por eso mismo **exige el tipo de prenda y el género** ({@link exigirDigitosDeNomenclatura}):
+ * son los dos dígitos con los que después se le arma el número, y un modelo de desarrollo sin ellos
+ * no se puede promover.
+ *
+ * ⚠️ El **ETL del histórico** carga ~4,987 modelos que SÍ son de producción, sin orden y sin género:
+ * no pasa por aquí, sino por `modelos/migracion.ts` → `crearModeloMigrado`, que comparte el
+ * {@link crearModeloNucleo} y entra **por debajo** de la regla de los dígitos.
  *
  * @example
  * const m = await crearModelo(sesion, {
- *   codigo: "501", descripcion: "Sudadera", maquilaBase: 35, idTemporada: 2,
+ *   codigo: "CYA-26-71-001", descripcion: "Sudadera", idTipoProducto: 7, idGenero: 1,
  * });
  */
 export async function crearModelo(
@@ -462,49 +757,13 @@ export async function crearModelo(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCrear, entrada);
 
-  try {
-    return await enTransaccion(async (tx) => {
-      await exigirCodigoLibre(tx, datos.codigo);
-      if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
-      if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
-      if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
-      if (datos.idTipoProducto !== undefined)
-        await exigirTipoProductoValido(tx, datos.idTipoProducto);
-      if (datos.idMaquileroCotizado !== undefined)
-        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
-
-      const modelo = await tx.modelo.create({
-        data: {
-          codigo: datos.codigo,
-          // Un modelo dado de alta aquí nace en PRODUCCIÓN (el default de la columna) y su código
-          // ES su nº de producción cuando tiene la forma de 5 dígitos. Se deriva para que OCUPE su
-          // consecutivo: si no, el generador propondría un número que este modelo ya usa.
-          numeroProduccion: numeroProduccionDeCodigo(datos.codigo),
-          ...datosOpcionalesCrear(datos),
-          ...datosCreacion(sesion),
-        },
-      });
-
-      await registrarBitacora(tx, sesion, {
-        entidad: 'Modelo',
-        idEntidad: modelo.id,
-        accion: 'CREAR',
-        datos: { codigo: modelo.codigo, idTemporada: modelo.idTemporada },
-      });
-
-      return tx.modelo.findUniqueOrThrow({
-        where: { id: modelo.id },
-        include: incluirRelacionesModelo,
-      });
-    }, bd);
-  } catch (error) {
-    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto(`Ya existe un modelo con el código "${datos.codigo}".`, {
-        causa: error,
-      });
-    }
-    throw error;
-  }
+  return conConflictoDeCodigo(datos.codigo, () =>
+    enTransaccion(async (tx) => {
+      // ⭐ La regla del alta normal, ANTES del núcleo (el modo migración entra por debajo).
+      await exigirDigitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
+      return crearModeloNucleo(tx, sesion, datos, marcaDesarrollo(datos.codigo));
+    }, bd),
+  );
 }
 
 /**
@@ -529,6 +788,10 @@ export async function actualizarModelo(
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
+      // ⭐ H9 — un modelo de DESARROLLO no puede quedarse sin sus dos dígitos por la vía de la
+      // edición: el alta ya no deja crearlo así, y esto cierra la otra mitad de la misma puerta.
+      await exigirNoDesnumerar(tx, datos, actual);
+
       const cambios: Prisma.ModeloUncheckedUpdateInput = { ...datosModificacion(sesion) };
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);
       if (cambiaCodigo && datos.codigo !== undefined) {
@@ -538,6 +801,15 @@ export async function actualizarModelo(
         // se queda en null (lo exige el CHECK de la base; su número lo estrena la promoción).
         cambios.numeroProduccion =
           actual.origen === 'desarrollo' ? null : numeroProduccionDeCodigo(datos.codigo);
+        // ⭐ V1-E8j — y en un modelo de DESARROLLO el nº de desarrollo VIAJA CON EL CÓDIGO: los dos
+        // valen lo mismo mientras vive ahí (§Post-F9.34 punto 5). Sin esto, renombrar dejaba el
+        // viejo colgado en la otra columna y el modelo quedaba con DOS códigos buscables, ninguno
+        // de los cuales era el que se ve. Desde que todo modelo nace en desarrollo, renombrarlo es
+        // el caso NORMAL, no el raro. En producción no se toca: ahí el nº de desarrollo es historia
+        // congelada (D3).
+        if (actual.origen === 'desarrollo') {
+          cambios.codigoDesarrollo = datos.codigo;
+        }
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
@@ -684,9 +956,42 @@ export interface ModeloPromovido extends ResultadoPromocion {
 /**
  * Pasa un modelo de DESARROLLO al catálogo de PRODUCCIÓN (§Post-F9.34 punto 4 / §Post-F9.46): le
  * asigna el nº de 5 dígitos —el que propone el sistema, o el que capture Daniel— y lo saca del
- * filtro de desarrollo. **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo
- * lo que cuelga del modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada
- * de eso apunta al código: apuntan al `id`, que no cambia.
+ * filtro de desarrollo.
+ *
+ * ---
+ * ## 🔴🔴 V1-E3 — QUÉ SIGNIFICA PULSAR ESTE BOTÓN HOY, Y LA PREGUNTA ABIERTA PARA DANIEL
+ *
+ * Desde V1-E3 (§Post-F9.172(b)) **el camino normal de entrar a producción es generar la OP**, que
+ * hace nacer **un modelo de producción por COLOR** compartiendo la receta del desarrollo. Este
+ * botón hace lo CONTRARIO: **transforma el modelo de desarrollo en el de producción**, con UN solo
+ * número, y **no tiene vuelta atrás** — a partir de ahí sus OP salen todas por la rama `heredado`.
+ *
+ * `promoverAProduccionNucleo` rechaza **UN solo caso** —el único en que promover rompe algo que ya
+ * existe—: un modelo **con hijos**, porque le daría un segundo número a una prenda que ya tiene el
+ * suyo por color. **Es la única guarda, y hay que leerla por lo que NO cubre.**
+ *
+ * 🔴 **LO QUE QUEDA ABIERTO ES CUALQUIER DESARROLLO SIN HIJOS TODAVÍA — tenga o no ficha de
+ * Desarrollo.** Medido: un modelo CON ficha y sin hijos se promueve sin una queja, y a partir de
+ * ahí sus cuatro OC de cuatro colores salen **las cuatro por la rama `heredado` con UN SOLO
+ * modelo** — *el bug de Daniel, al pie de la letra, y sin vuelta atrás*. Que tenga ficha **no lo
+ * protege**: se probó una segunda guarda por ahí y se retiró, porque rompía un camino existente y
+ * probado (`crearDesarrolloConModeloNuevo` → promover, `nomenclatura.int.test.ts`), o sea que no
+ * era una valla contra un descuido sino **retirar una capacidad** — y eso lo decide Daniel.
+ *
+ * ⚠️ Por eso el residuo **no se dejó silencioso**: lo fija la prueba `RESIDUO MEDIDO` de
+ * `nomenclatura.int.test.ts`, y el diálogo lo avisa en ámbar ANTES del clic
+ * (`DialogoPasarAProduccion.tsx`: *"UN número a todo el modelo, no uno por color… no hay vuelta
+ * atrás"*). Es lo único que hay entre el usuario y el bug: si alguien ordena ese diálogo y se lleva
+ * el aviso, el clic vuelve a ser silencioso.
+ *
+ * ⚠️ **Decisión pendiente de Daniel — §Post-F9.175** (la plantea V1-E3, no la resuelve): ¿el botón se **retira**
+ * del catálogo —porque desde V1-E8j «todo modelo nace en desarrollo» y desde V1-E3 el número se lo
+ * da su OP, así que ya no habría razón de asignarlo a mano— o **se queda**? Mientras no se conteste
+ * queda **con esa única guarda, la prueba del residuo y el aviso**.
+ *
+ * **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo lo que cuelga del
+ * modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada de eso apunta al
+ * código: apuntan al `id`, que no cambia.
  *
  * Todo en UNA transacción (A2) con el lock del par y la bitácora dentro (A7). El re-leído del
  * modelo va en la MISMA transacción a propósito: así el llamador ve la promoción ya aplicada sin
@@ -802,19 +1107,30 @@ export async function listarModelos(
  * Detalle de la consulta única: se traen TODAS las fotos de los modelos de la página de un
  * golpe (`idModelo in [...]`), ordenadas; al recorrerlas, la PRIMERA de cada modelo es su
  * principal (el resto se ignora). Las URLs prefirmadas se generan en paralelo.
+ *
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — es la forma EN LOTE de {@link idModeloDeLasFotos}: un modelo nacido
+ * POR COLOR sin fotos propias enseña la principal de su modelo de DESARROLLO. Sin esto, los cuatro
+ * modelos que nacen de un desarrollo salían **todos sin miniatura** en la galería — que es
+ * justamente donde se ven, porque el filtro por default del catálogo (`origen = produccion`)
+ * esconde al padre que sí las tiene. La consulta sigue siendo UNA (los ids de los padres se suman
+ * al mismo `in`), así que no aparece un N+1 nuevo.
  */
 async function adjuntarFotoPrincipal(
   cliente: ReturnType<typeof clienteLectura>,
   modelos: ModeloConRelaciones[],
   archivos: ServicioArchivos,
 ): Promise<ModeloConRelaciones[]> {
-  const conFotos = modelos.filter((m) => m._count.fotos > 0).map((m) => m.id);
-  if (conFotos.length === 0) {
+  // De quién son las fotos de CADA modelo de la página (la propia gana; si no tiene, las del padre).
+  const duenoPorModelo = new Map<number, number>(
+    modelos.map((m) => [m.id, idModeloDeLasFotos(m, m._count.fotos > 0)]),
+  );
+  const idsAConsultar = [...new Set(duenoPorModelo.values())];
+  if (idsAConsultar.length === 0) {
     return modelos.map((m) => ({ ...m, urlFotoPrincipal: null }));
   }
 
   const fotos = await cliente.modeloFoto.findMany({
-    where: { idModelo: { in: conFotos } },
+    where: { idModelo: { in: idsAConsultar } },
     orderBy: [{ orden: 'asc' }, { id: 'asc' }],
     select: { idModelo: true, archivo: { select: { key: true } } },
   });
@@ -839,7 +1155,51 @@ async function adjuntarFotoPrincipal(
     ),
   );
 
-  return modelos.map((m) => ({ ...m, urlFotoPrincipal: urlPorModelo.get(m.id) ?? null }));
+  // El camino de VUELTA: cada modelo recibe la URL de SU dueño de fotos (varios hijos pueden
+  // compartir el mismo padre, así que el mapa se lee por el dueño y no por el id del modelo).
+  return modelos.map((m) => ({
+    ...m,
+    urlFotoPrincipal: urlPorModelo.get(duenoPorModelo.get(m.id) ?? m.id) ?? null,
+  }));
+}
+
+/**
+ * ⭐ §Post-F9.137 (DANIEL, 28-ago-2026) — ¿esta sesión puede ver el COSTO REAL de un modelo?
+ *
+ * La columna «costo actual» del listado NO es el plan: es el costo unitario del ÚLTIMO COSTEO REAL
+ * (F7) de una orden ya producida, o sea **cómo terminamos**. Preguntado si escondérsela a quien
+ * lleva Desarrollo, Daniel contestó de una palabra: *«Escóndesela»*. Es la misma línea que sostuvo
+ * en §Post-F9.123 (*«tampoco costos finales reales»*) y en §Post-F9.125 sobre los factores
+ * (*«sólo yo los puedo mover»*, *«y no son visibles para nadie más»*): **Desarrollo ve el PLAN; el
+ * RESULTADO es del dueño.**
+ *
+ * 🔴 **Por qué el permiso es `costos.ver` y NO (sólo) `consultas.ver-importes`.** Hasta aquí el
+ * candado era `consultas.ver-importes`, que Gerencial —el rol de Aurora— SÍ tiene; por eso lo veía.
+ * La salida obvia parecía ser sacarla de ese permiso, y **medido, eso le habría roto el trabajo**:
+ * `consultas.ver-importes` es también el candado de importes del **PRE-COSTEO** (`calcularPreCosto`
+ * y `listaPrecios`, `costos/pre-costo.ts`) — justo lo que Daniel dijo que ella SÍ debe ver, y con lo
+ * que arma la cotización que él aprueba. Quitárselo le habría dejado el precosteo entero en `null`.
+ *
+ * El permiso que ya significa EL RESULTADO es `costos.ver` —así lo nombra la tabla de §Post-F9.123:
+ * *«costo real de la orden, costo real desde compras, márgenes»*— y Gerencial **ya estaba fuera de
+ * él** por diseño. Colgar la columna de ahí esconde exactamente lo que Daniel pidió **sin tocar el
+ * reparto de roles y sin quitarle a nadie nada más**: el seed NO cambia y NO hace falta re-sembrar.
+ *
+ * Se exigen **los DOS** permisos, no sólo `costos.ver`: en el reparto del seed todo perfil que
+ * lleva `costos.ver` lleva también `consultas.ver-importes`, pero eso es un HECHO del reparto de
+ * hoy, no una regla —desde el 3-sep-2026 cada perfil lista sus permisos uno por uno y nada obliga a
+ * que vayan juntos—; y además **los roles son datos editables** (`roles.administrar`), y
+ * un rol a la medida podría llevar `costos.ver` sin el de importes. Pedir los dos sólo puede
+ * ESTRECHAR el conjunto, nunca ampliarlo: es un costo real (`costos.ver`) **y** es dinero
+ * (`consultas.ver-importes`).
+ *
+ * ⚠️ **Guarda gemela.** El frontend tiene que esconder la columna con ESTA MISMA regla (esconder sin
+ * bloquear es maquillaje, §Post-F9.68; bloquear sin esconder deja un «—» que no explica nada). Su
+ * gemela es `puedeVerCostoRealDeModelo` en `frontend/src/modulos/modelos/ModelosPagina.tsx`. Si
+ * alguna de las dos cambia, cambian las dos.
+ */
+export function puedeVerCostoRealDeModelo(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'costos.ver') && tienePermiso(sesion, 'consultas.ver-importes');
 }
 
 /**
@@ -855,9 +1215,8 @@ async function adjuntarFotoPrincipal(
  *  • `costoActual` — costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa
  *    activa: el `CostoOrden` con `costoTotal` guardado más recientemente MODIFICADO (DISTINCT ON
  *    por modelo), dividido entre su base de prorrateo (`cantidadDeBase`, D2) — EXACTAMENTE el
- *    criterio de la Lista de costos (`listarCostos`). `null` si nunca se costeó o la base es 0.
- *    Mismo candado de importes que Costos: sin `consultas.ver-importes` viene `null` (ni se
- *    consulta).
+ *    criterio de la Lista de costos (`listarCostos`). `null` si nunca se costeó, si la base es 0
+ *    o si {@link puedeVerCostoRealDeModelo} dice que no (ni se consulta — §Post-F9.137).
  */
 async function adjuntarAgregadosListado(
   cliente: ReturnType<typeof clienteLectura>,
@@ -873,15 +1232,27 @@ async function adjuntarAgregadosListado(
 
   // Tela principal: todas las telas del BOM de los modelos de la página, en el orden de la ficha
   // (nombre asc); al recorrer, la PRIMERA de cada modelo es su principal (igual que la foto).
+  //
+  // 🔴 V1-E9b — LA RECETA COMPARTIDA **EN LOTE** (§Post-F9.167). Ésta es la forma del resolver que
+  // se olvida: no basta con traducir cada modelo a su receta para el `in`, hay que saber
+  // DEVOLVERLE sus filas —un padre con cuatro hijos reparte las MISMAS telas a los cuatro—. Sin el
+  // camino de vuelta, el `Map` sólo tendría al padre y **cada hijo saldría sin tela principal en el
+  // listado, en silencio**. El linaje ya viene en `modelos` (`idModeloDesarrollo`), así que el
+  // reparto se arma sin volver a la base.
+  const reparto = repartoDeRecetas(modelos);
   const telas = await cliente.modeloTela.findMany({
-    where: { idModelo: { in: ids } },
+    where: { idModelo: { in: reparto.idsDeReceta } },
     select: { idModelo: true, tela: { select: { nombre: true } } },
     orderBy: [{ tela: { nombre: 'asc' } }, { idTela: 'asc' }],
   });
+  const telasPorModelo = repartirFilasDeReceta(reparto, ids, telas, (t) => t.idModelo);
   const telaPorModelo = new Map<number, string>();
-  for (const t of telas) {
-    if (!telaPorModelo.has(t.idModelo)) {
-      telaPorModelo.set(t.idModelo, t.tela.nombre);
+  for (const [idModelo, filas] of telasPorModelo) {
+    // El `orderBy` de arriba se conserva dentro de cada grupo ⇒ la PRIMERA sigue siendo la
+    // principal, igual que en la ficha (y que la foto).
+    const primera = filas[0];
+    if (primera !== undefined) {
+      telaPorModelo.set(idModelo, primera.tela.nombre);
     }
   }
 
@@ -894,8 +1265,8 @@ async function adjuntarAgregadosListado(
   `);
   const stockPorModelo = new Map(stock.map((f) => [f.idModelo, Number(f.existencia)]));
 
-  // Costo actual: solo con el permiso de importes (mismo candado que la Lista de costos).
-  const costoPorModelo = tienePermiso(sesion, 'consultas.ver-importes')
+  // Costo actual: candado de COSTO REAL (§Post-F9.137). Si no pasa, ni se consulta.
+  const costoPorModelo = puedeVerCostoRealDeModelo(sesion)
     ? await costoUnitarioUltimoCosteo(cliente, idEmpresa, ids, bd)
     : new Map<number, number>();
 
@@ -910,9 +1281,15 @@ async function adjuntarAgregadosListado(
 /**
  * Resuelve el costo UNITARIO del ÚLTIMO costeo (F7) de cada modelo: DISTINCT ON por modelo del
  * `CostoOrden` con `costoTotal` guardado (el modificado más recientemente gana; desempate por id),
- * y `costoTotal / cantidadDeBase(baseProrrateo)` con las cantidades derivadas de esas órdenes
- * (`cantidadesDeOrdenes` — el MISMO helper de la Lista de costos, no una derivación distinta).
- * Los modelos sin costeo o con base 0 no entran al mapa (→ `null` en la salida).
+ * y `costoTotal / divisor` con las cantidades derivadas de esas órdenes (`cantidadesDeOrdenes` — el
+ * MISMO helper de la Lista de costos, no una derivación distinta). Los modelos sin costeo o con
+ * divisor 0 no entran al mapa (→ `null` en la salida).
+ *
+ * ⭐ **El divisor respeta el CONGELADO de la orden cerrada (0.061 — §Post-F9.154(c)):** si la orden
+ * del último costeo está cerrada se usa `cantidadBaseCongelada`, el mismo número que enseñan su
+ * ficha y la lista de costos. Por eso la consulta trae `congelado_en`, `cantidad_base_congelada` y
+ * `o."cerrada_en"`: sin ellas esta columna se re-dividía en vivo y podía contradecir a la ficha de
+ * la MISMA orden en cuanto cambiara una cantidad derivada.
  */
 async function costoUnitarioUltimoCosteo(
   cliente: ReturnType<typeof clienteLectura>,
@@ -925,14 +1302,23 @@ async function costoUnitarioUltimoCosteo(
       idModelo: number;
       idOrden: number;
       costoTotal: Prisma.Decimal;
-      baseProrrateo: 'cortado' | 'recibido' | 'vendido';
+      // El tipo del CONTRATO, no una copia literal: si algún día se agrega una base, esto no se
+      // queda callado (0.061).
+      baseProrrateo: BaseProrrateo;
+      // 0.061: el congelado del cierre (el `snake_case` viene de la consulta cruda con alias).
+      congeladoEn: Date | null;
+      cantidadBaseCongelada: number | null;
+      cerradaEn: Date | null;
     }[]
   >(Prisma.sql`
     SELECT DISTINCT ON (o."id_modelo")
       o."id_modelo"       AS "idModelo",
       co."id_orden"       AS "idOrden",
       co."costo_total"    AS "costoTotal",
-      co."base_prorrateo" AS "baseProrrateo"
+      co."base_prorrateo" AS "baseProrrateo",
+      co."congelado_en"             AS "congeladoEn",
+      co."cantidad_base_congelada"  AS "cantidadBaseCongelada",
+      o."cerrada_en"                AS "cerradaEn"
     FROM "costo_orden" co
     JOIN "ordenes" o ON o."id" = co."id_orden"
     WHERE co."id_empresa" = ${idEmpresa}
@@ -951,7 +1337,9 @@ async function costoUnitarioUltimoCosteo(
   const resultado = new Map<number, number>();
   for (const u of ultimos) {
     const c = cantidades.get(u.idOrden);
-    const cantidadBase = c === undefined ? 0 : cantidadDeBase(c, u.baseProrrateo);
+    // ⭐ 0.061: cerrada ⇒ el divisor CONGELADO; abierta ⇒ el vivo. La MISMA regla que la ficha.
+    const cantidadBase =
+      divisorCongelado(u, u) ?? (c === undefined ? 0 : cantidadDeBase(c, u.baseProrrateo));
     if (cantidadBase > 0) {
       resultado.set(u.idModelo, redondear2(Number(u.costoTotal) / cantidadBase));
     }

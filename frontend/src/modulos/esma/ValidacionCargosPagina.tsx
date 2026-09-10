@@ -130,6 +130,12 @@ export function ValidacionCargosPagina(): React.JSX.Element {
                     Propuesto: {c.cantidadPropuesta.toLocaleString('es-MX')} pzas ×{' '}
                     {moneda(c.precioPropuesto)} = {moneda(c.importePropuesto)}
                   </p>
+                  {c.incompletas > 0 ? (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      + {c.incompletas.toLocaleString('es-MX')} prenda(s) incompleta(s) entregada(s)
+                      — <b>no se pagan</b>: no van en la cantidad.
+                    </p>
+                  ) : null}
                   {c.estado === 'validado' ? (
                     <p className="text-xs text-muted-foreground">
                       Real: {(c.cantidadReal ?? 0).toLocaleString('es-MX')} pzas ×{' '}
@@ -281,6 +287,21 @@ function DialogoValidarCargo({
             cuenta en el estado de cuenta del maquilero.
           </DialogDescription>
         </DialogHeader>
+
+        {/* V1-E8k (§Post-F9.136): quien valida teclea la cantidad a pagar. Si el recibo trajo prendas
+            incompletas, tiene que verlo AQUÍ — si no, podría sumarlas a mano creyendo que se le
+            olvidaron al capturista. No se pagan. */}
+        {cargo !== null && cargo.incompletas > 0 ? (
+          <p
+            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+            role="status"
+            data-testid="cargo-aviso-incompletas"
+          >
+            En ese recibo entregó además{' '}
+            <b>{cargo.incompletas.toLocaleString('es-MX')} prenda(s) incompleta(s)</b>. Quedan
+            registradas, pero <b>no se pagan</b>: no las sumes a la cantidad real.
+          </p>
+        ) : null}
 
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <Field data-invalid={cantInvalida}>

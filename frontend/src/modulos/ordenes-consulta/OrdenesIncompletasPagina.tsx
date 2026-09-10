@@ -22,14 +22,19 @@ import { SemaforoBadge } from './piezas';
 const POR_PAGINA = 20;
 
 /**
- * Órdenes INCOMPLETAS (F2-E4): las capturadas SIN matriz (paridad con `FechaDet Is Null` del viejo),
+ * Órdenes INCOMPLETAS (F2-E4): las que están en `estado='capturada'`, es decir, a las que les falta
+ * alguno de los requisitos —tallas + receta liberada, y arte si aplica (`requisitos-orden.ts`)—,
  * ordenadas por antigüedad con un SEMÁFORO (verde/amarillo/urgente). El backend deriva el semáforo
  * (> 7 días = urgente, regla `EsUrgente`); la pantalla solo lo pinta (A1). Cada fila enlaza al
- * detalle de captura para completar la matriz, y se puede imprimir.
+ * detalle de captura para atender lo que falte, y se puede imprimir.
+ *
+ * ⚠️ NO son "las capturadas sin matriz" (eso era la paridad con `FechaDet Is Null` del viejo, y dejó
+ * de ser cierto el 26-jul-2026 con el estado automático): una incompleta PUEDE tener su matriz.
  *
  * Para ver el estado URGENTE en una `prueba`: sembrar una orden incompleta antigua con
- * `npm run demo:ordenes` (backend) o crear una orden y dejarla sin matriz > 7 días; el script
- * `backend/scripts/datos-demo-ordenes.ts` siembra una con `creadoEn` de hace 10 días.
+ * `npm run demo:ordenes` (backend) o dejar > 7 días una orden a la que le falte cualquier
+ * requisito; el script `backend/scripts/datos-demo-ordenes.ts` siembra una con `creadoEn` de hace
+ * 10 días.
  */
 export function OrdenesIncompletasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -51,7 +56,8 @@ export function OrdenesIncompletasPagina(): React.JSX.Element {
               Órdenes incompletas
             </h1>
             <p className="text-[12.5px] text-muted-foreground">
-              Órdenes capturadas a las que aún les falta la matriz color × talla.
+              Órdenes a las que aún les falta un requisito: la matriz color × talla, liberar la
+              receta o el arte.
             </p>
           </div>
         </div>

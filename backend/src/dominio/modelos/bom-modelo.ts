@@ -35,7 +35,6 @@ import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { factorParaLectura } from '../../comun/conversion.js';
 import { redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvioCatalogo,
@@ -58,7 +57,10 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
 
 import {
   borrarArchivoSiQuedoHuerfano,
@@ -175,7 +177,15 @@ function amarreNoFirmaElPrecio(
 export type ModeloTelaDetalle = {
   idTela: number;
   nombre: string;
+  /** Consumo por prenda. En una tela CON complemento, el del CUERPO. */
   consumoPorPrenda: number;
+  /**
+   * ⭐⭐ 0.156 — cómo se llama el complemento de esta tela (`Tela.nombreComplemento`), o null.
+   * Lo decide el CATÁLOGO; viaja para que la pantalla rotule el campo con su nombre real.
+   */
+  nombreComplemento: string | null;
+  /** ⭐⭐ 0.156 — consumo del COMPLEMENTO por prenda (número propio); null = sin capturar. */
+  consumoComplementoPorPrenda: number | null;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
@@ -252,11 +262,17 @@ export async function leerTelasBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloTelaDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA: un modelo de producción derivado lee las telas de su modelo
+  // de DESARROLLO. Se resuelve AQUÍ DENTRO, no en cada llamador: ésta es una de las tres lecturas
+  // canónicas y por ella entra todo el sistema (ficha, precosto de la orden, MRP). Resolver es
+  // idempotente (no hay cadenas), así que no importa si quien llama ya resolvió.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloTela.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      consumoComplementoPorPrenda: true,
       paraPreCosto: true,
       paraProduccion: true,
       paraCosto: true,
@@ -269,7 +285,9 @@ export async function leerTelasBom(
           proveedor: { select: { nombre: true } },
         },
       },
-      tela: { select: { nombre: true, precioSugerido: true } },
+      // ⭐⭐ 0.156 — `nombreComplemento` viene del CATÁLOGO en la MISMA consulta (nada de N+1):
+      // es lo que dice si esta tela lleva complemento y cómo se llama.
+      tela: { select: { nombre: true, precioSugerido: true, nombreComplemento: true } },
     },
     orderBy: { tela: { nombre: 'asc' } },
   });
@@ -303,6 +321,9 @@ export async function leerTelasBom(
       idTela: f.idTela,
       nombre: f.tela.nombre,
       consumoPorPrenda: f.consumoPorPrenda.toNumber(),
+      nombreComplemento: f.tela.nombreComplemento,
+      consumoComplementoPorPrenda:
+        f.consumoComplementoPorPrenda === null ? null : f.consumoComplementoPorPrenda.toNumber(),
       paraPreCosto: f.paraPreCosto,
       paraProduccion: f.paraProduccion,
       paraCosto: f.paraCosto,
@@ -344,8 +365,11 @@ export async function leerAviosBom(
   idModelo: number,
   idEmpresa: number,
 ): Promise<ModeloAvioDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA (ver {@link leerTelasBom}): los avíos salen del modelo de
+  // desarrollo cuando éste es uno de sus hijos de producción.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloAvio.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: {
       idAvio: true,
       consumoPorPrenda: true,
@@ -355,7 +379,7 @@ export async function leerAviosBom(
       consumoPorTalla: true,
       idAvioProveedor: true,
       avio: {
-        select: { clave: true, descripcion: true, precioReferencia: true, factorConversion: true },
+        select: { clave: true, descripcion: true, precioReferencia: true },
       },
     },
     orderBy: { avio: { clave: 'asc' } },
@@ -374,7 +398,6 @@ export async function leerAviosBom(
             idAvio: true,
             idProveedor: true,
             precio: true,
-            factorConversion: true,
             proveedor: { select: { nombre: true } },
           },
           // Orden DETERMINISTA: ante un empate exacto de precio, la cascada se queda con el
@@ -413,11 +436,11 @@ export async function leerAviosBom(
     const delAvio = proveedoresPorAvio.get(f.idAvio) ?? [];
     const nombrePorProveedor = new Map(delAvio.map((p) => [p.idProveedor, p.proveedor.nombre]));
     // MISMA función que el precosto (`resolverPrecioAvioCatalogo`), no una copia: promedio de
-    // medidas → amarre → más barato → referencia, con el precio ya ÷ factor (R1).
+    // medidas → amarre → más barato → referencia. Los precios ya están en unidad de consumo
+    // (§Post-F9.97), así que no hay conversión que aplicar ni factor corrupto que sanear.
     const resuelto = resolverPrecioAvioCatalogo({
       precioReferencia:
         f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
-      factorConversionAvio: factorParaLectura(f.avio.factorConversion?.toNumber()),
       idAvioProveedor: f.idAvioProveedor,
       medidas: medidasPorAvio.get(f.idAvio) ?? [],
       ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', f.idAvio)),
@@ -428,12 +451,6 @@ export async function leerAviosBom(
       proveedores: delAvio.map((p) => ({
         idProveedor: p.idProveedor,
         precio: p.precio === null ? null : p.precio.toNumber(),
-        // LECTURA: el factor se SANEA (`factorParaLectura`) antes de entrar al motor. El motor
-        // LANZA ante un factor ≤ 0 —y así debe ser al costear—, pero la ficha del modelo es una
-        // consulta: no puede devolver 500 por una fila con el factor corrupto. Saneando la
-        // ENTRADA se conserva UNA sola regla de precio (la misma del precosto) en vez de abrir un
-        // camino paralelo "tolerante" que derivaría.
-        factorConversion: factorParaLectura(p.factorConversion?.toNumber()),
       })),
     });
     return {
@@ -468,6 +485,56 @@ export async function leerAviosBom(
       precioReferencia:
         f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
     };
+  });
+}
+
+/** Una medida por talla del BOM, tal como la copia quien la lee (R18). */
+export interface ModeloAvioTallaBom {
+  idAvio: number;
+  idTalla: number;
+  consumo: Prisma.Decimal;
+  idAvioMedida: number | null;
+}
+
+/**
+ * ⭐⭐ V1-E9b — **LA CUARTA LECTURA CANÓNICA**: las MEDIDAS POR TALLA del BOM (R18,
+ * `ModeloAvioTalla`), con la receta compartida ya resuelta.
+ *
+ * ### Por qué existe, que es lo importante
+ *
+ * De las CINCO tablas de la receta, `ModeloAvioTalla` era **la única sin lectura canónica**. Las
+ * otras cuatro viven bajo el paraguas del embudo —`leerTelasBom`, `leerAviosBom` y
+ * `leerArtesModelo` resuelven POR DENTRO—, así que quien las llama puede pasarles el id del hijo o
+ * el del padre y **da lo mismo**: la resolución no se puede perder porque no está en el llamador.
+ *
+ * Las medidas no tenían ese paraguas, y el precio se pagaba en duplicación: su resolución vivía
+ * **repetida en cuatro sitios** de `produccion/receta-orden.ts` (la copia al crear la orden,
+ * agregar un renglón, restaurarlo y «traer del modelo») y **sólo uno de los cuatro tenía prueba**.
+ * El reviewer de la etapa lo demostró revirtiendo uno a mano: la suite entera —2,345 pruebas—
+ * **siguió en verde**. Y el guardián de lecturas tampoco lo veía, porque trabaja por ARCHIVO y ese
+ * archivo ya importaba el resolver.
+ *
+ * 🔴 **Lo que esa mutación superviviente significaba en el negocio:** en la orden de un modelo hijo,
+ * darle a «traer del modelo» metía el avío **sin sus medidas por talla**. No truena ni avisa:
+ * **cambia el requerido del MRP** y se compra otra cantidad.
+ *
+ * ⇒ Con esta función las cuatro duplicaciones se vuelven UNA, y la resolución deja de ser algo que
+ * un llamador pueda olvidar. `receta-compartida-guardian.test.ts` vigila que nadie vuelva a leer la
+ * tabla directo desde producción.
+ *
+ * `idAvio` acota a un solo renglón (lo que piden tres de los cuatro sitios); sin él trae las
+ * medidas de TODO el BOM (lo que pide la copia al crear la orden).
+ */
+export async function leerMedidasAvioBom(
+  tx: Tx,
+  idModelo: number,
+  idAvio?: number,
+): Promise<ModeloAvioTallaBom[]> {
+  // Mismo embudo que las otras tres canónicas: se resuelve AQUÍ DENTRO, nunca en el llamador.
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
+  return tx.modeloAvioTalla.findMany({
+    where: { idModelo: idReceta, ...(idAvio === undefined ? {} : { idAvio }) },
+    select: { idAvio: true, idTalla: true, consumo: true, idAvioMedida: true },
   });
 }
 
@@ -531,12 +598,30 @@ export async function obtenerFichaModelo(
 
 // ── Validación de componentes (existen y están activos) ────────────────────────
 
-/** Valida que todas las telas existan y estén ACTIVAS (no se mete una tela desactivada al BOM). */
-async function exigirTelasValidas(tx: Tx, ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
+/**
+ * Valida que todas las telas existan y estén ACTIVAS (no se mete una tela desactivada al BOM) y
+ * —⭐⭐ 0.156— que el CONSUMO DEL COMPLEMENTO sólo se capture donde el catálogo dice que hay
+ * complemento.
+ *
+ * 🔑 **El reparto de autoridad, que es la razón de que esto viva aquí y no en el esquema Zod:**
+ * *quién* lleva complemento lo decide el CATÁLOGO (`Tela.nombreComplemento`) y *cuánto* lleva lo
+ * decide la RECETA. Es palabra por palabra el mismo reparto que ya gobierna la línea de orden de
+ * compra (`compras/ordenes-compra.ts`, §Post-F9.18), y por eso el rechazo tiene que ser del dominio
+ * (A1): el esquema no puede consultar el catálogo.
+ *
+ * ⚠️ Sin esta guarda, un consumo de complemento capturado sobre una tela SIN complemento viajaría
+ * congelado hasta la orden y la explosión intentaría meterlo en la OC — donde `validarLineas` lo
+ * rechaza con un error que hablaría de una orden de compra que el usuario no estaba haciendo. Se
+ * corta en la puerta, que es donde se puede explicar.
+ *
+ * Se resuelve en UNA consulta (nada de N+1): el catálogo se lee una vez para las dos reglas.
+ */
+async function exigirTelasValidas(tx: Tx, deseados: TelaBomValidada[]): Promise<void> {
+  if (deseados.length === 0) return;
+  const ids = deseados.map((d) => d.idTela);
   const telas = await tx.tela.findMany({
     where: { id: { in: ids } },
-    select: { id: true, nombre: true, activo: true },
+    select: { id: true, nombre: true, activo: true, nombreComplemento: true },
   });
   if (telas.length !== ids.length) {
     throw new ErrorValidacion('Una o más telas seleccionadas no existen.');
@@ -546,6 +631,20 @@ async function exigirTelasValidas(tx: Tx, ids: number[]): Promise<void> {
     throw new ErrorValidacion(
       `La tela "${inactiva.nombre}" está desactivada y no se puede agregar al modelo.`,
     );
+  }
+  const porId = new Map(telas.map((t) => [t.id, t]));
+  for (const d of deseados) {
+    const tela = porId.get(d.idTela);
+    if (
+      tela !== undefined &&
+      tela.nombreComplemento === null &&
+      d.consumoComplementoPorPrenda !== null
+    ) {
+      throw new ErrorValidacion(
+        `La tela "${tela.nombre}" no lleva complemento: no se le puede capturar consumo de ` +
+          `complemento. Si sí lo lleva, decláraselo primero en el catálogo de telas.`,
+      );
+    }
   }
 }
 
@@ -661,10 +760,7 @@ async function sincronizarTelas(
   idModelo: number,
   deseados: TelaBomValidada[],
 ): Promise<boolean> {
-  await exigirTelasValidas(
-    tx,
-    deseados.map((d) => d.idTela),
-  );
+  await exigirTelasValidas(tx, deseados);
   await exigirAmarresTelaValidos(tx, deseados);
 
   const actuales = await tx.modeloTela.findMany({ where: { idModelo } });
@@ -675,10 +771,19 @@ async function sincronizarTelas(
   const aAgregar = deseados.filter((d) => !actualPorId.has(d.idTela));
   const aActualizar = deseados.filter((d) => {
     const actual = actualPorId.get(d.idTela);
-    return (
-      actual !== undefined &&
-      cambiaRenglonComponente(actual, d, actual.idTelaProveedor, d.idTelaProveedor)
-    );
+    if (actual === undefined) return false;
+    // ⭐⭐ 0.156 — el CONSUMO DEL COMPLEMENTO también es un cambio. Sin este término, teclear el
+    // cárdigan sobre un renglón que por lo demás no se movió dejaba el diff vacío: la pantalla
+    // decía "guardado" y el número no llegaba a la base. La comparación es por VALOR (los dos
+    // lados ya son `number | null`), nunca por `Decimal`.
+    if (
+      (actual.consumoComplementoPorPrenda === null
+        ? null
+        : actual.consumoComplementoPorPrenda.toNumber()) !== d.consumoComplementoPorPrenda
+    ) {
+      return true;
+    }
+    return cambiaRenglonComponente(actual, d, actual.idTelaProveedor, d.idTelaProveedor);
   });
 
   if (aQuitar.length === 0 && aAgregar.length === 0 && aActualizar.length === 0) {
@@ -694,6 +799,7 @@ async function sincronizarTelas(
         idModelo,
         idTela: d.idTela,
         consumoPorPrenda: d.consumoPorPrenda,
+        consumoComplementoPorPrenda: d.consumoComplementoPorPrenda,
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
@@ -708,6 +814,7 @@ async function sincronizarTelas(
       where: { idModelo_idTela: { idModelo, idTela: d.idTela } },
       data: {
         consumoPorPrenda: d.consumoPorPrenda,
+        consumoComplementoPorPrenda: d.consumoComplementoPorPrenda,
         paraPreCosto: d.paraPreCosto,
         paraProduccion: d.paraProduccion,
         paraCosto: d.paraCosto,
@@ -787,15 +894,6 @@ async function sincronizarAvios(
   return true;
 }
 
-/**
- * Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su BOM. EXPORTADA desde V1-E3v:
- * aceptar los avíos favoritos (`avios-favoritos.ts`) también cambia el BOM y debe tocar el modelo
- * igual que el PUT set-completo — si no, un cambio real quedaría sin firma (A7).
- */
-export async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
-}
-
 // ── Endpoints set-completo (uno por sección) ──────────────────────────────────
 
 /**
@@ -814,9 +912,12 @@ export async function reemplazarTelasBom(
   const deseados = validarEntrada(esquemaModeloTelas, telas);
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — la receta de un HIJO del linaje 1:N no se edita desde el hijo: guardar
+    // aquí reescribiría la del desarrollo y la de sus hermanos de color, en silencio.
+    await exigirRecetaPropia(tx, idModelo);
     const cambio = await sincronizarTelas(tx, sesion, idModelo, deseados);
     if (cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'telas');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -839,9 +940,11 @@ export async function reemplazarAviosBom(
   const deseados = validarEntrada(esquemaModeloAvios, avios);
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — misma razón que en las telas: la receta del hijo es de solo lectura.
+    await exigirRecetaPropia(tx, idModelo);
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'avios');
       // ⭐ V1-E3d (§Post-F9.43): AQUÍ YA NO SE TOCAN LAS ÓRDENES. Antes, editar el BOM del modelo
       // recalculaba el estado de sus órdenes (`recalcularEstadoOrdenesDeModelo`) — el "alcance
       // hacia atrás" que la etapa vino a cortar: cada orden tiene su receta CONGELADA, así que
@@ -906,6 +1009,30 @@ export async function listarAviosBom(
  * incluidos— y sus `Archivo` sin dueño se limpian con la misma regla de foto compartida que usa
  * `arte-modelo.ts` (D3: nada se borra en silencio).
  *
+ * ---
+ * ## ⭐ V1-E9b pieza B — LOS DOS LADOS DE LA RECETA COMPARTIDA, Y SE TRATAN DISTINTO
+ *
+ * **El DESTINO se BLOQUEA** ({@link exigirRecetaPropia}). Copiar sobre un hijo del linaje 1:N
+ * reescribiría la receta del desarrollo y la de sus hermanos de color — y con `reemplazar: true`,
+ * que es el DEFAULT (`CopiarBomDialogo.tsx`), primero la BORRA. El arte se borra **de verdad** (ver
+ * el aviso de arriba) y sólo sobrevive en la bitácora. Ése era el defecto silencioso y destructivo
+ * que esta pieza vino a cerrar: la operación “salía bien”, sin error y sin aviso.
+ *
+ * **El ORIGEN se RESUELVE.** Leerlo es una LECTURA como cualquier otra: copiar DESDE un hijo tiene
+ * que traer la receta que ese hijo enseña —la de su padre— y no una lista vacía. Las cuatro
+ * consultas de abajo (telas, avíos, arte y las medidas por talla) usan `idRecetaOrigen`, nunca
+ * `datos.idOrigen` en crudo.
+ *
+ * **Y la guarda origen≠destino se compara YA RESUELTA.** Copiar del padre a un hijo (o de un hijo a
+ * su padre) no es el mismo id **pero es la misma receta**: sin resolver los dos lados, la copia
+ * borraría la receta y la volvería a poner sobre sí misma. Comparar los ids crudos no lo ve.
+ *
+ * **Al REEMPLAZAR se borran los artes del destino**, y las fotos que quedan sin dueño se borran
+ * también de R2 (objeto físico incluido), TRAS el commit y en modo BEST-EFFORT (0.081a). Las fotos
+ * que OTRO arte siga compartiendo no se tocan.
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto) — ver
+ * {@link eliminarObjetosBestEffort}.
+ *
  * @example
  * await copiarBom(sesion, idDestino, { idOrigen: idBase, reemplazar: true });
  */
@@ -914,25 +1041,50 @@ export async function copiarBom(
   idDestino: number,
   entrada: EntradaCopiarBom,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<BomModelo> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCopiarBomCuerpo, entrada);
 
+  // El choque LITERAL se ataja antes de abrir la transacción: es el error común (elegirse a uno
+  // mismo en el selector) y no necesita la base. El choque por receta COMPARTIDA —que sí la
+  // necesita— se comprueba adentro, con su propio mensaje.
   if (datos.idOrigen === idDestino) {
     throw new ErrorValidacion('El modelo de origen y el de destino no pueden ser el mismo.');
   }
 
-  return enTransaccion(async (tx) => {
+  // Keys de R2 de las fotos de arte que el REEMPLAZO dejó sin dueño y la tx llegó a borrar. Se
+  // acumulan dentro de la transacción y se consumen DESPUÉS del commit (0.081a): si la tx revienta,
+  // la excepción se lleva por delante el borrado físico y no se toca un solo objeto del bucket.
+  const keysR2: string[] = [];
+
+  const bom = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idDestino);
     await exigirModelo(tx, datos.idOrigen);
+    // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (ver la nota de arriba).
+    await exigirRecetaPropia(tx, idDestino);
+
+    // Los DOS lados resueltos, no uno: la guarda de abajo compara RECETAS, no modelos, y el
+    // origen se lee de quien de verdad tiene las filas. Se resuelven los dos aunque el destino
+    // acabe de pasar por `exigirRecetaPropia`, para que la comparación no dependa de esa guarda.
+    const [idRecetaOrigen, idRecetaDestino] = await Promise.all([
+      resolverIdRecetaDeModelo(tx, datos.idOrigen),
+      resolverIdRecetaDeModelo(tx, idDestino),
+    ]);
+    if (idRecetaOrigen === idRecetaDestino) {
+      throw new ErrorValidacion(
+        'Esos dos modelos COMPARTEN la misma receta (uno nació del otro), así que copiarla sería ' +
+          'copiarla sobre sí misma. Elige un modelo de origen de otro desarrollo.',
+      );
+    }
 
     const [telasOrigen, aviosOrigen, artesOrigen] = await Promise.all([
-      tx.modeloTela.findMany({ where: { idModelo: datos.idOrigen } }),
-      tx.modeloAvio.findMany({ where: { idModelo: datos.idOrigen } }),
+      tx.modeloTela.findMany({ where: { idModelo: idRecetaOrigen } }),
+      tx.modeloAvio.findMany({ where: { idModelo: idRecetaOrigen } }),
       // Ordenados como se despliegan: al FUSIONAR se reindexan detrás de lo que ya tiene el
       // destino, así que el orden relativo del origen (su arte principal primero) se respeta.
       tx.modeloArte.findMany({
-        where: { idModelo: datos.idOrigen },
+        where: { idModelo: idRecetaOrigen },
         orderBy: [{ orden: 'asc' }, { id: 'asc' }],
         include: { fotos: { select: { idArchivo: true, orden: true }, orderBy: { orden: 'asc' } } },
       }),
@@ -975,7 +1127,10 @@ export async function copiarBom(
         for (const idArchivo of new Set(
           artesBorradas.flatMap((a) => a.fotos.map((f) => f.idArchivo)),
         )) {
-          await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+          const key = await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+          if (key !== null) {
+            keysR2.push(key);
+          }
         }
       }
     }
@@ -1013,6 +1168,9 @@ export async function copiarBom(
           idModelo: idDestino,
           idTela: t.idTela,
           consumoPorPrenda: t.consumoPorPrenda,
+          // ⭐⭐ 0.156 — el consumo del COMPLEMENTO viaja con el renglón, igual que el amarre:
+          // copiar una receta y perder el cárdigan dejaría al destino comprando media tela.
+          consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
           paraPreCosto: t.paraPreCosto,
           paraProduccion: t.paraProduccion,
           paraCosto: t.paraCosto,
@@ -1043,7 +1201,7 @@ export async function copiarBom(
       // "se consume por talla" encendido y la matriz VACÍA — el destino quedaba con un avío que
       // dice costear por talla y no tiene ni una medida (y su amarre medida×talla, perdido).
       const medidasOrigen = await tx.modeloAvioTalla.findMany({
-        where: { idModelo: datos.idOrigen, idAvio: { in: aviosACrear.map((a) => a.idAvio) } },
+        where: { idModelo: idRecetaOrigen, idAvio: { in: aviosACrear.map((a) => a.idAvio) } },
       });
       if (medidasOrigen.length > 0) {
         await tx.modeloAvioTalla.createMany({
@@ -1099,7 +1257,7 @@ export async function copiarBom(
       }
     }
 
-    await tocarModelo(tx, sesion, idDestino);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idDestino, 'copia-de-otro-modelo');
     // V1-E3d: copiar un BOM ya no alcanza a las órdenes del modelo destino (su receta está
     // congelada). Ver la nota de `reemplazarAviosBom`.
     await registrarBitacora(tx, sesion, {
@@ -1109,6 +1267,9 @@ export async function copiarBom(
       datos: {
         bom: 'copiar',
         idOrigen: datos.idOrigen,
+        // Si el origen era un HIJO del linaje 1:N, la receta salió de OTRO modelo (su desarrollo):
+        // el rastro tiene que decir de dónde vinieron de verdad las filas (A7/D3).
+        ...(idRecetaOrigen === datos.idOrigen ? {} : { idModeloDeLaRecetaOrigen: idRecetaOrigen }),
         reemplazar: datos.reemplazar,
         telas: telasACrear.length,
         avios: aviosACrear.length,
@@ -1118,4 +1279,12 @@ export async function copiarBom(
 
     return leerBom(tx, idDestino, sesion.idEmpresaActiva);
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos de arte que reemplazó la copia de receta al modelo ${String(idDestino)}`,
+  );
+
+  return bom;
 }

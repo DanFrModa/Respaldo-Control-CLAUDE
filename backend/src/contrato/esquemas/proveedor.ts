@@ -24,9 +24,27 @@ const esquemaRolesIds = z
   .refine((ids) => new Set(ids).size === ids.length, { error: 'Hay roles repetidos' });
 
 /** Campos fiscales/comerciales/operativos del proveedor (R15 §4), todos opcionales. */
+/**
+ * Cómo sale físicamente el dinero en la corrida semanal (0.113). Espejo del enum Prisma
+ * `FormaDePago`; se declara aquí —ARRIBA DEL TODO, antes de su primer uso— y no se importa de
+ * `concepto-pago.ts`: ese módulo importa de éste, y el ciclo dejaría uno de los dos sin
+ * inicializar (con la declaración más abajo el generador de OpenAPI truena con «Cannot access
+ * FORMAS_DE_PAGO_PROVEEDOR before initialization»: zona muerta temporal). `concepto-pago.ts` re-exporta la
+ * MISMA constante bajo `FORMAS_DE_PAGO`, así que la lista sigue siendo una sola.
+ */
+export const FORMAS_DE_PAGO_PROVEEDOR = ['efectivo', 'transferencia'] as const;
+
 const camposEnriquecidos = {
   // ── Fiscal ──────────────────────────────────────────────────────────────────
-  factura: z.boolean({ error: '¿Factura? debe ser verdadero o falso' }).optional(),
+  //
+  // 🔴 AQUÍ YA NO ESTÁ `factura` (fila 0.124, Daniel 3-sep-2026 — §Post-F9.188(d): *"es un error
+  // que existan"*). La pregunta *"¿este proveedor factura?"* se contestaba DOS veces —esa bandera
+  // y `modalidadFacturacion`— y nada impedía que se contradijeran: un `factura=false` + `solo_con`
+  // mandaba su entrada de tela por el camino SIN factura y su captura de CxP por el camino CON
+  // factura, o sea **sus pagos partidos en dos según la puerta**. Hoy la contesta
+  // `modalidadFacturacion` (abajo) y donde aún haga falta el booleano se DERIVA con `emiteFactura`
+  // (`dominio/terceros/facturacion-proveedor.ts`). La columna sigue en la base como histórico
+  // (REGLA 0-B) y se sigue exponiendo DERIVADA en la salida, pero ya no se captura.
   rfc: z
     .string()
     .trim()
@@ -78,6 +96,21 @@ const camposEnriquecidos = {
     .trim()
     .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' })
     .optional(),
+  /**
+   * ⭐ EFECTIVO o TRANSFERENCIA por omisión, para la corrida semanal (0.113; §Post-F9.189(c)):
+   * *«podemos dejarlo como default de cada proveedor, pero con opción a cambiarlo — de pronto un
+   * maquilero me pide que le pague una semana en efectivo»*. Cada renglón de la corrida lo puede
+   * cambiar; esto es sólo la sugerencia.
+   *
+   * ⚠️ NO confundir con `formaPago` (de arriba), que es TEXTO LIBRE con la clave del SAT para el
+   * CFDI ("03 — Transferencia") y quedó SUPERADO: ya no se captura en pantalla.
+   */
+  formaPagoPreferida: z
+    .enum(FORMAS_DE_PAGO_PROVEEDOR, {
+      error: 'La forma de pago debe ser efectivo o transferencia',
+    })
+    .nullable()
+    .optional(),
   metodoPago: z.enum(METODOS_PAGO, { error: 'El método de pago debe ser PUE o PPD' }).optional(),
   banco: z
     .string()
@@ -120,8 +153,14 @@ const camposEnriquecidos = {
     .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' })
     .optional(),
 
-  // ── Facturación EsMa (F6-E4/E5, decisión (h)) ────────────────────────────────
-  /** Modalidad de facturación de su cuenta de maquila (solo_con/solo_sin/ambos). */
+  // ── Facturación (F6-E4/E5 decisión (h); general del proveedor desde §Post-F9.57) ─
+  /**
+   * Modalidad de facturación del proveedor (solo_con/solo_sin/ambos).
+   *
+   * ⚠️ Aquí es `.optional()` porque este bloque lo comparten el ALTA, la EDICIÓN y la MIGRACIÓN, y
+   * cada una lo trata distinto. En el ALTA es **OBLIGATORIA** (fila 0.110): la sobrescribe
+   * {@link esquemaProveedorCrear}. Ver ahí el porqué.
+   */
   modalidadFacturacion: z
     .enum(MODALIDADES_FACTURACION, { error: 'La modalidad de facturación no es válida' })
     .optional(),
@@ -131,7 +170,7 @@ const camposEnriquecidos = {
  * Variante de EDICIÓN de los campos enriquecidos: los de texto/numéricos/enum
  * aceptan además `null` para poder VACIAR un dato ya capturado (M1). Semántica del
  * PATCH parcial: omitir el campo (`undefined`) = no tocar; mandar `null` = ponerlo a
- * null (borrar). Las banderas (`factura`/`retieneIva`/`retieneIsr`) NO se hacen
+ * null (borrar). Las banderas (`retieneIva`/`retieneIsr`) NO se hacen
  * nullable: el formulario siempre las manda como boolean y `undefined` basta para
  * "no tocar". `.nullable()` se aplica SOBRE el `.optional()` ya existente, así que
  * cada campo acepta `undefined | null | <valor válido>` conservando sus reglas.
@@ -154,10 +193,14 @@ const camposEnriquecidosEditar = {
   leadTimeDias: camposEnriquecidos.leadTimeDias.nullable(),
   notas: camposEnriquecidos.notas.nullable(),
   // Fusión de terceros (D12/R15): `obsPago` se puede VACIAR (M1); `asegurado`
-  // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
+  // es bandera (omitir = no tocar), no se hace nullable (igual que las retenciones).
   obsPago: camposEnriquecidos.obsPago.nullable(),
-  // Modalidad de facturación EsMa (enum): se puede VACIAR (null = "no definido").
-  modalidadFacturacion: camposEnriquecidos.modalidadFacturacion.nullable(),
+  // ⭐ Modalidad de facturación: **NO es nullable** (fila 0.110). Omitir = no tocar (así siguen
+  // funcionando los PATCH parciales: desactivar/reactivar un proveedor, o la fusión de roles del
+  // ETL). Pero mandar `null` —vaciarla— se RECHAZA: es el único campo del formulario que no se
+  // puede dejar sin definir, porque decide de dónde sale el pago del proveedor (§Post-F9.186(a)).
+  // Efecto en la pantalla: abrir y GUARDAR la ficha de un proveedor migrado obliga a elegirla.
+  modalidadFacturacion: camposEnriquecidos.modalidadFacturacion,
 } as const;
 
 // ── CONTACTOS del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1 / §Post-F9.57 punto 1) ──────────
@@ -242,6 +285,201 @@ export const esquemaProveedorContactoSalida = z
 /** Contacto de proveedor tal como sale de la API. */
 export type ProveedorContactoSalida = z.infer<typeof esquemaProveedorContactoSalida>;
 
+// ── CUENTAS / DESTINOS DE PAGO del proveedor (0.112) ─────────────────────────────────────────────
+//
+// 🔴 Salió de LEER el Excel con el que Daniel paga cada semana (~150 beneficiarios), no de una
+// entrevista. Dos hallazgos, y ninguno cabía en `Proveedor.banco` + `Proveedor.clabe`:
+// 🔒 Los nombres son INVENTADOS: los reales son personas físicas y el repo es PÚBLICO (fila 0.123).
+//   1. El BENEFICIARIO casi nunca es el proveedor («TALLER NORTE 1» se deposita a otra persona).
+//   2. «TALLER NORTE 1 / 2 / 3» no son tres proveedores: es UNO con TRES cuentas, partido en tres
+//      renglones porque Excel no sabe modelar otra cosa.
+// Daniel: *«Estaría bien poder tener más de una cuenta, definir una como default, pero tener las
+// demás como historial de cuentas, para poder reutilizarlas.»* Y: *«Tendría una cuenta Fiscal, y
+// podría tener más de una cuenta no fiscal.»*
+
+/** Cómo se identifica el destino del depósito. Espejo del enum Prisma `TipoCuentaPago`. */
+export const TIPOS_CUENTA_PAGO = ['clabe', 'tarjeta'] as const;
+/** Clave de tipo de cuenta de pago. */
+export type TipoCuentaPagoClave = (typeof TIPOS_CUENTA_PAGO)[number];
+
+/** Etiquetas para UI de cada tipo de cuenta. */
+export const ETIQUETAS_TIPO_CUENTA_PAGO: Record<TipoCuentaPagoClave, string> = {
+  clabe: 'CLABE interbancaria',
+  tarjeta: 'Tarjeta de débito',
+};
+
+/** Dígitos de una CLABE (Banxico): 17 + dígito de control. */
+const LARGO_CLABE = 18;
+/** Rango de dígitos de un número de tarjeta (PAN): 15 (Amex) a 19. */
+const LARGO_TARJETA_MIN = 15;
+const LARGO_TARJETA_MAX = 19;
+
+/**
+ * Deja SÓLO los dígitos de un número de cuenta capturado a mano o pegado del banco (que llega con
+ * espacios, guiones o puntos). Es lo que se guarda: así la unicidad por proveedor compara peras con
+ * peras y no deja pasar la misma cuenta escrita de dos maneras.
+ */
+export function normalizarNumeroDeCuenta(cuenta: string): string {
+  return cuenta.replace(/\D/g, '');
+}
+
+/**
+ * ¿Qué tiene de malo este número para el tipo declarado? Devuelve el mensaje en español, o `null`
+ * si está bien. Función PURA y COMPARTIDA a propósito: la usa el Zod del alta (donde el par llega
+ * completo) y la usa el DOMINIO al editar (donde el tipo puede venir de la base y el número del
+ * cuerpo, o al revés) — una sola regla, dos lugares que la aplican.
+ *
+ * ⚠️ **Tiene un ESPEJO en el front**, `frontend/src/modulos/proveedores/cuentas-pago.ts` (mismo
+ * criterio que `esClabeValida`, que ya vivía duplicado): el aviso al capturar tiene que decir lo
+ * mismo que contesta el servidor. **Si cambian estas reglas o los largos, cámbialos también allá.**
+ *
+ * La CLABE se valida ENTERA (18 dígitos + dígito de control de Banxico), igual que el campo viejo:
+ * una CLABE con el control mal es un error de dedo garantizado. La TARJETA sólo se valida por
+ * longitud (15–19 dígitos) y NO por Luhn: rebotar la captura de Daniel el día que esté cargando sus
+ * ~150 beneficiarios cuesta más que dejar pasar un dígito cambiado, que el banco rechaza igual.
+ */
+export function motivoCuentaInvalida(tipo: TipoCuentaPagoClave, cuenta: string): string | null {
+  const digitos = normalizarNumeroDeCuenta(cuenta);
+  if (digitos === '') {
+    return 'Escribe el número de la cuenta.';
+  }
+  if (tipo === 'clabe') {
+    if (digitos.length !== LARGO_CLABE) {
+      return `La CLABE debe tener ${LARGO_CLABE} dígitos (llevas ${digitos.length}).`;
+    }
+    return esClabeValida(digitos)
+      ? null
+      : 'La CLABE no es válida: su dígito de control no cuadra. Revisa el número.';
+  }
+  if (digitos.length < LARGO_TARJETA_MIN || digitos.length > LARGO_TARJETA_MAX) {
+    return `El número de tarjeta debe tener entre ${LARGO_TARJETA_MIN} y ${LARGO_TARJETA_MAX} dígitos (llevas ${digitos.length}).`;
+  }
+  return null;
+}
+
+/**
+ * Campos comunes de una cuenta de pago (mismas reglas en alta y edición).
+ *
+ * ⭐ **Se EXPORTA porque hay dos tablas de cuentas con la misma forma**: la del proveedor (0.112) y
+ * la del concepto de pago que no es proveedor (`concepto-pago.ts`, 0.125). Las reglas de captura son
+ * las mismas y se escriben UNA vez; el que difiere es el dueño, que va en la URL.
+ */
+export const camposCuentaPago = {
+  /**
+   * ⭐ A NOMBRE DE QUIÉN está la cuenta. Obligatorio, y **casi nunca es el proveedor**: por eso no
+   * se deriva de él ni se deja vacío "porque se entiende".
+   */
+  beneficiario: z
+    .string({ error: 'El beneficiario es obligatorio' })
+    .trim()
+    .min(1, { error: 'Escribe a nombre de quién está la cuenta' })
+    .max(150, { error: 'El beneficiario no puede tener más de 150 caracteres' }),
+  /** Banco del destino ("BBVA", "Banorte"…). Texto libre: no hay catálogo de bancos. */
+  banco: z
+    .string()
+    .trim()
+    .max(100, { error: 'El banco no puede tener más de 100 caracteres' })
+    .optional(),
+  tipoCuenta: z.enum(TIPOS_CUENTA_PAGO, { error: 'El tipo de cuenta debe ser CLABE o tarjeta' }),
+  /** El número tal como se captura (con o sin espacios); se guarda sólo con dígitos. */
+  cuenta: z
+    .string({ error: 'El número de cuenta es obligatorio' })
+    .trim()
+    .min(1, { error: 'Escribe el número de la cuenta' })
+    .max(40, { error: 'El número de cuenta no puede tener más de 40 caracteres' }),
+  /** Cómo la llama Daniel en su relación: su «1», «2», «3»… o "la de la esposa". */
+  alias: z
+    .string()
+    .trim()
+    .max(60, { error: 'El alias no puede tener más de 60 caracteres' })
+    .optional(),
+  /** ⭐ ¿Es la cuenta FISCAL? A ella puede salir un pago CON factura. */
+  esFiscal: z.boolean({ error: '¿Es cuenta fiscal? debe ser verdadero o falso' }).optional(),
+  notas: z
+    .string()
+    .trim()
+    .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' })
+    .optional(),
+} as const;
+
+/**
+ * Alta de una cuenta de pago (el proveedor va en la URL, no en el cuerpo).
+ *
+ * `esDefault` NO se pide en el alta: la PRIMERA cuenta del proveedor queda default sola (el dominio
+ * lo decide) y las demás se promueven después con el PATCH. Así el alta nunca compite por la marca.
+ */
+export const esquemaProveedorCuentaPagoCrear = z
+  .object(camposCuentaPago)
+  .superRefine((datos, ctx) => {
+    const motivo = motivoCuentaInvalida(datos.tipoCuenta, datos.cuenta);
+    if (motivo !== null) {
+      ctx.addIssue({ code: 'custom', message: motivo, path: ['cuenta'] });
+    }
+  })
+  .describe('Alta de una cuenta/destino de pago del proveedor.');
+
+/** Datos validados del alta de una cuenta de pago. */
+export type DatosProveedorCuentaPagoCrear = z.infer<typeof esquemaProveedorCuentaPagoCrear>;
+
+/**
+ * Edición PARCIAL de una cuenta: omitir = no tocar; `null`/'' = borrar el dato opcional.
+ *
+ * El par (tipo, número) NO se puede validar aquí cuando sólo viene uno de los dos: el otro está en
+ * la base. Esa validación la hace el DOMINIO sobre el par EFECTIVO, con la misma función pura
+ * (`motivoCuentaInvalida`) — la autoridad es el servidor (A1), no este esquema.
+ */
+export const esquemaProveedorCuentaPagoEditarCuerpo = z
+  .object({
+    beneficiario: camposCuentaPago.beneficiario.optional(),
+    banco: camposCuentaPago.banco.nullable(),
+    tipoCuenta: camposCuentaPago.tipoCuenta.optional(),
+    cuenta: camposCuentaPago.cuenta.optional(),
+    alias: camposCuentaPago.alias.nullable(),
+    esFiscal: camposCuentaPago.esFiscal,
+    notas: camposCuentaPago.notas.nullable(),
+    /**
+     * ⭐ `true` la vuelve LA cuenta por omisión del proveedor (y apaga la que lo era, en la misma
+     * transacción); `false` sólo le quita la marca — no promueve a nadie más.
+     */
+    esDefault: z
+      .boolean({ error: '¿Es la cuenta por omisión? debe ser verdadero o falso' })
+      .optional(),
+    /** Borrado SUAVE (D3): `false` RETIRA la cuenta (queda como historial), `true` la revive. */
+    activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
+  })
+  .describe('Edición parcial de una cuenta/destino de pago del proveedor.');
+
+/** Datos validados de la edición de una cuenta de pago. */
+export type DatosProveedorCuentaPagoEditarCuerpo = z.infer<
+  typeof esquemaProveedorCuentaPagoEditarCuerpo
+>;
+
+/**
+ * Forma de una cuenta de pago tal como la devuelve la API.
+ *
+ * ⚠️ `esDefault` sale como **boolean puro**: adentro la columna es `true`/NULL (así la base
+ * garantiza una sola default por proveedor), pero eso es plomería del esquema y no tiene por qué
+ * cruzar el contrato. La ruta lo proyecta con `=== true`.
+ */
+export const esquemaProveedorCuentaPagoSalida = z
+  .object({
+    id: z.number().int().describe('Id de la cuenta.'),
+    idProveedor: z.number().int().describe('Id del proveedor dueño de la cuenta.'),
+    beneficiario: z.string().describe('A nombre de quién está la cuenta (el del depósito).'),
+    banco: z.string().nullable().describe('Banco, o null.'),
+    tipoCuenta: z.enum(TIPOS_CUENTA_PAGO).describe('CLABE o tarjeta.'),
+    cuenta: z.string().describe('El número, sólo dígitos.'),
+    alias: z.string().nullable().describe('Cómo se le llama en la relación de pago ("1", "2"…).'),
+    esFiscal: z.boolean().describe('Verdadero si a ella puede salir un pago CON factura.'),
+    esDefault: z.boolean().describe('Verdadero si es LA cuenta por omisión del proveedor.'),
+    notas: z.string().nullable().describe('Notas, o null.'),
+    activo: z.boolean().describe('Falso si está retirada (sigue siendo historial reutilizable).'),
+  })
+  .describe('Cuenta/destino de pago de un proveedor.');
+
+/** Cuenta de pago tal como sale de la API. */
+export type ProveedorCuentaPagoSalida = z.infer<typeof esquemaProveedorCuentaPagoSalida>;
+
 // ── CONSTANCIA DE SITUACIÓN FISCAL (V1-E3f pieza B, §Post-F9.55) ─────────────────────────────────
 //
 // Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
@@ -304,11 +542,18 @@ export type AnalizarConstanciaSalida = z.infer<typeof esquemaAnalizarConstanciaS
  * Alta de proveedor (catálogo global F1-E1, ADR-0007: sin `idEmpresa`). El nombre
  * es la clave de negocio (único global); los demás datos son opcionales.
  *
- * F1-E1B (R15): agrega `roles` (multi-valor, ≥1 lo exige el dominio en alta), campos
- * fiscales/comerciales/operativos y la regla `factura ⇒ rfc + regimenFiscalSat`
- * (validada como regla de captura aquí; el dominio la repite, A1).
+ * F1-E1B (R15): agrega `roles` (multi-valor, ≥1 lo exige el dominio en alta) y los campos
+ * fiscales/comerciales/operativos.
+ *
+ * ⚠️ La regla de captura R15 —*"si el proveedor factura, captura su RFC y su régimen fiscal"*— ya
+ * NO existe (fila 0.124). Colgaba de `factura`, que salió del contrato de escritura, y **no se
+ * remapeó a `modalidadFacturacion` a propósito**: habría bloqueado justo el trabajo que abrió la
+ * fila 0.110 —ponerle la modalidad a los ~155 proveedores MIGRADOS, que llegan sin RFC A PROPÓSITO
+ * (REGLA 0-B: lo que falta se tolera, no se compensa)—. El RFC se sigue exigiendo donde de verdad
+ * decide dinero, y con mejor mensaje: al capturar un CFDI a su nombre (`exigirRfcDelProveedor`,
+ * `dominio/inventarios/cfdi-entrada-tela.ts`), que además corta la operación entera.
  */
-export const esquemaProveedorCrear = z
+const baseProveedorCrear = z
   .object({
     nombre: z
       .string({ error: 'El nombre es obligatorio' })
@@ -344,19 +589,48 @@ export const esquemaProveedorCrear = z
     roles: esquemaRolesIds.optional(),
     ...camposEnriquecidos,
   })
-  .refine(
-    // Regla de captura R15: si emite CFDI, exige RFC y régimen fiscal. Se valida
-    // sobre el payload de captura (no rompe filas migradas, que no mandan `factura`).
-    (datos) =>
-      datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== ''),
-    {
-      error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-      path: ['rfc'],
-    },
-  );
+  .describe('Alta de proveedor (base compartida por la captura y la migración).');
 
-/** Datos validados de alta de proveedor. */
+/**
+ * ALTA de proveedor (captura normal). Igual que la base, pero con la **modalidad de facturación
+ * OBLIGATORIA** (fila 0.110).
+ *
+ * ⭐ POR QUÉ ES OBLIGATORIA. Daniel (3-sep-2026, §Post-F9.186(a)): *"es un campo **obligatorio** de
+ * llenar. **A fuerzas hay que definir si es con, sin o ambas**"*. La marca con/sin factura decide
+ * **de dónde sale el pago** del proveedor: CON factura el pago nace del estado de cuenta del BANCO;
+ * SIN factura nace de la RELACIÓN que Daniel define y que se ejecuta tal cual (§Post-F9.184(f)). Un
+ * proveedor sin clasificar deja al sistema sin saber por cuál de los dos caminos meter su pago —y
+ * ese pago se pierde o se duplica—, así que la pregunta se hace **al darlo de alta**, no después.
+ *
+ * ⚠️ REGLA 0-B: esto NO toca a los proveedores que ya existen. Los migrados siguen consultándose,
+ * apareciendo en su estado de cuenta y en los reportes con la modalidad vacía; lo único que no se
+ * puede es **crear uno nuevo** sin ella (ni capturarle un movimiento hasta definírsela). La
+ * migración usa {@link esquemaProveedorCrearMigrado}.
+ */
+export const esquemaProveedorCrear = baseProveedorCrear.extend({
+  modalidadFacturacion: z.enum(MODALIDADES_FACTURACION, {
+    error:
+      'Indica cómo factura este proveedor: solo con factura, solo sin factura, o de las dos formas',
+  }),
+});
+
+/**
+ * ALTA en modo MIGRACIÓN: idéntica al alta normal salvo que la modalidad de facturación **puede
+ * faltar**. Uso EXCLUSIVO del ETL (`migracion/loaders/proveedores.ts`), **jamás desde una ruta
+ * REST** — el mismo patrón que `registrarMovimientoTerceroInterno` en el motor de terceros.
+ *
+ * Existe por la REGLA 0-B (`CLAUDE.md` §7): el sistema viejo nunca hizo esta pregunta, así que el
+ * histórico llega con el dato vacío **a propósito** y eso NO es un defecto. Daniel: *"yo me encargo
+ * de ponerlo bien cuando hagamos la migración de datos reales"*. Rellenarlo aquí con un valor
+ * inventado sería justo lo que la regla prohíbe.
+ */
+export const esquemaProveedorCrearMigrado = baseProveedorCrear;
+
+/** Datos validados de alta de proveedor (captura normal: la modalidad viene siempre). */
 export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
+
+/** Datos validados de alta de proveedor en modo MIGRACIÓN (la modalidad puede faltar). */
+export type DatosProveedorCrearMigrado = z.infer<typeof esquemaProveedorCrearMigrado>;
 
 /**
  * Edición de proveedor: todos los campos del alta son opcionales (edición parcial)
@@ -368,8 +642,9 @@ export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
  * sin default.
  *
  * `roles`: si se omite, NO se tocan los roles existentes; si se manda (aunque sea []),
- * el dominio reemplaza el set — y exige ≥1 (no puede quedar en 0). La misma regla
- * `factura ⇒ rfc + régimen` aplica, pero solo cuando el payload trae `factura: true`.
+ * el dominio reemplaza el set — y exige ≥1 (no puede quedar en 0). La regla de captura R15
+ * (*factura ⇒ RFC + régimen*) desapareció con la casilla `factura` en la fila 0.124: ver el TSDoc
+ * del alta.
  */
 const baseProveedorEditar = z
   .object({
@@ -418,38 +693,16 @@ const baseProveedorEditar = z
       .positive({ error: 'El id del proveedor debe ser positivo' }),
   });
 
-/**
- * Regla de captura compartida por crear/editar: factura ⇒ RFC + régimen fiscal. En
- * edición rfc/régimen pueden llegar `null` (intento de vaciarlos); `?? ''` los trata
- * como ausentes, así que poner factura sin RFC —o vaciar el RFC con factura activa—
- * falla la regla (no se puede facturar sin RFC).
- */
-const reglaFacturaExigeRfc = (datos: {
-  factura?: boolean | null | undefined;
-  rfc?: string | null | undefined;
-  regimenFiscalSat?: string | null | undefined;
-}): boolean =>
-  datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== '');
-
-export const esquemaProveedorEditar = baseProveedorEditar.refine(reglaFacturaExigeRfc, {
-  error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-  path: ['rfc'],
-});
+export const esquemaProveedorEditar = baseProveedorEditar;
 
 /** Datos validados de edición de proveedor. */
 export type DatosProveedorEditar = z.infer<typeof esquemaProveedorEditar>;
 
 /**
  * Cuerpo del PATCH de proveedor (la ruta REST recibe el `id` en la URL, no en el body).
- * Se deriva del esquema OBJETO base (antes del `.refine()`, que produce un efecto sin
- * `.omit()`), omitiendo `id` y re-aplicando la regla `factura ⇒ RFC`.
+ * Se deriva del esquema base omitiendo `id`.
  */
-export const esquemaProveedorPatchCuerpo = baseProveedorEditar
-  .omit({ id: true })
-  .refine(reglaFacturaExigeRfc, {
-    error: 'Si el proveedor factura, captura su RFC y su régimen fiscal',
-    path: ['rfc'],
-  });
+export const esquemaProveedorPatchCuerpo = baseProveedorEditar.omit({ id: true });
 
 /** Datos validados del cuerpo del PATCH de proveedor (sin `id`). */
 export type DatosProveedorPatchCuerpo = z.infer<typeof esquemaProveedorPatchCuerpo>;
@@ -480,7 +733,16 @@ export const esquemaProveedorSalida = z
     telefono: z.string().nullable().describe('Teléfono, o null.'),
     condiciones: z.string().nullable().describe('Condiciones comerciales (texto libre), o null.'),
     // ── Fiscal (E1B) ──────────────────────────────────────────────────────────
-    factura: z.boolean().nullable().describe('¿Emite CFDI? (formal/informal), o null.'),
+    /**
+     * ¿Emite CFDI? **DERIVADO** de `modalidadFacturacion` desde la fila 0.124 (`solo_con`/`ambos`
+     * ⇒ true · `solo_sin` ⇒ false · sin modalidad ⇒ null). Ya no se captura ni se lee de la
+     * columna homónima, que queda como histórico (REGLA 0-B): exponerla tal cual dejaría que la
+     * respuesta del API contradijera a la del catálogo — el defecto que esta fila cerró.
+     */
+    factura: z
+      .boolean()
+      .nullable()
+      .describe('¿Emite CFDI? DERIVADO de modalidadFacturacion (solo_sin ⇒ false), o null.'),
     rfc: z.string().nullable().describe('RFC, o null.'),
     regimenFiscalSat: z.string().nullable().describe('Régimen fiscal del SAT, o null.'),
     usoCfdiHabitual: z.string().nullable().describe('Uso de CFDI habitual, o null.'),
@@ -493,7 +755,14 @@ export const esquemaProveedorSalida = z
     // ── Comercial / pago (E1B) ──────────────────────────────────────────────────
     diasCredito: z.number().int().nullable().describe('Días de crédito (null/0 = contado).'),
     moneda: z.string().nullable().describe('Moneda habitual (MXN/USD), o null.'),
-    formaPago: z.string().nullable().describe('Forma de pago, o null.'),
+    formaPago: z
+      .string()
+      .nullable()
+      .describe('Clave del SAT para el CFDI (SUPERADA por formaPagoPreferida), o null.'),
+    formaPagoPreferida: z
+      .enum(FORMAS_DE_PAGO_PROVEEDOR)
+      .nullable()
+      .describe('Efectivo o transferencia por omisión en la corrida semanal, o null.'),
     metodoPago: z.string().nullable().describe('Método de pago CFDI (PUE/PPD), o null.'),
     banco: z.string().nullable().describe('Banco, o null.'),
     clabe: z.string().nullable().describe('CLABE interbancaria, o null.'),
@@ -513,6 +782,11 @@ export const esquemaProveedorSalida = z
     contactos: z
       .array(esquemaProveedorContactoSalida)
       .describe('Contactos ACTIVOS del proveedor (V1-E3f pieza B).'),
+    cuentasPago: z
+      .array(esquemaProveedorCuentaPagoSalida)
+      .describe(
+        'Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte.',
+      ),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
@@ -540,9 +814,14 @@ export const esquemaProveedoresQuery = z
       .number()
       .int()
       .min(1)
-      .max(500)
+      // ⚠️ 100 es el tope REAL, el del dominio (`comun/paginacion.ts`: "nadie lee más y protege la
+      // base"). El contrato decía 500 y era MENTIRA: el servicio re-valida con el esquema del
+      // dominio, así que quien leía el OpenAPI y pedía 500 recibía un 400. No es un cambio de
+      // conducta —hoy ya fallaba—: es dejar de prometer lo que nunca se cumplió. Que los dos lados
+      // sigan de acuerdo lo vigila `paginacion-honesta.test.ts`.
+      .max(100)
       .default(20)
-      .describe('Renglones por página (máx 500).'),
+      .describe('Renglones por página (máx 100).'),
     busqueda: z
       .string()
       .trim()

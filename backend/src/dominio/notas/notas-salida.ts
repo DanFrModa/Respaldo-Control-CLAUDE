@@ -67,7 +67,7 @@ import {
 import { EstatusNotaSalida, type Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import {
@@ -602,8 +602,9 @@ export async function crearNotaSalida(
 
   const idNota = await enTransaccion(async (tx) => {
     await exigirMaquileroExiste(tx, datos.idMaquilero);
-    // Almacén origen en el encabezado (decisión g): existe + activo + global o de la empresa (A9).
-    await exigirAlmacen(tx, datos.idAlmacen, idEmpresa);
+    // Almacén origen en el encabezado (decisión g): existe + activo + global o de la empresa (A9)
+    // y —fila 0.137— de AVIO: desde §Post-F9.38 la nota es SOLO de avíos, así que de ahí salen.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
     await validarRenglones(tx, idEmpresa, datos.lineas);
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_NOTA_SALIDA);
@@ -672,8 +673,9 @@ export async function actualizarNotaSalida(
       cambios.idMaquilero = datos.idMaquilero;
     }
     if (datos.idAlmacen !== undefined) {
-      // Almacén origen del encabezado (decisión g): existe + activo + global o de la empresa (A9).
-      await exigirAlmacen(tx, datos.idAlmacen, idEmpresa);
+      // Almacén origen del encabezado (decisión g): existe + activo + global o de la empresa (A9)
+      // y de AVIO (fila 0.137) — mismo criterio que el alta.
+      await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'AVIO', idEmpresa);
       cambios.idAlmacen = datos.idAlmacen;
     }
     if (datos.fechaElaboracion !== undefined) {
@@ -758,7 +760,7 @@ export async function confirmarNotaSalida(
     // Almacén ORIGEN del encabezado (decisión g): de aquí salen los avíos. Validado al crear/editar,
     // pero un almacén puede DESACTIVARSE entre el borrador y la confirmación: se re-valida aquí (mismo
     // helper y firma que crear/editar), antes de descontar, para no sacar de un almacén inactivo.
-    await exigirAlmacen(tx, nota.idAlmacen, idEmpresa);
+    await exigirAlmacenDelTipo(tx, nota.idAlmacen, 'AVIO', idEmpresa);
     const idAlmacen = nota.idAlmacen;
     const renglonesAvio = nota.lineas.filter((l) => l.idAvio !== null);
     if (renglonesAvio.length > 0) {

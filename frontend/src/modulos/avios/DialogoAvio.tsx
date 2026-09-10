@@ -58,6 +58,7 @@ const VALORES_INICIALES: DatosAvioFormulario = {
   favorito: false,
   cantFav: '',
   esGenerico: false,
+  seCompraSinColor: false,
   precioReferencia: '',
 };
 
@@ -108,6 +109,7 @@ function aCuerpoCrear(datos: DatosAvioFormulario, renglones: RenglonProveedorAvi
     presentacion: datos.presentacion,
     favorito: datos.favorito,
     esGenerico: datos.esGenerico,
+    seCompraSinColor: datos.seCompraSinColor,
     proveedores: aProveedoresCuerpo(renglones),
   };
   const cantFav = numeroOpcionalACuerpo(datos.cantFav);
@@ -135,6 +137,7 @@ function aCuerpoEditar(datos: DatosAvioFormulario, renglones: RenglonProveedorAv
     presentacion: datos.presentacion,
     favorito: datos.favorito,
     esGenerico: datos.esGenerico,
+    seCompraSinColor: datos.seCompraSinColor,
     cantFav: numeroOpcionalACuerpo(datos.cantFav) ?? null,
     precioReferencia: numeroOpcionalACuerpo(datos.precioReferencia) ?? null,
     proveedores: aProveedoresCuerpo(renglones),
@@ -196,6 +199,7 @@ export function DialogoAvio({
         favorito: avio.favorito,
         cantFav: numeroTexto(avio.cantFav),
         esGenerico: avio.esGenerico,
+        seCompraSinColor: avio.seCompraSinColor,
         precioReferencia: numeroTexto(avio.precioReferencia),
       });
       setRenglones(
@@ -375,6 +379,29 @@ export function DialogoAvio({
                   ¿Avío genérico de stock? (no se compra por orden)
                 </FieldLabel>
               </Field>
+
+              {/* ⭐⭐ fila 0.158 — Daniel: «hay ciertos avíos que no se compran por color… ¿cómo le
+                  puedo hacer para definirle que algunas cosas se compran juntas sin tomar en cuenta
+                  el color?». Va debajo del genérico porque se confunden con facilidad, y por eso el
+                  texto de abajo dice qué hace CADA uno. */}
+              <Field orientation="horizontal">
+                <input
+                  id="avio-sin-color"
+                  type="checkbox"
+                  className="size-4 rounded border-input accent-primary"
+                  disabled={guardando}
+                  data-testid="avio-sin-color"
+                  {...registrar('seCompraSinColor')}
+                />
+                <FieldLabel htmlFor="avio-sin-color" className="font-normal">
+                  ¿Se compra sin tomar en cuenta el color?
+                </FieldLabel>
+              </Field>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Marcado, la explosión de materiales junta todas las piezas de la orden en un solo
+                renglón (sin color) en vez de uno por color: es el caso de la etiqueta de lavado.
+                Sin marcar, cada color va en su propio renglón, como los cierres.
+              </p>
 
               <Field data-invalid={Boolean(errors.precioReferencia)}>
                 <FieldLabel htmlFor="avio-precio-ref">Precio de referencia</FieldLabel>

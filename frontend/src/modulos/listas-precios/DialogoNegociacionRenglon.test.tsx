@@ -49,6 +49,12 @@ vi.mock('@/modulos/desarrollo/DialogoPrecosto', () => ({
 vi.mock('./ComparadorVersiones', () => ({
   ComparadorVersiones: () => <div data-testid="stub-comparador" />,
 }));
+// La MESA (§Post-F9.138) tiene su propio archivo de pruebas (`MesaNegociacion.test.tsx`), donde se
+// prueba que al mover un costo el margen cambia en pantalla. Aquí sólo se estampa, para aseverar que
+// el diálogo la MONTA (y sólo con los dos permisos que su endpoint exige).
+vi.mock('./MesaNegociacion', () => ({
+  MesaNegociacion: () => <div data-testid="stub-mesa" />,
+}));
 
 function linea(): ListaLinea {
   return {
@@ -56,15 +62,30 @@ function linea(): ListaLinea {
     idDesarrollo: 3,
     idPrecosto: 11,
     versionPrecosto: 1,
+    avisoCostoViejo: null,
     codigoModelo: 'MOD-X',
     descripcionModelo: null,
     numeroCliente: null,
     costoUnit: 40,
     precioCalculado: 100,
     precioAprobado: null,
+    precioTarget: null, // ⭐ V1-E8w (§Post-F9.150): este renglón no trae target del cliente.
+    tieneTarget: false,
     aprobado: false,
     aprobadoPorId: null,
     aprobadoEn: null,
+    // ⭐⭐ Fila 0.153: el renglón todavía no tiene precio pactado (el diálogo es justo donde se
+    // pacta). El campo lo pinta la LISTA de afuera, no este diálogo.
+    precioNegociado: null,
+    tienePrecioNegociado: false,
+    precioNegociadoEn: null,
+    // ⭐ V1-E8x: el segundo eje del renglón (aquí, uno vivo).
+    estado: 'abierto' as const,
+    nombreEstado: 'Abierto',
+    estadoPorId: null,
+    estadoEn: null,
+    // ⭐ V1-E8y: los PENDIENTES del modelo (la libreta de la cita). Vacíos aquí.
+    pendientes: [],
   };
 }
 
@@ -81,7 +102,12 @@ function evento(
     precioNuevo: 120,
     acuerdo: 'Se quitan bolsas',
     registradoPorId: 'u1',
+    nombreRegistradoPor: 'Daniel Masri',
     registradoEn: '2026-07-06T10:00:00.000Z',
+    // ⭐ V1-E8w (§Post-F9.149): una RONDA no trae desglose de mesa. El caso con desglose lo pone
+    // su propia prueba, con importes ≠ 0.
+    costoEstimado: null,
+    costos: [],
     ...over,
   };
 }
@@ -130,6 +156,116 @@ describe('<DialogoNegociacionRenglon>', () => {
     expect(screen.getByTestId('stub-comparador')).toBeInTheDocument();
   });
 
+  /**
+   * ⭐ V1-E8q (§Post-F9.141) — lo que Daniel pidió VER, se prueba que SE VE.
+   *
+   * El hilo es "el porqué de cada número": dentro de seis meses se lee "estampado 9.00" y la
+   * pregunta no es cuánto sino POR QUÉ ése, y de quién salió. Por eso no basta con que el endpoint
+   * responda: hay que probar que el hilo se PINTA, con sus tres piezas —autor, fecha y texto— y en
+   * ORDEN cronológico. Antes de esta etapa la columna de autor no existía: se leía el qué y el
+   * cuándo, nunca el quién.
+   */
+  it('🔴 pinta el hilo completo: autor, fecha y texto de cada comentario, en orden', () => {
+    eventos = {
+      data: [
+        evento({ id: 1, acuerdo: 'Le bajaron dos colores', nombreRegistradoPor: 'Daniel Masri' }),
+        evento({
+          id: 2,
+          acuerdo: 'Le quitaron una costura al costado',
+          nombreRegistradoPor: 'Gabriel',
+        }),
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    const panel = screen.getByTestId('panel-negociacion');
+    const filas = within(panel).getAllByTestId('fila-evento-negociacion');
+    expect(filas).toHaveLength(2);
+
+    // Cada renglón trae SU autor, SU fecha y SU texto (no basta con que estén sueltos en la página).
+    expect(within(filas[0] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Daniel Masri',
+    );
+    expect(within(filas[0] as HTMLElement).getByText('Le bajaron dos colores')).toBeInTheDocument();
+    expect(within(filas[0] as HTMLElement).getByText(/2026/)).toBeInTheDocument();
+
+    expect(within(filas[1] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Gabriel',
+    );
+    expect(
+      within(filas[1] as HTMLElement).getByText('Le quitaron una costura al costado'),
+    ).toBeInTheDocument();
+
+    // ORDEN cronológico: el hilo se lee de arriba abajo, como se negoció.
+    const autores = within(panel)
+      .getAllByTestId('autor-evento')
+      .map((n) => n.textContent);
+    expect(autores).toEqual(['Daniel Masri', 'Gabriel']);
+  });
+
+  /**
+   * 🔴 V1-E8q (H3) — los TRES casos de `autorDeEvento`, que NO se pueden colapsar en dos.
+   *
+   * «Sistema» sólo cuando NADIE lo escribió (`registradoPorId === null`). Si hay id pero el nombre no
+   * resuelve, lo escribió una PERSONA: decir «Sistema» ahí **le atribuiría al sistema lo que dijo
+   * alguien en una mesa de negociación**. El backend distingue los dos casos; la pantalla también.
+   */
+  it('«Sistema» sólo si NADIE lo escribió; con id sin nombre dice que fue una persona', () => {
+    eventos = {
+      data: [
+        evento({
+          id: 1,
+          registradoPorId: null,
+          nombreRegistradoPor: null,
+          acuerdo: 'asiento auto',
+        }),
+        evento({
+          id: 2,
+          registradoPorId: 'cm3x9k2q0000abcd1234efgh',
+          nombreRegistradoPor: null,
+          acuerdo: 'lo escribió alguien',
+        }),
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    const filas = screen.getAllByTestId('fila-evento-negociacion');
+    // (1) sin autor → Sistema
+    expect(within(filas[0] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Sistema',
+    );
+    expect(within(filas[0] as HTMLElement).getByText('asiento auto')).toBeInTheDocument();
+    // (2) con id y sin nombre → NO es «Sistema», y NUNCA el id crudo
+    const autor2 = within(filas[1] as HTMLElement).getByTestId('autor-evento');
+    expect(autor2).toHaveTextContent('Usuario dado de baja');
+    expect(autor2.textContent).not.toContain('cm3x9k2q0000abcd1234efgh');
+    expect(within(filas[1] as HTMLElement).getByText('lo escribió alguien')).toBeInTheDocument();
+  });
+
   it('sin listas.negociar NO ofrece las acciones de negociar', () => {
     eventos = { data: [], isPending: false, isError: false, error: null };
     renderConProveedores(
@@ -145,6 +281,41 @@ describe('<DialogoNegociacionRenglon>', () => {
     expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
     expect(screen.queryByTestId('abrir-acuerdo')).not.toBeInTheDocument();
     expect(screen.getByTestId('negociacion-vacia')).toBeInTheDocument();
+    // Y tampoco la MESA: su endpoint exige `listas.negociar` (§Post-F9.138).
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ La MESA (§Post-F9.138) es lo PRIMERO del panel: es lo que se usa con el cliente enfrente,
+   * mientras que el historial cuenta lo que ya pasó. Se monta con los DOS permisos que su endpoint
+   * exige (`listas.negociar` + `consultas.ver-importes`) y con ninguno menos.
+   */
+  it('monta la MESA con listas.negociar + importes, y no sin importes', () => {
+    eventos = { data: [], isPending: false, isError: false, error: null };
+    const { unmount } = renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+    expect(screen.getByTestId('stub-mesa')).toBeInTheDocument();
+    unmount();
+
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes={false}
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
   });
 
   it('la nueva ronda exige elegir versión + acuerdo y llama a registrarRonda', async () => {
@@ -189,7 +360,9 @@ describe('<DialogoNegociacionRenglon>', () => {
         verImportes
         puedeNegociar
       />,
-      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+      // ⭐ V1-E8b: el margen sólo lo enseña el sistema a quien puede APROBAR precios
+      // (§Post-F9.125(b)), así que esta sesión lleva `listas.aprobar`. Antes bastaba negociar.
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar', 'listas.aprobar']) },
     );
 
     await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
@@ -199,6 +372,36 @@ describe('<DialogoNegociacionRenglon>', () => {
     await usuario.type(within(form).getByTestId('calculadora-precio-objetivo'), '205');
     expect(within(form).getByTestId('margen-bruto')).toBeInTheDocument();
     expect(within(form).getByTestId('badge-cumple-objetivo')).toBeInTheDocument();
+  });
+
+  // ⭐ V1-E8b (§Post-F9.125(b)) — la calculadora era la TERCERA puerta a los factores, y la más
+  // ancha: enseñaba `obj. 44.4%`, que ES el margen del cliente servido tal cual. Quien negocia sin
+  // aprobar precios sigue capturando el precio acordado —eso es su trabajo— pero el sistema ya no
+  // le entrega el veredicto. Daniel: *"puede hacer sus cálculos, pero el sistema no le muestra
+  // información digerida"*.
+  it('🔴 SIN `listas.aprobar` no se pinta el margen, y se dice por qué', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
+    const form = screen.getByTestId('form-nueva-ronda');
+    await usuario.type(within(form).getByTestId('calculadora-precio-objetivo'), '205');
+
+    expect(within(form).queryByTestId('margen-bruto')).toBeNull();
+    expect(within(form).queryByTestId('badge-cumple-objetivo')).toBeNull();
+    // Y el input SIGUE ahí: es el «precio acordado» de la ronda, que sí es trabajo de quien negocia.
+    expect(within(form).getByTestId('calculadora-precio-objetivo')).toBeInTheDocument();
+    // No se esconde en silencio: se dice a quién le toca (§Post-F9.68).
+    expect(within(form).getByTestId('calculadora-negociacion').textContent).toMatch(/dueño/i);
   });
 
   it('el acuerdo sin re-costeo llama a registrarAcuerdo', async () => {
@@ -223,5 +426,70 @@ describe('<DialogoNegociacionRenglon>', () => {
       { idLinea: 7, cuerpo: { acuerdo: 'Cliente pide muestra' } },
       expect.anything(),
     );
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.151): un modelo CERRADO o DROPEADO no admite movimiento ─────
+//
+// El servidor los rechaza con 409 (`exigirRenglonMovible`). Aquí se comprueba que la pantalla no
+// deja botones que fallan al pulsarlos —la cicatriz de «un control que existe y no funciona»— y
+// que, en cambio, DICE qué pasa y cómo salir. El historial NO se esconde: lo negociado sigue
+// consultable, sólo se congela.
+
+describe('⭐⭐ V1-E8x — un modelo cerrado o dropeado congela la negociación', () => {
+  /** El mismo renglón, en el estado dado. */
+  function lineaEn(estado: ListaLinea['estado'], nombreEstado: string): ListaLinea {
+    return { ...linea(), estado, nombreEstado };
+  }
+
+  function abrir(l: ListaLinea): void {
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={l}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar', 'consultas.ver-importes']) },
+    );
+  }
+
+  it('🔴 con el modelo DROPEADO no se ofrece ronda, acuerdo ni mesa', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-acuerdo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
+  });
+
+  it('🔴 y se DICE por qué, con el remedio (revivir) y el efecto en el papel', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    const aviso = screen.getByTestId('renglon-congelado');
+    expect(aviso).toHaveTextContent('Dropeado');
+    expect(aviso).toHaveTextContent(/Tampoco sale en el PDF/i);
+    expect(aviso).toHaveTextContent(/revívelo/i);
+  });
+
+  it('un modelo CERRADO también se congela, pero SÍ sigue saliendo en el papel', () => {
+    abrir(lineaEn('cerrado', 'Cerrado'));
+    const aviso = screen.getByTestId('renglon-congelado');
+    expect(aviso).toHaveTextContent('Cerrado');
+    // Cerrado = vendido, no caído: nada de «no sale en el PDF».
+    expect(aviso).not.toHaveTextContent(/sale en el PDF/i);
+    expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
+  });
+
+  it('con el modelo ABIERTO todo sigue igual que siempre (el candado no muerde de más)', () => {
+    abrir(lineaEn('abierto', 'Abierto'));
+    expect(screen.queryByTestId('renglon-congelado')).not.toBeInTheDocument();
+    expect(screen.getByTestId('abrir-nueva-ronda')).toBeInTheDocument();
+    expect(screen.getByTestId('abrir-acuerdo')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-mesa')).toBeInTheDocument();
+  });
+
+  it('🔴 el HISTORIAL sigue abierto en un modelo dropeado (lo negociado no se esconde)', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    // El doble de `useEventosLinea` de esta suite devuelve el hilo; lo que importa es que se pinte.
+    expect(screen.getByTestId('panel-negociacion')).toBeInTheDocument();
   });
 });

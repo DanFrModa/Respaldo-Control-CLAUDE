@@ -1,10 +1,10 @@
 import { TriangleAlert } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useSalidaTelaColorAOrden } from '@/api/inventario-materiales';
+import { usePreviaSalidaTelaColor, useSalidaTelaColorAOrden } from '@/api/inventario-materiales';
 import { useOrden } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoSobreSalidaTela } from './AvisoSobreSalidaTela';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
@@ -36,7 +37,23 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
  * consumo EMPAREJA por color, NO por partida (las salidas no obligan a escoger partida), y el
  * cuerpo y el complemento viajan JUNTOS en el mismo renglón. Como puede haber PARTIDAS con tonos
  * distintos del mismo color, la pantalla AVISA el riesgo de tono SIN bloquear (DECISIONES
- * §Post-F9.11 punto 2). Conserva el deep-link `state.idOrden` de "Descargar tela" (avance de
+ * §Post-F9.11 punto 2). Desde la fila 0.101 ese aviso dejó de salir SIEMPRE y el servidor devuelve
+ * un estado de TRES valores, que aquí se pintan **con dos pesos distintos a propósito**:
+ * `varias-partidas` → **alarma ámbar con la lista** de partidas (hay de dónde escoger: interrumpe);
+ * `origen-desconocido` → **línea neutra** que dice que el sistema no sabe de qué partidas es esa
+ * tela (acompaña, no interrumpe); `sin-riesgo` → nada. ⭐ **Desde la fila 0.142 el TRASPASO nombra el
+ * lote**, así que en el almacén del cortador —donde arranca esta pantalla— ya hay lista que enseñar;
+ * la línea neutra queda para la tela que nadie puede nombrar, que entra por **cuatro** puertas: la
+ * **traspasada antes de esa fila**, la del **ajuste de entrada del conteo cíclico** (que no crea
+ * partida a propósito), la que vuelve al **cancelar una salida** que tampoco llevaba lote y la de un
+ * **traspaso de hoy cuyo origen tampoco podía nombrarla** —incluido el remanente que deja el tope
+ * del reparto—. Los tres estados, las cuatro puertas y sus límites, en
+ * `dominio/inventarios/previa-salida-tela-orden.ts`.
+ * En la misma fila entró el aviso de **SOBRE-SALIDA** (Daniel §Post-F9.193 dec. 8): si lo que se
+ * saca —contando lo que YA salió antes— pasa de lo que la orden pide, se dice. **Los dos avisos
+ * los decide el SERVIDOR** (`usePreviaSalidaTelaColor` → `dominio/inventarios/previa-salida-tela-
+ * orden.ts`): la pantalla no compara nada (A1), sólo pinta el veredicto. Ninguno bloquea: el botón
+ * de guardar no se apaga jamás por ellos. Conserva el deep-link `state.idOrden` de "Descargar tela" (avance de
  * producción / centro de órdenes) y, desde §Post-F9.13, también `state.idCortador`: con el corte
  * capturado a nombre de un cortador, la salida arranca en SU almacén (el que tiene ligado en el
  * catálogo) sin que haya que buscarlo. El servidor valida no-negativo de AMBOS componentes bajo lock
@@ -119,6 +136,41 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
     location.pathname,
     navigate,
   ]);
+
+  /**
+   * Cuerpo de la PREVIA (fila 0.101): la captura en curso, tal cual, para que el SERVIDOR decida si
+   * hay sobre-salida y si hay riesgo de tono. Sin orden, sin almacén o sin renglones no hay nada
+   * que avisar y la consulta ni se dispara (el almacén es el que acota las partidas del tono).
+   */
+  const cuerpoPrevia = useMemo(
+    () =>
+      orden === undefined || idAlmacen === '' || renglones.length === 0
+        ? undefined
+        : {
+            idOrden: orden.id,
+            idAlmacen: Number(idAlmacen),
+            lineas: renglones.map((r) => ({
+              idTelaColor: r.idTelaColor,
+              cantidad: r.cantidad,
+              ...(r.nombreComplemento !== null
+                ? { cantidadComplemento: r.cantidadComplemento }
+                : {}),
+            })),
+          },
+    [orden, idAlmacen, renglones],
+  );
+  const previa = usePreviaSalidaTelaColor(cuerpoPrevia);
+  const avisos = previa.data;
+  // ⭐⭐ DOS LISTAS, DOS PESOS (fila 0.101, tercera revisión). `varias-partidas` es información
+  // accionable y poco frecuente ⇒ alarma. `origen-desconocido` sale en TODAS las capturas de un
+  // almacén alimentado por traspaso —el del cortador— ⇒ si gritara, volveríamos al «aviso que sale
+  // siempre» que esta fila vino a matar. Es la ausencia de un dato, y se dice como tal.
+  const coloresVariasPartidas = (avisos?.colores ?? []).filter(
+    (c) => c.estadoTono === 'varias-partidas',
+  );
+  const coloresSinPartidas = (avisos?.colores ?? []).filter(
+    (c) => c.estadoTono === 'origen-desconocido',
+  );
 
   const totalCuerpo = renglones.reduce((s, r) => s + r.cantidad, 0);
   const totalComplemento = renglones.reduce((s, r) => s + r.cantidadComplemento, 0);
@@ -247,22 +299,100 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                   />
                 </div>
 
-                {/* AVISO DE RIESGO DE TONO (Daniel, DECISIONES §Post-F9.11 punto 2): el consumo
-                    empareja por COLOR, no por partida — dos partidas del mismo color pueden traer
-                    TONOS distintos del mismo pantone. La pantalla AVISA, nunca bloquea. */}
-                {renglones.length > 0 ? (
+                {/* ⭐⭐ AVISO (a) — SOBRE-SALIDA (fila 0.101, Daniel §Post-F9.193 dec. 8): el
+                    componente lo comparten las DOS pantallas que sacan tela a una orden. */}
+                <AvisoSobreSalidaTela datos={avisos} testId="salida-color-aviso-sobre-salida" />
+
+                {/* ⭐⭐ AVISO (b1) — VARIAS PARTIDAS: la ALARMA (Daniel, DECISIONES §Post-F9.11
+                    punto 2). Hay más de un lote del mismo color en este almacén, así que hay de
+                    dónde escoger y el aviso interrumpe: ámbar, con la lista a la vista. Es lo que
+                    Daniel pidió, y es poco frecuente — por eso puede permitirse gritar. */}
+                {coloresVariasPartidas.length > 0 ? (
                   <div
                     className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400"
                     role="note"
                     data-testid="salida-color-aviso-tono"
                   >
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    <span>
-                      <strong>Riesgo de tono:</strong> la salida empareja por tela y color, no por
-                      partida. Si hay varias partidas de este color, verifica físicamente que el
-                      tono del rollo que sacas case con el resto de la orden. Este aviso no bloquea
-                      la salida.
-                    </span>
+                    <div className="space-y-1">
+                      <p>
+                        <strong>Riesgo de tono:</strong> la salida empareja por tela y color, no por
+                        partida, así que el sistema no elige el rollo. Verifica físicamente que el
+                        tono del que sacas case con el resto de la orden. Este aviso no bloquea la
+                        salida.
+                      </p>
+                      <ul className="list-disc space-y-0.5 pl-4">
+                        {coloresVariasPartidas.map((c) => (
+                          <li
+                            key={c.idTelaColor}
+                            data-testid={`salida-color-partidas-${String(c.idTelaColor)}`}
+                          >
+                            <strong>
+                              {c.tela} · {c.telaColor}
+                            </strong>{' '}
+                            — {c.partidas.length} partidas en este almacén:{' '}
+                            {c.partidas
+                              .map(
+                                (par) =>
+                                  `#${String(par.folio)}` +
+                                  (par.loteProveedor === null
+                                    ? ''
+                                    : ` (lote ${par.loteProveedor})`) +
+                                  (par.fecha === null ? '' : ` del ${par.fecha}`),
+                              )
+                              .join(' · ')}
+                            {/* 🔴 LA LISTA NO SIEMPRE ES TODO LO QUE HAY. Si además entró tela sin
+                                lote (conteo cíclico, salida cancelada, traspasos anteriores a la
+                                0.142, o un traspaso de hoy desde una bodega que tampoco la sabía
+                                nombrar), enseñar sólo los lotes conocidos haría creer que esos son
+                                el anaquel entero. No se presenta como completo lo que no lo es.
+                                `sinNombrar` lo calcula el dominio; aquí no se resta nada. */}
+                            {c.sinNombrar > 0
+                              ? `, y hay ${c.sinNombrar.toLocaleString('es-MX')} más cuyo origen no se puede nombrar`
+                              : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* ⭐⭐ AVISO (b2) — ORIGEN DESCONOCIDO: la LÍNEA NEUTRA, y el tono sobrio es la
+                    decisión, no un descuido. Desde la fila 0.142 el traspaso SÍ nombra el lote, así
+                    que este estado ya NO es el caso normal del almacén del cortador: queda para la
+                    tela que nadie puede nombrar —la traspasada ANTES de esa fila (REGLA 0-B: no se
+                    repara), la del ajuste de entrada del conteo cíclico, la devuelta al cancelar una
+                    salida que tampoco llevaba lote y la que llega de un traspaso cuyo ORIGEN tampoco
+                    la sabía nombrar—. Sigue en
+                    gris: pintarlo en ámbar quemaría la alarma de arriba, que es la que trae la lista
+                    de entre las que escoger. Acompaña, no interrumpe. */}
+                {coloresSinPartidas.length > 0 ? (
+                  <div
+                    className="space-y-0.5 text-xs text-muted-foreground"
+                    role="note"
+                    data-testid="salida-color-tono-sin-partidas"
+                  >
+                    <p>
+                      El sistema <strong>no sabe de qué partidas</strong> es esta tela: entró sin
+                      lote (traspasada antes de que el traspaso llevara el lote, ajustada por un
+                      conteo cíclico, devuelta de una salida cancelada, o traspasada desde una
+                      bodega que tampoco sabía de qué lote era), así que puede haber varios tonos.
+                      Verifícalo físicamente antes de cortar.
+                    </p>
+                    <ul className="list-disc space-y-0.5 pl-4">
+                      {coloresSinPartidas.map((c) => (
+                        <li
+                          key={c.idTelaColor}
+                          data-testid={`salida-color-sin-partidas-${String(c.idTelaColor)}`}
+                        >
+                          <strong>
+                            {c.tela} · {c.telaColor}
+                          </strong>{' '}
+                          — hay {c.existencia.toLocaleString('es-MX')} en este almacén y sólo se
+                          puede nombrar el origen de {c.saldoConocido.toLocaleString('es-MX')}.
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
 

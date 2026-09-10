@@ -1,6 +1,7 @@
 /**
  * MANTENIMIENTO — realinea el ESTADO GUARDADO de las órdenes con la regla automática
- * (`completa` = tallas + avíos, y arte si aplica; ver `src/dominio/produccion/requisitos-orden.ts`
+ * (`completa` = tallas + receta liberada, y arte si aplica; ver
+ * `src/dominio/produccion/requisitos-orden.ts`
  * y `DECISIONES.md §Post-F9.4`).
  *
  * ⚠️ **CÓRRELO AL TERMINAR CUALQUIER CARGA O RECARGA DE DATOS** (F10, o una re-corrida de los ETL):

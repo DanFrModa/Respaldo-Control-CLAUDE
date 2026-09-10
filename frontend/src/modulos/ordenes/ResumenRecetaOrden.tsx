@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRecetaOrden } from '@/api/receta-orden';
 import { Button } from '@/components/ui/button';
 
+import { ChipHermanas } from './AvisoHermanas';
 import { BadgeFirmaReceta, faltantesDelModelo } from './receta-piezas';
 
 /**
@@ -74,6 +75,12 @@ export function ResumenRecetaOrden({ idOrden }: { idOrden: number }): React.JSX.
           no tiene
         </p>
       ) : null}
+
+      {/* ⭐⭐ fila 0.068 (a): que esta OP no vaya igual que sus hermanas se asoma TAMBIÉN aquí, que
+          es el sitio desde el que se abre la OP. El detalle (material por material) vive en la
+          pantalla completa; el chip lo lleva en su `title`. Mismo componente que el Centro: una
+          sola copia del texto para las tres superficies. */}
+      <ChipHermanas frenteAlGrupo={d.frenteAlGrupo} className="text-xs" />
 
       {/* El aviso ROJO (el modelo se movió y ya hay OC) sí se asoma: es dinero comprometido. */}
       {d.desalineacion.critico ? (

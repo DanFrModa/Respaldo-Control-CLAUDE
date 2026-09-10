@@ -1,7 +1,7 @@
 /**
  * RESOLUCIÓN DE PRECIOS DE INSUMO amarrados a proveedor/producto/precio (F8-E1; R17/D13 —
  * PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md §7-A/B). Funciones PURAS (las ejercitan
- * los tests unitarios), SIN dependencias de BD: reciben ya los precios/factores leídos del catálogo
+ * los tests unitarios), SIN dependencias de BD: reciben ya los precios leídos del catálogo
  * y devuelven el precio efectivo + de DÓNDE salió (traza).
  *
  * Es la pieza HABILITADORA de la fase: hoy el pre-costo de F7 valúa la tela con el
@@ -40,12 +40,13 @@
  *                           luego por NOMBRE — ver {@link resolverPrecioColorReferencia}.
  *   6. sugerido           — `Tela.precioSugerido` (genérico, el de F7). Sin nada ⇒ `null`.
  *
- * CASCADA DEL AVÍO (el precio de compra se NORMALIZA a unidad de consumo dividiendo por el factor de
- * conversión, R1 — se reutiliza `comun/conversion.ts`, NO se duplica la aritmética):
- *   1. compra al amarrado — última compra REAL de este avío AL PROVEEDOR AMARRADO (ya ÷ factor).
- *   2. amarre     — `AvioProveedor.precio` del proveedor amarrado (÷ su `factorConversion`).
- *   3. última compra — la compra REAL más reciente del avío, venga de quien venga (ya ÷ factor).
- *   4. más barato — el `AvioProveedor` más barato ya normalizado (regla F4 actual, el fallback).
+ * CASCADA DEL AVÍO (§Post-F9.97: TODOS los precios están ya en unidad de consumo — metro, pieza,
+ * kilo—, así que no hay nada que normalizar. Hasta V1-E8a cada escalón dividía por un «factor de
+ * conversión» presentación→consumo; se retiró con la dualidad de unidades que lo justificaba):
+ *   1. compra al amarrado — última compra REAL de este avío AL PROVEEDOR AMARRADO.
+ *   2. amarre     — `AvioProveedor.precio` del proveedor amarrado.
+ *   3. última compra — la compra REAL más reciente del avío, venga de quien venga.
+ *   4. más barato — el `AvioProveedor` más barato (regla F4 actual, el fallback).
  *   5. referencia — `Avio.precioReferencia` (fallback sin proveedor mapeable, ADR-0009). Sin nada ⇒ `null`.
  *
  * Los escalones nuevos son OPCIONALES en la entrada: un llamador que no pase `ultimaCompra*` obtiene
@@ -53,13 +54,12 @@
  *
  * NOTA de moneda (decisión (d)): todo va en MXN; no hay motor de tipo de cambio (un proveedor en USD
  * se anota en `condiciones`). Estas funciones no redondean: el llamador decide la precisión final al
- * guardar en la columna Decimal (mismo criterio que `comun/conversion.ts`).
+ * guardar en la columna Decimal.
  */
-import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 
 /**
  * Escalón 1: la última compra REAL de un material, tal como la devuelve
- * `ultimo-precio-compra.ts` — ya POR UNIDAD DE CONSUMO (R1: `precio de la línea ÷ factor`). Se
+ * `ultimo-precio-compra.ts` — ya POR UNIDAD DE CONSUMO (es la unidad de la línea de OC). Se
  * declara aquí como forma MÍNIMA para que este módulo siga siendo puro (sin dependencias de BD).
  */
 export interface CompraRealPrecio {
@@ -238,22 +238,18 @@ export type OrigenPrecioAvio =
   | 'referencia'
   | 'sin-precio';
 
-/** Un proveedor del avío con su precio de compra y su factor de conversión (R1). */
+/** Un proveedor del avío con su precio de compra (en unidad de consumo, §Post-F9.97). */
 export interface ProveedorAvioPrecio {
   idProveedor: number;
-  /** `AvioProveedor.precio` (por presentación de compra). Null si no lo fija. */
+  /** `AvioProveedor.precio`, POR UNIDAD DE CONSUMO (§Post-F9.97). Null si no lo fija. */
   precio: number | null;
-  /** `AvioProveedor.factorConversion` (el fino, por proveedor). Null → usa el del avío. */
-  factorConversion: number | null;
 }
 
 /** Entrada de la resolución del precio de un AVÍO (ya leído del catálogo por el llamador). */
 export interface EntradaPrecioAvio {
   /** `Avio.precioReferencia` (fallback sin proveedor, ADR-0009). Ya en unidad de consumo. */
   precioReferencia: number | null;
-  /** `Avio.factorConversion` (fallback del avío cuando el proveedor no define el suyo). */
-  factorConversionAvio: number | null;
-  /** Proveedores del avío con su precio/factor (`AvioProveedor`). */
+  /** Proveedores del avío con su precio (`AvioProveedor`). */
   proveedores: readonly ProveedorAvioPrecio[];
   /** Proveedor amarrado por Desarrollo (`ModeloAvio.idAvioProveedor`). Null = sin amarre. */
   idAvioProveedor?: number | null;
@@ -262,13 +258,13 @@ export interface EntradaPrecioAvio {
    * normalizada a unidad de consumo por `ultimo-precio-compra.ts`. Omitir = cascada de antes.
    */
   ultimaCompra?: CompraRealPrecio | null;
-  /** ESCALÓN 1 CON AMARRE: última compra REAL de este avío **al proveedor amarrado** (÷ factor). */
+  /** ESCALÓN 1 CON AMARRE: última compra REAL de este avío **al proveedor amarrado**. */
   ultimaCompraProveedorAmarrado?: CompraRealPrecio | null;
 }
 
 /** Resultado de resolver el precio de un avío (incluye el proveedor elegido, para la traza/E6). */
 export interface PrecioAvioResuelto {
-  /** Precio efectivo POR UNIDAD DE CONSUMO (ya normalizado por el factor), o `null`. */
+  /** Precio efectivo POR UNIDAD DE CONSUMO, o `null`. */
   precio: number | null;
   /** De qué escalón salió. */
   origen: OrigenPrecioAvio;
@@ -277,18 +273,12 @@ export interface PrecioAvioResuelto {
 }
 
 /**
- * Costo por unidad de consumo de un renglón de proveedor: `precio ÷ factor` (R1), reutilizando el
- * motor de conversión (`comun/conversion.ts`). `null` si el proveedor no tiene precio usable.
+ * Costo por unidad de consumo de un renglón de proveedor: el precio TAL CUAL, porque
+ * `AvioProveedor.precio` ya está en unidad de consumo (§Post-F9.97 — aquí se dividía por el factor
+ * de conversión). `null` si el proveedor no tiene precio usable.
  */
-function costoNormalizado(
-  proveedor: ProveedorAvioPrecio,
-  factorAvio: number | null,
-): number | null {
-  if (!precioUsable(proveedor.precio)) {
-    return null;
-  }
-  const factor = resolverFactor(proveedor.factorConversion, factorAvio);
-  return precioAUnidadConsumo(proveedor.precio, factor);
+function costoDeProveedor(proveedor: ProveedorAvioPrecio): number | null {
+  return precioUsable(proveedor.precio) ? proveedor.precio : null;
 }
 
 /** De dónde salió el precio de un avío del CATÁLOGO (la cascada + el promedio por medidas). */
@@ -347,14 +337,13 @@ export function resolverPrecioAvioCatalogo(
 
 /**
  * Resuelve el precio de un AVÍO según la cascada única de §Post-F9.48 (compra al proveedor amarrado
- * → amarre → última compra real → más barato → referencia). El precio de cada proveedor se NORMALIZA
- * a unidad de consumo (÷ factor, R1) antes de comparar/elegir; el de la última compra ya viene
- * normalizado por `ultimo-precio-compra.ts`. Si hay amarre pero el proveedor amarrado no tiene ni
+ * → amarre → última compra real → más barato → referencia). Todos los precios que compara están ya
+ * en unidad de consumo (§Post-F9.97), así que se comparan directamente. Si hay amarre pero el proveedor amarrado no tiene ni
  * compra ni precio usable, la cascada sigue por los escalones generales (la regla F4 de "más barato"
  * se conserva como fallback: no-regresión).
  */
 export function resolverPrecioAvio(entrada: EntradaPrecioAvio): PrecioAvioResuelto {
-  const { proveedores, factorConversionAvio, precioReferencia } = entrada;
+  const { proveedores, precioReferencia } = entrada;
 
   if (entrada.idAvioProveedor != null) {
     // 1. ⭐ El amarre elige el PROVEEDOR; el precio es el de la última compra A ESE proveedor.
@@ -369,7 +358,7 @@ export function resolverPrecioAvio(entrada: EntradaPrecioAvio): PrecioAvioResuel
     // 2. Amarre: el precio de catálogo del proveedor elegido por Desarrollo.
     const amarrado = proveedores.find((p) => p.idProveedor === entrada.idAvioProveedor);
     if (amarrado !== undefined) {
-      const costo = costoNormalizado(amarrado, factorConversionAvio);
+      const costo = costoDeProveedor(amarrado);
       if (costo !== null) {
         return { precio: costo, origen: 'amarre', idProveedor: amarrado.idProveedor };
       }
@@ -390,7 +379,7 @@ export function resolverPrecioAvio(entrada: EntradaPrecioAvio): PrecioAvioResuel
   // 4. Más barato (regla F4): el menor costo normalizado entre los proveedores con precio.
   let mejor: { precio: number; idProveedor: number } | null = null;
   for (const proveedor of proveedores) {
-    const costo = costoNormalizado(proveedor, factorConversionAvio);
+    const costo = costoDeProveedor(proveedor);
     if (costo !== null && (mejor === null || costo < mejor.precio)) {
       mejor = { precio: costo, idProveedor: proveedor.idProveedor };
     }

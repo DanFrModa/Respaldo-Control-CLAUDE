@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
@@ -157,5 +159,53 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
     expect(
       motivoNoDuplicarOc({ fechaEntrega: null, estatus: 'pendiente_autorizacion' }),
     ).not.toMatch(/administrador/i);
+  });
+});
+
+/**
+ * ⭐⭐⭐ V1-E8z / H1 — **GUARDIÁN DE COLOCACIÓN DEL CANDADO DE COMPRA** (hallazgo del reviewer).
+ *
+ * 🔴 EL DEFECTO QUE VIGILA, con nombre y apellido. El candado (§Post-F9.160(a)) empezó viviendo
+ * DENTRO de `exigirRecetaLiberada`, y por eso **heredó la exención de `agregaLineas`**: la edición
+ * que *"conserva la identidad"* (misma línea, otra cantidad u otro precio) hace `continue` **antes**
+ * de llamar a la puerta. Esa exención se justificó para la FIRMA —*"un material que la receta
+ * firmada sí incluía"*— y esa razón **no transfiere al candado**, cuya premisa es que esa receta
+ * firmada está BAJO CORRECCIÓN. Medido: `cantidad: 100 → 5000` sobre una orden congelada pasaba.
+ *
+ * ⚠️ **POR QUÉ UN GUARDIÁN ESTRUCTURAL Y NO SÓLO LA PRUEBA DE INTEGRACIÓN.** El caso real vive en
+ * `receta-orden.int.test.ts` («SUBIR la cantidad de una línea YA existente»), donde se puede comprar
+ * de verdad; pero esa prueba necesita Postgres y **sólo corre en CI**. Este guardián corre en el
+ * `test:unit` de cualquiera, es determinista, y falla por la razón EXACTA: alguien volvió a meter el
+ * candado dentro del bucle exento. Es el mismo recurso que ya usa el repo cuando el peligro es la
+ * FORMA del código y no su resultado (`receta-embudo.test.ts`, y la cuenta de rutas de
+ * `receta-orden.rutas.test.ts`).
+ */
+describe('⭐⭐ V1-E8z (H1) — el candado va FUERA del bucle exento por `agregaLineas`', () => {
+  const fuente = readFileSync(new URL('./ordenes-compra.ts', import.meta.url), 'utf8');
+
+  it('el candado se llama sobre TODAS las órdenes ligadas, no orden por orden dentro del bucle', () => {
+    const candado = fuente.indexOf(
+      'await exigirComprasNoCongeladas(tx, idsOrdenLigada, idEmpresa)',
+    );
+    const bucleExento = fuente.indexOf('if (!agregaLineas(');
+
+    // Los dos anclajes tienen que existir: si alguno se renombra, esta prueba lo dice en vez de
+    // pasar en verde comparando -1 contra -1.
+    expect(candado).toBeGreaterThan(-1);
+    expect(bucleExento).toBeGreaterThan(-1);
+    // 🔴 LA INVARIANTE: el candado ANTES del `continue` que exime a la edición que conserva
+    // identidad. Si vuelve adentro, la cantidad se puede subir sin tope con la compra congelada.
+    expect(candado).toBeLessThan(bucleExento);
+  });
+
+  it('⚠️ y NO se cuela dentro de `exigirRecetaLiberada`: ahí volvería a heredar la exención', () => {
+    // La llamada a la puerta de la firma sigue DENTRO del bucle (ahí la exención sí es legítima):
+    // lo que no puede es ser el único sitio donde el candado se comprueba.
+    const puertaFirma = fuente.indexOf('await exigirRecetaLiberada(tx, idOrden, idEmpresa)');
+    const candado = fuente.indexOf(
+      'await exigirComprasNoCongeladas(tx, idsOrdenLigada, idEmpresa)',
+    );
+    expect(puertaFirma).toBeGreaterThan(-1);
+    expect(candado).toBeLessThan(puertaFirma);
   });
 });

@@ -210,6 +210,125 @@ describe('pedidosPorMes (R3, B6)', () => {
     expect(salida.totales.importe).toBeNull();
   });
 
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **LOS NÚMEROS QUE ENSEÑA LA PANTALLA SON LOS DE LOS MODELOS POR
+   * COLOR, no el del renglón.**
+   *
+   * 🔴 El renglón sigue apuntando a su modelo de DESARROLLO —que ya nunca se promueve—, así que
+   * `numeroProduccion` es `null` **para siempre** en el flujo nuevo. Sin `numerosProduccion`, la
+   * pantalla de Pedidos enseñaría el código de desarrollo y ningún número, para siempre.
+   */
+  it('⭐⭐ numerosProduccion: uno por color/OP del renglón, sin repetir y en orden', async () => {
+    const desarrollo = await cliente.modelo.create({
+      data: { codigo: 'CYA-26-71-009', origen: 'desarrollo', codigoDesarrollo: 'CYA-26-71-009' },
+    });
+    const hijos = [];
+    for (const numero of [71_002, 71_001]) {
+      hijos.push(
+        await cliente.modelo.create({
+          data: {
+            codigo: String(numero),
+            origen: 'produccion',
+            numeroProduccion: numero,
+            idModeloDesarrollo: desarrollo.id,
+          },
+        }),
+      );
+    }
+    const pedido = await cliente.pedido.create({
+      data: {
+        folio: BigInt(70),
+        idEmpresa,
+        idCliente: idClienteNegocio,
+        fechaHasta: new Date('2026-08-10T00:00:00.000Z'),
+      },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: desarrollo.id, cantidadPedida: 100, precio: 148 },
+    });
+    // TRES OPs vivas: una por hijo, y un RESURTIDO del primero (que NO debe repetir su número).
+    let folioOrden = 900;
+    for (const hijo of [...hijos, hijos[0]]) {
+      await cliente.orden.create({
+        data: {
+          folio: BigInt(folioOrden++),
+          idEmpresa,
+          idPedidoLinea: linea.id,
+          idModelo: hijo?.id ?? 0,
+          idCliente: idClienteNegocio,
+          estado: 'completa',
+        },
+      });
+    }
+
+    const salida = await pedidosPorMes(sesion(), { anio: 2026, mes: 8 }, bd());
+    const renglon = salida.datos.find((f) => f.folio === 70)?.renglones[0];
+
+    // El renglón sigue siendo del DESARROLLO, que no tiene número…
+    expect(renglon?.codigoModelo).toBe('CYA-26-71-009');
+    expect(renglon?.origenModelo).toBe('desarrollo');
+    expect(renglon?.numeroProduccion).toBeNull();
+    // …y los números que se enseñan son los de sus modelos por color, SIN repetir y ordenados.
+    expect(renglon?.numerosProduccion).toEqual([71_001, 71_002]);
+    expect(renglon?.numOrdenes).toBe(3);
+  });
+
+  /**
+   * ⚠️ **EL CONTRATO NO PUEDE PROMETER LO QUE EL DOMINIO NO PUEDE DAR.** `numerosProduccion` es
+   * `z.array(z.number().int())`: un `null` colado ahí no sería un dato feo, sería un **500** al
+   * serializar la respuesta. Y el caso existe de verdad — los 285 modelos del Access con código NO
+   * numérico (`51783a`, `M-18`) están en producción y no tienen número.
+   */
+  it('⭐ una OP de un modelo SIN número (histórico `M-18`) no mete un null en `numerosProduccion`', async () => {
+    const sinNumero = await cliente.modelo.create({
+      data: { codigo: 'M-18', origen: 'produccion' },
+    });
+    const pedido = await cliente.pedido.create({
+      data: {
+        folio: BigInt(72),
+        idEmpresa,
+        idCliente: idClienteNegocio,
+        fechaHasta: new Date('2026-08-12T00:00:00.000Z'),
+      },
+    });
+    const linea = await cliente.pedidoLinea.create({
+      data: { idPedido: pedido.id, idModelo: sinNumero.id, cantidadPedida: 10, precio: 100 },
+    });
+    await cliente.orden.create({
+      data: {
+        folio: BigInt(950),
+        idEmpresa,
+        idPedidoLinea: linea.id,
+        idModelo: sinNumero.id,
+        idCliente: idClienteNegocio,
+        estado: 'completa',
+      },
+    });
+
+    const salida = await pedidosPorMes(sesion(), { anio: 2026, mes: 8 }, bd());
+    const renglon = salida.datos.find((f) => f.folio === 72)?.renglones[0];
+
+    expect(renglon?.numerosProduccion).toEqual([]);
+    expect(renglon?.numOrdenes).toBe(1);
+  });
+
+  it('un renglón de modelo LEGADO sigue enseñando el número de su propio modelo', async () => {
+    // Control negativo del de arriba: `numeroProduccion` (el del renglón) NO se retiró, y para el
+    // histórico del Access —donde el renglón YA apunta a un modelo de producción— sigue siendo el
+    // dato bueno. Si `numerosProduccion` se hubiera hecho a costa de él, esta prueba cae.
+    await cliente.modelo.update({
+      where: { id: idModelo },
+      data: { numeroProduccion: 51_114 },
+    });
+    await sembrarPedido({ folio: 71, fechaHasta: '2026-08-11' });
+
+    const salida = await pedidosPorMes(sesion(), { anio: 2026, mes: 8 }, bd());
+    const renglon = salida.datos.find((f) => f.folio === 71)?.renglones[0];
+
+    expect(renglon?.numeroProduccion).toBe(51_114);
+    expect(renglon?.numerosProduccion).toEqual([]);
+  });
+
   it('A9: un idEmpresa distinto de la empresa activa devuelve vacío', async () => {
     await sembrarPedido({ folio: 60, fechaHasta: '2026-08-01' });
     const salida = await pedidosPorMes(sesion(), { idEmpresa: idEmpresa + 999 }, bd());

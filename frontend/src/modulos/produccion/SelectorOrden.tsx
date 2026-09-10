@@ -15,8 +15,9 @@ import { useDebounce } from '@/lib/useDebounce';
  * consulta y emite.
  *
  * ⚠️ NO filtra por `estado: 'completa'` (26-jul-2026). Lo hacía, y era el ÚNICO gate del sistema
- * sobre ese estado: al volverse AUTOMÁTICO (tallas + avíos, ver `requisitos-orden.ts`), una orden
- * de un modelo SIN receta de avíos —cosa común en lo migrado de Access— dejaba de aparecer aquí y
+ * sobre ese estado: al volverse AUTOMÁTICO (hoy: tallas + receta liberada, y arte si aplica — ver
+ * `requisitos-orden.ts`), una orden a la que le faltara cualquiera de esos requisitos —cosa común
+ * en lo migrado de Access, que llegó sin receta— dejaba de aparecer aquí y
  * NO se podía cortar, enviar, recibir ni entregar, sin más explicación que un "no hay órdenes que
  * coincidan". El filtro correcto es el mismo que ya usan los demás pickers (MRP, notas por orden,
  * costeo): **fuera las canceladas**, que es lo único que el backend rechaza de verdad

@@ -433,9 +433,8 @@ export const rutasTelas: FastifyPluginCallbackZod = (app, _opciones, done) => {
   // ⚖️ Permiso **`compras.administrar`**, NO `telas.administrar`: esta puerta es de la COMPRA, no
   // de la administración del catálogo — se abre donde se compra y para quien compra, igual que
   // `PUT /telas-colores/:id/precio`, que ya cambia el precio de un color con este mismo permiso.
-  // `telas.administrar` sólo lo tienen Administrador y AdministracionDireccion (se resta desde
-  // Directivo en el seed), así que habría dejado el alta fuera del alcance de todo perfil de
-  // compras salvo el dueño. El detalle vive en `agregarColorATela`; no revertir por simetría.
+  // `telas.administrar` sólo lo tienen Administrador y AdministracionDireccion, así que habría
+  // dejado el alta fuera del alcance de todo perfil de compras salvo el dueño. El detalle vive en `agregarColorATela`; no revertir por simetría.
   app.route({
     method: 'POST',
     url: '/telas/:id/colores',

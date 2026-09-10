@@ -70,6 +70,13 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
       await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
       await page.getByTestId('nuevo-modelo').click();
       await page.getByRole('dialog').getByLabel('Código').fill(modelo.codigo);
+      // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+      // dos dígitos con los que el sistema arma el nº de producción del modelo.
+      await page
+        .getByRole('dialog')
+        .getByLabel('Tipo de producto')
+        .selectOption({ label: 'Pantalón' });
+      await page.getByRole('dialog').getByLabel('Género').selectOption({ label: 'Caballero' });
       await page.getByTestId('guardar-modelo').click();
       await expect(page.getByText(`Modelo "${modelo.codigo}" creado.`)).toBeVisible();
     }

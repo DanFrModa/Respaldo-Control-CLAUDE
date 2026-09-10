@@ -1,7 +1,7 @@
 # backend — CONTROL v2 (Servicio de API)
 
 Servicio de API REST de **CONTROL v2** (ERP textil Marilyn / MJD). Construido con
-**Node 22 + TypeScript estricto + Fastify 5 + Prisma 7 + PostgreSQL 17**. Es un
+**Node 22 + TypeScript estricto + Fastify 5 + Prisma 7 + PostgreSQL 18** (el de Railway; local y CI 17). Es un
 servicio autonomo: tiene su propio `package.json` y se gestiona con **npm** (no es
 un monorepo).
 

@@ -60,6 +60,10 @@ function txFalso(opciones: {
   artes?: { id: number; descripcion: string }[];
   /** Cuántos renglones VIVOS ya están firmados (lo que decide si la puerta frena). */
   liberados?: number;
+  /** ⭐⭐ V1-E8z: la receta está REABIERTA desde esta fecha (la compra está congelada). */
+  recetaAbierta?: Date;
+  /** El motivo de esa reapertura (lo que el comprador lee en el 409). */
+  motivoApertura?: string;
 }): { tx: Tx; wheres: Record<string, unknown>[]; wheresConteo: Record<string, unknown>[] } {
   const wheres: Record<string, unknown>[] = [];
   const wheresConteo: Record<string, unknown>[] = [];
@@ -77,8 +81,18 @@ function txFalso(opciones: {
   });
   const tx = {
     orden: {
+      // ⭐⭐ V1-E8z: el `select` real trae también las columnas del CANDADO DE COMPRA. Por default
+      // van en NULL (receta no reabierta); `recetaAbierta` las enciende para probar el candado.
       findFirst: vi.fn(() =>
-        Promise.resolve((opciones.ordenExiste ?? true) ? { folio: 777n } : null),
+        Promise.resolve(
+          (opciones.ordenExiste ?? true)
+            ? {
+                folio: 777n,
+                recetaAbiertaEn: opciones.recetaAbierta ?? null,
+                recetaAbiertaMotivo: opciones.motivoApertura ?? null,
+              }
+            : null,
+        ),
       ),
     },
     ordenTela: tabla(opciones.telas ?? [], opciones.liberados ?? 0),
@@ -290,5 +304,63 @@ describe('recetaCompletamenteLiberada', () => {
 
   it('⭐ una receta VACÍA NO está "liberada completa" (liberar nada sería mentir)', () => {
     expect(recetaCompletamenteLiberada([])).toBe(false);
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO DE COMPRA, DENTRO DE LAS DOS PUERTAS (V1-E8z, §Post-F9.160(a)).
+ *
+ * 🔴 Lo que se prueba aquí NO es la guarda (ésa vive en `receta-orden.test.ts`): es que **las dos
+ * puertas de compra de verdad la llamen**. Es la unión, y es justo donde se rompen estas cosas —
+ * la guarda puede estar perfecta y no estar cableada, que es exactamente el modo de fallo que
+ * §Post-F9.165 describe: *un candado que se ve puesto y no cierra*.
+ *
+ * Se puede probar sin base porque las dos puertas leen el candado del MISMO `findFirst` con el que
+ * ya sacaban el folio: no cuesta ni una consulta más.
+ */
+describe('⭐⭐ V1-E8z — el CANDADO cablea las dos puertas de compra', () => {
+  const ABIERTA = new Date('2026-08-31T09:00:00.000Z');
+
+  it('🔴 `exigirRecetaLiberada` frena con la receta ABIERTA, aunque TODO esté firmado', async () => {
+    // `liberados: 3` y cero pendientes = la receta está completa. Antes del candado, esto pasaba.
+    const { tx } = txFalso({ liberados: 3, recetaAbierta: ABIERTA, motivoApertura: 'el cierre' });
+
+    const error = await exigirRecetaLiberada(tx, 1, 1).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect((error as ErrorConflicto).message).toContain('ABIERTA para corregirse');
+    expect((error as ErrorConflicto).message).toContain('el cierre');
+    // ⚠️ Y NO el mensaje de la otra puerta, que aquí sería falso: sí la liberaron.
+    expect((error as ErrorConflicto).message).not.toContain('todavía no la libera Desarrollo');
+  });
+
+  it('🔴 `exigirMaterialesLiberados` también, aunque el material que se compra esté firmado', async () => {
+    // Sin pendientes, esta puerta devuelve `undefined` de inmediato. Con el candado, frena antes.
+    const { tx } = txFalso({ recetaAbierta: ABIERTA });
+
+    await expect(exigirMaterialesLiberados(tx, 1, 1, [{ idTela: 10 }])).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+  });
+
+  it('con la receta CERRADA las dos puertas se comportan EXACTAMENTE como antes', async () => {
+    // La gemela positiva: sin ella, una guarda que frenara siempre pasaría igual de verde.
+    const { tx } = txFalso({ liberados: 3 });
+    await expect(exigirRecetaLiberada(tx, 1, 1)).resolves.toEqual([]);
+    await expect(exigirMaterialesLiberados(tx, 1, 1, [{ idTela: 10 }])).resolves.toBeUndefined();
+  });
+
+  it('⚠️ el candado va ANTES que la firma: con la receta abierta y NADA firmado, gana el candado', async () => {
+    // Es el orden que importa: corregir un renglón le quita su firma, así que una receta abierta
+    // puede acabar sin nada firmado. El mensaje tiene que describir la causa REAL (§Post-F9.165.8).
+    const { tx } = txFalso({ liberados: 0, recetaAbierta: ABIERTA });
+
+    const error = await exigirRecetaLiberada(tx, 1, 1).catch((e: unknown) => e);
+    expect((error as ErrorConflicto).message).toContain('ABIERTA para corregirse');
+  });
+
+  it('la orden de OTRA empresa sigue siendo 404, no el 409 del candado (A9)', async () => {
+    const { tx } = txFalso({ ordenExiste: false, recetaAbierta: ABIERTA });
+    await expect(exigirRecetaLiberada(tx, 1, 1)).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

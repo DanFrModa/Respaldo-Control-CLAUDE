@@ -7,6 +7,14 @@
  * Sobre el motor de kardex: el corte NO toca el kardex PT (no es entrada/salida de existencia).
  * Escribe `EtapaMovimiento` (encabezado del WIP) + `EtapaMovimientoDet` (color×talla, D4).
  *
+ * ⭐ 0.114 — LOS DOS SERVICIOS SOBRE LA ORDEN. Aquí viven también el CORTE PAGABLE y el EMPAQUE, que
+ * Daniel separó del resto: *«en corte no necesitas mandar y recibir mercancía … no va y viene. Lo
+ * mismo el empaque… el empaque no toca el inventario»* y, aun así, *«el monto a pagar sale de una
+ * orden, lo mismo que un maquilero»*. Los dos comparten forma: `idTipoProceso = NULL` (esa NULL es
+ * la marca de "servicio sobre la orden"), cero kardex, sin envío ni recibo, precio por prenda en la
+ * etapa y un `EsMaCargo` con `servicio` en vez de proceso ({@link crearCargoDeServicio}). NO son
+ * `TipoProceso` a propósito: eso los metería al flujo de ida y vuelta que Daniel dice que no son.
+ *
  * ⭐ El ENVÍO **sí** toca el kardex desde V1-E4b (§Post-F9.61) cuando lo que se manda ya es PRODUCTO
  * TERMINADO (`prendaTerminada` — un estampado/lavado DESPUÉS de la costura, que Daniel ya hace hoy):
  * traspasa las prendas del almacén de origen al almacén de TRÁNSITO, y su recibo las devuelve. Sin
@@ -43,19 +51,22 @@
  */
 import {
   esquemaCorteCrear,
+  esquemaEmpaqueCrear,
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
   esquemaCorteSemanalQuery,
+  esquemaSugerenciaCapturaQuery,
   type DatosEtapaLineaEntrada,
   type EtapaSalida,
   type EtapasOrdenLista,
   type PendientesOrden,
+  type SugerenciaCaptura,
   type CorteSemanalLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { ServicioOrden, TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -66,6 +77,7 @@ import {
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
 import { ORIGEN } from '../../comun/origenes.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -76,7 +88,13 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
+import { claveCeldaPack, esSinPack, normalizarPack, ordenManejaPacks } from './packs.js';
 import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
+// `metaPara`/`MetaCelda` viven en `wip.ts` (una sola copia, §Post-F9.10). Sin ciclo: el cierre
+// transitivo de `wip.ts` (incompletas · packs · ordenes · receta-* · requisitos-orden) NO
+// alcanza este módulo.
+import { metaPara, type MetaCelda } from './wip.js';
 
 /** Clave de la secuencia de folios de las etapas de producción (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ETAPA = 'etapa-mov';
@@ -116,6 +134,13 @@ const MAPEO_PROCESO_A_ROL: Record<string, string> = {
 /** Rol de proveedor que debe tener el CORTADOR de un corte (D12/R15). */
 const ROL_CORTADOR = 'corte';
 
+/**
+ * Rol de proveedor que debe tener el EMPACADOR de un empaque (0.114). Daniel: *«y una maquila de
+ * empaque también»* — el empacador es un proveedor de servicio, igual que el cortador. El rol se
+ * siembra en `prisma/seed.ts` (`ROLES_PROVEEDOR_BASE`), así que `prueba` necesita `SEED_ON_START`.
+ */
+const ROL_EMPACADOR = 'empaque';
+
 /** El rol de proveedor requerido para un proceso de maquila, o el código tal cual si no hay mapeo. */
 function rolDelProceso(codigoProceso: string): string {
   return MAPEO_PROCESO_A_ROL[codigoProceso] ?? codigoProceso;
@@ -123,10 +148,12 @@ function rolDelProceso(codigoProceso: string): string {
 
 // ── Tipos internos ──────────────────────────────────────────────────────────────────────────────
 
-/** Una celda color×talla "aplanada" (un renglón por talla), para sumas y comparaciones. */
+/** Una celda color×talla×PACK "aplanada" (un renglón por talla), para sumas y comparaciones. */
 interface Celda {
   idColor: number;
   idTalla: number;
+  /** Pack / tendido del renglón (§Post-F9.10); cadena vacía en las órdenes que no los manejan. */
+  pack: string;
   cantidad: number;
 }
 
@@ -155,12 +182,33 @@ interface ContextoOrden {
   /** Modelo que fabrica la orden: el artículo que el kardex mueve al tránsito (V1-E4b). */
   idModelo: number;
   estado: string;
-  /** Lo pedido por celda (orden − corte usa esto). */
+  /** Lo pedido por celda (orden − corte usa esto). Cada celda lleva su pack (§Post-F9.10). */
   pedido: Celda[];
   /** Colores válidos de la orden. */
   colores: Set<number>;
-  /** Tallas válidas por color (la combinación color×talla debe existir en la orden). */
-  tallasPorColor: Map<number, Set<number>>;
+  /**
+   * ⭐ ¿La orden se fabrica POR PACKS? (§Post-F9.10). De aquí cuelga que el pack sea OBLIGATORIO en
+   * el corte y en la entrega a maquila —*«cada tendido es de un pack»*— y que en una orden sin packs
+   * mandarlo sea un error de captura. La matriz no puede estar mezclada (lo impide `ordenes.ts`).
+   */
+  manejaPacks: boolean;
+  /**
+   * Tallas válidas por RENGLÓN de la orden = por `color:pack` ({@link claveRenglon}). Con packs, la
+   * talla EG puede existir en el pack B y no en el A: validar contra la unión por color dejaría
+   * cortar un tendido que la orden no pidió.
+   */
+  tallasPorRenglon: Map<string, Set<number>>;
+  /** Packs válidos de cada color, para redactar errores que digan qué SÍ se puede capturar. */
+  packsPorColor: Map<number, Set<string>>;
+}
+
+/**
+ * Clave de un RENGLÓN de la matriz de la orden: color × pack (§Post-F9.10). Acepta el pack tal como
+ * llega del contrato (donde es opcional) y lo normaliza: `undefined`, `null` y `'  '` son el mismo
+ * «sin pack», y tienen que producir la MISMA llave que la columna, que guarda cadena vacía.
+ */
+function claveRenglon(idColor: number, pack: string | null | undefined): string {
+  return `${idColor}:${normalizarPack(pack)}`;
 }
 
 /**
@@ -177,8 +225,17 @@ async function resolverOrden(
     select: {
       idEmpresa: true,
       idModelo: true,
+      folio: true,
       estado: true,
-      lineas: { select: { idColor: true, tallas: { select: { idTalla: true, cantidad: true } } } },
+      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
+      cerradaEn: true,
+      lineas: {
+        select: {
+          idColor: true,
+          pack: true,
+          tallas: { select: { idTalla: true, cantidad: true } },
+        },
+      },
     },
   });
   if (orden === null) {
@@ -187,18 +244,26 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
+  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
+  exigirOrdenAbierta(orden, 'le pueden capturar etapas');
 
   const pedido: Celda[] = [];
   const colores = new Set<number>();
-  const tallasPorColor = new Map<number, Set<number>>();
+  const tallasPorRenglon = new Map<string, Set<number>>();
+  const packsPorColor = new Map<number, Set<string>>();
   for (const linea of orden.lineas) {
+    const pack = normalizarPack(linea.pack);
     colores.add(linea.idColor);
-    const tallas = tallasPorColor.get(linea.idColor) ?? new Set<number>();
+    const packs = packsPorColor.get(linea.idColor) ?? new Set<string>();
+    packs.add(pack);
+    packsPorColor.set(linea.idColor, packs);
+    const clave = claveRenglon(linea.idColor, pack);
+    const tallas = tallasPorRenglon.get(clave) ?? new Set<number>();
     for (const t of linea.tallas) {
       tallas.add(t.idTalla);
-      pedido.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+      pedido.push({ idColor: linea.idColor, idTalla: t.idTalla, pack, cantidad: t.cantidad });
     }
-    tallasPorColor.set(linea.idColor, tallas);
+    tallasPorRenglon.set(clave, tallas);
   }
   return {
     idEmpresa: orden.idEmpresa,
@@ -206,20 +271,34 @@ async function resolverOrden(
     estado: orden.estado,
     pedido,
     colores,
-    tallasPorColor,
+    manejaPacks: ordenManejaPacks(orden.lineas.map((l) => l.pack)),
+    tallasPorRenglon,
+    packsPorColor,
   };
 }
 
 /**
- * Aplana la matriz de la entrada a celdas, validando SANIDAD (D4): cantidades enteras ≥ 0, color y
- * talla SIN repetir dentro de la captura, y que cada color×talla PERTENEZCA a la orden (no se puede
- * cortar/enviar un color o una talla que la orden no pidió). Esto aplica TANTO al corte (f) como al
- * envío (g): la holgura de sobre-corte es solo de CANTIDAD, no de colores/tallas inventados.
+ * Aplana la matriz de la entrada a celdas, validando SANIDAD (D4): cantidades enteras ≥ 0, renglón
+ * (color × PACK) SIN repetir dentro de la captura, talla sin repetir dentro del renglón, y que cada
+ * renglón y cada talla PERTENEZCAN a la orden (no se puede cortar/enviar un color, un pack o una
+ * talla que la orden no pidió). Esto aplica TANTO al corte (f) como al envío (g): la holgura de
+ * sobre-corte es solo de CANTIDAD, no de colores/packs/tallas inventados.
+ *
+ * ⭐ EL PACK (§Post-F9.10) — *«que viaje el pack al menos en el corte, entrega a maquila»*: en una
+ * orden que maneja packs es OBLIGATORIO (cada tendido es de un pack) y tiene que ser uno de los
+ * packs de ESE color; en una orden que no los maneja, mandarlo es un error de captura y se rechaza
+ * en vez de ignorarse — un pack silenciosamente descartado habría producido un corte que dice una
+ * cosa en la pantalla y otra en la BD. Ambas ramas comparten esta única función a propósito: corte y
+ * envío son caminos gemelos y aquí no pueden divergir.
  */
 function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden): Celda[] {
-  const idsColor = lineas.map((l) => l.idColor);
-  if (new Set(idsColor).size !== idsColor.length) {
-    throw new ErrorValidacion('Un color no puede aparecer dos veces en la misma captura.');
+  const claves = lineas.map((l) => claveRenglon(l.idColor, l.pack));
+  if (new Set(claves).size !== claves.length) {
+    throw new ErrorValidacion(
+      orden.manejaPacks
+        ? 'Un mismo color y pack no pueden aparecer dos veces en la misma captura.'
+        : 'Un color no puede aparecer dos veces en la misma captura.',
+    );
   }
 
   const celdas: Celda[] = [];
@@ -229,7 +308,28 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
         `El color ${linea.idColor} no pertenece a la orden; solo se capturan colores de la orden.`,
       );
     }
-    const tallasOrden = orden.tallasPorColor.get(linea.idColor) ?? new Set<number>();
+    const pack = normalizarPack(linea.pack);
+    if (orden.manejaPacks && esSinPack(pack)) {
+      throw new ErrorValidacion(
+        `Esta orden se fabrica por packs: di de qué pack es cada renglón. Los del color ` +
+          `${linea.idColor} son: ${packsDelColor(orden, linea.idColor)}.`,
+      );
+    }
+    if (!orden.manejaPacks && !esSinPack(pack)) {
+      throw new ErrorValidacion(
+        `Esta orden no se fabrica por packs, así que el renglón del color ${linea.idColor} no ` +
+          `puede llevar el pack "${pack}".`,
+      );
+    }
+    const tallasOrden = orden.tallasPorRenglon.get(claveRenglon(linea.idColor, pack));
+    if (tallasOrden === undefined) {
+      // Sólo puede pasar con packs: el color existe pero ESE pack no. Se nombra lo que sí hay, para
+      // que el error diga qué corregir en vez de dejar al operador adivinando.
+      throw new ErrorValidacion(
+        `El color ${linea.idColor} de la orden no tiene el pack "${pack}"; sus packs son: ` +
+          `${packsDelColor(orden, linea.idColor)}.`,
+      );
+    }
     const idsTalla = linea.tallas.map((t) => t.idTalla);
     if (new Set(idsTalla).size !== idsTalla.length) {
       throw new ErrorValidacion('Una talla no puede aparecer dos veces en el mismo color.');
@@ -240,11 +340,14 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
       }
       if (!tallasOrden.has(t.idTalla)) {
         throw new ErrorValidacion(
-          `La talla ${t.idTalla} no pertenece al color ${linea.idColor} de la orden.`,
+          esSinPack(pack)
+            ? `La talla ${t.idTalla} no pertenece al color ${linea.idColor} de la orden.`
+            : `La talla ${t.idTalla} no pertenece al pack "${pack}" del color ${linea.idColor} ` +
+                'de la orden.',
         );
       }
       if (t.cantidad > 0) {
-        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, pack, cantidad: t.cantidad });
       }
     }
   }
@@ -254,9 +357,32 @@ function aplanarYValidar(lineas: DatosEtapaLineaEntrada[], orden: ContextoOrden)
   return celdas;
 }
 
-/** Clave estable de una celda color×talla (para mapas). */
-function claveCelda(idColor: number, idTalla: number): string {
-  return `${idColor}:${idTalla}`;
+/**
+ * Pliega las celdas de una captura a color×talla, SUMANDO los tendidos. Es la frontera con lo que
+ * NO maneja packs (§Post-F9.10): hoy, el kardex de producto terminado.
+ */
+function plegarCeldasSinPack(
+  celdas: readonly Celda[],
+): { idColor: number; idTalla: number; cantidad: number }[] {
+  const porCelda = new Map<string, { idColor: number; idTalla: number; cantidad: number }>();
+  for (const c of celdas) {
+    const clave = `${c.idColor}:${c.idTalla}`;
+    const acum = porCelda.get(clave);
+    if (acum === undefined) {
+      porCelda.set(clave, { idColor: c.idColor, idTalla: c.idTalla, cantidad: c.cantidad });
+    } else {
+      acum.cantidad += c.cantidad;
+    }
+  }
+  return [...porCelda.values()];
+}
+
+/** Los packs que la orden tiene para un color, en texto, para redactar errores accionables. */
+function packsDelColor(orden: ContextoOrden, idColor: number): string {
+  const packs = [...(orden.packsPorColor.get(idColor) ?? new Set<string>())]
+    .filter((p) => !esSinPack(p))
+    .sort((a, b) => a.localeCompare(b, 'es'));
+  return packs.length > 0 ? packs.map((p) => `"${p}"`).join(', ') : '(ninguno)';
 }
 
 /**
@@ -309,9 +435,13 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
 }
 
 /**
- * Suma las celdas color×talla de las etapas VIVAS (no canceladas) de una orden que cumplan el
+ * Suma las celdas color×talla×PACK de las etapas VIVAS (no canceladas) de una orden que cumplan el
  * filtro de tipo/proceso, leyendo `EtapaMovimientoDet` DIRECTO (sin acumuladores; ADR-0010 §3). Es
  * la base de "cortado disponible por proceso" (g) y de los pendientes derivados.
+ *
+ * ⭐ La llave lleva el PACK (§Post-F9.10) porque corte y entrega a maquila lo declaran los DOS: el
+ * saldo «enviado ≤ cortado» se lleva tendido por tendido, que es lo que Daniel pidió. En una orden
+ * sin packs todas las celdas caen en el pack vacío y la llave es, punto por punto, la de siempre.
  */
 async function sumarCeldas(
   tx: Tx,
@@ -327,34 +457,17 @@ async function sumarCeldas(
         ...(filtro.idTipoProceso === undefined ? {} : { idTipoProceso: filtro.idTipoProceso }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, pack: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
+    const clave = claveCeldaPack(f.idColor, f.idTalla, f.pack);
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
-
-/**
- * Resuelve el nombre de cada `creadoPorId` en UN viaje (rediseño R2 §4.4.4 "capturado por · fecha";
- * mismo patrón que la RC de F5-E5: el id es texto sin FK física, los que no existan quedan null).
- */
-async function nombresDeCaptura(
-  cliente: ReturnType<typeof clienteLectura>,
-  ids: (string | null)[],
-): Promise<Map<string, string>> {
-  const unicos = [...new Set(ids.filter((x): x is string => x !== null))];
-  if (unicos.length === 0) return new Map();
-  const usuarios = await cliente.usuario.findMany({
-    where: { id: { in: unicos } },
-    select: { id: true, nombre: true },
-  });
-  return new Map(usuarios.map((u) => [u.id, u.nombre]));
-}
 
 /**
  * Proyecta una etapa (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
@@ -365,19 +478,31 @@ async function nombresDeCaptura(
  */
 function aEtapaSalida(
   etapa: EtapaConDetalle,
-  nombres?: Map<string, string>,
+  nombres: ReadonlyMap<string, string>,
   ocultarPrecio = false,
 ): EtapaSalida {
-  // Agrupa el detalle por color, ordenando las tallas por su `orden` del catálogo.
-  const porColor = new Map<number, { color: string; tallas: EtapaConDetalle['detalles'] }>();
+  // Agrupa el detalle por COLOR × PACK (§Post-F9.10 — el renglón de la etapa es el tendido, no el
+  // color), ordenando las tallas por su `orden` del catálogo. Agrupar sólo por color habría fundido
+  // en un renglón dos tendidos con corridas distintas, que es justo lo que esta etapa vino a separar.
+  const porRenglon = new Map<
+    string,
+    { idColor: number; color: string; pack: string; tallas: EtapaConDetalle['detalles'] }
+  >();
   for (const det of etapa.detalles) {
-    const grupo = porColor.get(det.idColor) ?? { color: det.color.nombre, tallas: [] };
+    const pack = normalizarPack(det.pack);
+    const clave = claveRenglon(det.idColor, pack);
+    const grupo = porRenglon.get(clave) ?? {
+      idColor: det.idColor,
+      color: det.color.nombre,
+      pack,
+      tallas: [],
+    };
     grupo.tallas.push(det);
-    porColor.set(det.idColor, grupo);
+    porRenglon.set(clave, grupo);
   }
 
   let totalPiezas = 0;
-  const lineas = [...porColor.entries()].map(([idColor, grupo]) => {
+  const lineas = [...porRenglon.values()].map((grupo) => {
     let totalLinea = 0;
     const tallas = grupo.tallas
       .slice()
@@ -387,7 +512,13 @@ function aEtapaSalida(
         return { idTalla: t.idTalla, etiquetaTalla: t.talla.etiqueta, cantidad: t.cantidad };
       });
     totalPiezas += totalLinea;
-    return { idColor, color: grupo.color, tallas, totalPiezas: totalLinea };
+    return {
+      idColor: grupo.idColor,
+      color: grupo.color,
+      pack: grupo.pack,
+      tallas,
+      totalPiezas: totalLinea,
+    };
   });
 
   return {
@@ -419,7 +550,7 @@ function aEtapaSalida(
     totalPiezas,
     creadoEn: etapa.creadoEn.toISOString(),
     creadoPorId: etapa.creadoPorId,
-    creadoPorNombre: etapa.creadoPorId === null ? null : (nombres?.get(etapa.creadoPorId) ?? null),
+    creadoPorNombre: nombreDeUsuario(nombres, etapa.creadoPorId),
   };
 }
 
@@ -442,10 +573,106 @@ async function registrarEventoEtapaRc(
   await registrarEventoOutbox(tx, evento, VERSION_EVENTO_ETAPA_RC, datos.idEmpresa, datos);
 }
 
+/**
+ * ⭐ EL CARGO DE UN SERVICIO SOBRE LA ORDEN (0.114) — corte y empaque, en un solo lugar.
+ *
+ * Daniel puso los dos del lado de la maquila: *«corte es parte de maquilas, no de proveedores.
+ * Tengo proveedores de corte que el monto a pagar sale de una orden, lo mismo que un maquilero. Y
+ * una maquila de empaque también»*. Pero NO son maquila de ida y vuelta: no hay envío ni recibo, no
+ * se mueve inventario, *«simplemente sucede y ya»*. Así que el cargo nace de la etapa MISMA (corte /
+ * empaque), no de un recibo, y en vez de `idTipoProceso` lleva `servicio`.
+ *
+ * Es un calco deliberado de lo que hace `recibos.ts` al cerrar un recibo (mismo estado `propuesto`,
+ * misma liga por `idEtapaRecibo`, misma cantidad DERIVADA de los detalles al proyectar el cargo, y
+ * el mismo punto de control humano después): quien valida cargos ve una sola cola con las mismas
+ * columnas, sin aprender un concepto nuevo.
+ *
+ * La CANTIDAD no se guarda aquí (se deriva de `EtapaMovimientoDet` en `esma/cargos.ts`, D3) y el
+ * PRECIO propuesto sale del `precioPactado` de la etapa: la orden trae precios de MAQUILA
+ * (`maquilaOrd`/`aplicacionOrd`) que no son los de estos servicios y no se les presta.
+ *
+ * Corre DENTRO de la transacción de la etapa (A2): si la etapa hace rollback, el cargo no existe.
+ */
+async function crearCargoDeServicio(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: {
+    idEmpresa: number;
+    idEtapa: number;
+    idOrden: number;
+    idTercero: number;
+    servicio: ServicioOrden;
+    totalPiezas: number;
+  },
+): Promise<void> {
+  // Puerta de cantidad 0, igual que el recibo: un cargo de 0 piezas sólo llenaría la cola de
+  // validación de renglones en $0. Hoy es inalcanzable —`aplanarYValidar` rechaza la captura sin
+  // ninguna pieza— y se conserva como defensa en profundidad, no como caso vivo.
+  if (datos.totalPiezas <= 0) {
+    return;
+  }
+  await tx.esMaCargo.create({
+    data: {
+      idEmpresa: datos.idEmpresa,
+      idEtapaRecibo: datos.idEtapa,
+      idMaquilero: datos.idTercero,
+      idOrden: datos.idOrden,
+      // Excluyentes por CHECK (`esma_cargo_proceso_o_servicio`): servicio SÍ, proceso NO.
+      idTipoProceso: null,
+      servicio: datos.servicio,
+      // cantidadReal/precioReal NULL mientras esté propuesto; lo propuesto se DERIVA de la etapa.
+      estado: 'propuesto',
+      ...datosCreacion(sesion),
+    },
+  });
+}
+
+/**
+ * CANCELA el cargo EsMa de una etapa de SERVICIO (corte/empaque, 0.114) junto con la etapa, dentro
+ * de su misma transacción (A2). Calco de `recibos.ts::cancelarReciboMaquila` (a):
+ *  • busca el cargo VIVO (no cancelado) ligado a la etapa;
+ *  • si ya está `validado`, exige `esma.cargo-validar` (A4) antes de tocarlo — es dinero
+ *    comprometido, y sin el permiso se rechaza la cancelación ENTERA (una sola transacción);
+ *  • lo pasa a `cancelado` (nunca lo borra, D3) y lo deja en la bitácora con su estado previo (A7).
+ *
+ * No-op si la etapa no tiene cargo: el corte de una orden capturada antes de 0.114 no lo tiene, y
+ * cancelarlo tiene que seguir funcionando igual.
+ */
+async function cancelarCargoDeServicio(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idEtapa: number,
+  motivo: string,
+): Promise<void> {
+  const cargo = await tx.esMaCargo.findFirst({
+    where: { idEtapaRecibo: idEtapa, estado: { not: 'cancelado' } },
+    select: { id: true, estado: true },
+  });
+  if (cargo === null) {
+    return;
+  }
+  if (cargo.estado === 'validado') {
+    // Permiso especial: cancelar una etapa cuyo cargo ya se validó (afecta el pago).
+    verificarPermiso(sesion, 'esma.cargo-validar');
+  }
+  await tx.esMaCargo.update({
+    where: { id: cargo.id },
+    data: { estado: 'cancelado', ...datosModificacion(sesion) },
+  });
+  await registrarBitacora(tx, sesion, {
+    entidad: 'EsMaCargo',
+    idEntidad: cargo.id,
+    accion: 'CANCELAR',
+    datos: { motivo, idEtapa, estadoPrevio: cargo.estado },
+  });
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────────────────
 
 /** Alta de corte: campos del esquema compartido. */
 export type EntradaRegistrarCorte = z.input<typeof esquemaCorteCrear>;
+/** Alta de empaque: campos del esquema compartido (0.114). */
+export type EntradaRegistrarEmpaque = z.input<typeof esquemaEmpaqueCrear>;
 /** Alta de envío: campos del esquema compartido. */
 export type EntradaRegistrarEnvio = z.input<typeof esquemaEnvioCrear>;
 
@@ -456,6 +683,13 @@ export type EntradaRegistrarEnvio = z.input<typeof esquemaEnvioCrear>;
  * cortador tenga el rol `corte` (D12/R15) y que cada color×talla pertenezca a la orden. Sobre-corte
  * LIBRE (decisión (f)): no bloquea por cortar más que lo pedido. Emite `corte-registrado`
  * post-commit (gancho RC F5).
+ *
+ * ⭐ 0.114 — EL CORTE SE PAGA. Daniel: *«en corte no necesitas mandar y recibir mercancía. Mando
+ * tela y corta una cierta cantidad. Sólo hay que poner su cantidad y precio para meterlo en la OP,
+ * pero no va y viene»*. Con eso el corte gana `precioPactado` y, en la MISMA transacción, su CARGO
+ * EsMa `propuesto` con `servicio: 'corte'` ({@link crearCargoDeServicio}) — para que el cortador se
+ * pueda pagar desde la orden como un maquilero, sin envío ni recibo de por medio. El corte SIGUE sin
+ * tocar el kardex: nace la cantidad, no entra ni sale mercancía.
  */
 export async function registrarCorte(
   sesion: SesionUsuario,
@@ -474,6 +708,7 @@ export async function registrarCorte(
     // de TOLERANCIA_SOBRE_CORTE). La pantalla AVISA cuánto excede; el servidor acepta.
 
     const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
+    const totalPiezas = celdas.reduce((s, c) => s + c.cantidad, 0);
     const etapa = await tx.etapaMovimiento.create({
       data: {
         folio,
@@ -482,16 +717,31 @@ export async function registrarCorte(
         tipo: TipoEtapaMovimiento.corte,
         idTercero: datos.idCortador,
         fecha: aDateColumna(datos.fecha),
+        // 0.114: el precio por prenda pactado con el cortador. Es la base del cargo EsMa del corte
+        // (`esma/cargos.ts` lo lee como precio propuesto). `null` explícito si no se capturó.
+        precioPactado: datos.precioPactado ?? null,
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
         detalles: {
           create: celdas.map((c) => ({
             idColor: c.idColor,
             idTalla: c.idTalla,
+            // El pack VIAJA con la pieza (§Post-F9.10): cadena vacía en las órdenes sin packs.
+            pack: c.pack,
             cantidad: c.cantidad,
           })),
         },
         ...datosCreacion(sesion),
       },
+    });
+
+    // 0.114: el CARGO del cortador, en la misma tx que el corte (A2).
+    await crearCargoDeServicio(tx, sesion, {
+      idEmpresa: orden.idEmpresa,
+      idEtapa: etapa.id,
+      idOrden: datos.idOrden,
+      idTercero: datos.idCortador,
+      servicio: ServicioOrden.corte,
+      totalPiezas,
     });
 
     await registrarBitacora(tx, sesion, {
@@ -504,7 +754,10 @@ export async function registrarCorte(
         idOrden: datos.idOrden,
         idCortador: datos.idCortador,
         celdas: celdas.length,
-        totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),
+        totalPiezas,
+        // A7: el precio pactado es DINERO (nace un cargo con él) y por eso queda en la bitácora,
+        // igual que en el envío a maquila.
+        precioPactado: datos.precioPactado ?? null,
       },
     });
 
@@ -520,10 +773,114 @@ export async function registrarCorte(
     return etapa.id;
   }, bd);
 
-  // Quien capturo ve SU captura completa (el corte no lleva precio, pero el criterio es uniforme).
+  // Quien captura ve SU captura completa, precio incluido (desde 0.114 el corte SÍ lleva precio):
+  // acaba de teclearlo, y redactárselo en la respuesta sería esconderle lo que él mismo escribió.
   const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
+}
+
+/**
+ * ⭐ Registra un EMPAQUE de una orden (0.114) — el hermano del corte, y por las mismas razones.
+ *
+ * Daniel: *«lo mismo el empaque… el empaque no toca el inventario»* y *«una maquila de empaque
+ * también»* (o sea: se paga contra la orden, como un maquilero). De ahí sale todo el diseño:
+ *
+ *  • `EtapaMovimiento(tipo=empaque, idTipoProceso=NULL, idTercero=empacador)` + su matriz
+ *    color×talla (D4), en UNA transacción (A2), con folio atómico (A3) y bitácora (A7);
+ *  • **NO toca el kardex**: no hay entrada ni salida de existencia. Empacar no mueve mercancía de
+ *    almacén, sólo la prepara;
+ *  • **NO hay envío ni recibo**: por eso NO es un `TipoProceso` (convertirlo en uno lo metería al
+ *    flujo de ida y vuelta que Daniel dice que no es);
+ *  • **la cantidad es PROPIA y NO SE TOPA** contra lo recibido ni contra lo cortado. Es la regla de
+ *    C&A que dictó Daniel: se fabrican 1,000 y se empacan 990 — se paga lo empacado y las 10
+ *    restantes se quedan quietas en inventario. Mismo criterio que el sobre-corte LIBRE (decisión
+ *    (f)): la pantalla puede AVISAR que excede lo recibido, el servidor acepta;
+ *  • genera su CARGO EsMa `propuesto` con `servicio: 'empaque'` ({@link crearCargoDeServicio}).
+ *
+ * Valida que el empacador tenga el rol `empaque` (D12/R15) y que cada color×talla pertenezca a la
+ * orden. Permiso propio `produccion.empaque` (A4).
+ *
+ * 🔴 POR QUÉ NO EMITE EVENTO A LA RUTA CRÍTICA (medido, no olvidado). La RC **sí** tiene un proceso
+ * `empaque` (`TipoEventoProceso.empaque`), pero **ya tiene dueño**: lo completa el HITO de orden de
+ * tipo `empaque` (`ruta-critica/hitosOrden.ts` → `hito-orden-resuelto` → `reevaluarHito`). Los dos
+ * caminos miden cosas distintas: el hito pregunta *«¿hay un hito vivo?»* y esta etapa mediría
+ * *«¿se cubrió toda la matriz color×talla?»*. Engancharla al MISMO renglón pondría dos escritores
+ * con reglas distintas sobre el mismo `RutaOrdenRenglon`, y un empaque PARCIAL —990 de 1,000, que
+ * es justo el caso que Daniel describió— **des-completaría** un hito que alguien ya registró. Se
+ * deja fuera a propósito: un evento que rompe algo que hoy funciona es peor que ninguno. Si Daniel
+ * quiere que el empaque capturado cierre solo su proceso de RC, la decisión que falta es cuál de los
+ * dos manda (y con qué regla de completitud), y eso es una etapa aparte.
+ */
+export async function registrarEmpaque(
+  sesion: SesionUsuario,
+  entrada: EntradaRegistrarEmpaque,
+  bd?: ContextoBd,
+): Promise<EtapaSalida> {
+  verificarPermiso(sesion, 'produccion.empaque');
+  const datos = validarEntrada(esquemaEmpaqueCrear, entrada);
+
+  const idEtapa = await enTransaccion(async (tx) => {
+    const orden = await resolverOrden(tx, datos.idOrden, sesion.idEmpresaActiva);
+    const celdas = aplanarYValidar(datos.lineas, orden);
+    await exigirTerceroConRol(tx, datos.idEmpacador, ROL_EMPACADOR, 'Empaque');
+
+    // Sin tope: la cantidad del empaque es propia (ver el TSDoc). No se compara contra lo recibido
+    // ni contra lo cortado, y por eso tampoco hace falta bloquear las etapas de la orden.
+
+    const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
+    const totalPiezas = celdas.reduce((s, c) => s + c.cantidad, 0);
+    const etapa = await tx.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: orden.idEmpresa,
+        idOrden: datos.idOrden,
+        tipo: TipoEtapaMovimiento.empaque,
+        idTercero: datos.idEmpacador,
+        fecha: aDateColumna(datos.fecha),
+        precioPactado: datos.precioPactado ?? null,
+        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        detalles: {
+          create: celdas.map((c) => ({
+            idColor: c.idColor,
+            idTalla: c.idTalla,
+            pack: c.pack,
+            cantidad: c.cantidad,
+          })),
+        },
+        ...datosCreacion(sesion),
+      },
+    });
+
+    await crearCargoDeServicio(tx, sesion, {
+      idEmpresa: orden.idEmpresa,
+      idEtapa: etapa.id,
+      idOrden: datos.idOrden,
+      idTercero: datos.idEmpacador,
+      servicio: ServicioOrden.empaque,
+      totalPiezas,
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'EtapaMovimiento',
+      idEntidad: etapa.id,
+      accion: 'CREAR',
+      datos: {
+        tipo: 'empaque',
+        folio: Number(folio),
+        idOrden: datos.idOrden,
+        idEmpacador: datos.idEmpacador,
+        celdas: celdas.length,
+        totalPiezas,
+        precioPactado: datos.precioPactado ?? null,
+      },
+    });
+
+    return etapa.id;
+  }, bd);
+
+  // Sin `dispararPublicacion()`: esta etapa NO escribe en el outbox (ver el TSDoc de arriba).
+  return obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
 }
 
 /**
@@ -596,17 +953,12 @@ export async function registrarEnvioMaquila(
             'del inventario hacia el tránsito).',
         );
       }
-      await exigirAlmacen(tx, datos.idAlmacenOrigen, orden.idEmpresa);
-      const almacen = await tx.almacen.findUnique({
-        where: { id: datos.idAlmacenOrigen },
-        select: { tipo: true, nombre: true },
-      });
-      if (almacen?.tipo !== 'PT') {
-        throw new ErrorValidacion(
-          `El almacén "${almacen?.nombre ?? String(datos.idAlmacenOrigen)}" no es de producto ` +
-            'terminado; las prendas terminadas solo pueden salir de un almacén de PT.',
-        );
-      }
+      // Fila 0.137, segunda pasada: este sitio YA exigía el tipo PT, pero a mano y con una SEGUNDA
+      // lectura del mismo renglón que la validación de almacén acababa de leer. Se colapsa en la
+      // guarda única del dominio, que hace las cuatro comprobaciones (existe → activo → de la
+      // empresa → del tipo) en UNA consulta. Sigue siendo PT porque esta rama solo corre cuando lo
+      // que se manda son PRENDAS YA TERMINADAS: el envío las saca del kardex de PT al tránsito.
+      await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'PT', orden.idEmpresa);
     } else if (datos.stockSinOrden) {
       // Sin sacar del almacén, el bucket de existencia no significa nada: decirlo es mejor que
       // guardarlo mudo y que alguien crea que el envío descontó de algún lado.
@@ -672,14 +1024,17 @@ export async function registrarEnvioMaquila(
     });
 
     for (const c of celdas) {
-      const clave = claveCelda(c.idColor, c.idTalla);
+      // La llave lleva el PACK: cada tendido tiene su propio saldo de cortado (§Post-F9.10). Sin
+      // packs es la celda de siempre.
+      const clave = claveCeldaPack(c.idColor, c.idTalla, c.pack);
       const cortadoCelda = cortado.get(clave) ?? 0;
       const enviadoCelda = yaEnviado.get(clave) ?? 0;
       const disponible = cortadoCelda - enviadoCelda;
       const topeConHolgura = Math.floor(disponible * (1 + TOLERANCIA_SOBRE_ENVIO));
       if (c.cantidad > topeConHolgura) {
         throw new ErrorConflicto(
-          `No se puede enviar ${c.cantidad} pza(s) de ese color/talla a "${proceso.nombre}": ` +
+          `No se puede enviar ${c.cantidad} pza(s) de ese color/talla` +
+            `${esSinPack(c.pack) ? '' : ` del pack "${c.pack}"`} a "${proceso.nombre}": ` +
             `solo hay ${disponible} cortada(s) sin enviar a ese proceso.`,
         );
       }
@@ -709,6 +1064,8 @@ export async function registrarEnvioMaquila(
           create: celdas.map((c) => ({
             idColor: c.idColor,
             idTalla: c.idTalla,
+            // El pack VIAJA con la pieza (§Post-F9.10): cadena vacía en las órdenes sin packs.
+            pack: c.pack,
             cantidad: c.cantidad,
           })),
         },
@@ -728,7 +1085,12 @@ export async function registrarEnvioMaquila(
         fecha: aDateColumna(datos.fecha),
         origenTipo: ORIGEN.envioMaquila,
         origenId: String(etapa.id),
-        celdas,
+        // ⭐ EL PACK SE PLIEGA AQUÍ (§Post-F9.10): el inventario de PT no maneja packs —*«ahí ya es
+        // sólo color»*—, así que dos tendidos de la MISMA celda (pack A: 5 CH, pack B: 3 CH) salen
+        // al tránsito como UN renglón de 8. Sin plegar, el traspaso llevaría dos renglones de la
+        // misma llave: el mismo saldo, pero el movimiento partido en dos y el lock del artículo
+        // tomado dos veces. El tendido sigue vivo donde importa: en la celda del WIP.
+        celdas: plegarCeldasSinPack(celdas),
       });
     }
 
@@ -770,14 +1132,31 @@ export async function registrarEnvioMaquila(
 }
 
 /**
- * CANCELA (suave) una etapa de corte o envío: setea `canceladoEn`/`canceladoPorId`/
+ * CANCELA (suave) una etapa de corte, envío o empaque: setea `canceladoEn`/`canceladoPorId`/
  * `motivoCancelacion` + bitácora `CANCELAR` (A7). La etapa NUNCA se borra ni se edita. Reglas:
  *  • solo etapas de la EMPRESA ACTIVA (A9);
  *  • no se puede re-cancelar una etapa ya cancelada;
  *  • no se puede cancelar un CORTE que tenga ENVÍOS VIVOS (no cancelados): primero se cancelan los
  *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado);
  *  • espejo del anterior: no se puede cancelar un ENVÍO que tenga RECIBOS VIVOS de su orden+proceso
- *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe).
+ *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe);
+ *  • el EMPAQUE no tiene guard de dependencias: nada cuelga de él (no hay recibo de empaque, no
+ *    mueve inventario y su cantidad es propia). Se cancela solo.
+ *
+ * ⭐ 0.114 — Y ARRASTRA SU CARGO. Desde que el corte y el empaque generan un `EsMaCargo`
+ * ({@link crearCargoDeServicio}), cancelarlos sin tocar el cargo dejaría al cortador cobrando un
+ * corte que ya no existe. Se aplica EXACTAMENTE la misma regla que el recibo de maquila
+ * (`recibos.ts::cancelarReciboMaquila`, deliberadamente calcada para que quien opera no tenga que
+ * aprender dos comportamientos):
+ *  • cargo `propuesto` → se cancela junto con la etapa, en la misma transacción, con bitácora (A7);
+ *  • cargo `validado` → exige el permiso especial `esma.cargo-validar` (A4) antes de cancelarlo:
+ *    ese cargo ya es un compromiso de pago, así que deshacerlo es una decisión de quien valida
+ *    cargos, no de quien captura producción. Sin el permiso, la cancelación se rechaza entera (el
+ *    corte tampoco se cancela: es una sola transacción).
+ *
+ * ⚠️ El cargo se busca por `idEtapaRecibo` —que en corte/empaque apunta a ESTA etapa— y sólo entre
+ * los NO cancelados, para que re-cancelar no tropiece con el cargo que ya se canceló antes.
+ *
  * Las etapas canceladas NO cuentan en ninguna suma de pendientes ({@link sumarCeldas} filtra
  * `canceladoEn: null`).
  */
@@ -798,6 +1177,9 @@ export async function cancelarEtapaMovimiento(
         tipo: true,
         idOrden: true,
         idTipoProceso: true,
+        // El TERCERO del envío: desde V1 (fila 0.109) hace falta para ver si ese maquilero ya tiene
+        // un CIERRE vivo de esta orden+proceso (ver el guard de abajo).
+        idTercero: true,
         canceladoEn: true,
         folio: true,
         prendaTerminada: true,
@@ -809,13 +1191,19 @@ export async function cancelarEtapaMovimiento(
     if (etapa.canceladoEn !== null) {
       throw new ErrorConflicto(`La etapa ${Number(etapa.folio)} ya está cancelada.`);
     }
-    // F3-E2 solo maneja corte y envío; recibo/entrega (con efectos de kardex) los cancela E4/E5.
+    // ⭐ 0.061: cancelar una etapa MUEVE las cantidades de la orden (y con ellas su costo). Sobre
+    // una orden CERRADA hay que reabrirla primero — el acto inverso auditado, no una edición.
+    await exigirOrdenAbiertaPorId(tx, etapa.idOrden, 'pueden cancelar sus etapas');
+    // Esta operación cancela corte, envío y EMPAQUE (0.114); recibo/entrega (con efectos de kardex)
+    // los cancela su propio módulo (E4/E5), que además revierte el inventario.
     if (
       etapa.tipo !== TipoEtapaMovimiento.corte &&
-      etapa.tipo !== TipoEtapaMovimiento.envio_maquila
+      etapa.tipo !== TipoEtapaMovimiento.envio_maquila &&
+      etapa.tipo !== TipoEtapaMovimiento.empaque
     ) {
       throw new ErrorValidacion(
-        'Esta operación solo cancela cortes y envíos; los recibos y entregas se cancelan en su módulo.',
+        'Esta operación solo cancela cortes, envíos y empaques; los recibos y entregas se cancelan ' +
+          'en su módulo.',
       );
     }
 
@@ -864,6 +1252,34 @@ export async function cancelarEtapaMovimiento(
         );
       }
 
+      // ⭐⭐ V1 (fila 0.109) — EL ENVÍO TAMBIÉN SOSTIENE LOS CIERRES, y el guard de arriba no los ve
+      // porque un cierre NO es un recibo: es el acto que da por perdidas las piezas que el maquilero
+      // nunca devolvió. El camino que esto cierra existe y no es raro: se le envían 100, no devuelve
+      // nada (⇒ CERO recibos vivos, el guard de arriba pasa), se cierra la orden cobrándole las 100…
+      // y entonces se cancela el envío. Quedaría `enviado = 0` con `saldado = 100`, o sea pendiente
+      // −100 en las CINCO puertas que derivan el pendiente, la orden de vuelta en ABIERTA, `kpi_wip`
+      // en negativo — y un `DescuentoMaquilero` cobrándole prendas de un envío que ya no existe.
+      // Es la «lección de la décima puerta» (§Post-F9.147) aplicada al lado que ESCRIBE: quien borra
+      // el minuendo tiene que mirar TODOS los sustraendos, no sólo el que conocía.
+      const cierresVivos = await tx.cierreMaquilaOrden.count({
+        where: {
+          idOrden: etapa.idOrden,
+          // El envío SIEMPRE trae proceso y tercero (lo exige `registrarEnvioMaquila`), pero el
+          // esquema los deja nullable porque el corte y la entrega no los llevan: si faltaran, se
+          // acota sólo por orden — MÁS conservador, nunca menos.
+          ...(etapa.idTipoProceso === null ? {} : { idTipoProceso: etapa.idTipoProceso }),
+          ...(etapa.idTercero === null ? {} : { idMaquilero: etapa.idTercero }),
+          deshechoEn: null,
+        },
+      });
+      if (cierresVivos > 0) {
+        throw new ErrorConflicto(
+          'No se puede cancelar el envío a maquila: la orden ya se CERRÓ con ese maquilero en este ' +
+            'proceso (sus faltantes están saldados, y puede haber un descuento propuesto). Deshaz ' +
+            'el cierre primero.',
+        );
+      }
+
       // ⭐ V1-E4b: si el envío SACÓ prendas terminadas del almacén, la cancelación las devuelve con
       // movimientos INVERSOS auditados (D3: el traspaso original nunca se edita ni se borra). El
       // guard de arriba garantiza que no hay recibos vivos, así que las piezas siguen en tránsito;
@@ -875,6 +1291,12 @@ export async function cancelarEtapaMovimiento(
           origenId: String(idEtapa),
         });
       }
+    }
+
+    // ⭐ 0.114 — EL CARGO DEL SERVICIO se va con la etapa (ver el TSDoc). Sólo aplica al corte y al
+    // empaque: el envío a maquila nunca generó cargo (el suyo nace en el RECIBO).
+    if (etapa.tipo === TipoEtapaMovimiento.corte || etapa.tipo === TipoEtapaMovimiento.empaque) {
+      await cancelarCargoDeServicio(tx, sesion, idEtapa, datos.motivo);
     }
 
     await tx.etapaMovimiento.update({
@@ -897,13 +1319,20 @@ export async function cancelarEtapaMovimiento(
     // OUTBOX (F5-E6, decisión (f)): la cancelación re-evalúa el proceso de la RC; si ya no está
     // cubierto, se des-completa y se recalcula el CPM. El consumidor sabe qué proceso por `tipoEtapa`
     // (+ `idTipoProceso` para envío costura/estampado).
-    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.etapaCancelada, {
-      idEmpresa: sesion.idEmpresaActiva,
-      idOrden: etapa.idOrden,
-      idEtapaMovimiento: etapa.id,
-      tipoEtapa: etapa.tipo,
-      idTipoProceso: etapa.idTipoProceso,
-    });
+    //
+    // El EMPAQUE se queda fuera a propósito (0.114): su alta tampoco emite, porque el proceso RC
+    // `empaque` ya lo gobierna el HITO de orden y meterle un segundo escritor lo rompería (el porqué
+    // completo está en el TSDoc de {@link registrarEmpaque}). Publicar aquí un evento que el
+    // consumidor ignora sería ruido con apariencia de contrato.
+    if (etapa.tipo !== TipoEtapaMovimiento.empaque) {
+      await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.etapaCancelada, {
+        idEmpresa: sesion.idEmpresaActiva,
+        idOrden: etapa.idOrden,
+        idEtapaMovimiento: etapa.id,
+        tipoEtapa: etapa.tipo,
+        idTipoProceso: etapa.idTipoProceso,
+      });
+    }
   }, bd);
 
   dispararPublicacion();
@@ -932,14 +1361,14 @@ export async function obtenerEtapa(
   if (etapa === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idEtapa);
   }
-  const nombres = await nombresDeCaptura(cliente, [etapa.creadoPorId]);
+  const nombres = await nombresDeUsuarios(cliente, [etapa.creadoPorId]);
   const ocultarPrecio =
     opciones.ocultarPrecio ?? !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
   return aEtapaSalida(etapa, nombres, ocultarPrecio);
 }
 
 /**
- * HISTORIAL de etapas (cortes Y envíos) de una orden de la empresa activa (A9): vivas y CANCELADAS
+ * HISTORIAL de etapas (cortes, envíos y empaques) de una orden de la empresa activa (A9): vivas y CANCELADAS
  * (las canceladas se conservan como historial, marcadas). Cada etapa trae su matriz color×talla y
  * su estado de cancelación (motivo + fecha). Es lo que las pantallas de captura muestran para
  * poder CANCELAR una etapa con motivo y ver el resultado. Ordenado por folio descendente (lo más
@@ -967,6 +1396,10 @@ export async function listarEtapasOrden(
   const tipos: TipoEtapaMovimiento[] = [
     TipoEtapaMovimiento.corte,
     TipoEtapaMovimiento.envio_maquila,
+    // 0.114: el EMPAQUE viaja SIEMPRE en el historial (no cuelga de `incluirRecibos`, que existe
+    // para no cambiarle la respuesta a las pantallas viejas de recibos). Es una etapa nueva: nadie
+    // la esperaba ausente, y el panel de avance la necesita para pintar su lista y poder cancelarla.
+    TipoEtapaMovimiento.empaque,
   ];
   if (opciones.incluirRecibos === true) {
     tipos.push(TipoEtapaMovimiento.recibo_maquila);
@@ -981,7 +1414,7 @@ export async function listarEtapasOrden(
     include: incluirEtapa,
   });
 
-  const nombres = await nombresDeCaptura(
+  const nombres = await nombresDeUsuarios(
     cliente,
     etapas.map((e) => e.creadoPorId),
   );
@@ -1016,6 +1449,7 @@ export async function pendientesPorOrden(
       lineas: {
         select: {
           idColor: true,
+          pack: true,
           color: { select: { nombre: true } },
           tallas: {
             select: {
@@ -1036,6 +1470,8 @@ export async function pendientesPorOrden(
   interface MetaCelda {
     idColor: number;
     color: string;
+    /** Pack / tendido de la celda (§Post-F9.10); cadena vacía en las órdenes sin packs. */
+    pack: string;
     idTalla: number;
     etiquetaTalla: string;
     ordenTalla: number;
@@ -1043,13 +1479,18 @@ export async function pendientesPorOrden(
   const meta = new Map<string, MetaCelda>();
   const pedido = new Map<string, number>();
   for (const linea of orden.lineas) {
+    // La llave lleva el PACK (§Post-F9.10): dos tendidos del mismo color son DOS celdas distintas,
+    // con su propio pendiente. Plegarlos aquí haría que la pantalla ofreciera un tope agregado que
+    // el servidor rechaza tendido por tendido al enviar (sobre-envío ESTRICTO, decisión (g)).
+    const pack = normalizarPack(linea.pack);
     for (const t of linea.tallas) {
-      const clave = claveCelda(linea.idColor, t.idTalla);
+      const clave = claveCeldaPack(linea.idColor, t.idTalla, pack);
       pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
       if (!meta.has(clave)) {
         meta.set(clave, {
           idColor: linea.idColor,
           color: linea.color.nombre,
+          pack,
           idTalla: t.idTalla,
           etiquetaTalla: t.talla.etiqueta,
           ordenTalla: t.talla.orden,
@@ -1076,11 +1517,19 @@ export async function pendientesPorOrden(
   // de pedido ∪ corte para porCortar y cortadoTotal.
   const todasClaves = new Set<string>([...pedido.keys(), ...cortado.keys()]);
 
-  const ordenarCeldas = <T extends { ordenTalla: number; idColor: number; idTalla: number }>(
+  // El PACK entra en el orden justo detrás del color: los tendidos de un mismo color salen juntos y
+  // en orden estable (§Post-F9.10). Sin packs, todos comparten la cadena vacía y el orden no cambia.
+  const ordenarCeldas = <
+    T extends { ordenTalla: number; idColor: number; idTalla: number; pack: string },
+  >(
     arr: T[],
   ): T[] =>
     arr.sort(
-      (a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla,
+      (a, b) =>
+        a.idColor - b.idColor ||
+        a.pack.localeCompare(b.pack, 'es') ||
+        a.ordenTalla - b.ordenTalla ||
+        a.idTalla - b.idTalla,
     );
 
   const porCortar = ordenarCeldas(
@@ -1135,27 +1584,213 @@ export async function pendientesPorOrden(
   };
 }
 
-/** Devuelve el metadato de presentación de una celda (defensivo: si falta, arma uno mínimo). */
-function metaPara(
-  meta: Map<
-    string,
-    { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number }
-  >,
-  clave: string,
-): { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number } {
-  const m = meta.get(clave);
-  if (m !== undefined) return m;
-  const [idColor, idTalla] = clave.split(':').map(Number);
+/**
+ * SUGERENCIA DE CAPTURA (V1-E8i, §Post-F9.131) — lo que los botones «Llenar con lo que falta por
+ * cortar» y «Llenar con lo que se cortó» ponen en la matriz. **NO guarda nada**: solo responde
+ * cuánto se puede capturar hoy, celda por celda. Lo pidió Daniel para no teclear talla por talla lo
+ * que casi siempre es exactamente lo esperado.
+ *
+ * Vive en el DOMINIO, junto a {@link registrarCorte} y {@link registrarEnvioMaquila}, porque
+ * "cuánto se puede enviar todavía" ES la regla (g) mirada del otro lado: si la pantalla la
+ * recalculara por su cuenta, las dos cuentas derivarían y el botón acabaría precargando un número
+ * que el servidor rechaza al guardar. Un botón que produce un error no es un atajo, es una trampa.
+ *
+ *  • Sin `idTipoProceso` → base **corte**: Σ orden − Σ corte, por celda, **sin negativos**. Con la
+ *    orden todavía sin cortar eso es literalmente "lo que se ordenó" (lo que pidió Daniel); con un
+ *    corte parcial ya capturado es lo que falta — precargar de nuevo lo ordenado duplicaría piezas.
+ *    El sobre-corte (decisión (f)) deja celdas negativas: se recortan a 0, porque no se puede
+ *    capturar un corte negativo (el sobre-corte se sigue permitiendo tecleándolo a mano).
+ *  • Con `idTipoProceso` → base **envío**: Σ corte − Σ enviado A ESE PROCESO, por celda, sin
+ *    negativos. Es exactamente el tope que valida {@link registrarEnvioMaquila} bajo lock (decisión
+ *    (g), sobre-envío ESTRICTO), así que el SEGUNDO envío parcial precarga solo el resto y nunca
+ *    lo ya enviado. Cada proceso se topa contra el cortado TOTAL (flujos paralelos, D8).
+ *
+ * `motivo` dice por qué NO hay nada que precargar (orden sin matriz, ya se cortó todo, todavía no
+ * se corta nada, ya se envió todo lo cortado) — la razón la decide el servidor, no la pantalla.
+ * Solo lectura (`produccion.wip-ver`), filtrada por la empresa activa (A9).
+ */
+export async function sugerirCaptura(
+  sesion: SesionUsuario,
+  idOrden: number,
+  parametros: z.input<typeof esquemaSugerenciaCapturaQuery> = {},
+  bd?: ContextoBd,
+): Promise<SugerenciaCaptura> {
+  verificarPermiso(sesion, 'produccion.wip-ver');
+  const { idTipoProceso } = validarEntrada(esquemaSugerenciaCapturaQuery, parametros);
+  const cliente = clienteLectura(bd);
+
+  const orden = await cliente.orden.findFirst({
+    where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
+    select: {
+      id: true,
+      lineas: {
+        select: {
+          idColor: true,
+          pack: true,
+          color: { select: { nombre: true } },
+          tallas: {
+            select: {
+              idTalla: true,
+              cantidad: true,
+              talla: { select: { etiqueta: true, orden: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', idOrden);
+  }
+
+  const base = idTipoProceso === undefined ? 'corte' : 'envio';
+
+  // Metadatos + pedido por celda (de la matriz de la orden, D4).
+  const meta = new Map<string, MetaCeldaPendiente>();
+  const pedido = new Map<string, number>();
+  for (const linea of orden.lineas) {
+    // La llave lleva el PACK (§Post-F9.10): dos tendidos del mismo color son DOS celdas distintas,
+    // con su propio pendiente. Plegarlos aquí haría que la pantalla ofreciera un tope agregado que
+    // el servidor rechaza tendido por tendido al enviar (sobre-envío ESTRICTO, decisión (g)).
+    const pack = normalizarPack(linea.pack);
+    for (const t of linea.tallas) {
+      const clave = claveCeldaPack(linea.idColor, t.idTalla, pack);
+      pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
+      if (!meta.has(clave)) {
+        meta.set(clave, {
+          idColor: linea.idColor,
+          color: linea.color.nombre,
+          pack,
+          idTalla: t.idTalla,
+          etiquetaTalla: t.talla.etiqueta,
+          ordenTalla: t.talla.orden,
+        });
+      }
+    }
+  }
+
+  // Las sumas SIEMPRE se leen (aunque la matriz venga vacía): el núcleo puro decide con las tres.
+  const cortado = await sumarCeldasLectura(cliente, idOrden, { tipo: 'corte' });
+  const enviado =
+    idTipoProceso === undefined
+      ? new Map<string, number>()
+      : await sumarCeldasLectura(cliente, idOrden, {
+          tipo: 'envio_maquila',
+          idTipoProceso,
+        });
+
+  const { disponible, motivo } = resolverSugerencia({ base, pedido, cortado, enviado });
+  const celdas = [...disponible]
+    .map(([clave, cantidad]) => ({ ...metaPara(meta, clave), cantidad }))
+    .sort(
+      (a, b) =>
+        a.idColor - b.idColor ||
+        a.pack.localeCompare(b.pack, 'es') ||
+        a.ordenTalla - b.ordenTalla ||
+        a.idTalla - b.idTalla,
+    )
+    .map(({ ordenTalla: _o, ...resto }) => resto);
+
   return {
-    idColor: idColor ?? 0,
-    color: `Color ${idColor ?? 0}`,
-    idTalla: idTalla ?? 0,
-    etiquetaTalla: '',
-    ordenTalla: 0,
+    idOrden,
+    base,
+    idTipoProceso: idTipoProceso ?? null,
+    celdas,
+    total: celdas.reduce((s, c) => s + c.cantidad, 0),
+    motivo,
   };
 }
 
-/** Variante de {@link sumarCeldas} para un cliente de LECTURA (sin transacción), para las consultas. */
+/**
+ * Núcleo PURO de {@link sugerirCaptura}: con lo pedido, lo cortado y lo ya enviado a un proceso,
+ * decide QUÉ se puede precargar por celda y, cuando no hay nada, POR QUÉ. Se exporta aparte de la
+ * lectura de BD para poder probar la regla sin base de datos (`etapas-sugerencia.test.ts`).
+ *
+ * Las celdas negativas se recortan a 0 y se descartan: no se puede capturar una cantidad negativa.
+ * El sobre-corte (decisión (f)) sigue siendo posible tecleándolo a mano — lo que el botón no hace
+ * es proponerlo.
+ */
+export function resolverSugerencia(entrada: {
+  base: 'corte' | 'envio';
+  /** Σ orden por celda (matriz color×talla de la orden, D4). */
+  pedido: ReadonlyMap<string, number>;
+  /** Σ corte VIVO por celda. */
+  cortado: ReadonlyMap<string, number>;
+  /** Σ enviado VIVO A ESE PROCESO por celda (vacío cuando la base es el corte). */
+  enviado: ReadonlyMap<string, number>;
+}): { disponible: Map<string, number>; motivo: SugerenciaCaptura['motivo'] } {
+  const { base, pedido, cortado, enviado } = entrada;
+  const vacio = (
+    motivo: SugerenciaCaptura['motivo'],
+  ): {
+    disponible: Map<string, number>;
+    motivo: SugerenciaCaptura['motivo'];
+  } => ({ disponible: new Map<string, number>(), motivo });
+
+  // Sin matriz color×talla no hay NADA que precargar, y no es culpa del avance (p. ej. una orden
+  // vieja migrada sin desglose): se dice tal cual, en vez de dejar un botón mudo.
+  if (pedido.size === 0) {
+    return vacio('orden-sin-matriz');
+  }
+
+  /** Recorta a positivas y descarta los ceros. */
+  const positivas = (mapa: ReadonlyMap<string, number>): Map<string, number> => {
+    const salida = new Map<string, number>();
+    for (const [clave, cantidad] of mapa) {
+      if (cantidad > 0) salida.set(clave, cantidad);
+    }
+    return salida;
+  };
+
+  if (base === 'corte') {
+    const porCortar = new Map<string, number>();
+    for (const [clave, cantidad] of pedido) {
+      porCortar.set(clave, cantidad - (cortado.get(clave) ?? 0));
+    }
+    const disponible = positivas(porCortar);
+    return disponible.size === 0 ? vacio('todo-cortado') : { disponible, motivo: 'hay' };
+  }
+
+  // ENVÍO. Sólo cuentan las celdas cortadas que SIGUEN en la matriz de la orden (H6 del reviewer):
+  // `guardarMatrizOrden` **no** bloquea quitar un color/talla que ya tiene cortes, y proponer una
+  // celda que la captura ya no dibuja sería invisible en pantalla, contada en el rótulo del botón y
+  // **descartada** por `lineasApi()` al guardar — el botón diría 240 y se guardarían 200. Una cifra
+  // afirmada y falsa. Sólo se propone lo que el usuario puede ver y capturar.
+  const cortadoCapturable = new Map<string, number>();
+  for (const [clave, cantidad] of cortado) {
+    if (pedido.has(clave)) cortadoCapturable.set(clave, cantidad);
+  }
+
+  // Antes de restar lo enviado: si no hay NI UNA celda cortada capturable, el motivo honesto es que
+  // todavía no se corta nada — no "ya se envió todo", que sobre un corte que nunca salió sería
+  // mentira. Se miran las celdas positivas, no la suma: en el histórico migrado un corte puede traer
+  // +5 en una talla y −5 en otra (total 0) y sí haber 5 piezas enviables.
+  if (positivas(cortadoCapturable).size === 0) {
+    return vacio('nada-cortado');
+  }
+  const porEnviar = new Map<string, number>();
+  for (const [clave, cantidad] of cortadoCapturable) {
+    porEnviar.set(clave, cantidad - (enviado.get(clave) ?? 0));
+  }
+  const disponible = positivas(porEnviar);
+  return disponible.size === 0 ? vacio('todo-enviado') : { disponible, motivo: 'hay' };
+}
+
+/**
+ * Metadato de presentación de una celda color×talla×PACK de los pendientes/sugerencias.
+ *
+ * 🔗 Es el MISMO tipo (y el mismo respaldo defensivo, {@link metaPara}) que usa el drill-down del
+ * WIP: vive UNA sola vez, en `produccion/wip.ts`. Aquí había una copia privada palabra por palabra
+ * —salvo una rama— y se retiró: dos versiones del respaldo de la misma llave `color:talla:pack` son
+ * exactamente la clase de gemela que se desincroniza sin que nadie lo note.
+ */
+type MetaCeldaPendiente = MetaCelda;
+
+/**
+ * Variante de {@link sumarCeldas} para un cliente de LECTURA (sin transacción), para las consultas.
+ * Misma llave color×talla×PACK que la transaccional, a propósito: si la lectura plegara el pack y la
+ * escritura no, la pantalla ofrecería un tope que el servidor rechaza.
+ */
 async function sumarCeldasLectura(
   cliente: ReturnType<typeof clienteLectura>,
   idOrden: number,
@@ -1170,11 +1805,11 @@ async function sumarCeldasLectura(
         ...(filtro.idTipoProceso === undefined ? {} : { idTipoProceso: filtro.idTipoProceso }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, pack: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
-    const clave = claveCelda(f.idColor, f.idTalla);
+    const clave = claveCeldaPack(f.idColor, f.idTalla, f.pack);
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;

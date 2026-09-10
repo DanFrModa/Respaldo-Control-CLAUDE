@@ -174,52 +174,74 @@ export function hayDescuadreDeRequerido(r: RequeridoContradictorio): boolean {
 }
 
 /**
- * LA MAGNITUD del descuadre, en prosa. 🔴 Sin ella el aviso sólo dice *"hay una contradicción"* —
- * y lo que Daniel necesita ver es **cuánto se está pidiendo de más**: la diferencia entre revisarlo
- * hoy o comprar 53 veces el cierre que hacía falta.
+ * LA MAGNITUD del descuadre, en prosa **y de entrada** (V1-E8h, §Post-F9.130). 🔴 Sin ella el aviso
+ * sólo dice *"hay una contradicción"* — y lo que Daniel necesita leer, en la primera línea, es
+ * **cuánto está pidiendo esta orden y cuánto debería pedir**: la diferencia entre revisarlo hoy o
+ * comprar 53 veces el cierre que hacía falta.
  *
  * Devuelve `''` cuando no hay diferencia que reportar (la bandera contradice, pero el requerido sale
  * igual): decir "0 de más" sería ruido.
  *
- * ⚠️ **El multiplicador va pegado a lo que MULTIPLICA** (hallazgo del reviewer): la primera versión
- * escribía *"1,560 pza de MÁS (53 veces)"* y las tres cifras eran exactas, pero el paréntesis
- * colgaba de la DIFERENCIA — y 1,560 es 52 veces 30, no 53. El 53 multiplica al total (1,590), así
- * que ahora encabeza la comparación y la diferencia se queda sola.
+ * ⚠️ **El multiplicador va pegado a lo que MULTIPLICA** (hallazgo del reviewer de §Post-F9.105): una
+ * versión anterior escribía *"1,560 pza de MÁS (53 veces)"* y las tres cifras eran exactas, pero el
+ * paréntesis colgaba de la DIFERENCIA — y 1,560 es 52 veces 30, no 53. El 53 multiplica al TOTAL
+ * (1,590), así que va inmediatamente después de la pareja *pide / deberían ser*, y la diferencia se
+ * queda sola al final.
  */
 function magnitudContradiccion(r: RequeridoContradictorio): string {
   if (!hayDescuadreDeRequerido(r)) return '';
   const diferencia = r.hoy - r.normalizado;
   const sentido = diferencia > 0 ? 'de MÁS' : 'de MENOS';
-  const comparacion =
-    `${cifra(r.hoy, r.unidad)} en vez de ${cifra(r.normalizado, r.unidad)}: ` +
-    `${cifra(Math.abs(diferencia), r.unidad)} ${sentido}`;
+  const cabeza = `Esta orden pide ${cifra(r.hoy, r.unidad)} y deberían ser ${cifra(r.normalizado, r.unidad)}`;
   // El "multiplicado por" sólo se puede decir si hay contra qué dividir: con el normalizado en 0
   // (un avío por medida con consumo por prenda 0) la proporción no existe, y escribir "∞ veces"
   // sería peor que callarla.
   if (r.normalizado > 0 && diferencia > 0) {
     const veces = (r.hoy / r.normalizado).toLocaleString('es-MX', { maximumFractionDigits: 1 });
-    return ` Con esas cantidades el requerido sale MULTIPLICADO por ${veces}: ${comparacion}.`;
+    return `${cabeza}: el requerido sale MULTIPLICADO por ${veces}, son ${cifra(diferencia, r.unidad)} ${sentido}.`;
   }
-  return ` Con esas cantidades el requerido sale en ${comparacion}.`;
+  return `${cabeza}: ${cifra(Math.abs(diferencia), r.unidad)} ${sentido}.`;
 }
+
+/** El PORQUÉ de la contradicción, una sola vez y en las tres pantallas. */
+const PORQUE_LA_CONTRADICCION =
+  'Viene de una captura vieja: este avío se compra POR MEDIDA (tiene medidas en su catálogo) y ' +
+  'trae encendido "se consume por talla", así que unas cantidades por talla que la pantalla ya ni ' +
+  'muestra siguen contando en el requerido.';
 
 /**
  * EL AVISO (nunca un bloqueo, §Post-F9.64) de que un avío **por medida** trae encendido el
  * `consumoPorTalla` de una captura anterior a V1-E3g.
  *
- * `comoSeArregla` es lo ÚNICO que cambia entre pantallas: en el BOM y en la receta se arregla
- * guardando ahí mismo; en la explosión hay que ir a la receta de la orden. `requerido` es opcional
- * porque el BOM del modelo no sabe de piezas: sin una orden detrás no hay magnitud que calcular.
+ * ⭐⭐ **V1-E8h (§Post-F9.130) — PRIMERO LA CIFRA, LUEGO EL PORQUÉ, Y AL FINAL EL REMEDIO.** Antes
+ * el texto abría con dos renglones de explicación técnica y la magnitud quedaba sepultada en medio;
+ * quien lo lee no es programador y lo que necesita para decidir está en los números. Daniel, 27-ago:
+ * *"me sigue multiplicando por las medidas… siento que estamos atorados en lo mismo desde hace
+ * varias versiones"*.
+ *
+ * `comoSeArregla` es lo ÚNICO que cambia entre pantallas, y **tiene que nombrar un botón que exista
+ * ahí donde se lee** (V1-E8h): en la receta de la orden, el botón «Corregir» del renglón; en la
+ * explosión, ese mismo botón pero diciendo a qué pantalla ir; en el BOM del modelo, su «Guardar».
+ * 🔴 Lo que ya no se vale es pedirle al usuario que adivine el conjuro *"guarda el renglón para
+ * normalizarlo"*: un sistema que detecta el error, sabe la solución y deja al usuario sin salida
+ * está peor que uno que no lo detecta.
+ *
+ * `requerido` es opcional porque el BOM del modelo no sabe de piezas: sin una orden detrás no hay
+ * magnitud que calcular.
  */
 export function avisoAvioPorMedidaConCantidadesPorTalla(
   comoSeArregla: string,
   requerido?: RequeridoContradictorio | null,
 ): string {
-  return (
-    'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
-    '"se consume por talla" de una captura anterior: las cantidades por talla ya no se capturan y ' +
-    'siguen contando en el requerido.' +
-    (requerido == null ? '' : magnitudContradiccion(requerido)) +
-    ` ${comoSeArregla}`
-  );
+  const magnitud = requerido == null ? '' : magnitudContradiccion(requerido);
+  // Sin magnitud (el BOM del modelo, o una bandera encendida que hoy no descuadra) el aviso abre
+  // por el hecho, no por un número que no existe.
+  if (magnitud === '') {
+    return (
+      'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
+      '"se consume por talla" de una captura anterior: las cantidades por talla ya no se capturan ' +
+      `y siguen contando en el requerido. ${comoSeArregla}`
+    );
+  }
+  return `${magnitud} ${PORQUE_LA_CONTRADICCION} ${comoSeArregla}`;
 }

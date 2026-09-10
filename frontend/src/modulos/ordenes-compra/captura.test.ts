@@ -86,6 +86,10 @@ describe('captura de OC (helpers F4-E2)', () => {
           descripcionLibre: null,
           idTelaColor: null,
           telaColor: null,
+          idColorPrenda: null,
+          colorPrenda: null,
+          colorAvio: null,
+          medidas: [],
           pantoneTelaColor: null,
           cantidadSugerida: null,
           avisoDesvio: null,
@@ -137,6 +141,10 @@ describe('captura de OC — V1-E3u: el color y la propuesta viajan de ida y vuel
           idAvioProveedor: null,
           idTelaColor: 77,
           telaColor: 'Grana 7700',
+          idColorPrenda: null,
+          colorPrenda: null,
+          colorAvio: null,
+          medidas: [],
           pantoneTelaColor: '19-1664 TCX',
           descripcionLibre: null,
           cantidad: 45,
@@ -170,5 +178,91 @@ describe('captura de OC — V1-E3u: el color y la propuesta viajan de ida y vuel
   it('un renglón de AVÍO nunca manda color (el color es de la tela)', () => {
     const cuerpo = renglonApi(renglon({ tipo: 'avio', idAvio: 5, idTelaColor: 77 }));
     expect(cuerpo.idTelaColor).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO Y SU DESGLOSE POR MEDIDA TAMBIÉN VIAJAN.**
+ *
+ * 🔴 Mismo argumento que el color de la tela, y por eso mismo la prueba: editar una OC borra y
+ * recrea sus líneas. Si el editor no los devolviera, corregir un precio dejaría al proveedor sin
+ * saber de qué color son los cierres ni cómo cortarlos — **en silencio**.
+ */
+describe('captura de OC — V1-E8c: el color del avío y las medidas viajan de ida y vuelta', () => {
+  /** Una línea de OC de avío con color y desglose, tal como la sirve el servidor. */
+  function lineaCierre(over: Record<string, unknown> = {}) {
+    return {
+      id: 1,
+      idTela: null,
+      tela: null,
+      nombreComplementoTela: null,
+      cantidadComplemento: null,
+      precioComplemento: null,
+      idAvio: 7,
+      avio: 'CIE-53 — Cierre',
+      idAvioProveedor: null,
+      idTelaColor: null,
+      telaColor: null,
+      idColorPrenda: 9,
+      colorPrenda: 'Rojo',
+      colorAvio: 'Rojo',
+      medidas: [
+        { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+        { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+      ],
+      pantoneTelaColor: null,
+      descripcionLibre: null,
+      cantidad: 30,
+      cantidadSugerida: 30,
+      avisoDesvio: null,
+      unidad: 'pza',
+      precio: 6,
+      subtotal: 180,
+      idOrden: 4,
+      folioOrden: 100,
+      tallas: [],
+      ...over,
+    };
+  }
+
+  it('⭐ corregir el PRECIO no borra el color ni el desglose', () => {
+    const [capturado] = capturaDesdeOc(ocDePrueba({ lineas: [lineaCierre()] }));
+    expect(capturado?.idColorPrenda).toBe(9);
+    expect(capturado?.colorAvio).toBe('Rojo');
+    expect(capturado?.medidas).toHaveLength(2);
+
+    const cuerpo = renglonApi({ ...(capturado as RenglonOcCaptura), precio: '7' });
+    // 🔴 El valor que lo pone rojo: `null` / `undefined` en cualquiera de los tres.
+    expect(cuerpo.idColorPrenda).toBe(9);
+    expect(cuerpo.colorAvio).toBe('Rojo');
+    expect(cuerpo.medidas).toHaveLength(2);
+    expect(cuerpo.precio).toBe(7);
+  });
+
+  it('🔴 si la CANTIDAD se edita a mano, el desglose se SUELTA (mentiría sobre la cantidad)', () => {
+    const [capturado] = capturaDesdeOc(ocDePrueba({ lineas: [lineaCierre()] }));
+    const cuerpo = renglonApi({ ...(capturado as RenglonOcCaptura), cantidad: '50' });
+    // El servidor rechazaría la OC entera con un desglose que suma 30 contra una cantidad de 50.
+    // Se prefiere perder la tablita —que es informativa y se recupera al re-explotar— antes que
+    // mandar un desglose que MIENTE. 🔴 Rojo si alguien "arregla" esto mandándolo siempre.
+    expect(cuerpo.medidas).toBeUndefined();
+    // El color NO se suelta: no depende de la cantidad.
+    expect(cuerpo.colorAvio).toBe('Rojo');
+  });
+
+  it('un renglón de TELA nunca manda color de prenda ni desglose', () => {
+    const cuerpo = renglonApi(
+      renglon({
+        tipo: 'tela',
+        idTela: 3,
+        idColorPrenda: 9,
+        colorAvio: 'Rojo',
+        medidas: [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 5, orden: 1 }],
+        cantidad: '5',
+      }),
+    );
+    expect(cuerpo.idColorPrenda).toBeNull();
+    expect(cuerpo.colorAvio).toBeNull();
+    expect(cuerpo.medidas).toBeUndefined();
   });
 });

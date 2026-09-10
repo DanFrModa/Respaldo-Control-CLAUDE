@@ -66,6 +66,12 @@ export const esquemaOrdenAdjuntoSalida = z
     tamanoBytes: z.number().int().describe('Tamaño en bytes.'),
     urlDescarga: z.string().describe('URL GET prefirmada para ver/descargar el archivo.'),
     subidoPorId: z.string().nullable().describe('Quién subió el archivo, o null.'),
+    nombreSubidoPor: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre de quien lo subió; null si el id no resuelve (el adjunto se sigue viendo).',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha en que se adjuntó (ISO 8601).'),
   })
   .describe('Adjunto de una orden con su URL de descarga.');

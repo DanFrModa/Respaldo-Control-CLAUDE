@@ -38,6 +38,13 @@ test.describe('Precosto (F8-E3)', () => {
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
     await page.getByTestId('nuevo-modelo').click();
     await page.getByRole('dialog').getByLabel('Código').fill(codigoModelo);
+    // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+    // dos dígitos con los que el sistema arma el nº de producción del modelo.
+    await page
+      .getByRole('dialog')
+      .getByLabel('Tipo de producto')
+      .selectOption({ label: 'Pantalón' });
+    await page.getByRole('dialog').getByLabel('Género').selectOption({ label: 'Caballero' });
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
@@ -80,10 +87,19 @@ test.describe('Precosto (F8-E3)', () => {
     const editor = dialogo.getByTestId('editor-precosto');
     await expect(editor).toBeVisible();
 
-    // R5/B8: el CORTE es un costo fijo por prenda, renglón propio SEPARADO de la maquila → su grupo
-    // aparece siempre al generar (aunque el modelo no capture `corteBase`, entra en $0).
+    // Las TRES ANCLAS FIJAS del precosto aparecen siempre al generar, aunque el modelo no traiga
+    // nada capturado (entran en $0 o en su default):
+    //  · R5/B8 — el CORTE es un costo fijo por prenda, renglón propio SEPARADO de la maquila; sin
+    //    `corteBase` en el modelo entra en $0.
+    //  · MAQUILA — el renglón manual que se edita abajo.
+    //  · ⭐ EMPAQUE (V1-E8w, §Post-F9.153) — la TERCERA ancla, *"como si fuera corte"*. NO entra en
+    //    $0: nace con `ConfiguracionEmpresa.costoEmpaqueBase` (default 2.20), así que TODO precosto
+    //    nuevo pesa 2.20 más que antes de esta etapa. Ése es el renglón extra que dejó desfasadas
+    //    las cifras de `listas-precios.spec.ts`; aquí se afirma que el grupo existe para que su
+    //    desaparición no se descubra por un total ajeno que ya no cuadra.
     await expect(editor.getByTestId('grupo-corte')).toBeVisible();
     await expect(editor.getByTestId('grupo-maquila')).toBeVisible();
+    await expect(editor.getByTestId('grupo-empaque')).toBeVisible();
 
     // ── Edita la MAQUILA (renglón manual) ───────────────────────────────────────
     const grupoMaquila = editor.getByTestId('grupo-maquila');
@@ -95,7 +111,18 @@ test.describe('Precosto (F8-E3)', () => {
     // ── Congela la versión (con confirmación) ───────────────────────────────────
     await editor.getByTestId('congelar-precosto').click();
     await dialogo.getByTestId('confirmar-precosto').click();
-    await expect(page.getByText(/Precosto v1 congelado\./)).toBeVisible();
+    // ⚠️ V1-E8f cambió este aviso: antes era «Precosto v1 congelado.» y ahí terminaba — era el
+    // eslabón SIN PUERTA del camino precosteo → lista → cotización. Ahora dice a dónde seguir.
+    // 🔴 Lo cazó el CI, y es la cicatriz de siempre: QUIEN CAMBIA UN TEXTO BARRE LAS PRUEBAS QUE LO
+    // ASERTAN. La aserción se ata a lo que la etapa vino a garantizar —que el aviso LLEVA a algún
+    // lado—, no sólo al hecho de que congeló.
+    // 🔴 UNA sola aserción, y sobre la frase COMPLETA. La primera corrección la partió en dos y la
+    // segunda mitad buscaba /lista de precios/i **en toda la página** — que es ambiguo justo por lo
+    // que esta etapa hizo: «Listas de precios» ahora está en el menú, así que coincidía en varios
+    // sitios y Playwright la rechazó. *Una aserción laxa se vuelve falsa cuando el sistema mejora.*
+    await expect(
+      page.getByText(/Precosto v1 congelado: ya puede incluirse en una lista de precios/),
+    ).toBeVisible();
 
     // ── La v1 aparece en el historial como "Congelado" ──────────────────────────
     const historial = dialogo.getByTestId('historial-precostos');

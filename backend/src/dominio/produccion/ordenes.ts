@@ -22,16 +22,18 @@
  * desligar la orden de su pedido; se exige que esa empresa sea la de la sesión activa (A9).
  *
  * ESTADO AUTOMÁTICO (no editable por el usuario; Daniel 26-jul-2026): la orden pasa sola a
- * `completa` cuando cumple sus REQUISITOS —**tallas + avíos, y arte si aplica**—. La regla vive
+ * `completa` cuando cumple sus REQUISITOS —**tallas + receta liberada, y arte si aplica**—. La regla vive
  * ENTERA en `requisitos-orden.ts` (función pura `requisitosOrden` + `recalcularEstadoOrden`), y
  * este módulo la invoca en los tres puntos donde la orden cambia: alta, guardar matriz y copiar
  * matriz. `fechaCompletada` se sella la PRIMERA vez que se completa y NUNCA se borra (paridad con
  * `Ordenes.FechaDet = Now()` de v1). `cancelada` (por `cancelarOrden`) SIEMPRE gana.
  *   DES-COMPLETAR es la excepción, no la regla: una orden solo vuelve de `completa` a `capturada`
  * al editar LA MATRIZ DE ESA ORDEN y siempre que NO tenga actividad de producción viva (corte o
- * envío sin cancelar). Los cambios del BOM del MODELO (`modelos/bom-modelo.ts`) SOLO pueden
- * COMPLETAR órdenes de ese modelo, nunca degradarlas: editar un catálogo no puede sacar de los
- * tableros a lo que ya se está produciendo ni degradar el histórico.
+ * envío sin cancelar). Editar el BOM del MODELO ya NO alcanza a sus órdenes (V1-E3d: cada orden
+ * tiene su receta congelada, `modelos/bom-modelo.ts`); lo único del modelo que las recalcula es la
+ * casilla "lleva arte" (`modelos/modelos.ts`), y ésa SOLO puede COMPLETAR, nunca degradar: editar
+ * un catálogo no puede sacar de los tableros a lo que ya se está produciendo ni degradar el
+ * histórico.
  *   El estado es un SEMÁFORO DE CAPTURA, no una llave para operar: ninguna pantalla exige
  * `completa` para cortar/enviar/recibir/entregar (lo único que bloquea es `cancelada`).
  *
@@ -96,13 +98,20 @@ import {
   esquemaOrdenCancelarCuerpo,
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenComentarioCuerpo,
+  esquemaEstadoOrden,
 } from '../../contrato/esquemas/orden.js';
 import type {
   DatosOrdenLineaEntrada,
   DatosOrdenReferenciaEntrada,
   OrdenSalida,
 } from '../../contrato/esquemas/orden.js';
-import type { Orden, OrdenLinea, OrdenLineaTalla, Prisma } from '../../datos/index.js';
+import type {
+  Orden,
+  OrdenLinea,
+  OrdenLineaTalla,
+  OrigenModelo,
+  Prisma,
+} from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -120,6 +129,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -129,8 +139,24 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
+
+// ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
+import { exigirOrdenAbierta } from './cierre-orden.js';
+import {
+  SIN_PACK,
+  coloresReempacados,
+  normalizarPack,
+  ordenManejaPacks,
+  packsPorColor,
+} from './packs.js';
 import { copiarRecetaDelModelo } from './receta-orden.js';
-import { recalcularEstadoOrden, requisitosOrden } from './requisitos-orden.js';
+import {
+  recalcularEstadoOrden,
+  requisitosOrden,
+  tieneActividadProduccion,
+} from './requisitos-orden.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN = 'orden';
@@ -151,7 +177,9 @@ const esquemaListarOrdenesDominio = esquemaPaginacion.extend({
   idModelo: z.number().int().positive().optional(),
   idCliente: z.number().int().positive().optional(),
   anio: z.number().int().min(2000).max(2100).optional(),
-  estado: z.enum(['capturada', 'completa', 'cancelada']).optional(),
+  // El esquema del CONTRATO, no una copia de sus valores: al agregar `cerrada` (0.061) una copia
+  // habría dejado la ruta sin poder filtrar por él.
+  estado: esquemaEstadoOrden.optional(),
   incluirCanceladas: z.boolean().default(false),
   ordenarPor: z.enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn']).default('folio'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
@@ -170,6 +198,9 @@ type OrdenConDetalle = Orden & {
     descripcion: string | null;
     /** Casilla "lleva arte": el único insumo de la regla que sigue viviendo en el MODELO. */
     llevaArte: boolean;
+    /** ⭐ Linaje V1-E3: de qué modelo de DESARROLLO nació el de la OP (fila 0.151), o null. */
+    idModeloDesarrollo: number | null;
+    modeloDesarrollo: { codigo: string } | null;
   };
   /** Artes VIVOS de la RECETA de esta orden (insumo de la regla, V1-E3d). */
   _count: { recetaArtes: number };
@@ -199,6 +230,12 @@ const incluirDetalle = {
       // Único insumo de la regla que sigue en el MODELO (V1-E3d): la casilla "lleva arte". Los
       // otros dos son de la ORDEN (receta liberada + artes de la receta) y viajan abajo.
       llevaArte: true,
+      // ⭐⭐ Fila 0.151 — EL LINAJE VIAJA EN LA ORDEN. DANIEL: *«en la OP no veo el modelo de
+      // desarrollo»*. La columna existía desde V1-E3 y sólo salía en la respuesta del alta; sin
+      // esto, una OP nacida por color no puede decir de qué desarrollo salió, y la cadena de
+      // trazabilidad del Centro apagaba su nodo «Desarrollo» con un tooltip FALSO.
+      idModeloDesarrollo: true,
+      modeloDesarrollo: { select: { codigo: true } },
     },
   },
   // Conteo del arte VIVO de la receta de ESTA orden, sin traer la receta entera.
@@ -260,19 +297,35 @@ interface OrigenPedidoLinea {
  *  • que el renglón exista,
  *  • que su pedido sea de la EMPRESA ACTIVA (A9),
  *  • que el pedido NO esté cancelado (`pedCancelado`) ni marcado `noProducir`,
- *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado).
+ *  • que el modelo del renglón siga ACTIVO (no producir un modelo descontinuado),
+ *  • 🔴 que el modelo que va a QUEDAR en la orden NO sea de `origen = 'desarrollo'` (fila 0.090,
+ *    cierra §Post-F9.34): un desarrollo no se produce, se le genera la OP —y ahí nace su modelo de
+ *    producción por color. Ver la guarda, abajo, para quién la cruza y quién no.
  * Devuelve el modelo/cliente/empresa para sellarlos en la orden.
+ *
+ * ⭐⭐ V1-E3 — `idModeloDeLaOrden` (opcional): el modelo que de verdad va a llevar la orden cuando
+ * NO es el del renglón. Pasa en un solo caso, y es el que da nombre a la etapa: el renglón apunta a
+ * un modelo de DESARROLLO y la salida a producción hace nacer (o reusa) el **modelo de producción de
+ * ese color**, que es quien tiene que quedar en la OP. El renglón NO se toca: sigue apuntando a su
+ * desarrollo, que es de donde salen la receta y el precio.
+ *
+ * ⚠️ Cuando viene, se comprueban **los DOS** modelos: el del renglón (el padre, dueño de la receta)
+ * y el de la orden (el hijo). Que el padre esté vivo no dice nada del hijo, ni al revés — y producir
+ * cualquiera de los dos descontinuado es lo que la guarda existe para impedir. La COMPOSICIÓN se
+ * hereda del modelo que queda en la ORDEN, no del renglón: es la ficha de la prenda que se va a
+ * producir.
  */
 async function resolverOrigenPedido(
   tx: Tx,
   idPedidoLinea: number,
   idEmpresa: number,
+  idModeloDeLaOrden?: number,
 ): Promise<OrigenPedidoLinea> {
   const linea = await tx.pedidoLinea.findUnique({
     where: { id: idPedidoLinea },
     select: {
       idModelo: true,
-      modelo: { select: { activo: true, codigo: true, composicion: true } },
+      modelo: { select: { activo: true, codigo: true, composicion: true, origen: true } },
       pedido: {
         select: {
           idEmpresa: true,
@@ -307,13 +360,76 @@ async function resolverOrigenPedido(
       `El modelo "${linea.modelo.codigo}" está descontinuado; no se puede producir.`,
     );
   }
+
+  // V1-E3: la orden puede llevar OTRO modelo que el del renglón (el hijo de producción del color).
+  // `modeloDeLaOrden` es el que se sella en la OP y del que se hereda la composición.
+  const modeloDeLaOrden =
+    idModeloDeLaOrden === undefined || idModeloDeLaOrden === linea.idModelo
+      ? { id: linea.idModelo, ...linea.modelo }
+      : await exigirModeloProducible(tx, idModeloDeLaOrden);
+
+  // 🔴🔴 V1-E3 (§Post-F9.34, cerrada en la fila 0.090) — **UNA OP NUNCA LLEVA UN MODELO DE
+  // DESARROLLO.** La guarda mira el modelo que se va a SELLAR en la orden, no la puerta por la que
+  // se entró, porque lo que hay que prohibir es el resultado: un desarrollo produciéndose.
+  //
+  // Quién la cruza y quién no, medido:
+  //  • `salidaAProduccion` — NUNCA la toca: `resolverModeloDeLaOp` le entrega o un modelo de
+  //    producción heredado (renglón legado) o el hijo por color que acaba de nacer/reusar, y los
+  //    dos son `origen = 'produccion'` por construcción.
+  //  • `POST /api/ordenes` — la cruza justo en el caso que era el agujero: renglón que apunta a un
+  //    desarrollo, sin `idModeloDeLaOrden`. Por esa puerta nacía una OP de un modelo que sigue en
+  //    `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+  //    Su caso LEGADO (renglón que ya apunta a producción) sigue funcionando igual: no se retira
+  //    ninguna capacidad, se cierra una que producía una OP inválida.
+  //
+  // FALLA CERRADO y manda a la puerta buena: el número de 5 dígitos es del MODELO, y quien lo hace
+  // nacer es la salida a producción. Crear la orden aquí y "arreglar el modelo después" no existe.
+  if (modeloDeLaOrden.origen === 'desarrollo') {
+    throw new ErrorConflicto(
+      `El modelo "${modeloDeLaOrden.codigo}" es de desarrollo: no se le puede crear una orden por ` +
+        `captura directa. Genera la OP desde el renglón del pedido ("Generar OP", ` +
+        `POST /api/pedidos/lineas/{idLinea}/salida-produccion): ahí nace el modelo de producción ` +
+        `del color con su número de 5 dígitos, que es el que lleva la orden.`,
+    );
+  }
+
   return {
-    idModelo: linea.idModelo,
+    idModelo: modeloDeLaOrden.id,
     idCliente: linea.pedido.idCliente,
     idEmpresa: linea.pedido.idEmpresa,
     ocCliente: linea.pedido.ocCliente,
-    composicionModelo: linea.modelo.composicion,
+    composicionModelo: modeloDeLaOrden.composicion,
   };
+}
+
+/**
+ * Exige que un modelo exista y NO esté descontinuado, con el MISMO texto que la comprobación del
+ * modelo del renglón (V1-E3): las dos prohíben lo mismo —producir un modelo dado de baja— y dos
+ * frases distintas para la misma regla es como se separan dos caminos que deben decidir igual.
+ */
+async function exigirModeloProducible(
+  tx: Tx,
+  idModelo: number,
+): Promise<{
+  id: number;
+  activo: boolean;
+  codigo: string;
+  composicion: string | null;
+  origen: OrigenModelo;
+}> {
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: { id: true, activo: true, codigo: true, composicion: true, origen: true },
+  });
+  if (modelo === null) {
+    throw new ErrorNoEncontrado('Modelo', idModelo);
+  }
+  if (!modelo.activo) {
+    throw new ErrorConflicto(
+      `El modelo "${modelo.codigo}" está descontinuado; no se puede producir.`,
+    );
+  }
+  return modelo;
 }
 
 /** Exige que el maquilero (Proveedor) exista (en F2 NO se valida su rol de maquila, solo asignación). */
@@ -346,12 +462,17 @@ async function exigirTelaExiste(tx: Tx, idTela: number): Promise<void> {
 // ── Sincronización de la matriz (colores × tallas) — diff mínimo, conserva auditoría ──
 
 /**
- * Sincroniza la matriz (renglones de color + sus tallas) al `set` deseado en la transacción (A2),
- * conservando la auditoría de los renglones que no cambian (diff mínimo, como `sincronizarLineas`
- * de pedidos). Valida:
- *  • COLOR no repetido en el set (regla `@@unique([idOrden, idColor])` + mensaje claro).
+ * Sincroniza la matriz (renglones de color × PACK + sus tallas) al `set` deseado en la transacción
+ * (A2), conservando la auditoría de los renglones que no cambian (diff mínimo, como
+ * `sincronizarLineas` de pedidos). Valida:
+ *  • La pareja COLOR + PACK no repetida en el set (regla `@@unique([idOrden, idColor, pack])` +
+ *    mensaje claro). Sin packs eso es lo de siempre: «un color no puede aparecer dos veces».
+ *  • ⭐ COHERENCIA DEL PACK (§Post-F9.10): la orden es CON packs o SIN packs, nunca mezclada. Una
+ *    matriz mitad y mitad dejaría sin respuesta la pregunta de la que cuelga todo lo de aguas abajo
+ *    —«¿el corte de esta orden tiene que declarar pack?»— y produciría órdenes en las que unas
+ *    piezas se pueden cortar y otras no, sin que nada lo explique.
  *  • Todos los colores existen y están activos.
- *  • Todas las tallas existen en el catálogo y no se repiten dentro de un mismo color.
+ *  • Todas las tallas existen en el catálogo y no se repiten dentro de un mismo renglón.
  *  • Cantidades enteras ≥0 (ya las validó Zod; aquí se confía en el tipo).
  *
  * Renglones con `id` que existan se ACTUALIZAN (y sus tallas se reemplazan diff-mínimo); los
@@ -364,11 +485,29 @@ async function sincronizarMatriz(
   idOrden: number,
   set: DatosOrdenLineaEntrada[],
 ): Promise<number> {
-  // 1) Color no repetido en el set entrante.
-  const idsColor = set.map((l) => l.idColor);
-  if (new Set(idsColor).size !== idsColor.length) {
-    throw new ErrorValidacion('Un color no puede aparecer dos veces en la misma orden.');
+  // 1) La pareja COLOR + PACK no repetida en el set entrante (§Post-F9.10). Sin packs, la regla es
+  //    literalmente la de siempre: un color no puede aparecer dos veces.
+  const packs = set.map((l) => normalizarPack(l.pack));
+  const clavesRenglon = set.map((l, i) => `${l.idColor}:${packs[i] ?? SIN_PACK}`);
+  if (new Set(clavesRenglon).size !== clavesRenglon.length) {
+    throw new ErrorValidacion(
+      ordenManejaPacks(packs)
+        ? 'Un mismo color y pack no pueden aparecer dos veces en la misma orden.'
+        : 'Un color no puede aparecer dos veces en la misma orden.',
+    );
   }
+
+  // 1b) ⭐ COHERENCIA DEL PACK: o TODOS los renglones traen pack, o NINGUNO. Una matriz mezclada
+  //     dejaría sin respuesta «¿el corte de esta orden declara pack?», que es de donde cuelga que el
+  //     pack sea obligatorio aguas abajo (corte y entrega a maquila).
+  if (packs.some((p) => p !== SIN_PACK) && packs.some((p) => p === SIN_PACK)) {
+    throw new ErrorValidacion(
+      'La orden no puede tener unos renglones con pack y otros sin pack: o todos los tendidos ' +
+        'llevan su pack, o ninguno.',
+    );
+  }
+
+  const idsColor = set.map((l) => l.idColor);
 
   // 2) Colores existen y están activos.
   if (idsColor.length > 0) {
@@ -409,9 +548,51 @@ async function sincronizarMatriz(
     }
   }
 
-  // 4) Diff de renglones (colores) por id.
-  const actuales = await tx.ordenLinea.findMany({ where: { idOrden }, select: { id: true } });
+  // 4) Diff de renglones (color × pack) por id.
+  const actuales = await tx.ordenLinea.findMany({
+    where: { idOrden },
+    select: { id: true, idColor: true, pack: true },
+  });
   const idsActuales = new Set(actuales.map((l) => l.id));
+
+  // 4b) ⭐ LOS PACKS DE UN COLOR YA EN PRODUCCIÓN NO CAMBIAN (§Post-F9.10).
+  //
+  //     EL DAÑO QUE EVITA: el corte y la entrega a maquila guardan SU pack en cada celda, y el saldo
+  //     «enviado ≤ cortado» se lleva tendido por tendido — `sumarCeldas` llavea lo cortado con
+  //     `color:talla:packViejo` y `registrarEnvioMaquila` lo busca con `color:talla:packNuevo`. Si
+  //     los packs de un color se re-empacan después de cortar, ese `cortadoCelda` da 0 y las piezas
+  //     ya cortadas **no se pueden enviar nunca**, con un error que además culpa al usuario. Se
+  //     ARREGLA LA ENTRADA (REGLA 0-B): se impide el cambio, no se inventa una reparación.
+  //
+  //     🔴 SE COMPARA POR COLOR, NO POR RENGLÓN, y eso es lo único que cierra las DOS puertas por
+  //     las que se colaba una comprobación atada al `id` de la fila:
+  //       • BORRAR Y RECREAR — un `set` con los mismos colores pero SIN `id` no cambia ningún
+  //         renglón: borra los viejos (abajo) y crea otros. Atada al `id`, la guarda no veía nada.
+  //       • `copiarDetalleOrden` — arma su `set` SIN `id` en ningún renglón, así que una guarda por
+  //         `id` **jamás** se ejecutaba ahí: copiar una matriz sobre una orden ya cortada la
+  //         re-empacaba en silencio, siempre.
+  //
+  //     Un color que se QUITA entero, o uno NUEVO, se dejan pasar: eso ya se podía antes de esta
+  //     etapa (la matriz siempre dejó borrar un color con cortes) y no es lo que este campo rompe.
+  // La ARITMÉTICA vive pura en `packs.ts` (probada sin BD y mutada allí); aquí sólo se leen los dos
+  // mapas y se consulta si hay producción viva.
+  const packsAntes = packsPorColor(actuales);
+  const packsDespues = packsPorColor(
+    set.map((l, i) => ({ idColor: l.idColor, pack: packs[i] ?? SIN_PACK })),
+  );
+  const reempacados = coloresReempacados(packsAntes, packsDespues);
+  if (reempacados.length > 0) {
+    // ⭐ 0.150: la MISMA pregunta que protege el des-completar, y la que la guarda de cancelar
+    // el pedido reusa como señal. Era el segundo de tres `count` idénticos escritos a mano.
+    if (await tieneActividadProduccion(tx, idOrden)) {
+      throw new ErrorConflicto(
+        'Esta orden ya tiene producción capturada (corte o entrega a maquila), y esas piezas se ' +
+          'guardaron con el pack que tenía la matriz: ya no se le pueden cambiar los packs a un ' +
+          'color (ni poniéndoselos, ni quitándoselos, ni recapturando el renglón). Cancela esos ' +
+          'movimientos si de verdad hay que recapturar la orden.',
+      );
+    }
+  }
   const idsDeseados = new Set(set.filter((l) => l.id !== undefined).map((l) => l.id as number));
 
   const aBorrar = [...idsActuales].filter((id) => !idsDeseados.has(id));
@@ -420,19 +601,24 @@ async function sincronizarMatriz(
     await tx.ordenLinea.deleteMany({ where: { id: { in: aBorrar }, idOrden } });
   }
 
-  for (const linea of set) {
+  for (const [i, linea] of set.entries()) {
     // Pantone POR color (petición Daniel): sólo se toca si viene en el set (undefined = no lo mandó,
     // se conserva; null = limpiarlo; string = capturarlo).
     const datosPantone = linea.pantone !== undefined ? { pantone: linea.pantone } : {};
+    // El PACK, en cambio, SIEMPRE se escribe: es parte de la identidad del renglón (color × pack) y
+    // el contrato lo normaliza a cadena vacía cuando no viene, así que no hay un «no lo mandó» que
+    // distinguir. Dejarlo fuera del update habría hecho que quitarle el pack a un renglón fuera
+    // imposible.
+    const pack = packs[i] ?? SIN_PACK;
     if (linea.id !== undefined && idsActuales.has(linea.id)) {
       await tx.ordenLinea.update({
         where: { id: linea.id },
-        data: { idColor: linea.idColor, ...datosPantone, ...datosModificacion(sesion) },
+        data: { idColor: linea.idColor, pack, ...datosPantone, ...datosModificacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, linea.id, linea.tallas);
     } else {
       const creada = await tx.ordenLinea.create({
-        data: { idOrden, idColor: linea.idColor, ...datosPantone, ...datosCreacion(sesion) },
+        data: { idOrden, idColor: linea.idColor, pack, ...datosPantone, ...datosCreacion(sesion) },
       });
       await reemplazarTallas(tx, sesion, creada.id, linea.tallas);
     }
@@ -492,8 +678,19 @@ async function reemplazarTallas(
  * (`precios-orden.ts`), `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado — sin el permiso
  * `ordenes.ver-precio-real-maquila` van null también aquí (paridad con el acceso 36 del viejo;
  * antes eran dato inerte del ETL y se exponían con solo `ordenes.ver`).
+ *
+ * `nombrePorId` llega YA RESUELTO desde el llamador (mismo patrón que `aEventoSalida`): esta función
+ * es SÍNCRONA a propósito y no puede consultar la base. Resolver el nombre del autor renglón por
+ * renglón haría N+1 en el LISTADO de órdenes —cada orden trae sus comentarios embebidos—, así que
+ * `listarOrdenes` resuelve la página COMPLETA de una sola consulta. El mapa es OBLIGATORIO a
+ * propósito (sin default): si mañana aparece un tercer llamador y olvida resolver los nombres, que
+ * sea un error de compilación y no un `nombreUsuario: null` silencioso en toda la pantalla.
  */
-function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSalida {
+function aOrdenSalida(
+  orden: OrdenConDetalle,
+  ocultarPrecios: boolean,
+  nombrePorId: ReadonlyMap<string, string>,
+): OrdenSalida {
   let totalPiezas = 0;
   const lineas = orden.lineas.map((l) => {
     let totalLinea = 0;
@@ -507,6 +704,7 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
       idColor: l.idColor,
       color: l.color.nombre,
       pantone: l.pantone,
+      pack: l.pack,
       tallas,
       totalPiezas: totalLinea,
     };
@@ -521,6 +719,8 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     idModelo: orden.idModelo,
     codigoModelo: orden.modelo.codigo,
     descripcionModelo: orden.modelo.descripcion,
+    idModeloDesarrollo: orden.modelo.idModeloDesarrollo,
+    codigoModeloDesarrollo: orden.modelo.modeloDesarrollo?.codigo ?? null,
     idCliente: orden.idCliente,
     cliente: orden.cliente.nombre,
     idMaquilero: orden.idMaquilero,
@@ -547,6 +747,10 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
       llevaArte: orden.modelo.llevaArte,
     }),
     motivoCancelada: orden.motivoCancelada,
+    // ⭐ 0.061: el cierre de la orden (§Post-F9.154(c)). `cerradaEn` es la verdad autoritativa;
+    // `estado === 'cerrada'` es su espejo (ver `dominio/produccion/cierre-orden.ts`).
+    cerradaEn: orden.cerradaEn === null ? null : orden.cerradaEn.toISOString(),
+    motivoCierre: orden.motivoCierre,
     ocCliente: orden.ocCliente,
     tallasV1: orden.tallasV1,
     maquilaOrd: ocultarPrecios || orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
@@ -567,6 +771,7 @@ function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSali
     comentarios: orden.comentarios.map((c) => ({
       id: c.id,
       idUsuario: c.idUsuario,
+      nombreUsuario: nombreDeUsuario(nombrePorId, c.idUsuario),
       comentario: c.comentario,
       fecha: c.fecha.toISOString(),
     })),
@@ -670,6 +875,24 @@ function resolverComposicion(args: {
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
+ * ⭐⭐ V1-E3 — Opciones del alta que **NO viajan por el contrato REST** y por eso no viven en
+ * `esquemaOrdenCrear`: son composición dominio→dominio.
+ *
+ * 🔴 **Y que no viajen es la mitad del diseño.** El modelo de una orden es AUTORRELLENO (sale del
+ * renglón del pedido, F2-E2): si esto fuera un campo del cuerpo, cualquier cliente del API podría
+ * crear una orden de un modelo que no tiene nada que ver con su pedido, y el autorrelleno dejaría de
+ * ser una garantía para volverse una sugerencia. Como parámetro de función, la única puerta que lo
+ * puede usar es la que ya decidió el modelo con la regla del negocio.
+ */
+export interface OpcionesAltaOrden {
+  /**
+   * El modelo de PRODUCCIÓN que se sella en la orden cuando NO es el del renglón — el hijo por color
+   * que hace nacer `salidaAProduccion` (V1-E3). Ausente = el de siempre, el del renglón.
+   */
+  idModeloDeLaOrden?: number | undefined;
+}
+
+/**
  * Crea una orden de producción desde un renglón de pedido (`idPedidoLinea`) en UNA transacción
  * (A2). AUTORRELLENO de modelo/cliente/empresa del renglón→pedido; el folio sale de la secuencia
  * atómica `"orden"` de la empresa del pedido (A3/A9). EXIGE el renglón de pedido y rechaza pedidos
@@ -687,17 +910,31 @@ function resolverComposicion(args: {
  * COMPOSICIÓN (Daniel 24-jul-2026): si el alta no la captura, la orden HEREDA
  * `Modelo.composicion` con `compForzada = false`; si la captura, queda como override
  * (`compForzada = true`). Ver `resolverComposicion`.
+ *
+ * ⭐⭐ V1-E3 — `opciones.idModeloDeLaOrden` ({@link OpcionesAltaOrden}) sella la orden con OTRO
+ * modelo que el del renglón: el hijo de producción por color que hace nacer `salidaAProduccion`.
+ * NO viaja por el contrato REST a propósito (ver el tipo). Sin él, todo sigue exactamente igual.
+ *
+ * 🔴 Y por eso mismo el alta por CAPTURA (la ruta `POST /api/ordenes`, que no pasa ese modelo)
+ * rechaza los renglones de DESARROLLO: sin el hijo por color, su OP nacería de un modelo que no
+ * está en producción y sin nº de 5 dígitos. La guarda vive en `resolverOrigenPedido`.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
   entrada: EntradaCrearOrden,
   bd?: ContextoBd,
+  opciones: OpcionesAltaOrden = {},
 ): Promise<OrdenSalida> {
   verificarPermiso(sesion, 'ordenes.administrar');
   const datos = validarEntrada(esquemaOrdenCrear, entrada);
 
   const idOrden = await enTransaccion(async (tx) => {
-    const origen = await resolverOrigenPedido(tx, datos.idPedidoLinea, sesion.idEmpresaActiva);
+    const origen = await resolverOrigenPedido(
+      tx,
+      datos.idPedidoLinea,
+      sesion.idEmpresaActiva,
+      opciones.idModeloDeLaOrden,
+    );
 
     if (datos.idMaquilero != null) {
       await exigirProveedorExiste(tx, datos.idMaquilero);
@@ -743,8 +980,18 @@ export async function crearOrden(
     });
 
     // Matriz inicial opcional: la sincroniza y deja que la regla derive el estado (tallas +
-    // avíos, y arte si aplica — `requisitos-orden.ts`). Una orden que nace ya con matriz y con
-    // la receta de avíos de su modelo nace COMPLETA sola; si le falta algo, nace `capturada`.
+    // receta liberada, y arte si aplica — `requisitos-orden.ts`).
+    // ⚠️ POR ESTA VÍA ninguna orden puede nacer `completa`, ni trayendo su matriz: la receta se
+    // copia unas líneas más abajo y `copiarRecetaDelModelo` NO escribe `liberadoEn` (la deja en
+    // NULL), así que `recetaLiberadaEn` de la orden nunca se pone y el recálculo del final SIEMPRE
+    // encuentra el requisito `receta` en falso. Una orden capturada a mano nace `capturada` y sólo
+    // se completa cuando Desarrollo libera su receta.
+    // La EXCEPCIÓN es la otra vía de creación: `crearOrdenMigrada` (`migracion.ts`) escribe el
+    // `estado` explícito de Access —que puede ser `completa`— y libera la receta migrada SÓLO si
+    // la orden no está cancelada y su receta no quedó vacía (`migracion.ts:220`). Como 2 de cada 3
+    // modelos del viejo no tienen BOM, muchas órdenes históricas nacen `completa` SIN cumplir la
+    // regla — por eso `realinear-estado-ordenes.ts` es paso obligatorio al cerrar la carga.
+    // No pasa por aquí (ver la nota de `crearOrden` más arriba).
     if (datos.lineas !== undefined && datos.lineas.length > 0) {
       await sincronizarMatriz(tx, sesion, orden.id, datos.lineas);
     }
@@ -820,6 +1067,8 @@ export async function actualizarOrden(
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar.');
     }
+    // ⭐ 0.061: la orden CERRADA es de solo lectura (su costo quedó congelado). Guarda ÚNICA.
+    exigirOrdenAbierta(actual, 'puede modificar');
 
     const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
 
@@ -898,6 +1147,8 @@ export async function guardarMatrizOrden(
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar su matriz.');
     }
+    // ⭐ 0.061: la matriz manda las cantidades pedidas — sobre una orden CERRADA no se toca.
+    exigirOrdenAbierta(actual, 'puede modificar su matriz');
 
     const renglones = await sincronizarMatriz(tx, sesion, id, datos.lineas);
 
@@ -944,6 +1195,8 @@ export async function copiarDetalleOrden(
     if (destino.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar su matriz.');
     }
+    // ⭐ 0.061: copiar una matriz ENCIMA es escribir la matriz. Sobre la CERRADA, no.
+    exigirOrdenAbierta(destino, 'puede copiarle una matriz');
     // El origen debe existir y ser de la misma empresa (A9); incluye su matriz con las tallas.
     const origen = await tx.orden.findFirst({
       where: { id: datos.idOrdenOrigen, idEmpresa: sesion.idEmpresaActiva },
@@ -955,8 +1208,12 @@ export async function copiarDetalleOrden(
 
     // Construye el set deseado a partir de la matriz del origen y lo sincroniza (reemplaza la del
     // destino). El mapeo "por etiqueta" se honra reutilizando la MISMA talla del catálogo global.
+    // El PACK viaja con el renglón (§Post-F9.10): copiar la matriz de una OP de C&A sin sus tendidos
+    // habría producido una orden con dos renglones del mismo color y sin nada que los distinga — que
+    // es exactamente lo que la llave `(orden, color, pack)` impide, así que ni siquiera guardaría.
     const set: DatosOrdenLineaEntrada[] = origen.lineas.map((l) => ({
       idColor: l.idColor,
+      pack: l.pack,
       tallas: l.tallas.map((t) => ({ idTalla: t.idTalla, cantidad: t.cantidad })),
     }));
     const renglones = await sincronizarMatriz(tx, sesion, id, set);
@@ -979,6 +1236,22 @@ export async function copiarDetalleOrden(
  * Cancela una orden (cancelación SUAVE): `estado='cancelada'` + `motivoCancelada` (OBLIGATORIO) +
  * bitácora `CANCELAR`. La orden sigue consultable; no se borra. Cancelar dos veces es conflicto.
  * Permiso propio: `ordenes.cancelar`.
+ *
+ * ⭐⭐ **0.150 — POR QUÉ AQUÍ *NO* SE APLICA la guarda de «esta orden ya tiene vida»**
+ * ({@link senalesDeActividadOrden}), que sí frena la cascada de `cancelarPedido`. No es un
+ * descuido: es la diferencia entre un BARRIDO y un ACTO.
+ *  • La cascada del pedido cancela órdenes que el usuario **no eligió una por una** —pidió parar el
+ *    pedido, no matar la OP que el piso está cosiendo—, así que ahí la guarda protege de un daño
+ *    que nadie decidió. Es lo que pidió DANIEL: *«no quiero que se borren las OP en ese caso»*.
+ *  • Esta puerta es lo contrario: alguien ABRIÓ esa orden, tiene `ordenes.cancelar` y escribió un
+ *    motivo obligatorio que queda en bitácora. Es una decisión consciente sobre UNA orden.
+ *
+ * 🔑 Y hay una razón dura, no sólo de criterio: **el mensaje de la cascada manda justo aquí.** Al
+ * conservar una OP con vida, el aviso dice *«cancélalas una por una desde Órdenes»*. Si esta puerta
+ * también bloqueara, ese aviso nombraría una salida que no existe — exactamente el defecto que la
+ * 0.150 vino a cerrar en el mensaje de la orden CERRADA (*«o cancela el pedido sin arrastrar las
+ * OPs»*, una puerta imaginaria). Una guarda aquí dejaría al usuario sin ninguna forma de parar una
+ * OP que de verdad hay que parar.
  */
 export async function cancelarOrden(
   sesion: SesionUsuario,
@@ -994,6 +1267,9 @@ export async function cancelarOrden(
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto(`La orden ${Number(actual.folio)} ya está cancelada.`);
     }
+    // ⭐ 0.061: cancelar una orden CERRADA dejaría el `estado` diciendo «cancelada» mientras
+    // `cerradaEn` sigue puesta —dos finales a la vez, y el badge mintiendo—. Primero se reabre.
+    exigirOrdenAbierta(actual, 'puede cancelar');
     await tx.orden.update({
       where: { id },
       data: { estado: 'cancelada', motivoCancelada: datos.motivo, ...datosModificacion(sesion) },
@@ -1034,6 +1310,8 @@ export async function guardarReferenciasOrden(
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se pueden modificar sus referencias.');
     }
+    // ⭐ 0.061: las referencias del cliente son captura de la orden. Sobre la CERRADA, no.
+    exigirOrdenAbierta(actual, 'pueden modificar sus referencias');
     await validarReferencias(tx, actual.idCliente, datos.referencias);
     await sincronizarReferencias(tx, sesion, id, datos.referencias);
 
@@ -1175,7 +1453,11 @@ export async function obtenerOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', id);
   }
-  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'));
+  const nombrePorId = await nombresDeUsuarios(
+    clienteLectura(bd),
+    orden.comentarios.map((c) => c.idUsuario),
+  );
+  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'), nombrePorId);
 }
 
 /**
@@ -1203,7 +1485,7 @@ export async function listarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -1218,7 +1500,12 @@ export async function listarOrdenes(
   ]);
 
   const ocultarPrecios = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
-  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios));
+  // Los autores de los comentarios de TODA la página, en UNA consulta (nunca una por orden).
+  const nombrePorId = await nombresDeUsuarios(
+    cliente,
+    datos.flatMap((o) => (o as OrdenConDetalle).comentarios.map((c) => c.idUsuario)),
+  );
+  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios, nombrePorId));
   return armarPagina(salida, total, filtros);
 }
 
@@ -1232,8 +1519,22 @@ export const buscarOrdenes = listarOrdenes;
  * Exportado para reusarse en las CONSULTAS ligeras (F2-E4, `consultas.ts`): la consulta y el
  * buscador global comparten EXACTAMENTE esta lógica de búsqueda combinada (folio + modelo + cliente
  * + valor de referencia), con su proyección ligera propia.
+ *
+ * ⭐⭐ `sinonimosDepartamento` (§Post-F9.172(a)) — nombres de departamento que la búsqueda debe
+ * entender ADEMÁS del texto tecleado, porque el catálogo dice que se fusionaron con él. Buscar
+ * «Caballeros» tiene que traer las órdenes cuya referencia dice «2-HOMBRE»: el texto que el cliente
+ * escribió en su OC **no se reescribe nunca**, así que el sinónimo se resuelve al consultar. Se
+ * comparan por IGUALDAD (insensible a mayúsculas), no por `contains`: no son un fragmento que el
+ * usuario tecleó sino nombres EXACTOS del catálogo —los mismos que el importador copió al valor de
+ * la referencia—, y un `contains` con un nombre de una o dos letras arrastraría media base.
+ *
+ * 🔑 Esta función sigue siendo **pura**: quien la llama resuelve el conjunto de sinónimos UNA vez
+ * (`armarBusquedaConSinonimos`) y se lo pasa. Nunca se recorre la cadena de fusiones por fila.
  */
-export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
+export function armarBusqueda(
+  busqueda: string | undefined,
+  sinonimosDepartamento: readonly string[] = [],
+): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -1242,11 +1543,53 @@ export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereIn
     { cliente: { nombre: { contains: busqueda, mode: 'insensitive' } } },
     { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
   ];
+  const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
+  if (porSinonimo !== null) {
+    or.push(porSinonimo);
+  }
   const folio = aFolioBusqueda(busqueda);
   if (folio !== null) {
     or.push({ folio });
   }
   return { OR: or };
+}
+
+/**
+ * Condición "alguna referencia de la orden ES uno de estos nombres de departamento" (§Post-F9.172(a)).
+ * `null` cuando no hay sinónimos, para no meter un `OR` vacío —que en Prisma no casa NADA— en el
+ * `where`. Exportada para el Centro de Órdenes, que arma su propio `OR` (busca sin nombre de
+ * cliente) pero entiende los mismos sinónimos.
+ */
+export function condicionSinonimosDepartamento(
+  sinonimos: readonly string[],
+): Prisma.OrdenWhereInput | null {
+  if (sinonimos.length === 0) {
+    return null;
+  }
+  return {
+    referencias: {
+      some: { OR: sinonimos.map((nombre) => ({ valor: { equals: nombre, mode: 'insensitive' } })) },
+    },
+  };
+}
+
+/**
+ * ⭐⭐ La búsqueda de órdenes CON los sinónimos ya resueltos (§Post-F9.172(a)): el embudo que usan el
+ * listado, las consultas ligeras, el buscador global, el tablero WIP y la lista de costos.
+ *
+ * Es {@link armarBusqueda} + **una** resolución de sinónimos por consulta
+ * ({@link sinonimosDeDepartamentos}, 1 viaje si el texto no casa con ningún departamento). Se hizo
+ * async por esto: el rastro de la fusión vive en el catálogo y hay que leerlo, pero **una sola vez**
+ * — jamás por fila.
+ */
+export async function armarBusquedaConSinonimos(
+  busqueda: string | undefined,
+  bd?: ContextoBd,
+): Promise<Prisma.OrdenWhereInput> {
+  if (busqueda === undefined || busqueda === '') {
+    return {};
+  }
+  return armarBusqueda(busqueda, await sinonimosDeDepartamentos(busqueda, bd));
 }
 
 /** Si la búsqueda es un entero, devuelve el `bigint` para filtrar por folio; si no, `null`. */

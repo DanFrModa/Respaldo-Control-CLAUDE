@@ -4,9 +4,20 @@
  *
  * El sistema PROPONE `precioCalculado` (fórmula de cascada, `../costos/precio-lista.ts`) y el dueño,
  * renglón por renglón, APRUEBA ese o TECLEA otro (`precioAprobado`). Los factores se copian como
- * SNAPSHOT editable al crear la lista; editarlos recalcula TODOS los `precioCalculado` sin tocar los
- * aprobados. En E4 la lista NACE `abierta` y ahí se queda (los cambios de estado + la negociación por
- * versiones son E5).
+ * SNAPSHOT editable al crear la lista; editarlos recalcula TODOS los `precioCalculado`. En E4 la lista
+ * NACE `abierta` y ahí se queda (los cambios de estado + la negociación por versiones son E5).
+ *
+ * ⭐ **V1-E8b (§Post-F9.125) — EL PRECIO DE VENTA ES SÓLO DEL DUEÑO.** Tres cosas cambiaron aquí:
+ *  • **(a)** editar los factores del snapshot pide **`listas.aprobar`**, no `listas.administrar`
+ *    (Daniel: *"los factores sólo yo los puedo mover"*).
+ *  • **(b)** los cuatro factores salen en `null` para quien no los pueda mover — el criterio ÚNICO es
+ *    `puedeVerFactoresDePrecio` (`./cliente-factores.ts`), el mismo que usan el catálogo del cliente y
+ *    la calculadora de la mesa.
+ *  • **(d)** mover los factores **TUMBA las aprobaciones** de la lista, con nota de qué las invalidó y
+ *    cuándo. Antes se recalculaba el precio *"sin tocar los aprobados"* para no pisarle la firma al
+ *    dueño, **y el efecto era el contrario**: quedaba un precio aprobado que ya no correspondía a los
+ *    factores con que se calculó. La ronda de negociación (`negociacion.ts`) SÍ reseteaba: eran DOS
+ *    criterios para el mismo hecho, y hoy son uno solo.
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica vive aquí; las rutas sólo validan permiso + Zod y delegan. La aritmética del
@@ -16,25 +27,36 @@
  *  • A7 — auditoría uniforme + `Bitacora` en la misma tx.
  *  • A9 — scope por empresa activa en TODA lectura/mutación (la lista es por empresa; sus renglones
  *    cuelgan de la lista). Una lista de otra empresa, para esta sesión, no existe.
- *  • Importes ocultos (null) sin `consultas.ver-importes` — lo aplica la proyección server-side.
+ *  • Importes ocultos (null) sin `consultas.ver-importes`, y FACTORES ocultos sin `listas.aprobar` —
+ *    los dos los aplica la proyección server-side.
  */
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoRenglonLista, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import {
+  esquemaAgregarLineasLista,
   esquemaAjustarPrecioLinea,
+  esquemaListaEncabezadoEditar,
   esquemaListaFactoresEditar,
   esquemaListaPreciosCrear,
+  esquemaPrecioTargetLinea,
   type CandidatoLista,
   type DatosAjustarPrecioLinea,
   type DatosListaFactoresEditar,
   type DatosListaPreciosCrear,
+  type DatosPrecioTargetLinea,
+  type DescartadoLista,
+  type DatosAgregarLineasLista,
+  type DatosListaEncabezadoEditar,
   type DesgloseCostoLinea,
   type ListaPreciosLineaSalida,
+  type PendienteLineaSalida,
   type ListaPreciosResumen,
   type ListaPreciosDetalle,
   type ListasPreciosQuery,
+  type MotivoNoCandidato,
 } from '../../contrato/esquemas/lista-precios.js';
+import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import {
   aJsonBitacora,
   datosCreacion,
@@ -42,6 +64,7 @@ import {
   registrarBitacora,
 } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -53,10 +76,21 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import { calcularPrecioLista, type FactoresLista } from '../costos/precio-lista.js';
-import { factoresANumeros, resolverFactores, validarFactores } from './cliente-factores.js';
+import {
+  factoresANumeros,
+  puedeVerFactoresDePrecio,
+  buscarFactoresResueltos,
+  resolverFactores,
+  validarFactores,
+} from './cliente-factores.js';
+import { avisoDeCostoViejo } from './costo-viejo.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaCrearLista = z.input<typeof esquemaListaPreciosCrear>;
+/** ⭐ V1-E8y: agregar renglones a una lista ya creada. */
+export type EntradaAgregarLineas = z.input<typeof esquemaAgregarLineasLista>;
+/** ⭐ V1-E8y: editar el encabezado de la cita (lugar + notas). */
+export type EntradaEditarEncabezadoLista = z.input<typeof esquemaListaEncabezadoEditar>;
 export type EntradaEditarFactoresLista = z.input<typeof esquemaListaFactoresEditar>;
 export type EntradaAjustarPrecio = z.input<typeof esquemaAjustarPrecioLinea>;
 
@@ -100,21 +134,95 @@ const incluirLista = {
       desarrollo: {
         select: {
           numeroCliente: true,
-          modelo: { select: { codigo: true, descripcion: true } },
+          // ⭐ V1-E8d: `recetaTocadaEn`/`recetaTocadaCambio` son la MARCA DE AGUA de la receta
+          // (sólo las escribe el embudo `tocarModeloPorCambioDeReceta`); contra `congeladoEn` de
+          // abajo dicen si el costo del renglón quedó viejo. §Post-F9.127.
+          modelo: {
+            select: {
+              codigo: true,
+              descripcion: true,
+              recetaTocadaEn: true,
+              recetaTocadaCambio: true,
+            },
+          },
         },
       },
-      precosto: { select: { version: true } },
+      precosto: { select: { version: true, congeladoEn: true } },
+      // ⭐ V1-E8y (§Post-F9.152): los PENDIENTES del modelo viajan con el renglón. La mesa los
+      // enseña fila por fila; pedirlos aparte serían N llamadas para pintar una lista de 20.
+      pendientes: { orderBy: { id: 'asc' } },
+      // ⭐⭐ FILA 0.153 — **el precio que quedó en la negociación**, para que la lista de afuera
+      // diga lo mismo que el diálogo de adentro (Daniel: *«dice precio aprobado, pero dentro de la
+      // negociación quedó otro»*). Se pide el ÚLTIMO evento QUE TRAE PRECIO —no el último a
+      // secas—: los cambios de estado del renglón (`cambiarEstadoRenglon`) escriben el evento con
+      // los dos precios en null a propósito, y cerrar un modelo no puede borrar de la vista el
+      // precio con el que se cerró. El filtro + `take: 1` van en SQL: son 20 renglones por lista y
+      // traerse el historial entero para quedarse con uno sería pagarlo N veces.
+      eventos: {
+        where: { precioNuevo: { not: null } },
+        orderBy: { id: 'desc' },
+        take: 1,
+        select: { id: true, precioNuevo: true, registradoEn: true },
+      },
     },
   },
 } satisfies Prisma.ListaPreciosInclude;
 
 type ListaConDetalle = Prisma.ListaPreciosGetPayload<{ include: typeof incluirLista }>;
 
+/**
+ * ⭐⭐ **EL CRITERIO** de la fila 0.153: de los eventos de negociación de un renglón, ¿cuál es «el
+ * precio que quedó»? **El del ÚLTIMO evento que registró un precio** (el de `id` mayor: los ids son
+ * autoincrementales, así que el orden de id ES el orden en que pasaron las cosas).
+ *
+ * 🔴 **Por qué el último y no «el del acuerdo»**, que era la otra opción sobre la mesa: `NegociacionEvento`
+ * **no tiene columna de tipo**, y las cinco cosas que escriben un precio ahí no se distinguen por sus
+ * columnas —una ronda con precio pactado, un acuerdo, el cierre de la mesa y la invalidación
+ * automática por mover los factores dejan todas la misma forma—. Cualquier intento de «quedarme sólo
+ * con los acuerdos» tendría que adivinar leyendo la prosa del comentario, que es exactamente el tipo
+ * de regla que se rompe en silencio el día que alguien reescribe un mensaje.
+ *
+ * Y hay una razón mejor que la técnica: **lo que Daniel pidió es CONGRUENCIA con el diálogo**. La
+ * última fila del historial que se ve al abrir la negociación es, precisamente, el último evento con
+ * precio. Si de afuera enseñáramos «el último acuerdo» y de adentro se leyera otro número más abajo,
+ * habríamos mudado su queja de sitio en vez de resolverla. El número de afuera es el mismo de la
+ * última fila de adentro, siempre, venga de donde venga — y el porqué de ese número lo cuenta el
+ * comentario del evento, que se lee en el diálogo.
+ *
+ * Devuelve `null` cuando el renglón no tiene NINGÚN evento con precio (nunca se negoció, o sólo se
+ * movió de estado). En ese caso la pantalla no inventa nada: pinta el hueco.
+ *
+ * Es PURA a propósito (recibe los eventos, no el cliente de Prisma): así el criterio se prueba sin
+ * base de datos y vive en UN solo sitio.
+ */
+export function ultimoPrecioDeNegociacion(
+  eventos: readonly { id: number; precioNuevo: Prisma.Decimal | null; registradoEn: Date }[],
+): { precio: number; registradoEn: Date } | null {
+  let elegido: { id: number; precioNuevo: Prisma.Decimal; registradoEn: Date } | null = null;
+  for (const evento of eventos) {
+    if (evento.precioNuevo === null) {
+      continue;
+    }
+    if (elegido === null || evento.id > elegido.id) {
+      elegido = {
+        id: evento.id,
+        precioNuevo: evento.precioNuevo,
+        registradoEn: evento.registradoEn,
+      };
+    }
+  }
+  return elegido === null
+    ? null
+    : { precio: num(elegido.precioNuevo), registradoEn: elegido.registradoEn };
+}
+
 /** Proyecta un renglón a la salida del contrato (importes en null sin `consultas.ver-importes`). */
 function aLineaSalida(
   linea: ListaConDetalle['lineas'][number],
   verImportes: boolean,
 ): ListaPreciosLineaSalida {
+  // ⭐⭐ Fila 0.153 — el precio que quedó en la negociación (ver `ultimoPrecioDeNegociacion`).
+  const negociado = ultimoPrecioDeNegociacion(linea.eventos);
   return {
     id: linea.id,
     idDesarrollo: linea.idDesarrollo,
@@ -126,9 +234,68 @@ function aLineaSalida(
     costoUnit: verImportes ? linea.costoUnit.toNumber() : null,
     precioCalculado: verImportes ? linea.precioCalculado.toNumber() : null,
     precioAprobado: verImportes ? numOrNull(linea.precioAprobado) : null,
+    // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente. Es un importe → tras la reja; el HECHO de que
+    // exista no lo es, y va aparte para que quien no ve importes sepa que ese renglón trae target
+    // (mismo criterio que `aprobado` respecto de `precioAprobado`).
+    precioTarget: verImportes ? numOrNull(linea.precioTarget) : null,
+    tieneTarget: linea.precioTarget !== null,
     aprobado: linea.precioAprobado !== null,
     aprobadoPorId: linea.aprobadoPorId,
     aprobadoEn: linea.aprobadoEn === null ? null : linea.aprobadoEn.toISOString(),
+    // ⭐⭐ FILA 0.153 — **los DOS precios, uno al lado del otro** (Daniel: *«o estaría bien poner
+    // los dos, mejor»*). El importe va tras la reja como todos los demás; el HECHO de que exista un
+    // precio negociado y CUÁNDO se registró, no —igual que `tieneTarget` y `aprobadoEn`—, porque
+    // saber cuál de los dos números es el más nuevo es lo que deshace la confusión que reportó.
+    //
+    // 🔴 Esto NO escribe `precioAprobado` ni lo sustituye: aprobar sigue siendo un acto aparte, del
+    // dueño y con `listas.aprobar`. Es sólo que ahora el precio pactado se ve SIN abrir el diálogo.
+    precioNegociado: verImportes && negociado !== null ? negociado.precio : null,
+    tienePrecioNegociado: negociado !== null,
+    precioNegociadoEn: negociado === null ? null : negociado.registradoEn.toISOString(),
+    // ⭐ V1-E8x (§Post-F9.151): el SEGUNDO eje del renglón. No es un importe (no lo tapa
+    // `consultas.ver-importes`): saber que un modelo se dropeó es un hecho del negocio, y quien no
+    // ve precios igual necesita saber que ese modelo ya no va en el papel.
+    estado: linea.estado,
+    nombreEstado: NOMBRE_ESTADO_RENGLON[linea.estado],
+    estadoPorId: linea.estadoPorId,
+    estadoEn: linea.estadoEn === null ? null : linea.estadoEn.toISOString(),
+    // ⭐ V1-E8d (§Post-F9.127): la FRASE del aviso la arma el servidor (criterio único en
+    // `costo-viejo.ts`), no la pantalla. Null = no hay nada que avisar. NO va tras la reja de
+    // importes: no lleva ni un número de dinero, y quien no ve importes también tiene que saber
+    // que ese renglón está costeado con una receta vieja.
+    avisoCostoViejo: avisoDeCostoViejo({
+      congeladoEn: linea.precosto.congeladoEn,
+      versionPrecosto: linea.precosto.version,
+      recetaTocadaEn: linea.desarrollo.modelo.recetaTocadaEn,
+      recetaTocadaCambio: linea.desarrollo.modelo.recetaTocadaCambio,
+      aprobado: linea.precioAprobado !== null,
+    }),
+    // ⭐ V1-E8y (§Post-F9.152): la LIBRETA del modelo. No son importes ni factores — se ven
+    // completos sin `consultas.ver-importes`: *"falta muestra de color"* no dice ningún precio.
+    pendientes: linea.pendientes.map(aPendienteSalida),
+  };
+}
+
+/** Proyecta un pendiente del renglón a la salida del contrato (V1-E8y). */
+export function aPendienteSalida(pendiente: {
+  id: number;
+  idListaLinea: number;
+  texto: string;
+  resuelto: boolean;
+  resueltoEn: Date | null;
+  resueltoPorId: string | null;
+  creadoEn: Date;
+  creadoPorId: string | null;
+}): PendienteLineaSalida {
+  return {
+    id: pendiente.id,
+    idListaLinea: pendiente.idListaLinea,
+    texto: pendiente.texto,
+    resuelto: pendiente.resuelto,
+    resueltoEn: pendiente.resueltoEn === null ? null : pendiente.resueltoEn.toISOString(),
+    resueltoPorId: pendiente.resueltoPorId,
+    creadoEn: pendiente.creadoEn.toISOString(),
+    creadoPorId: pendiente.creadoPorId,
   };
 }
 
@@ -137,8 +304,18 @@ function aFechaCorta(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
 }
 
-/** Proyecta una lista COMPLETA (con renglones) a la salida del contrato. */
-function aListaSalida(lista: ListaConDetalle, verImportes: boolean): ListaPreciosDetalle {
+/**
+ * Proyecta una lista COMPLETA (con renglones) a la salida del contrato.
+ *
+ * Dos rejas DISTINTAS, y por eso son dos parámetros: los IMPORTES (costo/precios) se ocultan sin
+ * `consultas.ver-importes`, y los cuatro FACTORES sin `listas.aprobar` (§Post-F9.125(b) — quien arma
+ * la lista ve los precios, pero no de qué porcentajes salieron).
+ */
+function aListaSalida(
+  lista: ListaConDetalle,
+  verImportes: boolean,
+  verFactores: boolean,
+): ListaPreciosDetalle {
   return {
     id: lista.id,
     folio: Number(lista.folio),
@@ -150,11 +327,13 @@ function aListaSalida(lista: ListaConDetalle, verImportes: boolean): ListaPrecio
     idEstadoLista: lista.idEstadoLista,
     codigoEstado: lista.estadoLista.codigo,
     nombreEstado: lista.estadoLista.nombre,
-    margenPct: verImportes ? lista.margenPct.toNumber() : null,
-    descuentosPct: verImportes ? lista.descuentosPct.toNumber() : null,
-    regaliasPct: verImportes ? lista.regaliasPct.toNumber() : null,
-    costoVentasPct: verImportes ? lista.costoVentasPct.toNumber() : null,
+    margenPct: verFactores ? lista.margenPct.toNumber() : null,
+    descuentosPct: verFactores ? lista.descuentosPct.toNumber() : null,
+    regaliasPct: verFactores ? lista.regaliasPct.toNumber() : null,
+    costoVentasPct: verFactores ? lista.costoVentasPct.toNumber() : null,
     notas: lista.notas,
+    // ⭐ V1-E8y (§Post-F9.152): dónde fue la cita. Sin reja: no es importe ni factor.
+    lugar: lista.lugar,
     lineas: lista.lineas.map((l) => aLineaSalida(l, verImportes)),
     creadoEn: lista.creadoEn.toISOString(),
     creadoPorId: lista.creadoPorId,
@@ -207,6 +386,14 @@ export async function exigirLineaBloqueandoLista(
   idPrecosto: number;
   precioCalculado: Prisma.Decimal;
   precioAprobado: Prisma.Decimal | null;
+  /**
+   * ⭐ V1-E8x (§Post-F9.151): el estado del RENGLÓN, leído BAJO el mismo lock que el de la lista.
+   * Viaja por aquí a propósito: este helper es la ÚNICA puerta de las siete mutaciones de renglón
+   * (aprobar, teclear, target, quitar, ronda, acuerdo, mesa), así que devolverlo aquí le da el
+   * guard a las siete de una vez y race-free — nadie cierra ni dropea el renglón entre que se lee
+   * su estado y se muta.
+   */
+  estado: EstadoRenglonLista;
   esCierre: boolean;
 }> {
   const base = await tx.listaPreciosLinea.findFirst({
@@ -227,6 +414,7 @@ export async function exigirLineaBloqueandoLista(
       idPrecosto: true,
       precioCalculado: true,
       precioAprobado: true,
+      estado: true,
       lista: { select: { estadoLista: { select: { esCierre: true } } } },
     },
   });
@@ -240,6 +428,7 @@ export async function exigirLineaBloqueandoLista(
     idPrecosto: linea.idPrecosto,
     precioCalculado: linea.precioCalculado,
     precioAprobado: linea.precioAprobado,
+    estado: linea.estado,
     esCierre: linea.lista.estadoLista.esCierre,
   };
 }
@@ -257,7 +446,150 @@ export function exigirListaNoCerrada(esCierre: boolean): void {
   }
 }
 
+/** Nombre legible de cada estado del renglón (el que Daniel lee, en sus palabras). */
+export const NOMBRE_ESTADO_RENGLON: Record<EstadoRenglonLista, string> = {
+  abierto: 'Abierto',
+  en_negociacion: 'En negociación',
+  cerrado: 'Cerrado',
+  // 🔴 «Dropeado» es la palabra de Daniel (§Post-F9.151 punto 2): NO se traduce.
+  dropeado: 'Dropeado',
+};
+
+/**
+ * ⭐ V1-E8x (§Post-F9.151) — GUARD del RENGLÓN: un modelo **cerrado o dropeado NO acepta más
+ * movimiento** (ni rondas, ni acuerdos, ni mesa, ni target, ni re-aprobación) hasta que se REVIVA
+ * con `cambiarEstadoRenglon`.
+ *
+ * Es el eje HERMANO de {@link exigirListaNoCerrada} y NO lo sustituye: aquél cierra el DOCUMENTO
+ * entero, éste cierra UN modelo dentro de él (que es justo lo que Daniel pidió: *«de una lista de 10
+ * modelos, cierro 5 y los otros ya no los vendo»*). Se evalúa con el `estado` leído BAJO el advisory
+ * lock por lista (`exigirLineaBloqueandoLista`), así que es race-free.
+ *
+ * 🔴 **Quitar el renglón NO pasa por aquí, a propósito.** `lista_precios_linea` tiene
+ * `@@unique([idDesarrollo])`: si un renglón dropeado no se pudiera quitar, su desarrollo quedaría
+ * ATRAPADO para siempre y no podría entrar NUNCA a otra lista — exactamente la trampa que V1-E4
+ * vino a cerrar. Dropear no puede resucitarla.
+ */
+export function exigirRenglonMovible(estado: EstadoRenglonLista, accion: string): void {
+  if (estado === 'cerrado' || estado === 'dropeado') {
+    throw new ErrorConflicto(
+      `Este modelo está ${NOMBRE_ESTADO_RENGLON[estado].toLowerCase()} y ya no admite ${accion}. ` +
+        'Revívelo (déjalo en Abierto o En negociación) si hay que volver a moverlo; su historial se conserva.',
+    );
+  }
+}
+
 // ── Crear lista ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Texto del RECHAZO por cada motivo de no-candidatura (V1-E8f). Vive aquí, y no en el frontend, porque
+ * es el mensaje de un ERROR del API (el diálogo, en cambio, redacta sus propios avisos a partir del
+ * motivo). El de borrador NOMBRA la versión cuando se conoce: "no le sirve de nada saber que algo
+ * falta si no sabe QUÉ" (§Post-F9.96).
+ */
+const TEXTO_MOTIVO_NO_CANDIDATO: Record<MotivoNoCandidato, (version?: number) => string> = {
+  apagado: () => 'está apagado (reactívalo antes de cotizarlo)',
+  // ⚠️ NEUTRO a propósito (hallazgo del reviewer de V1-E8y): este mapa lo comparten el alta —donde
+  // el renglón siempre está en OTRA lista, porque la nueva aún no existe— y `agregarLineasLista`,
+  // donde puede estar en **la que el usuario tiene enfrente**. Decir «otra» ahí mandaba a buscarlo
+  // por todas las demás listas. Cuando se sabe que es ÉSTA, el texto se especializa abajo.
+  'ya-en-lista': () => 'ya está en una lista de precios',
+  'precosto-borrador': (version) =>
+    version === undefined
+      ? 'su precosto sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)'
+      : `su precosto v${version} sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)`,
+  'sin-precosto': () => 'todavía no tiene precosto: genéralo y congélalo',
+};
+
+/**
+ * Forma MÍNIMA que la clasificación necesita de un desarrollo. Deliberadamente laxa (`readonly`,
+ * sólo lo que se lee) para que las dos consultas —la de `crearLista` y la de `agregarLineasLista`,
+ * que traen campos distintos— encajen sin convertir nada.
+ */
+export interface DesarrolloParaCandidatura {
+  apagado: boolean;
+  modelo: { codigo: string };
+  precostos: readonly { estado: string; version: number }[];
+  /**
+   * Los renglones de lista que YA tiene este desarrollo (a lo más uno, por el
+   * `@@unique([idDesarrollo])`). `idLista` es OPCIONAL porque `crearLista` no lo necesita —cuando
+   * crea, la lista todavía no existe, así que cualquier renglón previo es por fuerza de otra— y
+   * `agregarLineasLista` sí: con él distingue «está en ESTA lista» de «está en otra».
+   */
+  listaLineas: readonly { idLista?: number }[];
+}
+
+/**
+ * ⭐ V1-E8y — LA CLASIFICACIÓN, EN UN SOLO SITIO Y **PURA**: dados los ids pedidos y lo que se leyó
+ * de la base, ¿qué desarrollos NO pueden entrar a una lista y por qué?
+ *
+ * Nació de partir el cuerpo de `crearLista` cuando `agregarLineasLista` necesitó exactamente lo
+ * mismo. **No se copió: se compartió** — es la lección de este proyecto repetida hasta el cansancio
+ * (la copia reducida siempre deriva). Y al ser pura se puede probar sin base de datos, con las
+ * mutaciones que importan.
+ *
+ * Devuelve los problemas EN EL ORDEN EN QUE SE PIDIERON los ids (no en el que los devolvió la base):
+ * el usuario los lee contra su propia selección.
+ *
+ * `hayEntradaInvalida` distingue el **400** del **409**: un id que no es de ese cliente/departamento
+ * —o que no existe— es entrada inválida; que un desarrollo esté apagado o sin congelar es un
+ * conflicto de estado.
+ */
+export function problemasDeCandidatura(
+  ids: readonly number[],
+  porId: ReadonlyMap<number, DesarrolloParaCandidatura>,
+  opciones: { idListaActual?: number } = {},
+): { problemas: string[]; hayEntradaInvalida: boolean } {
+  const problemas: string[] = [];
+  let hayEntradaInvalida = false;
+  for (const id of ids) {
+    const d = porId.get(id);
+    if (d === undefined) {
+      problemas.push(`#${id}: no es del cliente/departamento indicado (o no existe)`);
+      hayEntradaInvalida = true;
+      continue;
+    }
+    // MISMA regla que el diálogo de candidatos (V1-E8f): una sola función decide quién entra, y
+    // aquí sólo se traduce su motivo a texto. Antes la regla estaba escrita dos veces.
+    const motivo = motivoNoCandidato(d);
+    if (motivo === null) {
+      continue;
+    }
+    // ⭐ Cuando el renglón que estorba es de LA MISMA lista, se dice así: el caso real es pulsar dos
+    // veces «Agregar a la lista» desde la mesa, y «está en otra lista» mandaba a buscarlo por todas
+    // las demás cuando estaba a la vista.
+    if (
+      motivo === 'ya-en-lista' &&
+      opciones.idListaActual !== undefined &&
+      d.listaLineas.some((l) => l.idLista === opciones.idListaActual)
+    ) {
+      problemas.push(`${d.modelo.codigo}: ya está en ESTA lista`);
+      continue;
+    }
+    const borrador = d.precostos.find((p) => p.estado === 'borrador');
+    problemas.push(`${d.modelo.codigo}: ${TEXTO_MOTIVO_NO_CANDIDATO[motivo](borrador?.version)}`);
+  }
+  return { problemas, hayEntradaInvalida };
+}
+
+/**
+ * Aplica {@link problemasDeCandidatura} y RECHAZA con el tipo de error que toca (400 vs 409),
+ * nombrando todos los problemas. `encabezado` es la frase con la que arranca el mensaje, para que
+ * cada puerta diga lo suyo ("No se puede crear la lista" / "No se pueden agregar estos modelos").
+ */
+function exigirCandidaturaLimpia(
+  ids: readonly number[],
+  porId: ReadonlyMap<number, DesarrolloParaCandidatura>,
+  encabezado: string,
+  opciones: { idListaActual?: number } = {},
+): void {
+  const { problemas, hayEntradaInvalida } = problemasDeCandidatura(ids, porId, opciones);
+  if (problemas.length === 0) {
+    return;
+  }
+  const mensaje = `${encabezado}; corrige estos desarrollos: ${problemas.join('; ')}.`;
+  throw hayEntradaInvalida ? new ErrorValidacion(mensaje) : new ErrorConflicto(mensaje);
+}
 
 /**
  * CREA una lista de precios (A2/A3) por Cliente+Departamento con un renglón por desarrollo. Valida que
@@ -285,13 +617,29 @@ export async function crearLista(
     // desarrollo"): la lectura de `listaLineas` de abajo re-valida bajo el lock, sin TOCTOU.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_CREAR_LISTA}::int, ${idEmpresa}::int)`;
 
-    // El departamento debe pertenecer al cliente (si no, la resolución de factores mentiría).
+    // El departamento debe pertenecer al cliente (si no, la resolución de factores mentiría) y estar
+    // ACTIVO.
+    //
+    // 🔴 Lo ACTIVO se exige desde V1-E8p (§Post-F9.122a): apagar un departamento es *cómo* la fusión
+    // retira un duplicado (borrado suave, D3), así que a partir de esa etapa es el flujo normal. Sin
+    // esta guarda se podía —reproducido— fusionar y acto seguido armar una lista NUEVA colgada del
+    // absorbido, sin error y sin aviso: el estado prohibido que la fusión acaba de barrer, de vuelta
+    // en una llamada. Hasta ahora la invariante la sostenía la PANTALLA (`DialogoCrearLista.tsx`
+    // filtra por `activo`) — lógica de negocio en el frontend (A1), que una pestaña vieja atraviesa.
+    //
+    // ⭐ Guarda GEMELA de `cliente-factores.ts` y de `proyectos.ts`: mismo `ErrorConflicto` y misma
+    // forma de mensaje. Los tres escritores de este catálogo dicen lo mismo.
     const departamento = await tx.clienteDepartamento.findFirst({
       where: { id: datos.idClienteDepartamento, idCliente: datos.idCliente },
-      select: { id: true },
+      select: { id: true, activo: true, nombre: true },
     });
     if (departamento === null) {
       throw new ErrorValidacion('El departamento no pertenece al cliente indicado.');
+    }
+    if (!departamento.activo) {
+      throw new ErrorConflicto(
+        `El departamento "${departamento.nombre}" está desactivado; reactívalo para armar su lista de precios.`,
+      );
     }
 
     // Desarrollos que SÍ son del cliente+departamento+empresa, con su última versión congelada.
@@ -308,47 +656,27 @@ export async function crearLista(
         id: true,
         apagado: true,
         modelo: { select: { codigo: true } },
+        // TODOS los precostos, no sólo los congelados (V1-E8f): con los borradores a la vista, la
+        // clasificación es la MISMA regla del diálogo (`motivoNoCandidato`) y el rechazo puede
+        // nombrar la versión que se quedó sin congelar.
         precostos: {
-          where: { estado: 'congelado' },
           orderBy: { version: 'desc' },
-          take: 1,
-          select: { id: true, costoTotal: true },
+          select: { id: true, version: true, estado: true, costoTotal: true },
         },
-        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `candidatosParaLista`): si ya
+        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `motivoNoCandidato`): si ya
         // tiene un renglón, se rechaza (la re-negociación de E5 vive en la lista existente, no crea otra).
-        listaLineas: { take: 1, select: { id: true } },
+        // Se selecciona `idLista` —y no `id`— para que la forma sea LA MISMA que la de
+        // `agregarLineasLista` y las dos encajen en `DesarrolloParaCandidatura` sin conversiones.
+        // Aquí el valor nunca se compara: al crear, la lista todavía no existe.
+        listaLineas: { take: 1, select: { idLista: true } },
       },
     });
 
-    // Junta TODOS los problemas (con su razón) en una sola pasada: el usuario los ve todos de una vez,
-    // no de categoría en categoría. Un id que no es del cliente/no existe es entrada INVÁLIDA (400);
-    // el resto son conflictos de estado (409). Se elige el tipo según haya o no entradas inválidas.
+    // Junta TODOS los problemas (con su razón) en una sola pasada: el usuario los ve todos de una
+    // vez, no de categoría en categoría. La clasificación vive en `problemasDeCandidatura`, que la
+    // COMPARTE con `agregarLineasLista` (V1-E8y) — dos puertas al mismo hecho, una sola regla.
     const porId = new Map(desarrollos.map((d) => [d.id, d]));
-    const problemas: string[] = [];
-    let hayEntradaInvalida = false;
-    for (const id of ids) {
-      const d = porId.get(id);
-      if (d === undefined) {
-        problemas.push(`#${id}: no es del cliente/departamento indicado (o no existe)`);
-        hayEntradaInvalida = true;
-        continue;
-      }
-      if (d.apagado) {
-        problemas.push(`${d.modelo.codigo}: está apagado`);
-        continue;
-      }
-      if (d.precostos.length === 0) {
-        problemas.push(`${d.modelo.codigo}: no tiene un precosto congelado`);
-        continue;
-      }
-      if (d.listaLineas.length > 0) {
-        problemas.push(`${d.modelo.codigo}: ya está en otra lista de precios`);
-      }
-    }
-    if (problemas.length > 0) {
-      const mensaje = `No se puede crear la lista; corrige estos desarrollos: ${problemas.join('; ')}.`;
-      throw hayEntradaInvalida ? new ErrorValidacion(mensaje) : new ErrorConflicto(mensaje);
-    }
+    exigirCandidaturaLimpia(ids, porId, 'No se puede crear la lista');
 
     // Factores del cliente/departamento (snapshot). Se re-validan por si acaso (deben venir válidos).
     const factoresFila = await resolverFactores(tx, datos.idCliente, datos.idClienteDepartamento);
@@ -380,6 +708,11 @@ export async function crearLista(
         regaliasPct: factoresFila.regaliasPct,
         costoVentasPct: factoresFila.costoVentasPct,
         ...(datos.notas === undefined || datos.notas === null ? {} : { notas: datos.notas }),
+        // ⭐ V1-E8y: el LUGAR de la cita, igual que las notas. Va aquí y no sólo en el PATCH del
+        // encabezado porque `esquemaListaPreciosCrear` **ya lo acepta** y está publicado en el
+        // OpenAPI: sin esta línea, un `POST` con `lugar` respondía 201 con el campo en `null` y sin
+        // avisar de nada — un contrato que miente. (Hallazgo del reviewer de V1-E8y.)
+        ...(datos.lugar === undefined || datos.lugar === null ? {} : { lugar: datos.lugar }),
         ...datosCreacion(sesion),
       },
       select: { id: true },
@@ -388,7 +721,7 @@ export async function crearLista(
     // Un renglón por desarrollo (en el orden pedido, ya validado). costoUnit = costo del congelado.
     const auditoria = datosCreacion(sesion);
     const renglones: Prisma.ListaPreciosLineaCreateManyInput[] = ids.map((id) => {
-      const precosto = porId.get(id)?.precostos[0];
+      const precosto = porId.get(id)?.precostos.find((p) => p.estado === 'congelado');
       // La validación de arriba garantiza el congelado; si faltara, es una invariante rota (no un
       // `idPrecosto: 0` silencioso que reventaría opaco contra la FK Restrict).
       if (precosto === undefined) {
@@ -424,12 +757,264 @@ export async function crearLista(
   return obtenerLista(sesion, idNueva, bd);
 }
 
+// ── ⭐⭐ V1-E8y — AGREGAR RENGLONES A UNA LISTA YA CREADA (§Post-F9.152) ────────────
+
+/**
+ * ⭐⭐ **AGREGA modelos a una lista que ya existe** — la pieza que faltaba para que la mesa esté
+ * abierta (§Post-F9.152 punto 2: *«el modelo nace dentro de la lista que está negociando»*).
+ *
+ * 🔴 **Hasta hoy no había forma.** El ÚNICO escritor de `lista_precios_linea` era el `createMany`
+ * de {@link crearLista}: una lista nacía con sus modelos y no admitía ni uno más. Agregar uno
+ * obligaba a borrar la lista y rehacerla — perdiendo aprobaciones, rondas, acuerdos e historial.
+ *
+ * **Las mismas reglas que crear**, con la misma función (`problemasDeCandidatura`): el desarrollo
+ * tiene que ser de un proyecto del MISMO cliente+departamento de la lista y de la empresa activa
+ * (A9), no estar apagado, tener un precosto CONGELADO y no vivir ya en otra lista.
+ *
+ * ⚠️ **EL PRECIO SALE DEL SNAPSHOT DE LA LISTA, NO DE LOS FACTORES VIGENTES DEL CLIENTE.** Los
+ * cuatro porcentajes se copiaron a la lista al crearla y ahí se editan (§Post-F9.125(a)); si aquí se
+ * volvieran a resolver desde `ClienteFactores`, un modelo agregado el martes saldría con otro margen
+ * que sus doce hermanos y **nadie lo vería** —los cuatro números del encabezado seguirían diciendo
+ * los de siempre—. El renglón nuevo se calcula con lo que dice ESTA lista.
+ *
+ * ⚠️⚠️ **LOS DOS LOCKS, Y SU ORDEN.** Esta función es la única que toma los dos:
+ *  1. `NAMESPACE_LOCK_CREAR_LISTA` por EMPRESA — el mismo que toma {@link crearLista}. Sin él se
+ *     reabre el TOCTOU que ese lock existe para cerrar: dos transacciones (una creando una lista y
+ *     otra agregando a una existente) leerían ambas `listaLineas = 0` del mismo desarrollo y las
+ *     dos intentarían insertarlo, con el `@@unique([idDesarrollo])` reventando en 500 opaco en vez
+ *     de dar el mensaje de negocio.
+ *  2. `NAMESPACE_LOCK_LISTA` por LISTA — el mismo que toma `cambiarEstadoLista`, para que
+ *     `exigirListaNoCerrada` sea race-free (nadie cierra la lista entre que se lee el estado y se
+ *     escriben los renglones).
+ *
+ * 🔑 **El orden es EMPRESA → LISTA y no al revés, a propósito.** Es el orden canónico: ninguna otra
+ * función toma el de lista y después el de empresa, así que no puede formarse un ciclo. Invertirlo
+ * aquí sí lo permitiría el día que alguien tome los dos en otro sitio. Si algún día hace falta
+ * tomarlos en otra función, **este orden manda**.
+ *
+ * Requiere `listas.administrar` (es armar la lista, no aprobar precios).
+ */
+export async function agregarLineasLista(
+  sesion: SesionUsuario,
+  idLista: number,
+  entrada: EntradaAgregarLineas,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.administrar');
+  const datos: DatosAgregarLineasLista = validarEntrada(esquemaAgregarLineasLista, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+  const ids = [...new Set(datos.idsDesarrollo)];
+
+  await enTransaccion(async (tx) => {
+    // (1) EMPRESA y (2) LISTA — en ese orden. Ver el porqué en el encabezado.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_CREAR_LISTA}::int, ${idEmpresa}::int)`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_LISTA}::int, ${idLista}::int)`;
+
+    // A9 + estado, leídos BAJO los locks.
+    const lista = await tx.listaPrecios.findFirst({
+      where: { id: idLista, idEmpresa },
+      select: {
+        id: true,
+        idCliente: true,
+        idClienteDepartamento: true,
+        margenPct: true,
+        descuentosPct: true,
+        regaliasPct: true,
+        costoVentasPct: true,
+        estadoLista: { select: { esCierre: true } },
+      },
+    });
+    if (lista === null) {
+      throw new ErrorNoEncontrado('Lista de precios', idLista);
+    }
+    exigirListaNoCerrada(lista.estadoLista.esCierre);
+
+    // Los desarrollos que SÍ son de este cliente+departamento+empresa, con sus precostos.
+    const desarrollos = await tx.desarrollo.findMany({
+      where: {
+        id: { in: ids },
+        proyecto: {
+          idEmpresa,
+          idCliente: lista.idCliente,
+          idClienteDepartamento: lista.idClienteDepartamento,
+        },
+      },
+      select: {
+        id: true,
+        apagado: true,
+        modelo: { select: { codigo: true } },
+        precostos: {
+          orderBy: { version: 'desc' },
+          select: { id: true, version: true, estado: true, costoTotal: true },
+        },
+        // Incluye el renglón que pudiera tener ya, **con su `idLista`**: agregar dos veces el mismo
+        // modelo es el error más fácil de cometer desde la mesa (dos clics en «Agregar a la
+        // lista»), y con el id el rechazo puede decir «ya está en ESTA lista» en vez de mandar a
+        // buscarlo por las demás.
+        listaLineas: { take: 1, select: { idLista: true } },
+      },
+    });
+
+    const porId = new Map(desarrollos.map((d) => [d.id, d]));
+    exigirCandidaturaLimpia(ids, porId, 'No se pueden agregar estos modelos a la lista', {
+      idListaActual: idLista,
+    });
+
+    // El SNAPSHOT de la lista (no los factores vigentes del cliente). Ver el encabezado.
+    const factores: FactoresLista = factoresANumeros(lista);
+
+    const auditoria = datosCreacion(sesion);
+    const renglones: Prisma.ListaPreciosLineaCreateManyInput[] = ids.map((id) => {
+      const precosto = porId.get(id)?.precostos.find((p) => p.estado === 'congelado');
+      if (precosto === undefined) {
+        // La validación de arriba lo garantiza; si faltara es una invariante rota, no un
+        // `idPrecosto: 0` silencioso que reventaría opaco contra la FK Restrict.
+        throw new Error(`Desarrollo ${id} quedó sin precosto congelado tras la validación.`);
+      }
+      const costoUnit = num(precosto.costoTotal);
+      return {
+        idLista,
+        idDesarrollo: id,
+        idPrecosto: precosto.id,
+        costoUnit,
+        precioCalculado: calcularPrecioLista(costoUnit, factores),
+        ...auditoria,
+      };
+    });
+    await tx.listaPreciosLinea.createMany({ data: renglones });
+
+    // La lista cambió: su `modificadoEn/Por` lo dice (mismo criterio que quitar un renglón).
+    await tx.listaPrecios.update({
+      where: { id: idLista },
+      data: { ...datosModificacion(sesion) },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: idLista,
+      accion: 'MODIFICAR',
+      datos: {
+        operacion: 'agregar-lineas',
+        idsDesarrollo: ids,
+        modelos: ids.map((id) => porId.get(id)?.modelo.codigo ?? `#${id}`),
+      },
+    });
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
+// ── ⭐ V1-E8y — EL ENCABEZADO DE LA CITA (lugar + notas) ────────────────────────────
+
+/**
+ * ⭐ V1-E8y (§Post-F9.152) — Edita el LUGAR de la cita y las NOTAS de la lista. PATCH parcial:
+ * omitir = no tocar; `null`/'' = vaciar.
+ *
+ * ⚠️ **`notas` existía desde F8-E4 y NO SE PODÍA CORREGIR**: el único sitio que las escribía era
+ * `crearLista`. Se abre aquí, junto al lugar, porque son el mismo acto —los datos de la junta— y
+ * dejar media puerta (el campo nuevo editable y el viejo no) sería la clase de asimetría que nadie
+ * recuerda después.
+ *
+ * Bajo el advisory lock por lista y con `exigirListaNoCerrada`: el encabezado de una lista cerrada
+ * es parte del compromiso; para cambiarlo hay que reabrirla, y eso queda auditado.
+ * Requiere `listas.administrar`.
+ */
+export async function editarEncabezadoLista(
+  sesion: SesionUsuario,
+  idLista: number,
+  entrada: EntradaEditarEncabezadoLista,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.administrar');
+  const datos: DatosListaEncabezadoEditar = validarEntrada(esquemaListaEncabezadoEditar, entrada);
+
+  await enTransaccion(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_LISTA}::int, ${idLista}::int)`;
+    const base = await exigirLista(tx, idLista, sesion.idEmpresaActiva);
+    exigirListaNoCerrada(base.esCierre);
+
+    const actual = await tx.listaPrecios.findUniqueOrThrow({
+      where: { id: idLista },
+      select: { lugar: true, notas: true },
+    });
+
+    const cambios: Prisma.ListaPreciosUpdateInput = { ...datosModificacion(sesion) };
+    const detalle: Record<string, unknown> = {};
+    for (const campo of ['lugar', 'notas'] as const) {
+      const crudo = datos[campo];
+      if (crudo === undefined) continue;
+      const nuevo = crudo === null || crudo === '' ? null : crudo;
+      if (nuevo !== actual[campo]) {
+        (cambios as Record<string, unknown>)[campo] = nuevo;
+        detalle[campo] = { de: actual[campo], a: nuevo };
+      }
+    }
+    if (Object.keys(detalle).length === 0) {
+      return;
+    }
+
+    await tx.listaPrecios.update({ where: { id: idLista }, data: cambios });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: idLista,
+      accion: 'MODIFICAR',
+      datos: { operacion: 'editar-encabezado', ...detalle },
+    });
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
 // ── Editar factores (snapshot) ─────────────────────────────────────────────────────
 
 /**
- * EDITA el snapshot de factores de la lista y RECALCULA el `precioCalculado` de TODOS sus renglones,
- * SIN tocar los `precioAprobado` (la aprobación del dueño se respeta). Serializado por advisory lock
- * por lista (evita recálculos concurrentes que se pisen). Requiere `listas.administrar`.
+ * ¿De verdad cambió alguno de los cuatro factores? Se compara NÚMERO a número (el snapshot viene en
+ * `Decimal` y la entrada en `number`, así que se normalizan los dos con `factoresANumeros`/la propia
+ * entrada). Guardar los MISMOS valores no mueve nada, y por eso no tumba ninguna firma: castigar un
+ * "guardar" sin cambios sería exactamente la firma-adorno al revés, un sobresalto sin hecho detrás.
+ */
+function factoresCambiaron(antes: FactoresLista, ahora: FactoresLista): boolean {
+  return (
+    antes.margenPct !== ahora.margenPct ||
+    antes.descuentosPct !== ahora.descuentosPct ||
+    antes.regaliasPct !== ahora.regaliasPct ||
+    antes.costoVentasPct !== ahora.costoVentasPct
+  );
+}
+
+/**
+ * ⭐ **V1-E8b (§Post-F9.125(d))** — EDITA el snapshot de factores de la lista, RECALCULA el
+ * `precioCalculado` de TODOS sus renglones y **TUMBA las aprobaciones** que hubiera.
+ *
+ * ⚠️ **Qué cambió y por qué, porque es lo contrario de lo que decía antes.** Hasta V1-E8a esta
+ * función recalculaba *"sin tocar `precioAprobado`"*, y estaba escrito como una cortesía: **no
+ * pisarle la firma al dueño**. El efecto era el contrario del propósito — quedaba un precio APROBADO
+ * que ya no correspondía a los factores con que se calculó, y el sistema lo seguía presentando como
+ * firmado. Es la misma lección de §Post-F9.116 en el otro extremo del flujo: *una firma que no está
+ * amarrada a lo que se firmó no es una firma, es un adorno.*
+ *
+ * ⚠️ **Y había DOS criterios para el mismo hecho.** `registrarRonda` (`negociacion.ts`) SÍ resetea
+ * `precioAprobado` cuando el COSTO cambia. Que mover el costo tumbara la firma y mover el margen no,
+ * no era una distinción de negocio: era que nadie las había mirado juntas. Hoy las dos puertas hacen
+ * lo mismo y por el mismo camino — un `NegociacionEvento` INMUTABLE por renglón.
+ *
+ * ⚠️ **Dónde queda la firma vieja (D3): NO se borra.** El renglón se limpia (nadie ha aprobado el
+ * precio que hay AHORA, y dejar ahí a quien aprobó el anterior sería el adorno otra vez), pero:
+ *  • el **evento de negociación** —que es el libro inmutable del renglón, el mismo que la pantalla ya
+ *    enseña como historial— se lleva el precio anterior y la NOTA de qué lo invalidó y cuándo;
+ *  • la **bitácora** se lleva, renglón por renglón, quién había aprobado y en qué fecha.
+ * Se vuelve a aprobar normalmente, con `listas.aprobar`, como cualquier renglón nuevo: **no hay
+ * estado muerto** (§Post-F9.125(d), condición (c) de §Post-F9.116).
+ *
+ * 🔴🔴 **V1-E8x — LOS RENGLONES CERRADOS Y DROPEADOS QUEDAN FUERA DEL RECÁLCULO.** Daniel: *«No se
+ * tocan: lo cerrado es un compromiso»*. A un modelo en estado terminal no se le recalcula el precio
+ * ni se le tumba la firma: su precio es un **pacto con el cliente**, no un derivado de un porcentaje
+ * interno. Para cambiarlo hay que **revivirlo**, y eso queda registrado. (Sin esta excepción el
+ * cerrado quedaba sin firma **y sin manera de re-firmarla** —`aprobarLinea` lo rechaza por
+ * terminal—, y como sí es vigente arrastraba a la lista entera a quedarse sin papel.)
+ *
+ * Serializado por advisory lock por lista (evita recálculos concurrentes que se pisen). **Requiere
+ * `listas.aprobar`** (§Post-F9.125(a)): mover un factor ES mover el precio de venta.
  */
 export async function editarFactoresLista(
   sesion: SesionUsuario,
@@ -437,7 +1022,7 @@ export async function editarFactoresLista(
   entrada: EntradaEditarFactoresLista,
   bd?: ContextoBd,
 ): Promise<ListaPreciosDetalle> {
-  verificarPermiso(sesion, 'listas.administrar');
+  verificarPermiso(sesion, 'listas.aprobar');
   const datos: DatosListaFactoresEditar = validarEntrada(esquemaListaFactoresEditar, entrada);
   validarFactores(datos);
 
@@ -447,6 +1032,13 @@ export async function editarFactoresLista(
     // E5: no se editan factores/recalculan precios sobre una lista en estado de CIERRE. El `esCierre`
     // se leyó BAJO el mismo advisory lock que `cambiarEstadoLista` toma → race-free.
     exigirListaNoCerrada(lista.esCierre);
+
+    // Los factores VIGENTES, leídos bajo el lock: son los que dicen si de verdad hubo cambio.
+    const snapshot = await tx.listaPrecios.findUniqueOrThrow({
+      where: { id: idLista },
+      select: { margenPct: true, descuentosPct: true, regaliasPct: true, costoVentasPct: true },
+    });
+    const cambiaron = factoresCambiaron(factoresANumeros(snapshot), datos);
 
     await tx.listaPrecios.update({
       where: { id: idLista },
@@ -459,18 +1051,100 @@ export async function editarFactoresLista(
       },
     });
 
-    // Recalcula precioCalculado por renglón (depende de su costoUnit). Nunca toca precioAprobado.
     const renglones = await tx.listaPreciosLinea.findMany({
       where: { idLista },
-      select: { id: true, costoUnit: true },
+      select: {
+        id: true,
+        costoUnit: true,
+        precioAprobado: true,
+        aprobadoPorId: true,
+        aprobadoEn: true,
+        // ⭐⭐ V1-E8x: decide si este renglón se toca. Ver el bloque de abajo.
+        estado: true,
+      },
     });
+
+    const cuando = new Date();
+    /** Las firmas que se cayeron, para que la bitácora pueda contestar "¿quién la había aprobado?". */
+    const firmasTumbadas: Prisma.JsonArray = [];
+    /** Los renglones TERMINALES que el recálculo no tocó (para que la bitácora lo diga). */
+    const saltados: Prisma.JsonArray = [];
+
     for (const renglon of renglones) {
+      /**
+       * 🔴🔴 **V1-E8x — LO CERRADO NO SE TOCA.** Daniel, al preguntárselo: *«No se tocan: lo
+       * cerrado es un compromiso»*.
+       *
+       * Un renglón `cerrado` o `dropeado` **se salta entero**: ni se le recalcula el precio ni se
+       * le tumba la firma. La razón es de negocio: el precio de un modelo cerrado es un
+       * **compromiso pactado con el cliente**, no un derivado del cálculo — moverlo porque cambió
+       * un porcentaje INTERNO contradice el sentido mismo de «cerrado». Si hay que cambiarlo, se
+       * **revive** el renglón, y eso deja rastro, que es justo lo que se quiere.
+       *
+       * ⚠️ Y sin esto había un CALLEJÓN SIN SALIDA, no sólo una incoherencia: tumbarle la firma a
+       * un `cerrado` lo dejaba sin precio aprobado **y sin forma de volver a firmarlo**, porque
+       * `aprobarLinea`/`ajustarPrecioLinea` rechazan un renglón terminal. Como `cerrado` SÍ es
+       * vigente, el guard del papel lo nombraba como faltante ⇒ la lista entera se quedaba sin
+       * PDF, sin Excel y sin cotización. El mismo agujero que §Post-F9.155 vino a tapar, abierto
+       * por el otro lado.
+       *
+       * (Del `dropeado` ni hablar: el evento de invalidación termina diciendo *"Hay que volver a
+       * aprobarlo"*, y a un dropeado no se le va a aprobar nada nunca.)
+       */
+      if (renglon.estado === 'cerrado' || renglon.estado === 'dropeado') {
+        saltados.push({
+          idLinea: renglon.id,
+          estado: renglon.estado,
+          precioAprobado: numOrNull(renglon.precioAprobado),
+        });
+        continue;
+      }
+
+      const precioCalculado = calcularPrecioLista(num(renglon.costoUnit), datos);
+      // Sólo cae la firma que EXISTE y sólo si los factores de verdad se movieron.
+      const tumbar = cambiaron && renglon.precioAprobado !== null;
+
       await tx.listaPreciosLinea.update({
         where: { id: renglon.id },
         data: {
-          precioCalculado: calcularPrecioLista(num(renglon.costoUnit), datos),
+          precioCalculado,
+          ...(tumbar ? { precioAprobado: null, aprobadoPorId: null, aprobadoEn: null } : {}),
           ...datosModificacion(sesion),
         },
+      });
+
+      if (!tumbar) {
+        continue;
+      }
+
+      const desde =
+        renglon.aprobadoEn === null
+          ? ''
+          : ` La aprobación era del ${fechaDelActo(renglon.aprobadoEn)}.`;
+      // El evento es INMUTABLE y sin precostos (no hubo re-costeo: el costo no se movió, los
+      // factores sí). Su `precioAnterior` es la firma que se cae; su `precioNuevo`, lo que la
+      // fórmula propone ahora.
+      await tx.negociacionEvento.create({
+        data: {
+          idListaLinea: renglon.id,
+          idPrecostoAnterior: null,
+          idPrecostoNuevo: null,
+          precioAnterior: renglon.precioAprobado,
+          precioNuevo: precioCalculado,
+          acuerdo:
+            `Se INVALIDÓ la aprobación automáticamente el ${fechaDelActo(cuando)}: después de ` +
+            `aprobarse se movieron los FACTORES de la lista (margen / descuentos / regalías / ` +
+            `costo de ventas), así que el precio firmado ya no corresponde a los porcentajes con ` +
+            `los que se calculó.${desde} Hay que volver a aprobarlo.`,
+          registradoPorId: sesion.id,
+        },
+      });
+
+      firmasTumbadas.push({
+        idLinea: renglon.id,
+        precioAprobadoAnterior: num(renglon.precioAprobado),
+        aprobadoPorId: renglon.aprobadoPorId,
+        aprobadoEn: renglon.aprobadoEn === null ? null : renglon.aprobadoEn.toISOString(),
       });
     }
 
@@ -478,7 +1152,18 @@ export async function editarFactoresLista(
       entidad: 'ListaPrecios',
       idEntidad: idLista,
       accion: 'MODIFICAR',
-      datos: { operacion: 'editar-factores', renglones: renglones.length },
+      datos: {
+        operacion: 'editar-factores',
+        renglones: renglones.length,
+        // ⭐ V1-E8x: cuántos se recalcularon de verdad y CUÁLES se respetaron por estar cerrados o
+        // dropeados. Sin esto, la bitácora afirmaría haber tocado renglones que no tocó.
+        renglonesRecalculados: renglones.length - saltados.length,
+        terminalesRespetados: saltados,
+        factoresCambiaron: cambiaron,
+        // D3: las firmas que se cayeron viajan ÍNTEGRAS al renglón de bitácora. Sin esto, una vez
+        // sobrescrita la fila nadie podría contestar quién había aprobado ese precio y cuándo.
+        firmasInvalidadas: firmasTumbadas,
+      },
     });
   }, bd);
 
@@ -505,6 +1190,8 @@ export async function aprobarLinea(
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     // E5: no se aprueba sobre una lista en estado de CIERRE.
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: ni sobre un MODELO cerrado/dropeado (§Post-F9.151) — el eje hermano, por renglón.
+    exigirRenglonMovible(linea.estado, 'aprobar su precio');
     if (num(linea.precioCalculado) <= 0) {
       throw new ErrorConflicto(
         'No se puede aprobar un precio calculado de 0; ajusta el precosto (para que tenga costo) o teclea un precio.',
@@ -551,6 +1238,8 @@ export async function ajustarPrecioLinea(
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     // E5: no se teclea precio sobre una lista en estado de CIERRE.
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: ni sobre un MODELO cerrado/dropeado (§Post-F9.151).
+    exigirRenglonMovible(linea.estado, 'teclearle un precio');
     await tx.listaPreciosLinea.update({
       where: { id: idLinea },
       data: {
@@ -572,6 +1261,61 @@ export async function ajustarPrecioLinea(
   return obtenerLista(sesion, idLista, bd);
 }
 
+// ── ⭐ El TARGET PRICE del cliente (V1-E8w, §Post-F9.150) ────────────────────────────
+
+/**
+ * ⭐ FIJA (o BORRA) el **TARGET PRICE** que el cliente dio para un renglón. Daniel:
+ *
+ * > *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
+ * > negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios. (o los modelos).
+ * > Debe de tener un liugar para poner el target que le dio el cliente si es que nos lo dio. Y me
+ * > debe de aparecer en la negociacion.»*
+ *
+ * 🔴 **El permiso es `listas.administrar`, NO `listas.aprobar`.** Es deliberado y es el corazón de
+ * la decisión: quien lo captura es **Aurora al armar la lista** (Gerencial: administra listas,
+ * negocia y cotiza, pero **no** aprueba precios), no el dueño en la mesa. Con `listas.aprobar` el
+ * dato habría quedado del lado equivocado del reparto — es la misma puerta con la que se agrega y
+ * se quita un renglón, que es exactamente cuando se conoce el target.
+ *
+ * 🔴 **INFORMA, NO BLOQUEA** (decisión punto 4): fijar un target no impide aprobar por debajo, ni
+ * cotizar, ni bajar el PDF. Es un dato que viene de FUERA; el sistema no lo calcula ni lo obedece.
+ *
+ * `precioTarget: null` **borra** el target: *"si es que nos lo dio"* — un número capturado por error
+ * tiene que poder retirarse, porque un target falso en la mesa es peor que ninguno.
+ *
+ * Bajo el advisory lock por lista + guard de lista NO cerrada, como cualquier edición de renglón (una
+ * lista en estado de cierre es historia; para tocarla se reabre, y eso queda auditado).
+ */
+export async function fijarPrecioTargetLinea(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: z.input<typeof esquemaPrecioTargetLinea>,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.administrar');
+  const datos: DatosPrecioTargetLinea = validarEntrada(esquemaPrecioTargetLinea, entrada);
+
+  const idLista = await enTransaccion(async (tx) => {
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: un modelo cerrado/dropeado tampoco recibe target nuevo (§Post-F9.151).
+    exigirRenglonMovible(linea.estado, 'capturarle el target del cliente');
+    await tx.listaPreciosLinea.update({
+      where: { id: idLinea },
+      data: { precioTarget: datos.precioTarget, ...datosModificacion(sesion) },
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: linea.idLista,
+      accion: 'MODIFICAR',
+      datos: { operacion: 'precio-target', idLinea, precioTarget: datos.precioTarget },
+    });
+    return linea.idLista;
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
 // ── Quitar un renglón / borrar la lista (V1-E4 punto 4) ─────────────────────────────
 
 /**
@@ -584,9 +1328,10 @@ export async function ajustarPrecioLinea(
  *
  * D3 (nada desaparece en silencio): el renglón se borra FÍSICO —tiene que hacerlo, o el unique lo
  * seguiría reteniendo— pero antes queda ÍNTEGRO en la bitácora: el objeto completo del `antes` con
- * todos sus importes y su aprobación, MÁS todos sus eventos de negociación (que se irían por
- * cascada). Nada de conteos: lo que se guarda es lo que había, tal cual, y con eso se puede
- * reconstruir el renglón entero.
+ * todos sus importes y su aprobación, MÁS todos sus eventos de negociación **con el DESGLOSE de
+ * costos de cada uno** (que se irían por cascada). Nada de conteos: lo que se guarda es lo que
+ * había, tal cual, y con eso se puede reconstruir el renglón entero — incluida la mesa con la que
+ * se vendió (§Post-F9.149).
  *
  * Guardas: `listas.administrar`, empresa activa (A9 — un renglón ajeno da 404, no 409) y lista NO
  * cerrada (una lista en estado de cierre es historia; para tocarla hay que reabrirla, que es un
@@ -603,10 +1348,36 @@ export async function quitarLineaLista(
     // Mismo patrón que aprobar/ajustar: advisory lock por lista ANTES de leer el estado.
     const base = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(base.esCierre);
+    // 🔴 V1-E8x: quitar NO lleva `exigirRenglonMovible`, y es DELIBERADO. Un renglón dropeado
+    // (o cerrado) sigue reteniendo su desarrollo por el `@@unique([idDesarrollo])`: si tampoco se
+    // pudiera quitar, ese desarrollo no podría entrar NUNCA a otra lista — la trampa exacta que
+    // esta función vino a cerrar. Dropear un modelo no puede resucitarla.
+
+    // V1-E7c: un renglón YA COTIZADO sí se puede quitar. Retenerlo (como hacía la primera versión de
+    // esta etapa, con un `Restrict`) NO protegía la cotización —su contenido está congelado en sus
+    // propias columnas— sino que ATRAPABA el desarrollo: con `@@unique([idDesarrollo])` no podría
+    // entrar NUNCA a otra lista, y sin escapatoria, porque una cotización no se borra ni cancelándola.
+    // La FK del documento es `SetNull`: al quitar el renglón, el puntero se va a null y el papel se
+    // sigue imprimiendo idéntico.
 
     // El objeto COMPLETO del `antes` (D3) + los eventos que se van por cascada.
     const antes = await tx.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
     const eventos = await tx.negociacionEvento.findMany({
+      where: { idListaLinea: idLinea },
+      orderBy: { id: 'asc' },
+      // 🔴🔴 CON SU DESGLOSE, no sólo el escalar (V1-E8w, ronda de corrección).
+      // `NegociacionEventoCosto` cuelga del evento con `onDelete: Cascade`, así que se va en el
+      // mismo borrado; sin este `include` la foto guardaba el `costoEstimado` y el comentario, y el
+      // desglose —tela 1.2×20, maquila 5, jareta 3.25…— desaparecía SIN RASTRO. Es exactamente lo
+      // que §Post-F9.149 declara insuficiente: *«un total sin desglose no sirve para eso»*, porque
+      // con el desglose es como Desarrollo arma la receta nueva.
+      include: { costos: { orderBy: { orden: 'asc' } } },
+    });
+    // 🔴🔴 V1-E8y — LOS PENDIENTES TAMBIÉN SE VAN POR CASCADA. Es exactamente la trampa que
+    // §Post-F9.149 dejó documentada con los `NegociacionEventoCosto`: lo que muere en cascada y no
+    // se fotografía **desaparece sin rastro**. *"Falta muestra de color"* es trabajo pendiente de
+    // verdad; si el renglón se quita por error, la bitácora es lo único que lo puede devolver.
+    const pendientes = await tx.listaPreciosLineaPendiente.findMany({
       where: { idListaLinea: idLinea },
       orderBy: { id: 'asc' },
     });
@@ -626,6 +1397,7 @@ export async function quitarLineaLista(
         idLinea,
         antes: aJsonBitacora(antes),
         eventosNegociacion: eventos.map(aJsonBitacora),
+        pendientes: pendientes.map(aJsonBitacora),
       },
     });
     return base.idLista;
@@ -640,7 +1412,8 @@ export async function quitarLineaLista(
  * retenía a TODOS sus desarrollos, y ninguno podía entrar a la lista buena.
  *
  * D3: el `antes` que queda en bitácora es la lista ENTERA —encabezado con sus factores, cada
- * renglón con sus importes y su aprobación, y cada evento de negociación—, no un conteo.
+ * renglón con sus importes y su aprobación, y cada evento de negociación **con su desglose de
+ * costos**—, no un conteo.
  *
  * Guardas: `listas.administrar`, empresa activa (A9) y estado NO de cierre. Una lista `cerrada` o
  * `ya-pedida` es un compromiso con el cliente: para borrarla hay que reabrirla primero (cambio de
@@ -683,7 +1456,22 @@ export async function eliminarLista(
     const eventos = await tx.negociacionEvento.findMany({
       where: { idListaLinea: { in: lineas.map((l) => l.id) } },
       orderBy: { id: 'asc' },
+      // 🔴🔴 CON SU DESGLOSE (V1-E8w, ronda de corrección) — ver el mismo `include` en
+      // `quitarLineaLista`: los `NegociacionEventoCosto` se van por cascada y sin fotografiarlos el
+      // `antes` guardaba un total mudo.
+      include: { costos: { orderBy: { orden: 'asc' } } },
     });
+    // 🔴 V1-E8y — los PENDIENTES de cada renglón también se van por cascada (misma trampa que los
+    // `NegociacionEventoCosto`): se fotografían o desaparecen sin rastro.
+    const pendientes = await tx.listaPreciosLineaPendiente.findMany({
+      where: { idListaLinea: { in: lineas.map((l) => l.id) } },
+      orderBy: { id: 'asc' },
+    });
+
+    // V1-E7c: una lista que ya produjo cotizaciones SÍ se borra. El documento emitido no depende de
+    // ella para nada —su encabezado (cliente, departamento, folio de la lista) y sus renglones están
+    // CONGELADOS como valores—, así que `Cotizacion.idLista` es `SetNull` y la cotización queda
+    // íntegra con el puntero en null. Blindarla habría dejado la lista atrapada para siempre.
 
     // La bitácora va ANTES del delete: si el borrado falla, tampoco queda el registro (A2), y si
     // sale bien el `antes` ya está escrito en la MISMA transacción.
@@ -700,28 +1488,40 @@ export async function eliminarLista(
           estadoLista: undefined,
           lineas,
           eventosNegociacion: eventos,
+          pendientes,
         }),
       },
     });
-    // Cascade: `lista_precios_linea` y, desde ahí, `negociacion_evento`.
+    // Cascade: `lista_precios_linea` y, desde ahí, `negociacion_evento` y
+    // `lista_precios_linea_pendiente` (los tres quedaron fotografiados arriba).
     await tx.listaPrecios.delete({ where: { id: idLista } });
   }, bd);
 }
 
 // ── Lecturas ────────────────────────────────────────────────────────────────────────
 
-/** Un renglón mínimo para contar aprobados en el listado (sin cargar todo). */
+/** Un renglón mínimo para contar aprobados/dropeados en el listado (sin cargar todo). */
 const incluirResumen = {
   cliente: { select: { nombre: true } },
   clienteDepartamento: { select: { nombre: true } },
   estadoLista: { select: { codigo: true, nombre: true } },
-  lineas: { select: { precioAprobado: true } },
+  lineas: { select: { precioAprobado: true, estado: true } },
 } satisfies Prisma.ListaPreciosInclude;
 
 type ListaResumenPayload = Prisma.ListaPreciosGetPayload<{ include: typeof incluirResumen }>;
 
-/** Proyecta una lista a su resumen de listado (sin renglones; con conteo de aprobados). */
+/**
+ * Proyecta una lista a su resumen de listado (sin renglones; con los conteos que deciden si de esa
+ * lista puede salir papel).
+ *
+ * ⭐ V1-E8x (§Post-F9.155): `renglonesAprobados` cuenta **sólo entre los VIGENTES**, no entre todos.
+ * Antes de los estados daba igual; hoy no: un dropeado que quedó con su firma vieja habría inflado
+ * el conteo, y uno sin firmar lo habría dejado congelado en «3/5» para siempre aunque el PDF ya
+ * pudiera bajarse. El par que la pantalla enseña —aprobados sobre vigentes— es exactamente el que
+ * el guard del papel evalúa.
+ */
 function aResumen(lista: ListaResumenPayload): ListaPreciosResumen {
+  const vigentes = lista.lineas.filter((l) => l.estado !== 'dropeado');
   return {
     id: lista.id,
     folio: Number(lista.folio),
@@ -734,7 +1534,8 @@ function aResumen(lista: ListaResumenPayload): ListaPreciosResumen {
     codigoEstado: lista.estadoLista.codigo,
     nombreEstado: lista.estadoLista.nombre,
     totalRenglones: lista.lineas.length,
-    renglonesAprobados: lista.lineas.filter((l) => l.precioAprobado !== null).length,
+    renglonesDropeados: lista.lineas.length - vigentes.length,
+    renglonesAprobados: vigentes.filter((l) => l.precioAprobado !== null).length,
     creadoEn: lista.creadoEn.toISOString(),
   };
 }
@@ -786,81 +1587,213 @@ export async function obtenerLista(
   if (lista === null) {
     throw new ErrorNoEncontrado('Lista de precios', id);
   }
-  return aListaSalida(lista, tienePermiso(sesion, 'consultas.ver-importes'));
+  return aListaSalida(
+    lista,
+    tienePermiso(sesion, 'consultas.ver-importes'),
+    puedeVerFactoresDePrecio(sesion),
+  );
 }
 
 /**
- * CANDIDATOS para una lista: desarrollos "cotizados" (≥1 precosto congelado) de ese cliente+
- * departamento de la empresa activa (A9), NO apagados y SIN renglón en ninguna lista. Para el diálogo
- * de crear. Con `idProyecto` (Daniel, ago-2026) se acotan a UN proyecto: es lo que ofrece el
- * botón
- * «Generar lista de precios» desde la página del proyecto, que ya conoce cliente y departamento.
+ * ⭐ V1-E8f (§Post-F9.128) — CLASIFICADOR PURO: ¿este desarrollo entra a una lista, y si no, por qué?
+ *
+ * Está aparte y sin BD a propósito: es la regla de **QUIÉN CALIFICA**, en un solo lugar y con prueba
+ * unitaria (antes vivía disuelta en el `where` de Prisma, donde no se puede preguntar "¿y por qué no?").
+ *
+ * ⚠️ **NO trae el ALCANCE, y no debe traerlo.** Las tres condiciones de alcance —empresa activa (A9),
+ * cliente y departamento— siguen en el `where`, porque **definen el universo de la pregunta, no un
+ * descarte**: un desarrollo de otro cliente no es "descartado", simplemente no es de esta pregunta.
+ * Se dice aquí porque la primera redacción afirmaba "la regla ENTERA", y quien la reusara creyendo
+ * que trae el A9 dentro se saltaría el scope por empresa.
+ * `null` = SÍ es candidato.
+ *
+ * ⭐ **LA PRECEDENCIA NO ES COSMÉTICA: decide QUÉ REMEDIO se le ofrece al usuario**, así que se elige
+ * por *"¿cuál de los dos arreglos lo acerca de verdad a cotizarlo?"*, no por cuál se detectó antes.
+ *
+ * `ya-en-lista` **gana a `apagado`** — y esto se corrigió en la ronda de revisión de V1-E8f. Antes
+ * ganaba `apagado`, y como `apagarDesarrollo` **no impide** apagar algo que ya está en una lista, el
+ * caso es alcanzable: el usuario leía *"reactívalo antes de cotizarlo"*, lo reactivaba… **y seguía sin
+ * poder**, ahora bajo *"ya está en una lista"*. **Un remedio que promete un resultado que no puede
+ * entregar es peor que no ofrecer ninguno.** Con `ya-en-lista` primero, la cadena termina bien:
+ * quitarlo de la lista → (si además está apagado) reactivarlo → cotizarlo.
+ *
+ * Después va `apagado`, y sólo al final se distingue "tiene precosto pero en borrador" de "no tiene ni
+ * uno".
+ */
+export function motivoNoCandidato(desarrollo: {
+  apagado: boolean;
+  precostos: readonly { estado: string }[];
+  listaLineas: readonly unknown[];
+}): MotivoNoCandidato | null {
+  if (desarrollo.listaLineas.length > 0) {
+    return 'ya-en-lista';
+  }
+  if (desarrollo.apagado) {
+    return 'apagado';
+  }
+  if (desarrollo.precostos.some((p) => p.estado === 'congelado')) {
+    return null;
+  }
+  return desarrollo.precostos.length > 0 ? 'precosto-borrador' : 'sin-precosto';
+}
+
+/** Lo que devuelve el diagnóstico: los que SÍ califican, los que no con su motivo, y si faltan factores. */
+export interface DiagnosticoCandidatos {
+  candidatos: CandidatoLista[];
+  descartados: DescartadoLista[];
+  /**
+   * ⭐ V1-E8t (§Post-F9.145) — ¿este cliente+departamento NO tiene factores de precio? Lo contesta
+   * `buscarFactoresResueltos`, **la misma función que usa el bloqueo** (`resolverFactores` dentro de
+   * `crearLista`): el aviso y el candado no pueden decir cosas distintas.
+   */
+  faltanFactores: boolean;
+}
+
+/**
+ * DIAGNÓSTICO de candidatura para una lista, de TODOS los desarrollos de ese cliente+departamento de
+ * la empresa activa (A9). Devuelve los CANDIDATOS —"cotizados" (≥1 precosto congelado), no apagados y
+ * sin renglón en ninguna lista— y también los DESCARTADOS con el motivo exacto que los dejó fuera.
+ *
+ * ⭐ V1-E8f (§Post-F9.128): antes esto sólo devolvía los candidatos y el filtro vivía en el `where`,
+ * así que cuando salían cero el usuario recibía *"no hay desarrollos cotizados disponibles"* y nada
+ * más — Daniel se topó justo con eso. Ahora se traen TODOS y se clasifican en memoria con
+ * `motivoNoCandidato`: una sola consulta, una sola regla, y el aviso puede decir POR QUÉ y a dónde ir.
+ *
+ * ⚠️ **SIN TOPE, y la razón está MEDIDA a medias — queda dicho.** El universo es un
+ * cliente+departamento, y la primera redacción lo llamaba *"acotado"* **sin haberlo medido**. Hoy no
+ * duele (Desarrollo arranca en cero: no hay ETL de Access para este módulo), pero **el cubo
+ * `ya-en-lista` CRECE MONÓTONAMENTE** — es *"todo lo que alguna vez se cotizó a ese cliente"*—, y se
+ * trae entero en cada apertura del diálogo, con todos sus precostos, y se pinta un renglón por cada
+ * descartado. Lo levantó el reviewer de V1-E8f.
+ * ⇒ **Cuando un cliente pase de ~200 desarrollos cotizados, hay que paginar o dejar de traer los ya
+ * colocados.** *Llamar "acotado" a algo que sólo crece es la clase de suposición que se descubre el
+ * día que duele.*
+ *
+ * Con `idProyecto` (Daniel, ago-2026) se acota a UN proyecto: es lo que ofrece el botón «Generar lista
+ * de precios» desde la página del proyecto, que ya conoce cliente y departamento.
  * Requiere `listas.ver`.
  */
-export async function candidatosParaLista(
+export async function diagnosticoCandidatosLista(
   sesion: SesionUsuario,
   parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
   bd?: ContextoBd,
-): Promise<CandidatoLista[]> {
+): Promise<DiagnosticoCandidatos> {
   verificarPermiso(sesion, 'listas.ver');
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
-  const desarrollos = await clienteLectura(bd).desarrollo.findMany({
+  const cliente = clienteLectura(bd);
+
+  // ⭐ V1-E8t (§Post-F9.145) — el OTRO requisito de la lista, preguntado ANTES de apretar el botón.
+  // Se pregunta con la MISMA función del bloqueo, no con una copia de la cascada override→default.
+  const faltanFactores =
+    (await buscarFactoresResueltos(
+      cliente,
+      parametros.idCliente,
+      parametros.idClienteDepartamento,
+    )) === null;
+
+  const desarrollos = await cliente.desarrollo.findMany({
     where: {
-      apagado: false,
       ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
       proyecto: {
         idEmpresa: sesion.idEmpresaActiva,
         idCliente: parametros.idCliente,
         idClienteDepartamento: parametros.idClienteDepartamento,
       },
-      precostos: { some: { estado: 'congelado' } },
-      listaLineas: { none: {} },
     },
     select: {
       id: true,
+      apagado: true,
       numeroCliente: true,
       idProyecto: true,
       proyecto: { select: { folio: true, nombre: true } },
       modelo: { select: { codigo: true, descripcion: true } },
+      // TODOS los precostos (no sólo los congelados): sin los borradores no se puede distinguir
+      // "le falta congelar la v2" de "no tiene ni un precosto", que son remedios DISTINTOS.
       precostos: {
-        where: { estado: 'congelado' },
         orderBy: { version: 'desc' },
-        take: 1,
-        select: { id: true, version: true, costoTotal: true },
+        select: { id: true, version: true, estado: true, costoTotal: true },
       },
+      listaLineas: { select: { idLista: true, lista: { select: { folio: true } } } },
     },
     orderBy: { id: 'asc' },
   });
 
-  return desarrollos.map((d): CandidatoLista => {
-    const precosto = d.precostos[0];
-    return {
+  const candidatos: CandidatoLista[] = [];
+  const descartados: DescartadoLista[] = [];
+
+  for (const d of desarrollos) {
+    const motivo = motivoNoCandidato(d);
+    if (motivo === null) {
+      // `precostos` viene ordenado por versión DESC: el primero congelado es el más reciente.
+      const precosto = d.precostos.find((p) => p.estado === 'congelado');
+      candidatos.push({
+        idDesarrollo: d.id,
+        idProyecto: d.idProyecto,
+        folioProyecto: Number(d.proyecto.folio),
+        nombreProyecto: d.proyecto.nombre,
+        codigoModelo: d.modelo.codigo,
+        descripcionModelo: d.modelo.descripcion,
+        numeroCliente: d.numeroCliente,
+        idPrecosto: precosto?.id ?? 0,
+        versionPrecosto: precosto?.version ?? 0,
+        costoTotal: verImportes ? num(precosto?.costoTotal) : null,
+      });
+      continue;
+    }
+    const borrador = d.precostos.find((p) => p.estado === 'borrador');
+    const renglon = d.listaLineas[0];
+    descartados.push({
       idDesarrollo: d.id,
       idProyecto: d.idProyecto,
       folioProyecto: Number(d.proyecto.folio),
       nombreProyecto: d.proyecto.nombre,
       codigoModelo: d.modelo.codigo,
-      descripcionModelo: d.modelo.descripcion,
       numeroCliente: d.numeroCliente,
-      idPrecosto: precosto?.id ?? 0,
-      versionPrecosto: precosto?.version ?? 0,
-      costoTotal: verImportes ? num(precosto?.costoTotal) : null,
-    };
-  });
+      motivo,
+      versionPrecosto: motivo === 'precosto-borrador' ? (borrador?.version ?? null) : null,
+      idLista: motivo === 'ya-en-lista' ? (renglon?.idLista ?? null) : null,
+      folioLista:
+        motivo === 'ya-en-lista' && renglon !== undefined ? Number(renglon.lista.folio) : null,
+    });
+  }
+
+  return { candidatos, descartados, faltanFactores };
 }
 
 /**
- * DESGLOSE de costo de un renglón (rediseño R5, §4.8): agrupa los conceptos del precosto CONGELADO del
- * renglón y suma sus importes EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca se pivotea en el
- * cliente) — Tela · Avíos · Procesos · Corte · Maquila = costo total. Para que el dueño revise "que
- * haga sentido" antes de aprobar/autorizar. Scope por empresa (A9); los importes se OCULTAN (null) sin
- * `consultas.ver-importes`. Requiere `listas.ver` (evita el cruce de permisos con `desarrollo.ver`).
+ * DESGLOSE de costo de un renglón (rediseño R5, §4.8 + ⭐⭐ V1-E8w): los conceptos del precosto
+ * CONGELADO del renglón, agrupados y sumados EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca
+ * se pivotea en el cliente) — Tela · Avíos · Procesos · Corte · Maquila · Empaque = costo total.
+ *
+ * ⭐⭐ **V1-E8w — YA NO APLASTA.** Hasta la 0.059 esta función devolvía SÓLO el subtotal por concepto:
+ * el detalle vivía en `precosto.lineas` y la mesa nunca lo veía. Ése era el defecto —agrupaba, no le
+ * faltaba el dato—, y es justo lo que Daniel pidió abrir:
+ *
+ * > *«En el desglose de elementos, es importante poner precio de la tela, y consumo…»*
+ * > *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover
+ * > los costos ahi. Desglosados… no solo el total, por que no se bien de que elementos se compone.»*
+ *
+ * Así que cada grupo viaja con sus `lineas` (id, descripción, **consumo y precio separados**,
+ * importe) **además** del subtotal. El subtotal no se retira: los consumidores que sólo lo querían
+ * —el renglón expandible de la lista— siguen leyéndolo igual.
+ *
+ * ⭐ **Y trae la FOTO principal del modelo** (*«Me gustaria ir viendo la foto del modelo. La
+ * principal.»*). Se firma AQUÍ, en el desglose de UN renglón, y no en la lista completa: prefirmar
+ * una URL cuesta un viaje a R2, y una lista de 20 modelos habría pagado 20 en cada carga para
+ * enseñar una sola foto a la vez. La "principal" es la PRIMERA por `orden` — el mismo criterio del
+ * carrusel, la galería y el impreso de la orden (`orden-principal.ts`), nunca una segunda opinión.
+ *
+ * Scope por empresa (A9); los importes se OCULTAN (null) sin `consultas.ver-importes` —el `consumo`
+ * NO: es una cantidad, mismo criterio que `PrecostoLineaSalida`—. Requiere `listas.ver` (evita el
+ * cruce de permisos con `desarrollo.ver`).
  */
 export async function desgloseCostoLinea(
   sesion: SesionUsuario,
   idLinea: number,
   bd?: ContextoBd,
+  /** Servicio de archivos inyectable (para probar sin R2 real, como fotos de modelo/bordado). */
+  archivos?: ServicioArchivos,
 ): Promise<DesgloseCostoLinea> {
   verificarPermiso(sesion, 'listas.ver');
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
@@ -869,12 +1802,32 @@ export async function desgloseCostoLinea(
     where: { id: idLinea, lista: { idEmpresa: sesion.idEmpresaActiva } },
     select: {
       idPrecosto: true,
+      desarrollo: {
+        select: {
+          modelo: {
+            select: {
+              codigo: true,
+              // La PRIMERA por `orden` (luego `id`) es la principal — el criterio único del sistema.
+              fotos: {
+                orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+                take: 1,
+                select: { archivo: { select: { key: true } } },
+              },
+            },
+          },
+        },
+      },
       precosto: {
         select: {
           version: true,
           costoTotal: true,
           lineas: {
+            orderBy: [{ conceptoCosto: { orden: 'asc' } }, { id: 'asc' }],
             select: {
+              id: true,
+              descripcion: true,
+              consumo: true,
+              precioUnit: true,
               importe: true,
               conceptoCosto: { select: { codigo: true, nombre: true, orden: true } },
             },
@@ -887,10 +1840,18 @@ export async function desgloseCostoLinea(
     throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
   }
 
-  // Suma por concepto (server-side): un renglón por concepto con su subtotal, ordenado por catálogo.
+  // Agrupación por concepto (server-side): subtotal + LOS RENGLONES, ordenados por catálogo. El
+  // `orderBy` de la consulta ya deja las líneas en orden de concepto y luego de id, así que el
+  // recorrido conserva ese orden dentro de cada grupo sin volver a ordenar.
   const porConcepto = new Map<
     string,
-    { codigo: string; nombre: string; orden: number; subtotal: number }
+    {
+      codigo: string;
+      nombre: string;
+      orden: number;
+      subtotal: number;
+      lineas: DesgloseCostoLinea['grupos'][number]['lineas'];
+    }
   >();
   for (const l of linea.precosto.lineas) {
     const c = l.conceptoCosto;
@@ -899,8 +1860,16 @@ export async function desgloseCostoLinea(
       nombre: c.nombre,
       orden: c.orden,
       subtotal: 0,
+      lineas: [],
     };
     acc.subtotal += num(l.importe);
+    acc.lineas.push({
+      id: l.id,
+      descripcion: l.descripcion,
+      consumo: numOrNull(l.consumo),
+      precioUnit: verImportes ? num(l.precioUnit) : null,
+      importe: verImportes ? num(l.importe) : null,
+    });
     porConcepto.set(c.codigo, acc);
   }
   const grupos = [...porConcepto.values()]
@@ -909,12 +1878,21 @@ export async function desgloseCostoLinea(
       codigo: g.codigo,
       nombre: g.nombre,
       subtotal: verImportes ? redondear2(g.subtotal) : null,
+      lineas: g.lineas,
     }));
+
+  // La foto sólo se firma si la hay: `servicioArchivos()` lee la configuración de R2 al construirse,
+  // y un renglón sin fotos no tiene por qué exigirla.
+  const keyFoto = linea.desarrollo.modelo.fotos[0]?.archivo.key;
+  const urlFotoModelo =
+    keyFoto === undefined ? null : await (archivos ?? servicioArchivos()).urlDescarga(keyFoto);
 
   return {
     idPrecosto: linea.idPrecosto,
     versionPrecosto: linea.precosto.version,
     grupos,
     costoTotal: verImportes ? num(linea.precosto.costoTotal) : null,
+    codigoModelo: linea.desarrollo.modelo.codigo,
+    urlFotoModelo,
   };
 }

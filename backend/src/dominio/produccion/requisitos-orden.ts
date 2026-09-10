@@ -111,13 +111,16 @@ function evaluarArte(llevaArte: boolean, artesOrden: number): 'no-aplica' | bool
 }
 
 /**
- * Texto corto de "qué le falta" en lenguaje de negocio (p. ej. `Falta: avíos`), o `null` si no
- * falta nada. Vive aquí (con la regla) para que la UI y los mensajes del backend digan lo mismo.
+ * Texto corto de "qué le falta" en lenguaje de negocio (p. ej. `Falta: liberar la receta`), o
+ * `null` si no falta nada. Las etiquetas salen de {@link ETIQUETA_REQUISITO_ORDEN}, así que este
+ * texto sigue a la regla y no al revés. Vive aquí (con la regla) para que la UI y los mensajes del
+ * backend digan lo mismo.
  */
 export function textoFaltantesOrden(requisitos: RequisitosOrden): string | null {
   if (requisitos.faltantes.length === 0) return null;
   const etiquetas = requisitos.faltantes.map((f) => ETIQUETA_REQUISITO_ORDEN[f]);
-  // "tallas", "tallas y avíos", "tallas, avíos y arte" (coma hasta el penúltimo, "y" al final).
+  // "tallas", "tallas y liberar la receta", "tallas, liberar la receta y arte" (coma hasta el
+  // penúltimo, "y" al final).
   const ultima = etiquetas.pop() as string;
   return `Falta: ${etiquetas.length === 0 ? ultima : `${etiquetas.join(', ')} y ${ultima}`}`;
 }
@@ -152,9 +155,13 @@ export async function insumosRequisitosDeOrden(
  * Traduce los requisitos al par (`estado`, `fechaCompletada`) que debe quedar guardado, a partir
  * de lo que la orden tiene HOY. Puro (no toca BD) para poder probarlo sin Postgres.
  *
- *  • `cancelada` SIEMPRE gana: una orden cancelada no cambia de estado por esta regla.
- *  • El `estado` refleja la VERDAD ACTUAL: si deja de cumplir requisitos (le borran la matriz, le
- *    quitan los avíos al modelo) vuelve a `capturada`. No es un sello de una sola vía.
+ *  • `cancelada` y `cerrada` SIEMPRE ganan: una orden cancelada o CERRADA (0.061) no cambia de
+ *    estado por esta regla. Los dos son actos de una PERSONA, no derivados — degradarlos aquí
+ *    borraría el acto en silencio. Para el `cerrada`, además, el estado es el espejo de
+ *    `Orden.cerradaEn`: dejarlos desalineados haría mentir al badge y a los filtros.
+ *  • El `estado` refleja la VERDAD ACTUAL: si deja de cumplir requisitos (le borran la matriz, o su
+ *    receta deja de estar liberada por completo) vuelve a `capturada`. No es un sello de una sola
+ *    vía. Editar el BOM del MODELO ya no la mueve (V1-E3d: la receta de la orden está congelada).
  *  • `fechaCompletada` sella la PRIMERA vez que se cumple y NUNCA se borra (es el `FechaDet` de
  *    v1: el dato histórico de "cuándo quedó lista por primera vez").
  *  • Devuelve `null` cuando no hay nada que escribir (evita UPDATEs vacíos).
@@ -164,7 +171,8 @@ export function cambiosEstadoPorRequisitos(
   requisitos: RequisitosOrden,
   ahora: Date = new Date(),
 ): { estado?: EstadoOrden; fechaCompletada?: Date } | null {
-  if (actual.estado === 'cancelada') return null;
+  // ⭐ Los estados que NO se derivan (los pone y los quita una persona) son intocables aquí.
+  if (actual.estado === 'cancelada' || actual.estado === 'cerrada') return null;
 
   const estado: EstadoOrden = requisitos.completa ? 'completa' : 'capturada';
   const sellaFecha = requisitos.completa && actual.fechaCompletada === null;
@@ -177,12 +185,24 @@ export function cambiosEstadoPorRequisitos(
 }
 
 /**
- * ¿La orden YA TIENE ACTIVIDAD DE PRODUCCIÓN? (≥1 `EtapaMovimiento` viva: corte o envío a maquila).
- * Es el cinturón de seguridad del des-completar: una orden que ya se está produciendo NO puede
- * degradarse a `capturada` por un cambio de catálogo — degradarla la sacaría de los tableros y
- * confundiría al piso. Los movimientos CANCELADOS no cuentan (esa actividad se deshizo).
+ * ¿La orden YA TIENE ACTIVIDAD DE PRODUCCIÓN? (≥1 `EtapaMovimiento` viva: corte, envío a maquila,
+ * recibo, entrega o empaque). Es el cinturón de seguridad del des-completar: una orden que ya se
+ * está produciendo NO puede degradarse a `capturada` por un cambio de catálogo — degradarla la
+ * sacaría de los tableros y confundiría al piso. Los movimientos CANCELADOS no cuentan (esa
+ * actividad se deshizo).
+ *
+ * ⭐ **EXPORTADA en la fila 0.150, y por una razón concreta:** esta misma pregunta estaba escrita
+ * A MANO en tres sitios más (la guarda de re-empaque de packs en `ordenes.ts` y las dos guardas de
+ * cancelación de `etapas.ts`, éstas acotadas por tipo). La fila que necesitaba una CUARTA copia
+ * —la guarda de cancelar el pedido, `actividad-orden.ts`— pagó la deuda en vez de agrandarla:
+ * `ordenes.ts` ya la llama, y `actividad-orden.ts` la REUSA como una de sus señales en lugar de
+ * duplicar el `count`.
+ *
+ * ⚠️ Contesta *«¿puedo degradar el semáforo?»*, que **no** es *«¿esta orden tiene vida?»*: sólo mira
+ * `EtapaMovimiento` y no ve compras, tela surtida, notas, cierres, EsMa, costo ni EDR. Para eso
+ * está {@link senalesDeActividadOrden} (`actividad-orden.ts`), que es más amplia y la incluye.
  */
-async function tieneActividadProduccion(tx: Tx, idOrden: number): Promise<boolean> {
+export async function tieneActividadProduccion(tx: Tx, idOrden: number): Promise<boolean> {
   const vivos = await tx.etapaMovimiento.count({ where: { idOrden, canceladoEn: null } });
   return vivos > 0;
 }
@@ -238,8 +258,10 @@ const LOTE_RECALCULO = 500;
 
 /**
  * Qué disparó el recálculo por catálogo. Va TAL CUAL a la bitácora de cada orden, así que tiene que
- * nombrar la causa REAL: `bom-modelo` (se editó la receta de avíos/arte) o `lleva-arte` (se marcó o
- * desmarcó la casilla del modelo).
+ * nombrar la causa REAL. Hoy hay UNA sola: `lleva-arte` (se marcó o desmarcó la casilla del
+ * modelo), y su único llamador es `modelos/modelos.ts`. Editar el BOM del modelo ya NO recalcula
+ * nada (V1-E3d: cada orden vive de su receta congelada), por eso el motivo `bom-modelo` desapareció
+ * del tipo y de la bitácora.
  */
 export type MotivoRecalculoModelo = 'lleva-arte';
 
@@ -287,6 +309,8 @@ export async function recalcularEstadoOrdenesDeModelo(
 
   // Universo: `capturada` de este modelo CON matriz y CON receta liberada. Lo demás no puede
   // completarse por un cambio de la casilla, y filtrarlo aquí evita traerlo a memoria.
+  // (0.061: `cerrada` y `cancelada` quedan fuera POR CONSTRUCCIÓN — el filtro es `= 'capturada'`,
+  // no un `!=`. Si algún día se ensancha este universo, hay que excluirlas a mano.)
   const candidatas = await tx.orden.findMany({
     where: {
       idModelo,
@@ -404,6 +428,9 @@ export function sumarResumenRealineacion(
  * permite degradar (el propósito es justamente poner al día el semáforo), pero solo donde el
  * cinturón lo autoriza.
  *
+ * ⚠️ NO toca las órdenes `cancelada` ni `cerrada` (0.061): las dos son actos de una persona, no
+ * estados derivables, y realinearlas las desharía.
+ *
  * NO toca `fechaCompletada` más que para sellarla la primera vez (nunca la borra) ni
  * `modificadoPorId` (no lo hizo una persona: el rastro es la bitácora con `idUsuario` NULL, mismo
  * criterio que el ETL y que la migración `20260726130000_recalculo_estado_ordenes`).
@@ -425,7 +452,10 @@ export async function realinearEstadoOrdenes(
   if (idsOrden.length === 0) return vacio;
 
   const ordenes = await tx.orden.findMany({
-    where: { id: { in: idsOrden }, estado: { not: 'cancelada' } },
+    // ⭐ 0.061: `cerrada` queda FUERA igual que `cancelada`. Sin esto, el script de mantenimiento
+    // post-carga REABRIRÍA en silencio toda orden cerrada (le pondría `capturada`/`completa`),
+    // dejando el badge mintiendo mientras `cerradaEn` sigue puesta y la guarda sigue bloqueando.
+    where: { id: { in: idsOrden }, estado: { notIn: ['cancelada', 'cerrada'] } },
     select: {
       id: true,
       idModelo: true,

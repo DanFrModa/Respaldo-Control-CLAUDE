@@ -103,6 +103,21 @@ function camposTercero(
  * Precondiciones (las garantiza el loader): `entradas` NO vacío, cada `importe > 0`, y ninguna
  * `claveFuente` ya existe en `MapeoMigracion` (el loader las filtró) — aquí solo llegan filas nuevas.
  *
+ * ⚠️ **ESTE INSERT NO PASA POR ZOD, y eso tiene una consecuencia aguas abajo.** `createManyAndReturn`
+ * escribe tal cual lo que trae el loader —incluidas las `observaciones`, que salen de una columna de
+ * texto libre del CSV (`migracion/loaders/terceros-saldos.ts`) y **no tienen tope de longitud**—,
+ * mientras el alta normal (`esquemaMovimientoTerceroCrear`) las limita a **1000 caracteres**. Es
+ * deliberado: el histórico se tolera como viene (REGLA 0-B), no se repara ni se recorta.
+ *
+ * 🔑 Lo que sí hubo que hacer es que **las funciones nuevas no truenen con esas filas**. La
+ * CORRECCIÓN de un movimiento sin factura (fila 0.145) reenviaba la nota original por el contrato al
+ * capturar el sustituto, así que corregir **sólo la fecha** de una de estas filas devolvía 400 por un
+ * campo que el usuario ni tocó. Se arregló en `cuenta-terceros.ts::corregirMovimientoTercero`, que
+ * ahora arrastra la nota por el canal del dominio en vez de revalidarla — ver su TSDoc.
+ *
+ * ⇒ **Si añades aquí otro campo sin validar, comprueba quién lo vuelve a leer y a mandar por un
+ * esquema.** Ése es el patrón que muerde, y muerde el día que este ETL se corre, no antes.
+ *
  * @param entidadMapeo entidad de `MapeoMigracion` bajo la que se registran (p. ej. `'AperturaTercero'`).
  */
 export async function insertarAperturasMigradas(

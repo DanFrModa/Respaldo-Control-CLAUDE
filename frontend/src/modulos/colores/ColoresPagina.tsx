@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useColores, useDesactivarColor, useReactivarColor } from '@/api/colores';
 import type { Color, ColoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/lib/useDebounce';
 import {
@@ -113,11 +114,27 @@ export function ColoresPagina(): React.JSX.Element {
       }
     : undefined;
 
-  // Proto `vCat` colores: renglón plano (sin thumb) — solo el nombre en `cell-strong`.
+  // Proto `vCat` colores: renglón plano (sin thumb) — el nombre en `cell-strong` y, cuando a ese
+  // color se lo llevó una FUSIÓN, a dónde se fue.
+  //
+  // ⭐ Antes la fusión no se veía en NINGUNA pantalla: el rastro estaba en la base
+  // (`Color.idFusionadoEn`) y en la bitácora, pero la tabla pintaba un color ABSORBIDO igual que
+  // uno que su dueño apagó a mano — los dos con el chip gris "Inactivo". Así no había forma de
+  // contestar la pregunta que se hace quien busca un color y no lo encuentra: "¿y a dónde se fue?".
+  // El chip lo dice con el NOMBRE del canónico, que es el que de verdad sobrevivió.
   const columnas: ColumnaCatalogo<Color>[] = [
     {
       encabezado: 'Color',
-      render: (c) => <span className="font-semibold">{c.nombre}</span>,
+      render: (c) => (
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">{c.nombre}</span>
+          {c.fusionadoEn !== null ? (
+            <ChipEstado tono="info" data-testid={`color-fusionado-${String(c.id)}`}>
+              fusionado en {c.fusionadoEn.nombre}
+            </ChipEstado>
+          ) : null}
+        </span>
+      ),
     },
   ];
 

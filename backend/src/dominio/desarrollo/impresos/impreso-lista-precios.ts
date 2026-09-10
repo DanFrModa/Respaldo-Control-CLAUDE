@@ -9,6 +9,17 @@
  * filtra por la empresa activa → 404 si la lista no es de la empresa; los importes ya vienen resueltos
  * por el dominio). La ruta EXIGE `consultas.ver-importes`, así que en este camino los precios siempre
  * llegan (el impreso ES la exportación de precios).
+ *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — LOS DROPEADOS NO SALEN.** El papel muestra los renglones NO
+ * dropeados, y esa única regla cubre los dos momentos: antes de negociar no hay ninguno dropeado
+ * (sale la lista completa, la *cotización previa* de Daniel) y después salen sólo los vigentes.
+ *
+ * 🔴 **V1-E8b (§Post-F9.125(c)) — SIN APROBACIÓN NO SALE ESTA HOJA.** Imprimía
+ * `precioAprobado ?? precioCalculado`, o sea que de una lista sin firmar salía un papel con precios
+ * que nadie autorizó y con la MISMA pinta que el bueno. Daniel: *"si no está aprobado no debería de
+ * poder bajar ni un borrador porque puede confundir al cliente"*. Hoy pasa por
+ * {@link exigirRenglonesAprobados}, el MISMO guard de la cotización — no una copia con criterio
+ * propio.
  */
 import { createElement as h, type ReactElement } from 'react';
 
@@ -33,6 +44,7 @@ import {
 
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { exigirRenglonesAprobados } from '../cotizaciones.js';
 import { obtenerLista } from '../listas-precios.js';
 
 /** Un renglón de la lista, ya proyectado para el PDF. */
@@ -40,7 +52,11 @@ export interface RenglonListaImpreso {
   codigoModelo: string;
   descripcionModelo: string | null;
   numeroCliente: string | null;
-  /** Precio a imprimir: aprobado si existe, si no el calculado. Null solo si no hubo importes. */
+  /**
+   * Precio a imprimir. SIEMPRE el APROBADO (§Post-F9.125(c): sin aprobación no sale la hoja); el
+   * `?? precioCalculado` es sólo la red del tipo, porque {@link exigirRenglonesAprobados} ya rechazó
+   * el caso. Null únicamente si la sesión no viera importes, que la ruta impide.
+   */
   precio: number | null;
   aprobado: boolean;
 }
@@ -64,7 +80,8 @@ export interface DepsImpresoListaPrecios {
 
 /**
  * Resuelve los datos del impreso de la lista (A9). Reusa `obtenerLista` (renglones con sus precios ya
- * resueltos) y proyecta el precio a imprimir (`precioAprobado ?? precioCalculado`).
+ * resueltos), EXIGE que los renglones **VIGENTES** estén aprobados (§Post-F9.125(c) + §Post-F9.155) y
+ * proyecta a imprimir **sólo esos**: los dropeados no salen en la hoja que ve el cliente.
  */
 export async function armarDatosImpresoListaPrecios(
   sesion: SesionUsuario,
@@ -75,6 +92,14 @@ export async function armarDatosImpresoListaPrecios(
   const obtener = deps.obtenerLista ?? obtenerLista;
   const lista = await obtener(sesion, idLista, bd);
 
+  // §Post-F9.125(c): ni un borrador de una lista sin aprobar. Va ANTES de armar nada — si no puede
+  // salir, no se gasta un worker de PDF en construirlo.
+  //
+  // ⭐⭐ V1-E8x (§Post-F9.155): el guard exige la firma **sólo de los vigentes** y DEVUELVE esos
+  // vigentes, que son los que se imprimen. Los dropeados no salen en la hoja que ve el cliente —y
+  // tampoco se mencionan: que un modelo se haya caído es asunto NUESTRO, no suyo.
+  const vigentes = exigirRenglonesAprobados(lista.lineas, 'bajar el impreso de la lista');
+
   return {
     empresa: sesion.nombreEmpresaActiva,
     folio: lista.folio,
@@ -83,7 +108,7 @@ export async function armarDatosImpresoListaPrecios(
     fecha: lista.fecha,
     estado: lista.nombreEstado,
     notas: lista.notas,
-    renglones: lista.lineas.map((l) => ({
+    renglones: vigentes.map((l) => ({
       codigoModelo: l.codigoModelo,
       descripcionModelo: l.descripcionModelo,
       numeroCliente: l.numeroCliente,

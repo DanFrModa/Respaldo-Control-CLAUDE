@@ -44,6 +44,8 @@ function empresa(id: number, nombre: string, sobre: Partial<Empresa> = {}): Empr
     nombre,
     razonSocial: null,
     rfc: null,
+    regimenFiscalSat: null,
+    codigoPostalFiscal: null,
     identificador: null,
     favorita: false,
     idArchivoLogo: null,
@@ -244,5 +246,73 @@ describe('<EmpresasPagina>', () => {
     const [args] = actualizarMutate.mock.calls[0] as [{ id: number; cuerpo: { rfc?: string } }];
     expect(args.id).toBe(4);
     expect(args.cuerpo.rfc).toBe('XAXX010101000');
+  });
+
+  /**
+   * ⭐ LA FICHA FISCAL DEL RECEPTOR (fila 0.118, §Post-F9.186(k)). Sin régimen y sin CP fiscal, el
+   * proveedor no puede timbrar a nombre de la empresa y el documento para facturar NO se emite. El
+   * único sitio donde se capturan es aquí, así que aquí se mide que existan y que viajen.
+   */
+  it('captura el régimen fiscal y el CP fiscal, y los envía en el cuerpo del PATCH', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(
+      consultaConDatos([
+        empresa(6, 'Receptor SA', { regimenFiscalSat: null, codigoPostalFiscal: null }),
+      ]),
+    );
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+    await u.click(screen.getByTestId('fila-empresa'));
+    await u.click(screen.getByTestId('editar-empresa'));
+
+    const dialogo = await screen.findByRole('dialog');
+    await u.type(within(dialogo).getByLabelText('Régimen fiscal'), '601');
+    await u.type(within(dialogo).getByLabelText('Código postal fiscal'), '11000');
+    await u.click(screen.getByTestId('guardar-empresa'));
+
+    const [args] = actualizarMutate.mock.calls[0] as [
+      { id: number; cuerpo: { regimenFiscalSat?: string; codigoPostalFiscal?: string } },
+    ];
+    expect(args.id).toBe(6);
+    expect(args.cuerpo.regimenFiscalSat).toBe('601');
+    expect(args.cuerpo.codigoPostalFiscal).toBe('11000');
+  });
+
+  it('⭐ un CP fiscal que no son 5 dígitos NO se guarda (se avisa en el campo)', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(consultaConDatos([empresa(7, 'Receptor SA')]));
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+    await u.click(screen.getByTestId('fila-empresa'));
+    await u.click(screen.getByTestId('editar-empresa'));
+
+    const dialogo = await screen.findByRole('dialog');
+    await u.type(within(dialogo).getByLabelText('Código postal fiscal'), '110');
+    await u.click(screen.getByTestId('guardar-empresa'));
+
+    expect(actualizarMutate).not.toHaveBeenCalled();
+    expect(
+      await within(dialogo).findByText('El código postal debe tener 5 dígitos'),
+    ).toBeInTheDocument();
+  });
+
+  it('el detalle enseña la ficha fiscal, y marca en vacío lo que falta por capturar', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(
+      consultaConDatos([
+        empresa(8, 'Receptor SA', {
+          rfc: 'XAXX010101000',
+          regimenFiscalSat: '601',
+          codigoPostalFiscal: null,
+        }),
+      ]),
+    );
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+    await u.click(screen.getByTestId('fila-empresa'));
+
+    const cuerpo = detalle();
+    expect(within(cuerpo).getByText('Ficha fiscal (con la que nos facturan)')).toBeInTheDocument();
+    expect(within(cuerpo).getByText('XAXX010101000')).toBeInTheDocument();
+    expect(within(cuerpo).getByText('601')).toBeInTheDocument();
   });
 });

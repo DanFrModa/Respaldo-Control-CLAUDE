@@ -44,10 +44,20 @@
          rutas del backend, para exigir que declaren el MISMO limite de cuerpo.
        - `src/cabeceras-seguridad-nginx.test.ts` lee nginx.conf.template e index.html
          para exigir que las cabeceras de seguridad sigan ahi (y que el hash del CSP
-         siga cuadrando con el script en linea del tema). */
+         siga cuadrando con el script en linea del tema).
+       - `src/abreviatura-e2e.test.ts` lee frontend/openapi.json para exigir que la
+         abreviatura que fabrica el e2e cumpla el patron REAL del contrato.
+       - `src/selector-proveedor-unico.test.ts` recorre los .tsx de src/ para exigir
+         que ningun `<SelectNativo>` se alimente del catalogo de proveedores.
+       - `src/documentos.test.ts` ejecuta `herramientas/verificar-documentos.mjs`
+         (fila 0.142) para cruzar el contador de filas de HOJA-DE-RUTA.md contra su
+         linea de resumen y el numero de version en sus cuatro sitios. */
   "exclude": [
+    "src/documentos.test.ts",
     "src/version.test.ts",
     "src/limite-cuerpo-api.test.ts",
-    "src/cabeceras-seguridad-nginx.test.ts"
+    "src/cabeceras-seguridad-nginx.test.ts",
+    "src/abreviatura-e2e.test.ts",
+    "src/selector-proveedor-unico.test.ts"
   ]
 }

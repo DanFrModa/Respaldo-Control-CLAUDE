@@ -4,6 +4,7 @@
  * ruta→dominio y el RBAC deny-by-default (A4):
  *  - el admin captura un movimiento y la bandeja "por pagar" lo refleja;
  *  - `cxp.ver` basta para la bandeja (no exige `terceros.*`); el estado de cuenta sí necesita `terceros.ver`;
+ *  - la bandeja acepta el `segmento` con/sin factura por querystring y lo devuelve (fila 0.132);
  *  - un usuario sin `cxp.administrar` NO puede capturar (403);
  *  - la vista FISCAL del estado de cuenta exige `terceros.fiscal` (403 sin ella; 200 la operativa).
  */
@@ -111,6 +112,38 @@ describe('rutas de CxP', () => {
     }>();
     expect(cuerpo.resumen.proveedoresConSaldo).toBeGreaterThanOrEqual(1);
     expect(cuerpo.filas.some((f) => f.idProveedor === idProveedor)).toBe(true);
+  });
+
+  // ⭐ Fila 0.132: el chip de la relación de pago viaja por la querystring hasta el dominio.
+  it('la bandeja acepta `segmento` y lo devuelve; uno inventado es 400', async () => {
+    const cookie = await cookieAdmin();
+
+    for (const segmento of ['todos', 'con', 'sin'] as const) {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/cxp/por-pagar?segmento=${segmento}`,
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json<{ segmento: string }>().segmento).toBe(segmento);
+    }
+
+    // Sin pedir nada, la bandeja de siempre.
+    const sinPedir = await app.inject({
+      method: 'GET',
+      url: '/api/cxp/por-pagar',
+      headers: { cookie },
+    });
+    expect(sinPedir.json<{ segmento: string }>().segmento).toBe('todos');
+
+    // "fiscal" es el vocabulario de LA OTRA partición (la vista del contador): se rechaza, no se
+    // degrada a la cartera completa en silencio.
+    const malo = await app.inject({
+      method: 'GET',
+      url: '/api/cxp/por-pagar?segmento=fiscal',
+      headers: { cookie },
+    });
+    expect(malo.statusCode).toBe(400);
   });
 
   it('`cxp.ver` basta para la bandeja (no exige terceros.*)', async () => {

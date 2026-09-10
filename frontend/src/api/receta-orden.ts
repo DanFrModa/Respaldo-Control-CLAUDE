@@ -10,6 +10,7 @@ import { CLAVE_ORDENES } from './ordenes';
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  AbrirRecetaCuerpo,
   LiberarRecetaCuerpo,
   RecetaAgregarCuerpo,
   RecetaEditarCuerpo,
@@ -164,6 +165,47 @@ export function useQuitarRenglonReceta(): UseMutationResult<
   });
 }
 
+/** Argumentos de corregir la captura heredada de un renglón de AVÍO. */
+export interface ArgsCorregirCapturaAvio {
+  idOrden: number;
+  idRenglon: number;
+}
+
+/**
+ * ⭐⭐⭐ **EL BOTÓN «CORREGIR»** (V1-E8h, §Post-F9.130). Apaga el «se consume por talla» que un avío
+ * POR MEDIDA arrastra de una captura vieja — la contradicción que hacía que la orden pidiera hasta
+ * 53 veces el material que necesita.
+ *
+ * 🔴 Es una MUTACIÓN, y eso es el entregable: el sistema ya detectaba el error y ya sabía cuánto
+ * debería pedir, pero el aviso terminaba con *"guarda el renglón para normalizarlo"* — un conjuro
+ * que un no-programador no puede adivinar. Sigue siendo un acto EXPLÍCITO (D3: una lectura no
+ * cambia datos); lo que cambia es que ahora el acto es un botón que se entiende.
+ *
+ * Qué hace y qué no lo decide el BACKEND (A1): aquí sólo se pide. El renglón vuelve a quedar SIN
+ * FIRMAR —el requerido cambió—, así que también se refresca la bandeja de Desarrollo.
+ */
+export function useCorregirCapturaAvio(): UseMutationResult<
+  RecetaOrden,
+  ErrorDeApi,
+  ArgsCorregirCapturaAvio
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, idRenglon }: ArgsCorregirCapturaAvio) => {
+      const { data, error } = await api.POST(
+        '/api/ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir',
+        { params: { path: { id: idOrden, idRenglon } } },
+      );
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, { idOrden }) => {
+      trasMutar(qc, idOrden, receta);
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
 /** Argumentos de restaurar un renglón al BOM del modelo. */
 export interface ArgsRestaurarRenglonReceta {
   idOrden: number;
@@ -243,6 +285,66 @@ export function useLiberarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, A
     onSuccess: (receta, { idOrden }) => {
       trasMutar(qc, idOrden, receta);
       // La bandeja de Desarrollo cuenta pendientes por orden: firmar cambia lo que muestra.
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+// ── ⭐⭐ V1-E8z · EL CANDADO DE COMPRA (§Post-F9.160(a)) ──────────────────────────────────────
+
+/** Argumentos de ABRIR la receta: el motivo es obligatorio (lo exige el contrato). */
+export interface ArgsAbrirReceta {
+  idOrden: number;
+  cuerpo: AbrirRecetaCuerpo;
+}
+
+/**
+ * ⭐⭐⭐ **REABRE la receta para corregirla y CONGELA la compra de la orden.** DANIEL: *"pongamos un
+ * candado que no se pueda comprar nada hasta que esté cerrado otra vez"*.
+ *
+ * **Las firmas NO se pierden**: reabrir sólo marca, así que cerrar es un clic y sólo hay que
+ * re-firmar lo que se toque (§Post-F9.165 punto 1). Todas las reglas —que la receta esté liberada
+ * completa, que no esté ya abierta, que la orden esté viva— las decide el BACKEND (A1); aquí sólo
+ * se pide.
+ *
+ * Se invalida también la BANDEJA: la orden reabierta aparece ahí marcada «En corrección», que es lo
+ * único que impide que se quede congelada e invisible.
+ */
+export function useAbrirReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, ArgsAbrirReceta> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, cuerpo }: ArgsAbrirReceta) => {
+      const { data, error } = await api.POST('/api/ordenes/{id}/receta/abrir', {
+        params: { path: { id: idOrden } },
+        body: cuerpo,
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, { idOrden }) => {
+      trasMutar(qc, idOrden, receta);
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
+/**
+ * **CIERRA la receta reabierta y descongela la compra.** El backend exige que no quede ningún
+ * renglón vivo sin firmar y nombra los que falten (A1: esa regla no se replica aquí). Sin cuerpo: la
+ * razón ya se dio al abrir.
+ */
+export function useCerrarReceta(): UseMutationResult<RecetaOrden, ErrorDeApi, number> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (idOrden: number) => {
+      const { data, error } = await api.POST('/api/ordenes/{id}/receta/cerrar', {
+        params: { path: { id: idOrden } },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, idOrden) => {
+      trasMutar(qc, idOrden, receta);
       void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
     },
   });

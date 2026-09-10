@@ -25,9 +25,19 @@
  *    ya anda en correos, cotizaciones y listas de precios del cliente), así que los dos criterios
  *    conviven en el catálogo y eso es correcto.
  *
+ *    ⭐ **Y arranca DESPUÉS del último consecutivo que ese cliente+año ya tenga** (V1-E7h). Sin eso
+ *    la regla anterior se cumplía en el papel y NO en la pantalla: la secuencia nacía en 1, el
+ *    código lleva el par y sólo chocaba dentro del MISMO par, así que un cliente que ya llegaba al
+ *    `007` recibía `71-001`, `71-002` y `72-008` — exactamente lo que Daniel reportó el 25-ago-2026
+ *    y exactamente lo que el criterio VIEJO producía. Lo esperado es `008, 009, 010`, de corrido y
+ *    sin importar la prenda. El arranque lo pone {@link pisoConsecutivoDesarrollo}.
+ *
  * ⚠️ **Por qué el consecutivo de producción NO sale de una secuencia y el de desarrollo SÍ.**
  * A3 exige folios por secuencia atómica, jamás `Max()+1`, y el de DESARROLLO lo cumple al pie de
- * la letra ({@link siguienteFolioGlobal}): es una serie NUEVA que arranca en 1 y nadie más escribe.
+ * la letra ({@link siguienteFolioGlobal}). El PISO de V1-E7h no lo rompe: no decide el número en
+ * JS, sólo entra como parámetro de la MISMA sentencia atómica, que se queda con el mayor de los dos
+ * y suma 1 — dos altas simultáneas siguen esperándose en el candado de la fila y sacan números
+ * distintos. Lo que sería `Max()+1` es leer el máximo y escribirlo con un `UPDATE`; eso no se hace.
  * La de PRODUCCIÓN no puede: son 30 años de numeración hecha a mano, **hueca y ya topada** — al
  * medir los 4,987 modelos del Access, el par `51` tiene 535 números usados de 999 **y el 999 ya
  * está ocupado**; lo mismo `20`, `30`, `39`, `73`, `74`. Una secuencia (que sólo sabe avanzar)
@@ -46,8 +56,15 @@ import { z } from 'zod';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { validarEntrada } from '../../comun/validacion.js';
 import { siguienteFolioGlobal } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
+
+import {
+  CAMPOS_FICHA_HEREDADOS,
+  crearModeloNucleo,
+  type MarcaNomenclaturaModelo,
+} from './modelos.js';
 
 /** Tope del consecutivo de un par concepto+género (Daniel: los otros 3 dígitos). */
 export const CONSECUTIVO_MAX = 999;
@@ -65,6 +82,23 @@ export const LIBRES_PARA_AVISAR = 50;
  * 20_5xx en el comentario de `NAMESPACE_LOCK_FOTOS` (`fotos-modelo.ts`); éste estrena el 20_546.
  */
 const NAMESPACE_LOCK_NUMERO_PRODUCCION = 20_546;
+
+/**
+ * ⭐⭐ V1-E3 — Namespace del `pg_advisory_xact_lock` que serializa **el reuso o nacimiento del modelo
+ * de un color** dentro de UN desarrollo. Segunda clave = el id del modelo de DESARROLLO (el padre).
+ * Estrena el 20_548 de la familia 20_5xx.
+ *
+ * 🔴 **Por qué hace falta un lock APARTE del de la serie.** La llave `modelos_linaje_color_unico`
+ * ata al (desarrollo, color) *concreto*, pero la decisión de reusar se toma ANTES de escribir: dos
+ * salidas simultáneas del mismo color mirarían las dos "no existe" y las dos derivarían. La de la
+ * serie (`NAMESPACE_LOCK_NUMERO_PRODUCCION`) no sirve para esto: se toma DENTRO de derivar, o sea
+ * después de haber decidido. Y para los hijos MULTICOLOR (`idColor = null`) este lock es la
+ * ÚNICA red, porque un índice único no ata dos NULL.
+ *
+ * ⚠️ **Orden de los locks:** éste SIEMPRE antes que el de la serie (nunca al revés), que es lo que
+ * impide un abrazo mortal entre dos salidas del mismo par de dígitos.
+ */
+const NAMESPACE_LOCK_MODELO_POR_COLOR = 20_548;
 
 /** Un código de producción es SIEMPRE numérico de 5 dígitos (concepto ≥ 2 → nunca empieza en 0). */
 const PATRON_CODIGO_PRODUCCION = /^\d{5}$/;
@@ -237,13 +271,29 @@ export interface SerieProduccion {
   libres: number;
 }
 
-/** Lee el estado de UNA serie: cuántos números tiene usados y cuál es el hueco más bajo. */
+/**
+ * Lee el estado de UNA serie: cuántos números tiene usados y cuál es el hueco más bajo.
+ *
+ * `reservados` son números de 5 dígitos que **todavía no están en la base** pero que el llamador ya
+ * apartó en esta misma pasada; se cuentan como ocupados. Existe por UN caso medido (fila 0.151): la
+ * vista previa del importador de OC por PDF precarga el nº de cada PDF y, sin apartar los ya
+ * propuestos, **cuatro OC de cuatro colores del mismo modelo se precargarían con el MISMO número** —
+ * el usuario confirmaría creyendo que son cuatro y el segundo nacimiento reventaría la tanda entera
+ * con "ese número ya está ocupado". Los reservados de otro par se ignoran solos.
+ */
 export async function leerSerie(
   tx: Tx,
   concepto: number,
   genero: number,
+  reservados: ReadonlySet<number> = new Set(),
 ): Promise<SerieProduccion> {
   const usados = await consecutivosUsados(tx, concepto, genero);
+  const parSerie = parDe(concepto, genero);
+  for (const numero of reservados) {
+    if (Math.floor(numero / 1000) === parSerie) {
+      usados.add(numero - parSerie * 1000);
+    }
+  }
   let libre: number | null = null;
   for (let n = 1; n <= CONSECUTIVO_MAX; n += 1) {
     if (!usados.has(n)) {
@@ -283,18 +333,22 @@ export interface PropuestaNumeroProduccion {
  *
  * ⚠️ Debe llamarse DENTRO de la transacción que va a guardar el número, y después de tomar el
  * lock del par ({@link promoverAProduccion} lo hace): fuera de eso la propuesta es informativa.
+ *
+ * `reservados` (fila 0.151) apartan números que el llamador ya propuso en esta misma pasada y que
+ * todavía no están en la base — ver {@link leerSerie}.
  */
 export async function proponerNumeroProduccion(
   tx: Tx,
   digitos: DigitosModelo,
+  reservados: ReadonlySet<number> = new Set(),
 ): Promise<PropuestaNumeroProduccion> {
   const avisos: string[] = [];
-  const base = await leerSerie(tx, digitos.concepto, digitos.genero);
+  const base = await leerSerie(tx, digitos.concepto, digitos.genero, reservados);
 
   let serie = base;
   let continuada = false;
   if (base.libre === null && digitos.generoAlterno !== null) {
-    serie = await leerSerie(tx, digitos.concepto, digitos.generoAlterno);
+    serie = await leerSerie(tx, digitos.concepto, digitos.generoAlterno, reservados);
     continuada = true;
     avisos.push(
       `La serie ${base.par} se agotó (999 de 999 usados); se continúa en la serie ${serie.par}, ` +
@@ -354,6 +408,16 @@ export const esquemaAnioEntrega = z
   .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
   .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' });
 
+/**
+ * Lo que TODO código de desarrollo de un cliente+año comparte: `CYA-26-` (abreviatura + año a dos
+ * dígitos + guion). Es a la vez lo que arma el código y lo que lo RECONOCE al buscar el piso del
+ * consecutivo, y por eso vive en una sola función: si el armado y el reconocimiento se escribieran
+ * por separado, bastaría tocar uno para que el piso dejara de ver los códigos que él mismo arma.
+ */
+export function prefijoCodigoDesarrollo(abreviatura: string, anioEntrega: number): string {
+  return `${abreviatura}-${String(anioEntrega % 100).padStart(2, '0')}-`;
+}
+
 /** Arma el código de desarrollo `CYA-26-71-001` (sin tocar la base). */
 export function armarCodigoDesarrollo(
   abreviatura: string,
@@ -362,18 +426,121 @@ export function armarCodigoDesarrollo(
   genero: number,
   consecutivo: number,
 ): string {
-  const anio = String(anioEntrega % 100).padStart(2, '0');
-  return `${abreviatura}-${anio}-${parTexto(concepto, genero)}-${String(consecutivo).padStart(3, '0')}`;
+  return `${prefijoCodigoDesarrollo(abreviatura, anioEntrega)}${parTexto(concepto, genero)}-${String(
+    consecutivo,
+  ).padStart(3, '0')}`;
 }
 
 /**
- * Cuántos intentos se hacen si el código armado ya existe. Dos motivos lo provocan: un código
- * capturado a mano, y —desde V1-E7a— el cambio de criterio del contador, que hace a la serie nueva
- * volver a pasar por números que el criterio viejo ya entregó.
+ * Forma del consecutivo al LEER un código: se escribe con 3 dígitos y DEGRADA a 4 pasando de 999
+ * (`armarCodigoDesarrollo` sólo rellena, no recorta), así que el ancho no es fijo. El tope de 9
+ * dígitos no es capricho: más allá ya no es un consecutivo sino un número tecleado que se salió de
+ * la forma, y admitirlo dispararía el piso de TODA la serie por un dedazo
+ * (`CYA-26-71-99999999999` dejaría al cliente sin poder dar de alta nada). Se IGNORA, como
+ * cualquier otro código no canónico.
+ */
+const PATRON_CONSECUTIVO_LEIDO = /^\d{3,9}$/;
+
+/**
+ * Extrae el CONSECUTIVO de un código de desarrollo de ese `prefijo`, o `null` si el código no tiene
+ * la forma canónica. Es la lectura inversa de {@link armarCodigoDesarrollo}.
  *
- * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer). El bucle avanza de UNO EN UNO y el
- * código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con `71-001..010`
- * y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin llegar al 71.
+ * ⚠️ **Se lee el NÚMERO, no el texto** (V1-E7h). Un "los últimos dígitos" a ciegas se equivocaría en
+ * los dos casos que de verdad existen en el catálogo:
+ *
+ *  • la VERSIÓN de un modelo (`CYA-26-71-045-02`, V1-E7b) daría **2**, cuando la versión NO quema
+ *    consecutivo y lo que cuenta es el de su raíz (`45`);
+ *  • el consecutivo DEGRADA a 4 dígitos pasando de 999 (`…-71-1000`), así que no se puede leer un
+ *    ancho fijo de 3.
+ *
+ * Y lo que NO cumple la forma —códigos capturados a mano, migrados del Access, cualquier cosa— se
+ * ignora devolviendo `null`: **jamás revienta**. Un piso "de menos" sólo hace trabajar al centinela
+ * del bucle; una excepción aquí tumbaría el alta entera.
+ *
+ * La comparación del prefijo es case-INSENSITIVE a propósito, igual que el resto del módulo: en la
+ * base conviven `CYA-…` y `cya-…` y los dos ocupan el mismo número.
+ */
+export function consecutivoDeCodigoDesarrollo(codigo: string, prefijo: string): number | null {
+  if (!codigo.toUpperCase().startsWith(prefijo.toUpperCase())) {
+    return null;
+  }
+  // Lo que sobra tras el prefijo: `71-001`, `71-001-02` o basura. Como el prefijo se comparó
+  // insensible a la caja pero con la MISMA longitud, cortar por longitud es exacto.
+  const partes = codigo.slice(prefijo.length).split('-');
+  if (partes.length < 2 || partes.length > 3) {
+    return null;
+  }
+  const [par, consecutivo, version] = partes;
+  if (par === undefined || !/^\d{2}$/.test(par)) {
+    return null;
+  }
+  if (consecutivo === undefined || !PATRON_CONSECUTIVO_LEIDO.test(consecutivo)) {
+    return null;
+  }
+  // El sufijo de versión, si viene, tiene que ser numérico: `CYA-26-71-001-BIS` no es canónico.
+  if (version !== undefined && !/^\d+$/.test(version)) {
+    return null;
+  }
+  return Number(consecutivo);
+}
+
+/**
+ * El PISO del consecutivo de un cliente+año: el MAYOR consecutivo que ya existe en el catálogo con
+ * ese prefijo, o `0` si no hay ninguno.
+ *
+ * ⚠️ **Por qué existe (V1-E7h — defecto reportado por Daniel el 25-ago-2026).** El contador corre
+ * por cliente+año (V1-E7a), pero la secuencia de ese cliente+año NACÍA EN 1 aunque el catálogo ya
+ * tuviera modelos del criterio anterior. El bucle de reintentos tapaba la colisión sólo cuando el
+ * código armado ya existía —o sea, sólo dentro del MISMO par—, y el resultado se veía idéntico al
+ * criterio viejo: Daniel metió dos sudaderas y un jogger a un cliente que ya llegaba al 007 y
+ * obtuvo **001, 002 y 008** en vez de **008, 009 y 010**. El piso arregla la causa: la serie no
+ * arranca donde está el contador, arranca donde de verdad va el catálogo.
+ *
+ * Se mira en las DOS columnas que pueden llevar un código de desarrollo: `codigoDesarrollo` (lo
+ * normal, y lo ÚNICO que le queda a un modelo ya promovido, D3) y `codigo` (un código de desarrollo
+ * capturado a mano, que nunca pasó por aquí). El filtro de la base es un `startsWith` insensible
+ * —barato de escribir pero NO exacto: si la abreviatura trajera comodines de `LIKE` podría traer de
+ * más— y por eso cada fila se vuelve a validar en {@link consecutivoDeCodigoDesarrollo}, que es la
+ * autoridad. La base FILTRA; quien DECIDE es el parseo.
+ *
+ * Es un recorrido de unos pocos miles de modelos por alta de desarrollo (una acción humana, no un
+ * bucle): irrelevante al lado de dejar la numeración mal.
+ */
+async function pisoConsecutivoDesarrollo(tx: Tx, prefijo: string): Promise<number> {
+  const filas = await tx.modelo.findMany({
+    where: {
+      OR: [
+        { codigo: { startsWith: prefijo, mode: 'insensitive' } },
+        { codigoDesarrollo: { startsWith: prefijo, mode: 'insensitive' } },
+      ],
+    },
+    select: { codigo: true, codigoDesarrollo: true },
+  });
+
+  let piso = 0;
+  for (const fila of filas) {
+    for (const texto of [fila.codigo, fila.codigoDesarrollo]) {
+      if (texto === null) {
+        continue;
+      }
+      const consecutivo = consecutivoDeCodigoDesarrollo(texto, prefijo);
+      if (consecutivo !== null && consecutivo > piso) {
+        piso = consecutivo;
+      }
+    }
+  }
+  return piso;
+}
+
+/**
+ * Cuántos intentos se hacen si el código armado ya existe. Desde V1-E7h la serie arranca sobre el
+ * piso del catálogo, así que el único motivo que queda es un código que el piso no puede ver: uno
+ * capturado a mano fuera de la forma canónica, o un alta simultánea todavía sin comitear.
+ *
+ * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer; sigue vigente). El bucle avanza de UNO
+ * EN UNO y el código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con
+ * `71-001..010` y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin
+ * llegar al 71.
  * Y agotarlos **no es un error recuperable**: el minteo corre DENTRO de la transacción del llamador
  * (`desarrollo/desarrollos.ts`), así que al lanzar **la secuencia se revierte con ella** — el
  * siguiente intento arranca del mismo número y falla igual, dejando a ese cliente+año sin poder dar
@@ -389,6 +556,56 @@ export function armarCodigoDesarrollo(
 export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
 
 /**
+ * ⭐ V1-E8y — LOS DOS DÍGITOS DEL CÓDIGO, leídos del catálogo con sus candados.
+ *
+ * El código de desarrollo (`CYA-26-**71**-001`) y el nº de producción de 5 dígitos llevan **los
+ * mismos dos**: el `digitoConcepto` del tipo de prenda y el `digitoNomenclatura` del género. Esta
+ * función los saca, y de paso hace cumplir las cuatro condiciones que hacen falta para armar
+ * cualquiera de los dos códigos: que existan, que estén ACTIVOS y que tengan su dígito capturado.
+ *
+ * 🔑 **Vive aquí y se COMPARTE porque hay dos puertas que arman el mismo código**: el alta de
+ * desarrollo con modelo nuevo (`desarrollo/desarrollos.ts`) y el alta desde la MESA de negociación
+ * (`desarrollo/modelo-en-la-mesa.ts`, V1-E8y). El bloque estaba escrito a mano en la primera; la
+ * segunda lo habría copiado, y en este proyecto la copia reducida siempre termina derivando (es la
+ * lección de R3-H1). Los mensajes dicen **qué falta y dónde capturarlo**: se leen en plena cita.
+ */
+export async function digitosDeNomenclatura(
+  tx: Tx,
+  idTipoProducto: number,
+  idGenero: number,
+): Promise<{ concepto: number; genero: number }> {
+  const [tipo, genero] = await Promise.all([
+    tx.tipoProducto.findUnique({
+      where: { id: idTipoProducto },
+      select: { nombre: true, activo: true, digitoConcepto: true },
+    }),
+    tx.genero.findUnique({
+      where: { id: idGenero },
+      select: { nombre: true, activo: true, digitoNomenclatura: true },
+    }),
+  ]);
+  if (tipo === null || !tipo.activo) {
+    throw new ErrorValidacion('El tipo de producto seleccionado no existe o está desactivado.');
+  }
+  if (genero === null || !genero.activo) {
+    throw new ErrorValidacion('El género seleccionado no existe o está desactivado.');
+  }
+  if (tipo.digitoConcepto === null) {
+    throw new ErrorValidacion(
+      `El tipo de producto "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él no se ` +
+        `puede armar el código del modelo. Captúralo en su catálogo.`,
+    );
+  }
+  if (genero.digitoNomenclatura === null) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él no se ` +
+        `puede armar el código del modelo. Captúralo en su catálogo.`,
+    );
+  }
+  return { concepto: tipo.digitoConcepto, genero: genero.digitoNomenclatura };
+}
+
+/**
  * MINTEA el código de desarrollo de un modelo nuevo, en la transacción del llamador. El
  * consecutivo sale de una secuencia GLOBAL atómica (A3) —nunca `Max()+1`— cuya clave es
  * **`cliente + año`**, tal como Daniel lo cerró el 25-ago-2026: *"Me gusta solo por cliente por
@@ -398,14 +615,17 @@ export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
  * La clave lleva el **id** del cliente, no su abreviatura: si mañana Daniel corrige el `CYA`, el
  * contador no se reinicia ni se mezcla con el de otro cliente.
  *
- * ⚠️ **Por qué el bucle de reintentos NO es adorno — y por qué el cambio de criterio no necesitó
- * migración.** Al pasar la clave de `cliente+año+par` a `cliente+año`, la serie NUEVA de un
- * cliente+año que ya tiene modelos arranca otra vez en 1 y puede proponer un código que el criterio
- * viejo ya entregó (`CYA-26-71-001`). Por eso, después de pedir el número se comprueba que el
- * código armado esté LIBRE en las DOS columnas que pueden llevarlo y, si está ocupado, se pide
- * otro: la secuencia avanza sola hasta rebasar lo ya usado y el cambio se absorbe sin renumerar
- * nada. La comprobación es case-INSENSITIVE a propósito, igual que el control de duplicados de
- * `crearModelo` (que es quien recibe este código y abortaría la transacción entera si chocara).
+ * ⭐ **La serie arranca DESPUÉS de lo que ya existe** ({@link pisoConsecutivoDesarrollo}, V1-E7h).
+ * Ésa es la corrección del defecto que reportó Daniel: no basta con que el contador sea por
+ * cliente+año si para un cliente que ya tenía modelos ese contador nace en 1.
+ *
+ * ⚠️ **Y el bucle de reintentos SE QUEDA, aunque ya casi nunca actúe.** Con el piso puesto, el
+ * código armado sólo puede chocar con algo que el piso NO alcanzó a ver: un código capturado a mano
+ * que no cumple la forma canónica, o un alta simultánea aún sin comitear. Es la última red antes del
+ * `@unique`: si el código estuviera ocupado y se entregara igual, reventaría al insertar y
+ * **abortaría la transacción entera del alta**. Por eso se comprueba que esté LIBRE en las DOS
+ * columnas que pueden llevarlo y, si no, se pide otro número. La comprobación es case-INSENSITIVE a
+ * propósito, igual que el control de duplicados de `crearModelo` (que es quien recibe este código).
  */
 export async function mintearCodigoDesarrollo(
   tx: Tx,
@@ -429,8 +649,20 @@ export async function mintearCodigoDesarrollo(
   // «✅ RESUELTO»; sustituye a §Post-F9.34/.46). Volverlo a meter aquí revive el criterio viejo.
   const clave = `modelo-desarrollo-${String(entrada.idCliente)}-${String(entrada.anioEntrega)}`;
 
+  // ⭐ DÓNDE ARRANCA la serie (V1-E7h): en el máximo que YA existe en el catálogo para este
+  // cliente+año, no en 1. Se recalcula en CADA alta a propósito, y no se "siembra una sola vez":
+  // los clientes que ya venían del criterio anterior tienen la secuencia a media asta (la de Daniel
+  // iba en 3 con el catálogo en 7) y una siembra sólo-al-nacer nunca los alcanzaría — harían falta
+  // scripts a mano, cliente por cliente. Con el piso en cada alta la regla es una sola y se cumple
+  // sola: **la secuencia nunca retrocede, pero sí adelanta**.
+  const prefijo = prefijoCodigoDesarrollo(cliente.abreviatura, entrada.anioEntrega);
+  const piso = await pisoConsecutivoDesarrollo(tx, prefijo);
+
   for (let intento = 0; intento < MAX_INTENTOS_CODIGO_DESARROLLO; intento += 1) {
-    const consecutivo = Number(await siguienteFolioGlobal(tx, clave));
+    // El piso viaja DENTRO de la sentencia atómica de la secuencia (A3): no se lee-decide-escribe
+    // aquí. Va también en los reintentos y es inofensivo: tras la primera vuelta la secuencia ya
+    // rebasó el piso y `GREATEST` se queda con ella.
+    const consecutivo = Number(await siguienteFolioGlobal(tx, clave, piso));
     const codigo = armarCodigoDesarrollo(
       cliente.abreviatura,
       entrada.anioEntrega,
@@ -481,9 +713,48 @@ export interface ResultadoPromocion {
 }
 
 /**
- * Toma el lock del par y calcula/valida el número. Núcleo compartido por el endpoint «pasar a
- * producción» y por la salida a producción (generar OP), para que los dos apliquen las MISMAS
- * reglas dentro de la MISMA transacción (A2).
+ * Toma el lock del par y calcula/valida el número, y **TRANSFORMA LA FILA** del modelo: le cambia
+ * el código, le pone el número y lo muda al catálogo de producción.
+ *
+ * ⚠️ **Desde V1-E3 su ÚNICO llamador es el endpoint «pasar a producción»** (`modelos.ts` →
+ * `pasarModeloAProduccion`). La salida a producción ya NO pasa por aquí: usa
+ * {@link obtenerODerivarModeloDeProduccion}, que **crea una fila nueva por color** y deja el
+ * desarrollo intacto — que es lo único que permite que de un mismo desarrollo salgan cuatro.
+ *
+ * ---
+ * ## 🔴🔴 V1-E3 — LAS DOS GUARDAS NUEVAS, Y POR QUÉ SIN ELLAS ESTA PUERTA DESHACE LA ETAPA
+ *
+ * Promover **transforma** el modelo: al terminar, su `origen` es `produccion` **para siempre** (no
+ * hay camino de vuelta), y `derivarModeloDeProduccion` exige un padre de DESARROLLO. Es decir: un
+ * clic aquí deja al modelo **incapaz de tener modelos por color, definitivamente**. Se midieron los
+ * dos daños, y los dos eran **silenciosos** —ni error, ni aviso—:
+ *
+ *  • **Promover DESPUÉS de que ya nació un hijo** — lo que ESTA guarda impide: el padre se llevaba
+ *    el **71002** de la misma serie mientras su hijo Rojo tenía el **71001** ⇒ **la misma prenda con
+ *    DOS números de catálogo**, que es exactamente lo que la decisión (B) de §Post-F9.172 existe
+ *    para impedir.
+ *  • **Promover ANTES de las OC** — lo que esta guarda **NO** impide, y hay que decirlo con todas
+ *    las letras: las cuatro OC de cuatro colores salen las cuatro por la rama `heredado` con **UN
+ *    SOLO modelo** —*el bug de Daniel, al pie de la letra*— y sin vuelta atrás. Ver el límite, abajo.
+ *
+ * ⚠️ Y la guarda A tapa un agujero que **ningún CHECK de la base puede ver**: el
+ * `modelos_linaje_desarrollo_solo_produccion_check` garantiza que un hijo apunte a un padre, pero
+ * un CHECK **no mira otra fila**, así que no puede impedir que el padre **deje de ser de
+ * desarrollo DESPUÉS**. La nota de `schema.prisma` ya lo decía —*"quien escriba esta columna por
+ * otra puerta tiene que comprobar él mismo que el padre es de DESARROLLO"*—; esto es la otra mitad:
+ * quien **cambie el origen de un padre** tiene que comprobar que no tenga hijos.
+ *
+ * ⚠️ **EL LÍMITE DE ESTA GUARDA, dicho con todas las letras.** Sólo mira los hijos que YA
+ * nacieron. Un modelo de desarrollo **sin hijos todavía** —tenga o no ficha de Desarrollo— sigue
+ * siendo promovible, y al promoverlo queda con UN modelo para todos sus colores, para siempre.
+ *
+ * 🔴 **Se probó una segunda guarda («con ficha de Desarrollo no se promueve») y se RETIRÓ a
+ * propósito:** rompía un camino existente y probado (`crearDesarrolloConModeloNuevo` → promover, en
+ * `nomenclatura.int.test.ts`), o sea que no es una valla contra un descuido — es **retirar una
+ * capacidad**, y eso es decisión de producto de Daniel, no de esta función. Lo que V1-E3 sí hace
+ * mientras tanto es que el clic **deje de ser silencioso**: el diálogo lo avisa ANTES de pulsarlo
+ * (`DialogoPasarAProduccion.tsx`) y `pasarModeloAProduccion` lo documenta. La pregunta —¿se retira
+ * el botón del catálogo?— va planteada ahí.
  */
 export async function promoverAProduccionNucleo(
   tx: Tx,
@@ -501,6 +772,10 @@ export async function promoverAProduccionNucleo(
       numeroProduccion: true,
       idTipoProducto: true,
       idGenero: true,
+      // ⚠️ V1-E9c — aquí venían `idModeloPadre` / `versionDesarrollo` / `idModeloDesarrollo` /
+      // `revisionEstado` / `revisadoEn` / `revisionNota`: los leía LA COMPUERTA de la revisión, que
+      // §Post-F9.169 disolvió (ver abajo). Sin ella nadie los pregunta, y un `select` que arrastra
+      // columnas que no se usan hace creer que alguna regla las mira.
     },
   });
   if (modelo === null) {
@@ -514,6 +789,39 @@ export async function promoverAProduccionNucleo(
           : ` con el número ${codigoDeNumeroProduccion(modelo.numeroProduccion)}.`),
     );
   }
+
+  // ── 🔴🔴 V1-E3 · GUARDA A — un padre CON HIJOS no se transforma ──────────────────────────────
+  // Ver el encabezado: promoverlo le daría al padre un segundo número de la misma serie para la
+  // MISMA prenda, y dejaría a sus hijos colgando de un padre que ya no es de desarrollo —lo único
+  // que la base NO puede vigilar sola—.
+  const hijos = await tx.modelo.findMany({
+    where: { idModeloDesarrollo: idModelo },
+    orderBy: { numeroProduccion: 'asc' },
+    select: { codigo: true },
+    take: 5,
+  });
+  if (hijos.length > 0) {
+    throw new ErrorConflicto(
+      `El modelo "${modelo.codigo}" ya tiene modelos de producción nacidos de él por color ` +
+        `(${hijos.map((h) => h.codigo).join(', ')}): su número no es suyo, es el de cada color. ` +
+        `Pasarlo a producción le daría un número MÁS a la misma prenda. Si falta un color, sale ` +
+        `solo al generar la OP de ese color.`,
+    );
+  }
+
+  // 🔴🔴 V1-E9c (§Post-F9.169) — AQUÍ ESTABA LA COMPUERTA DE LA REVISIÓN, Y SE QUITÓ.
+  //
+  // `exigirRevisionAprobadaParaProducir(modelo)` frenaba aquí a toda VERSIÓN sin firma, y como este
+  // núcleo lo comparten el endpoint «pasar a producción» y `salida-produccion.ts` paso 4 (generar
+  // la OP promueve el modelo sola), frenaba las dos. Daniel: *«Todo lo que no está firmado
+  // simplemente no se puede comprar. **Pero no detiene ni la producción** ni los demás renglones ya
+  // firmados.»* Promover es el acto de producir, así que aquí no queda ninguna raya: la orden nace
+  // con la receta pendiente de revisar y lo que se frena, renglón por renglón, es COMPRARLE
+  // material (`produccion/receta-orden.ts`).
+  //
+  // ⚠️ **No volver a poner una guarda de revisión en este camino.** La revisión sobrevive como
+  // REGISTRO —se firma desde la ficha del modelo y se lista en «Recetas por revisar»—, pero ya no
+  // gobierna ninguna operación.
 
   const digitos = await digitosDelModelo(tx, modelo);
 
@@ -598,6 +906,495 @@ export async function promoverAProduccionNucleo(
     numeroCapturado: numeroCapturado !== undefined,
     avisos,
   };
+}
+
+// ── ⭐⭐ V1-E9a · EL LINAJE 1:N — HACER NACER UN MODELO DE PRODUCCIÓN DE UN DESARROLLO ──────────
+//
+// §Post-F9.135 (DANIEL): cuatro órdenes de compra del cliente para **cuatro colores del mismo
+// modelo** producen hoy 4 órdenes y **UN SOLO modelo de producción**. Lo que tiene que pasar es que
+// nazcan **N modelos de producción** —uno por color, cada uno con SU número de 5 dígitos— y que los
+// N **compartan la receta** de su modelo de desarrollo. Esta etapa (V1-E9a) construye **el
+// vínculo**; el resolver que lee la receta por él es la siguiente (V1-E9b), y quien llama a esto
+// desde la salida a producción es la de después (V1-E9c).
+//
+// ⚠️ **La diferencia con `promoverAProduccionNucleo`, en una línea:** promover **transforma la fila**
+// del desarrollo (un `update`: le cambia el código, le pone el número y lo muda de catálogo);
+// derivar **crea una fila NUEVA** y deja el desarrollo **intacto y en su catálogo**, que es lo único
+// que permite que de un mismo desarrollo salgan cuatro. Las dos comparten TODO lo que decide el
+// número —los dígitos, el advisory lock del par, la propuesta del hueco libre, los avisos de
+// congruencia y la comprobación de choque—, porque son la misma regla de nomenclatura aplicada dos
+// veces, y por eso viven en el mismo archivo.
+
+/** Lo que se puede ajustar al derivar (el resto se HEREDA del modelo de desarrollo). */
+export interface DatosDerivarModelo {
+  /**
+   * Descripción del modelo hijo; si se omite, hereda la del padre. Existe para que quien llame
+   * (V1-E9c) pueda decir de qué COLOR es este hijo sin tener que editarlo después.
+   */
+  descripcion?: string | undefined;
+  /**
+   * Nº de producción capturado a mano, en vez del que propone el sistema. Misma semántica que en
+   * {@link promoverAProduccionNucleo}: la congruencia con los dígitos **avisa, no bloquea**
+   * (§Post-F9.34 punto 7 — *"si Daniel quiere una excepción, la excepción es suya"*), pero el
+   * número REPETIDO sí bloquea.
+   *
+   * ⚠️ **Se valida DENTRO de la función** (`esquemaNumeroProduccion`: entero de 5 dígitos), porque
+   * a diferencia de la promoción **este camino no pasa por ninguna ruta REST**: ver el comentario
+   * de la validación.
+   */
+  numeroCapturado?: number | undefined;
+  /**
+   * ⭐⭐ V1-E3 (§Post-F9.172(b)) — COLOR de catálogo del que nace este hijo. Es su IDENTIDAD (con el
+   * padre forma la llave `modelos_linaje_color_unico`), **no una instrucción de producción**: lo que
+   * se corta lo sigue mandando la matriz de la OP.
+   *
+   * `null`/ausente = el hijo **no es de un color**: nace de una salida con matriz MULTICOLOR (el
+   * importador por Excel agrupa por modelo, no por color). Ese hijo cubre varios colores a la vez,
+   * exactamente como se comportaba el sistema antes de esta etapa.
+   */
+  idColor?: number | null | undefined;
+}
+
+/** Resultado de derivar: el hijo que nació, con su número y los avisos de la serie. */
+export interface ResultadoDerivacion {
+  /** Id del modelo de PRODUCCIÓN recién nacido. */
+  idModelo: number;
+  /** Id del modelo de DESARROLLO del que nació (y de quien es la receta). */
+  idModeloDesarrollo: number;
+  /** Nº de producción asignado. */
+  numeroProduccion: number;
+  /** Código del hijo (= el número de 5 dígitos). */
+  codigo: string;
+  /** `true` si el número lo capturó el usuario en vez de aceptar la propuesta. */
+  numeroCapturado: boolean;
+  avisos: string[];
+}
+
+/**
+ * La marca con la que entra al catálogo un HIJO del linaje 1:N: producción, con su número, **sin
+ * código de desarrollo** y apuntando al desarrollo del que nació.
+ *
+ * ⚠️ **`codigoDesarrollo` va en `null`, y no es un olvido.** Esa columna es `@unique` global: si los
+ * cuatro hijos se llevaran el `CYA-26-71-001` del padre, el segundo reventaría contra el índice. Y
+ * tampoco sería verdad — ese código es del padre, que sigue vivo, en su catálogo y con él puesto,
+ * así que el número de desarrollo **no se pierde** (D3): se llega a él por `idModeloDesarrollo`,
+ * que es una liga de verdad y no un texto repetido.
+ *
+ * ⚠️ **`idModeloPadre` NO se toca** (queda en `null`): un hijo de producción **no es una versión**.
+ * Ver `esVersionDeModelo` en `revision-modelo.ts` para lo que pasaría si lo fuera.
+ */
+function marcaProduccionDerivada(
+  numeroProduccion: number,
+  idModeloDesarrollo: number,
+  idColor: number | null,
+): MarcaNomenclaturaModelo {
+  return {
+    origen: 'produccion',
+    codigoDesarrollo: null,
+    numeroProduccion,
+    idModeloDesarrollo,
+    idColor,
+  };
+}
+
+/**
+ * ⭐⭐ **HACE NACER UN MODELO DE PRODUCCIÓN A PARTIR DE UNO DE DESARROLLO** (§Post-F9.135, V1-E9a).
+ *
+ * El hijo nace **ya en producción**, con su propio código y número de 5 dígitos minteados con las
+ * MISMAS reglas que la promoción (hueco libre más bajo del par, bajo el advisory lock de la serie),
+ * hereda la **ficha** del padre ({@link CAMPOS_FICHA_HEREDADOS}) y **apunta a su receta en vez de
+ * copiarla**. Se puede llamar N veces sobre el mismo desarrollo: cada llamada da un hijo más, y el
+ * padre no recibe ni un `update`.
+ *
+ * 🔑 **QUE NO COPIE RECETA ES LO QUE LA HACE INOFENSIVA.** Es la diferencia entera con
+ * `mintearVersionDeModelo`, que sí copia: por eso aquélla vive en `versiones.ts`, declarado
+ * **excepción del embudo de receta** (`receta-embudo.test.ts`), y ésta no necesita serlo. Esta
+ * función **no escribe ni una fila de `ModeloTela`/`ModeloAvio`/`ModeloAvioTalla`/`ModeloArte`**, y
+ * eso no es una casualidad que haya que recordar: es lo que contesta la pregunta de Daniel
+ * *«¿cómo controlas que los cuatro lleven lo mismo?»*. Con cuatro copias no se controla, se vigila;
+ * con una sola receta compartida **la igualdad es estructural**.
+ *
+ * ### Las tres guardas, y por qué cada una
+ *
+ *  1. **El padre existe** → `ErrorNoEncontrado`.
+ *  2. **El padre es de DESARROLLO.** Es la semántica de la columna (*«nació del desarrollo N»*) y,
+ *     junto con el CHECK `modelos_linaje_desarrollo_solo_produccion_check` de la base, es **lo que
+ *     hace imposibles las CADENAS**: un hijo es de producción ⇒ nunca puede ser padre de otro. Un
+ *     modelo de producción tampoco necesita derivar: su receta ya es suya y su orden ya lo apunta.
+ *  3. **El padre está ACTIVO.** Mismo criterio que `mintearVersionDeModelo` (§Post-F9.119, DANIEL:
+ *     *"Hay que activarlo para poder usarlo nuevamente"*): descontinuar es reversible y cuesta un
+ *     clic, pero que un modelo dado de baja vuelva a producirse **como efecto lateral** de generar
+ *     una OP no se paga con nada.
+ *
+ * ⚠️ **Hubo una cuarta guarda y V1-E9c la retiró:** la REVISIÓN del padre aprobada. La revisión ya
+ * no detiene producir (§Post-F9.169), así que derivar tampoco la pregunta. Un hijo puede nacer de
+ * un desarrollo cuya receta nadie ha revisado; lo que no se le puede comprar es el renglón que no
+ * esté liberado.
+ *
+ * ⚠️ **Corre dentro de la transacción del llamador** (A2) — recibe `tx`, no abre la suya: hacer
+ * nacer los N hijos de una salida a producción es **un solo hecho**, y el advisory lock del par sólo
+ * vale mientras esa transacción viva.
+ *
+ * ⚠️ **Deja DOS renglones de bitácora para el mismo nacimiento**, y es a propósito: el `CREAR`
+ * genérico que escribe {@link crearModeloNucleo} (el alta, igual que cualquier otro modelo) y éste,
+ * que cuenta **el acto de derivar** — de qué padre, con qué número, propuesto o capturado, y con qué
+ * avisos. Sin el segundo, la bitácora no podría contestar *"¿de dónde salió el 71004?"* una vez que
+ * alguien mire la fila y sólo vea una columna con un id.
+ */
+export async function derivarModeloDeProduccion(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModeloDesarrollo: number,
+  datos: DatosDerivarModelo = {},
+): Promise<ResultadoDerivacion> {
+  const padre = await tx.modelo.findUnique({
+    where: { id: idModeloDesarrollo },
+    select: {
+      id: true,
+      codigo: true,
+      codigoDesarrollo: true,
+      origen: true,
+      activo: true,
+      // ⚠️ V1-E9c — aquí venían las seis columnas de la revisión, que leía la compuerta retirada
+      // (ver la guarda 4, borrada más abajo).
+      // La FICHA que el hijo hereda tal cual.
+      ...CAMPOS_FICHA_HEREDADOS,
+    },
+  });
+  if (padre === null) {
+    throw new ErrorNoEncontrado('Modelo', idModeloDesarrollo);
+  }
+
+  // Guarda 2 — ver el encabezado: la semántica de la columna, y la raíz de que no haya cadenas.
+  if (padre.origen !== 'desarrollo') {
+    throw new ErrorConflicto(
+      `El modelo "${padre.codigo}" YA está en el catálogo de producción, así que no se le pueden ` +
+        `derivar modelos de producción: los que nacen por color salen de un modelo de DESARROLLO, ` +
+        `que es de donde sale la receta que todos van a compartir.`,
+    );
+  }
+
+  // Guarda 3 — descontinuado: se reactiva a mano, nunca como efecto lateral (§Post-F9.119). El
+  // texto vive en `mensajeDesarrolloDescontinuado` porque el camino de REUSO aplica esta MISMA
+  // guarda (V1-E3) y las dos tienen que decir lo mismo, palabra por palabra.
+  if (!padre.activo) {
+    throw new ErrorConflicto(mensajeDesarrolloDescontinuado(padre.codigo));
+  }
+
+  // 🔴 V1-E9c (§Post-F9.169) — AQUÍ ESTABA LA GUARDA 4: la compuerta de la revisión evaluada
+  // contra el PADRE. Se fue por lo mismo que la de `promoverAProduccionNucleo`: derivar es el acto
+  // de producir, y la revisión ya no lo detiene. **Ojo con la medición vieja**: §Post-F9.164 contó
+  // UN solo llamador de la compuerta porque se midió antes de que V1-E9a añadiera éste; dejarlo
+  // habría devuelto el muro entero por la puerta más nueva —justo la que V1-E3 va a usar para
+  // hacer nacer un modelo por color—.
+
+  const digitos = await digitosDelModelo(tx, padre);
+
+  // El lock ANTES de mirar la ocupación: dentro de él, "elegir el hueco" y "escribirlo" son un solo
+  // hecho (ver el encabezado del módulo). Es el MISMO namespace y la MISMA clave que usa la
+  // promoción — tiene que serlo, porque las dos se reparten la misma serie de números.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_NUMERO_PRODUCCION}::int, ${parDe(
+    digitos.concepto,
+    digitos.genero,
+  )}::int)`;
+
+  const propuesta = await proponerNumeroProduccion(tx, digitos);
+  const avisos = [...propuesta.avisos];
+
+  let numero: number;
+  if (datos.numeroCapturado === undefined) {
+    if (propuesta.numero === null) {
+      throw new ErrorValidacion(
+        `No queda ningún número libre en la serie ${propuesta.serie.par}: captura el número de ` +
+          `producción a mano.`,
+      );
+    }
+    numero = propuesta.numero;
+  } else {
+    // 🔴 **EL NÚMERO CAPTURADO SE VALIDA AQUÍ, Y NO ES DUPLICAR LA CAPA API: ES QUE NO HAY.**
+    // `promoverAProduccionNucleo` recibe el suyo ya pasado por `esquemaNumeroProduccion` en la
+    // ruta REST (`modelos.ts` → `pasarModeloAProduccion`). Esta función **no tiene endpoint**: su
+    // llamador es `salidaAProduccion` (V1-E9c), dominio→dominio, **sin frontera Zod por medio**.
+    // Sin esta línea, un `123456` o un `5` que venga de ahí pasa entero: `codigoDeNumeroProduccion`
+    // no recorta ni rellena hacia abajo, así que nacería un modelo de producción con código de 6
+    // dígitos (o de 1) que ya **no casa con `PATRON_CODIGO_PRODUCCION`** — no lo vería
+    // `numeroProduccionDeCodigo`, ni `consecutivosUsados`, ni el centinela de choque, ni ninguno de
+    // los dos CHECK de la base, que sólo miran el linaje. Un modelo fuera de la nomenclatura, en
+    // silencio. La clase entera se cierra **antes de que E3 exista**, que es lo que E1 puede hacer
+    // gratis.
+    numero = validarEntrada(esquemaNumeroProduccion, datos.numeroCapturado);
+    avisos.push(...avisosDeCongruencia(numero, digitos));
+  }
+
+  const codigo = codigoDeNumeroProduccion(numero);
+
+  // Repetido = BLOQUEA (lo único que §Post-F9.34 pide impedir; el resto sólo avisa). Se comprueban
+  // las TRES columnas que pueden llevar el número, igual que la promoción. Aquí NO hay un `id` que
+  // excluir: el hijo todavía no existe.
+  const chocan = await tx.modelo.findFirst({
+    where: {
+      OR: [
+        { codigo: { equals: codigo, mode: 'insensitive' } },
+        { numeroProduccion: numero },
+        { codigoDesarrollo: { equals: codigo, mode: 'insensitive' } },
+      ],
+    },
+    select: { codigo: true, activo: true },
+  });
+  if (chocan !== null) {
+    throw new ErrorConflicto(
+      `El número de producción ${codigo} ya está ocupado por el modelo "${chocan.codigo}"` +
+        (chocan.activo ? '.' : ' (descontinuado).'),
+    );
+  }
+
+  // El alta pasa por el NÚCLEO compartido (`crearModeloNucleo`) y no por un `create` propio: así el
+  // hijo recibe las mismas comprobaciones de código libre y de FKs vivas, y la misma auditoría y
+  // bitácora de alta, que cualquier otro modelo del catálogo. Lo único suyo es la MARCA.
+  const hijo = await crearModeloNucleo(
+    tx,
+    sesion,
+    {
+      codigo,
+      // La ficha del padre, tal cual. `null` se pasa como `undefined` para que el núcleo
+      // simplemente no escriba la columna y la base ponga su default (`llevaArte`,
+      // `secuenciaEstampado`), en vez de estrellarse contra un NOT NULL.
+      // ⚠️⚠️ **AQUÍ SE COPIA LA FICHA, Y LA COPIA DIVERGE — la pregunta abierta de V1-E3 (N1).**
+      //
+      // La RECETA es COMPARTIDA (el hijo apunta a la del padre, `receta-compartida.ts`), pero estos
+      // campos de FICHA se COPIAN al nacer. Medido: si el padre cambia su `composicion` DESPUÉS,
+      // el hijo que ya había nacido se queda con la vieja y el que nazca después trae la nueva ⇒
+      // dos colores de la misma prenda con composiciones distintas, y la OP de cada uno se lleva
+      // la suya (`crearOrden` hereda la del modelo que queda en la ORDEN, igual que
+      // `actualizarOrden` al re-derivarla: las dos leen el mismo modelo, así que son coherentes
+      // entre sí — lo que diverge es la copia, no el camino).
+      //
+      // 🔴 Es PREEXISTENTE (V1-E9a ya copiaba la ficha), pero V1-E3 lo pone en el camino principal,
+      // porque hasta hoy casi no nacían hijos. **No se resuelve aquí a propósito**: contestar
+      // *«¿la ficha también se comparte, o cada color puede tener la suya?»* es decisión de Daniel
+      // —es exactamente su pregunta *«¿cómo controlas que los cuatro lleven lo mismo?»* aplicada a
+      // la ficha—, y cualquiera de las dos respuestas se implementa en ESTAS líneas.
+      ...sinNulos({
+        descripcion: datos.descripcion ?? padre.descripcion,
+        composicion: padre.composicion,
+        maquilaBase: padre.maquilaBase === null ? null : padre.maquilaBase.toNumber(),
+        corteBase: padre.corteBase === null ? null : padre.corteBase.toNumber(),
+        idTemporada: padre.idTemporada,
+        idCurvaTalla: padre.idCurvaTalla,
+        idGenero: padre.idGenero,
+        idTipoProducto: padre.idTipoProducto,
+        idMaquileroCotizado: padre.idMaquileroCotizado,
+        numOperaciones: padre.numOperaciones,
+        secuenciaEstampado: padre.secuenciaEstampado,
+        llevaArte: padre.llevaArte,
+      }),
+    },
+    marcaProduccionDerivada(numero, padre.id, datos.idColor ?? null),
+  );
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Modelo',
+    idEntidad: hijo.id,
+    accion: 'CREAR',
+    datos: {
+      operacion: 'derivar-modelo-de-produccion',
+      codigo,
+      numeroProduccion: numero,
+      numeroCapturado: datos.numeroCapturado !== undefined,
+      propuesto: propuesta.numero,
+      // De qué desarrollo salió — y de quién es, por lo tanto, la receta que va a leer (A7). Se
+      // guardan los DOS textos del padre: su código VIGENTE y su nº de desarrollo, que casi siempre
+      // valen lo mismo pero no tienen por qué (un código de desarrollo capturado a mano).
+      idModeloDesarrollo: padre.id,
+      codigoModeloDesarrollo: padre.codigo,
+      numeroDeDesarrollo: padre.codigoDesarrollo,
+      // V1-E3: DE QUÉ COLOR nació (o `null` si la salida traía varios). Sin esto la bitácora no
+      // podría contestar "¿por qué el 71004 y el 71005 salieron del mismo desarrollo?".
+      idColor: datos.idColor ?? null,
+      avisos,
+    },
+  });
+
+  return {
+    idModelo: hijo.id,
+    idModeloDesarrollo: padre.id,
+    numeroProduccion: numero,
+    codigo,
+    numeroCapturado: datos.numeroCapturado !== undefined,
+    avisos,
+  };
+}
+
+/**
+ * Lo que la salida a producción necesita saber del modelo que va a llevar la OP: el mismo cuerpo de
+ * {@link ResultadoDerivacion} más **si nació aquí o ya existía**.
+ *
+ * ⚠️ `numeroProduccion` es anulable aquí y no en aquél a propósito: un hijo recién derivado SIEMPRE
+ * estrena número, pero uno REUSADO se lee de la base tal como esté. Fingir que nunca puede faltar
+ * obligaría a inventar una rama imposible de probar.
+ */
+export interface ResultadoModeloDeLaOp {
+  /** Id del modelo de PRODUCCIÓN que va a llevar la orden. */
+  idModelo: number;
+  /** Id del modelo de DESARROLLO del que nació (y de quien es su receta). */
+  idModeloDesarrollo: number;
+  /** Su nº de producción de 5 dígitos. */
+  numeroProduccion: number | null;
+  /** Su código VIGENTE (= el número, para todo hijo nacido por esta puerta). */
+  codigo: string;
+  /** `true` si el número lo capturó el usuario en vez de aceptar la propuesta del sistema. */
+  numeroCapturado: boolean;
+  /** Avisos que NUNCA bloquean (dígitos que no cuadran, serie cerca del tope, número ignorado). */
+  avisos: string[];
+  /** ⭐ `true` si el modelo YA existía para ese (desarrollo, color) y esta llamada NO estrenó número. */
+  reusado: boolean;
+}
+
+/**
+ * ⭐⭐ **EL MODELO DE PRODUCCIÓN DE ESTE COLOR: se REUSA si ya existe, y sólo si no, NACE** (V1-E3,
+ * §Post-F9.172(b)).
+ *
+ * DANIEL, textual: ***«se reúsa cuando sea el mismo modelo»***. Ese «mismo modelo» tenía dos
+ * lecturas posibles y sólo una cumple la frase — la llave es **(desarrollo, color)**, no el renglón
+ * de pedido: con la llave en el renglón, un resurtido de la misma OC reusaría, pero **una OC nueva
+ * del mismo color estrenaría otro número** y la misma prenda acabaría con dos números de catálogo.
+ * El porqué completo está en la migración `20260901120000_un_modelo_por_color`.
+ *
+ * ---
+ * ## 🔴 ESTA FUNCIÓN ES LA IDEMPOTENCIA, Y ANTES DE V1-E3 NO EXISTÍA
+ *
+ * Hasta hoy el freno del doble clic en «Generar OP» era **un efecto de borde**, no una regla: la
+ * primera salida dejaba el modelo en `produccion`, así que la segunda ya no entraba a promover. Con
+ * el linaje 1:N el desarrollo **se queda en `desarrollo` para siempre** ⇒ sin esta puerta, *cada*
+ * llamada derivaría un hijo más y **dos clics harían nacer dos modelos**, quemando dos números de
+ * una serie que sólo tiene **999 por par** (concepto+género). Por eso el reuso no es una
+ * optimización: es la regla.
+ *
+ * ## Cómo se hace atómica
+ *
+ * `pg_advisory_xact_lock(NAMESPACE, idModeloDesarrollo)` **antes de mirar**: dentro del lock,
+ * "¿ya existe?" y "créalo" son un solo hecho. La llave única `modelos_linaje_color_unico` es la RED
+ * (una escritura por otra puerta), no el mecanismo — y para los hijos MULTICOLOR (`idColor = null`)
+ * el lock es la única red, porque un índice único no ata dos NULL.
+ *
+ * ⚠️ Corre **dentro de la transacción del llamador** (A2), como {@link derivarModeloDeProduccion}:
+ * el lock sólo vale mientras esa transacción viva.
+ *
+ * ## Las dos guardas del camino de REUSO (las del camino de NACER las pone `derivarModeloDeProduccion`)
+ *
+ *  1. **El hijo está ACTIVO.** Reusar un modelo descontinuado lo devolvería a producción como
+ *     efecto lateral de generar una OP — exactamente lo que §Post-F9.119 prohíbe.
+ *  2. **El padre sigue ACTIVO.** Es la MISMA guarda 3 de derivar, aplicada al otro camino: si
+ *     bloquea estrenar un color nuevo de un desarrollo descontinuado, no puede dejar pasar el
+ *     resurtido de otro — y la receta que se va a producir es la del padre.
+ *
+ * ## Y el número capturado, cuando se reusa
+ *
+ * **No se aplica: se AVISA.** El número es del modelo, y el modelo ya tiene el suyo; pisárselo
+ * renombraría un modelo que quizá ya tiene órdenes, inventario y kardex colgando. Ignorarlo en
+ * silencio sería mentirle a quien lo tecleó, así que sale por `avisos` — que nunca bloquean.
+ */
+export async function obtenerODerivarModeloDeProduccion(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModeloDesarrollo: number,
+  datos: DatosDerivarModelo = {},
+): Promise<ResultadoModeloDeLaOp> {
+  const idColor = datos.idColor ?? null;
+
+  // El lock ANTES de mirar (ver el encabezado). Va SIEMPRE antes que el de la serie, nunca al revés.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_MODELO_POR_COLOR}::int, ${idModeloDesarrollo}::int)`;
+
+  const existente = await tx.modelo.findFirst({
+    where: { idModeloDesarrollo, idColor },
+    // Determinista: si por una escritura de otra puerta hubiera dos multicolor, siempre gana el
+    // primero que nació. Sin `orderBy`, la misma pregunta podría contestar cosas distintas.
+    orderBy: { id: 'asc' },
+    select: { id: true, codigo: true, numeroProduccion: true, activo: true },
+  });
+
+  if (existente !== null) {
+    if (!existente.activo) {
+      throw new ErrorConflicto(
+        `El modelo de producción "${existente.codigo}" de ese color está descontinuado; ` +
+          `reactívalo desde su ficha si vas a producirlo otra vez. No se le puede dar la vuelta ` +
+          `haciendo nacer otro: el número es del modelo, y ese color ya tiene el suyo.`,
+      );
+    }
+    await exigirDesarrolloActivo(tx, idModeloDesarrollo);
+    const avisos: string[] = [];
+    if (
+      datos.numeroCapturado !== undefined &&
+      datos.numeroCapturado !== existente.numeroProduccion
+    ) {
+      avisos.push(
+        `Ese color ya tenía el modelo de producción ${existente.codigo}, así que la orden se hizo ` +
+          `con él y el número ${String(datos.numeroCapturado)} que capturaste NO se usó: el número ` +
+          `es del modelo, no de la orden.`,
+      );
+    }
+    return {
+      idModelo: existente.id,
+      idModeloDesarrollo,
+      numeroProduccion: existente.numeroProduccion,
+      codigo: existente.codigo,
+      // Reusar no captura nada: el número que manda es el que el modelo ya traía.
+      numeroCapturado: false,
+      avisos,
+      reusado: true,
+    };
+  }
+
+  const nacido = await derivarModeloDeProduccion(tx, sesion, idModeloDesarrollo, datos);
+  return { ...nacido, reusado: false };
+}
+
+/**
+ * Exige que el modelo de DESARROLLO siga ACTIVO. Es la guarda 3 de {@link
+ * derivarModeloDeProduccion} extraída para que el camino de REUSO aplique **exactamente la misma
+ * regla con exactamente el mismo texto**: dos frases distintas para la misma prohibición es como se
+ * empiezan a separar dos caminos que deben decidir igual.
+ */
+async function exigirDesarrolloActivo(tx: Tx, idModeloDesarrollo: number): Promise<void> {
+  const padre = await tx.modelo.findUnique({
+    where: { id: idModeloDesarrollo },
+    select: { codigo: true, activo: true },
+  });
+  if (padre === null) {
+    throw new ErrorNoEncontrado('Modelo', idModeloDesarrollo);
+  }
+  if (!padre.activo) {
+    throw new ErrorConflicto(mensajeDesarrolloDescontinuado(padre.codigo));
+  }
+}
+
+/** El texto ÚNICO del desarrollo descontinuado (lo comparten derivar y reusar). */
+function mensajeDesarrolloDescontinuado(codigo: string): string {
+  return (
+    `El modelo "${codigo}" está descontinuado; reactívalo primero si vas a producirlo. Se ` +
+    `hace desde la ficha del modelo, marcándolo como activo.`
+  );
+}
+
+/**
+ * Quita del objeto las claves cuyo valor es `null`, dejándolas `undefined`.
+ *
+ * La ficha del padre se lee de Prisma, donde "no capturado" es `null`; el alta la recibe como
+ * `DatosModeloCrearMigracion`, donde "no capturado" es que la clave **no venga** — `crearModeloNucleo`
+ * decide con `!== undefined` qué columnas escribe. Sin esta traducción, un `secuenciaEstampado: null`
+ * o un `llevaArte: null` viajarían al `create` y reventarían contra el NOT NULL de la base, y un
+ * `idTemporada: null` pediría validar una temporada que nadie eligió.
+ */
+function sinNulos<T extends Record<string, unknown>>(
+  objeto: T,
+): { [K in keyof T]?: Exclude<T[K], null> } {
+  const salida: Record<string, unknown> = {};
+  for (const [clave, valor] of Object.entries(objeto)) {
+    if (valor !== null) {
+      salida[clave] = valor;
+    }
+  }
+  return salida as { [K in keyof T]?: Exclude<T[K], null> };
 }
 
 /**

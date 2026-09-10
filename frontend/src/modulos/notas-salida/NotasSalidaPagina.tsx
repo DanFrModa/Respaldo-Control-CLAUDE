@@ -20,8 +20,8 @@ import {
   useNotasSalida,
   useResumenNotas,
 } from '@/api/notas-salida';
-import { useProveedores } from '@/api/proveedores';
 import type { NotaSalida, NotasSalidaQuery, ResumenNotasQuery } from '@/api/tipos';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -36,7 +36,6 @@ import {
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -90,10 +89,11 @@ export function NotasSalidaPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [filtroEstatus, setFiltroEstatus] = useState<FiltroEstatus>('todas');
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);
+  // Nombre del maquilero filtrado: con búsqueda server-side el combobox sólo conoce su página.
+  const [nombreMaquilero, setNombreMaquilero] = useState<string | undefined>(undefined);
   const [pagina, setPagina] = useState(1);
   const [idSeleccion, setIdSeleccion] = useState<number | null>(null);
 
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   // El listado solo trae `idEmpresa`: el nombre sale del catálogo (lookup de presentación).
   const empresas = useEmpresas();
   const nombreEmpresa = useMemo(() => {
@@ -259,23 +259,22 @@ export function NotasSalidaPagina(): React.JSX.Element {
             />
           </div>
           {/* Filtro por maquilero (funcional, se conserva del F4-E5; el proto no lo trae). */}
-          <SelectNativo
-            className="w-44 h-8 text-sm"
-            aria-label="Filtrar por maquilero"
-            value={idMaquilero === null ? '' : String(idMaquilero)}
-            onChange={(e) => {
-              setIdMaquilero(e.target.value === '' ? null : Number(e.target.value));
-              setPagina(1);
-            }}
-            data-testid="filtro-maquilero-nota"
-          >
-            <option value="">Todos los maquileros</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER palabra, en el
+              SERVIDOR. El `<select>` de aquí topaba en 100 y sólo dejaba teclear el prefijo. */}
+          <div className="w-44">
+            <FiltroProveedor
+              idProveedor={idMaquilero}
+              nombreInicial={nombreMaquilero}
+              alCambiar={(maquilero) => {
+                setIdMaquilero(maquilero?.id ?? null);
+                setNombreMaquilero(maquilero?.nombre);
+                setPagina(1);
+              }}
+              etiqueta="Filtrar por maquilero"
+              placeholder="Todos los maquileros"
+              testid="filtro-maquilero-nota"
+            />
+          </div>
           <span className="ml-auto text-[12px] text-faint">
             {total.toLocaleString('es-MX')} notas
           </span>

@@ -67,10 +67,15 @@ export function redondearCantidadCompra(n: number): number {
 /**
  * ⭐ Escala del **PRECIO** de la línea: `OrdenCompraLinea.precio Decimal(12, 2)`.
  *
- * Es el MISMO hueco que el de la cantidad, en otra columna, y también estaba abierto: el precio
- * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas —100 ÷ 3 =
- * 33.333333…—. Con el precio largo, la revisión previa prometía **5,999.99** y la orden de compra
- * guardaba **5,999.40**: la previa mentía sobre el DINERO, que es lo último que puede mentir.
+ * Es el MISMO hueco que el de la cantidad, en otra columna, y también estaba abierto: un precio de
+ * COLA LARGA —más decimales de los que la columna guarda— hacía que la revisión previa prometiera
+ * **5,999.99** mientras la orden de compra guardaba **5,999.40**: la previa mentía sobre el DINERO,
+ * que es lo último que puede mentir.
+ *
+ * ⚠️ De dónde salen hoy esas colas. Cuando esto se escribió, del «factor de conversión»
+ * (100 ÷ 3 = 33.333333…), retirado en §Post-F9.97. Siguen vivas dos fuentes: el PROMEDIO de las
+ * medidas de un avío "por medida" (R5/B11) y el precio que TECLEA el comprador en la previa
+ * (§Post-F9.94, un `number` del cuerpo sin tope de decimales). El redondeo sigue haciendo falta.
  */
 export const ESCALA_PRECIO_COMPRA = 2;
 

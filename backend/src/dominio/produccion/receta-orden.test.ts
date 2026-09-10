@@ -19,10 +19,14 @@ import { Prisma } from '../../datos/index.js';
 
 import {
   calcularDesalineacion,
+  exigirCompraNoCongelada,
   laCulpaEsDeLaNormalizacion,
+  magnitudDelAvisoDeCaptura,
   medidasResultantes,
+  renglonesTocadosYaComprados,
   requeridoDelRenglon,
   sacaDeLaCompra,
+  type RenglonParaMagnitud,
   type RenglonParaRequerido,
 } from './receta-orden.js';
 
@@ -52,6 +56,8 @@ function tela(over: Partial<RecetaOrdenTela> = {}): RecetaOrdenTela {
     consumoModelo: 1.5,
     precioModelo: 30,
     precioModeloDeCompra: false,
+    // ⭐ 0.085: por default este material NO está comprado (el caso normal).
+    ocsComprometidas: [],
     ...over,
   };
 }
@@ -83,6 +89,7 @@ function avio(over: Partial<RecetaOrdenAvio> = {}): RecetaOrdenAvio {
     modoCaptura: 'consumo',
     unidadMedida: null,
     avisoCaptura: null,
+    capturaReparable: false,
     idAvioProveedor: null,
     proveedorAmarrado: null,
     tallas: [],
@@ -90,6 +97,8 @@ function avio(over: Partial<RecetaOrdenAvio> = {}): RecetaOrdenAvio {
     consumoModelo: 1,
     precioModelo: 0.85,
     precioModeloDeCompra: false,
+    // ⭐ 0.085: por default este material NO está comprado (el caso normal).
+    ocsComprometidas: [],
     ...over,
   };
 }
@@ -573,5 +582,186 @@ describe('laCulpaEsDeLaNormalizacion (§Post-F9.105)', () => {
 
   it('no es nuestra si el renglón no traía la bandera encendida (no había nada que normalizar)', () => {
     expect(laCulpaEsDeLaNormalizacion(true, false, false)).toBe(false);
+  });
+});
+
+/**
+ * 🔴 **H1 del review de V1-E8h (§Post-F9.130) — EL AVISO NO PUEDE AFIRMAR UN NÚMERO FALSO.**
+ *
+ * El aviso de la contradicción pasó de ser **condicional** (*"el requerido saldría en 1,590"*) a ser
+ * una **afirmación factual sobre la orden** puesta de primera (*"Esta orden **PIDE** 53,095 pza"*).
+ * Sobre una **lápida** (`excluido`) o un renglón apagado para producción, esa frase es **falsa**: la
+ * orden pide CERO de ese material. Y como ahora hay un botón «Corregir» junto al aviso, el usuario lo
+ * aprieta, lee *"ya pide lo que de verdad lleva"*, la explosión no cambia en nada, y la bitácora del
+ * mismo acto guarda 0/0 — **contradiciendo el número que acababa de leer**.
+ *
+ * ⚠️ La decisión NO puede vivir en `requeridoContradictorioPorMedida`: su tipo de entrada
+ * (`AvioRecetaR18`) **ni siquiera tiene** `excluido` ni `paraProduccion`. Por eso se le pregunta a
+ * `requeridoDelRenglon`, que es quien ya lo decide para la guarda de compra y para la bitácora.
+ */
+describe('magnitudDelAvisoDeCaptura (V1-E8h/H1 — sólo se afirma lo que la orden pide de verdad)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+  // Orden de 10 piezas de la talla 1. El cierre: 2/prenda de verdad (20), pero con el 53 de "53 cm"
+  // metido en la cantidad por talla pide 530 — el caso de Daniel, a escala.
+  const piezas = { total: 10, porTalla: new Map<number, number>([[1, 10]]) };
+
+  function renglon(over: Partial<RenglonParaMagnitud> = {}): RenglonParaMagnitud {
+    return {
+      excluido: false,
+      paraProduccion: true,
+      consumoPorPrenda: D(2),
+      consumoPorTalla: true,
+      tallas: [{ idTalla: 1, consumo: D(53) }],
+      avio: { unidad: 'pza' },
+      ...over,
+    };
+  }
+
+  it('⭐ en un renglón VIVO sí dice la magnitud: pide 530 y debería pedir 20', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon(), piezas)).toEqual({
+      hoy: 530,
+      normalizado: 20,
+      unidad: 'pza',
+    });
+  });
+
+  it('🔴 sobre una LÁPIDA (excluido) NO hay magnitud: esa orden no pide nada de ese material', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon({ excluido: true }), piezas)).toBeNull();
+  });
+
+  it('🔴 con `paraProduccion: false` tampoco: el renglón está vivo pero fuera de la compra', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon({ paraProduccion: false }), piezas)).toBeNull();
+  });
+
+  it('en una orden SIN matriz capturada (0 piezas) no se inventa un descuadre', () => {
+    const sinMatriz = { total: 0, porTalla: new Map<number, number>() };
+    expect(magnitudDelAvisoDeCaptura(renglon(), sinMatriz)).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO DE COMPRA, su parte PURA (V1-E8z, §Post-F9.160(a)) — DANIEL: *"pongamos un
+ * candado que **no se pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * Lo que se fija aquí es **el mensaje**, y no es cosmética: es lo único que el comprador recibe
+ * cuando su orden de compra se rechaza. Si dijera *«todavía no la libera Desarrollo»* —el texto de
+ * la OTRA puerta— sería **falso** (sí la liberaron: está en corrección) y lo mandaría a pedir una
+ * firma que ya existe. §Post-F9.165 punto 8 lo nombra aparte por eso.
+ *
+ * El resto del candado —que las cinco bocas de gasto pasen de verdad por esta guarda— vive en
+ * `receta-orden.int.test.ts`, que es donde se puede intentar comprar.
+ */
+describe('exigirCompraNoCongelada — la puerta del candado (V1-E8z)', () => {
+  const abierta = {
+    folio: 1234n,
+    recetaAbiertaEn: new Date('2026-08-31T09:00:00.000Z'),
+    recetaAbiertaMotivo: 'el cliente cambió el cierre',
+  };
+
+  it('con la receta CERRADA no estorba (`recetaAbiertaEn` en null = todo como siempre)', () => {
+    expect(() =>
+      exigirCompraNoCongelada({ folio: 1234n, recetaAbiertaEn: null, recetaAbiertaMotivo: null }),
+    ).not.toThrow();
+  });
+
+  it('🔴 con la receta ABIERTA frena, nombra la ORDEN, la FECHA y el MOTIVO', () => {
+    const error = (() => {
+      try {
+        exigirCompraNoCongelada(abierta);
+        return null;
+      } catch (e) {
+        return e as Error;
+      }
+    })();
+
+    expect(error).not.toBeNull();
+    expect(error?.message).toContain('1234');
+    expect(error?.message).toContain('2026-08-31');
+    expect(error?.message).toContain('el cliente cambió el cierre');
+    expect(error?.message).toContain('CONGELADA');
+  });
+
+  it('⭐ y NO dice «todavía no la libera Desarrollo»: eso sería mentira y manda a pedir una firma que ya existe', () => {
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/ABIERTA para corregirse/);
+    expect(() => exigirCompraNoCongelada(abierta)).not.toThrow(/todavía no la libera/);
+  });
+
+  it('dice las DOS cosas que el comprador necesita saber: quién la cierra y qué NO está frenado', () => {
+    // Sin el «dónde se cierra», el 409 es un muro. Sin el «cortar y producir no están bloqueados»,
+    // medio taller cree que la producción se paró (la misma aclaración que ya lleva la otra puerta).
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/Desarrollo/);
+    expect(() => exigirCompraNoCongelada(abierta)).toThrow(/cortar y producir/);
+  });
+
+  it('sin motivo guardado (dato viejo) NO se rompe: frena igual y no inventa texto', () => {
+    // REGLA 0-B: la única pregunta es «¿funciona bien cuando el dato NO está?». Aquí sí: el candado
+    // frena, y sencillamente no hay motivo que citar.
+    const sinMotivo = { ...abierta, recetaAbiertaMotivo: null };
+    expect(() => exigirCompraNoCongelada(sinMotivo)).toThrow(/CONGELADA/);
+    expect(() => exigirCompraNoCongelada(sinMotivo)).not.toThrow(/Motivo/);
+  });
+});
+
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — DE LO QUE ACABA DE CAMBIAR, ¿QUÉ YA ESTABA COMPRADO?**
+ *
+ * Es el filtro que decide si el aviso sale o no, y por eso se prueba solo: si dijera que sí de más,
+ * cada edición de la receta gritaría *"¡ya está comprado!"* y el aviso se volvería ruido; si dijera
+ * que no de más, volvería el silencio que la etapa vino a romper.
+ */
+describe('⭐ renglonesTocadosYaComprados — el filtro del aviso', () => {
+  const OC = { idOrdenCompra: 100, folio: 12, estatus: 'autorizada' as const, recibida: false };
+  const receta = {
+    telas: [
+      tela({ id: 1, idTela: 10, nombre: 'Jersey', ocsComprometidas: [OC] }),
+      // ⚠️ La tela SIN comprar existe a propósito: sin ella, quitar el filtro de "ya comprado" en
+      // la rama de TELA no ponía roja ninguna prueba (mutación superviviente medida el 1-sep-2026).
+      tela({ id: 4, idTela: 11, nombre: 'Felpa' }),
+    ],
+    avios: [
+      avio({ id: 2, idAvio: 20, clave: 'J01', descripcion: 'Jareta', ocsComprometidas: [OC] }),
+      avio({ id: 3, idAvio: 21, clave: 'B01', descripcion: 'Botón' }),
+    ],
+  };
+
+  it('un renglón tocado que SÍ está comprado sale, con el nombre con el que se le llama', () => {
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'tela', idRenglon: 1 }])).toEqual([
+      { material: 'Jersey', ocs: [OC] },
+    ]);
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 2 }])).toEqual([
+      { material: 'J01 — Jareta', ocs: [OC] },
+    ]);
+  });
+
+  it('🔴 un renglón tocado que NO está comprado NO sale (si no, el aviso sería ruido de fondo)', () => {
+    // Las DOS ramas, tela y avío: cada una tiene su `find` y su filtro, y una puede perderlo sola.
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 3 }])).toEqual([]);
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'tela', idRenglon: 4 }])).toEqual([]);
+  });
+
+  it('no se cuela un renglón que NADIE tocó, aunque esté comprado', () => {
+    // Rojo si alguien "simplifica" leyendo toda la receta en vez de la lista de tocados: entonces
+    // cambiar el botón avisaría sobre la jareta, que nadie movió.
+    expect(renglonesTocadosYaComprados(receta, [])).toEqual([]);
+  });
+
+  it('el mismo renglón tocado dos veces se nombra UNA', () => {
+    expect(
+      renglonesTocadosYaComprados(receta, [
+        { tipo: 'tela', idRenglon: 1 },
+        { tipo: 'tela', idRenglon: 1 },
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it('un ARTE nunca sale: ninguna línea de OC puede apuntar a un arte', () => {
+    // 🔴 El id es el de un renglón de AVÍO **comprado**, y ahí está toda la prueba: los ids son por
+    // tabla, así que un arte 2 y un avío 2 conviven. Con un id que no choca con nada, tratar al
+    // arte como avío pasaba verde por accidente (mutación superviviente medida el 1-sep-2026).
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'arte', idRenglon: 2 }])).toEqual([]);
+  });
+
+  it('un renglón que ya no está en la receta (borrado) no rompe nada', () => {
+    expect(renglonesTocadosYaComprados(receta, [{ tipo: 'avio', idRenglon: 999 }])).toEqual([]);
   });
 });

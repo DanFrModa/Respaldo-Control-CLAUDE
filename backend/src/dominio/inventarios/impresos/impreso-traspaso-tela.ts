@@ -14,6 +14,19 @@
  * (el cortador dueño del almacén destino — `Almacen.idCortador`, §Post-F9.13) y el detalle por color
  * con AMBOS componentes (cuerpo y complemento/cardigan, que viajan juntos en el renglón).
  *
+ * ⭐ **Y DESDE LA FILA 0.142, EL DESGLOSE POR LOTE** (decisión P4 del lead). El traspaso reparte lo
+ * que se mueve entre los lotes del origen (FIFO por folio de partida), y cada lote va en SU renglón
+ * del kardex ⇒ la hoja sale con un renglón por lote, nombrándolo con el **folio de la partida** y el
+ * **lote del proveedor**. Es lo que hace útil el papel en el anaquel: quien recibe puede casar el
+ * rollo físico —que trae el número del proveedor escrito— con lo que dice la nota, en vez de recibir
+ * «300 kg de marino» sin saber de cuál tono. Un renglón que ninguna partida explica sale con «—», que
+ * es la verdad; y eso pasa por **cuatro** motivos, no sólo uno — los mismos cuatro del mapa de
+ * `dominio/inventarios/previa-salida-tela-orden.ts`: tela traspasada **antes** de la 0.142 (REGLA
+ * 0-B), tela entrada por el **ajuste de entrada del conteo cíclico**, tela devuelta al **cancelar
+ * una salida** que tampoco llevaba lote, y **tela que el traspaso de hoy tampoco puede nombrar**
+ * —porque el origen ya la tenía anónima, o porque el TOPE del reparto se niega a nombrar un lote
+ * que la existencia no respalda—.
+ *
  * REIMPRIMIBLE desde el historial (el kardex por color), no solo al momento de guardar — mismo
  * criterio que la reimpresión de producción de V1-E3a. Y un traspaso CANCELADO **no se imprime**: su
  * papel no debe volver a salir con un bulto (misma regla que los envíos a maquila).
@@ -63,6 +76,10 @@ export interface RenglonImpresoTraspasoTela {
   nombreComplemento: string | null;
   /** Cantidad del complemento; null = la tela no lleva complemento. */
   cantidadComplemento: number | null;
+  /** Folio de la PARTIDA de la que sale esta tela (fila 0.142); null = el sistema no lo sabe. */
+  partidaFolio: number | null;
+  /** Número de lote del PROVEEDOR de esa partida (lo que viene escrito en el rollo); o null. */
+  loteProveedor: string | null;
 }
 
 /** Todo lo que necesita el impreso del traspaso, ya resuelto (sin BD) → función pura. */
@@ -94,6 +111,8 @@ const incluirPata = {
       tela: { select: { nombre: true, nombreCuerpo: true, nombreComplemento: true } },
       telaColor: { select: { nombre: true, pantone: true } },
       lote: { select: { clave: true } },
+      // Fila 0.142: el lote de origen que el traspaso repartió (NULL en lo traspasado antes).
+      partida: { select: { folio: true, loteProveedor: true } },
     },
   },
 } satisfies Prisma.MovimientoInclude;
@@ -190,6 +209,8 @@ export async function armarDatosImpresoTraspasoTela(
     cantidadCuerpo: Number(d.cantidad),
     nombreComplemento: d.tela.nombreComplemento,
     cantidadComplemento: d.cantidadComplemento === null ? null : Number(d.cantidadComplemento),
+    partidaFolio: d.partida === null ? null : Number(d.partida.folio),
+    loteProveedor: d.partida?.loteProveedor ?? null,
   }));
 
   return {
@@ -212,9 +233,11 @@ export async function armarDatosImpresoTraspasoTela(
 
 const estilos = StyleSheet.create({
   cTela: { flexGrow: 1, flexBasis: 0 },
-  cColor: { width: '22%' },
-  cPantone: { width: '14%' },
-  cCantidad: { width: '14%', textAlign: 'right' },
+  cColor: { width: '20%' },
+  cPantone: { width: '12%' },
+  /** Fila 0.142 — el lote de origen: lo que quien recibe casa contra el rollo físico. */
+  cLote: { width: '18%' },
+  cCantidad: { width: '13%', textAlign: 'right' },
   cTotalEtiqueta: { flexGrow: 1, flexBasis: 0, fontFamily: FUENTE.negrita },
   firmas: { flexDirection: 'row', gap: 24, marginTop: 28 },
   firma: { flexGrow: 1, flexBasis: 0, borderTopWidth: 0.5, paddingTop: 4, textAlign: 'center' },
@@ -230,13 +253,34 @@ function campo(etiqueta: string, valor: string | null): ReactElement {
   );
 }
 
+/**
+ * Cómo se nombra el LOTE de un renglón en la hoja (fila 0.142). El **lote del proveedor** va
+ * primero porque es lo que viene escrito en el rollo —lo que quien recibe puede casar a la vista— y
+ * el **folio de la partida** entre paréntesis, que es lo que el sistema sabe buscar. Sin partida
+ * (tela traspasada antes de la 0.142) sale «—»: decir un lote que no se sabe sería peor que callar.
+ */
+export function etiquetaLoteImpreso(
+  partidaFolio: number | null,
+  loteProveedor: string | null,
+): string {
+  if (partidaFolio === null) return '—';
+  const folio = `#${String(partidaFolio)}`;
+  return loteProveedor === null || loteProveedor.trim() === ''
+    ? folio
+    : `${loteProveedor} (${folio})`;
+}
+
 /** Formatea una cantidad de tela (kg/m) con separadores y hasta 3 decimales. */
 function cantidad(valor: number | null): string {
   if (valor === null) return '—';
   return valor.toLocaleString('es-MX', { maximumFractionDigits: 3 });
 }
 
-/** Tabla del detalle: una fila por tela × color, con los DOS componentes. */
+/**
+ * Tabla del detalle: una fila por tela × color **× LOTE**, con los DOS componentes. Desde la fila
+ * 0.142 un mismo color puede ocupar VARIAS filas —una por cada partida que aportó al traspaso—,
+ * porque así es como el kardex lo guardó; el total de abajo sigue siendo el del traspaso completo.
+ */
 function tablaRenglones(datos: DatosImpresoTraspasoTela): ReactElement {
   // Los nombres de los componentes salen de la PRIMERA tela que los declare (el impreso es de un
   // envío, casi siempre de la misma tela); si nadie los nombra, se usan los genéricos.
@@ -250,6 +294,7 @@ function tablaRenglones(datos: DatosImpresoTraspasoTela): ReactElement {
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cTela] }, 'Tela'),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cColor] }, 'Color'),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cPantone] }, 'Pantone'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cLote] }, 'Lote'),
     h(
       Text,
       { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cCantidad] },
@@ -269,6 +314,11 @@ function tablaRenglones(datos: DatosImpresoTraspasoTela): ReactElement {
       h(Text, { style: [estilosDoc.celda, estilos.cTela] }, r.tela),
       h(Text, { style: [estilosDoc.celda, estilos.cColor] }, r.colorOLote),
       h(Text, { style: [estilosDoc.celda, estilos.cPantone] }, r.pantone ?? '—'),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.cLote] },
+        etiquetaLoteImpreso(r.partidaFolio, r.loteProveedor),
+      ),
       h(Text, { style: [estilosDoc.celda, estilos.cCantidad] }, cantidad(r.cantidadCuerpo)),
       h(Text, { style: [estilosDoc.celda, estilos.cCantidad] }, cantidad(r.cantidadComplemento)),
     ),
@@ -284,6 +334,7 @@ function tablaRenglones(datos: DatosImpresoTraspasoTela): ReactElement {
     ),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cColor] }, ''),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cPantone] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cLote] }, ''),
     h(
       Text,
       { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cCantidad] },

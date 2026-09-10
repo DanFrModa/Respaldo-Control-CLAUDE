@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
+
 /**
  * Esquemas Zod de las ETAPAS de producción (F3-E2: corte + envío a maquila unificado; doc
  * 03-Produccion Pasos 3 y 4 + flujo paralelo de estampado, Observación 4). UNA sola definición de
@@ -26,12 +28,23 @@ const esquemaEtapaTalla = z.object({
     .min(0, { error: 'La cantidad no puede ser negativa' }),
 });
 
-/** Un renglón de la matriz de la etapa: un color con sus cantidades por talla (D4). */
+/**
+ * Un renglón de la matriz de la etapa: un color × su PACK, con sus cantidades por talla (D4).
+ *
+ * ⭐ El PACK (§Post-F9.10) es OBLIGATORIO en corte y en entrega a maquila **cuando la orden maneja
+ * packs** — *«cada tendido es de un pack»* — y tiene que ser uno de los packs de la orden. En una
+ * orden SIN packs el campo se omite (o va vacío) y todo se comporta igual que siempre; mandarlo en
+ * ese caso es un error de captura y el dominio lo rechaza, no lo ignora.
+ */
 const esquemaEtapaLinea = z.object({
   idColor: z
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  pack: esquemaPackEntrada.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). OBLIGATORIO en corte y entrega a maquila si la ' +
+      'orden maneja packs; ausente o vacío en las órdenes que no los manejan.',
+  ),
   tallas: z
     .array(esquemaEtapaTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
@@ -50,9 +63,28 @@ export type DatosEtapaLineaEntrada = z.infer<typeof esquemaEtapaLinea>;
 // ── Corte ────────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * PRECIO POR PRENDA pactado con el proveedor de un SERVICIO sobre la orden (corte/empaque, 0.114).
+ * Misma forma que el `precioPactado` del envío a maquila: opcional, ≥ 0 y con dos decimales — la
+ * columna es `Decimal(12,2)` y un tercer decimal se perdería en silencio al guardarlo.
+ *
+ * Es la mitad que faltaba de *«sólo hay que poner su cantidad y precio para meterlo en la OP»*: sin
+ * él, el cargo del cortador nace SIN precio y hay que teclearlo aparte al validarlo — la doble
+ * captura que v2 elimina.
+ */
+const esquemaPrecioServicio = z
+  .number({ error: 'El precio pactado debe ser un número' })
+  .min(0, { error: 'El precio pactado no puede ser negativo' })
+  .multipleOf(0.01, { error: 'El precio pactado no puede tener más de 2 decimales' });
+
+/**
  * Alta de un CORTE de una orden (doc 03-Produccion Paso 3). `idTipoProceso` es NULL (el corte no
  * es maquila); `idTercero` es el CORTADOR (Proveedor con rol `corte`). Sobre-corte LIBRE (f): no
  * hay tope de cantidad — la pantalla avisa, el servidor acepta.
+ *
+ * ⭐ 0.114 — el corte es PAGABLE. Daniel: *«en corte no necesitas mandar y recibir mercancía… sólo
+ * hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene»*. Con
+ * `precioPactado` el corte genera su CARGO EsMa (`servicio: 'corte'`) igual que el recibo de
+ * maquila genera el suyo, sin envío ni recibo de por medio.
  */
 export const esquemaCorteCrear = z
   .object({
@@ -68,6 +100,9 @@ export const esquemaCorteCrear = z
     fecha: z.iso
       .date({ error: 'La fecha del corte es obligatoria (YYYY-MM-DD)' })
       .describe('Fecha del corte (YYYY-MM-DD).'),
+    precioPactado: esquemaPrecioServicio
+      .nullish()
+      .describe('Precio por prenda pactado con el cortador (base de su cargo EsMa), opcional.'),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaEtapaMatriz,
   })
@@ -75,6 +110,44 @@ export const esquemaCorteCrear = z
 
 /** Datos validados de alta de corte. */
 export type DatosCorteCrear = z.infer<typeof esquemaCorteCrear>;
+
+// ── Empaque (servicio sobre la orden, hermano del corte — 0.114) ────────────────────────────────
+
+/**
+ * Alta de un EMPAQUE de una orden (0.114). Calcado del corte y por la MISMA razón: Daniel dictó que
+ * *«el empaque no toca el inventario»* y que *«una maquila de empaque»* se paga desde la orden. Así
+ * que `idTipoProceso` va NULL (no es maquila: no hay envío ni recibo) e `idTercero` es el EMPACADOR
+ * (Proveedor con rol `empaque`).
+ *
+ * ⭐ LA CANTIDAD ES PROPIA, no se deriva del recibo (regla de C&A que dictó Daniel): se fabrican
+ * 1,000 y se empacan 990 — se paga lo empacado y las 10 restantes se quedan quietas en inventario.
+ * Por eso el servidor NO topa el empaque contra lo recibido ni contra lo cortado (igual que el
+ * sobre-corte libre, decisión (f)): la pantalla puede AVISAR, el servidor acepta.
+ */
+export const esquemaEmpaqueCrear = z
+  .object({
+    idOrden: z
+      .number({ error: 'La orden es obligatoria' })
+      .int({ error: 'El id de la orden debe ser entero' })
+      .positive({ error: 'El id de la orden debe ser positivo' }),
+    idEmpacador: z
+      .number({ error: 'El empacador es obligatorio' })
+      .int({ error: 'El id del empacador debe ser entero' })
+      .positive({ error: 'El id del empacador debe ser positivo' })
+      .describe('Proveedor con rol "empaque".'),
+    fecha: z.iso
+      .date({ error: 'La fecha del empaque es obligatoria (YYYY-MM-DD)' })
+      .describe('Fecha del empaque (YYYY-MM-DD).'),
+    precioPactado: esquemaPrecioServicio
+      .nullish()
+      .describe('Precio por prenda pactado con el empacador (base de su cargo EsMa), opcional.'),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: esquemaEtapaMatriz,
+  })
+  .describe('Datos de un empaque de orden (color×talla, D4; cantidad propia, sin tope).');
+
+/** Datos validados de alta de empaque. */
+export type DatosEmpaqueCrear = z.infer<typeof esquemaEmpaqueCrear>;
 
 // ── Envío a maquila (UN servicio para costura Y estampado) ──────────────────────────────────────
 
@@ -167,6 +240,9 @@ const esquemaEtapaTallaSalida = z.object({
 const esquemaEtapaLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = sin pack.',
+  ),
   tallas: z.array(esquemaEtapaTallaSalida).describe('Cantidades por talla.'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
 });
@@ -180,12 +256,16 @@ export const esquemaEtapaSalida = z
     idOrden: z.number().int().describe('Orden a la que pertenece.'),
     folioOrden: z.number().int().describe('Folio de la orden.'),
     tipo: z
-      .enum(['corte', 'envio_maquila', 'recibo_maquila', 'entrega_cliente'])
+      .enum(['corte', 'envio_maquila', 'recibo_maquila', 'entrega_cliente', 'empaque'])
       .describe('Tipo de etapa.'),
-    idTipoProceso: z.number().int().nullable().describe('Proceso de maquila (null en corte).'),
-    tipoProceso: z.string().nullable().describe('Nombre del proceso (null en corte).'),
-    idTercero: z.number().int().nullable().describe('Cortador/maquilero (Proveedor).'),
-    tercero: z.string().nullable().describe('Nombre del cortador/maquilero.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso de maquila (null en corte y empaque: son servicios sobre la orden).'),
+    tipoProceso: z.string().nullable().describe('Nombre del proceso (null en corte y empaque).'),
+    idTercero: z.number().int().nullable().describe('Cortador/maquilero/empacador (Proveedor).'),
+    tercero: z.string().nullable().describe('Nombre del cortador/maquilero/empacador.'),
     fecha: z.string().describe('Fecha de la etapa (YYYY-MM-DD).'),
     fechaCompromiso: z.string().nullable().describe('Fecha compromiso (YYYY-MM-DD) o null.'),
     precioPactado: z
@@ -266,10 +346,16 @@ export type EtapasOrdenQuery = z.infer<typeof esquemaEtapasOrdenQuery>;
 
 // ── Pendientes por orden (derivados, sin acumuladores) ──────────────────────────────────────────
 
-/** Pendiente de UNA celda color×talla, para una etapa concreta. */
+/**
+ * Pendiente de UNA celda color×talla×PACK, para una etapa concreta. El pack entra en la LLAVE de la
+ * celda (§Post-F9.10): sin él, la pantalla ofrecería un tope agregado por color que el servidor
+ * rechaza pack por pack al enviar (sobre-envío ESTRICTO, decisión (g)). En una orden sin packs va
+ * vacío y la celda es la de siempre.
+ */
 const esquemaPendienteCelda = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe('PACK de la celda. CADENA VACÍA = la orden no maneja packs.'),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   cantidad: z.number().int().describe('Cantidad pendiente (puede ser negativa por sobre-corte).'),
@@ -308,6 +394,88 @@ export const esquemaPendientesOrden = z
 
 /** Forma de los pendientes de una orden tal como los devuelve la API. */
 export type PendientesOrden = z.infer<typeof esquemaPendientesOrden>;
+
+// ── Sugerencia de captura: "corte completo" / "lo que se cortó" (V1-E8i, §Post-F9.131) ─────────
+
+/**
+ * El veredicto de la sugerencia: `'hay'` (sí se puede precargar) y las **cuatro** razones por las que
+ * no. Es un dato del DOMINIO, no un texto de pantalla: la razón la decide el servidor (que es quien
+ * sabe cuánto se pidió, se cortó y se envió) y la pantalla solo la traduce a palabras de taller. Sin
+ * esto, el botón se quedaría mudo y el usuario no sabría si falla el sistema o es que de verdad ya
+ * no queda nada.
+ */
+export const MOTIVOS_SUGERENCIA = [
+  'hay',
+  'orden-sin-matriz',
+  'todo-cortado',
+  'nada-cortado',
+  'todo-enviado',
+] as const;
+
+/** Una celda color×talla×PACK que la captura puede precargar (siempre positiva). */
+const esquemaCeldaSugerida = z.object({
+  idColor: z.number().int().describe('Id del color.'),
+  color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe('PACK de la celda. CADENA VACÍA = la orden no maneja packs.'),
+  idTalla: z.number().int().describe('Id de la talla.'),
+  etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
+  cantidad: z.number().int().positive().describe('Cantidad sugerida para esta celda (> 0).'),
+});
+
+/**
+ * Lo que un botón de precarga puede llenar en la captura de una etapa (V1-E8i). NO guarda nada:
+ * es el atajo de captura que pidió Daniel para no teclear talla por talla lo que casi siempre es
+ * exactamente lo esperado.
+ *
+ *  • base `corte` → lo que FALTA POR CORTAR = Σ orden − Σ corte, por celda, sin negativos. Con la
+ *    orden todavía sin cortar es exactamente "lo que se ordenó", que es lo que pidió Daniel; con un
+ *    corte parcial ya capturado es lo que falta, que es lo único que se puede cortar de nuevo sin
+ *    duplicar piezas.
+ *  • base `envio` → lo que se puede ENVIAR TODAVÍA a ESE proceso = Σ corte − Σ enviado a ese
+ *    proceso, por celda, sin negativos. Respeta la decisión (g) (sobre-envío ESTRICTO): precargar
+ *    el bruto cortado tras un primer envío parcial produciría un guardado que el servidor rechaza.
+ */
+export const esquemaSugerenciaCaptura = z
+  .object({
+    idOrden: z.number().int().describe('Orden.'),
+    base: z
+      .enum(['corte', 'envio'])
+      .describe('Qué captura se precarga: el corte o el envío a un proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso al que se enviaría (null cuando la base es el corte).'),
+    celdas: z
+      .array(esquemaCeldaSugerida)
+      .describe('Celdas color×talla a precargar (solo las positivas).'),
+    total: z.number().int().describe('Suma de las celdas sugeridas.'),
+    motivo: z
+      .enum(MOTIVOS_SUGERENCIA)
+      .describe(
+        'hay = sí hay qué precargar; el resto explica por qué no (orden sin matriz color×talla, ' +
+          'ya se cortó todo, todavía no se corta nada, o ya se envió todo lo cortado).',
+      ),
+  })
+  .describe('Qué puede precargar el botón de captura de una etapa (no guarda nada).');
+
+/** Forma de la sugerencia de captura tal como la devuelve la API. */
+export type SugerenciaCaptura = z.infer<typeof esquemaSugerenciaCaptura>;
+
+/** Filtros de la sugerencia de captura (querystring): el proceso al que se enviaría, si aplica. */
+export const esquemaSugerenciaCapturaQuery = z
+  .object({
+    idTipoProceso: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Proceso de maquila al que se enviaría. Sin él, la sugerencia es la del CORTE.'),
+  })
+  .describe('Filtros de la sugerencia de captura de una etapa.');
+
+/** Parámetros de la sugerencia de captura ya coaccionados. */
+export type SugerenciaCapturaQuery = z.infer<typeof esquemaSugerenciaCapturaQuery>;
 
 // ── Corte semanal por cortador ──────────────────────────────────────────────────────────────────
 

@@ -12,7 +12,9 @@ import { useDebounce } from '@/lib/useDebounce';
  * `SelectorProveedor`: typeahead con debounce + anti-carrera del kit — el catálogo puede
  * rebasar cualquier página cargada, y sugerir solo la página 1 invitaría a duplicar
  * "Verde bandera" nada más por no verlo). Los colores ya usados en la matriz no se
- * ofrecen. Si lo tecleado NO existe según la búsqueda YA RESUELTA y el usuario TIENE el
+ * ofrecen — salvo cuando la orden se fabrica por TENDIDOS (§Post-F9.10), donde el padre
+ * manda `idsUsados` VACÍO a propósito porque el segundo tendido del Negro es otra fila
+ * del MISMO color. Si lo tecleado NO existe según la búsqueda YA RESUELTA y el usuario TIENE el
  * permiso que exige el endpoint de crear color (`colores.administrar` — la opción NO se
  * muestra sin él), ofrece "Crear color …": llama el endpoint EXISTENTE `POST /api/colores`
  * y agrega la fila con el color recién creado. El backend valida y autoriza (A1); crear
@@ -29,7 +31,10 @@ export function AgregarColorMatriz({
   puedeCrear,
   deshabilitado = false,
 }: {
-  /** Ids de color de PRENDA que YA están en la matriz (no se vuelven a ofrecer). */
+  /**
+   * Ids de color de PRENDA que YA están en la matriz (no se vuelven a ofrecer). El padre lo manda
+   * VACÍO cuando la orden maneja packs: ahí repetir el color es capturar otro tendido, no duplicar.
+   */
   idsUsados: ReadonlySet<number>;
   /** Agrega la fila del color elegido/creado a la matriz. */
   alAgregar: (idColor: number, nombre: string) => void;

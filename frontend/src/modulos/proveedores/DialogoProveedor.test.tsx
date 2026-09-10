@@ -1,11 +1,20 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Proveedor, ProveedorCrear, RolProveedor } from '@/api/tipos';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
+import type { Proveedor, ProveedorCrear, ProveedorCuentaPago, RolProveedor } from '@/api/tipos';
 import { renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoProveedor } from './DialogoProveedor';
+
+// El editor de cuentas AVISA con `toast.warning` al retirar la cuenta por omisión (R2); hay que
+// poder verlo. `success`/`error` se mockean también porque el resto del diálogo los usa.
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 // Se controla la capa de datos: las pruebas no tocan la red. Se capturan los
 // argumentos de crear/actualizar para verificar el cuerpo (roles incluidos).
@@ -13,6 +22,10 @@ const crearMutate = vi.fn();
 const actualizarMutate = vi.fn();
 const crearContactoMutate = vi.fn();
 const actualizarContactoMutate = vi.fn();
+const crearCuentaPagoMutate = vi.fn();
+const actualizarCuentaPagoMutate = vi.fn();
+/** Lo que devuelve `useCuentasPagoProveedor` (activas + retiradas). Cada prueba lo fija si le toca. */
+let cuentasDeLaConsulta: ProveedorCuentaPago[] | undefined;
 const analizarConstanciaMutate = vi.fn();
 const subirAdjuntoMutate = vi.fn();
 
@@ -41,6 +54,20 @@ vi.mock('@/api/proveedores', () => ({
   useCrearContactoProveedor: () => ({ mutate: crearContactoMutate, isPending: false }),
   useActualizarContactoProveedor: () => ({ mutate: actualizarContactoMutate, isPending: false }),
   useAnalizarConstancia: () => ({ mutate: analizarConstanciaMutate, isPending: false }),
+  // Hooks de 0.112: las CUENTAS de pago del proveedor (beneficiario + varias cuentas).
+  useCrearCuentaPagoProveedor: () => ({ mutate: crearCuentaPagoMutate, isPending: false }),
+  useActualizarCuentaPagoProveedor: () => ({
+    mutate: actualizarCuentaPagoMutate,
+    isPending: false,
+  }),
+  // La consulta propia del editor (activas + retiradas). `undefined` = todavía cargando, y el
+  // editor usa la semilla de la ficha; las pruebas del historial la fijan a mano.
+  useCuentasPagoProveedor: () => ({
+    data: cuentasDeLaConsulta,
+    isPending: cuentasDeLaConsulta === undefined,
+    isError: false,
+    error: null,
+  }),
 }));
 
 /** Proveedor de ejemplo (enriquecido R15) para las pruebas de edicion. */
@@ -64,6 +91,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     diasCredito: null,
     moneda: null,
     formaPago: null,
+    formaPagoPreferida: null,
     metodoPago: null,
     banco: null,
     clabe: null,
@@ -72,9 +100,10 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     notas: null,
     asegurado: null,
     obsPago: null,
-    modalidadFacturacion: null,
+    modalidadFacturacion: 'solo_con',
     roles: [],
     contactos: [],
+    cuentasPago: [],
     cantidadAdjuntos: 0,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
@@ -93,7 +122,24 @@ describe('<DialogoProveedor>', () => {
     actualizarContactoMutate.mockReset();
     analizarConstanciaMutate.mockReset();
     subirAdjuntoMutate.mockReset();
+    crearCuentaPagoMutate.mockReset();
+    actualizarCuentaPagoMutate.mockReset();
+    cuentasDeLaConsulta = undefined;
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.warning).mockClear();
   });
+
+  /**
+   * Elige la modalidad de facturación (fila 0.110). Es OBLIGATORIA, así que sin ella NINGÚN alta
+   * llega a enviarse: se llama en las pruebas que están midiendo OTRA regla, para que su fallo no
+   * se confunda con éste. Las pruebas que miden esta regla NO la llaman, a propósito.
+   */
+  async function elegirModalidad(
+    usuario: ReturnType<typeof userEvent.setup>,
+    valor: 'solo_con' | 'solo_sin' | 'ambos' = 'solo_con',
+  ): Promise<void> {
+    await usuario.selectOptions(screen.getByTestId('proveedor-modalidad-facturacion'), valor);
+  }
 
   it('en alta renderiza las secciones plegables y el selector de roles', () => {
     renderConProveedores(
@@ -139,6 +185,7 @@ describe('<DialogoProveedor>', () => {
     );
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin roles');
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     // No se llama a crear y se muestra el error de captura de roles.
@@ -146,24 +193,38 @@ describe('<DialogoProveedor>', () => {
     expect(await screen.findByText('Elige al menos un rol o servicio.')).toBeInTheDocument();
   });
 
-  it('si marca ¿factura? y deja el RFC vacío, no envía y muestra el error', async () => {
+  /**
+   * ⭐ FILA 0.124 — la casilla *"¿Emite factura (CFDI)?"* se retiró (contestaba lo mismo que
+   * «¿Cómo factura?» y podían contradecirse), y con ella se fue la regla de captura
+   * `factura ⇒ RFC + régimen`. NO se remapeó a la modalidad a propósito: habría bloqueado
+   * clasificar a los proveedores MIGRADOS, que llegan sin RFC (REGLA 0-B). El RFC se exige donde
+   * decide dinero —al capturarle un CFDI—, no aquí.
+   */
+  it('⭐ un proveedor que factura se puede guardar SIN RFC (fila 0.124)', async () => {
     const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Factura sin RFC' }));
+      },
+    );
     renderConProveedores(
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Factura sin RFC');
-    // Elige un rol (para aislar la regla fiscal de la regla de roles).
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
-    // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
+    await elegirModalidad(usuario, 'solo_con');
+    // Y la casilla vieja ya no existe: hay UNA sola pregunta de facturación en la pantalla.
     await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-    await usuario.click(await screen.findByTestId('proveedor-factura'));
+    expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
+
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
-    expect(crearMutate).not.toHaveBeenCalled();
-    expect(
-      await screen.findByText('Si el proveedor factura, captura su RFC y su régimen fiscal'),
-    ).toBeInTheDocument();
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.modalidadFacturacion).toBe('solo_con');
+    // El campo retirado NO viaja en el cuerpo (si volviera, volvería la contradicción).
+    expect('factura' in cuerpo).toBe(false);
   });
 
   it('crea un proveedor enviando los roles seleccionados inline', async () => {
@@ -181,6 +242,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo Prov');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-2'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -207,6 +269,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'BLOOM TEXTIL');
     await usuario.type(screen.getByTestId('proveedor-nombre-corto'), 'Bloom');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -233,6 +296,7 @@ describe('<DialogoProveedor>', () => {
     const campoCorto = screen.getByTestId('proveedor-nombre-corto');
     expect(campoCorto).toHaveValue('Bloom');
     await usuario.clear(campoCorto);
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -261,6 +325,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
     await usuario.click(await screen.findByTestId('proveedor-asegurado'));
     await usuario.type(screen.getByLabelText('Observaciones de pago'), 'paga viernes');
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -307,6 +372,7 @@ describe('<DialogoProveedor>', () => {
       />,
     );
 
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -342,6 +408,7 @@ describe('<DialogoProveedor>', () => {
     await usuario.click(screen.getByRole('button', { name: 'Contacto' }));
     const telefono = await screen.findByLabelText('Teléfono');
     await usuario.clear(telefono);
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -370,6 +437,7 @@ describe('<DialogoProveedor>', () => {
       />,
     );
 
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
@@ -394,6 +462,7 @@ describe('<DialogoProveedor>', () => {
 
     await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await elegirModalidad(usuario);
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -405,13 +474,15 @@ describe('<DialogoProveedor>', () => {
     expect('diasCredito' in cuerpo).toBe(false);
   });
 
-  // ── §Post-F9.56 punto 4: la pantalla OBEDECE la bandera de factura ──────────
+  // ── §Post-F9.56 punto 4: la pantalla OBEDECE si el proveedor factura ────────
+  // ⭐ Fila 0.124: quien lo dice es la MODALIDAD (`solo_sin` = no factura), no una casilla aparte.
   describe('si no emite CFDI, no se piden datos fiscales (§Post-F9.56 punto 4)', () => {
-    it('con la casilla APAGADA esconde RFC, régimen, uso de CFDI y CP, y lo explica', async () => {
+    it('con «solo sin factura» esconde RFC, régimen, uso de CFDI y CP, y lo explica', async () => {
       const usuario = userEvent.setup();
       renderConProveedores(
         <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
       );
+      await elegirModalidad(usuario, 'solo_sin');
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
 
       expect(await screen.findByTestId('aviso-sin-cfdi')).toBeInTheDocument();
@@ -421,16 +492,32 @@ describe('<DialogoProveedor>', () => {
       expect(screen.queryByLabelText('CP de expedición')).not.toBeInTheDocument();
     });
 
-    it('al ENCENDERLA aparecen los campos fiscales', async () => {
+    it('con «solo con factura» (o «ambos») aparecen los campos fiscales', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await elegirModalidad(usuario, 'solo_con');
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+      expect(screen.getByLabelText('Régimen fiscal (SAT)')).toBeInTheDocument();
+      expect(screen.queryByTestId('aviso-sin-cfdi')).not.toBeInTheDocument();
+
+      await elegirModalidad(usuario, 'ambos');
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+    });
+
+    // Mientras nadie conteste, los campos SE VEN: esconderlos antes de la respuesta obligaría a
+    // contestar en un orden que nadie pidió (y la modalidad ya es obligatoria para guardar).
+    it('sin modalidad elegida todavía, los campos fiscales se ven', async () => {
       const usuario = userEvent.setup();
       renderConProveedores(
         <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
       );
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      await usuario.click(await screen.findByTestId('proveedor-factura'));
 
       expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
-      expect(screen.getByLabelText('Régimen fiscal (SAT)')).toBeInTheDocument();
       expect(screen.queryByTestId('aviso-sin-cfdi')).not.toBeInTheDocument();
     });
   });
@@ -460,18 +547,25 @@ describe('<DialogoProveedor>', () => {
 
   // ── §Post-F9.55: la constancia PROPONE, la persona CONFIRMA ─────────────────
   describe('lector de la Constancia de Situación Fiscal', () => {
-    /** Propuesta de ejemplo con DOS regímenes (persona física). */
+    /**
+     * Propuesta de ejemplo con DOS regímenes (persona física).
+     *
+     * ⚠️ TODOS los datos son EVIDENTEMENTE SINTÉTICOS a propósito: nombre de relleno, el RFC
+     * GENÉRICO del SAT (`XAXX010101000`, el de "público en general") y un domicilio de mentira.
+     * Este repositorio es público y una constancia fiscal es justo el documento que amontona datos
+     * de una persona física: un fixture que *parezca* real acaba leyéndose como real.
+     */
     const PROPUESTA = {
       tipoPersona: 'fisica' as const,
-      rfc: 'MASD850101H29',
-      razonSocial: 'DANIELA MARTINEZ SOLIS',
-      curp: 'MASD850101HDFRRN04',
+      rfc: 'XAXX010101000',
+      razonSocial: 'FULANA DE TAL PÉREZ',
+      curp: 'XAXX010101MDFXXX00',
       regimenes: [
         { clave: '612', descripcion: 'Personas Físicas con Actividades Empresariales' },
         { clave: '626', descripcion: 'Régimen Simplificado de Confianza' },
       ],
-      codigoPostalExpedicion: '06600',
-      direccion: 'TAINE No. 412, Col. POLANCO, MIGUEL HIDALGO, C.P. 06600',
+      codigoPostalExpedicion: '00000',
+      direccion: 'CALLE FALSA No. 123, Col. DE PRUEBA, DEMARCACIÓN DE PRUEBA, C.P. 00000',
       advertencias: ['La constancia trae 2 regímenes: escoge cuál usar para el CFDI.'],
     };
 
@@ -500,13 +594,13 @@ describe('<DialogoProveedor>', () => {
 
       // Ya se ve la propuesta…
       expect(await screen.findByTestId('constancia-propuesta')).toBeInTheDocument();
-      expect(screen.getByTestId('constancia-rfc')).toHaveTextContent('MASD850101H29');
+      expect(screen.getByTestId('constancia-rfc')).toHaveTextContent('XAXX010101000');
       // …pero el formulario sigue INTACTO: el nombre no se llenó solo.
       expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('');
 
       await usuario.click(screen.getByTestId('usar-constancia'));
       expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue(
-        'DANIELA MARTINEZ SOLIS',
+        'FULANA DE TAL PÉREZ',
       );
     });
 
@@ -523,10 +617,10 @@ describe('<DialogoProveedor>', () => {
       await usuario.selectOptions(selector, '626');
       await usuario.click(screen.getByTestId('usar-constancia'));
 
-      // Al confirmar enciende la casilla de factura, así que los campos fiscales ya se ven.
+      // Los campos fiscales se ven mientras la modalidad no diga «solo sin factura» (fila 0.124).
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
       expect(await screen.findByLabelText('Régimen fiscal (SAT)')).toHaveValue('626');
-      expect(screen.getByLabelText('RFC')).toHaveValue('MASD850101H29');
+      expect(screen.getByLabelText('RFC')).toHaveValue('XAXX010101000');
     });
 
     it('⭐ CONSERVA el PDF como adjunto CONSTANCIA al guardar (no se lee y se tira)', async () => {
@@ -534,7 +628,7 @@ describe('<DialogoProveedor>', () => {
       conPropuesta();
       crearMutate.mockImplementation(
         (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
-          opciones?.onSuccess?.(proveedorEjemplo({ id: 42, nombre: 'DANIELA MARTINEZ SOLIS' }));
+          opciones?.onSuccess?.(proveedorEjemplo({ id: 42, nombre: 'FULANA DE TAL PÉREZ' }));
         },
       );
       renderConProveedores(
@@ -543,6 +637,7 @@ describe('<DialogoProveedor>', () => {
       await subirPdf(usuario);
       await usuario.click(await screen.findByTestId('usar-constancia'));
       await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario);
       await usuario.click(screen.getByTestId('guardar-proveedor'));
 
       await waitFor(() => expect(subirAdjuntoMutate).toHaveBeenCalledTimes(1));
@@ -569,13 +664,14 @@ describe('<DialogoProveedor>', () => {
       );
       await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin constancia');
       await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario);
       await usuario.click(screen.getByTestId('guardar-proveedor'));
 
       await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
       expect(subirAdjuntoMutate).not.toHaveBeenCalled();
     });
 
-    it('⭐ si NO se reconoció el régimen, NO enciende «emite factura» (no deja el alta trabada)', async () => {
+    it('⭐ la constancia NO contesta cómo factura: la modalidad se queda sin elegir (fila 0.124)', async () => {
       const usuario = userEvent.setup();
       // Formato que el lector no supo mapear: devuelve el texto crudo con clave ''.
       analizarConstanciaMutate.mockImplementation(
@@ -593,11 +689,13 @@ describe('<DialogoProveedor>', () => {
       await subirPdf(usuario);
       await usuario.click(await screen.findByTestId('usar-constancia'));
 
-      // La casilla queda apagada: con `factura` encendida y sin régimen, la regla de captura
-      // (`factura ⇒ RFC + régimen`) trabaría el guardado por un dato que el papel no traía.
+      // El papel prueba que está dado de alta en el SAT, NO que a nosotros nos facture siempre,
+      // nunca o de las dos formas (un taller registrado que nunca timbra es un caso real). Así que
+      // la modalidad la sigue eligiendo la persona, y mientras tanto los campos fiscales se ven.
+      expect(screen.getByTestId('proveedor-modalidad-facturacion')).toHaveValue('');
       await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
-      expect(await screen.findByTestId('proveedor-factura')).not.toBeChecked();
-      expect(screen.getByTestId('aviso-sin-cfdi')).toBeInTheDocument();
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+      expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
     });
 
     it('muestra las advertencias del papel sin bloquear el alta', async () => {
@@ -725,6 +823,519 @@ describe('<DialogoProveedor>', () => {
         id: 10,
         idContacto: 7,
         cuerpo: { activo: false },
+      });
+    });
+  });
+  // ── ⭐ MODALIDAD DE FACTURACIÓN OBLIGATORIA (fila 0.110, §Post-F9.186(a)) ──────────────────────
+  //
+  // Daniel: *"es un campo **obligatorio** de llenar. A fuerzas hay que definir si es con, sin o
+  // ambas"*. No es cosmético: decide de dónde sale el pago del proveedor (§Post-F9.184(f)).
+  describe('modalidad de facturación: obligatoria al dar de alta y al editar', () => {
+    it('⭐ un ALTA sin elegir modalidad NO se envía, y lo dice', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin clasificar');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      // A propósito NO se llama a `elegirModalidad`.
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      expect(crearMutate).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(
+          'Indica cómo factura este proveedor: solo con, solo sin, o de las dos formas',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('elegida la modalidad, el alta la manda en el cuerpo', async () => {
+      const usuario = userEvent.setup();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Ambos' }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Ambos');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario, 'ambos');
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+      const cuerpo = crearMutate.mock.calls[0]?.[0] as ProveedorCrear;
+      expect(cuerpo.modalidadFacturacion).toBe('ambos');
+    });
+
+    // ⚠️ REGLA 0-B: el proveedor MIGRADO (modalidad en null) se LEE con toda normalidad. Lo que no
+    // se puede es dejarlo así al guardar. Nada de auditar ni rellenar el dato viejo por detrás.
+    it('⭐ un proveedor MIGRADO sin modalidad se ABRE y se LEE sin que truene nada', () => {
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ nombre: 'Migrado de Access', modalidadFacturacion: null })}
+        />,
+      );
+
+      // La ficha abre, el nombre se ve, y el selector simplemente está sin elegir.
+      expect(screen.getByRole('heading', { name: 'Editar proveedor' })).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('Migrado de Access');
+      expect(screen.getByTestId('proveedor-modalidad-facturacion')).toHaveValue('');
+    });
+
+    /**
+     * ⭐ FILA 0.124 — LA CONTRADICCIÓN YA NO PUEDE DARSE.
+     *
+     * Aquí vivían cuatro pruebas del aviso de contradicción: el sistema arrastraba DOS preguntas
+     * sobre facturación —`factura` (*"¿Emite factura (CFDI)?"*) y `modalidadFacturacion`— y nada
+     * las ataba, así que un proveedor podía quedar contestado de las dos formas a la vez y **sus
+     * pagos se partían según por qué puerta entraran**. El aviso avisaba; no podía hacer más.
+     *
+     * Esta fila quitó la segunda pregunta. Ya no hay nada que comparar, así que el aviso se fue con
+     * ella y en su lugar queda esta prueba: **en la pantalla hay UNA sola pregunta de facturación**.
+     * Si alguien volviera a poner la casilla, esto se pone rojo.
+     */
+    it('⭐ ya no hay dos preguntas que se puedan contradecir (fila 0.124)', async () => {
+      const usuario = userEvent.setup();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Sin contradicción' }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin contradicción');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await elegirModalidad(usuario, 'solo_con');
+
+      // La casilla vieja no existe —ni con la sección Fiscal abierta— y por lo tanto tampoco el
+      // aviso que comparaba las dos respuestas.
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      expect(screen.queryByTestId('proveedor-factura')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('aviso-facturacion-contradictoria')).not.toBeInTheDocument();
+
+      // Y lo que se guarda lleva UNA sola respuesta: la modalidad.
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+      await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+      const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(cuerpo.modalidadFacturacion).toBe('solo_con');
+      expect('factura' in cuerpo).toBe(false);
+    });
+
+    it('⭐ …pero GUARDARLO sin elegirla NO envía; al elegirla, sí', async () => {
+      const usuario = userEvent.setup();
+      actualizarMutate.mockImplementation(
+        (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo());
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            modalidadFacturacion: null,
+            roles: [{ id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' }],
+          })}
+        />,
+      );
+
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+      expect(actualizarMutate).not.toHaveBeenCalled();
+
+      await elegirModalidad(usuario, 'solo_sin');
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+      const args = actualizarMutate.mock.calls[0]?.[0] as {
+        cuerpo: { modalidadFacturacion?: string | null };
+      };
+      // Y nunca viaja como `null`: vaciarla es justo lo que el backend rechaza.
+      expect(args.cuerpo.modalidadFacturacion).toBe('solo_sin');
+    });
+  });
+
+  /**
+   * ⭐⭐ LA SIEMBRA DEL FORMULARIO ES UNA VEZ POR APERTURA, NO POR RE-RENDER.
+   *
+   * 🔴 Regresión REAL, no teórica: la pantalla entrega a propósito la versión FRESCA del proveedor
+   * (para que los editores de adentro vean lo que acaban de agregar), así que el objeto cambia de
+   * IDENTIDAD cada vez que una cuenta o un contacto invalidan la lista — con el mismo contenido.
+   * Mientras `proveedor` fue dependencia del efecto de siembra, ese re-render disparaba
+   * `formulario.reset(...)`: quien estuviera corrigiendo el teléfono, el RFC o la razón social y
+   * todavía no hubiera guardado, **perdía lo escrito en silencio** en cuanto agregaba una cuenta.
+   * Y con ello se iba también la Constancia leída y aún no conservada.
+   */
+  describe('la siembra del formulario', () => {
+    /**
+     * Anfitrión que re-renderiza el MISMO diálogo montado con otro objeto de proveedor.
+     *
+     * ⚠️ Tiene que ser un anfitrión con estado y NO el `rerender` de testing-library: como el
+     * helper de render envuelve el árbol en los proveedores, un `rerender` monta el diálogo DE
+     * NUEVO — y un componente recién montado siempre siembra el formulario, así que la prueba
+     * pasaría igual con el efecto roto. (Comprobado por mutación: con `rerender` la prueba de
+     * abajo sobrevivía a quitarle `idEnEdicion` a las dependencias.)
+     */
+    function Anfitrion({
+      inicial,
+      siguiente,
+    }: {
+      inicial: Proveedor;
+      /** Lo que entrega el botón. Por omisión, una COPIA del inicial (identidad nueva). */
+      siguiente?: Proveedor;
+    }): React.JSX.Element {
+      const [p, setP] = useState<Proveedor>(inicial);
+      return (
+        <>
+          <button
+            data-testid="refrescar"
+            type="button"
+            onClick={() => setP(siguiente ?? { ...inicial })}
+          >
+            refrescar
+          </button>
+          <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={p} />
+        </>
+      );
+    }
+
+    it('un objeto NUEVO con el mismo contenido NO pisa lo que se está escribiendo', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<Anfitrion inicial={proveedorEjemplo({ telefono: '55-1111' })} />);
+
+      const nombre = screen.getByTestId('proveedor-nombre-corto');
+      await usuario.clear(nombre);
+      await usuario.type(nombre, 'BLOOM');
+      expect(nombre).toHaveValue('BLOOM');
+
+      // Llega la versión fresca (identidad nueva, contenido idéntico), como tras agregar una cuenta.
+      // `fireEvent` porque con el diálogo de radix abierto jsdom deja el body sin pointer-events.
+      fireEvent.click(screen.getByTestId('refrescar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('BLOOM');
+      });
+    });
+
+    it('pero pasar a OTRO proveedor sí vuelve a sembrar el formulario', async () => {
+      renderConProveedores(
+        <Anfitrion
+          inicial={proveedorEjemplo({ id: 10, nombreCorto: 'UNO' })}
+          siguiente={proveedorEjemplo({ id: 11, nombreCorto: 'DOS' })}
+        />,
+      );
+      expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('UNO');
+
+      fireEvent.click(screen.getByTestId('refrescar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('proveedor-nombre-corto')).toHaveValue('DOS');
+      });
+    });
+  });
+
+  // ── 0.112: las CUENTAS de pago, N por proveedor, con su beneficiario ────────
+  describe('cuentas de pago del proveedor', () => {
+    /** Una cuenta como la devuelve el API. */
+    function cuenta(sobre: Partial<Proveedor['cuentasPago'][number]> = {}) {
+      return {
+        id: 3,
+        idProveedor: 10,
+        beneficiario: 'Fulana de Tal',
+        banco: 'BBVA',
+        tipoCuenta: 'clabe' as const,
+        cuenta: '002010077777777771',
+        alias: '1',
+        esFiscal: true,
+        esDefault: true,
+        notas: null,
+        activo: true,
+        ...sobre,
+      };
+    }
+
+    it('el BANCO y la CLABE ya no se capturan en la sección Pago (0.112)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Pago' }));
+      expect(screen.queryByLabelText('Banco')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('CLABE')).not.toBeInTheDocument();
+    });
+
+    it('en ALTA no se pueden capturar todavía: pide guardar primero', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      expect(await screen.findByTestId('cuentas-pago-requiere-guardar')).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-cuentas-pago')).not.toBeInTheDocument();
+    });
+
+    it('en EDICIÓN lista las cuentas con su beneficiario y marcas, y permite agregar otra', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta()] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+
+      const editor = await screen.findByTestId('editor-cuentas-pago');
+      // El BENEFICIARIO es lo que se lee, no el nombre del proveedor.
+      expect(within(editor).getByText('Fulana de Tal')).toBeInTheDocument();
+      expect(within(editor).getByText('Por omisión')).toBeInTheDocument();
+      expect(within(editor).getByText('Cuenta fiscal')).toBeInTheDocument();
+
+      await usuario.type(screen.getByTestId('cuenta-beneficiario'), 'Zutano de Tal');
+      await usuario.type(screen.getByTestId('cuenta-numero'), '002010077777777771');
+      await usuario.click(screen.getByTestId('cuenta-es-fiscal'));
+      await usuario.click(screen.getByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      const args = crearCuentaPagoMutate.mock.calls[0]?.[0] as {
+        id: number;
+        cuerpo: { beneficiario: string; tipoCuenta: string; esFiscal: boolean };
+      };
+      expect(args.id).toBe(10);
+      expect(args.cuerpo).toMatchObject({
+        beneficiario: 'Zutano de Tal',
+        tipoCuenta: 'clabe',
+        esFiscal: true,
+      });
+    });
+
+    it('agregar sin beneficiario no llama al API y muestra el error', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('Escribe a nombre de quién está la cuenta.')).toBeInTheDocument();
+    });
+
+    it('retirar una cuenta manda activo:false (historial reutilizable, D3)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 9 })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 9,
+        cuerpo: { activo: false },
+      });
+    });
+
+    it('⭐ se puede EDITAR una cuenta capturada: el typo del beneficiario se corrige', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [cuenta({ id: 5, beneficiario: 'Fulana de Tl', alias: '1' })],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+
+      // El formulario se llena con lo que había (es el mismo, en modo edición).
+      expect(screen.getByTestId('titulo-formulario-cuenta')).toHaveTextContent('Editando');
+      expect(screen.getByTestId('cuenta-beneficiario')).toHaveValue('Fulana de Tl');
+      expect(screen.getByTestId('cuenta-alias')).toHaveValue('1');
+
+      await usuario.clear(screen.getByTestId('cuenta-beneficiario'));
+      await usuario.type(screen.getByTestId('cuenta-beneficiario'), 'Fulana de Tal');
+      await usuario.type(screen.getByTestId('cuenta-notas'), 'la corrigió el capturista');
+      await usuario.click(screen.getByTestId('guardar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate).not.toHaveBeenCalled();
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 5,
+        cuerpo: {
+          beneficiario: 'Fulana de Tal',
+          tipoCuenta: 'clabe',
+          esFiscal: true,
+          alias: '1',
+          notas: 'la corrigió el capturista',
+        },
+      });
+    });
+
+    it('editando, los opcionales vaciados viajan como null (para poder BORRARLOS)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, alias: '1' })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+      await usuario.clear(screen.getByTestId('cuenta-alias'));
+      await usuario.clear(screen.getByTestId('cuenta-banco'));
+      await usuario.click(screen.getByTestId('guardar-cuenta-pago'));
+
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        cuerpo: { alias: null, banco: null, notas: null },
+      });
+    });
+
+    it('cancelar la edición devuelve el formulario al modo ALTA', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5 })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('editar-cuenta-pago'));
+      await usuario.click(screen.getByTestId('cancelar-edicion-cuenta'));
+
+      expect(screen.getByTestId('titulo-formulario-cuenta')).toHaveTextContent(
+        'Agregar una cuenta',
+      );
+      expect(screen.getByTestId('cuenta-beneficiario')).toHaveValue('');
+      expect(screen.getByTestId('agregar-cuenta-pago')).toBeInTheDocument();
+    });
+
+    it('el alta puede capturar NOTAS (antes era una columna muerta desde la UI)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.type(await screen.findByTestId('cuenta-beneficiario'), 'Fulana de Tal');
+      await usuario.type(screen.getByTestId('cuenta-numero'), '002010077777777771');
+      await usuario.type(screen.getByTestId('cuenta-notas'), 'sólo hasta el día 15');
+      await usuario.click(screen.getByTestId('agregar-cuenta-pago'));
+
+      expect(crearCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        cuerpo: { notas: 'sólo hasta el día 15' },
+      });
+    });
+
+    it('⭐ una cuenta retirada NO se pinta también como activa (una sola fuente)', async () => {
+      const usuario = userEvent.setup();
+      // La consulta manda: la 5 sigue activa, la 6 está retirada. La ficha (semilla) está vieja y
+      // todavía trae la 6 como activa — antes eso las pintaba en las DOS listas.
+      cuentasDeLaConsulta = [
+        cuenta({ id: 5, beneficiario: 'Fulana de Tal' }),
+        cuenta({ id: 6, beneficiario: 'Zutano de Tal', esDefault: false, activo: false }),
+      ];
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [
+              cuenta({ id: 5, beneficiario: 'Fulana de Tal' }),
+              cuenta({ id: 6, beneficiario: 'Zutano de Tal', esDefault: false }),
+            ],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('ver-historial-cuentas'));
+
+      const activas = screen.getAllByTestId('cuenta-pago-proveedor');
+      const archivadas = screen.getAllByTestId('cuenta-pago-retirada');
+      expect(activas).toHaveLength(1);
+      expect(archivadas).toHaveLength(1);
+      expect(within(activas[0] as HTMLElement).getByText('Fulana de Tal')).toBeInTheDocument();
+      expect(within(archivadas[0] as HTMLElement).getByText('Zutano de Tal')).toBeInTheDocument();
+      // Y "Zutano de Tal" aparece UNA sola vez en toda la pantalla.
+      expect(screen.getAllByText('Zutano de Tal')).toHaveLength(1);
+    });
+
+    it('retirar la cuenta por omisión AVISA que el proveedor se quedó sin una (R2)', async () => {
+      const usuario = userEvent.setup();
+      actualizarCuentaPagoMutate.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.(cuenta({ id: 5, activo: false }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, esDefault: true })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast.warning).mock.calls[0]?.[0]).toMatch(/sin una|por omisión/i);
+    });
+
+    it('retirar una cuenta que NO es la por omisión no avisa nada', async () => {
+      const usuario = userEvent.setup();
+      actualizarCuentaPagoMutate.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.(cuenta({ id: 5, activo: false }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ cuentasPago: [cuenta({ id: 5, esDefault: false })] })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('retirar-cuenta-pago'));
+
+      expect(vi.mocked(toast.warning)).not.toHaveBeenCalled();
+    });
+
+    it('marcar otra por omisión manda esDefault:true (la anterior la apaga el backend)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            cuentasPago: [cuenta({ id: 12, esDefault: false, beneficiario: 'Perengano de Tal' })],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      await usuario.click(await screen.findByTestId('usar-cuenta-por-omision'));
+
+      expect(actualizarCuentaPagoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarCuentaPagoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idCuenta: 12,
+        cuerpo: { esDefault: true },
       });
     });
   });

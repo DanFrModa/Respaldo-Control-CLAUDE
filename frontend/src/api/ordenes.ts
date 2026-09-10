@@ -8,10 +8,15 @@ import {
 } from '@tanstack/react-query';
 
 import { api } from './cliente';
+// 0.061: cerrar/reabrir una orden congela y descongela su COSTO ⇒ hay que invalidar también las
+// consultas de costos, no sólo las de órdenes.
+import { CLAVE_COSTOS } from './costos';
 import { ErrorDeApi } from './errores';
 import type {
   Orden,
   OrdenCancelar,
+  OrdenCerrar,
+  OrdenReabrir,
   OrdenComentarioCrear,
   OrdenCopiarMatriz,
   OrdenEditar,
@@ -104,6 +109,36 @@ async function copiarMatriz(id: number, cuerpo: OrdenCopiarMatriz): Promise<Orde
 /** Cancela una orden (cancelación suave, exige motivo, `POST /api/ordenes/{id}/cancelar`). */
 async function cancelarOrden(id: number, cuerpo: OrdenCancelar): Promise<Orden> {
   const { data, error } = await api.POST('/api/ordenes/{id}/cancelar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * ⭐ CIERRA una orden (`POST /api/ordenes/{id}/cerrar`, 0.061): deja de admitir captura y CONGELA su
+ * costo unitario. Exige `ordenes.cerrar` (lo decide el backend, A1).
+ */
+async function cerrarOrden(id: number, cuerpo: OrdenCerrar): Promise<Orden> {
+  const { data, error } = await api.POST('/api/ordenes/{id}/cerrar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * ⭐ REABRE una orden cerrada (`POST /api/ordenes/{id}/reabrir`, 0.061): acto INVERSO auditado (D3),
+ * con motivo obligatorio. El costo vuelve a calcularse en vivo. Mismo permiso `ordenes.cerrar`.
+ */
+async function reabrirOrden(id: number, cuerpo: OrdenReabrir): Promise<Orden> {
+  const { data, error } = await api.POST('/api/ordenes/{id}/reabrir', {
     params: { path: { id } },
     body: cuerpo,
   });
@@ -224,6 +259,45 @@ export function useCancelarOrden(): UseMutationResult<Orden, ErrorDeApi, ArgsCan
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarOrden) => cancelarOrden(id, cuerpo),
     onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
+  });
+}
+
+/** Argumentos de cerrar una orden (0.061). */
+export interface ArgsCerrarOrden {
+  id: number;
+  cuerpo: OrdenCerrar;
+}
+
+/**
+ * ⭐ Cierra una orden e invalida su detalle y la lista. Tambien invalida el COSTO: cerrar congela el
+ * unitario, asi que la pantalla de costeo tiene que volver a leerlo o seguiria mostrando el vivo.
+ */
+export function useCerrarOrden(): UseMutationResult<Orden, ErrorDeApi, ArgsCerrarOrden> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCerrarOrden) => cerrarOrden(id, cuerpo),
+    onSuccess: async (_resultado, variables) => {
+      invalidar(queryClient, variables.id);
+      await queryClient.invalidateQueries({ queryKey: CLAVE_COSTOS });
+    },
+  });
+}
+
+/** Argumentos de reabrir una orden (0.061). */
+export interface ArgsReabrirOrden {
+  id: number;
+  cuerpo: OrdenReabrir;
+}
+
+/** ⭐ Reabre una orden cerrada e invalida lo mismo que cerrarla (el costo vuelve a lo vivo). */
+export function useReabrirOrden(): UseMutationResult<Orden, ErrorDeApi, ArgsReabrirOrden> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsReabrirOrden) => reabrirOrden(id, cuerpo),
+    onSuccess: async (_resultado, variables) => {
+      invalidar(queryClient, variables.id);
+      await queryClient.invalidateQueries({ queryKey: CLAVE_COSTOS });
+    },
   });
 }
 

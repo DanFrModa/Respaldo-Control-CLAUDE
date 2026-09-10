@@ -1,6 +1,7 @@
 /**
- * Rutas REST de la ENTRADA DE TELA por FACTURA/REMISIÓN sin orden de compra (etapa B1 — Daniel
- * `DECISIONES.md` §Post-F9.9 punto 7). Handlers DELGADOS (A1): validan (Zod compartido de
+ * Rutas REST de la ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor, SIEMPRE contra sus órdenes
+ * de compra (etapa B1; §Post-F9.159(a) cerró la vía "sin OC" que permitía §Post-F9.9 punto 7 —
+ * Daniel: *«sin OC no podemos recibir tela»*). Handlers DELGADOS (A1): validan (Zod compartido de
  * `src/contrato`), autorizan (`conPermiso`, A4) y delegan al dominio
  * `dominio/inventarios/entradas-tela` (y `adjuntos-entrada-tela` para el PDF de la factura). Las
  * reglas (folio atómico, partidas, kardex, inverso de cancelación, ocultamiento de importes del
@@ -103,7 +104,7 @@ export const rutasEntradasTela: FastifyPluginCallbackZod = (app, _opciones, done
     preHandler: app.conPermiso('inventario-telas.ver'),
     schema: {
       tags: ['inventario-telas'],
-      summary: 'Listar las entradas de tela por factura/remisión (sin orden de compra)',
+      summary: 'Listar las entradas de tela por factura/remisión del proveedor',
       security: SEGURIDAD_SESION,
       querystring: esquemaEntradasTelaQuery,
       response: { 200: esquemaEntradasTelaPagina, ...respuestasError },

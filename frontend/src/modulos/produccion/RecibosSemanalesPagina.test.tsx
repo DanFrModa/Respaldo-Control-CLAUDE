@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
@@ -17,8 +17,22 @@ const useRecibosSemanales = vi.fn<() => EstadoConsulta>();
 vi.mock('@/api/recibos', () => ({
   useRecibosSemanales: () => useRecibosSemanales(),
 }));
+// V1-E7g: el filtro de proveedor/maquilero es el `SelectorProveedor` (combobox con búsqueda en
+// SERVIDOR), que consulta por `useProveedoresPorRol`. El mock filtra por «contiene», igual que el
+// servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 1, nombre: 'Maquila SA' }] } }),
+  COD_ROL_PROVEEDOR: { corte: 'corte' },
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 1, nombre: 'Maquila SA' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 
 function reporte(): RecibosSemanales {
@@ -32,6 +46,8 @@ function reporte(): RecibosSemanales {
         totalRecibido: 180,
         totalPrimeras: 170,
         totalSegundas: 10,
+        // V1-E8k: aparte del total recibido — 4 prendas que llegaron sin terminar de coser.
+        totalIncompletas: 4,
         numRecibos: 3,
       },
     ],
@@ -58,6 +74,23 @@ describe('RecibosSemanalesPagina (F3-E4)', () => {
     expect(screen.getAllByText('180').length).toBeGreaterThan(0);
     expect(screen.getAllByText('170').length).toBeGreaterThan(0);
     expect(screen.getAllByText('10').length).toBeGreaterThan(0);
+  });
+
+  it('V1-E8k · muestra la columna de prendas INCOMPLETAS, aparte del total recibido', () => {
+    useRecibosSemanales.mockReturnValue({
+      data: reporte(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<RecibosSemanalesPagina />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver']),
+    });
+    const tabla = screen.getByTestId('recibos-semanales-tabla');
+    expect(within(tabla).getByText('Incompletas')).toBeInTheDocument();
+    expect(within(tabla).getByText('4')).toBeInTheDocument();
+    // El total recibido NO las incluye: 180 sigue siendo 180 (§Post-F9.136).
+    expect(within(tabla).getByText('180')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay recibos', () => {

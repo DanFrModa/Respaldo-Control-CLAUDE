@@ -196,6 +196,18 @@ describe('cambiosEstadoPorRequisitos (estado automático + sello de fechaComplet
       cambiosEstadoPorRequisitos({ estado: 'cancelada', fechaCompletada: null }, noCumple, AHORA),
     ).toBeNull();
   });
+
+  it('⭐ 0.061: CERRADA también gana — el cierre es un acto, no un derivado', () => {
+    // Sin esta guarda, el primer recálculo por requisitos BORRARÍA el cierre (lo pondría en
+    // `completa`/`capturada`) mientras `Orden.cerradaEn` sigue puesta: el badge mentiría y la
+    // orden se vería abierta aunque la guarda la siga bloqueando.
+    expect(
+      cambiosEstadoPorRequisitos({ estado: 'cerrada', fechaCompletada: null }, cumple, AHORA),
+    ).toBeNull();
+    expect(
+      cambiosEstadoPorRequisitos({ estado: 'cerrada', fechaCompletada: AHORA }, noCumple, AHORA),
+    ).toBeNull();
+  });
 });
 
 // ── Guardas del DES-COMPLETAR y del recálculo por BOM (26-jul-2026, tras revisión) ───

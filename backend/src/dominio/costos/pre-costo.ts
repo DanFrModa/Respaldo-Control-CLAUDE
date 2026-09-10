@@ -41,6 +41,7 @@ import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { conRecetaCompartida, conRecetaCompartidaDeUno } from '../modelos/receta-compartida.js';
 
 import { num, numOrNull, promedioSimple, redondear2, redondear4 } from './decimales.js';
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';
@@ -112,8 +113,7 @@ const incluirReceta = {
           clave: true,
           descripcion: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           // R5/B11: medidas ACTIVAS del avío "por medida" → su promedio simple gana la cascada.
           medidas: { where: { activo: true }, select: { precio: true } },
         },
@@ -225,14 +225,12 @@ function numerosPreCosto(modelo: ModeloConReceta, ultimos: UltimosPreciosCompra)
     );
     const resuelto = resolverPrecioAvioCatalogo({
       precioReferencia: numOrNull(a.avio.precioReferencia),
-      factorConversionAvio: numOrNull(a.avio.factorConversion),
       idAvioProveedor: a.idAvioProveedor,
       // R5/B11: el avío "por medida" se costea con el promedio de sus medidas (2ª divergencia).
       medidas: a.avio.medidas.map((m) => num(m.precio)),
       proveedores: a.avio.proveedores.map((p) => ({
         idProveedor: p.idProveedor,
         precio: numOrNull(p.precio),
-        factorConversion: numOrNull(p.factorConversion),
       })),
       ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', a.idAvio)),
       ultimaCompraProveedorAmarrado:
@@ -278,13 +276,21 @@ export async function calcularPreCosto(
   verificarPermiso(sesion, 'precostos.consultar');
   const cliente = clienteLectura(bd);
 
-  const modelo = await cliente.modelo.findUnique({
+  const propio = await cliente.modelo.findUnique({
     where: { id: idModelo },
     include: incluirReceta,
   });
-  if (modelo === null) {
+  if (propio === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
+  // 🔴 V1-E9b — LA RECETA COMPARTIDA POR `include` (§Post-F9.167). Aquí la receta llega por NOMBRE
+  // DE RELACIÓN (`telas`/`avios`/`avios.tallas`/`artes`) sin nombrar nunca la tabla: es la clase de
+  // lectura que el conteo del plan no vio. Sin este injerto, un modelo de producción DERIVADO
+  // precostearía con la receta VACÍA —sólo maquila, corte y empaque— sin lanzar y sin verse raro,
+  // y de ese número sale el precio que se cotiza en la cara del cliente.
+  const modelo = await conRecetaCompartidaDeUno(propio, (idPadre) =>
+    cliente.modelo.findUnique({ where: { id: idPadre }, include: incluirReceta }),
+  );
 
   // §Post-F9.48: escalón 1 de la cascada = la última COMPRA REAL, acotada a la empresa activa (A9).
   const ultimos = await leerUltimosPreciosCompra(
@@ -367,11 +373,13 @@ export async function listaPrecios(
     ...(filtros.idGenero === undefined ? {} : { idGenero: filtros.idGenero }),
   };
 
-  const modelos = await cliente.modelo.findMany({
-    where,
-    orderBy: { codigo: 'asc' },
-    include: incluirReceta,
-  });
+  // V1-E9b — misma receta compartida que el precosto de la ficha, en LOTE: los padres de toda la
+  // página se leen en UNA consulta (nada de N+1) y varios hijos pueden compartir el mismo.
+  const modelos = await conRecetaCompartida(
+    await cliente.modelo.findMany({ where, orderBy: { codigo: 'asc' }, include: incluirReceta }),
+    (idsPadre) =>
+      cliente.modelo.findMany({ where: { id: { in: idsPadre } }, include: incluirReceta }),
+  );
   const params = await parametrosPrecioEmpresa(cliente, sesion.idEmpresaActiva);
   // UNA sola consulta de últimas compras para TODOS los modelos de la lista (no una por renglón).
   const ultimos =

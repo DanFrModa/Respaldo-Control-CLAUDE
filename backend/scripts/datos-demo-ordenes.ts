@@ -59,6 +59,8 @@ function sesionDemo(idEmpresaActiva: number): SesionUsuario {
     idEmpresaActiva,
     nombreEmpresaActiva: 'FR Moda',
     permisos: new Set<ClavePermiso>(CLAVES_PERMISO),
+    // Fila 0.145: los datos demo no corrigen nada (la bandera es de una persona, no de un script).
+    puedeCorregirSinFactura: false,
   };
 }
 
@@ -246,7 +248,8 @@ async function sembrarDemo(prisma: PrismaClient): Promise<DatosDemo> {
   const ordenCancelar = await crearOrden(sesion, { idPedidoLinea: lineaPedido.id });
   await cancelarOrden(sesion, ordenCancelar.id, { motivo: 'Demo de cancelación' });
 
-  // DEMO-D: INCOMPLETA y ANTIGUA (F2-E4) — se crea SIN matriz (queda en estado 'capturada') y se
+  // DEMO-D: INCOMPLETA y ANTIGUA (F2-E4) — se crea y se deja tal cual: nace 'capturada' porque le
+  // faltan requisitos (tallas + receta liberada, y arte si aplica; aquí no tiene ninguno) y se
   // retrocede su `creadoEn` 10 días para que el semáforo de antigüedad la marque URGENTE (> 7 días,
   // regla `EsUrgente`). Así Gabriel ve el estado urgente en la pantalla "Órdenes incompletas".
   const ordenIncompleta = await crearOrden(sesion, { idPedidoLinea: lineaPedido.id });
@@ -313,7 +316,7 @@ function imprimirResumen(d: DatosDemo): void {
   );
   console.log(`  • DEMO-C (cancelada) .......... id ${d.idOrdenCancelada}`);
   console.log(
-    `  • DEMO-D (incompleta URGENTE).. id ${d.idOrdenIncompletaUrgente}  folio ${d.folioOrdenIncompletaUrgente}  (sin matriz, creadoEn -10 días → semáforo URGENTE en "Órdenes incompletas")`,
+    `  • DEMO-D (incompleta URGENTE).. id ${d.idOrdenIncompletaUrgente}  folio ${d.folioOrdenIncompletaUrgente}  (sin requisitos, creadoEn -10 días → semáforo URGENTE en "Órdenes incompletas")`,
   );
   console.log('─────────────────────────────────────────────────────────────────────\n');
 }

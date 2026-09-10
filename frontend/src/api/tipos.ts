@@ -86,6 +86,17 @@ export type ProveedorContactoCrear =
 /** Cuerpo de edicion de un contacto (`PATCH /api/proveedores/{id}/contactos/{idContacto}`). */
 export type ProveedorContactoEditar =
   paths['/api/proveedores/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
+/** Una CUENTA / destino de pago del proveedor (0.112). */
+export type ProveedorCuentaPago = Proveedor['cuentasPago'][number];
+/** Cuerpo de alta de una cuenta de pago (`POST /api/proveedores/{id}/cuentas-pago`). */
+export type ProveedorCuentaPagoCrear =
+  paths['/api/proveedores/{id}/cuentas-pago']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de una cuenta (`PATCH /api/proveedores/{id}/cuentas-pago/{idCuenta}`). */
+export type ProveedorCuentaPagoEditar =
+  paths['/api/proveedores/{id}/cuentas-pago/{idCuenta}']['patch']['requestBody']['content']['application/json'];
+/** Lista de cuentas de pago, incluido el historial (`GET /api/proveedores/{id}/cuentas-pago`). */
+export type ProveedorCuentasPagoLista =
+  paths['/api/proveedores/{id}/cuentas-pago']['get']['responses']['200']['content']['application/json'];
 /** Datos que PROPONE la Constancia de Situacion Fiscal (`POST /api/proveedores/constancia/analizar`). */
 export type ConstanciaPropuesta =
   paths['/api/proveedores/constancia/analizar']['post']['responses']['200']['content']['application/json'];
@@ -274,6 +285,24 @@ export type ClienteDepartamentoCrear =
 /** Cuerpo de edicion de un departamento (`PATCH /api/clientes/{idCliente}/departamentos/{id}`). */
 export type ClienteDepartamentoEditar =
   paths['/api/clientes/{idCliente}/departamentos/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de una FUSION de departamentos duplicados (canonico + absorbidos, §Post-F9.122a). */
+export type ClienteDepartamentoFusionar =
+  paths['/api/clientes/{idCliente}/departamentos/fusionar']['post']['requestBody']['content']['application/json'];
+/** Vista previa de una fusion de departamentos: que se mueve y que pasa con los factores. */
+export type FusionDepartamentosPrevia =
+  paths['/api/clientes/{idCliente}/departamentos/fusionar/previa']['post']['responses']['200']['content']['application/json'];
+
+/** Lista de CONTACTOS de un cliente (V1-E8y, §Post-F9.152 — la compradora). */
+export type ClienteContactosLista =
+  paths['/api/clientes/{id}/contactos']['get']['responses']['200']['content']['application/json'];
+/** Un contacto del cliente (departamento OPCIONAL: null = atiende al cliente completo). */
+export type ClienteContacto = ClienteContactosLista['datos'][number];
+/** Cuerpo de alta de un contacto del cliente (`POST /api/clientes/{id}/contactos`). */
+export type ClienteContactoCrear =
+  paths['/api/clientes/{id}/contactos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion/archivado (`PATCH /api/clientes/{id}/contactos/{idContacto}`). */
+export type ClienteContactoEditar =
+  paths['/api/clientes/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
 
 // ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
 
@@ -386,6 +415,13 @@ export type PedidoRealCrear =
 /** Cuerpo de cancelar un pedido (V1-E4 punto 5: opcionalmente arrastra sus OPs). */
 export type PedidoCancelarCuerpo =
   paths['/api/pedidos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/**
+ * Resultado de cancelar un pedido (0.150): el pedido + el DESENLACE de cada OP. La cascada ya no
+ * es total —las OP que ya tienen movimientos se conservan— y esta respuesta es lo que impide que
+ * eso pase en silencio.
+ */
+export type PedidoCancelarResultado =
+  paths['/api/pedidos/{id}/cancelar']['post']['responses']['200']['content']['application/json'];
 /** Cuerpo de cancelar un pedido real (V1-E4 punto 6: motivo obligatorio). */
 export type PedidoRealCancelarCuerpo =
   paths['/api/pedidos-reales/{idReal}/cancelar']['post']['requestBody']['content']['application/json'];
@@ -432,6 +468,18 @@ export type OrdenCopiarMatriz =
 /** Cuerpo de cancelacion de orden (`POST /api/ordenes/{id}/cancelar`). */
 export type OrdenCancelar =
   paths['/api/ordenes/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de CERRAR una orden (`POST /api/ordenes/{id}/cerrar`) — 0.061. Motivo OPCIONAL: cerrar es
+ * el final normal de una orden (deja de admitir captura y congela su costo), no una excepcion.
+ */
+export type OrdenCerrar =
+  paths['/api/ordenes/{id}/cerrar']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de REABRIR una orden cerrada (`POST /api/ordenes/{id}/reabrir`) — 0.061. Motivo
+ * OBLIGATORIO: es el acto inverso auditado (D3) y devuelve el costo a calculo vivo.
+ */
+export type OrdenReabrir =
+  paths['/api/ordenes/{id}/reabrir']['post']['requestBody']['content']['application/json'];
 /** Cuerpo del set COMPLETO de referencias D7 (`PUT /api/ordenes/{id}/referencias`). */
 export type OrdenReferencias =
   paths['/api/ordenes/{id}/referencias']['put']['requestBody']['content']['application/json'];
@@ -647,6 +695,16 @@ export type PlanProveedor = PlanCompra['proveedores'][number];
 export type PlanRenglon = PlanProveedor['renglones'][number];
 /** Un material que se queda FUERA de la compra, con su razón. */
 export type OmitidoPlan = PlanCompra['omitidos'][number];
+/**
+ * ⭐⭐ V1-E8e (§Post-F9.99) — cuerpo de «con esto queda cubierto» / «volver a pedirlo» desde el
+ * renglón de la explosión (`PUT /api/explosion/dado-por-cubierto`). La CANTIDAD no viaja: la calcula
+ * el servidor (A1) — lo que la pantalla dice es *"esto ya no me lo pidas"*, no un número.
+ */
+export type DarPorCubiertoCuerpo =
+  paths['/api/explosion/dado-por-cubierto']['put']['requestBody']['content']['application/json'];
+/** Resultado de dar por cubierto (o de deshacerlo): qué renglones se movieron y por cuánto. */
+export type DarPorCubiertoResultado =
+  paths['/api/explosion/dado-por-cubierto']['put']['responses']['200']['content']['application/json'];
 /**
  * ⭐ V1-E3m (§Post-F9.82) — cuerpo de asignar/quitar el proveedor con el que ESTA orden compra un
  * material (`PUT /api/ordenes/{id}/materiales/proveedor`). `idProveedor: null` = quitar.
@@ -957,6 +1015,22 @@ export type RecetaOrdenAvio = RecetaOrden['avios'][number];
 export type RecetaOrdenArte = RecetaOrden['artes'][number];
 /** Un cambio del BOM del modelo respecto de la receta congelada. */
 export type CambioReceta = RecetaOrden['desalineacion']['cambios'][number];
+/**
+ * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — una OC que YA comprometió la compra frente al proveedor (folio +
+ * estado). Sale de la receta, de cada renglón y de la bandeja «Recetas por liberar»: es el MISMO
+ * dato en los tres sitios, así que se nombra una sola vez.
+ */
+export type OcComprometida = RecetaOrden['ocsComprometidas'][number];
+/**
+ * ⭐⭐ fila 0.068 (a) — cómo va una OP frente a sus **OP HERMANAS** (las del mismo linaje de modelo).
+ *
+ * 🔴 **No es `desalineacion`**: aquélla compara la receta congelada contra la del MODELO (vertical);
+ * ésta, contra la de sus hermanas (horizontal). Viaja en la receta de la OP **y** en cada fila del
+ * Centro de Órdenes — es el MISMO objeto en los dos sitios, así que se nombra una sola vez.
+ */
+export type FrenteAlGrupo = RecetaOrden['frenteAlGrupo'];
+/** Un material en el que esta OP no coincide con sus hermanas. */
+export type DiferenciaConHermanas = FrenteAlGrupo['diferencias'][number];
 /** Estado de revisión de un renglón (sin revisar / revisado / ajustado). */
 export type EstadoRenglonReceta = RecetaOrdenTela['estado'];
 /** Sección de la receta a la que pertenece un renglón. */
@@ -973,6 +1047,14 @@ export type RecetaEditarCuerpo =
 /** Cuerpo de LIBERAR: los renglones que se firman, nombrados uno por uno (§Post-F9.80). */
 export type LiberarRecetaCuerpo = NonNullable<
   paths['/api/ordenes/{id}/receta/liberar']['post']['requestBody']
+>['content']['application/json'];
+/**
+ * ⭐⭐ V1-E8z — Cuerpo de ABRIR la receta (§Post-F9.160(a)): reabrirla para corregirla **congela la
+ * compra de la orden** hasta que se cierre. El `motivo` es OBLIGATORIO — es lo que el comprador ve
+ * en el 409 cuando intenta comprar. Cerrar no lleva cuerpo.
+ */
+export type AbrirRecetaCuerpo = NonNullable<
+  paths['/api/ordenes/{id}/receta/abrir']['post']['requestBody']
 >['content']['application/json'];
 /** Cuerpo de TRAER DEL MODELO (sin `materiales` = todo lo que falte). */
 export type TraerDelModeloCuerpo = NonNullable<
@@ -1072,6 +1154,9 @@ export type Etapa =
 /** Cuerpo de alta de un corte (`POST /api/produccion/cortes`). */
 export type CorteCrear =
   paths['/api/produccion/cortes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un empaque (`POST /api/produccion/empaques`, 0.114). */
+export type EmpaqueCrear =
+  paths['/api/produccion/empaques']['post']['requestBody']['content']['application/json'];
 /** Cuerpo de alta de un envío a maquila (`POST /api/produccion/envios`). */
 export type EnvioCrear =
   paths['/api/produccion/envios']['post']['requestBody']['content']['application/json'];
@@ -1081,6 +1166,14 @@ export type EtapaCancelar =
 /** Pendientes derivados de una orden (`GET /api/produccion/ordenes/{id}/pendientes`). */
 export type PendientesOrden =
   paths['/api/produccion/ordenes/{id}/pendientes']['get']['responses']['200']['content']['application/json'];
+/**
+ * Qué precargar en la captura de una etapa
+ * (`GET /api/produccion/ordenes/{id}/sugerencia-captura`, V1-E8i). NO guarda nada.
+ */
+export type SugerenciaCaptura =
+  paths['/api/produccion/ordenes/{id}/sugerencia-captura']['get']['responses']['200']['content']['application/json'];
+/** Una celda color×talla que la captura puede precargar. */
+export type CeldaSugerida = SugerenciaCaptura['celdas'][number];
 /** Historial de etapas (cortes/envíos) de una orden (`GET /api/produccion/ordenes/{id}/etapas`). */
 export type EtapasOrden =
   paths['/api/produccion/ordenes/{id}/etapas']['get']['responses']['200']['content']['application/json'];
@@ -1176,9 +1269,52 @@ export type MovimientoTelaColor =
 /** Cuerpo de un ajuste de tela por color (`POST /api/inventarios/telas/color/ajustes`). */
 export type AjusteTelaColorCrear =
   paths['/api/inventarios/telas/color/ajustes']['post']['requestBody']['content']['application/json'];
+/**
+ * Cuerpo de un CONTEO físico de tela por color (fila 0.098): se manda LO CONTADO, no la diferencia
+ * — el servidor la calcula contra el saldo que lee bajo lock y la aplica como movimiento (D3).
+ */
+export type ConteoTelaColorCrear =
+  paths['/api/inventarios/telas/color/conteos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un conteo: detalle teórico/contado/diferencia + los movimientos que lo aplicaron. */
+export type ConteoTelaColor =
+  paths['/api/inventarios/telas/color/conteos']['post']['responses']['201']['content']['application/json'];
+/** Un renglón del resultado del conteo. */
+export type ConteoTelaColorRenglon = ConteoTelaColor['renglones'][number];
+/** Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, nunca la vista). */
+export type SaldosTelaColor =
+  paths['/api/inventarios/telas/color/saldos']['get']['responses']['200']['content']['application/json'];
+/** El saldo de UN color dentro de la respuesta. */
+export type SaldoTelaColor = SaldosTelaColor['saldos'][number];
+/** Parámetros de los saldos por color (querystring; los colores van separados por comas). */
+export type SaldosTelaColorQuery = NonNullable<
+  paths['/api/inventarios/telas/color/saldos']['get']['parameters']['query']
+>;
 /** Cuerpo de una salida de tela por color a orden. */
 export type SalidaTelaColorCrear =
   paths['/api/inventarios/telas/color/salidas-orden']['post']['requestBody']['content']['application/json'];
+/**
+ * ⭐⭐ LOS DOS AVISOS de la salida de tela (fila 0.101): cuerpo de la PREVIA — la captura en curso
+ * que se manda al servidor para que él decida si hay sobre-salida y si hay riesgo de tono.
+ */
+export type PreviaSalidaTelaColorCrear =
+  paths['/api/inventarios/telas/color/salidas-orden/previa']['post']['requestBody']['content']['application/json'];
+/** Los dos avisos ya DECIDIDOS por el dominio (la pantalla no compara nada, A1). */
+export type PreviaSalidaTelaColor =
+  paths['/api/inventarios/telas/color/salidas-orden/previa']['post']['responses']['200']['content']['application/json'];
+/** El aviso (a) de UNA tela: lo que la orden pide, lo ya salido y cuánto se pasa. */
+export type PreviaSalidaTelaRenglon = PreviaSalidaTelaColor['telas'][number];
+/** El aviso (b) de UN color: si hay riesgo de tono y las partidas entre las que se escoge. */
+export type PreviaSalidaColorRenglon = PreviaSalidaTelaColor['colores'][number];
+/** Una partida de la lista del aviso de tono. */
+export type PreviaSalidaPartida = PreviaSalidaColorRenglon['partidas'][number];
+/**
+ * ⭐ Cuerpo de una salida de tela por color que NO va a ninguna orden (fila 0.104): devolución al
+ * proveedor, venta de material que ya no se usa u otra causa. Sólo ajusta inventario.
+ */
+export type SalidaTelaColorSinOrdenCrear =
+  paths['/api/inventarios/telas/color/salidas-sin-orden']['post']['requestBody']['content']['application/json'];
+/** Por qué sale el material cuando no va a ninguna orden (enum cerrado del contrato). */
+export type ConceptoSalidaSinOrden = SalidaTelaColorSinOrdenCrear['concepto'];
 /** Cuerpo de un traspaso de tela por color. */
 export type TraspasoTelaColorCrear =
   paths['/api/inventarios/telas/color/traspasos']['post']['requestBody']['content']['application/json'];
@@ -1226,6 +1362,9 @@ export type AjusteAvioCrear =
 /** Cuerpo de un traspaso de avío (`POST /api/inventarios/avios/traspasos`). */
 export type TraspasoAvioCrear =
   paths['/api/inventarios/avios/traspasos']['post']['requestBody']['content']['application/json'];
+/** ⭐ Cuerpo de una salida de avío que NO va a ninguna orden (fila 0.104). */
+export type SalidaAvioSinOrdenCrear =
+  paths['/api/inventarios/avios/salidas-sin-orden']['post']['requestBody']['content']['application/json'];
 /** Resultado de un traspaso de avío: las dos patas. */
 export type TraspasoAvio =
   paths['/api/inventarios/avios/traspasos']['post']['responses']['201']['content']['application/json'];
@@ -1262,6 +1401,19 @@ export type ReciboCancelar =
 /** Pendientes por recibir de una orden (`GET /api/produccion/ordenes/{id}/pendientes-recibir`). */
 export type PendientesRecibir =
   paths['/api/produccion/ordenes/{id}/pendientes-recibir']['get']['responses']['200']['content']['application/json'];
+/** Un CIERRE de orden con un maquilero (V1, fila 0.109). */
+export type CierreMaquila =
+  paths['/api/produccion/ordenes/{id}/cierre-maquila']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de `POST /api/produccion/ordenes/{id}/cierre-maquila` (cerrar la orden con un maquilero). */
+export type CierreMaquilaCrear =
+  paths['/api/produccion/ordenes/{id}/cierre-maquila']['post']['requestBody']['content']['application/json'];
+/** Cuerpo del deshacer de un cierre (`POST /api/produccion/cierres-maquila/{id}/deshacer`). */
+export type CierreMaquilaDeshacer =
+  paths['/api/produccion/cierres-maquila/{id}/deshacer']['post']['requestBody']['content']['application/json'];
+/** Los cierres de una orden (`GET /api/produccion/ordenes/{id}/cierres-maquila`). */
+export type CierresMaquila =
+  paths['/api/produccion/ordenes/{id}/cierres-maquila']['get']['responses']['200']['content']['application/json'];
+
 /** Recibos semanales por maquilero (`GET /api/produccion/recibos-semanales`). */
 export type RecibosSemanales =
   paths['/api/produccion/recibos-semanales']['get']['responses']['200']['content']['application/json'];
@@ -1316,6 +1468,11 @@ export type EsMaSaldo =
 export type EsMaSaldoQuery = NonNullable<
   paths['/api/esma/maquileros/{id}/saldo']['get']['parameters']['query']
 >;
+/**
+ * Lo CAPTURADO que aún espera revisión y por eso NO entra al saldo (V1, fila 0.115). Viaja junto al
+ * saldo —y en cada fila del tablero— para que el dinero excluido se vea en vez de desaparecer.
+ */
+export type EsMaPendienteRevision = EsMaSaldo['pendienteRevision'];
 
 /** Conciliación EsMa vs recibos del periodo (`GET /api/esma/conciliacion`). */
 export type EsMaConciliacion =
@@ -1346,6 +1503,12 @@ export type EsMaDesglosado =
   paths['/api/esma/maquileros/{id}/desglosado']['get']['responses']['200']['content']['application/json'];
 /** Un cargo desglosado (detalle por orden/modelo). */
 export type EsMaDesglosadoCargo = EsMaDesglosado['cargos'][number];
+
+/**
+ * Bloque de PRENDAS INCOMPLETAS que el maquilero entregó (V1-E8k, §Post-F9.136). Viene en las DOS
+ * vistas del estado de cuenta con la MISMA forma; es informativo y **no afecta el saldo**.
+ */
+export type EsMaIncompletasBloque = EsMaEstadoCuenta['incompletas'];
 
 /** Saldos de todos los maquileros (`GET /api/esma/saldos`). */
 export type EsMaSaldosTodos =
@@ -1441,7 +1604,7 @@ export type WipProcesoPendiente = WipOrden['cortadoPorEnviar'][number];
 /** Existencias en poder del maquilero (`GET /api/produccion/existencias-maquilero`). */
 export type ExistenciaMaquilero =
   paths['/api/produccion/existencias-maquilero']['get']['responses']['200']['content']['application/json'];
-/** Una fila de existencia en poder del maquilero (enviado − recibido). */
+/** Una fila de existencia en poder del maquilero (enviado − recibido − incompletas − saldados). */
 export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
 /** Parámetros de las existencias en poder del maquilero (querystring). */
 export type ExistenciaMaquileroQuery = NonNullable<
@@ -1832,6 +1995,16 @@ export type ExactitudCiclico =
   paths['/api/indicadores/ciclicos/{id}/exactitud']['get']['responses']['200']['content']['application/json'];
 /** Un renglón de exactitud (teórico vs real). */
 export type ExactitudCiclicoRenglon = ExactitudCiclico['renglones'][number];
+/** Qué cuenta la hoja (se deriva del tipo del almacén — fila 0.099). */
+export type DimensionCiclico = InventarioCiclicoResumen['dimension'];
+/** Agregar a la hoja un artículo que el sistema cree que no tiene (`POST .../renglones`). */
+export type CiclicoRenglonAgregar =
+  paths['/api/indicadores/ciclicos/{id}/renglones']['post']['requestBody']['content']['application/json'];
+/** Resultado de pedir el ajuste: aplicado, o detenido con el aviso de que el almacén se movió. */
+export type AjusteCiclico =
+  paths['/api/indicadores/ciclicos/{id}/ajuste']['post']['responses']['200']['content']['application/json'];
+/** Un artículo que se movió entre el alta y el cierre de la hoja (decisión 6). */
+export type CiclicoArticuloMovido = NonNullable<AjusteCiclico['aviso']>['articulos'][number];
 
 // ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2) ──────────────────
 
@@ -1868,6 +2041,21 @@ export type CxpOrigen = CxpMovimientoCrear['origen'];
 /** Cancelación de un movimiento de CxP (`POST /api/cxp/movimientos/{id}/cancelar`). */
 export type CxpMovimientoCancelar =
   paths['/api/cxp/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+
+/**
+ * ⭐ Fila 0.145 — cuerpo de la CORRECCIÓN de un movimiento SIN FACTURA
+ * (`POST /api/cxp/movimientos/{id}/corregir`). Sólo importe, fecha y observaciones (+ el motivo,
+ * obligatorio): el proveedor y el tipo de movimiento NO son campos de este cuerpo a propósito.
+ */
+export type CorreccionSinFactura =
+  paths['/api/cxp/movimientos/{id}/corregir']['post']['requestBody']['content']['application/json'];
+
+/** ⭐ Fila 0.145 — resultado de corregir un movimiento de EsMa (qué se anuló y qué nació). */
+export type EsMaCorreccion =
+  paths['/api/esma/movimientos/{concepto}/{id}/corregir']['post']['responses']['200']['content']['application/json'];
+/** Concepto corregible de EsMa (abono/descuento/pago; el cargo no se corrige). */
+export type EsMaConceptoCorregible =
+  paths['/api/esma/movimientos/{concepto}/{id}/corregir']['post']['parameters']['path']['concepto'];
 
 // ── Importación de CFDI de proveedores (Módulo 14, F9-E3; R11) ──────────────────
 /** Previsualización de un CFDI (`POST /api/terceros/cfdi/previsualizar`). */
@@ -1982,3 +2170,72 @@ export type DirectorioTercero = DirectorioTercerosPagina['datos'][number];
 export type DirectorioTercerosQuery = NonNullable<
   paths['/api/directorio-terceros']['get']['parameters']['query']
 >;
+
+// ── La corrida semanal de pagos (fila 0.113) y su catálogo de conceptos (0.125) ──────────────────
+
+/** Página de corridas (`GET /api/pagos/corridas`). */
+export type CorridasLista =
+  paths['/api/pagos/corridas']['get']['responses']['200']['content']['application/json'];
+/** El encabezado de una corrida (folio, semana, segmento, estado y totales). */
+export type CorridaResumen = CorridasLista['filas'][number];
+/** Filtros de la lista de corridas (querystring). */
+export type CorridasQuery = NonNullable<paths['/api/pagos/corridas']['get']['parameters']['query']>;
+/** Alta de una corrida (cuerpo). */
+export type CorridaCrear =
+  paths['/api/pagos/corridas']['post']['requestBody']['content']['application/json'];
+/** La PANTALLA DE TRABAJO: la corrida con sus secciones por rubro y sus bloqueos. */
+export type CorridaDetalle =
+  paths['/api/pagos/corridas/{id}']['get']['responses']['200']['content']['application/json'];
+/** Una sección (rubro) de la relación. */
+export type SeccionCorrida = CorridaDetalle['secciones'][number];
+/** Una fila de trabajo: un beneficiario con su referencia al lado y sus renglones. */
+export type FilaCorrida = SeccionCorrida['filas'][number];
+/** Un renglón capturado. */
+export type RenglonCorrida = FilaCorrida['renglones'][number];
+/** Una cuenta destino elegible. */
+export type CuentaDestino = FilaCorrida['cuentas'][number];
+/** Los totales de efectivo/transferencia (de la sección o de toda la corrida). */
+export type TotalesPago = SeccionCorrida['totales'];
+/** Cuerpo para capturar/reemplazar un renglón. */
+export type RenglonCorridaGuardar =
+  paths['/api/pagos/corridas/{id}/renglones']['post']['requestBody']['content']['application/json'];
+/** La relación ejecutable (`GET /api/pagos/corridas/{id}/concentrado`). */
+export type ConcentradoCorrida =
+  paths['/api/pagos/corridas/{id}/concentrado']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la relación ejecutable (con su facturabilidad ya resuelta, fila 0.118). */
+export type ConcentradoRenglon = ConcentradoCorrida['secciones'][number]['renglones'][number];
+
+/**
+ * ⭐ EL DOCUMENTO PARA FACTURAR de un renglón (fila 0.118): o los datos con los que el proveedor
+ * debe facturar, o el motivo por el que no se emite. Nunca las dos cosas.
+ */
+export type DocumentoParaFacturar =
+  paths['/api/pagos/corridas/{id}/renglones/{idRenglon}/documento-facturacion']['get']['responses']['200']['content']['application/json'];
+/** Un dato fiscal que falta para poder emitir el documento (con su aviso ya redactado). */
+export type FaltanteFiscal = DocumentoParaFacturar['faltantes'][number];
+
+/** Página del catálogo de conceptos de pago (`GET /api/conceptos-pago`). */
+export type ConceptosPagoPagina =
+  paths['/api/conceptos-pago']['get']['responses']['200']['content']['application/json'];
+/** Un concepto de pago con sus cuentas. */
+export type ConceptoPago = ConceptosPagoPagina['datos'][number];
+/** Una cuenta de un concepto de pago. */
+export type ConceptoPagoCuenta = ConceptoPago['cuentas'][number];
+/** Filtros del catálogo (querystring). */
+export type ConceptosPagoQuery = NonNullable<
+  paths['/api/conceptos-pago']['get']['parameters']['query']
+>;
+/** Alta de un concepto de pago (cuerpo). */
+export type ConceptoPagoCrear =
+  paths['/api/conceptos-pago']['post']['requestBody']['content']['application/json'];
+/** Edición parcial de un concepto de pago (cuerpo). */
+export type ConceptoPagoEditar = NonNullable<
+  paths['/api/conceptos-pago/{id}']['patch']['requestBody']
+>['content']['application/json'];
+/** Alta de una cuenta de un concepto (cuerpo). */
+export type ConceptoPagoCuentaCrear =
+  paths['/api/conceptos-pago/{id}/cuentas']['post']['requestBody']['content']['application/json'];
+/** Edición parcial de una cuenta de un concepto (cuerpo). */
+export type ConceptoPagoCuentaEditar = NonNullable<
+  paths['/api/conceptos-pago/{id}/cuentas/{idCuenta}']['patch']['requestBody']
+>['content']['application/json'];

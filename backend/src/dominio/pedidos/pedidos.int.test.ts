@@ -38,6 +38,7 @@ import {
   crearPedidoReal,
   listarPedidosReales,
 } from './pedidos-reales.js';
+import { cerrarOrden, reabrirOrden } from '../produccion/cierre-orden.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 /**
@@ -370,7 +371,11 @@ describe('Pedidos (F2-E1) — cancelación suave (doc 02 §4.2)', () => {
     );
 
     const cancelado = await cancelarPedido(s, pedido.id, {}, bd(), archivos);
-    expect(cancelado.pedCancelado).toBe(true);
+    expect(cancelado.pedido.pedCancelado).toBe(true);
+    // 0.150: sin OPs no hay nada que decir — ni canceladas, ni conservadas, ni aviso.
+    expect(cancelado.foliosOrdenesCanceladas).toEqual([]);
+    expect(cancelado.ordenesConservadas).toEqual([]);
+    expect(cancelado.aviso).toBeNull();
 
     // sigue consultable
     const visto = await obtenerPedido(s, pedido.id, bd(), archivos);
@@ -560,9 +565,13 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
       archivos,
     );
 
-    expect(resultado.pedCancelado).toBe(true);
+    expect(resultado.pedido.pedCancelado).toBe(true);
+    // 0.150: la OP estaba LIMPIA, así que sí se arrastró — y el desenlace lo dice.
+    expect(resultado.ordenesConservadas).toEqual([]);
+    expect(resultado.aviso).toBeNull();
     const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
     expect(orden.estado).toBe('cancelada');
+    expect(resultado.foliosOrdenesCanceladas).toEqual([Number(orden.folio)]);
     expect(orden.motivoCancelada).toContain('El cliente canceló la compra');
     // D3/A7: cada OP cancelada dejó SU propio renglón de bitácora (no un "se cancelaron N").
     const bitacoraOrden = await cliente.bitacora.findFirst({
@@ -599,6 +608,96 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⭐⭐ 0.061 → 0.150 — LA ORDEN CERRADA: de PUERTA 17 a callejón sin salida, y de ahí a señal.
+  //
+  // La 0.061 tapó un agujero real: la cascada escribía `estado='cancelada'` sobre una orden con
+  // `cerradaEn` puesta —dos finales para la misma orden—, y la dejaba ATRAPADA (la ficha esconde
+  // «Reabrir» cuando el estado es `cancelada`). Lo tapó RECHAZANDO... y con eso creó otro
+  // encierro: sin cascada rechazaba el aviso de OPs vivas, con cascada rechazaba el cierre, y el
+  // mensaje del cierre ofrecía «o cancela el pedido sin arrastrar las OPs» — UNA PUERTA QUE NO
+  // EXISTÍA. El pedido con una OP cerrada no se podía cancelar por ninguna vía.
+  //
+  // La 0.150 lo disuelve sin un caso especial: `cerrada` es UNA SEÑAL MÁS de «esta orden tiene
+  // vida», así que la OP se conserva, el pedido SÍ se cancela y el aviso la nombra.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  describe('⭐ 0.150 — la orden CERRADA se conserva (y deja de atrapar al pedido)', () => {
+    const PERM_CON_CIERRE: ClavePermiso[] = [
+      ...PERM_CON_CANCELAR,
+      'ordenes.cancelar',
+      'ordenes.cerrar',
+    ];
+
+    it('🔴 el pedido SÍ se cancela, la OP cerrada queda INTACTA y el aviso la nombra', async () => {
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden, folioOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, { motivo: 'temporada cerrada' }, bd());
+
+      const resultado = await cancelarPedido(
+        s,
+        idPedido,
+        { cancelarOrdenes: true, motivo: 'El cliente canceló la compra' },
+        bd(),
+        archivos,
+      );
+
+      // El pedido sí se cancela: eso es lo que el usuario pidió y lo que antes era imposible.
+      expect(resultado.pedido.pedCancelado).toBe(true);
+      expect(resultado.foliosOrdenesCanceladas).toEqual([]);
+      // La OP se CONSERVA, nombrada y con su porqué.
+      expect(resultado.ordenesConservadas).toHaveLength(1);
+      expect(resultado.ordenesConservadas[0]?.folio).toBe(folioOrden);
+      expect(resultado.ordenesConservadas[0]?.porque).toMatch(/CERRADA/);
+      expect(resultado.aviso).toContain(String(folioOrden));
+      // 🔑 Y el aviso NO ofrece la puerta que no existe (la del mensaje viejo del cierre).
+      expect(resultado.aviso).not.toMatch(/sin arrastrar las OPs/);
+
+      // La orden NO se movió ni un milímetro: sigue cerrada, sin motivo de cancelación.
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cerrada');
+      expect(orden.cerradaEn).not.toBeNull();
+      expect(orden.motivoCancelada).toBeNull();
+    });
+
+    it('reabierta y limpia, la MISMA cascada SÍ la cancela (el freno era el cierre)', async () => {
+      // La rama gemela: sin ella, una guarda que conservara SIEMPRE también pasaría la de arriba.
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, {}, bd());
+      await reabrirOrden(s, idOrden, { motivo: 'hay que cancelar el pedido entero' }, bd());
+
+      const resultado = await cancelarPedido(
+        s,
+        idPedido,
+        { cancelarOrdenes: true, motivo: 'El cliente canceló la compra' },
+        bd(),
+        archivos,
+      );
+
+      expect(resultado.pedido.pedCancelado).toBe(true);
+      expect(resultado.ordenesConservadas).toEqual([]);
+      expect(resultado.aviso).toBeNull();
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cancelada');
+      expect(orden.cerradaEn).toBeNull();
+    });
+
+    it('sin `cancelarOrdenes` sigue avisando de la viva (una cerrada también se seguiría produciendo)', async () => {
+      // Una orden cerrada sigue contando como «no cancelada» para el aviso de siempre: cancelar el
+      // pedido tampoco la detiene, así que el usuario tiene que enterarse igual.
+      const s = sesion(PERM_CON_CIERRE);
+      const { idPedido, idOrden, folioOrden } = await pedidoConOp();
+      await cerrarOrden(s, idOrden, {}, bd());
+
+      const error = await cancelarPedido(s, idPedido, {}, bd(), archivos).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      expect((error as Error).message).toContain(String(folioOrden));
+      const orden = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+      expect(orden.estado).toBe('cerrada');
+    });
+  });
+
   it('las OPs YA canceladas no estorban: el pedido se cancela sin pedir nada más', async () => {
     const s = sesion([...PERM_CON_CANCELAR, 'ordenes.cancelar']);
     const { idPedido, idOrden } = await pedidoConOp();
@@ -609,7 +708,7 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
 
     const resultado = await cancelarPedido(s, idPedido, {}, bd(), archivos);
 
-    expect(resultado.pedCancelado).toBe(true);
+    expect(resultado.pedido.pedCancelado).toBe(true);
   });
 });
 
@@ -706,5 +805,172 @@ describe('⭐ cancelar el pedido real (V1-E4)', () => {
     await expect(
       cancelarPedidoReal(sesionOtra, idReal, { motivo: 'x' }, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+/**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **EL Nº DE 5 DÍGITOS QUE EL DETALLE DEL PEDIDO HABÍA PERDIDO.**
+ *
+ * 🔴 Hasta V1-E3 el detalle lo enseñaba **por accidente**: pintaba `codigoModelo`, y ese código
+ * *era* el de producción porque generar la OP **transformaba** el modelo del renglón. Desde V1-E3 el
+ * desarrollo ya no se transforma —nacen modelos de producción POR COLOR—, así que
+ * `numeroProduccion` del renglón es `null` **para siempre** y el detalle se quedó sin ningún número
+ * que enseñar, **mientras la vista del MES sí los traía**. La misma necesidad se cubría en una
+ * pantalla y en la otra no; esto cierra la asimetría con la MISMA regla (`consulta-mes.ts`).
+ */
+describe('⭐⭐ Pedidos — numerosProduccion en el detalle (V1-E3)', () => {
+  /** Crea un pedido de un renglón con el modelo dado y devuelve el pedido y el id del renglón. */
+  async function pedidoDeUnRenglon(
+    idModelo: number,
+  ): Promise<{ idPedido: number; idLinea: number }> {
+    const pedido = await crearPedido(
+      sesion([...PERM_TODOS]),
+      { idCliente: clienteNegocio.id, lineas: [{ idModelo, cantidadPedida: 100, precio: 148 }] },
+      bd(),
+      archivos,
+    );
+    return { idPedido: pedido.id, idLinea: pedido.lineas[0]!.id };
+  }
+
+  /** Un modelo de DESARROLLO (el que apunta el renglón desde V1-E3: nunca tiene número). */
+  async function modeloDesarrollo(codigo: string): Promise<Modelo> {
+    return cliente.modelo.create({
+      data: { codigo, origen: 'desarrollo', codigoDesarrollo: codigo },
+    });
+  }
+
+  /** Un hijo de PRODUCCIÓN por color del desarrollo dado, con su nº de 5 dígitos (o sin él). */
+  async function hijoDeProduccion(
+    idModeloDesarrollo: number,
+    codigo: string,
+    numeroProduccion: number | null,
+  ): Promise<Modelo> {
+    return cliente.modelo.create({
+      data: {
+        codigo,
+        origen: 'produccion',
+        idModeloDesarrollo,
+        ...(numeroProduccion === null ? {} : { numeroProduccion }),
+      },
+    });
+  }
+
+  /** Una OP del renglón, con el modelo dado. `folio` es del llamador (único por empresa). */
+  async function opDelRenglon(
+    idLinea: number,
+    idModelo: number,
+    folio: number,
+    estado: 'completa' | 'cancelada' = 'completa',
+  ): Promise<void> {
+    await cliente.orden.create({
+      data: {
+        folio: BigInt(folio),
+        idEmpresa: empresa.id,
+        idPedidoLinea: idLinea,
+        idModelo,
+        idCliente: clienteNegocio.id,
+        estado,
+        ...(estado === 'cancelada' ? { motivoCancelada: 'prueba' } : {}),
+      },
+    });
+  }
+
+  it('los nº de los modelos POR COLOR de sus OPs vivas: ordenados y SIN repetir', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-009');
+    // Se crean DESORDENADOS a propósito (71002 antes que 71001): el orden lo pone el servidor.
+    const rojo = await hijoDeProduccion(desarrollo.id, '71002', 71_002);
+    const azul = await hijoDeProduccion(desarrollo.id, '71001', 71_001);
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(desarrollo.id);
+    await opDelRenglon(idLinea, rojo.id, 900);
+    await opDelRenglon(idLinea, azul.id, 901);
+    await opDelRenglon(idLinea, rojo.id, 902); // RESURTIDO del rojo: no repite su número.
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    // El renglón sigue apuntando a su DESARROLLO, que no tiene número…
+    expect(salida.lineas[0]?.codigoModelo).toBe('CYA-26-71-009');
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
+    // …y lo que el detalle enseña son los de sus modelos por color.
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([71_001, 71_002]);
+  });
+
+  it('🔴 LA GEMELA — un renglón SIN OPs sale VACÍO (no un cero, no un hueco)', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-010');
+    await hijoDeProduccion(desarrollo.id, '71003', 71_003); // el hijo existe, pero no hay OP.
+    const { idPedido } = await pedidoDeUnRenglon(desarrollo.id);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
+  });
+
+  it('una OP CANCELADA no aporta su número (viva ≠ existente)', async () => {
+    const desarrollo = await modeloDesarrollo('CYA-26-71-011');
+    const viva = await hijoDeProduccion(desarrollo.id, '71004', 71_004);
+    const muerta = await hijoDeProduccion(desarrollo.id, '71005', 71_005);
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(desarrollo.id);
+    await opDelRenglon(idLinea, viva.id, 910);
+    await opDelRenglon(idLinea, muerta.id, 911, 'cancelada');
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([71_004]);
+  });
+
+  /**
+   * ⚠️ **EL CONTRATO NO PUEDE PROMETER LO QUE EL DOMINIO NO PUEDE DAR.** `numerosProduccion` es
+   * `z.array(z.number().int())`: un `null` colado ahí no sería un dato feo, sería un **500** al
+   * serializar la respuesta. Y el caso existe de verdad: los 285 modelos del Access con código NO
+   * numérico (`51783a`, `M-18`) están en producción y no tienen número.
+   */
+  it('⭐ una OP de un modelo SIN número (histórico `M-18`) no mete un null en el array', async () => {
+    const sinNumero = await cliente.modelo.create({
+      data: { codigo: 'M-18', origen: 'produccion' },
+    });
+    const { idPedido, idLinea } = await pedidoDeUnRenglon(sinNumero.id);
+    await opDelRenglon(idLinea, sinNumero.id, 920);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+  });
+
+  it('el renglón LEGADO sigue enseñando el número de su propio modelo (lo nuevo no se comió lo viejo)', async () => {
+    // Control negativo: `numeroProduccion` (el del modelo del RENGLÓN) NO se retiró. Para el
+    // histórico del Access —donde el renglón YA apunta a un modelo de producción— sigue siendo el
+    // dato bueno. Si `numerosProduccion` se hubiera hecho a costa de él, esta prueba cae.
+    await cliente.modelo.update({ where: { id: modeloA.id }, data: { numeroProduccion: 51_114 } });
+    const { idPedido } = await pedidoDeUnRenglon(modeloA.id);
+
+    const salida = await obtenerPedido(sesion([...PERM_TODOS]), idPedido, bd(), archivos);
+
+    expect(salida.lineas[0]?.numeroProduccion).toBe(51_114);
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+  });
+
+  /**
+   * 🔴 El agregado va POR LOTE (una consulta para toda la página). El modo de fallo propio del lote
+   * no es "no salen": es que **salgan los del pedido de al lado**. Sin esta prueba, repartir mal el
+   * `Map` por renglón pasa en verde con las de arriba, que miran un pedido solo.
+   */
+  it('⭐ en el LISTADO cada pedido se queda con SUS números (el lote no los cruza)', async () => {
+    const devA = await modeloDesarrollo('CYA-26-71-020');
+    const devB = await modeloDesarrollo('CYA-26-71-021');
+    const hijoA = await hijoDeProduccion(devA.id, '71020', 71_020);
+    const hijoB = await hijoDeProduccion(devB.id, '71021', 71_021);
+    const a = await pedidoDeUnRenglon(devA.id);
+    const b = await pedidoDeUnRenglon(devB.id);
+    await opDelRenglon(a.idLinea, hijoA.id, 930);
+    await opDelRenglon(b.idLinea, hijoB.id, 931);
+    // Un tercer pedido SIN OP: en la misma página, y tiene que salir vacío.
+    const sinOp = await pedidoDeUnRenglon(modeloB.id);
+
+    const pagina = await listarPedidos(sesion([...PERM_TODOS]), {}, bd(), archivos);
+    const porId = new Map(pagina.datos.map((p) => [p.id, p.lineas[0]?.numerosProduccion]));
+
+    expect(porId.get(a.idPedido)).toEqual([71_020]);
+    expect(porId.get(b.idPedido)).toEqual([71_021]);
+    expect(porId.get(sinOp.idPedido)).toEqual([]);
   });
 });

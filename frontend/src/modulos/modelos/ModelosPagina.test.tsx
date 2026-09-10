@@ -1,7 +1,8 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ClavePermiso } from '@/api/tipos';
 import type { Modelo, ModeloFicha, ModelosPagina as TipoPagina } from '@/api/modelos';
 import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -41,6 +42,9 @@ const useFichaModelo = vi.fn<(id: number | undefined) => EstadoFicha>();
 const useFotosModelo = vi.fn<(id: number | undefined) => EstadoFotos>();
 const descontinuarMutate = vi.fn();
 const reactivarMutate = vi.fn();
+const crearVersionMutate = vi.fn();
+const aprobarRevisionMutate = vi.fn();
+const rechazarRevisionMutate = vi.fn();
 let ultimaQuery: Record<string, unknown> | undefined;
 
 vi.mock('@/api/modelos', () => ({
@@ -58,6 +62,14 @@ vi.mock('@/api/modelos', () => ({
   useActualizarModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useDescontinuarModelo: () => ({ mutate: descontinuarMutate, isPending: false }),
   useReactivarModelo: () => ({ mutate: reactivarMutate, isPending: false }),
+  // ⭐ V1-E7b — «Crear versión» (§Post-F9.110).
+  useCrearVersionModelo: () => ({ mutate: crearVersionMutate, isPending: false }),
+  // ⭐ V1-E7d — las dos firmas de la REVISIÓN (§Post-F9.110).
+  useAprobarRevisionModelo: () => ({ mutate: aprobarRevisionMutate, isPending: false }),
+  useRechazarRevisionModelo: () => ({ mutate: rechazarRevisionMutate, isPending: false }),
+  // ⭐ V1-E9p — la META en vivo que el diálogo de revisión pide para poder preguntar «¿se logró lo
+  // prometido?». Aquí no se ejercita (tiene su propio archivo de pruebas): basta con que exista.
+  useMetaPrometida: () => ({ data: undefined }),
   useGeneros: () => ({ data: [], isPending: false }),
   usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
   usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
@@ -109,6 +121,23 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion: null,
+    // Linaje de versiones (V1-E7b): estos fixtures son de modelos RAÍZ (no nacieron de otro).
+    idModeloPadre: null,
+    codigoPadre: null,
+    versionDesarrollo: null,
+    idModeloDesarrollo: null,
+    codigoModeloDesarrollo: null,
+    // ⭐ V1-E7d — no son versiones, así que NO llevan revisión: los cuatro campos en null.
+    revisionEstado: null,
+    idRevisadoPor: null,
+    revisadoPor: null,
+    revisadoEn: null,
+    revisionNota: null,
+    // ⭐⭐ V1-E9p — el DESENLACE de la promesa: null = nadie lo declaró (conducta de siempre).
+    metaResultado: null,
+    metaCostoPrometido: null,
+    metaCostoConseguido: null,
+    metaNota: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,
@@ -175,6 +204,7 @@ describe('<ModelosPagina>', () => {
     useExistenciasPtMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     descontinuarMutate.mockReset();
     reactivarMutate.mockReset();
+    crearVersionMutate.mockReset();
     ultimaQuery = undefined;
     // Por defecto: ficha del seleccionado y sin fotos.
     useFichaModelo.mockImplementation((id) =>
@@ -267,15 +297,18 @@ describe('<ModelosPagina>', () => {
     expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
   });
 
+  /** Los dos permisos que §Post-F9.137 exige para ver el COSTO REAL del listado (+ el de acceso). */
+  const PERM_COSTO_REAL: ClavePermiso[] = ['modelos.ver', 'costos.ver', 'consultas.ver-importes'];
+
   it('pinta las columnas Tela principal, Stock PT y Costo con los agregados del listado', () => {
     useModelos.mockReturnValue(
       listaConDatos([
         modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
-        // Sin BOM/costeo (o sin permiso de importes): guiones; stock 0 se pinta atenuado.
+        // Sin BOM/costeo: guiones; stock 0 se pinta atenuado.
         modelo(2, '777', true, { telaPrincipal: null, stockPt: 0, costoActual: null }),
       ]),
     );
-    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(PERM_COSTO_REAL) });
 
     // Acotado a la tabla de escritorio: las tarjetas móviles repiten estos datos en el DOM de jsdom.
     const tabla = within(screen.getByTestId('modelos-tabla'));
@@ -286,6 +319,52 @@ describe('<ModelosPagina>', () => {
     const filas = screen.getAllByTestId('fila-modelo');
     expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(filas[1] as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+
+    // ⚠️ Y la TARJETA DE MÓVIL, acotada a ELLA (no a la tabla). Sin esta aserción el pintado móvil
+    // sólo se ejercitaba en la dirección negativa: poner su ternario en `false` dejaba la suite en
+    // VERDE y Daniel perdía el costo en el teléfono, en silencio. Es la misma trampa que esta
+    // pareja de pruebas dice cazar. Texto EXACTO: `'$118.00'` no casa dentro de `'$1,118.00'`.
+    const costoMovil = screen.getAllByTestId('costo-modelo-movil');
+    expect(costoMovil).toHaveLength(2); // una tarjeta por modelo
+    expect(within(costoMovil[0] as HTMLElement).getByText('$118.00')).toBeInTheDocument();
+    // El modelo sin costeo pinta su guion en la tarjeta, no un importe.
+    expect(within(costoMovil[1] as HTMLElement).getByText('—')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ §Post-F9.137 (DANIEL, 28-ago-2026) — *«Escóndesela»*. Lo que se pide OCULTAR se prueba en las
+   * DOS direcciones: sin el permiso NO se ve (aquí), y con él SÍ se ve (la prueba de arriba, que
+   * pinta `$118.00` con `PERM_COSTO_REAL`). Sin la segunda mitad, una columna borrada para siempre
+   * también pasaría en verde.
+   *
+   * Los permisos de este render son EXACTAMENTE los de GERENCIAL, el rol de Aurora: tiene
+   * `consultas.ver-importes` y NO tiene `costos.ver`.
+   */
+  it('⭐ sin `costos.ver` la columna «Costo» NO se pinta —ni encabezado ni celda— aunque el dato llegara', () => {
+    useModelos.mockReturnValue(
+      listaConDatos([
+        // El fixture SÍ trae el costo: se prueba que la pantalla no lo pinta ni así (el servidor,
+        // por su lado, ya ni lo manda — eso lo fija `modelos-listado.int.test.ts`).
+        modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
+      ]),
+    );
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'consultas.ver-importes']),
+    });
+
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    // Ni el encabezado de la columna…
+    expect(tabla.queryByRole('columnheader', { name: 'Costo' })).not.toBeInTheDocument();
+    // …ni la celda, en NINGUNO de los dos pintados (tabla de escritorio y tarjeta de móvil).
+    expect(screen.queryByTestId('costo-modelo-tabla')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('costo-modelo-movil')).not.toBeInTheDocument();
+    // Y el importe no aparece por ninguna otra vía en la pantalla.
+    expect(screen.queryByText('$118.00')).not.toBeInTheDocument();
+
+    // Lo demás del listado le sigue llegando: se esconde el costo, no se le rompe la pantalla.
+    expect(tabla.getByText('Felpa premium')).toBeInTheDocument();
+    expect(tabla.getByText('1,240')).toBeInTheDocument();
+    expect(tabla.getByRole('columnheader', { name: 'Stock PT' })).toBeInTheDocument();
   });
 
   it('la matriz del cajón consume el rollup `porColorTalla` del servidor (sin pivote local)', () => {
@@ -397,16 +476,51 @@ describe('<ModelosPagina>', () => {
   });
 
   /**
-   * Separación desarrollo/producción (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por
-   * default —Daniel pidió no llenarlo de los modelos de desarrollo que nunca salen— y los de
-   * desarrollo quedan detrás del filtro, no escondidos.
+   * ⭐ V1-E8j (§Post-F9.134) — **LA PANTALLA NO PUEDE ESCONDER LO QUE ACABAS DE CREAR.**
+   *
+   * Hasta V1-E3n el catálogo arrancaba filtrado a `produccion` (§Post-F9.34 punto 2, *"no llenar de
+   * basura el catálogo"*). Juntado con que **todo modelo nace en desarrollo**, eso dio la queja de
+   * Daniel: *"generé dos modelos en precosteo… y no los veo en modelos"*.
+   *
+   * ⚠️ **La aserción de esta prueba es a propósito la de la LISTA, no la del default del esquema.**
+   * El default vive en CUATRO puertas —el Zod del dominio, el del contrato y los `useState` del
+   * catálogo y de la galería— y esta pantalla manda el suyo EXPLÍCITO en la query: una prueba que
+   * mirara el esquema del servidor pasaría verde con el defecto vivo en la pantalla. Lo que se mide
+   * aquí es que, recién abierta y **sin tocar un filtro**, el modelo de desarrollo ESTÁ.
    */
-  it('el catálogo pide SOLO producción por default, y el filtro cambia el origen en la query', async () => {
+  it('recién abierto, el catálogo NO esconde los modelos de desarrollo (y el filtro sigue acotando)', async () => {
     const usuario = userEvent.setup();
-    useModelos.mockReturnValue(listaConDatos([modelo(1, '51001')]));
+    const enDesarrollo = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([enDesarrollo, modelo(2, '51001')]));
     renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
 
-    // El valor concreto importa: con 'todos' (o sin el campo) la vitrina traería los desarrollos.
+    // 1) Lo recién creado se VE, sin tocar nada. Con `origen: 'produccion'` de arranque, la query
+    //    habría pedido sólo producción y este renglón no existiría.
+    //    ⚠️ Se mira la FILA, no `getByText`: la pantalla monta el bloque de móvil Y el de escritorio
+    //    (los oculta con CSS), así que el código aparece dos veces en el DOM.
+    const filas = screen.getAllByTestId('fila-modelo');
+    expect(filas).toHaveLength(2);
+    expect(filas[0]).toHaveTextContent('CYA-26-71-001');
+    // 2) …y cada renglón DICE su etapa: es lo que hace que ver de más no se lea como dos catálogos
+    //    revueltos (la otra mitad de la decisión).
+    expect(screen.getAllByTestId('etapa-modelo').map((e) => e.textContent)).toEqual([
+      'Desarrollo',
+      'Producción',
+    ]);
+    // …en la tabla de escritorio Y en la tarjeta de móvil. Son dos bloques distintos del mismo
+    // componente: probar sólo uno deja al otro sin quien lo mate.
+    expect(screen.getAllByTestId('etapa-modelo-movil').map((e) => e.textContent)).toEqual([
+      'Desarrollo',
+      'Producción',
+    ]);
+    // 3) El valor concreto de la query importa: es la puerta de ESTA pantalla.
+    expect(ultimaQuery?.origen).toBe('todos');
+
+    // 4) Y el filtro sigue ahí para quien quiera una sola cara del catálogo.
+    await usuario.click(screen.getByTestId('origen-produccion'));
     expect(ultimaQuery?.origen).toBe('produccion');
 
     await usuario.click(screen.getByTestId('origen-desarrollo'));
@@ -430,6 +544,30 @@ describe('<ModelosPagina>', () => {
     expect(filas[0]).toHaveTextContent('desarrollo CYA-26-71-003');
     // Y al que nunca fue de desarrollo no se le inventa una segunda línea.
     expect(filas[1]).not.toHaveTextContent('desarrollo');
+  });
+
+  /**
+   * ⭐ V1 — la MISMA regla, en la tarjeta de MÓVIL.
+   *
+   * 🔴 La prueba de arriba mira `fila-modelo`, que es la tabla de ESCRITORIO: pasaba en verde
+   * mientras el teléfono no pintaba el nº de desarrollo por ningún lado. Es la rama gemela de
+   * siempre —PC y móvil son dos caras del mismo dato— y ya tiene lección propia en este repo
+   * (V1-E8j hizo exactamente esta corrección con el chip de la etapa). Por eso la aserción de móvil
+   * va APARTE y contra su propio testid: la de escritorio no la cubre.
+   */
+  it('el nº de DESARROLLO también se ve en la tarjeta de móvil (no sólo en la tabla)', () => {
+    const promovido = modelo(1, '71050', true, {
+      codigoDesarrollo: 'CYA-26-71-003',
+      numeroProduccion: 71_050,
+    });
+    const dePlano = modelo(2, '51001', true, { numeroProduccion: 51_001 });
+    useModelos.mockReturnValue(listaConDatos([promovido, dePlano]));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    const tarjetas = screen.getAllByTestId('modelo-tarjeta');
+    expect(tarjetas[0]).toHaveTextContent('desarrollo CYA-26-71-003');
+    // Y al que nunca fue de desarrollo tampoco se le inventa la línea en el teléfono.
+    expect(tarjetas[1]).not.toHaveTextContent('desarrollo');
   });
 
   it('«Pasar a producción» sólo se ofrece en los modelos de DESARROLLO', async () => {
@@ -615,5 +753,432 @@ describe('<ModelosPagina>', () => {
     expect(screen.queryByRole('heading', { name: 'Modelos' })).not.toBeInTheDocument();
     // Lo que SÍ es consultable —y en lo que se anclan los e2e— es el cajón con su modelo.
     expect(screen.getByRole('heading', { name: /DEEP-999/ })).toBeInTheDocument();
+  });
+
+  // ── ⭐ V1-E7b — «Crear versión» (§Post-F9.110) ──────────────────────────────
+
+  /** Un modelo de DESARROLLO, que es el que puede versionarse (el sufijo cuelga de su código). */
+  function enDesarrollo(id = 1, codigo = 'CYA-26-71-001'): Modelo {
+    return modelo(id, codigo, true, { origen: 'desarrollo', codigoDesarrollo: codigo });
+  }
+
+  it('⭐ el botón «Crear versión» se pinta con `modelos.aprobar-receta`, aunque NO se administren modelos', () => {
+    // Es el reparto que pidió Daniel: Gerencial (Aurora) aprueba recetas pero NO administra
+    // catálogos. Si el botón colgara de `modelos.administrar`, ella no lo vería nunca.
+    const m = enDesarrollo();
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.getByTestId('crear-version-modelo')).toBeInTheDocument();
+    // Y sin administrar, las acciones de escritura del catálogo siguen escondidas.
+    expect(screen.queryByTestId('editar-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ sin `modelos.aprobar-receta` NO se pinta, aunque se administren modelos', () => {
+    const m = enDesarrollo();
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.queryByTestId('crear-version-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un modelo SIN número de desarrollo no ofrece el botón (no se abre una puerta cerrada)', () => {
+    // El servidor lo rechaza porque el sufijo cuelga del código de desarrollo. Enseñar el botón
+    // sería mandar al usuario a una puerta que ya está cerrada.
+    const migrado = modelo(1, '71001');
+    useModelos.mockReturnValue(listaConDatos([migrado]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(migrado)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.queryByTestId('crear-version-modelo')).not.toBeInTheDocument();
+  });
+
+  it('pide confirmación diciendo qué va a pasar, y sólo entonces crea la versión', async () => {
+    const usuario = userEvent.setup();
+    const m = enDesarrollo(7);
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('crear-version-modelo'));
+
+    // Abre confirmación y todavía NO llamó al API.
+    expect(await screen.findByText('Crear versión del modelo')).toBeInTheDocument();
+    expect(screen.getByText(/queda igual/)).toBeInTheDocument();
+    // Nombra de qué modelo nace. NO afirma un código de ejemplo: el sufijo lo decide el servidor
+    // leyendo la familia bajo lock, y el que había aquí era justo el que mentía (ver la prueba
+    // del padre `-01`, abajo).
+    expect(
+      within(await screen.findByRole('dialog')).getByText('CYA-26-71-001'),
+    ).toBeInTheDocument();
+    expect(crearVersionMutate).not.toHaveBeenCalled();
+
+    await usuario.click(screen.getByTestId('confirmar-accion'));
+    expect(crearVersionMutate).toHaveBeenCalledTimes(1);
+    expect(crearVersionMutate.mock.calls[0]?.[0]).toEqual({ id: 7 });
+  });
+
+  it('⭐ al versionar una VERSIÓN, el diálogo NO promete un código ANIDADO', async () => {
+    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y por el que un defecto vivió en verde: con un
+    // padre RAÍZ, «código del padre + -01» acierta por casualidad. Con un padre que YA es versión,
+    // el mismo texto escribía `CYA-26-71-001-01-01` — la forma anidada que Daniel descartó
+    // (*"en tres temporadas hay -01-02-01 y nadie lo lee"*), enseñada como promesa a quien aprueba.
+    // El servidor siempre creó bien el `-02`; el que mentía era el diálogo.
+    const usuario = userEvent.setup();
+    const v1 = modelo(9, 'CYA-26-71-001-01', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-01',
+      versionDesarrollo: 1,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([v1]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(v1)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('crear-version-modelo'));
+    const dialogo = await screen.findByRole('dialog');
+
+    // Ni el código anidado exacto…
+    expect(dialogo).not.toHaveTextContent('CYA-26-71-001-01-01');
+    // …ni ningún otro sufijo colgado del código del padre (`-01-02`, `-01-2`…): la familia se
+    // numera contra la RAÍZ, así que cualquier cosa que cuelgue del `-01` es falsa.
+    expect(dialogo.textContent ?? '').not.toMatch(/CYA-26-71-001-01-\d/);
+
+    // Y no pasa por callarse: sigue diciendo de qué modelo nace y qué se hereda.
+    expect(within(dialogo).getByText('CYA-26-71-001-01')).toBeInTheDocument();
+    expect(within(dialogo).getByText(/la misma receta/)).toBeInTheDocument();
+    expect(within(dialogo).getByText(/queda igual/)).toBeInTheDocument();
+  });
+
+  it('enseña el LINAJE de una versión con liga al modelo del que nació', () => {
+    const version = modelo(9, 'CYA-26-71-001-02', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-02',
+      versionDesarrollo: 2,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001-01',
+    });
+    useModelos.mockReturnValue(listaConDatos([version]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(version)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const linaje = screen.getByTestId('linaje-modelo');
+    expect(linaje).toHaveTextContent('Versión 2 de');
+    expect(within(linaje).getByRole('button', { name: 'CYA-26-71-001-01' })).toBeInTheDocument();
+  });
+
+  // ── ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110) ────────
+
+  /**
+   * ⚠️ Lo que estas pruebas fijan es lo que la PANTALLA enseña y manda.
+   *
+   * 🔴 **V1-E9c (§Post-F9.169) — la revisión ya NO impide producir.** Aquí decía que el backend
+   * *"niega producir una versión sin revisar dentro del núcleo de la promoción"*: esa compuerta se
+   * retiró. La firma sobrevive como REGISTRO, y lo que estas pruebas cuidan es que ese registro se
+   * pueda **ver y levantar siempre** —incluido el caso nuevo: la versión que YA está en
+   * producción—, porque un acto que nadie puede ejecutar es peor que no tenerlo.
+   */
+  function versionPendiente(extra: Partial<Modelo> = {}): Modelo {
+    return modelo(9, 'CYA-26-71-001-01', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-01',
+      versionDesarrollo: 1,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001',
+      revisionEstado: 'pendiente',
+      ...extra,
+    });
+  }
+
+  function abrirModelo(m: Modelo, permisos: string[]): void {
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(permisos as never),
+    });
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+  }
+
+  it('⭐ una versión PENDIENTE lo dice, y con `modelos.aprobar-receta` ofrece las dos firmas', () => {
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('⭐ una versión SIN firma (`revisionEstado` en NULL) también se ve y SE PUEDE firmar', () => {
+    // 🔴 EL CALLEJÓN SIN SALIDA que dejaba el predicado viejo. La pantalla preguntaba «¿tiene
+    // `revisionEstado`?» para decidir si esto es una versión — un PROXY que sólo acierta porque
+    // «crear versión» siempre escribe `'pendiente'`. Las versiones que nacieron antes de que esta
+    // etapa se desplegara (las que estrenó V1-E7b en `prueba`, que no tenían ni la columna) llegan
+    // con NULL: el backend las lee como PENDIENTES, y aquí no se pintaba ni el chip ni los botones.
+    // Resultado: una versión sin firmar que nadie podía firmar. Ahora las dos puertas preguntan lo
+    // mismo —el LINAJE—, y el null se pinta como lo que significa: nadie la ha revisado.
+    abrirModelo(versionPendiente({ revisionEstado: null }), [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión pendiente');
+    expect(chip).toHaveTextContent('Nadie la ha revisado todavía');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ V1-E9c — una versión YA EN PRODUCCIÓN sigue enseñando el chip Y los dos botones', () => {
+    // 🔴 EL CASO QUE ESTA ETAPA ESTRENA, y que **ninguna prueba cubría**: aquí había un filtro
+    // `seleccion.origen === 'desarrollo'` y no había ni una aserción sobre él (quitarlo dejaba todo
+    // en verde). Sin compuerta, generar la OP promueve la versión con la revisión en `pendiente`:
+    // con ese filtro puesto, la ficha enseñaría «Revisión pendiente» SIN ningún botón para
+    // resolverlo, para siempre. Si alguien lo devuelve, esta prueba muere.
+    abrirModelo(
+      versionPendiente({ origen: 'produccion', codigo: '71001', numeroProduccion: 71_001 }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('⭐ sin `modelos.aprobar-receta` se VE el estado pero no se puede firmar', () => {
+    // El estado es información que le sirve a cualquiera que mire el modelo; la firma no.
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.administrar']);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un modelo migrado (producción) no enseña revisión ninguna', () => {
+    // Los ~4,987 migrados del Access: esta etapa no les cambió nada, ni siquiera en pantalla.
+    abrirModelo(modelo(1, '71001'), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un DESARROLLO NORMAL (que no nació de otro modelo) tampoco lleva revisión', () => {
+    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y que dejó viva una mutación: con un modelo
+    // MIGRADO los botones se escondían por dos razones a la vez, así que quitar la condición de la
+    // revisión no rompía nada. El caso que de verdad la ejercita es un desarrollo normal —el caso
+    // COMÚN del módulo—: es de desarrollo y NO es versión, así que la revisión no le toca. Si la
+    // condición desapareciera, aquí saldrían dos botones que no van.
+    const desarrolloNormal = modelo(3, 'CYA-26-71-005', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-005',
+      revisionEstado: null,
+    });
+    abrirModelo(desarrolloNormal, ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+    // Y lo que SÍ le toca sigue estando: versionarlo es lo que le abre la puerta a la revisión.
+    expect(screen.getByTestId('crear-version-modelo')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ V1-E9a (§Post-F9.167 punto 2) — EL CHIP FANTASMA QUE NO VA A NACER.
+   *
+   * Un HIJO del linaje 1:N (uno de los N modelos de producción que salen de un desarrollo, uno por
+   * color de la OC) **no lleva revisión propia**: su receta es la de su padre y la firma que lo
+   * habilitó a producir se firmó contra el padre. Si esta pantalla le pintara el chip, se enseñaría
+   * a sí mismo como *«Revisión pendiente»* y pediría una firma que no le toca: firmar la receta del
+   * hijo sería firmar dos veces la del padre, y de paso lo metería en la bandeja «Recetas por
+   * revisar» a esperar algo que nadie tiene que hacer.
+   *
+   * ⚠️ **Los dos casos, y en qué se diferencian.** (a) es el hijo TAL COMO NACE HOY: sin
+   * `idModeloPadre` ni `versionDesarrollo`, así que el predicado ya lo dejaría fuera aunque nadie
+   * hubiera tocado nada — es la conducta documentada, no la guarda. (b) es el hijo con
+   * `idModeloPadre` puesto, la forma que produciría una etapa futura que quisiera "guardar de dónde
+   * salió": **ése es el caso que la exclusión de V1-E9a existe para atajar**, y el único de los dos
+   * que se pone rojo si alguien la quita.
+   */
+  it('⭐ un HIJO del linaje 1:N no enseña revisión, ni siquiera con el linaje de versiones puesto', () => {
+    // (a) tal como nace hoy
+    const hijo = modelo(31, '71004', true, {
+      origen: 'produccion',
+      numeroProduccion: 71_004,
+      idModeloDesarrollo: 7,
+      codigoModeloDesarrollo: 'CYA-26-71-001',
+    });
+    abrirModelo(hijo, ['modelos.ver', 'modelos.aprobar-receta']);
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+
+    // (b) el mismo hijo si además cargara el linaje de VERSIONES: sigue sin llevar revisión.
+    cleanup();
+    abrirModelo({ ...hijo, idModeloPadre: 7, codigoPadre: 'CYA-26-71-001', versionDesarrollo: 1 }, [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+
+    // Y el control: la MISMA fila sin el vínculo 1:N sí es una versión y sí enseña el chip. Sin
+    // esta línea, las dos de arriba pasarían con la ficha rota del todo.
+    cleanup();
+    abrirModelo(
+      {
+        ...hijo,
+        idModeloDesarrollo: null,
+        codigoModeloDesarrollo: null,
+        idModeloPadre: 7,
+        codigoPadre: 'CYA-26-71-001',
+        versionDesarrollo: 1,
+      },
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+    expect(screen.getByTestId('revision-modelo')).toBeInTheDocument();
+  });
+
+  it('una versión APROBADA ya no ofrece aprobar (no hay nada que firmar dos veces)', () => {
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'aprobada',
+        revisadoPor: 'Aurora',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión aprobada');
+    expect(chip).toHaveTextContent('por Aurora');
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('una versión RECHAZADA enseña el MOTIVO (que es lo único que sirve para corregir)', () => {
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'rechazada',
+        revisadoPor: 'Daniel',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+        revisionNota: 'el cierre que se quitó sí costaba',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent(
+      'el cierre que se quitó sí costaba',
+    );
+  });
+
+  // ── ⭐ V1-E7e — La aprobación se invalida si la receta cambia (§Post-F9.116) ──
+
+  /**
+   * Desde V1-E7e, «pendiente» ya no significa una sola cosa: puede ser una versión que nadie ha
+   * mirado, o una que Aurora SÍ aprobó y perdió la firma porque después le cambiaron la receta.
+   * La pantalla tiene que distinguirlas — si dijera "nadie la ha revisado" de la segunda, estaría
+   * borrando en la cara del usuario el hecho de que hubo una firma y de qué la tumbó.
+   */
+  const NOTA_INVALIDACION =
+    // Las fechas van en formato de MÉXICO (25/8/2026), que es lo que el backend emite desde que
+    // V1-E7d unificó `fechaDelActo`. Antes decía ISO y era un fixture desactualizado: no rompía
+    // ninguna aserción, pero enseñaba a quien lo leyera un formato que el sistema ya no produce.
+    'Se INVALIDÓ automáticamente el 25/8/2026: después de aprobarse cambió las TELAS de la ' +
+    'receta, así que la firma anterior ya no corresponde a lo que se va a fabricar. La ' +
+    'aprobación era del 2026-08-12. Hay que volver a revisarla.';
+
+  it('⭐ una versión INVALIDADA enseña POR QUÉ perdió la firma (no "nadie la ha revisado")', () => {
+    abrirModelo(
+      // Así queda la fila tras la invalidación: pendiente, SIN firmante (nadie ha revisado la
+      // receta que hay ahora) y con la nota que cuenta qué pasó.
+      versionPendiente({ revisionEstado: 'pendiente', revisionNota: NOTA_INVALIDACION }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión pendiente');
+    expect(chip).toHaveTextContent('cambió las TELAS');
+    // 🔴 La frase que MENTIRÍA: aquí sí hubo revisión, y se perdió.
+    expect(chip).not.toHaveTextContent('Nadie la ha revisado todavía');
+    // Y (d) no es un callejón sin salida: se vuelve a firmar con el mismo permiso.
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('una versión pendiente que NADIE ha mirado sigue diciéndolo tal cual', () => {
+    // El otro lado del mismo `if`: sin nota, el texto de siempre. Si alguien cambiara la condición
+    // por el estado en vez de por la nota, este caso se quedaría mudo.
+    abrirModelo(versionPendiente({ revisionNota: null }), [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Nadie la ha revisado todavía');
+  });
+
+  it('una versión APROBADA no arrastra la nota de la firma anterior', () => {
+    // La nota de una aprobación es una observación del aprobador, no una alarma: enseñarla en rojo
+    // junto al chip verde diría que algo está mal cuando no lo está.
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'aprobada',
+        revisadoPor: 'Aurora',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+        revisionNota: 'la revisé con Daniel',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('por Aurora');
+    expect(chip).not.toHaveTextContent('la revisé con Daniel');
+  });
+
+  it('⭐ el rechazo NO se manda sin motivo, y cuando lo hay lo lleva', async () => {
+    const usuario = userEvent.setup();
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    await usuario.click(screen.getByTestId('rechazar-revision-modelo'));
+    const confirmar = await screen.findByTestId('confirmar-revision-modelo');
+    // Sin motivo el botón está cerrado: un rechazo mudo no le dice nada a quien tiene que corregir.
+    expect(confirmar).toBeDisabled();
+
+    await usuario.type(screen.getByTestId('modelo-revision-texto'), 'el pantone no es el de la OP');
+    await usuario.click(screen.getByTestId('confirmar-revision-modelo'));
+
+    expect(rechazarRevisionMutate).toHaveBeenCalledTimes(1);
+    expect(rechazarRevisionMutate.mock.calls[0]?.[0]).toEqual({
+      id: 9,
+      texto: 'el pantone no es el de la OP',
+    });
+  });
+
+  it('la aprobación sí se puede firmar sin escribir nada (la nota es opcional)', async () => {
+    const usuario = userEvent.setup();
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    await usuario.click(screen.getByTestId('aprobar-revision-modelo'));
+    await usuario.click(await screen.findByTestId('confirmar-revision-modelo'));
+
+    expect(aprobarRevisionMutate).toHaveBeenCalledTimes(1);
+    expect(aprobarRevisionMutate.mock.calls[0]?.[0]).toEqual({ id: 9, texto: '' });
   });
 });

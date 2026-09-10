@@ -13,8 +13,8 @@ import type { paths } from './esquema.gen';
 import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
- * Capa de datos de la ENTRADA DE TELA por FACTURA/REMISIÓN sin orden de compra (etapa B1 — Daniel
- * §Post-F9.9 punto 7). Mismo ESTÁNDAR que el resto: llama al cliente TIPADO del OpenAPI, normaliza
+ * Capa de datos de la ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor, siempre contra su orden
+ * de compra (etapa B1; §Post-F9.159(a)). Mismo ESTÁNDAR que el resto: llama al cliente TIPADO del OpenAPI, normaliza
  * (`data` / `ErrorDeApi`) y expone hooks de TanStack Query; las mutaciones invalidan la caché.
  * CERO lógica de negocio (A1): el backend valida (folio, partidas, kardex, no-negativo, inverso de
  * cancelación) y decide qué precios se ven (ex-acceso #7 `telas.ver-totales`).

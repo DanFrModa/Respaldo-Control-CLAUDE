@@ -28,6 +28,8 @@ import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
 import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
 import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { ConceptosPagoPagina } from '@/modulos/pagos/ConceptosPagoPagina';
+import { CorridaPagosPagina } from '@/modulos/pagos/CorridaPagosPagina';
 import { CxpPagina } from '@/modulos/cxp/CxpPagina';
 import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
 import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
@@ -61,6 +63,7 @@ import { AjusteTelaColorPagina } from '@/modulos/inventarios/AjusteTelaColorPagi
 import { TraspasoTelaColorPagina } from '@/modulos/inventarios/TraspasoTelaColorPagina';
 import { EntradasTelaPagina } from '@/modulos/inventarios/EntradasTelaPagina';
 import { CapturaEntradaTelaPagina } from '@/modulos/inventarios/CapturaEntradaTelaPagina';
+import { SalidaSinOrdenPagina } from '@/modulos/inventarios/SalidaSinOrdenPagina';
 import { SalidaTelaColorOrdenPagina } from '@/modulos/inventarios/SalidaTelaColorOrdenPagina';
 import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
@@ -71,6 +74,8 @@ import { TraspasoMaterialesPagina } from '@/modulos/inventarios/TraspasoMaterial
 import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
+import { PromesasIncumplidasPagina } from '@/modulos/modelos/PromesasIncumplidasPagina';
+import { RecetasPorRevisarPagina } from '@/modulos/modelos/RecetasPorRevisarPagina';
 import { BandejaAutorizacionPagina } from '@/modulos/ordenes-compra/BandejaAutorizacionPagina';
 import { ComprasPorOrdenPagina } from '@/modulos/ordenes-compra/ComprasPorOrdenPagina';
 import { EstatusMaterialesPagina } from '@/modulos/ordenes-compra/EstatusMaterialesPagina';
@@ -183,6 +188,11 @@ const router = createBrowserRouter([
           { path: 'arte/galeria', element: <GaleriaArte /> },
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
+          // ⭐⭐ V1-E8r (§Post-F9.140) — la COLA de la revisión de receta. Sólo lectura: lleva a
+          // `/modelos` (deep-link por `state`), que es donde se firma viendo.
+          { path: 'modelos/recetas-por-revisar', element: <RecetasPorRevisarPagina /> },
+          // ⭐⭐ V1-E9p (§Post-F9.144(b)) — la lista del DUEÑO: lo que se vendió y no se consiguió.
+          { path: 'modelos/promesas-incumplidas', element: <PromesasIncumplidasPagina /> },
           // Pedidos por mes (rediseño R3, §4.1): la pantalla nueva con el constructor y "Generar
           // OP"; la edición fina F2 (renglones/reales/copiar) se conserva en /pedidos/administrar.
           { path: 'pedidos', element: <PedidosMesPagina /> },
@@ -259,7 +269,7 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/ajuste', element: <AjusteTelaColorPagina /> },
           { path: 'inventarios/telas/traspaso', element: <TraspasoTelaColorPagina /> },
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaColorOrdenPagina /> },
-          // Entrada de tela por FACTURA/REMISIÓN sin orden de compra (B1). Las rutas ESTÁTICAS
+          // Entrada de tela por FACTURA/REMISIÓN contra su OC (B1). Las rutas ESTÁTICAS
           // ('nueva') van ANTES de las que llevan :param, si no 'nueva' caería en el detalle.
           { path: 'inventarios/telas/entradas', element: <EntradasTelaPagina /> },
           { path: 'inventarios/telas/entradas/nueva', element: <CapturaEntradaTelaPagina /> },
@@ -272,8 +282,13 @@ const router = createBrowserRouter([
           { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
+          // ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104): telas y avíos, sólo inventario.
+          { path: 'inventarios/salida-sin-orden', element: <SalidaSinOrdenPagina /> },
           // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
           // experiencia de usuario del estado de cuenta (F6-E5). Rutas estáticas antes de cualquier :param.
+          // La corrida semanal de pagos (0.113) y su catálogo de conceptos (0.125).
+          { path: 'pagos/corrida', element: <CorridaPagosPagina /> },
+          { path: 'catalogos/conceptos-pago', element: <ConceptosPagoPagina /> },
           { path: 'esma', element: <EsMaPagina /> },
           { path: 'esma/estado-cuenta', element: <EstadoCuentaPagina /> },
           { path: 'esma/saldos', element: <SaldosMaquilerosPagina /> },

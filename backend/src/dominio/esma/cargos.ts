@@ -7,6 +7,13 @@
  * la CANTIDAD propuesta se DERIVA del recibo (piezas recibidas). El admin VALIDA el cargo fijando la
  * cantidad y el precio REALES (punto de control humano conservado de v1).
  *
+ * ⭐ 0.114 — TAMBIÉN NACEN CARGOS SIN MAQUILA. El CORTE y el EMPAQUE son *servicios sobre la orden*:
+ * Daniel dictó que *«en corte no necesitas mandar y recibir mercancía … simplemente sucede y ya»* y
+ * que aun así *«el monto a pagar sale de una orden, lo mismo que un maquilero»*. Esos cargos llevan
+ * `servicio` (`corte`/`empaque`) e `idTipoProceso` NULL —excluyentes, con CHECK en la BD— y su
+ * `idEtapaRecibo` apunta a la etapa de corte/empaque, de la que sale la cantidad propuesta igual que
+ * de un recibo. La ETIQUETA que ven las pantallas se redacta en `etiqueta-cargo.ts` (una sola copia).
+ *
  * Reglas de F6-E4:
  *  • PRECIO PROPUESTO de referencia (decisión (e)): el cargo se valúa con el precio de la ORDEN por
  *    tipo de proceso — `maquilaOrd` para COSTURA, `aplicacionOrd` para ESTAMPADO/APLICACIÓN (y demás
@@ -17,6 +24,11 @@
  *    saldo y del pago.
  *  • Los estados de conciliación "capturado/revisado/pagado" se PROYECTAN (no se persisten aparte):
  *    propuesto=capturado, validado=revisado, validado+totalmente-pagado=pagado, cancelado=cancelado.
+ *  • ⭐ PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136): el cargo las expone como `incompletas`, un número
+ *    INFORMATIVO que NUNCA entra en `cantidadPropuesta` ni en `importePropuesto` — *"tampoco se
+ *    pagan"*. Está aquí porque ésta es la pantalla donde alguien teclea `cantidadReal`: si no viera
+ *    las incompletas, podría sumarlas a mano creyendo que faltaban. Y un recibo que SOLO trae
+ *    incompletas ni siquiera genera cargo (`produccion/recibos.ts`).
  *
  * Innegociables: A1 (lógica aquí), A2 (la validación es una transacción), A4 (`esma.cargo-validar`),
  * A7 (bitácora), A9 (empresa activa). NO toca kardex (D3 no aplica: el cargo es CxP de maquila).
@@ -36,6 +48,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { importePropuestoDelCargo, precioDeReferenciaDelCargo } from './cargo-propuesto.js';
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
 
 /** `include` para proyectar un cargo con sus nombres legibles, la cantidad recibida y los precios. */
@@ -47,7 +61,10 @@ const incluirCargo = {
     select: {
       folio: true,
       precioPactado: true,
-      detalles: { select: { cantidad: true } },
+      // `cantidad` = lo que se PAGA. `cantidadIncompletas` viaja aparte y NUNCA se le suma
+      // (V1-E8k, §Post-F9.136: *"tampoco se pagan"*): solo se muestra para que quien valida el
+      // cargo sepa que el maquilero sí entregó esas prendas.
+      detalles: { select: { cantidad: true, cantidadIncompletas: true } },
     },
   },
 } satisfies Prisma.EsMaCargoInclude;
@@ -61,17 +78,27 @@ type CargoConDetalle = Prisma.EsMaCargoGetPayload<{ include: typeof incluirCargo
  */
 function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
   const cantidadPropuesta = (c.etapaRecibo?.detalles ?? []).reduce((s, d) => s + d.cantidad, 0);
+  // FUERA de `cantidadPropuesta` a propósito: toda pieza que entre ahí acaba multiplicada por un
+  // precio en `importePropuesto` (§Post-F9.136). Esto es INFORMACIÓN, no dinero.
+  const incompletas = (c.etapaRecibo?.detalles ?? []).reduce(
+    (s, d) => s + (d.cantidadIncompletas ?? 0),
+    0,
+  );
 
-  // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros → aplicacionOrd.
-  const esCostura = c.tipoProceso.codigo === 'costura';
-  const precioOrden = esCostura ? c.orden.maquilaOrd : c.orden.aplicacionOrd;
-  const precioPropuesto =
-    precioOrden != null
-      ? precioOrden.toNumber()
-      : c.etapaRecibo?.precioPactado == null
-        ? null
-        : c.etapaRecibo.precioPactado.toNumber();
-  const importePropuesto = precioPropuesto === null ? null : cantidadPropuesta * precioPropuesto;
+  // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros →
+  // aplicacionOrd, con caída al precio pactado del envío; y un cargo de SERVICIO (corte/empaque,
+  // 0.114) va SÓLO con el precio pactado de su etapa. La regla NO se escribe aquí (V1, fila 0.111):
+  // sale de `cargo-propuesto.ts`, que es la MISMA que usa el bloque «por revisar» del saldo —en
+  // Prisma y en SQL—. Estaba sólo aquí, y al necesitarla el tablero habría nacido una segunda copia
+  // con vida propia.
+  const precioPropuesto = precioDeReferenciaDelCargo({
+    servicio: c.servicio,
+    codigoProceso: c.tipoProceso?.codigo ?? null,
+    maquilaOrd: c.orden.maquilaOrd?.toNumber() ?? null,
+    aplicacionOrd: c.orden.aplicacionOrd?.toNumber() ?? null,
+    precioPactado: c.etapaRecibo?.precioPactado?.toNumber() ?? null,
+  });
+  const importePropuesto = importePropuestoDelCargo(cantidadPropuesta, precioPropuesto);
 
   const cantidadReal = c.cantidadReal === null ? null : c.cantidadReal.toNumber();
   const precioReal = c.precioReal === null ? null : c.precioReal.toNumber();
@@ -110,10 +137,13 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
     idOrden: c.idOrden,
     folioOrden: Number(c.orden.folio),
     idTipoProceso: c.idTipoProceso,
-    tipoProceso: c.tipoProceso.nombre,
+    servicio: c.servicio,
+    // UNA sola fuente para la etiqueta (`etiqueta-cargo.ts`): nombre del proceso, o Corte/Empaque.
+    tipoProceso: etiquetaProcesoDelCargo(c),
     cantidadPropuesta,
     precioPropuesto,
     importePropuesto,
+    incompletas,
     cantidadReal,
     precioReal,
     importeReal,

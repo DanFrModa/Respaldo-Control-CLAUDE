@@ -50,6 +50,7 @@ import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacion
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { ChipHermanas } from './AvisoHermanas';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
@@ -77,13 +78,29 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'O
 /** Renglones por página (tabla densa de operación). */
 const POR_PAGINA = 50;
 
-/** Chip de estatus derivado de la fila (proto `opEstatus`): corte 0/parcial/completo o cancelada. */
+/**
+ * Chip de estatus derivado de la fila (proto `opEstatus`): corte 0/parcial/completo, o el FINAL de
+ * la orden cuando ya lo tiene.
+ *
+ * ⭐ **Los dos finales ganan sobre el avance del corte, y por la misma razón (0.061).** Una orden
+ * `cancelada` nunca se produjo; una `cerrada` terminó su vida administrativa y su costo quedó
+ * congelado. En los dos casos, pintar «Cortada» o «En proceso» —lo que salía antes para la
+ * cerrada— diría que la orden sigue en juego, **en la pantalla desde la que se opera a diario**.
+ * La decisión dice que el estado es «el espejo visible» del cierre; éste es el espejo que más se
+ * mira, y era el único donde no se veía.
+ *
+ * Se distinguen por TONO, no sólo por texto: `crit` para la cancelada (algo salió mal) y `neutro`
+ * para la cerrada (es el final NORMAL), igual que el badge de la ficha.
+ */
 export function estatusDeFila(fila: Pick<OrdenCentro, 'estado' | 'cantOrdenada' | 'cantCortada'>): {
   tono: TonoEstado;
   texto: string;
 } {
   if (fila.estado === 'cancelada') {
     return { tono: 'crit', texto: 'Cancelada' };
+  }
+  if (fila.estado === 'cerrada') {
+    return { tono: 'neutro', texto: 'Cerrada' };
   }
   if (fila.cantCortada === 0) {
     return { tono: 'neutro', texto: 'Sin cortar' };
@@ -458,8 +475,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
   const total = consulta.data?.total ?? 0;
   const totalPaginas = consulta.data?.totalPaginas ?? 1;
+  // Cuántas de la página siguen EN JUEGO. ⭐ 0.061: la orden CERRADA no lo está — terminó su vida
+  // administrativa—, así que se excluye igual que la cancelada. Sin esto el contador la seguía
+  // sumando como abierta, que es la misma ceguera al estado nuevo que tenía el chip.
   const abiertas = filas.filter(
-    (f) => estatusDeFila(f).texto !== 'Cortada' && f.estado !== 'cancelada',
+    (f) =>
+      estatusDeFila(f).texto !== 'Cortada' && f.estado !== 'cancelada' && f.estado !== 'cerrada',
   ).length;
 
   function reiniciarPagina(): void {
@@ -758,6 +779,13 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                                   {textoFaltantes(fila.faltantes)}
                                 </span>
                               )}
+                            {/* ⭐⭐ fila 0.068 (a) — el aviso EN LA FAMILIA, también en móvil: es la
+                                gemela de la celda de la tabla y omitirla dejaría media pantalla sin
+                                el aviso, que es el defecto que esta etapa vino a evitar. */}
+                            <ChipHermanas
+                              frenteAlGrupo={fila.frenteAlGrupo}
+                              className="mt-0.5 justify-end"
+                            />
                           </div>
                         </div>
                         <p className="mt-1 truncate text-sm font-medium">{fila.cliente}</p>
@@ -899,6 +927,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                                     {textoFaltantes(fila.faltantes)}
                                   </span>
                                 )}
+                              {/* ⭐⭐ fila 0.068 (a) — **EL AVISO EN LA FAMILIA.** El Centro es la
+                                  única pantalla que enseña juntas todas las OP de un modelo, así
+                                  que es donde se reconoce a la que se salió del grupo sin abrirlas
+                                  una por una. Va bajo el chip de estatus, como `faltantes`, y NO
+                                  ocupa columna nueva. El texto lo redacta el servidor. */}
+                              <ChipHermanas frenteAlGrupo={fila.frenteAlGrupo} className="mt-0.5" />
                             </TablaDensaCelda>
                           </TablaDensaFila>
                         );
@@ -1080,6 +1114,16 @@ export function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
             <tr key={linea.id} className="border-b">
               <td className="px-2 py-1 whitespace-nowrap">
                 <span className="font-medium">{linea.color}</span>
+                {/* §Post-F9.10: dos tendidos del mismo color son dos renglones; sin la etiqueta se
+                    leerían como el mismo color repetido con números distintos. */}
+                {linea.pack !== '' ? (
+                  <span
+                    className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                    data-testid="centro-matriz-pack"
+                  >
+                    Pack {linea.pack}
+                  </span>
+                ) : null}
                 {linea.pantone !== null && linea.pantone !== '' ? (
                   <span
                     className="block text-[10px] font-normal text-muted-foreground"
@@ -1125,10 +1169,96 @@ export function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
 }
 
 /**
+ * ⭐⭐ **EL NODO «DESARROLLO» DE UNA OP, SIN MENTIR** (fila 0.151).
+ *
+ * DANIEL, textual: *«¿qué pasa si me equivoqué con el modelo de desarrollo al que lo relacioné?…
+ * **En la OP no veo el modelo de desarrollo**»*.
+ *
+ * 🔴 **Lo que había, y por qué era falso.** El nodo sólo se encendía con la LIGA del expediente
+ * (`DesarrolloOrden`), y si no la había ponía `—` con el tooltip *«modelo anterior al módulo de
+ * Desarrollo (sin liga)»*. Toda OP nacida del importador de OC por PDF cae ahí —`crearOrdenDesdePdf`
+ * crea el renglón SIN `idDesarrollo`, así que `salidaAProduccion` no liga nada—, y sin embargo su
+ * modelo **sí nació de un desarrollo**, que es exactamente lo que el tooltip negaba. El usuario leía
+ * "este modelo es viejo" de una OP importada hace un minuto.
+ *
+ * 🔑 **La cura es distinguir DOS cosas que no son la misma**, y por eso el nodo tiene tres estados:
+ *  1. **Ligada al expediente** (`yaLigada`) — hay `DesarrolloOrden`: proyecto, precosto y lista. Es
+ *     el nodo fuerte de siempre.
+ *  2. **Con LINAJE pero sin expediente** (`orden.idModeloDesarrollo !== null`) — el modelo de la OP
+ *     nació de un desarrollo (V1-E3: un modelo por color), aunque nadie ligó el expediente. El nodo
+ *     enseña el **nº de desarrollo** y navega a su ficha; el tooltip dice la verdad completa: de
+ *     dónde salió y que la liga del expediente falta.
+ *  3. **Ni lo uno ni lo otro** — recién ahí se apaga, y con un texto que sólo afirma lo que se puede
+ *     comprobar (el modelo no nació de un desarrollo y la OP no está ligada), no la edad del modelo.
+ *
+ * ⚠️ Y la NAVEGACIÓN va al PADRE, no al modelo de la orden: desde V1-E3 la OP lleva el hijo de
+ * producción, y `/desarrollo` sólo encuentra modelos de desarrollo — abrirla con el id del hijo
+ * llegaba a una ficha vacía.
+ */
+function nodoDesarrollo({
+  orden,
+  yaLigada,
+  expediente,
+  puedeVerDesarrollo,
+  navigate,
+}: {
+  orden: Orden;
+  yaLigada: boolean;
+  expediente: { data?: { codigoModelo?: string } | undefined };
+  puedeVerDesarrollo: boolean;
+  navigate: ReturnType<typeof useNavigate>;
+}): NodoTraza {
+  // El modelo de desarrollo al que hay que ir: el PADRE del linaje si lo hay; si no, el de la orden
+  // (caso legado, donde la orden lleva directamente el modelo que el desarrollo apunta).
+  const idDestino = orden.idModeloDesarrollo ?? orden.idModelo;
+  const irADesarrollo = {
+    onNavegar: () => void navigate('/desarrollo', { state: { idModelo: idDestino } }),
+  };
+
+  if (yaLigada) {
+    return {
+      clave: 'desarrollo',
+      etiqueta: 'Desarrollo',
+      valor: `#${expediente.data?.codigoModelo ?? orden.codigoModeloDesarrollo ?? orden.codigoModelo}`,
+      activo: true,
+      // §Post-F9.68: el nodo NAVEGA solo si el usuario puede abrir el destino; sin
+      // el permiso queda como dato (no como enlace roto) y NO se dice por qué —
+      // antes el tooltip anunciaba «Requiere permiso de Desarrollo».
+      ...(puedeVerDesarrollo ? irADesarrollo : {}),
+    };
+  }
+
+  if (orden.codigoModeloDesarrollo !== null) {
+    return {
+      clave: 'desarrollo',
+      etiqueta: 'Desarrollo',
+      valor: `#${orden.codigoModeloDesarrollo}`,
+      activo: true,
+      titulo:
+        `El modelo ${orden.codigoModelo} de esta OP nació del desarrollo ` +
+        `${orden.codigoModeloDesarrollo} (de ahí sale su receta). La OP todavía NO está ligada a un ` +
+        `expediente de Desarrollo, así que no trae proyecto ni lista de precios.`,
+      ...(puedeVerDesarrollo ? irADesarrollo : {}),
+    };
+  }
+
+  return {
+    clave: 'desarrollo',
+    etiqueta: 'Desarrollo',
+    valor: '—',
+    activo: false,
+    titulo:
+      `El modelo ${orden.codigoModelo} de esta OP no nació de un desarrollo y la OP no está ligada ` +
+      `a ningún expediente de Desarrollo.`,
+  };
+}
+
+/**
  * Cadena de trazabilidad COMPACTA del panel (R3, §4.1): `OC cliente → Desarrollo → Lista →
  * Pedido → OP`. El nodo de desarrollo/lista se resuelve con el expediente F8-E6 (mismas claves de
  * cache que `SeccionDesarrolloOrden`: cero peticiones extra); sin `desarrollo.ver` quedan
- * apagados. Los históricos sin ficha avisan "modelo anterior al módulo de Desarrollo".
+ * apagados. El nodo de Desarrollo lo arma {@link nodoDesarrollo} (fila 0.151): liga del
+ * expediente, o —si no la hay— el LINAJE del modelo de la OP; sólo sin ninguno de los dos se apaga.
  */
 function CadenaTrazaOrden({
   orden,
@@ -1158,23 +1288,7 @@ function CadenaTrazaOrden({
           },
         ]
       : []),
-    {
-      clave: 'desarrollo',
-      etiqueta: 'Desarrollo',
-      valor: yaLigada ? `#${expediente.data?.codigoModelo ?? orden.codigoModelo}` : '—',
-      activo: yaLigada,
-      // §Post-F9.68: el nodo NAVEGA solo si el usuario puede abrir el destino; sin
-      // el permiso queda como dato (no como enlace roto) y NO se dice por qué —
-      // antes el tooltip anunciaba «Requiere permiso de Desarrollo».
-      ...(yaLigada
-        ? puedeVerDesarrollo
-          ? {
-              onNavegar: () =>
-                void navigate('/desarrollo', { state: { idModelo: orden.idModelo } }),
-            }
-          : {}
-        : { titulo: 'modelo anterior al módulo de Desarrollo (sin liga)' }),
-    },
+    nodoDesarrollo({ orden, yaLigada, expediente, puedeVerDesarrollo, navigate }),
     {
       clave: 'lista',
       etiqueta: 'Lista de precios',
@@ -1275,9 +1389,12 @@ function DetalleCentroOrden({
       ? estatusDeFila(fila)
       : orden.estado === 'cancelada'
         ? { tono: 'crit' as TonoEstado, texto: 'Cancelada' }
-        : orden.estado === 'completa'
-          ? { tono: 'info' as TonoEstado, texto: 'Completa' }
-          : { tono: 'neutro' as TonoEstado, texto: 'Capturada' };
+        : // 0.061: la CERRADA también es un final, y aquí tampoco se veía.
+          orden.estado === 'cerrada'
+          ? { tono: 'neutro' as TonoEstado, texto: 'Cerrada' }
+          : orden.estado === 'completa'
+            ? { tono: 'info' as TonoEstado, texto: 'Completa' }
+            : { tono: 'neutro' as TonoEstado, texto: 'Capturada' };
   const referencia = orden.referencias[0]?.valor ?? fila?.pedidoCliente ?? null;
 
   return (

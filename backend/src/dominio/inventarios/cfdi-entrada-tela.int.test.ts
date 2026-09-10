@@ -115,6 +115,46 @@ async function ocAutorizada(lineas: { idTela: number; cantidad: number; precio: 
   return oc;
 }
 
+/**
+ * §Post-F9.159(a) — **NO SE RECIBE TELA SIN OC**: toda entrada de este archivo nace contra un
+ * renglón de orden de compra AUTORIZADA, y éste lo crea.
+ *
+ * Se crea **bajo demanda, nunca en el `beforeEach`**, a propósito: las pruebas de "Leer el CFDI"
+ * miden EXACTAMENTE qué renglones pendientes se cruzan con qué conceptos, y una OC de más en el
+ * fixture les cambiaría la respuesta en silencio.
+ *
+ * Cantidad enorme: la orden nunca llega a `recibida_total`, así que sigue siendo recibible por la
+ * siguiente entrada de la misma prueba (`ESTATUS_RECIBIBLES` = autorizada | recibida_parcial).
+ */
+async function renglonOc(
+  opciones: { idTela?: number; idProveedor?: number; conComplemento?: boolean } = {},
+): Promise<number> {
+  const oc = await crearOC(
+    sesion(),
+    {
+      fechaEntrega: '2026-09-30',
+      idDireccionEntrega,
+      idProveedor: opciones.idProveedor ?? proveedor.id,
+      lineas: [
+        {
+          idTela: opciones.idTela ?? telaFelpa.id,
+          cantidad: 100_000,
+          precio: 1,
+          unidad: 'kg',
+          ...(opciones.conComplemento === true ? { cantidadComplemento: 5_000 } : {}),
+        },
+      ],
+    },
+    bd(),
+  );
+  await autorizarOC(sesion(), oc.id, bd());
+  const linea = oc.lineas[0]?.id;
+  if (linea === undefined) {
+    throw new Error('Fixture roto: la OC no devolvió su renglón de tela.');
+  }
+  return linea;
+}
+
 beforeAll(() => {
   cliente = clientePruebas();
 });
@@ -341,6 +381,98 @@ describe('Leer el CFDI para la entrada de tela (§Post-F9.20)', () => {
   });
 });
 
+/**
+ * 🔴🔴 **EL AVISO NO PUEDE AFIRMAR MÁS DE LO QUE SE PREGUNTÓ** (§Post-F9.159(a), segundo hallazgo
+ * del reviewer).
+ *
+ * `lineasTelaPendientesDeProveedor` se llama ACOTADA a una orden cuando la lectura llegó desde ella
+ * (`entrada.idOrdenCompra`, §Post-F9.15). Su vacío significa entonces «esta orden no tiene tela
+ * pendiente», y **no** «este proveedor no tiene nada»: decir lo segundo es falso, y mandar a
+ * «levanta (o autoriza) la orden» lo es doblemente, porque a ese camino sólo se llega desde una OC
+ * YA autorizada.
+ */
+describe('§Post-F9.159(a): el aviso de "no hay pendientes" dice hasta dónde se preguntó', () => {
+  const xmlSuelto = (uuid: string) =>
+    xmlCfdi({
+      emisorRfc: 'TNO850101BBB',
+      receptorRfc: 'FRM900101AAA',
+      uuid,
+      conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 90 }],
+    });
+
+  it('SIN acotar (captura desde cero): ahí sí se preguntó por TODO el proveedor', async () => {
+    // Sin una sola OC abierta: el vacío cubre al proveedor entero y la frase puede nombrarlo.
+    const propuesta = await leerCfdiParaEntradaTela(
+      sesion(),
+      { xml: xmlSuelto('aaaaaaaa-0000-0000-0000-000000000001') },
+      bd(),
+    );
+
+    const avisos = propuesta.avisos.join(' ');
+    expect(avisos).toMatch(/Ese proveedor no tiene renglones de tela pendientes/);
+    expect(avisos).toMatch(/Levanta \(o autoriza\)/);
+  });
+
+  it('🔴 ACOTADO a una OC: habla de ESA ORDEN, no del proveedor — y no manda a autorizar lo ya autorizado', async () => {
+    // La configuración CORRIENTE que lo destapa: una OC con TELA y un renglón que no es tela, cuya
+    // tela YA llegó completa. El botón «Dar entrada a la tela» no mira el pendiente, así que la
+    // sigue ofreciendo… y la consulta acotada vuelve vacía.
+    const ocRecibida = await crearOC(
+      sesion(),
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega,
+        idProveedor: proveedor.id,
+        lineas: [
+          { idTela: telaFelpa.id, cantidad: 100, precio: 90, unidad: 'kg' },
+          { descripcionLibre: 'Fletes', cantidad: 1, precio: 500, unidad: 'servicio' },
+        ],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(), ocRecibida.id, bd());
+    const idLineaTela = ocRecibida.lineas.find((l) => l.idTela !== null)?.id;
+    if (idLineaTela === undefined) {
+      throw new Error('Fixture roto: la OC no devolvió su renglón de tela.');
+    }
+    // Y el proveedor SÍ tiene pendiente en OTRA orden: si el aviso hablara de él, mentiría.
+    await ocAutorizada([{ idTela: telaRib.id, cantidad: 300, precio: 70 }]);
+
+    const color = await cliente.telaColor.create({
+      data: { idTela: telaFelpa.id, nombre: 'Marino recibido' },
+    });
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'R-77',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-05',
+        idAlmacen: almacen.id,
+        lineas: [
+          { idTelaColor: color.id, cantidad: 100, precioUnit: 90, idOrdenCompraLinea: idLineaTela },
+        ],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    const propuesta = await leerCfdiParaEntradaTela(
+      sesion(),
+      { xml: xmlSuelto('aaaaaaaa-0000-0000-0000-000000000002'), idOrdenCompra: ocRecibida.id },
+      bd(),
+    );
+
+    const avisos = propuesta.avisos.join(' ');
+    expect(avisos).toMatch(/Esta orden de compra ya no tiene renglones de tela pendientes/);
+    // Las dos mitades que eran falsas: el proveedor (al que no se le preguntó) y el imperativo
+    // imposible (la orden por la que se preguntó ya está autorizada).
+    expect(avisos).not.toMatch(/Ese proveedor no tiene/);
+    expect(avisos).not.toMatch(/Levanta \(o autoriza\)/);
+  });
+});
+
 describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
   /**
    * Captura una entrada CON su XML y devuelve el documento creado. El color se deriva del uuid
@@ -350,6 +482,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
     });
+    const idOrdenCompraLinea = await renglonOc();
     return crearEntradaTela(
       sesion(),
       {
@@ -364,7 +497,9 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
           uuid,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario }],
         }),
-        lineas: [{ idTelaColor: color.id, cantidad: 10, precioUnit: valorUnitario }],
+        lineas: [
+          { idTelaColor: color.id, cantidad: 10, precioUnit: valorUnitario, idOrdenCompraLinea },
+        ],
       },
       bd(),
       archivosFalsos,
@@ -461,6 +596,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Blanco' },
     });
+    const idOrdenCompraLinea = await renglonOc();
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -469,7 +605,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
         idProveedor: proveedor.id,
         fecha: '2026-08-05',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 5, precioUnit: 10 }],
+        lineas: [{ idTelaColor: color.id, cantidad: 5, precioUnit: 10, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -490,6 +626,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Arena' },
     });
+    const idOrdenCompraLinea = await renglonOc();
     await expect(
       crearEntradaTela(
         sesion(),
@@ -505,7 +642,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
             uuid: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -523,6 +660,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Rojo' },
     });
+    const idOrdenCompraLinea = await renglonOc();
     await expect(
       crearEntradaTela(
         sesion(),
@@ -538,7 +676,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
             uuid: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -549,18 +687,52 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
 });
 
 describe('Proveedor que NO factura (§Post-F9.22)', () => {
-  /** Un tercero informal: da de alta con la casilla "¿Emite factura?" en NO. */
+  /**
+   * Un tercero informal: se da de alta con «¿Cómo factura?» en *solo sin factura*.
+   *
+   * 🔴 Fila 0.124 — la intención se expresa con `modalidadFacturacion: 'solo_sin'`, que es HOY la
+   * única fuente de verdad (`emiteFactura`). Antes esta fixture ponía `factura: false`: esa columna
+   * ya no la lee nadie, así que el proveedor quedaba como "modalidad sin definir" —que NO es lo
+   * mismo que "no factura"— y el dominio lo trataba como formal.
+   */
   async function proveedorInformal() {
     return cliente.proveedor.create({
-      data: { nombre: 'Talleres Don Chuy', factura: false },
+      data: { nombre: 'Talleres Don Chuy', modalidadFacturacion: 'solo_sin' },
     });
   }
 
-  it('al confirmar le nace su CxP NO FISCAL, por la suma de los renglones capturados a mano', async () => {
+  /**
+   * El informal LISTO para recibirle: su proveedor, **su propia tela**, su color y el renglón de OC
+   * autorizada contra el que se le va a recibir.
+   *
+   * 🔴 Desde §Post-F9.159(a) las tres cosas van juntas y la tela **tiene que ser suya**: no hay
+   * entrada sin OC, la OC tiene que ser del MISMO proveedor que la factura
+   * (`registrarRecepcionesDesdeEntradaTela`) y `crearOC` rechaza poner en ella la tela de otro dueño.
+   * Antes, estas pruebas recibían la felpa de "Textiles del Norte" facturada por el informal —una
+   * combinación que ya no puede existir.
+   */
+  async function informalListoParaRecibir(nombreTela: string, conComplemento = false) {
     const informal = await proveedorInformal();
-    const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Gris' },
+    const tela = await cliente.tela.create({
+      data: {
+        nombre: nombreTela,
+        idProveedor: informal.id,
+        unidadMedida: 'KG',
+        ...(conComplemento ? { nombreComplemento: 'Cardigan' } : {}),
+      },
     });
+    const color = await cliente.telaColor.create({ data: { idTela: tela.id, nombre: 'Único' } });
+    const idOrdenCompraLinea = await renglonOc({
+      idTela: tela.id,
+      idProveedor: informal.id,
+      conComplemento,
+    });
+    return { informal, color, idOrdenCompraLinea };
+  }
+
+  it('al confirmar le nace su CxP NO FISCAL, por la suma de los renglones capturados a mano', async () => {
+    const { informal, color, idOrdenCompraLinea } =
+      await informalListoParaRecibir('Manta Don Chuy');
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -569,7 +741,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         idProveedor: informal.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 12, precioUnit: 45.5 }],
+        lineas: [{ idTelaColor: color.id, cantidad: 12, precioUnit: 45.5, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -589,16 +761,10 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
   });
 
   it('el complemento (cardigan) también suma a lo que se le debe', async () => {
-    const informal = await proveedorInformal();
-    const tela = await cliente.tela.create({
-      data: {
-        nombre: 'Felpa con Cardigan',
-        idProveedor: informal.id,
-        unidadMedida: 'KG',
-        nombreComplemento: 'Cardigan',
-      },
-    });
-    const color = await cliente.telaColor.create({ data: { idTela: tela.id, nombre: 'Negro' } });
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Felpa con Cardigan',
+      true,
+    );
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -614,6 +780,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
             precioUnit: 100,
             cantidadComplemento: 2,
             precioUnitComplemento: 50,
+            idOrdenCompraLinea,
           },
         ],
       },
@@ -628,10 +795,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
   });
 
   it('sin precios capturados NO se inventa una deuda de cero', async () => {
-    const informal = await proveedorInformal();
-    const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Crudo' },
-    });
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir('Popelina Chuy');
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -640,7 +804,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         idProveedor: informal.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 7 }],
+        lineas: [{ idTelaColor: color.id, cantidad: 7, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -650,10 +814,8 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
   });
 
   it('cancelar la entrada también revierte el cargo NO fiscal', async () => {
-    const informal = await proveedorInformal();
-    const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Verde' },
-    });
+    const { informal, color, idOrdenCompraLinea } =
+      await informalListoParaRecibir('Gabardina Chuy');
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -662,7 +824,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         idProveedor: informal.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 4, precioUnit: 25 }],
+        lineas: [{ idTelaColor: color.id, cantidad: 4, precioUnit: 25, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -676,10 +838,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
   });
 
   it('NO se le puede capturar el documento como FACTURA', async () => {
-    const informal = await proveedorInformal();
-    const color = await cliente.telaColor.create({
-      data: { idTela: telaFelpa.id, nombre: 'Azul' },
-    });
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir('Tafeta Chuy');
     await expect(
       crearEntradaTela(
         sesion(),
@@ -689,22 +848,25 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
           idProveedor: informal.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
   it('RECHAZA subirle un XML, aunque la pantalla lo hubiera dejado pasar', async () => {
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Informal con RFC', rfc: 'TNO850101BBB', factura: false },
+      data: { nombre: 'Informal con RFC', rfc: 'TNO850101BBB', modalidadFacturacion: 'solo_sin' },
     });
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Café' },
     });
+    // El renglón de OC es de "Textiles del Norte" y da igual: esta captura se rechaza ANTES, al
+    // sellar el XML (el proveedor no factura). Va sólo para que el contrato pase (§Post-F9.159(a)).
+    const idOrdenCompraLinea = await renglonOc();
     await expect(
       crearEntradaTela(
         sesion(),
@@ -720,12 +882,12 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
             uuid: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
@@ -734,11 +896,13 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
     // un cargo NO fiscal (por precios capturados) SIN el uuid en el `MovimientoTercero`, y Finanzas
     // podía importar después ese mismo CFDI — dos cargos por la misma factura.
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Informal con folio', factura: false },
+      data: { nombre: 'Informal con folio', modalidadFacturacion: 'solo_sin' },
     });
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: 'Verde' },
     });
+    // Igual que arriba: se rechaza antes de llegar al embudo, el renglón va para pasar el contrato.
+    const idOrdenCompraLinea = await renglonOc();
     await expect(
       crearEntradaTela(
         sesion(),
@@ -749,19 +913,19 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
           uuidCfdi: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
     expect(await cliente.entradaTela.count()).toBe(0);
   });
 
   it('leer un CFDI de un proveedor marcado "no factura" AVISA para corregir el catálogo', async () => {
     await cliente.proveedor.update({
       where: { id: proveedor.id },
-      data: { factura: false },
+      data: { modalidadFacturacion: 'solo_sin' },
     });
     const propuesta = await leerCfdiParaEntradaTela(
       sesion(),
@@ -775,7 +939,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
       },
       bd(),
     );
-    expect(propuesta.avisos.some((a) => /NO emite factura/.test(a))).toBe(true);
+    expect(propuesta.avisos.some((a) => /NUNCA factura/.test(a))).toBe(true);
   });
 });
 
@@ -793,6 +957,9 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
     const color = await cliente.telaColor.create({
       data: { idTela: telaFelpa.id, nombre: `Marino ${uuid.slice(0, 8)}` },
     });
+    // §Post-F9.159(a): la entrada nace contra su OC, y el renglón viaja de vuelta porque cada
+    // prueba de EDICIÓN lo tiene que volver a mandar (el PUT reemplaza los renglones completos).
+    const idOrdenCompraLinea = await renglonOc();
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -807,16 +974,16 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
         }),
-        lineas: [{ idTelaColor: color.id, cantidad: 10, precioUnit: 92 }],
+        lineas: [{ idTelaColor: color.id, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
     );
-    return { entrada, idTelaColor: color.id };
+    return { entrada, idTelaColor: color.id, idOrdenCompraLinea };
   }
 
   it('editar SIN volver a subir el XML conserva el sello, y la CxP sí nace al confirmar', async () => {
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
 
     // Así edita la pantalla un borrador: cabecera + renglones, sin el XML (que ya está guardado).
     const editada = await actualizarEntradaTela(
@@ -828,7 +995,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
         idProveedor: proveedor.id,
         fecha: '2026-08-05',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor, cantidad: 12, precioUnit: 92 }],
+        lineas: [{ idTelaColor, cantidad: 12, precioUnit: 92, idOrdenCompraLinea }],
       },
       bd(),
     );
@@ -848,7 +1015,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
   });
 
   it('editar NO puede cambiar el proveedor dejando amarrada la factura de otro', async () => {
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
     const otro = await cliente.proveedor.create({
       data: { nombre: 'Avios del Centro', rfc: 'ACE010101QQQ' },
     });
@@ -863,7 +1030,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: otro.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
         },
         bd(),
       ),
@@ -879,7 +1046,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
     // Mismo agujero que al dar de alta, por la otra puerta: el sello ya está guardado y la edición
     // solo cambia el proveedor. Como el migrado no tiene RFC, la comparación contra `rfcCfdi` se
     // saltaba sola y al confirmar nacía el cargo FISCAL contra él, con el RFC de Textiles del Norte.
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
     const migrado = await cliente.proveedor.create({
       data: { nombre: 'Avios del Centro (migrado)' }, // rfc NULL
     });
@@ -894,7 +1061,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: migrado.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
         },
         bd(),
       ),
@@ -907,9 +1074,9 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
   });
 
   it('editar tampoco puede dejársela a un proveedor que NO factura', async () => {
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
     const informal = await cliente.proveedor.create({
-      data: { nombre: 'Talleres Don Chuy', factura: false },
+      data: { nombre: 'Talleres Don Chuy', modalidadFacturacion: 'solo_sin' },
     });
 
     await expect(
@@ -922,15 +1089,15 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: informal.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
         },
         bd(),
       ),
-    ).rejects.toThrow(/NO emite factura/);
+    ).rejects.toThrow(/NUNCA factura/);
   });
 
   it('editar CON un XML nuevo re-sella (y pasa por las MISMAS guardas del alta)', async () => {
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
     const uuidNuevo = 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2';
 
     const editada = await actualizarEntradaTela(
@@ -948,7 +1115,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid: uuidNuevo,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 5, valorUnitario: 100 }],
         }),
-        lineas: [{ idTelaColor, cantidad: 5, precioUnit: 100 }],
+        lineas: [{ idTelaColor, cantidad: 5, precioUnit: 100, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -974,7 +1141,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
             uuid: 'f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3',
             conceptos: [{ descripcion: 'FELPA', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor, cantidad: 1, precioUnit: 1 }],
+          lineas: [{ idTelaColor, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -1002,7 +1169,14 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
             uuid: UUID, // el de la PRIMERA entrada
             conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
           }),
-          lineas: [{ idTelaColor: segunda.idTelaColor, cantidad: 10, precioUnit: 92 }],
+          lineas: [
+            {
+              idTelaColor: segunda.idTelaColor,
+              cantidad: 10,
+              precioUnit: 92,
+              idOrdenCompraLinea: segunda.idOrdenCompraLinea,
+            },
+          ],
         },
         bd(),
         archivosFalsos,
@@ -1012,7 +1186,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
   });
 
   it('volver a subir el MISMO XML a la MISMA entrada no se toma por duplicado', async () => {
-    const { entrada, idTelaColor } = await borradorConFactura();
+    const { entrada, idTelaColor, idOrdenCompraLinea } = await borradorConFactura();
 
     const editada = await actualizarEntradaTela(
       sesion(),
@@ -1029,7 +1203,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid: UUID,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
         }),
-        lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92 }],
+        lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,

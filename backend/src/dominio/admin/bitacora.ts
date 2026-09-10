@@ -12,6 +12,7 @@ import { esquemaBitacoraQuery, type BitacoraSalida } from '../../contrato/index.
 import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -71,17 +72,10 @@ export async function listarBitacora(
   ]);
 
   // Resuelve los nombres de usuario de la página de una sola consulta (sin FK física en Bitacora).
-  const idsUsuario = [
-    ...new Set(registros.map((r) => r.idUsuario).filter((id): id is string => id !== null)),
-  ];
-  const usuarios =
-    idsUsuario.length === 0
-      ? []
-      : await cliente.usuario.findMany({
-          where: { id: { in: idsUsuario } },
-          select: { id: true, nombre: true },
-        });
-  const nombrePorId = new Map(usuarios.map((u) => [u.id, u.nombre]));
+  const nombrePorId = await nombresDeUsuarios(
+    cliente,
+    registros.map((r) => r.idUsuario),
+  );
 
   const datos: BitacoraSalida[] = registros.map((r) => ({
     id: r.id.toString(),
@@ -90,7 +84,7 @@ export async function listarBitacora(
     accion: r.accion,
     datos: r.datos ?? null,
     idUsuario: r.idUsuario,
-    nombreUsuario: r.idUsuario === null ? null : (nombrePorId.get(r.idUsuario) ?? null),
+    nombreUsuario: nombreDeUsuario(nombrePorId, r.idUsuario),
     fecha: r.fecha.toISOString(),
   }));
 

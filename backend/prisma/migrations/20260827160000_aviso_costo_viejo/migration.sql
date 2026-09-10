@@ -1,0 +1,37 @@
+-- V1-E8d · AVISAR CUANDO LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO (§Post-F9.127, Daniel:
+-- *"Si. Ok. Que me avise."*).
+--
+-- Migración 100 % ADITIVA: dos columnas nullable en `modelos`. No toca ni una fila existente, no
+-- borra nada, no cambia ningún default, no crea ningún CHECK ni ningún índice, y no restringe nada
+-- de lo que hoy se puede hacer. NO requiere `SEED_ON_START` (no hay permisos ni catálogos nuevos).
+--
+-- EL QUÉ. Un renglón de lista de precios apunta a un precosto CONGELADO —inmutable por diseño (D3)—
+-- y guarda una copia de su costo. Si después alguien cambia la RECETA del modelo, esa foto no se
+-- mueve: hay que congelar una versión nueva Y registrar una ronda, las dos a mano. Si se olvida
+-- cualquiera de las dos, el precio aprobado sigue en pie sobre un costo que ya no existe — y hasta
+-- hoy nada avisaba. Estas dos columnas son la SEÑAL que hacía falta para avisar.
+--
+--   1. `modelos.receta_tocada_en`     — CUÁNDO se tocó por última vez la receta.
+--   2. `modelos.receta_tocada_cambio` — QUÉ parte se tocó (telas / avios / medidas-por-talla /
+--                                       arte / copia-de-otro-modelo).
+--
+-- ⚠️ POR QUÉ UNA COLUMNA NUEVA Y NO `modificado_en`, que ya existía. Porque `modificado_en` es
+-- `@updatedAt`: se mueve con CUALQUIER escritura al modelo, y hay 11 en el código que no son receta
+-- (renombrar la descripción, pasar a producción, la propia firma de revisión, las fotos…). Usarla
+-- habría dado falsas alarmas, que es la peor clase de aviso: el que se aprende a ignorar, y que el
+-- día que es de verdad nadie mira. Estas dos columnas las escribe UNA sola función —
+-- `tocarModeloPorCambioDeReceta`, el embudo obligatorio de V1-E7e por el que pasan las 6 puertas de
+-- la receta— así que dicen exactamente lo que su nombre promete.
+--
+-- ⚠️ SIN BACKFILL, a propósito. Todo el catálogo (los ~4,987 modelos migrados del Access incluidos)
+-- queda en NULL, y NULL aquí significa **no se sabe**, no "nunca se tocó": no hay dato del que
+-- deducir cuándo se movió una receta antes de este despliegue, y rellenarlo con `modificado_en`
+-- sería exactamente la mentira que estas columnas vienen a evitar. Consecuencia DECLARADA: un
+-- desfase que ya existía el día del despliegue no se detecta; se detecta el primer cambio de receta
+-- posterior. Ver §Post-F9.127.
+--
+-- ⚠️ `receta_tocada_cambio` es TEXT y no un enum de Postgres a propósito: el catálogo de cambios
+-- vive en TypeScript (`CambioDeReceta`), lo consume una sola función para armar una frase en
+-- español, y un enum de BD obligaría a migrar cada vez que nazca una puerta nueva de receta.
+ALTER TABLE "modelos" ADD COLUMN "receta_tocada_en" TIMESTAMP(3);
+ALTER TABLE "modelos" ADD COLUMN "receta_tocada_cambio" TEXT;

@@ -58,17 +58,21 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 105 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 110 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
-    // (105 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
+    // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
     // el archivo histórico de órdenes; +1 en §Post-F9.28: el directorio histórico de terceros;
     // −3 en V1-E3a: se RETIRARON «Captura de corte», «Envío a maquila» y «Recibo de maquila», las
     // tres pantallas del mismo acto que ya vive en el panel de avance — una sola pantalla por acto,
     // §Post-F9.36 punto 2); −1 en V1-E3d: el CATÁLOGO de arte desapareció —el arte vive dentro
     // del modelo (§Post-F9.35)— y solo sobrevive su galería; +1 en V1-E3h: la bandeja «Recetas
-    // por liberar» de Desarrollo (§Post-F9.72). Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(105);
+    // por liberar» de Desarrollo (§Post-F9.72); +1 en V1-E8r: su hermana «Recetas por revisar»,
+    // la cola de la revisión de receta (§Post-F9.140); +1 en V1-E9p: «Promesas incumplidas», la
+    // lista del DUEÑO con lo que se vendió y no se consiguió (§Post-F9.144(b)); +1 en la fila
+    // 0.104: «Salida de material sin orden» (la devolución / venta de telas y avíos que no pasa
+    // por ninguna OP, §Post-F9.193 resp. 12). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(110);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -186,8 +190,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
     // +4 en A2: ajuste/traspaso de telas por color y las vistas legadas por lote (existencias y
-    // salida a orden); +1 en B1: entradas de tela por factura/remisión.
-    expect(inventarios).toHaveLength(15);
+    // salida a orden); +1 en B1: entradas de tela por factura/remisión; +1 en la fila 0.104: la
+    // salida de material sin orden (cuelga del grupo, no de «Telas» ni de «Avíos», porque sirve a
+    // las dos dimensiones).
+    expect(inventarios).toHaveLength(16);
   });
 
   it('busca por clave: hojas, padres (ruta legada /compras) e inexistentes', () => {
@@ -241,7 +247,18 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           padre: true,
           // V1-E3h (§Post-F9.72): «Recetas por liberar» entra al RIEL — es trabajo DIARIO de
           // Desarrollo, y una bandeja que hay que buscar no se abre.
-          hijos: ['modelos', 'recetas-por-liberar', 'desarrollo', 'listas-precios'],
+          // V1-E8r (§Post-F9.140): su hermana «Recetas por revisar» entra por lo mismo, y va justo
+          // después de «Modelos» porque es la cola de la revisión del modelo.
+          // V1-E9p (§Post-F9.144(b)): «Promesas incumplidas» va PEGADA a ella porque es la otra
+          // mitad de la misma pregunta — una se vacía al firmar, la otra se queda.
+          hijos: [
+            'modelos',
+            'recetas-por-revisar',
+            'promesas-incumplidas',
+            'recetas-por-liberar',
+            'desarrollo',
+            'listas-precios',
+          ],
         },
         { clave: 'pedidos', padre: false },
         {
@@ -308,12 +325,13 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
             // así que ofrecer solo aquél mandaba al usuario a un flujo que no mueve las
             // existencias que ve arriba.
             'inventario-telas-traspaso',
-            // +2 el 12-ago-2026: las vistas de «materiales» que sirven a las DOS dimensiones (tela
-            // por lote Y avío), AL FINAL. Cuelgan del padre «Telas» en el catálogo y el riel solo
-            // admite hijos del MISMO padre, así que no pueden ir bajo Avíos. Eran TRES: el ajuste
-            // se volvió solo-avíos y se mudó a «Avíos» el 13-ago-2026.
+            // +1 el 12-ago-2026, AL FINAL: la vista de «materiales» que sirve a las DOS dimensiones
+            // (tela por lote Y avío). Cuelga del padre «Telas» en el catálogo y el riel solo admite
+            // hijos del MISMO padre, así que no puede ir bajo Avíos. Eran TRES: el ajuste se volvió
+            // solo-avíos y se mudó a «Avíos» el 13-ago-2026, y el traspaso en la fila 0.098. El
+            // KARDEX se queda porque su pata de tela SIGUE VIVA (es la única ventana al histórico
+            // por lote), no porque sirva a dos dimensiones.
             'inventario-materiales-kardex',
-            'inventario-materiales-traspasos',
           ],
         },
         {
@@ -321,14 +339,22 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
           // avíos» no tenía ENTRADA EN EL MENÚ (mismo defecto que el catálogo de telas en A2).
           // +1 el 13-ago-2026: «Ajuste de avíos» (antes «Ajuste de materiales», bajo Telas): al
           // dejar de tocar tela, bajo Telas se escondía justo de quien la busca.
+          // +1 en la fila 0.098: «Traspaso de avíos» (antes «Traspaso de materiales», bajo Telas),
+          // por EXACTAMENTE la misma razón y con el mismo criterio.
           clave: 'avios',
           padre: true,
           hijos: [
             'inventario-avios-existencias',
             'catalogo-avios',
             'inventario-materiales-ajustes',
+            'inventario-materiales-traspasos',
           ],
         },
+        // ⭐ Fila 0.104: la salida de material que NO va a una orden. HOJA de primer nivel porque
+        // sirve a las DOS dimensiones (telas y avíos) en pestañas — la decisión de Daniel fue una
+        // sola («Lo mismo en telas»), y meterla bajo uno de los dos padres la escondería de quien
+        // la busque por el otro. Sólo la ve quien tiene `salida-material.registrar`.
+        { clave: 'salida-material-sin-orden', padre: false },
         {
           // Daniel, 11-ago-2026: Compras pasó a DESPLEGABLE — como hoja colapsada, Recepción /
           // Estatus / Explosión no tenían ENTRADA EN EL MENÚ ni enlace estable (solo ⌘K/URL; la
@@ -360,6 +386,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     {
       titulo: 'Finanzas',
       entradas: [
+        // ⭐ La PRIMERA de Finanzas (fila 0.113): es la pantalla que Daniel usa cada semana
+        // (§Post-F9.185: *«una de las pantallas más importantes dentro del sistema»*).
+        { clave: 'corrida-pagos', padre: false },
         { clave: 'cxc', padre: false },
         { clave: 'cxp', padre: false },
         { clave: 'reportes-fiscales', padre: false }, // F9-E5: reporte del contador (gate terceros.fiscal)
@@ -432,6 +461,29 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     expect(destacadas[0]?.clave).toBe('ruta-critica');
   });
 
+  // ⭐ V1-E8f (§Post-F9.128): la MISMA pantalla se llamaba «Cotizaciones» en Desarrollo y «Listas
+  // de precios» en Clientes, y Daniel la buscó por el segundo nombre sin encontrarla ("no está la
+  // opción de listas de precios en desarrollo"). Hoy se llama igual en los dos lados.
+  it('«Listas de precios» se llama IGUAL en Desarrollo y en Clientes (misma pantalla)', () => {
+    const hojas = RIEL_GRUPOS.flatMap((g) =>
+      g.entradas.flatMap((e) => (e.hijos === undefined ? [e] : e.hijos)),
+    ).filter((h) => h.ruta === '/listas-precios');
+    expect(hojas).toHaveLength(2);
+    expect(hojas.map((h) => h.titulo)).toEqual(['Listas de precios', 'Listas de precios']);
+    // …y se distingue de «Pre-costeos», que es la pantalla a la que Daniel entró por equivocación.
+    const desarrollo = RIEL_GRUPOS.flatMap((g) => g.entradas).find(
+      (e) => e.clave === 'g-desarrollo',
+    );
+    expect(desarrollo?.hijos?.map((h) => h.titulo)).toEqual([
+      'Modelos',
+      'Recetas por revisar',
+      'Promesas incumplidas',
+      'Recetas por liberar',
+      'Pre-costeos',
+      'Listas de precios',
+    ]);
+  });
+
   it('«Compras» es desplegable y lleva a Recepción de compras (Daniel, 11-ago-2026)', () => {
     // Regresión del defecto reportado por Daniel: con Compras como hoja colapsada a
     // /compras/ordenes, las pantallas de Recepción, Estatus y Explosión de materiales no tenían
@@ -476,32 +528,38 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
 
     const avios = entradaRiel('avios');
     expect(avios?.hijos, 'Avíos debe ser padre desplegable en el riel').toBeDefined();
-    // +«Ajuste de avíos» el 13-ago-2026: la pantalla dejó de tocar tela, así que su lugar es este
-    // padre. Bajo «Telas» (donde vivía como «Ajuste de materiales») se escondía de quien la busca.
+    // +«Ajuste de avíos» el 13-ago-2026 y +«Traspaso de avíos» en la fila 0.098: las dos pantallas
+    // dejaron de tocar tela, así que su lugar es este padre. Bajo «Telas» (donde vivían como
+    // «Ajuste/Traspaso de materiales») se escondían de quien las busca.
     expect(avios?.hijos?.map((h) => [h.clave, h.ruta])).toEqual([
       ['inventario-avios-existencias', '/inventarios/avios/existencias'],
       ['catalogo-avios', '/catalogos/avios'],
       ['inventario-materiales-ajustes', '/inventarios/materiales/ajustes'],
+      ['inventario-materiales-traspasos', '/inventarios/materiales/traspasos'],
     ]);
     // Gates HEREDADOS del catálogo, sin ensancharlos ni estrecharlos: el catálogo de avíos sigue
-    // "autenticado" como toda su familia (deuda de paridad front/back en `HOJA-DE-RUTA.md` §4).
+    // "autenticado" como toda su familia (deuda de paridad front/back en `HOJA-DE-RUTA.md` §4). El
+    // del traspaso se ESTRECHÓ en el catálogo al permiso que de verdad usa (era
+    // `inventario-telas.mover | inventario-avios.mover`), igual que se hizo con el ajuste.
     expect(avios?.hijos?.map((h) => h.permisos)).toEqual([
       ['inventario-avios.ver'],
       'autenticado',
       ['inventario-avios.mover'],
+      ['inventario-avios.mover'],
     ]);
 
-    // Las vistas de «materiales» que sirven a las DOS dimensiones (tela por lote Y avío) cuelgan
-    // del padre «Telas» en el catálogo y el riel solo admite hijos del MISMO padre: por eso van ahí
-    // y no bajo Avíos. El AJUSTE ya no está entre ellas (es solo-avíos y se mudó a «Avíos»).
+    // El KARDEX de «materiales» sigue colgando del padre «Telas» —su pata de tela por LOTE sigue
+    // viva: es la única ventana al histórico migrado y a «Salida a orden por lote (legado)»—, y el
+    // riel solo admite hijos del MISMO padre. El AJUSTE y el TRASPASO ya no están entre ellas: al
+    // quedarse solo-avíos se mudaron a «Avíos».
     const telas = entradaRiel('telas');
     const clavesTelas = telas?.hijos?.map((h) => h.clave) ?? [];
-    for (const clave of ['inventario-materiales-kardex', 'inventario-materiales-traspasos']) {
-      expect(clavesTelas, clave).toContain(clave);
-    }
-    expect(clavesTelas, 'el ajuste de avíos ya NO cuelga de Telas').not.toContain(
-      'inventario-materiales-ajustes',
+    expect(clavesTelas, 'el kardex de materiales sigue bajo Telas').toContain(
+      'inventario-materiales-kardex',
     );
+    for (const clave of ['inventario-materiales-ajustes', 'inventario-materiales-traspasos']) {
+      expect(clavesTelas, `${clave} ya NO cuelga de Telas`).not.toContain(clave);
+    }
     // …y el traspaso POR COLOR —el flujo VIGENTE de telas— tiene que estar, o el menú sólo ofrecería
     // el de lote, que graba `id_tela_color = NULL` y por tanto no mueve «Existencias de telas»
     // (vista `existencia_tela_color`). Daniel: «El traspaso se hace por color» (§Post-F9.32).
@@ -509,15 +567,34 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       'inventario-telas-traspaso',
     );
 
-    // Ninguna de las 4 entradas del grupo Inventarios navega ya: todas despliegan.
+    // Ninguno de los 4 PADRES del grupo Inventarios queda colapsado: todos despliegan. (La quinta
+    // entrada, «Salida de material sin orden» de la fila 0.104, es una HOJA de verdad —una
+    // pantalla propia, como `pedidos` o `ruta-critica` en otros grupos—, no un padre escondido
+    // detrás de una de sus pantallas, que es el defecto que este caso vigila.)
     const grupo = RIEL_GRUPOS.find((g) => g.clave === 'inventarios');
     expect(grupo?.entradas.map((e) => e.clave)).toEqual([
       'inventarios',
       'telas',
       'avios',
+      'salida-material-sin-orden',
       'compras',
     ]);
+    const salidaSinOrden = grupo?.entradas.find((e) => e.clave === 'salida-material-sin-orden');
+    expect(salidaSinOrden, 'la salida sin orden debe estar en el grupo').toBeDefined();
+    // `hijos === undefined` es el discriminante de la unión: además de comprobar que NO es un
+    // padre, es lo que le deja ver a TypeScript que aquí hay una hoja (con `ruta` y `permisos`).
+    if (salidaSinOrden !== undefined && salidaSinOrden.hijos === undefined) {
+      expect(salidaSinOrden.ruta).toBe('/inventarios/salida-sin-orden');
+      expect(
+        salidaSinOrden.permisos,
+        'gate propio: sólo lo ve quien puede sacar sin orden',
+      ).toEqual(['salida-material.registrar']);
+    } else {
+      expect.unreachable('la salida sin orden es una hoja, no un padre desplegable');
+    }
+
     for (const entrada of grupo?.entradas ?? []) {
+      if (entrada.clave === 'salida-material-sin-orden') continue;
       expect(entrada.hijos, `${entrada.clave} debe ser desplegable`).toBeDefined();
     }
   });

@@ -225,18 +225,64 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           {
             clave: 'listas-precios',
-            // «Cotizaciones» a secas: el título largo ("Cotizaciones / Listas de
-            // precios") se TRUNCABA feo en el riel (queja de Gabriel, 9-jul-2026).
-            // Bajo el padre «Desarrollo» es inequívoco; «Listas de precios» sigue
-            // existiendo bajo Clientes (misma pantalla) y la descripción conserva
-            // el nombre completo para que ⌘K lo encuentre por cualquiera de los dos.
-            titulo: 'Cotizaciones',
+            // ⭐ V1-E8f (§Post-F9.128) — se llama «Listas de precios», como en Clientes.
+            // Se llamaba «Cotizaciones» (el título largo "Cotizaciones / Listas de
+            // precios" se TRUNCABA feo en el riel, queja de Gabriel 9-jul-2026), y
+            // eso le costó a Daniel dos de los cuatro muros: entró a «Pre-costeos»
+            // creyendo que ahí estaban las listas (*"yo estaba viendo los precosteos
+            // en lugar de lista de precios"*) y luego reportó que *"no está la opción
+            // de listas de precios en desarrollo"*. La MISMA pantalla se llamaba
+            // distinto en Desarrollo («Cotizaciones») y en Clientes («Listas de
+            // precios»): ahora se llama igual en las dos, con el nombre que él buscó.
+            // «Cotizaciones» no se pierde — encabeza la descripción (⌘K la indexa),
+            // sigue en el H1 de la pantalla y es el nombre del documento que emite.
+            titulo: 'Listas de precios',
             descripcion:
-              'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
+              'Cotizaciones: listas de precios por cliente y departamento, con factores, aprobación del dueño y emisión al cliente (PDF/Excel)',
             ruta: '/listas-precios',
             icono: 'archivo',
             permisos: ['listas.ver'],
             subVista: true,
+          },
+          // ⭐⭐ V1-E8r (§Post-F9.140) — LA OTRA BANDEJA, la de la RECETA NEGOCIADA. Daniel:
+          // *"despues de una negociacion, tiene que haber una validadcion de la receta original…
+          // de alguna manera deberia de pasar un filtro"*. La firma existía desde V1-E7d pero
+          // nadie podía LISTAR lo que esperaba revisión — y desde que V1-E9c disolvió el muro que
+          // había detrás (§Post-F9.169), esta lista es lo ÚNICO que hace que la revisión se
+          // levante. Entra al RIEL (no sólo a ⌘K) por la misma razón que su
+          // hermana: una bandeja que hay que buscar no se abre. Gate `modelos.ver` — el mismo que
+          // abre la ficha a la que lleva; firmar exige `modelos.aprobar-receta` y no se hace aquí.
+          {
+            clave: 'recetas-por-revisar',
+            titulo: 'Recetas por revisar',
+            descripcion:
+              'Versiones negociadas cuya receta todavía no se revisa — y cuáles ya tienen un pedido esperando',
+            ruta: '/modelos/recetas-por-revisar',
+            icono: 'lista-tareas',
+            permisos: ['modelos.ver'],
+          },
+          // ⭐⭐ V1-E9p (§Post-F9.144(b)) — LA OTRA MITAD de la pregunta. La bandeja de arriba
+          // contesta *"¿ya lo cuadraste?"* y se VACÍA al firmar; ésta contesta *"¿se logró lo que se
+          // prometió?"* y se QUEDA, porque un margen que se perdió no deja de haberse perdido
+          // porque alguien firme. Daniel: *"todo eso se intentará hacer así, pero no es seguro que
+          // se consiga"*. Le importa AL DUEÑO, que ya le dio ese precio al cliente.
+          //
+          // ⚠️ **El gate es `consultas.ver-importes` A SECAS, y NO la pareja con `modelos.ver`,
+          // aunque el endpoint exija las dos.** `esModuloVisible` filtra con `.some()` (basta UNO),
+          // así que listar las dos se la enseñaría a todo el que tiene `modelos.ver` —Ventas,
+          // Logística, Asistente…— y al entrar recibirían un 403: un ENLACE MUERTO, justo lo que el
+          // criterio de §Post-F9.68 evita. Con la restrictiva sola el conjunto es EXACTO:
+          // `consultas.ver-importes` lo tienen Administrador, AdministracionDireccion, Directivo y
+          // Gerencial —y nadie más, `prisma/seed.ts`—, y los cuatro tienen `modelos.ver`.
+          // Sin permisos nuevos.
+          {
+            clave: 'promesas-incumplidas',
+            titulo: 'Promesas incumplidas',
+            descripcion:
+              'Lo que se vendió con un costo estimado en la negociación y al final no se consiguió, con la brecha y el margen comprometido',
+            ruta: '/modelos/promesas-incumplidas',
+            icono: 'lista-tareas',
+            permisos: ['consultas.ver-importes'],
           },
           // ⭐ V1-E3h (§Post-F9.72) — LA BANDEJA de Desarrollo. Daniel: *"está buenísima"*. Sin
           // ella, para saber qué le falta firmar habría que abrir orden por orden: nadie lo hace,
@@ -389,7 +435,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'ordenes-incompletas',
             titulo: 'Órdenes incompletas',
-            descripcion: 'Órdenes capturadas sin matriz, con semáforo de antigüedad',
+            descripcion:
+              'Órdenes a las que les falta un requisito (tallas, receta liberada o arte), con ' +
+              'semáforo de antigüedad',
             ruta: '/produccion/incompletas',
             icono: 'alerta',
             permisos: ['ordenes.ver'],
@@ -624,7 +672,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'inventario-telas-entradas',
             titulo: 'Entradas de tela por factura',
             descripcion:
-              'Entrada SIN orden de compra: factura o remisión del proveedor con N partidas y su PDF',
+              'Factura o remisión del proveedor contra su orden de compra, con N partidas y su PDF',
             ruta: '/inventarios/telas/entradas',
             icono: 'paquete',
             permisos: ['inventario-telas.ver'],
@@ -634,7 +682,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'inventario-telas-ajuste',
             titulo: 'Ajuste de telas por color',
             descripcion:
-              'Conteo físico / arranque desde cero por color: la entrada crea la partida',
+              'Conteo físico / arranque desde cero por color: se captura lo contado y el sistema aplica la diferencia',
             ruta: '/inventarios/telas/ajuste',
             icono: 'paquete',
             permisos: ['inventario-telas.mover'],
@@ -669,26 +717,25 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-telas.mover'],
             subVista: true,
           },
-          // Las vistas de "materiales" que sirven a las DOS dimensiones (telas por lote + avíos)
-          // cuelgan aquí: el flujo de telas es el dominante y duplicarlas bajo Avíos ensuciaría el
-          // menú (decisión del lead, R1). Ya solo son DOS: el ajuste se volvió solo-avíos el
-          // 13-ago-2026 y se mudó al grupo «Avíos».
+          // La ÚNICA vista de "materiales" que sigue colgando de «Telas»: el KARDEX. Sirve a las
+          // DOS dimensiones y su pata de tela SÍ SIGUE VIVA — es la única ventana que queda a los
+          // movimientos del flujo LEGADO por lote (el histórico migrado y lo que capture «Salida a
+          // orden por lote (legado)»), porque el kardex del inventario vigente va por COLOR y vive
+          // DENTRO de «Inventario de telas». Por eso NO se muda a «Avíos» como sus dos hermanas:
+          // esconderla de aquí sería quitarle la pantalla justo a quien la busca. Lo que sí se
+          // arregló (fila 0.098) es que MINTIERA: la pestaña dice «Telas (lote · legado)», explica
+          // de qué flujo habla y a dónde ir por el vigente, y el vacío ya no es mudo.
+          //
+          // Sus hermanas ya se fueron a «Avíos» al quedarse solo-avíos: el AJUSTE el 13-ago-2026 y
+          // el TRASPASO en la fila 0.098 (mismo criterio, mismo defecto).
           {
             clave: 'inventario-materiales-kardex',
             titulo: 'Kardex de materiales',
-            descripcion: 'Movimientos con saldo corrido por tela (lote) o por avío',
+            descripcion:
+              'Saldo corrido por avío, y el histórico LEGADO de telas por lote (el kardex vigente de una tela va por color)',
             ruta: '/inventarios/materiales/kardex',
             icono: 'almacen',
             permisos: ['inventario-telas.ver', 'inventario-avios.ver'],
-            subVista: true,
-          },
-          {
-            clave: 'inventario-materiales-traspasos',
-            titulo: 'Traspaso de materiales',
-            descripcion: 'Mueve tela (por lote) o avío entre almacenes en una sola operación',
-            ruta: '/inventarios/materiales/traspasos',
-            icono: 'paquete',
-            permisos: ['inventario-telas.mover', 'inventario-avios.mover'],
             subVista: true,
           },
         ],
@@ -738,7 +785,41 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['inventario-avios.mover'],
             subVista: true,
           },
+          {
+            // AQUÍ, bajo Avíos, desde la fila 0.098 — MISMO caso y MISMO criterio que «Ajuste de
+            // avíos» en agosto. Vivía bajo «Telas» como «Traspaso de materiales» porque servía a
+            // las dos dimensiones, pero su pestaña de TELAS estaba atada al motor LEGADO por lote
+            // —y la pantalla ARRANCABA en ella—, así que lo traspasado ahí no movía «Inventario de
+            // telas» (la vista `existencia_tela_color` excluye los renglones con
+            // `id_tela_color = NULL`). El traspaso de TELA se hace por color en «Traspaso de telas
+            // por color», hijo de «Telas», y así lo dictó Daniel (§Post-F9.32). Al quedarse SOLO
+            // con avíos, dejarlo colgando de «Telas» escondía la pantalla justo de quien la busca.
+            // Su gate se estrechó al permiso que de verdad usa (A4).
+            clave: 'inventario-materiales-traspasos',
+            titulo: 'Traspaso de avíos',
+            descripcion: 'Mueve avío entre almacenes en una sola operación (salida + entrada)',
+            ruta: '/inventarios/materiales/traspasos',
+            icono: 'paquete',
+            permisos: ['inventario-avios.mover'],
+            subVista: true,
+          },
         ],
+      },
+      {
+        // ⭐⭐ LA SALIDA QUE NO ES POR OP (fila 0.104). Va como HOJA de primer nivel del grupo, no
+        // colgando de «Telas» ni de «Avíos», porque sirve a LAS DOS dimensiones en pestañas —
+        // igual que la decisión de Daniel, que fue una sola («Lo mismo en telas»). Meterla bajo uno
+        // de los dos padres la escondería justo de quien la busca por el otro, que es el defecto
+        // que ya se corrigió dos veces en este mismo menú (el ajuste en agosto y el traspaso en la
+        // fila 0.098). Su gate es el permiso PROPIO: a quien no lo tenga, la entrada ni le aparece.
+        clave: 'salida-material-sin-orden',
+        titulo: 'Salida de material sin orden',
+        descripcion:
+          'Sacar telas o avíos que no van a ninguna orden: devolución al proveedor, venta de material que ya no se usa u otra causa',
+        ruta: '/inventarios/salida-sin-orden',
+        icono: 'paquete',
+        permisos: ['salida-material.registrar'],
+        subVista: true,
       },
       {
         clave: 'compras',
@@ -831,8 +912,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'clientes-listas-precios',
             titulo: 'Listas de precios',
+            // Misma pantalla que la de Desarrollo ⇒ mismo nombre y misma descripción (V1-E8f).
             descripcion:
-              'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
+              'Cotizaciones: listas de precios por cliente y departamento, con factores, aprobación del dueño y emisión al cliente (PDF/Excel)',
             ruta: '/listas-precios',
             icono: 'archivo',
             permisos: ['listas.ver'],
@@ -858,6 +940,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         permisos: 'autenticado',
       },
       {
+        clave: 'conceptos-pago',
+        titulo: 'Conceptos de pago',
+        descripcion:
+          'Lo que se paga cada semana y NO es un proveedor: nómina por fuera, servicios, caja chica (con sus cuentas)',
+        ruta: '/catalogos/conceptos-pago',
+        icono: 'billete',
+        permisos: ['conceptos-pago.ver'],
+      },
+      {
         clave: 'directorio-historico',
         titulo: 'Directorio histórico',
         descripcion:
@@ -872,6 +963,17 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
     clave: 'finanzas',
     titulo: 'Finanzas',
     entradas: [
+      // ⭐ La primera de Finanzas a propósito: es la pantalla que Daniel usa cada semana
+      // (§Post-F9.185: *«una de las pantallas más importantes dentro del sistema»*).
+      {
+        clave: 'corrida-pagos',
+        titulo: 'Corrida de pagos',
+        descripcion:
+          'La relación semanal: a quién se le paga y cuánto, con el saldo y lo recibido al lado como referencia (con factura y sin factura)',
+        ruta: '/pagos/corrida',
+        icono: 'billete',
+        permisos: ['pagos.corrida-ver'],
+      },
       {
         clave: 'cxc',
         titulo: 'Cuentas por cobrar',
@@ -921,7 +1023,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             clave: 'esma-saldos',
             titulo: 'Saldos de maquileros',
             descripcion:
-              'Maquileros activos con saldo distinto de cero, con drill-down al estado de cuenta',
+              'Maquileros activos con saldo distinto de cero —o con partidas por revisar—, con drill-down al estado de cuenta',
             ruta: '/esma/saldos',
             icono: 'billete',
             permisos: ['esma.ver-pagos'],
@@ -1449,7 +1551,14 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         clave: 'g-desarrollo',
         // «Recetas por liberar» entra al RIEL (no solo a ⌘K): es trabajo DIARIO de Desarrollo, y
         // una bandeja que hay que buscar no se abre. Va después de Modelos, junto a lo demás suyo.
-        hijos: ['modelos', 'recetas-por-liberar', 'desarrollo', 'listas-precios'],
+        hijos: [
+          'modelos',
+          'recetas-por-revisar',
+          'promesas-incumplidas',
+          'recetas-por-liberar',
+          'desarrollo',
+          'listas-precios',
+        ],
       },
       { tipo: 'hoja', clave: 'pedidos' },
       {
@@ -1549,18 +1658,28 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         // `existencia_tela_color` los excluye (`WHERE d."id_tela_color" IS NOT NULL`, migración
         // 20260806130000_a2_partidas_telas), así que traspasar por lote deja «Existencias de telas»
         // —el primer hijo de este mismo menú— sin moverse. Ofrecer solo el de lote era mandar al
-        // usuario al flujo muerto.
+        // usuario al flujo que YA NO OPERA. (Decía «al flujo muerto»: se precisó en la fila 0.098,
+        // porque esa misma dimensión legada es la que el KARDEX de aquí abajo sigue sirviendo — no
+        // está muerta, está jubilada para ESCRIBIR.)
         //
-        // + las DOS vistas de «materiales» que SÍ sirven a las dos dimensiones (12-ago-2026), AL
-        // FINAL porque son las de lote/avíos: kardex y traspaso (su gate es `inventario-telas.* |
-        // inventario-avios.*`). Cuelgan del padre «Telas» en el catálogo y `resolverEntradaRiel`
-        // solo admite hijos del MISMO padre, así que no se pueden colgar de Avíos. Hasta el
-        // 12-ago-2026 no tenían ENTRADA EN EL MENÚ ni enlace estable: solo ⌘K/URL o el hub
-        // `/inventarios` (`InventariosPagina`), que tampoco es entrada del riel. OJO al leer el
-        // menú: para TELAS el traspaso vigente es el de color; «Traspaso de materiales» está por
-        // los AVÍOS (su pata de tela es la legada por lote) — así lo fijó `DECISIONES.md
-        // §Post-F9.32`. La TERCERA vista de «materiales», el ajuste, se fue al padre «Avíos» el
-        // 13-ago-2026: ya es solo-avíos («Ajuste de avíos») y aquí no la encontraba quien la busca.
+        // + la ÚNICA vista de «materiales» que sigue aquí (12-ago-2026), AL FINAL porque es la de
+        // lote/avíos: el KARDEX (su gate es `inventario-telas.ver | inventario-avios.ver`). Cuelga
+        // del padre «Telas» en el catálogo y `resolverEntradaRiel` solo admite hijos del MISMO
+        // padre, así que no se puede colgar de Avíos. Hasta el 12-ago-2026 no tenía ENTRADA EN EL
+        // MENÚ ni enlace estable: solo ⌘K/URL o el hub `/inventarios` (`InventariosPagina`), que
+        // tampoco es entrada del riel. Se QUEDA aquí a propósito (fila 0.098): su pata de tela
+        // sigue VIVA —es la única ventana a los movimientos del flujo legado por lote— y moverla a
+        // «Avíos» se la escondería a quien la busca; lo que se arregló es que la pantalla dijera de
+        // qué flujo habla y a dónde ir por el kardex vigente (que va por COLOR, dentro de
+        // «Inventario de telas»).
+        //
+        // Las otras dos vistas de «materiales» ya se fueron al padre «Avíos» al quedarse solo-avíos:
+        // el AJUSTE el 13-ago-2026 y el TRASPASO en la fila 0.098. El criterio NO es «su pata de
+        // tela está muerta» —opera la MISMA dimensión legada que este kardex—, sino que aquéllas
+        // TIENEN REEMPLAZO VIGENTE dictado por Daniel (§Post-F9.32: el traspaso y el ajuste de tela
+        // se hacen POR COLOR) y este kardex no tiene ninguno: es la única ventana al histórico.
+        // OJO al leer el menú: para TELAS el traspaso vigente es el de COLOR — así lo fijó
+        // `DECISIONES.md §Post-F9.32`.
         tipo: 'padre',
         clave: 'telas',
         hijos: [
@@ -1571,23 +1690,31 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
           'inventario-telas-ajuste',
           'inventario-telas-traspaso',
           'inventario-materiales-kardex',
-          'inventario-materiales-traspasos',
         ],
       },
       {
         // Avíos es PADRE desplegable (Daniel, 12-ago-2026): como hoja colapsada solo navegaba a
         // Existencias y el «Catálogo de avíos» se quedaba sin ENTRADA EN EL MENÚ —igual que le pasó
         // al de telas en A2—; su único enlace era la tarjeta del hub `/catalogos`, que tampoco es
-        // entrada del riel. Van sus TRES hijos, que son todos los que tiene el padre: +«Ajuste de
-        // avíos» el 13-ago-2026, que colgaba de «Telas» cuando todavía servía a las dos dimensiones
-        // —al quedarse solo-avíos, ahí se escondía justo de quien la busca—. El KARDEX y el TRASPASO
-        // de avíos siguen en las vistas de «materiales» bajo el padre «Telas» (sirven a las dos
-        // dimensiones y `resolverEntradaRiel` solo admite hijos del MISMO padre); no hay pantalla de
-        // "movimientos de avíos" — los movimientos de avío se capturan por ese ajuste y ese traspaso.
+        // entrada del riel. Van sus CUATRO hijos, que son todos los que tiene el padre: +«Ajuste de
+        // avíos» el 13-ago-2026 y +«Traspaso de avíos» en la fila 0.098 — las dos colgaban de
+        // «Telas» cuando todavía servían a las dos dimensiones y, al quedarse solo-avíos, ahí se
+        // escondían justo de quien las busca. El KARDEX sigue en la vista de «materiales» bajo el
+        // padre «Telas» (sirve a las dos dimensiones —su pata de tela legada sigue viva— y
+        // `resolverEntradaRiel` solo admite hijos del MISMO padre); no hay pantalla de "movimientos
+        // de avíos" — los movimientos de avío se capturan por ese ajuste y ese traspaso.
         tipo: 'padre',
         clave: 'avios',
-        hijos: ['inventario-avios-existencias', 'catalogo-avios', 'inventario-materiales-ajustes'],
+        hijos: [
+          'inventario-avios-existencias',
+          'catalogo-avios',
+          'inventario-materiales-ajustes',
+          'inventario-materiales-traspasos',
+        ],
       },
+      // ⭐ La salida sin orden entra al RIEL como hoja: sólo la ve quien tiene el permiso (que es
+      // el administrador), y a él le tiene que aparecer sin ir a buscarla por ⌘K.
+      { tipo: 'hoja', clave: 'salida-material-sin-orden' },
       {
         // Compras es PADRE desplegable (pedido de Daniel, 11-ago-2026: «en Compras no hay un
         // submenú de Recepción de compras»): como hoja colapsada solo navegaba a las Órdenes de
@@ -1623,6 +1750,7 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
   {
     grupo: 'finanzas',
     entradas: [
+      { tipo: 'hoja', clave: 'corrida-pagos' },
       { tipo: 'hoja', clave: 'cxc' },
       { tipo: 'hoja', clave: 'cxp' },
       { tipo: 'hoja', clave: 'reportes-fiscales' },

@@ -55,8 +55,20 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
   - `cxp/` y `cxc/` — usos de negocio del motor por **composición** (cero duplicación): registrar
     pagos/abonos/descuentos/NC, estado de cuenta operativo/fiscal, **aging server-side**
     (`aging-comun.ts`: cubetas + neteo FIFO). La bandeja "por pagar" **foldea** el saldo EsMa (misma
-    cuenta del maquilero, en cubeta "Maquila sin antigüedad"); el `%` al corriente es honesto (`null`
-    si no hay cartera clasificable).
+    cuenta del maquilero, en una cubeta "Maquila" que **no se reparte** en las cuatro del aging — sus
+    DÍAS VENCIDOS sí se calculan, ver `dias-vencidos.ts`); el `%` al corriente es honesto (`null`
+    si no hay cartera clasificable). El fold trae DOS cosas por maquilero (`aportesEsMaSaldoLote`, un
+    solo agregado, nunca N+1): el **saldo** —al que sólo entra lo REVISADO en los cuatro conceptos,
+    V1 fila 0.115— y `maquilaPorRevisar`, lo capturado que aún espera revisión.
+    - ⭐ **El corte de la bandeja es `saldo ≠ 0` **o** algo por revisar** (§Post-F9.188a, Daniel): un
+      maquilero con TODO sin revisar tiene saldo 0 y, con el corte anterior, DESAPARECÍA justo cuando
+      alguien tiene que decidir sobre ese dinero. Es el mismo corte del tablero de EsMa, con las
+      mismas funciones (`tieneSaldo` / `hayPendiente` de `esma/formula-saldo.ts`), y se mide por el
+      CONTEO de partidas, no por el neto (dos partidas pueden netear cero).
+    - Lo por revisar **no es deuda todavía**: no suma a `carteraTotal`, a `maquilaTotal` ni a
+      `proveedoresConSaldo` (los KPIs siguen contando sólo saldo ≠ 0), pero se declara aparte en el
+      resumen y en la columna «Por revisar» de la tabla, con su importe y su conteo. Los importes se
+      ocultan sin `consultas.ver-importes`; el conteo nunca.
   - `cfdi/` — `parser-cfdi.ts` (CFDI **4.0** puro, endurecido contra XML no confiable: sin DTD, sin
     expansión de entidades, tope 2 MB), `cfdi-proveedor.ts` (I → `factura_proveedor` +, E →
     `nota_credito` −) y `cfdi-ventas.ts` (reusa el parser con roles invertidos: emisor = empresa,
@@ -69,6 +81,34 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
     del periodo completo. Exports **Excel** (exceljs) y **PDF** (@react-pdf, con leyenda de truncado).
   - `config-aging.ts` — límites del aging **configurables por empresa**
     (`ConfiguracionEmpresa.agingLimite1/2`, default 30/60 — cierra D15d).
+  - ⭐ `dias-vencidos.ts` — **LOS DÍAS VENCIDOS** (V1, fila **0.121**; §Post-F9.218(a)/§Post-F9.220).
+    Daniel: *«**Solo con que pongas los días vencidos es suficiente**»* ⇒ un número por renglón, no
+    una cubeta. Es **el único dato de antigüedad que cubre la MAQUILA**, y ahí está el porqué de este
+    archivo: los cargos de maquila **no viven en el motor** —viven en EsMa, cuyas tablas **no tienen
+    columna de vencimiento** (`EsMaCargo` ni siquiera tiene columna de fecha: su fecha es su
+    `creadoEn`)— así que `convivencia-esma.ts` los proyectaba con `fechaVencimiento: null` y no había
+    edad que enseñar. ⇒ el vencimiento se **DERIVA al leer**: fecha del cargo + `Proveedor.diasCredito`,
+    con la aritmética única `sumarPlazo` (extraída de `calcularVencimiento` a `aging-comun.ts`).
+    **Sin columna, sin migración y sin backfill** — y por eso el histórico ya migrado también envejece.
+    - **Qué número es:** los días del **cargo más viejo que sobrevive a los pagos**, aplicándolos de
+      más viejo a más nuevo — la MISMA convención de `netearCubetas`, para que esta columna y las
+      cubetas de la bandeja no cuenten historias distintas del mismo proveedor. Tres estados que **no
+      se colapsan**: `n` días · `0` (debe, dentro de plazo) · `null` (nada que envejecer).
+    - **Cómo se obtiene:** DOS agregados SQL (nunca N+1) sobre **tres** fuentes de cargo (motor ·
+      cargo EsMa · **abono** EsMa) y **dos** de crédito. Los días los resta **Postgres**
+      (`CURRENT_DATE − vencimiento`), la misma expresión de las cubetas: si el servidor de la
+      aplicación usara su propio reloj, dos números de la misma pantalla podrían desfasarse un día.
+    - 🔴 **La trampa de los signos, que hay que conocer antes de tocar esto:** en EsMa el `abono` es un
+      **CARGO extra al maquilero** (suma) y en el motor **resta**. Quién envejece se decide por el
+      **SIGNO** (`SIGNO_SALDO`, definición única), **nunca** por la etiqueta del origen — preguntarle a
+      `calcularVencimiento`, que decide por el origen, dejaría al abono de EsMa sin edad en silencio.
+    - 🔻 **Lo que NO cubre:** la cubeta «Maquila» **sigue sin repartirse** en las cuatro cubetas del
+      aging, y en la bandeja `vencido` **sigue siendo sólo del motor**. Eso pide que EsMa registre por
+      el motor; §Post-F9.218(a) no lo pidió. Y un **pago sigue sin amarrarse a una factura**, así que la
+      edad es la mejor suposición posible (el saldo total nunca se ve afectado).
+    - **Dónde se ve:** columna «Días venc.» de **la corrida semanal de pagos** (fila 0.113) — la
+      pantalla de los jueves donde Daniel decide a quién le paga—, y la fecha derivada en el estado de
+      cuenta del proveedor.
   - `migracion.ts` — **modo migración** (F9-E6): `insertarAperturasMigradas` inserta los saldos
     iniciales por **LOTES** (ver §ETL abajo).
 - **Rutas** `backend/src/api/terceros/` — delegan al dominio; RBAC deny-by-default.
@@ -117,6 +157,198 @@ ETL es de **saldos iniciales** + **importación masiva de CFDI**, no del `.mdb` 
 Formato de entrada, ejemplos y cómo correr: `backend/migracion/README.md` (sección F9). **Se corre con
 `npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=...`** (NUNCA `npm run`).
 
+## ⭐⭐ CORREGIR un movimiento SIN FACTURA (fila 0.145, §Post-F9.203)
+
+**Qué resuelve.** Hasta la 0.145, un **abono o un pago a un maquilero capturado por error NO se podía
+anular NUNCA**: de los cuatro conceptos de EsMa sólo el descuento tenía cancelación (fila 0.109, y sólo
+para el *deshacer* de un cierre). En CxP, en cambio, se cancela todo desde F9-E1. Daniel pidió cerrar
+esa asimetría con estas palabras: *«Quiero tener manera de modificar cualquier registro que se meta en
+cualquier estado de cuenta de los proveedores **sin factura**. **Sólo yo. Nadie más ni con permiso.
+Sólo yo.**»* — y sobre la forma, *«Sí, está bien **con rastro**.»*
+
+### Cómo funciona
+
+En pantalla es **un solo gesto que se comporta como editar**: se abre el renglón con sus valores, se
+cambia lo que haga falta, se pone el **motivo** (obligatorio) y se guarda. Por dentro, **en UNA
+transacción**:
+
+1. el movimiento viejo queda **cancelado** —en el motor, con su **inverso auditado**; en EsMa, con
+   cancelación **suave** (`canceladoEn` + autor + motivo)—;
+2. nace uno **nuevo** con los valores corregidos, **ligado** al que sustituye
+   (`MovimientoTercero.idMovimientoCorregido`, `AbonoMaquilero.idAbonoCorregido`,
+   `DescuentoMaquilero.idDescuentoCorregido`, `PagoMaquilero.idPagoCorregido` — todos `@unique`);
+3. la **bitácora** guarda quién, cuándo, el motivo y **qué decía antes** (A7).
+
+⇒ **D3 intacto**: nada se edita ni se borra; el saldo sigue siendo Σ de movimientos y el pasado se
+sigue pudiendo reconstruir. Una corrección se puede volver a corregir (se **encadenan**); el corregido,
+ya cancelado, no.
+
+**Dónde vive el código**
+
+| Pieza | Archivo |
+|---|---|
+| Lo común y puro (¿es sin factura? ¿qué queda? ¿cambió algo?) | `dominio/finanzas/correccion-comun.ts` |
+| El motor de terceros (CxP/CxC) — compone cancelar + registrar | `dominio/terceros/cuenta-terceros.ts::corregirMovimientoTercero` |
+| CxP (verifica que sea de un proveedor y delega) | `dominio/terceros/cxp/cxp.ts::corregirMovimientoCxp` |
+| EsMa (abono/descuento/pago) | `dominio/esma/correccion.ts::corregirMovimientoEsMa` |
+| La mecánica del pago aplicado | `dominio/esma/pagos.ts` (`cancelarPagoMaquileroInterno`, `recapturarPagoCorregido`, `prendasPagadasVivas`) |
+| La bandera de la persona | `comun/permisos.ts::verificarCorrectorSinFactura` |
+| Endpoints | `POST /api/terceros/movimientos/{id}/corregir` · `POST /api/cxp/movimientos/{id}/corregir` · `POST /api/esma/movimientos/{concepto}/{id}/corregir` |
+| *(Alcance de la ruta del motor)* | Como `cancelar`, la ruta del motor es **genérica**: acepta un movimiento de cliente (CxC) igual que uno de proveedor. La corrección se pidió **para proveedores**, así que sólo la OFRECEN las pantallas de CxP y de maquila; CxC no pinta el botón |
+| Pantallas | el cajón compartido `components/dominio/CajonCorregirSinFactura.tsx`, montado en el estado de cuenta de **CxP** y en el de **maquila** |
+
+### Quién puede: una BANDERA, no un permiso
+
+`Usuario.puedeCorregirSinFactura` — mismo patrón que `Usuario.esAuditor`, pero **no se asigna desde
+ninguna pantalla ni desde ningún endpoint**: se prende **sólo por base de datos**.
+
+```sql
+UPDATE usuarios SET puede_corregir_sin_factura = TRUE WHERE username = '…';
+```
+
+- **No es** `roles.administrar` ni ningún permiso de admin (ése es el defecto de la fila 0.120).
+- **No es** un `cxp.corregir` asignable: Daniel dijo *«ni con permiso»*.
+- La exige el **DOMINIO** (A1), no la ruta.
+- **No exime del permiso del módulo**: sigue haciendo falta `terceros.administrar`/`cxp.administrar`
+  (motor) o `esma.modificar`/`esma.ver-pagos` (EsMa), y `esma.revisar` si el movimiento estaba
+  `revisado` —porque el corregido **hereda** ese estado, y nacer `revisado` es un acto de validación
+  (fila 0.128)—.
+
+**La pantalla no adivina nada:** cada renglón del estado de cuenta llega con `corregible` y
+`importeCorregible` ya calculados por el servidor, así que nunca se ofrece un botón que después se
+rechaza. Por eso la bandera **no** viaja en `GET /api/sesion`.
+
+### 🔴 QUÉ **NO** SE PUEDE CORREGIR (y por qué)
+
+| No se corrige | Por qué |
+|---|---|
+| **Un renglón CON factura** (`esFiscal = true` en el motor, `conFactura = true` en EsMa), **aunque sea del mismo proveedor** | Un CFDI se cancela ante el SAT y se vuelve a timbrar; no se edita por dentro. El segmento es del **MOVIMIENTO**, no del tercero: un proveedor `ambos` tiene de los dos |
+| **El PROVEEDOR o el TIPO de movimiento** | No son campos del cuerpo (`strictObject` ⇒ **400** explícito) y el servidor los toma del corregido. Cambiar de proveedor o de concepto no es *corregir* un renglón: es **otro renglón** — para eso está cancelar y capturar de nuevo |
+| **El IMPORTE de un PAGO ya aplicado a cargos** | Su monto no es un dato suelto: es `Σ(prendas × precio del cargo)`, y el modelo promete `monto = Σ aplicaciones.importe`. Se corrigen su **fecha** y sus **observaciones**; para cambiar el dinero hay que cambiar las prendas, y eso es capturar el pago de nuevo. El cajón lo dice con todas sus letras |
+| **El DESCUENTO que propuso el CIERRE de una orden** | Su liga al cierre es `@unique` e intransferible: el sustituto no podría heredarla y el *deshacer* del cierre quedaría buscando un descuento que ya nadie usa. **Se deshace el cierre** |
+| **Un CARGO de EsMa** | No es un movimiento que alguien «meta» en el estado de cuenta: nace de un **recibo de maquila** y ya tiene su propio camino (validarlo fija cantidad y precio reales; cancelarlo lo saca) |
+| **Un movimiento ya cancelado, o el inverso de una cancelación** | No hay nada que corregir: se corrige el renglón bueno |
+| *(Al revés — lo que SÍ se permite a propósito)* **corregir el movimiento de un maquilero DESACTIVADO** | Capturar uno nuevo sí exige que esté activo; corregir, no. **Corregir no es hacer negocio nuevo: es arreglar lo que ya pasó.** Obligar a reactivar un taller para poder tocar su contabilidad sería mover el catálogo por la contabilidad |
+| **Una corrección que no cambia nada** | Quemaría dos folios y metería dos renglones vacíos de contenido en el estado de cuenta |
+
+📌 El `conFactura` **sin definir (`null`)** de lo migrado cuenta como **sin factura** —es lo que ya hace
+la partición `whereSegmentoFactura('sin')`—, así que lo viejo también se corrige (REGLA 0-B: el dato
+viejo se tolera, no se repara).
+
+### ⭐⭐ El caso difícil: el pago aplicado a cargos
+
+Un pago de EsMa **consume «prendas por pagar»** de cargos concretos, y de ahí se deriva `Orden.pagada`.
+Cancelarlo cambiando sólo su renglón dejaría los cargos **marcados como pagados con dinero que ya no
+existe**. Por eso:
+
+- las prendas por pagar se cuentan por la **suma VIVA** de `PagoAplicacion`
+  (`pago.canceladoEn IS NULL`) — la columna `EsMaCargo.cantidadPagada` sigue siendo un **cache**, no la
+  verdad;
+- corregir un pago aplicado **deshace su aplicación y la vuelve a hacer**, bajo el
+  `pg_advisory_xact_lock` **por maquilero**, recalculando `cantidadPagada` y `Orden.pagada`;
+- las filas de `PagoAplicacion` del pago cancelado **NO se borran** (D3): son el rastro. Lo que cambia
+  es que la suma que manda las excluye.
+
+### El pago que nació de la corrida semanal: la relación NO se repunta (deliberado)
+
+Un pago de la **corrida semanal** (fila 0.113) se puede corregir como cualquier otro. Cuando se
+corrige, el `RenglonCorridaPago` **sigue apuntando al pago viejo** y no al nuevo.
+
+🔴 **Es deliberado, no un cabo suelto — no lo "arregles".** El renglón de la corrida es el registro
+histórico de **lo que esa corrida emitió ese día**; la corrección es un **hecho posterior**, y queda
+ligada por `idPagoCorregido`. Repuntar el renglón sería **reescribir el pasado**, que es exactamente
+lo que esta fila existe para evitar. Además, el monto que la relación reporta vive en su **propia
+columna** (`RenglonCorridaPago.monto`), así que no hay doble conteo con el libro. La FK del renglón es
+`@unique`, de modo que tampoco *podría* apuntar a los dos.
+
+⭐ **Y vale IGUAL para el otro lado de la corrida.** Un renglón de corrida de un **proveedor** (no
+maquilero) apunta a un movimiento del motor por `RenglonCorridaPago.idMovimientoTercero`, que lleva el
+**mismo `@@unique`**: al corregir ese movimiento, el renglón sigue apuntando al viejo, por la misma
+razón y con la misma conclusión. Se dice aquí para que nadie lea la nota de arriba como si fuera sólo
+de maquila.
+
+### El RECIBO en PDF de un pago anulado va SELLADO
+
+`GET /api/esma/pagos/{id}` y su impreso **siguen devolviendo** un pago anulado —esconderlo rompería el
+rastro y dejaría un id que «desaparece»—, pero la proyección trae `canceladoEn`/`motivoCancelacion` y
+el PDF estampa arriba del importe: **«RECIBO ANULADO — NO ES COMPROBANTE DE PAGO»**, con la fecha y el
+motivo. 🔑 Este papel es el que se le entrega al maquilero: antes de la 0.145 un pago no se podía
+anular, así que el impreso no tenía nada que decir; **un comprobante anulado que no lo dice se puede
+cobrar dos veces**. El texto del sello vive en `textoSelloAnulado` (función pura, probada suelta) para
+que se pueda afirmar sin abrir un binario.
+
+### El `importeGuardado`: por qué el `monto` no servía para corregir
+
+Cada renglón del estado de cuenta trae **dos** números y no son el mismo:
+
+| Campo | Qué es | Cuándo va `null` |
+|---|---|---|
+| `monto` | La **aportación al saldo**: lleva signo (un pago resta) y **se vacía si el renglón todavía no está revisado** (no aporta) | sin revisar · sin `consultas.ver-importes` |
+| `importeGuardado` | El **importe capturado**, normalizado a POSITIVO por `importeGuardadoDe` | en un renglón **corregible**, **sólo** sin `consultas.ver-importes` (el CARGO va `null` siempre: su importe se deriva, y nunca es corregible) |
+
+🔴 El cajón de corrección arranca de `importeGuardado`, y la razón es un defecto real: un movimiento
+«capturado por error» es, por definición, uno **que aún no se revisó** —el caso central de la fila—, y
+arrancando de `monto` el importe quedaba intocable justo ahí… explicado además con un mensaje sobre
+permisos que era **falso**. Regla que queda: **en un renglón corregible, el `null` de
+`importeGuardado` significa una sola cosa**, y por eso el mensaje de permisos sólo puede salir cuando
+de verdad faltan.
+
+⚠️ **Y el POSITIVO no es cosmético.** El ETL de EsMa carga los *«saldo anterior»* del sistema viejo
+**en negativo** (`dominio/esma/migracion.ts`: *«los servicios normales rechazarían montos negativos,
+que el viejo SÍ tiene»*), y llegan con `conFactura = null`, que cuenta como **sin factura** ⇒ son
+corregibles. Si el importe llegara en negativo, el cajón cortaría al guardar con «captura un importe
+mayor a 0» **aunque sólo se hubiera cambiado la fecha**: el botón no serviría justo sobre los
+renglones viejos que más se van a querer tocar. Por eso la normalización vive en **un solo helper**
+compartido por el motor y las seis ramas de EsMa — cuando estaba escrita a mano en cada sitio, el
+motor la cumplía y EsMa no.
+
+🔴 **Y el gemelo del negativo, que `Math.abs` no cura: el importe 0.** El mismo ETL carga un monto
+vacío como **cero** —`migracion/loaders/esma-cargos.ts:545`, `parsearDinero(...) ?? 0`, la mecánica
+compartida por abonos, pagos y descuentos—, y esos movimientos también llegan con `conFactura = null`
+⇒ **corregibles**. El cajón validaba
+el importe en **todos** los envíos, así que sobre ellos guardar cortaba con *«Captura un importe mayor
+a 0»* aunque sólo se hubiera cambiado la fecha — y el `<input min="0.01">` los dejaba `:invalid`, de
+modo que el navegador ni llegaba a enviar el formulario. **La regla que queda:** ese mensaje habla del
+importe **NUEVO**, así que sólo sale cuando el usuario propone uno (el campo se compara contra el texto
+con el que nació), y el `min` del campo es **`0`** — el suelo de lo que el dato puede valer, no el de
+lo que se puede teclear. Que un importe nuevo sea mayor que 0 lo exigen `enviar` y el servidor.
+
+### La tercera forma del mismo defecto: la nota que nadie tocó (y el ETL que la despierta)
+
+El defecto del importe tiene una **forma general**, y conviene nombrarla porque va a volver:
+*el sistema vuelve a juzgar un dato que el usuario no propuso, y le niega la corrección por él.*
+
+En el servidor apareció con las **observaciones**. `corregirMovimientoTercero` capturaba el
+sustituto reenviando la nota original por `esquemaMovimientoTerceroCrear`, que la limita a **1000
+caracteres**. Pero el **ETL de apertura de terceros** las escribe **sin validar ninguna**
+(`dominio/terceros/migracion.ts::insertarAperturasMigradas` inserta con `createManyAndReturn`, que
+no pasa por Zod) desde una columna de texto libre del CSV (`migracion/loaders/terceros-saldos.ts`).
+⇒ Sobre un movimiento migrado con una nota larga, **corregir sólo la fecha devolvía 400** —
+*«Too big: expected string to have <=1000 characters»*— por un campo que nadie había tocado.
+
+⚠️ **No era alcanzable con datos capturados a mano** (el alta normal ya corta en 1000): **se despierta
+el día que se corra ese ETL**, que hoy está *«LISTO SIN CORRER»* esperando el corte de SINUBE. Por eso
+el aviso vive también **pegado al ETL**, en el TSDoc de `insertarAperturasMigradas`: quien lo corra
+tiene que poder enterarse sin leer este documento.
+
+**La regla que queda, en las dos mitades:**
+
+| La nota… | Por dónde viaja | ¿Se valida? |
+|---|---|---|
+| la **PROPONE** el usuario | `entrada` (el contrato) | **Sí** — es captura suya, y 1001 caracteres se rechazan |
+| sólo se **ARRASTRA** | `extras.observacionesConservadas` (canal del dominio) | **No** — nadie la propuso |
+
+🔑 **Y la segunda mitad no es opcional: no revalidarla no puede significar perderla.** Si la nota
+arrastrada no viajara por ningún camino, corregir la fecha la borraría en silencio — un defecto peor
+que el que se venía a arreglar. Las pruebas pinzan las dos mitades por separado.
+
+### Efecto de fondo: los tres movimientos planos vuelven a ser el mismo criterio
+
+La condición de **estar vivo** (`canceladoEn IS NULL`) sube de ser sólo del descuento a serlo de los
+tres movimientos planos en la definición única (`dominio/esma/formula-saldo.ts`). Como esa definición
+alimenta a la vez a Prisma y al SQL crudo, viaja sola a **las cinco sumas del saldo** y a las listas: un
+movimiento cancelado **ni suma al saldo ni sigue apareciendo como «esperando tu decisión»**.
+
 ## Decisiones (DECISIONES.md §D15)
 
 - **D15a** — el movimiento referencia al tercero por **tipo + id** (dos FKs nullable + CHECK de
@@ -137,3 +369,8 @@ Formato de entrada, ejemplos y cómo correr: `backend/migracion/README.md` (secc
   el desglose vive en el XML guardado en R2. Leerlo del XML para el reporte del contador es iteración
   posterior (documentado en el TSDoc de `reportes/`).
 - **UsuarioRol / usuarios reales** — dependen de F10 (go-live); no afectan el motor.
+- **Prender la bandera de corrección** (`usuarios.puede_corregir_sin_factura`) para Daniel en `prueba`
+  y, más tarde, en producción. Es un **UPDATE a mano**: ninguna pantalla la reparte, ningún seed la
+  siembra y ningún endpoint la escribe — que es justo lo que él pidió (§Post-F9.203).
+
+> **Ver también:** `pagos-corrida.md` — la corrida semanal de pagos (0.113) y el catálogo de conceptos de pago (0.125), que es donde los saldos de CxP y EsMa se convierten en pagos.

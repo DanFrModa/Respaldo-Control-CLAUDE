@@ -7,19 +7,60 @@
  * usable por la empresa de la sesión (A9): un almacén privado de OTRA empresa, para esta sesión,
  * no existe. Este helper centraliza esa regla (antes duplicada en `produccion/recibos.ts` y
  * `produccion/entregas-cliente.ts`).
+ *
+ * ⚠️ **Y el TIPO (fila 0.137).** `Almacen.tipo` dice qué inventario guarda cada bodega
+ * (`PT` / `TELA` / `AVIO`), pero hasta esta fila NADIE lo verificaba al mover: el desplegable de
+ * la pantalla era el único filtro, así que un movimiento de producto terminado entraba sin
+ * chistar a la bodega de telas (y una entrada de tela a un almacén de PT). Eso parte el inventario
+ * en buckets que nadie va a mirar: la existencia sigue cuadrando en la suma del kardex, pero la
+ * mercancía no está donde el sistema dice. A1 manda que esa validación viva en el DOMINIO, no en
+ * el desplegable → {@link exigirAlmacenDelTipo}.
+ *
+ * REGLA DE USO: todo escritor que reciba un `idAlmacen` llama a {@link exigirAlmacenDelTipo} con el
+ * tipo del artículo que mueve, DENTRO de su transacción y ANTES de escribir. Es la ÚNICA puerta.
+ * Hubo una variante sin tipo (`exigirAlmacen`) mientras la fila 0.137 convertía a los escritores de
+ * inventarios, compras, notas de salida y conteo cíclico; se retiró en la SEGUNDA PASADA, al
+ * convertir los de PRODUCCIÓN (recibo de maquila, entrega a cliente y envío de prenda terminada),
+ * que eran sus últimos tres llamadores. Dejar a mano una versión más débil de la misma
+ * comprobación solo servía para que el siguiente escritor eligiera la equivocada.
+ *
+ * NO se llama en las CANCELACIONES ni en el modo MIGRACIÓN:
+ *  • La cancelación es un movimiento INVERSO sobre el almacén del movimiento ORIGINAL (D3). Un
+ *    inverso SIEMPRE debe poder registrarse — es EL mecanismo de corrección; bloquearlo porque el
+ *    almacén cambió de tipo o se desactivó dejaría un error sin forma de deshacerse.
+ *  • El ETL (`dominio/**\/migracion.ts`) preserva el histórico tal cual (relaja a propósito las
+ *    validaciones de captura, ver su cabecera) y no pasa por estos escritores.
  */
+import type { TipoAlmacen } from '../datos/index.js';
+
 import { ErrorNoEncontrado, ErrorValidacion } from './errores.js';
 import type { Tx } from './transaccion.js';
 
+/** Lo que el inventario de cada tipo de almacén guarda, en palabras del negocio (para el mensaje). */
+const QUE_GUARDA: Record<TipoAlmacen, string> = {
+  PT: 'producto terminado',
+  TELA: 'telas',
+  AVIO: 'avíos',
+};
+
+/** Almacén ya verificado como usable por la empresa de la sesión. */
+interface AlmacenUsable {
+  nombre: string;
+  tipo: TipoAlmacen;
+}
+
 /**
- * Verifica que un almacén exista, esté ACTIVO y sea GLOBAL o de la empresa dada (A9). Lanza
- * `ErrorNoEncontrado` si no existe y `ErrorValidacion` si está desactivado o es de otra empresa.
- * Pensado para llamarse DENTRO de la transacción del flujo, antes de cualquier escritura.
+ * Lee el almacén y verifica que exista, esté ACTIVO y sea GLOBAL o de la empresa dada (A9).
+ * Devuelve su nombre y su tipo para que el llamador decida si además exige un tipo concreto.
  */
-export async function exigirAlmacen(tx: Tx, idAlmacen: number, idEmpresa: number): Promise<void> {
+async function leerAlmacenUsable(
+  tx: Tx,
+  idAlmacen: number,
+  idEmpresa: number,
+): Promise<AlmacenUsable> {
   const almacen = await tx.almacen.findUnique({
     where: { id: idAlmacen },
-    select: { activo: true, idEmpresa: true, nombre: true },
+    select: { activo: true, idEmpresa: true, nombre: true, tipo: true },
   });
   if (almacen === null) {
     throw new ErrorNoEncontrado('Almacen', idAlmacen);
@@ -29,5 +70,53 @@ export async function exigirAlmacen(tx: Tx, idAlmacen: number, idEmpresa: number
   }
   if (almacen.idEmpresa !== null && almacen.idEmpresa !== idEmpresa) {
     throw new ErrorValidacion(`El almacén "${almacen.nombre}" no es de esta empresa.`);
+  }
+  return { nombre: almacen.nombre, tipo: almacen.tipo };
+}
+
+/**
+ * Lee el TIPO de un almacén ya verificado como usable por la empresa (existe + activo + A9), SIN
+ * exigir un tipo concreto. Es la única lectura legítima "antes de saber el tipo", y existe por el
+ * inventario CÍCLICO (fila 0.099): ahí el usuario elige el ALMACÉN y el sistema DERIVA de su tipo
+ * qué se va a contar (producto terminado, telas o avíos) — no al revés.
+ *
+ * ⚠️ NO sustituye a {@link exigirAlmacenDelTipo} ni relaja nada: quien usa esto sigue obligado a
+ * pasar por la puerta con el tipo que ya dedujo. La razón es que entre el ALTA de una hoja de
+ * conteo y su CIERRE pueden pasar días, y en ese rato el almacén pudo desactivarse o cambiar de
+ * tipo; la hoja lleva su dimensión persistida y al cerrar se vuelve a exigir contra ella.
+ */
+export async function tipoDeAlmacenUsable(
+  tx: Tx,
+  idAlmacen: number,
+  idEmpresa: number,
+): Promise<TipoAlmacen> {
+  const almacen = await leerAlmacenUsable(tx, idAlmacen, idEmpresa);
+  return almacen.tipo;
+}
+
+/**
+ * Verifica que un almacén exista, esté ACTIVO, sea GLOBAL o de la empresa dada (A9) y sea del
+ * `tipo` que corresponde al artículo que se está moviendo (fila 0.137). Lanza `ErrorNoEncontrado`
+ * si no existe y `ErrorValidacion` si está desactivado, es de otra empresa o es de otro tipo — este
+ * último con el nombre del almacén y qué guarda cada uno, para que el capturador sepa qué elegir
+ * sin adivinar. Pensado para llamarse DENTRO de la transacción del flujo, antes de escribir nada.
+ *
+ * El orden de las verificaciones importa: existe → activo → de la empresa → del tipo. Un almacén
+ * privado de OTRA empresa "no existe" para esta sesión (A9), así que su mensaje gana al del tipo:
+ * decir "es de telas" de un almacén que el usuario no debería ni ver filtraría información de otra
+ * empresa.
+ */
+export async function exigirAlmacenDelTipo(
+  tx: Tx,
+  idAlmacen: number,
+  tipo: TipoAlmacen,
+  idEmpresa: number,
+): Promise<void> {
+  const almacen = await leerAlmacenUsable(tx, idAlmacen, idEmpresa);
+  if (almacen.tipo !== tipo) {
+    throw new ErrorValidacion(
+      `El almacén "${almacen.nombre}" es de ${QUE_GUARDA[almacen.tipo]}; este movimiento es de ` +
+        `${QUE_GUARDA[tipo]}. Elige un almacén de ${QUE_GUARDA[tipo]}.`,
+    );
   }
 }

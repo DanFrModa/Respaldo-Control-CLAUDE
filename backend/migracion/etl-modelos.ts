@@ -120,8 +120,43 @@ async function main(): Promise<void> {
   }
 }
 
-/** Script solo-fotos-modelos: `npm run etl:fotos-modelos`. */
-async function mainFotosModelos(): Promise<void> {
+/**
+ * Lee `--limite N` de los argumentos. Devuelve `undefined` si no viene.
+ * Acepta las dos formas: `--limite 20` y `--limite=20`.
+ */
+function leerLimite(argv: readonly string[]): number | undefined {
+  let crudo: string | undefined;
+  const pegado = argv.find((a) => a.startsWith('--limite='));
+  if (pegado !== undefined) {
+    crudo = pegado.slice('--limite='.length);
+  } else {
+    const i = argv.indexOf('--limite');
+    if (i === -1) {
+      return undefined;
+    }
+    crudo = argv[i + 1];
+  }
+  const n = Number(crudo);
+  if (!Number.isInteger(n) || n <= 0) {
+    console.error(`--limite requiere un entero positivo (recibido: ${crudo ?? '<nada>'})`);
+    process.exit(1);
+  }
+  return n;
+}
+
+/**
+ * Script solo-fotos-modelos: `npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos`.
+ *
+ * Con `--simular` NO sube nada a R2 ni escribe en la BD: solo resuelve el cruce
+ * `Foto1`/`Foto2` contra la carpeta y saca el reporte (cuántas subirían, cuáles no se
+ * encontraron y qué archivos no reclama ningún modelo). Sirve para ver el resultado de una
+ * corrida sin arriesgar nada.
+ *
+ * Con `--limite N` procesa solo N modelos —los más nuevos que tengan su archivo en la
+ * carpeta— en vez del catálogo completo. Es la corrida de prueba: sube de verdad, pero
+ * acotada. Las dos banderas se combinan.
+ */
+async function mainFotosModelos(simular: boolean, limite: number | undefined): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error('Falta DATABASE_URL');
@@ -134,8 +169,22 @@ async function mainFotosModelos(): Promise<void> {
   try {
     const sesion = sesionEtl();
     const reporte = new Reporte();
-    const resultado = await cargarFotosModelos(sesion, cliente, reporte);
-    log('Fotos modelos', resultado);
+    if (simular) {
+      console.log('MODO SIMULACIÓN — no se sube a R2 ni se escribe en la BD.\n');
+    }
+    if (limite !== undefined) {
+      console.log(`LÍMITE — solo los ${String(limite)} modelos más nuevos con foto disponible.\n`);
+    }
+    const resultado = await cargarFotosModelos(
+      sesion,
+      cliente,
+      reporte,
+      undefined,
+      undefined,
+      simular,
+      limite,
+    );
+    log(simular ? 'Fotos modelos (simulado)' : 'Fotos modelos', resultado);
     console.log(reporte.aTexto());
   } finally {
     await cliente.$disconnect();
@@ -169,8 +218,10 @@ const ejecutadoComoScript =
 
 if (ejecutadoComoScript) {
   const subcomando = process.argv[2];
+  const simular = process.argv.includes('--simular');
+  const limite = leerLimite(process.argv);
   if (subcomando === '--fotos-modelos') {
-    await mainFotosModelos();
+    await mainFotosModelos(simular, limite);
   } else if (subcomando === '--fotos-arte') {
     await mainFotosArte();
   } else {

@@ -33,6 +33,7 @@ import {
   esquemaProveedorContactoCrear,
   esquemaProveedorContactoEditarCuerpo,
   esquemaProveedorCrear,
+  esquemaProveedorCrearMigrado,
   esquemaProveedorEditar,
   type DatosProveedorAdjuntoCrear,
   type DatosProveedorAvioAsignar,
@@ -43,11 +44,16 @@ import type {
   Proveedor,
   ProveedorArchivo,
   ProveedorContacto,
+  ProveedorCuentaPago,
   RolProveedor,
 } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -73,6 +79,9 @@ const CARPETA_ADJUNTOS = 'proveedores';
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearProveedor = z.input<typeof esquemaProveedorCrear>;
 
+/** Alta en modo MIGRACIÓN: igual, pero la modalidad de facturación puede faltar (REGLA 0-B). */
+export type EntradaCrearProveedorMigrado = z.input<typeof esquemaProveedorCrearMigrado>;
+
 /** Edición: `id` + cambios parciales (incluye `activo` para des/reactivar). */
 export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
 
@@ -80,6 +89,7 @@ export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
 export type ProveedorConRoles = Proveedor & {
   roles: { rol: Pick<RolProveedor, 'id' | 'codigo' | 'nombre'> }[];
   contactos: ProveedorContacto[];
+  cuentasPago: ProveedorCuentaPago[];
   _count: { archivos: number };
 };
 
@@ -94,6 +104,15 @@ const incluirRolesYConteo = {
     orderBy: { rol: { nombre: 'asc' } },
   },
   contactos: { where: { activo: true }, orderBy: [{ nombre: 'asc' }, { id: 'asc' }] },
+  // Cuentas de pago ACTIVAS, la DEFAULT primero (0.112). Las retiradas son historial: no viajan en
+  // la ficha, se piden con `?incluirInactivas=true` en su listado propio.
+  // ⚠️ `nulls: 'last'` NO es adorno: `esDefault` es `true`/NULL (así la base garantiza una sola
+  // default) y en Postgres un `ORDER BY ... DESC` pone los NULL PRIMERO. Sin esto, la default
+  // saldría hasta el final.
+  cuentasPago: {
+    where: { activo: true },
+    orderBy: [{ esDefault: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+  },
   _count: { select: { archivos: true } },
 } satisfies Prisma.ProveedorInclude;
 
@@ -169,8 +188,11 @@ async function exigirCortoLibre(tx: Tx, corto: string, idActual?: number): Promi
   }
 }
 
-/** Busca un proveedor por id o lanza `ErrorNoEncontrado`. */
-async function exigirProveedor(tx: Tx, id: number): Promise<Proveedor> {
+/**
+ * Confirma que el proveedor existe (404 si no). EXPORTADO: lo reusan los sub-catálogos que cuelgan
+ * del proveedor y viven en su propio archivo (`proveedor-cuentas-pago.ts`).
+ */
+export async function exigirProveedor(tx: Tx, id: number): Promise<Proveedor> {
   const proveedor = await tx.proveedor.findUnique({ where: { id } });
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', id);
@@ -247,7 +269,7 @@ async function sincronizarRoles(
 
 /** Construye el `data` de los campos enriquecidos presentes en el alta (solo los definidos). */
 function datosEnriquecidosCrear(
-  datos: z.output<typeof esquemaProveedorCrear>,
+  datos: z.output<typeof esquemaProveedorCrearMigrado>,
 ): Partial<Prisma.ProveedorCreateInput> {
   const data: Partial<Prisma.ProveedorCreateInput> = {};
   // Campo corto ÚNICO de uso diario ("Bloom" para BLOOM TEXTIL; A1.1 + §Post-F9.57/.58). La
@@ -256,7 +278,6 @@ function datosEnriquecidosCrear(
   if (datos.razonSocial !== undefined) data.razonSocial = datos.razonSocial;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.condiciones !== undefined) data.condiciones = datos.condiciones;
-  if (datos.factura !== undefined) data.factura = datos.factura;
   if (datos.rfc !== undefined) data.rfc = datos.rfc;
   if (datos.regimenFiscalSat !== undefined) data.regimenFiscalSat = datos.regimenFiscalSat;
   if (datos.usoCfdiHabitual !== undefined) data.usoCfdiHabitual = datos.usoCfdiHabitual;
@@ -270,6 +291,7 @@ function datosEnriquecidosCrear(
   if (datos.diasCredito !== undefined) data.diasCredito = datos.diasCredito;
   if (datos.moneda !== undefined) data.moneda = datos.moneda;
   if (datos.formaPago !== undefined) data.formaPago = datos.formaPago;
+  if (datos.formaPagoPreferida !== undefined) data.formaPagoPreferida = datos.formaPagoPreferida;
   if (datos.metodoPago !== undefined) data.metodoPago = datos.metodoPago;
   if (datos.banco !== undefined) data.banco = datos.banco;
   if (datos.clabe !== undefined) data.clabe = datos.clabe;
@@ -299,6 +321,11 @@ const CAMPOS_TEXTO_EDITABLES = [
   'direccion',
   'moneda',
   'formaPago',
+  // ⚠️ `formaPagoPreferida` es un ENUM, no texto libre, y aun así va en esta lista a propósito: el
+  // bucle hace exactamente lo que necesita —omitir = no tocar, ''/null = borrar la preferencia— y
+  // así hereda el mismo renglón de bitácora que los demás campos (0.113). El Zod ya garantiza que
+  // el valor sólo pueda ser `efectivo`, `transferencia` o nulo.
+  'formaPagoPreferida',
   'metodoPago',
   'banco',
   'clabe',
@@ -307,8 +334,14 @@ const CAMPOS_TEXTO_EDITABLES = [
   'obsPago',
 ] as const;
 
-/** Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean). */
-const CAMPOS_BOOL_EDITABLES = ['factura', 'retieneIva', 'retieneIsr', 'asegurado'] as const;
+/**
+ * Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean).
+ *
+ * ⚠️ `factura` YA NO está (fila 0.124): la pregunta *"¿este proveedor factura?"* la contesta
+ * `modalidadFacturacion` y nada más. La columna sigue en la base como histórico (REGLA 0-B) pero
+ * ninguna edición la escribe; donde hace falta el booleano se DERIVA con `emiteFactura`.
+ */
+const CAMPOS_BOOL_EDITABLES = ['retieneIva', 'retieneIsr', 'asegurado'] as const;
 
 /** Campos NUMÉRICOS enteros editables (nullables: `null` = borrar el dato). */
 const CAMPOS_NUM_EDITABLES = ['diasCredito', 'leadTimeDias'] as const;
@@ -379,7 +412,9 @@ function aplicarEnriquecidosEditar(
     }
   }
 
-  // `modalidadFacturacion` es enum (F6-E5): omitir = no tocar; `null` = borrar (sin definir).
+  // `modalidadFacturacion` es enum (F6-E5): omitir = no tocar. **`null` YA NO se admite** (fila
+  // 0.110): el esquema lo rechaza antes de llegar aquí, porque vaciarla dejaría al proveedor sin
+  // saber por qué camino sale su pago (§Post-F9.186(a)). Se cambia de valor, no se borra.
   if (datos.modalidadFacturacion !== undefined) {
     const nuevo = datos.modalidadFacturacion;
     if (nuevo !== actual.modalidadFacturacion) {
@@ -393,15 +428,29 @@ function aplicarEnriquecidosEditar(
 /**
  * Crea un proveedor (catálogo global) con sus roles en UNA transacción (A2). Reglas:
  * permiso `proveedores.administrar`; nombre único global → `ErrorConflicto`; **≥1 rol**
- * (R15); si `factura=true` exige RFC + régimen (regla de captura, validada en el
- * esquema); nace activo; auditoría y bitácora en la misma transacción (A7).
+ * (R15); **`modalidadFacturacion` OBLIGATORIA** (fila 0.110, ver abajo); nace activo;
+ *
+ * ⚠️ Ya NO exige RFC + régimen al que factura (fila 0.124). Esa regla colgaba de la casilla
+ * `factura`, que se retiró; NO se remapeó a la modalidad a propósito, porque habría bloqueado justo
+ * el trabajo que abrió la fila 0.110 —ponerle la modalidad a los proveedores MIGRADOS, que llegan
+ * sin RFC a propósito (REGLA 0-B: lo que falta se tolera, no se compensa)—. El RFC se sigue
+ * exigiendo donde de verdad hace falta y con mejor mensaje: al capturar un CFDI a su nombre
+ * (`exigirRfcDelProveedor`, `dominio/inventarios/cfdi-entrada-tela.ts`).
+ * auditoría y bitácora en la misma transacción (A7).
+ *
+ * ⭐ LA MODALIDAD DE FACTURACIÓN SE PREGUNTA AL DAR DE ALTA. Daniel (3-sep-2026,
+ * §Post-F9.186(a)): *"es un campo **obligatorio** de llenar. **A fuerzas hay que definir si es con,
+ * sin o ambas**"*. No es cosmético: decide **de dónde sale el pago** del proveedor —CON factura, el
+ * pago nace del estado de cuenta del BANCO; SIN factura, de la RELACIÓN que Daniel define
+ * (§Post-F9.184(f))—. Sin ella, su pago no sabe por cuál de los dos caminos entrar. Lo exige
+ * `esquemaProveedorCrear`; el ETL usa {@link crearProveedorMigrado}.
  *
  * Condición de pago: `diasCredito` (null o 0 = contado; >0 = días de crédito).
  *
  * @example
  * const p = await crearProveedor(sesion, {
- *   nombre: "Maquilas SA", roles: [1, 2],
- *   factura: true, rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
+ *   nombre: "Maquilas SA", roles: [1, 2], modalidadFacturacion: "solo_con",
+ *   rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
  * });
  */
 export async function crearProveedor(
@@ -410,7 +459,36 @@ export async function crearProveedor(
   bd?: ContextoBd,
 ): Promise<ProveedorConRoles> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  const datos = validarEntrada(esquemaProveedorCrear, entrada);
+  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrear, entrada), bd);
+}
+
+/**
+ * MISMA alta, con la **modalidad de facturación opcional**. Uso EXCLUSIVO del ETL
+ * (`migracion/loaders/proveedores.ts`), **jamás desde una ruta REST** — mismo patrón que
+ * `registrarMovimientoTerceroInterno` en el motor de terceros.
+ *
+ * Por qué existe (REGLA 0-B, `CLAUDE.md` §7): Access nunca preguntó cómo factura cada proveedor,
+ * así que el histórico llega con el dato vacío **a propósito** y eso NO es un defecto. Daniel: *"yo
+ * me encargo de ponerlo bien cuando hagamos la migración de datos reales"*. Inventar aquí un valor
+ * para cuadrar el alta sería justo lo que la regla prohíbe. El proveedor migrado se consulta y
+ * aparece en su estado de cuenta con normalidad; lo que no se le puede es **capturar un movimiento
+ * nuevo** hasta que se le defina la modalidad (`resolverConFactura` lo corta).
+ */
+export async function crearProveedorMigrado(
+  sesion: SesionUsuario,
+  entrada: EntradaCrearProveedorMigrado,
+  bd?: ContextoBd,
+): Promise<ProveedorConRoles> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrearMigrado, entrada), bd);
+}
+
+/** Cuerpo compartido del alta (ya validada y con el permiso verificado). */
+async function crearProveedorValidado(
+  sesion: SesionUsuario,
+  datos: z.output<typeof esquemaProveedorCrearMigrado>,
+  bd?: ContextoBd,
+): Promise<ProveedorConRoles> {
   if (datos.roles === undefined || datos.roles.length === 0) {
     throw new ErrorValidacion('El proveedor debe tener al menos un rol/servicio.');
   }
@@ -816,21 +894,28 @@ export async function listarAdjuntosProveedor(
 
 /**
  * Quita un adjunto del proveedor (R15 §4) en UNA transacción (A2): borra el
- * `ProveedorArchivo` y su `Archivo` (el objeto R2 huérfano es inofensivo — lo
- * documenta `comun/archivos.ts`). Requiere `proveedores.administrar`. Si el adjunto
- * no pertenece a ese proveedor → `ErrorNoEncontrado`.
+ * `ProveedorArchivo` y su `Archivo` y, TRAS el commit, borra el OBJETO físico de R2 en
+ * modo BEST-EFFORT (0.081a: antes el objeto se quedaba en el bucket para siempre). Si R2
+ * falla NO revierte el borrado del registro. Requiere `proveedores.administrar`. Si el
+ * adjunto no pertenece a ese proveedor → `ErrorNoEncontrado`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico
+ * corre DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarAdjuntoProveedor(
   sesion: SesionUsuario,
   idProveedor: number,
   idArchivo: string,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  return enTransaccion(async (tx) => {
+
+  // La key del objeto R2 se captura DENTRO de la tx para borrarlo best-effort tras el commit.
+  const keyR2 = await enTransaccion(async (tx) => {
     const adjunto = await tx.proveedorArchivo.findFirst({
       where: { idProveedor, idArchivo },
-      include: { archivo: { select: { nombreOriginal: true } } },
+      include: { archivo: { select: { key: true, nombreOriginal: true } } },
     });
     if (adjunto === null) {
       throw new ErrorNoEncontrado('Adjunto del proveedor', idArchivo);
@@ -846,7 +931,15 @@ export async function quitarAdjuntoProveedor(
       accion: 'MODIFICAR',
       datos: { adjunto: 'quitar', archivo: adjunto.archivo.nombreOriginal },
     });
+
+    return adjunto.archivo.key;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    [keyR2],
+    `el adjunto del proveedor ${String(idProveedor)}`,
+  );
 }
 
 // ── Avíos que surte el proveedor (B17, R9 — lado PROVEEDOR de AvioProveedor) ────

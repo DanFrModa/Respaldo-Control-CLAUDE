@@ -42,13 +42,15 @@ const esquemaClienteFormulario = z.object({
     .min(1, { error: 'El nombre es obligatorio' })
     .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
   // Abreviatura (§Post-F9.34): el "CYA" del código de desarrollo. Vacía = sin capturar; con
-  // valor, 2–6 letras/dígitos en MAYÚSCULAS (el backend re-valida y exige que sea única, A1).
+  // valor, EXACTAMENTE 3 LETRAS en MAYÚSCULAS (V1-E7b: con longitud variable el código deja de
+  // alinearse, `CYA-26-71-001` contra `MARILY-26-71-001`). El backend re-valida con la MISMA
+  // regla y exige además que sea única (A1) — aquí sólo se adelanta el aviso.
   abreviatura: z
     .string()
     .trim()
     .toUpperCase()
-    .refine((v) => v === '' || /^[A-Z0-9]{2,6}$/.test(v), {
-      error: 'La abreviatura debe tener de 2 a 6 letras o dígitos, sin espacios',
+    .refine((v) => v === '' || /^[A-Z]{3}$/.test(v), {
+      error: 'La abreviatura del cliente son 3 letras (el «CYA» de CYA-26-71-001)',
     }),
   razonSocial: z
     .string()
@@ -296,14 +298,14 @@ export function DialogoCliente({
                   <Input
                     id="cliente-abreviatura"
                     placeholder="Ej. CYA"
-                    maxLength={6}
+                    maxLength={3}
                     className="uppercase"
                     aria-invalid={Boolean(errors.abreviatura)}
                     disabled={guardando}
                     {...registrar('abreviatura')}
                   />
                   <FieldDescription>
-                    Las 2 a 6 letras con las que arranca el nº de DESARROLLO de sus modelos
+                    Las 3 letras con las que arranca el nº de DESARROLLO de sus modelos
                     (CYA-26-71-001). Sin ella no se le pueden dar de alta modelos nuevos de
                     desarrollo.
                   </FieldDescription>

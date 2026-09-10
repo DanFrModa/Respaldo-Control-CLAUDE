@@ -6,7 +6,10 @@
  * Innegociables:
  *  • §11 — la captura NUNCA espera esto: corre en segundo plano (pg-boss). `generarRutaOrden` /
  *    `ajustarRutaOrden` (E3) ya encolan el job tras su commit; aquí solo lo consumimos.
- *  • SERIALIZADO por orden (singletonKey, E3) → dos recálculos de la MISMA orden no se pisan.
+ *  • SERIALIZADO por orden (`singletonKey` + la política `stately` de la cola, sin la cual la clave
+ *    no restringiría nada) → dos recálculos de la MISMA orden no corren a la vez, y los disparos
+ *    seguidos colapsan en uno. Sí puede quedar UNO esperando detrás del que corre: es a propósito,
+ *    para que un cambio ocurrido a mitad del recálculo no se pierda.
  *  • IDEMPOTENTE: un reintento del job da el MISMO resultado. Conserva `fechaPlaneadaOriginal`
  *    (snapshot del primer cálculo) y NO toca `fechaReal` ni la captura (las maneja `completarProceso`).
  *  • A2 — la escritura va en UNA transacción. A7 — deja rastro del recálculo en `Bitacora` (sistema).

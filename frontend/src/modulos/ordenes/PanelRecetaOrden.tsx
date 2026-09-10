@@ -3,17 +3,26 @@ import {
   CheckCircle2,
   Download,
   Loader2Icon,
+  Lock,
   LockOpen,
   Pencil,
   RotateCcw,
   Undo2,
+  Wrench,
   X,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
+  CLAVE_RECETA_ORDEN,
+  useAbrirReceta,
   useAgregarRenglonReceta,
+  useCerrarReceta,
+  useCorregirCapturaAvio,
   useEditarRenglonReceta,
   useLiberarReceta,
   useMarcarRecetaRevisada,
@@ -22,9 +31,12 @@ import {
   useRestaurarRenglonReceta,
   useTraerDelModelo,
 } from '@/api/receta-orden';
+import { useFotosArteOrden } from '@/api/fotos-arte-orden';
 import { useMedidasAvio as useMedidasDelCatalogo } from '@/api/medidas-avio';
+import type { ErrorDeApi } from '@/api/errores';
 import type {
   CambioReceta,
+  OcComprometida,
   RecetaOrden,
   RecetaOrdenArte,
   RecetaOrdenAvio,
@@ -57,7 +69,17 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)): el chip de «esto ya está comprado» vive en las piezas del módulo de
+// Órdenes de Compra —junto a la ÚNICA traducción de los estatus de OC— para que la receta y la
+// bandeja «Recetas por liberar» lo lean idéntico.
+import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
+// ⭐ fila 0.068: el aviso LLEVA a des-autorizar, y lleva al MISMO diálogo de la pantalla de Compras — no
+// a una segunda versión del acto (que es como acaban divergiendo dos caminos para lo mismo).
+import { DialogoDesautorizarOc } from '@/modulos/ordenes-compra/DialogoDesautorizarOc';
+import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoHermanas } from './AvisoHermanas';
+import { FotosArteOrden } from './FotosArteOrden';
 import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
 
 /**
@@ -120,6 +142,57 @@ import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './recet
  * Presentación pura (A1): todas las reglas —qué se excluye, qué se borra, cuándo se puede liberar—
  * las decide el backend; esta pantalla solo pide y pinta.
  */
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — LA ÚNICA PUERTA POR LA QUE EL AVISO ENTRA A LA PANTALLA.**
+ *
+ * Envuelve una mutación de receta para que **toda** respuesta reporte su
+ * `avisoCambioSobreLoComprado` — el `null` incluido, que es lo que apaga el eco anterior.
+ *
+ * 🔴 **Por qué un envoltorio y no un `onSuccess` en cada `mutate`.** En esta pantalla hay una
+ * docena de llamadas a `mutate` repartidas en cuatro componentes. Cablear el aviso en cada una
+ * significa que **la número trece se olvide** —y el síntoma de ese olvido es exactamente el defecto
+ * que esta etapa vino a cerrar: un cambio sobre material ya comprado que ocurre en silencio—. Aquí
+ * es imposible olvidarlo: se envuelve el HOOK, no la llamada.
+ *
+ * Devuelve sólo lo que esta pantalla usa (`mutate` + `isPending`) en vez del `UseMutationResult`
+ * entero: ése es una unión discriminada por estado y re-armarla con un `mutate` distinto la
+ * rompería. De paso, `tsc` garantiza que ningún llamador toque nada fuera de esas dos claves, así
+ * que el olvido queda **estructuralmente imposible**… en las que caben aquí.
+ *
+ * ⚠️ **LA EXCEPCIÓN, dicha en voz alta: `useTraerDelModelo` NO se puede envolver.** Devuelve
+ * `TraerDelModeloResultado`, no `RecetaOrden`, así que no encaja en esta firma y reporta **a mano**
+ * (`alResponder(r.receta)`, en su propio `onSuccess`). Es la única, está probada aparte, y quien
+ * agregue otra mutación con forma distinta tiene que hacer lo mismo — o el eco se queda pegado.
+ */
+function recordandoElAviso<TVars>(
+  mutacion: UseMutationResult<RecetaOrden, ErrorDeApi, TVars>,
+  alResponder: (receta: RecetaOrden) => void,
+): {
+  mutate: (
+    vars: TVars,
+    opciones?: {
+      onSuccess?: (receta: RecetaOrden) => void;
+      onError?: (error: ErrorDeApi) => void;
+    },
+  ) => void;
+  isPending: boolean;
+} {
+  return {
+    isPending: mutacion.isPending,
+    mutate: (vars, opciones) =>
+      mutacion.mutate(vars, {
+        onSuccess: (recetaNueva) => {
+          alResponder(recetaNueva);
+          opciones?.onSuccess?.(recetaNueva);
+        },
+        ...(opciones?.onError === undefined ? {} : { onError: opciones.onError }),
+      }),
+  };
+}
+
+/** Lo que cada sección necesita para reportar el aviso de «ya está comprado» (0.085). */
+type ReportarReceta = (receta: RecetaOrden) => void;
+
 export function PanelRecetaOrden({
   idOrden,
   puedeAdministrar,
@@ -128,19 +201,87 @@ export function PanelRecetaOrden({
   /** `desarrollo.administrar`: sin él la receta es de solo lectura. */
   puedeAdministrar: boolean;
 }): React.JSX.Element {
+  const navigate = useNavigate();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA PUERTA QUE SÍ SE LE PUEDE PINTAR AL COMPRADOR.
+   *
+   * Los chips de «ya está comprado» llevan a **las compras de esta orden** (`/compras/por-orden`),
+   * que es una pantalla de lectura de Compras — y **sólo** si esta sesión tiene `compras.ver`. Sin
+   * ese permiso los chips siguen informando, pero no se pinta un enlace que acabaría en un 403
+   * (§Post-F9.68: esconder lo que no se puede usar; §Post-F9.145(f): no mandar a nadie a rebotar).
+   *
+   * ⭐⭐⭐ fila 0.068 — **Y LA SEGUNDA PUERTA: DES-AUTORIZAR LA OC, PARA QUIEN SÍ PUEDE.**
+   *
+   * Hasta la 0.085 aquí decía que «des-autorizar» no se pintaba **nunca**, y la razón era buena…
+   * pero sólo para quien NO tiene el permiso. Para Administrador y Dirección —a quienes el seed sí
+   * les da `compras.desautorizar`— la misma §Post-F9.68 dice lo contrario: **enseñar lo que sí se
+   * puede usar**. El aviso pedía un acto y no llevaba a hacerlo, que es justo lo que §Post-F9.145
+   * prohíbe. Se resuelve con la MISMA forma que `compras.ver` dos líneas arriba: se pinta sólo con
+   * el permiso, y a quien no lo tiene le sigue hablando el texto del servidor, que ya dice a quién
+   * pedírselo.
+   *
+   * 🔴 **LLEVAR NO ES HACER.** El botón abre el diálogo de siempre ({@link DialogoDesautorizarOc}),
+   * que exige MOTIVO escrito y una confirmación explícita: nada se des-autoriza solo. Y ni siquiera
+   * eso cancela la compra — DANIEL: *«no se puede cancelar la OC en automático: eso hay que
+   * negociarlo con el proveedor»*. Lo único automático aquí es llegar a la decisión, no tomarla.
+   */
+  const { tienePermiso } = useSesion();
+  const puedeVerCompras = tienePermiso('compras.ver');
+  // ⭐ fila 0.068: la llave PROPIA de des-firmar una compra (V1-E3y/§Post-F9.79). Esconderlo sin ella NO
+  // es la defensa —el servidor re-valida permiso y estatus (A1/A4)—: es no ofrecer un 403.
+  const puedeDesautorizarOc = tienePermiso('compras.desautorizar');
   const receta = useRecetaOrden(idOrden);
-  const marcar = useMarcarRecetaRevisada();
-  const liberar = useLiberarReceta();
-  const quitar = useQuitarRenglonReceta();
-  const restaurar = useRestaurarRenglonReceta();
-  const agregar = useAgregarRenglonReceta();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO VIVE AQUÍ, NO EN LA CACHÉ DE LA QUERY.**
+   *
+   * 🔴 Y esto no es una preferencia de estilo: la primera versión lo leía de `receta.data` y **se
+   * borraba solo**. `trasMutar` (`api/receta-orden.ts`) mete la receta en caché y acto seguido
+   * invalida `CLAVE_ORDENES = ['ordenes']`, que **por prefijo también casa** con
+   * `['ordenes','receta',id]`; la query está activa, se re-pide, y una LECTURA devuelve
+   * `avisoCambioSobreLoComprado: null` **por diseño** (el backend lo dice en su propio comentario:
+   * *"no es estado de la receta, es la respuesta a lo que se acaba de hacer"*). Medido: el bloque
+   * rojo parpadeaba lo que dura un round-trip y desaparecía.
+   *
+   * ⚠️ **La alternativa —estrechar la invalidación— se descartó**: de `['ordenes']` cuelga media
+   * docena de listas que sí tienen que refrescarse. La respuesta correcta es que el eco viva donde
+   * viven las respuestas: en el estado de esta pantalla.
+   *
+   * Lo alimenta {@link recordandoElAviso}, que envuelve TODA mutación de receta — así una mutación
+   * nueva no puede olvidarse de reportarlo, que es exactamente la clase de olvido que esta etapa
+   * vino a cerrar.
+   */
+  const [avisoYaComprado, setAvisoYaComprado] = useState<string | null>(null);
+  /** ⭐ fila 0.068: la OC que el aviso llevó a des-autorizar. `null` = el diálogo está cerrado. */
+  const [ocADesautorizar, setOcADesautorizar] = useState<OcComprometida | null>(null);
+  const clienteQuery = useQueryClient();
+  /** Cada respuesta de mutación PISA el eco anterior: `null` incluido, para que no se quede pegado. */
+  const alResponder = (r: RecetaOrden): void => {
+    setAvisoYaComprado(r.avisoCambioSobreLoComprado);
+  };
+  // Cambiar de orden sin desmontar el panel no puede arrastrar el aviso de la anterior — ni el
+  // diálogo de des-autorizar que ese aviso hubiera abierto sobre una OC de la orden anterior.
+  useEffect(() => {
+    setAvisoYaComprado(null);
+    setOcADesautorizar(null);
+  }, [idOrden]);
+
+  const marcar = recordandoElAviso(useMarcarRecetaRevisada(), alResponder);
+  const liberar = recordandoElAviso(useLiberarReceta(), alResponder);
+  const quitar = recordandoElAviso(useQuitarRenglonReceta(), alResponder);
+  const restaurar = recordandoElAviso(useRestaurarRenglonReceta(), alResponder);
+  const agregar = recordandoElAviso(useAgregarRenglonReceta(), alResponder);
   const traer = useTraerDelModelo();
+  // ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)).
+  const abrir = recordandoElAviso(useAbrirReceta(), alResponder);
+  const cerrar = recordandoElAviso(useCerrarReceta(), alResponder);
   const [aQuitar, setAQuitar] = useState<{
     tipo: TipoRenglonReceta;
     id: number;
     nombre: string;
   } | null>(null);
   const [motivo, setMotivo] = useState('');
+  const [abriendo, setAbriendo] = useState(false);
+  const [motivoApertura, setMotivoApertura] = useState('');
 
   if (receta.isPending) {
     return <p className="text-sm text-muted-foreground">Cargando la receta de la orden…</p>;
@@ -160,7 +301,9 @@ export function PanelRecetaOrden({
     quitar.isPending ||
     restaurar.isPending ||
     agregar.isPending ||
-    traer.isPending;
+    traer.isPending ||
+    abrir.isPending ||
+    cerrar.isPending;
 
   /**
    * ⭐ V1-E3k (§Post-F9.80) — FIRMA **UN** RENGLÓN. No hay otra forma de liberar desde aquí, y ésa
@@ -192,6 +335,20 @@ export function PanelRecetaOrden({
       { idOrden, ...(cuerpo === undefined ? {} : { cuerpo }) },
       {
         onSuccess: (r) => {
+          /*
+           * ⭐⭐⭐ 0.085 — **LA DÉCIMA MUTACIÓN, A MANO** (remate del reviewer).
+           *
+           * 🔴 Es la única de las diez que {@link recordandoElAviso} **no puede** envolver: devuelve
+           * `TraerDelModeloResultado`, no `RecetaOrden`. Y la ironía es exacta: el envoltorio nació
+           * para que *"la número trece no se olvide"*… y la que se quedó fuera fue **la décima**.
+           *
+           * No pierde ningún aviso —traer del modelo sólo CREA renglones, nunca llama a
+           * `tocoRenglon`—, pero sin esta línea **no APAGA el eco anterior**: editabas una tela ya
+           * comprada, salía el bloque rojo, pulsabas «Traer del modelo» y el bloque **seguía ahí**,
+           * hablando de una acción que ya no era la última. Eso es el *gritar en falso* que este
+           * módulo dice que enseña a la gente a ignorar los avisos.
+           */
+          alResponder(r.receta);
           if (r.traidos.length > 0) {
             toast.success(
               `Se trajeron ${r.traidos.length} del modelo: ${r.traidos.map((t) => t.material).join(', ')}. ` +
@@ -217,6 +374,27 @@ export function PanelRecetaOrden({
    * mensaje de alarma junto a la salida, que es exactamente lo que la escondió.
    */
   const conLlamado = editable && faltantesDelModelo(d).length > 0;
+
+  /**
+   * ⭐⭐ REABRE la receta. El motivo viaja tal cual: es lo que el comprador leerá en el 409 cuando
+   * intente comprar, así que aquí no se recorta ni se rellena con un default.
+   */
+  function alAbrirConfirmado(): void {
+    abrir.mutate(
+      { idOrden, cuerpo: { motivo: motivoApertura.trim() } },
+      {
+        onSuccess: () => {
+          toast.success(
+            'Receta abierta para corregir: la compra de esta orden queda congelada hasta que la ' +
+              'cierres. Las firmas se conservan.',
+          );
+          setAbriendo(false);
+          setMotivoApertura('');
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
 
   function alQuitarConfirmado(): void {
     if (aQuitar === null) return;
@@ -253,13 +431,37 @@ export function PanelRecetaOrden({
         />
       ) : null}
 
+      {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — "ACABAS DE CAMBIAR ALGO QUE YA ESTÁ COMPRADO". */}
+      <AvisoCambioSobreLoComprado
+        aviso={avisoYaComprado}
+        ocs={d.ocsComprometidas}
+        alVerCompras={
+          puedeVerCompras
+            ? () => void navigate('/compras/por-orden', { state: { idOrden } })
+            : undefined
+        }
+        {...(puedeDesautorizarOc ? { alDesautorizar: setOcADesautorizar } : {})}
+      />
+
       <CabeceraReceta
         receta={d}
         editable={editable}
+        puedeAdministrar={puedeAdministrar}
         ocupado={ocupado}
         alMarcarTodo={() => {
           marcar.mutate(idOrden, {
             onSuccess: () => toast.success('Receta marcada como revisada.'),
+            onError: (error) => toast.error(error.message),
+          });
+        }}
+        alAbrir={() => {
+          setMotivoApertura('');
+          setAbriendo(true);
+        }}
+        alCerrar={() => {
+          cerrar.mutate(idOrden, {
+            onSuccess: () =>
+              toast.success('Receta cerrada: la compra de esta orden vuelve a estar abierta.'),
             onError: (error) => toast.error(error.message),
           });
         }}
@@ -269,11 +471,18 @@ export function PanelRecetaOrden({
 
       <AvisosDesalineacion receta={d} omitirFaltantes={conLlamado} />
 
+      {/* ⭐⭐ fila 0.068 (a) — LA OTRA comparación, y va justo debajo de la de arriba a propósito:
+          son perpendiculares y hay que poder distinguirlas de un vistazo. `AvisosDesalineacion`
+          dice *"el MODELO se movió"* (vertical, ámbar/rojo: algo que revisar); ésta dice *"esta OP
+          no lleva lo mismo que sus hermanas"* (horizontal, azul: informativo y legítimo). */}
+      <AvisoHermanas frenteAlGrupo={d.frenteAlGrupo} />
+
       <SeccionTelas
         receta={d}
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('tela', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'tela', id, nombre });
@@ -303,6 +512,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('avio', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'avio', id, nombre });
@@ -332,6 +542,7 @@ export function PanelRecetaOrden({
         idOrden={idOrden}
         editable={editable}
         ocupado={ocupado}
+        alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('arte', id)}
         alQuitar={(id, nombre) => {
           setAQuitar({ tipo: 'arte', id, nombre });
@@ -346,6 +557,89 @@ export function PanelRecetaOrden({
           );
         }}
       />
+
+      {/* ⭐⭐ V1-E8z — EL MOTIVO NO ES OPCIONAL, y por eso tiene diálogo propio en vez de un botón
+          seco. Abrir congela la compra de TODA la orden: quien la abre tiene que decir por qué,
+          porque ese texto es literalmente lo que el comprador va a leer cuando su orden de compra
+          sea rechazada. El botón queda deshabilitado mientras el campo esté vacío — y el servidor
+          lo vuelve a exigir (§Post-F9.68: esconder *y* bloquear). */}
+      <Dialog
+        open={abriendo}
+        onOpenChange={(sigueAbierto) => {
+          if (!sigueAbierto) {
+            setAbriendo(false);
+            setMotivoApertura('');
+          }
+        }}
+      >
+        <DialogContent data-testid="dialogo-abrir-receta">
+          <DialogHeader>
+            <DialogTitle>Abrir la receta para corregirla</DialogTitle>
+            <DialogDescription>
+              Mientras esté abierta <strong>no se podrá comprar nada de esta orden</strong>: ni
+              explotar el MRP, ni generar, capturar, duplicar o autorizar órdenes de compra. Las
+              firmas de Desarrollo <strong>se conservan</strong>, así que al terminar sólo hay que
+              volver a firmar los renglones que hayas tocado. Las órdenes de compra ya autorizadas
+              no se tocan, y cortar y producir siguen sin bloquearse.
+            </DialogDescription>
+          </DialogHeader>
+          {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO LLEGA ANTES DE CONFIRMAR.**
+              Hasta la 0.084 aquí no se decía una palabra de las órdenes de compra: quien congelaba
+              la compra de una orden entera no sabía si había dinero comprometido hasta toparse con
+              ello. El texto lo redacta el SERVIDOR (A1) y nombra folio y estado, porque de eso
+              depende el camino: una autorizada se des-autoriza (con el permiso de Dirección), una
+              recibida NO. Precedente §Post-F9.145(a): *el aviso llega antes*. */}
+          {d.avisoCompraComprometida === null ? null : (
+            <div
+              className="space-y-2 rounded-lg border border-warn/50 bg-warn/5 p-3"
+              data-testid="abrir-receta-compra-comprometida"
+            >
+              <p className="flex items-center gap-1.5 text-sm font-medium text-warn">
+                <AlertTriangle className="size-4" aria-hidden />
+                Esta orden ya tiene compra comprometida
+              </p>
+              <p className="text-xs">{d.avisoCompraComprometida}</p>
+              <ChipsOcComprometidas
+                ocs={d.ocsComprometidas}
+                {...(puedeVerCompras
+                  ? {
+                      alVer: () => void navigate('/compras/por-orden', { state: { idOrden } }),
+                    }
+                  : {})}
+              />
+            </div>
+          )}
+          <Field>
+            <FieldLabel htmlFor="motivo-abrir-receta">Motivo (obligatorio)</FieldLabel>
+            <Input
+              id="motivo-abrir-receta"
+              value={motivoApertura}
+              onChange={(e) => setMotivoApertura(e.target.value)}
+              placeholder="Ej. el cliente cambió el cierre"
+              data-testid="motivo-abrir-receta"
+            />
+          </Field>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAbriendo(false);
+                setMotivoApertura('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={abrir.isPending || motivoApertura.trim() === ''}
+              onClick={alAbrirConfirmado}
+              data-testid="confirmar-abrir-receta"
+            >
+              {abrir.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+              Abrir y congelar la compra
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={aQuitar !== null}
@@ -396,6 +690,34 @@ export function PanelRecetaOrden({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ⭐⭐⭐ fila 0.068 — A DONDE LLEVA EL AVISO: el diálogo de des-autorizar, EL MISMO de Compras.
+          Sólo se monta con `compras.desautorizar`: sin la llave no existe ni el botón que lo abre
+          ni el diálogo detrás, así que no hay forma de llegar a él por accidente. */}
+      {puedeDesautorizarOc ? (
+        <DialogoDesautorizarOc
+          abierto={ocADesautorizar !== null}
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setOcADesautorizar(null);
+          }}
+          oc={
+            ocADesautorizar === null
+              ? undefined
+              : { id: ocADesautorizar.idOrdenCompra, numCompra: ocADesautorizar.folio }
+          }
+          alDesautorizada={() => {
+            /*
+             * 🔴 **RE-LEER LA RECETA, o el chip se queda mintiendo.** `useDesautorizarOc` invalida
+             * el árbol `['ordenes-compra']`, y «Comprado · OC 12 · Autorizada» no vive ahí: sale de
+             * `ocsComprometidas`, dentro de la receta (`['ordenes','receta',id]`). Sin esta línea,
+             * quien acaba de quitarle la firma a la OC seguiría viendo el chip —y su botón—, y el
+             * segundo clic se estrellaría contra el 409 del servidor («no está autorizada»). Se
+             * invalida ESTA receta y no `['ordenes']` entero: es lo único que cambió aquí.
+             */
+            void clienteQuery.invalidateQueries({ queryKey: [...CLAVE_RECETA_ORDEN, idOrden] });
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -419,19 +741,39 @@ export function PanelRecetaOrden({
 function CabeceraReceta({
   receta,
   editable,
+  puedeAdministrar,
   ocupado,
   alMarcarTodo,
+  alAbrir,
+  alCerrar,
 }: {
   receta: RecetaOrden;
   editable: boolean;
+  /**
+   * ⭐⭐ V1-E8z (H2) — el permiso CRUDO, **sin** el filtro de «orden cancelada» que lleva `editable`.
+   * Existe por una sola razón, y es la que impide que el candado sea una trampa: **cerrar la receta
+   * es la única mutación legal sobre una orden cancelada** (el dominio lo permite a propósito, ver
+   * `permitirOrdenCancelada`). Con `editable` a secas, una OP que se cancelaba con la receta
+   * abierta se quedaba con la compra congelada **para siempre**: sin botón aquí, sin fila en la
+   * bandeja —que excluye las canceladas— y sin ningún mensaje que insinuara la salida.
+   */
+  puedeAdministrar: boolean;
   ocupado: boolean;
   alMarcarTodo: () => void;
+  /** ⭐⭐ V1-E8z: reabrir para corregir (pide motivo en un diálogo aparte). */
+  alAbrir: () => void;
+  /** ⭐⭐ V1-E8z: cerrar y descongelar la compra. Sin diálogo: la razón ya se dio al abrir. */
+  alCerrar: () => void;
 }): React.JSX.Element {
   const r = receta.resumen;
   // ⭐ V1-E3h: TRES estados, no dos. Los decide el SERVIDOR y los lee `estadoFirmaReceta` — UNA sola
   // copia, compartida con el resumen del detalle de la OP (hallazgo del reviewer de V1-E3j: estaban
   // escritos dos veces y coincidían por casualidad).
-  const enParte = estadoFirmaReceta(receta) === 'en-parte';
+  const estadoFirma = estadoFirmaReceta(receta);
+  const enParte = estadoFirma === 'en-parte';
+  // ⭐⭐ V1-E8z: la receta está ABIERTA para corregirse ⇒ la compra de la orden está CONGELADA. Lo
+  // decide el SERVIDOR (`abiertaEn`); aquí sólo se lee, igual que los otros tres estados.
+  const enCorreccion = estadoFirma === 'en-correccion';
   // V1-E3j: receta SIN renglones vivos. `total` lo cuenta el servidor (los excluidos no cuentan).
   const vacia = r.total === 0;
   return (
@@ -444,28 +786,90 @@ function CabeceraReceta({
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {vacia
-          ? 'Esta orden todavía no tiene ningún material en su receta.'
-          : receta.todoLiberado
-            ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
-            : enParte
-              ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
-              : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
-      </p>
+      {/* ⭐⭐ V1-E8z — EL CANDADO manda sobre el resto del letrero: mientras la receta está abierta,
+          lo único que importa saber es que NO SE PUEDE COMPRAR y quién tiene que cerrarla. Decir
+          debajo "la receta está liberada completa" (que sigue siendo cierto) sería el mensaje que
+          se lleva la atención mientras el comprador se topa con un 409 que no entiende. */}
+      {enCorreccion ? (
+        <p className="text-xs text-crit" data-testid="receta-aviso-en-correccion">
+          Esta receta está ABIERTA para corregirse: la compra de esta orden está{' '}
+          <strong>congelada</strong> (no se puede explotar el MRP, ni generar o autorizar órdenes de
+          compra) hasta que Desarrollo la cierre. Las firmas se conservaron: sólo hay que volver a
+          firmar lo que se toque. Las órdenes de compra ya autorizadas no se tocan, y cortar y
+          producir NO están bloqueados.
+          {receta.abiertaMotivo === null ? null : <> Motivo: &quot;{receta.abiertaMotivo}&quot;.</>}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {vacia
+            ? 'Esta orden todavía no tiene ningún material en su receta.'
+            : receta.todoLiberado
+              ? `Desarrollo liberó esta receta completa${receta.liberadaPor === null && receta.liberadaEn !== null ? ' (migración)' : ''}: ya se puede explotar el MRP y generar órdenes de compra.`
+              : enParte
+                ? `Se puede comprar lo ya liberado (${r.liberados} de ${r.total}). Los ${r.porLiberar} renglones sin firmar NO entran a la explosión de materiales, y el comprador los ve como pendientes.`
+                : 'Hasta que Desarrollo libere algo de la receta no se puede explotar el MRP ni generar órdenes de compra. Cortar y producir NO están bloqueados.'}
+        </p>
+      )}
 
-      {editable ? (
+      {/* ⭐⭐ V1-E8z (H2) — CERRAR SOBREVIVE A LA CANCELACIÓN DE LA ORDEN, y por eso este bloque ya
+          NO cuelga de `editable` a secas. El dominio permite cerrar una receta abierta aunque la OP
+          esté cancelada (`permitirOrdenCancelada`) justamente para que el candado tenga salida; si
+          la pantalla lo escondiera, esa salida no existiría en ninguna parte —la bandeja tampoco
+          lista las canceladas— y `autorizarOC` seguiría contestando 409 por esa OP para siempre.
+          **ABRIR sí exige la orden viva**: reabrir para corregir lo que ya no se va a producir no
+          significa nada, y el servidor lo rechaza. */}
+      {editable || (enCorreccion && puedeAdministrar) ? (
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={ocupado || r.sinRevisar === 0}
-            onClick={alMarcarTodo}
-            data-testid="receta-marcar-revisado"
-          >
-            <CheckCircle2 aria-hidden /> Marcar todo revisado
-          </Button>
+          {editable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={ocupado || r.sinRevisar === 0}
+              onClick={alMarcarTodo}
+              data-testid="receta-marcar-revisado"
+            >
+              <CheckCircle2 aria-hidden /> Marcar todo revisado
+            </Button>
+          ) : null}
+          {/* ABRIR y CERRAR, y **nunca los dos a la vez**: son los dos lados del mismo
+              interruptor. Abrir sólo se ofrece con la receta liberada COMPLETA, que es la única que
+              el servidor deja reabrir (§Post-F9.165 punto 4) — ofrecerlo siempre sería un botón que
+              contesta 409 la mitad de las veces. */}
+          {/* ⚠️ Aquí NO se vuelve a preguntar por `puedeAdministrar` ni por `editable`, y no es un
+              olvido: la condición de arriba ya los agotó. Sin el permiso, `editable` es false Y la
+              segunda rama también, así que a este punto **no se llega**; y a la rama de ABRIR sólo
+              se llega con `!enCorreccion`, donde la condición de arriba se reduce a `editable`. Un
+              `&&` que nunca puede ser falso es una guarda que ninguna prueba puede tumbar — y este
+              proyecto ya decidió que eso no vale como protección. */}
+          {enCorreccion ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={ocupado}
+              onClick={alCerrar}
+              data-testid="receta-cerrar"
+            >
+              {ocupado ? (
+                <Loader2Icon className="animate-spin" aria-hidden />
+              ) : (
+                <Lock aria-hidden />
+              )}{' '}
+              Cerrar la receta (descongela la compra)
+            </Button>
+          ) : receta.todoLiberado ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={ocupado}
+              onClick={alAbrir}
+              title="Reabrir para corregir. Mientras esté abierta no se puede comprar nada de esta orden."
+              data-testid="receta-abrir"
+            >
+              <LockOpen aria-hidden /> Abrir para corregir
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -572,6 +976,137 @@ function LlamadoTraerDelModelo({
  * fue justo lo que la escondió.
  */
 /**
+ * ⭐⭐⭐ **"YA ESTÁ COMPRADO, Y ACABAS DE CAMBIARLO"** (0.085, §Post-F9.173(a)).
+ *
+ * DANIEL, textual: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+ * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer.
+ * **No se puede cancelar la OC en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * 🔴 **POR QUÉ ES UN BLOQUE Y NO UN TOAST.** Un toast se va en cuatro segundos, y esto no es un
+ * "guardado ✓": es *"acabas de descuadrar una orden de compra que ya está con el proveedor"*.
+ *
+ * ⚠️ **Y por qué el texto llega por `aviso` y no de `receta.avisoCambioSobreLoComprado`**: leerlo de
+ * la receta era el defecto que tumbó la primera versión —la invalidación de `['ordenes']` casa por
+ * prefijo con la query de la receta, la re-pide, y una LECTURA devuelve `null` por diseño, así que
+ * el bloque parpadeaba y se borraba solo—. Ahora vive en el estado del panel, alimentado por
+ * `recordandoElAviso`, y se apaga con la primera respuesta que no traiga aviso. Lo fija
+ * `PanelRecetaOrden.avisoComprado.test.tsx`, que corre con hooks y `QueryClient` de verdad.
+ *
+ * 🔴 **Y NO BLOQUEA NADA.** Daniel pidió *avisar*, no impedir: cambiarle el precio o el consumo a un
+ * material ya comprado es legítimo. Lo que no puede pasar es que ocurra en silencio.
+ *
+ * A1: el texto viene REDACTADO del servidor (nombra material, folio y estado, y dice a quién
+ * pedirle qué). Aquí no se arma la frase, no se resuelve el plural y no se decide el camino.
+ *
+ * ⭐⭐⭐ **fila 0.068 — Y AHORA LLEVA A HACERLO** (§Post-F9.145: *el aviso que pide un acto, lleva a
+ * hacerlo*). A quien tiene `compras.desautorizar` se le pinta, por cada OC todavía `autorizada`, el
+ * botón que abre {@link DialogoDesautorizarOc}. **Abrir un diálogo no es des-autorizar**: sigue
+ * haciendo falta que una persona escriba el motivo y confirme, y ni así se cancela nada con el
+ * proveedor. A quien no tiene la llave no le cambia nada: el texto del servidor ya le dice a quién
+ * pedírselo.
+ *
+ * ⚠️ **El texto es un ECO congelado; los chips y los botones son EL AHORA.** Ya era así antes de
+ * esta etapa (la frase viene del estado del panel, los chips de la receta), y por eso al des-autorizar
+ * una OC su chip y su botón desaparecen mientras la frase sigue contando lo que pasó — que es lo que
+ * describe: lo que acabas de hacer, no cómo quedó el mundo.
+ */
+function AvisoCambioSobreLoComprado({
+  aviso,
+  ocs,
+  alVerCompras,
+  alDesautorizar,
+}: {
+  aviso: string | null;
+  ocs: RecetaOrden['ocsComprometidas'];
+  /** Sólo se pasa con `compras.ver`: un enlace que da 403 es peor que no tenerlo. */
+  alVerCompras?: (() => void) | undefined;
+  /**
+   * ⭐ fila 0.068 — Sólo se pasa con `compras.desautorizar` (Administrador y Dirección). Abre el
+   * diálogo; **no des-autoriza nada**.
+   */
+  alDesautorizar?: ((oc: OcComprometida) => void) | undefined;
+}): React.JSX.Element | null {
+  if (aviso === null || aviso === '') return null;
+  /*
+   * ⭐⭐ fila 0.068 — **A CUÁLES SE LES PUEDE OFRECER, Y POR QUÉ ESTA CONDICIÓN Y NO OTRA.**
+   *
+   * `estatus === 'autorizada'` es LA MISMA condición con la que la pantalla de Órdenes de compra
+   * pinta su botón (`OrdenesCompraPagina`: `puedeDesautorizar && seleccion.estatus === 'autorizada'`)
+   * — una sola regla escrita una sola manera, en vez de dos primos que un día se separan.
+   *
+   * 🔴 **Y con eso la OC RECIBIDA queda fuera para TODO EL MUNDO, Dirección incluida**, que es la
+   * mitad que de verdad importa: `desautorizarOC` la rechaza con un 409 (*"ya tiene material
+   * RECIBIDO… el camino es una devolución o un ajuste"*, DANIEL 20-ago: *"una vez recibido no se
+   * puede desautorizar"*). No hace falta preguntar por `recibida` para excluirla: una
+   * `recibida_parcial`/`recibida_total` **no es** `autorizada`. *(Eso sí está clavado por pruebas:
+   * dejar pasar la recibida las pone rojas.)*
+   *
+   * ⚠️ **Y AHORA LA PARTE HONESTA: preferir `=== 'autorizada'` sobre `!o.recibida` es un ARGUMENTO
+   * DE DISEÑO, no una propiedad demostrada.** Hoy las dos escrituras se comportan IGUAL, porque
+   * `ESTATUS_OC_COMPROMETIDA` sólo tiene esos tres estatus — así que **ninguna prueba las
+   * distingue**: cambiar una por la otra deja la suite entera en verde. El argumento es que ésta
+   * falla CERRADA si mañana naciera un cuarto estatus comprometido (no ofrecería el botón hasta que
+   * alguien lo decida) mientras `!o.recibida` lo ofrecería sola; y que es LA MISMA expresión que ya
+   * usa Órdenes de compra. Buenas razones, pero razones — no un hecho que la suite defienda.
+   *
+   * ⚠️ `o.recibida` sigue siendo del servidor y sigue decidiendo el TEXTO del chip: aquí no se
+   * re-implementa `algunaRecibida`, se pregunta por un hecho distinto (¿hay firma que quitar?).
+   *
+   * ⚠️⚠️ **RESIDUO DECLARADO — LA PUERTA ES MÁS ANCHA QUE EL AVISO, y hay que saberlo.** `ocs` es
+   * `d.ocsComprometidas`, que el servidor arma como *lo comprometido de TODA la orden*
+   * (`dominio/produccion/receta-orden.ts`), mientras el TEXTO del aviso nombra sólo las OC **del
+   * material que se acaba de tocar**. Con la OC#12 (tela) y la OC#33 (avíos) las dos autorizadas,
+   * cambiar **la tela** ofrece des-autorizar **las dos**.
+   *
+   * Se deja así **a propósito**: los botones acompañan a los CHIPS, y los chips ya pintan toda la
+   * orden desde la 0.085 — estrecharlos sólo aquí haría que el botón y el chip de al lado contaran
+   * cosas distintas dentro del mismo bloque. Estrecharlo DE VERDAD pide que el servidor devuelva las
+   * OC *del cambio*, o sea tocar el contrato: fuera del alcance de un cambio sólo-frontend. Y el
+   * riesgo está acotado por el diseño de la etapa: **ninguna de las dos se des-autoriza sin que una
+   * persona la elija por su folio, escriba el motivo y confirme.**
+   */
+  const desautorizables =
+    alDesautorizar === undefined ? [] : ocs.filter((o) => o.estatus === 'autorizada');
+  return (
+    <div
+      className="space-y-2 rounded-lg border border-destructive/50 bg-destructive/5 p-3"
+      data-testid="receta-aviso-ya-comprado"
+      role="alert"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+        <AlertTriangle className="size-4" aria-hidden />
+        Cambiaste algo que YA ESTÁ COMPRADO
+      </p>
+      <p className="text-xs">{aviso}</p>
+      <ChipsOcComprometidas ocs={ocs} {...(alVerCompras ? { alVer: alVerCompras } : {})} />
+      {desautorizables.length === 0 || alDesautorizar === undefined ? null : (
+        <div className="space-y-1" data-testid="receta-aviso-desautorizar">
+          <div className="flex flex-wrap items-center gap-2">
+            {desautorizables.map((o) => (
+              <Button
+                key={o.idOrdenCompra}
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => alDesautorizar(o)}
+                data-testid={`desautorizar-oc-${String(o.folio)}`}
+              >
+                <Undo2 aria-hidden /> Des-autorizar la OC {o.folio}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Des-autorizar sólo le quita la firma <strong>en el sistema</strong> y devuelve la orden
+            de compra a borrador, con su motivo en la bitácora.{' '}
+            <strong>No la cancela con el proveedor</strong>: eso se negocia con él.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * ⭐ **AVISO DE CURVA DISTINTA** (V1-E3r, §Post-F9.81): la curva del modelo y las tallas de esta
  * orden no coinciden.
  *
@@ -670,6 +1205,7 @@ function ChipsRenglon({
   excluido,
   cambios,
   liberadoEn,
+  ocsComprometidas,
 }: {
   estado: string;
   agregadoAMano: boolean;
@@ -677,6 +1213,12 @@ function ChipsRenglon({
   cambios: readonly string[];
   /** V1-E3h: la firma es de ESTE renglón. `null` = no se compra todavía. */
   liberadoEn: string | null;
+  /**
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)): las OC ya comprometidas que compraron ESTE material. Se pinta
+   * SIEMPRE que las haya —no sólo tras un cambio—: quien va a tocar el renglón tiene que verlo
+   * ANTES, no enterarse después. El ARTE no lo lleva (ninguna línea de OC puede apuntar a un arte).
+   */
+  ocsComprometidas?: RecetaOrden['ocsComprometidas'];
 }): React.JSX.Element {
   return (
     <span className="flex flex-wrap items-center gap-1">
@@ -718,33 +1260,79 @@ function ChipsRenglon({
           El modelo cambió
         </Badge>
       ) : null}
+      {/* ⭐⭐⭐ 0.085: «Comprado · OC 12 · Autorizada». Va AL FINAL de los chips del renglón: no es
+          un estado de la receta, es un hecho de AFUERA que condiciona lo que se puede hacer con él.
+
+          🔴 **SÍ se pinta en la LÁPIDA, al revés que la firma** (hallazgo del reviewer). La firma se
+          calla ahí porque un material excluido no se compra; esto no es una firma: es que **existe
+          una OC viva contra un material que esta orden dice que NO lleva**. Nada impide que Compras
+          capture esa línea a mano, y quien vaya a REVIVIR la lápida —lo que le reescribe consumo,
+          precio y amarre— tiene que ver la compra ANTES, no enterarse después. Callarlo en el único
+          renglón donde el dato es una contradicción sería callarlo justo donde más grita. */}
+      <ChipsOcComprometidas ocs={ocsComprometidas ?? []} />
     </span>
   );
 }
 
 /**
- * ⭐⭐ **§Post-F9.105 — EL AVISO DE CAPTURA DEL AVÍO, EN LA FILA.**
+ * ⭐⭐ **§Post-F9.105 — EL AVISO DE CAPTURA DEL AVÍO, EN LA FILA** · ⭐⭐⭐ **V1-E8h (§Post-F9.130) —
+ * CON SU BOTÓN DE REPARAR AL LADO.**
  *
  * Daniel, 24-ago-2026: *"la compra de los cierres me está dando una cantidad muchísimo mayor de la
  * que necesito"*. El sistema ya conocía ese estado y **tenía el texto escrito** desde V1-E3g… pero
  * lo pintaba DENTRO del desplegable «(por talla: …)», que nace cerrado. Un aviso que hay que ir a
  * buscar no avisa: se puede tener la contradicción delante durante meses y comprar 53 veces el
- * cierre sin enterarse.
+ * cierre sin enterarse. §Post-F9.105 lo subió a la fila.
  *
- * Ahora vive en la fila, con tono de aviso (`warn`) y junto a los chips de estado — el mismo sitio
- * donde ya se lee «El modelo cambió». El texto lo redacta el SERVIDOR (`avisoCaptura`), que es quien
- * sabe si el avío es por medida y cuánto se está pidiendo de más: esta pantalla no lo re-escribe ni
- * lo interpreta.
+ * 🔴 **Y aun así seguía atorado**, tres versiones después (Daniel, 27-ago-2026: *"Siento que estamos
+ * atorados en lo mismo desde hace varias versiones. No podemos desatorarlo."*). El aviso decía la
+ * magnitud y terminaba con *"Guarda el renglón para normalizarlo"* — **un conjuro**. El motor estaba
+ * sano desde el 18-ago (una OP nueva nace bien); lo que nadie tocaba era el **dato ya congelado** de
+ * las órdenes viejas, y el único remedio era un hechizo que quien lee no puede adivinar. Un sistema
+ * que detecta el error, sabe la solución y deja al usuario sin salida está PEOR que uno que no lo
+ * detecta: le enseña que hay algo roto y no le da la puerta.
+ *
+ * Por eso el remedio va **AQUÍ MISMO**, pegado al aviso, y no en un menú aparte. Cuándo aparece lo
+ * dice el SERVIDOR (`capturaReparable`), no el texto: esta pantalla no interpreta prosa (A1) — y
+ * `avisoCaptura` también cubre otro caso (un número absurdo para la unidad) que NO se arregla con un
+ * botón. El texto también lo redacta el servidor, que es quien sabe cuánto se está pidiendo de más.
  */
-function AvisoCapturaAvio({ avio }: { avio: RecetaOrdenAvio }): React.JSX.Element | null {
+function AvisoCapturaAvio({
+  avio,
+  editable,
+  ocupado,
+  alCorregir,
+}: {
+  avio: RecetaOrdenAvio;
+  /** `desarrollo.administrar` y orden viva: sin esto el aviso se lee, pero no se repara. */
+  editable: boolean;
+  ocupado: boolean;
+  alCorregir: () => void;
+}): React.JSX.Element | null {
   if (avio.avisoCaptura === null) return null;
   return (
     <span
-      className="mt-1 flex max-w-md items-start gap-1 text-xs text-warn"
+      className="mt-1 flex max-w-md flex-col items-start gap-1 text-xs text-warn"
       data-testid={`aviso-captura-receta-avio-${avio.id}`}
     >
-      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-      <span>{avio.avisoCaptura}</span>
+      <span className="flex items-start gap-1">
+        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span>{avio.avisoCaptura}</span>
+      </span>
+      {avio.capturaReparable && editable ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 border-warn text-warn hover:bg-warn/10"
+          disabled={ocupado}
+          onClick={alCorregir}
+          data-testid={`corregir-captura-receta-avio-${avio.id}`}
+        >
+          <Wrench className="size-3.5" aria-hidden />
+          Corregir
+        </Button>
+      ) : null}
     </span>
   );
 }
@@ -1291,6 +1879,7 @@ function SeccionTelas({
   alRestaurar,
   alAgregar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1300,8 +1889,10 @@ function SeccionTelas({
   alRestaurar: (id: number) => void;
   alAgregar: (idTela: number, consumo: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
   return (
     <Seccion
       titulo="Telas"
@@ -1353,6 +1944,7 @@ function SeccionTelas({
                   excluido={t.excluido}
                   cambios={t.cambios}
                   liberadoEn={t.liberadoEn}
+                  ocsComprometidas={t.ocsComprometidas}
                 />
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
@@ -1416,6 +2008,7 @@ function SeccionAvios({
   alRestaurar,
   alAgregar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1425,8 +2018,12 @@ function SeccionAvios({
   alRestaurar: (id: number) => void;
   alAgregar: (idAvio: number, consumo: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
+  // ⭐⭐⭐ V1-E8h (§Post-F9.130) — el botón «Corregir» de la contradicción heredada.
+  const corregir = recordandoElAviso(useCorregirCapturaAvio(), alResponder);
   return (
     <Seccion
       titulo="Avíos"
@@ -1501,9 +2098,31 @@ function SeccionAvios({
                   excluido={a.excluido}
                   cambios={a.cambios}
                   liberadoEn={a.liberadoEn}
+                  ocsComprometidas={a.ocsComprometidas}
                 />
-                {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA. */}
-                <AvisoCapturaAvio avio={a} />
+                {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA · ⭐⭐⭐ V1-E8h — CON SU REMEDIO.
+                    El botón va donde se lee el aviso, no en un menú aparte: ése era el defecto.
+                    Se ofrece TAMBIÉN sobre una lápida (el dominio lo acepta) para que el aviso
+                    nunca quede sin salida — un renglón excluido puede revivir, y más vale que
+                    reviva ya sano. */}
+                <AvisoCapturaAvio
+                  avio={a}
+                  editable={editable}
+                  ocupado={ocupado || editar.isPending || corregir.isPending}
+                  alCorregir={() =>
+                    corregir.mutate(
+                      { idOrden, idRenglon: a.id },
+                      {
+                        onSuccess: () =>
+                          toast.success(
+                            `"${a.clave} — ${a.descripcion}" corregido: la orden ya pide lo que ` +
+                              'de verdad lleva. El renglón quedó SIN FIRMAR — revísalo y libéralo.',
+                          ),
+                        onError: (error) => toast.error(error.message),
+                      },
+                    )
+                  }
+                />
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
                 <CeldaNumero
@@ -1565,6 +2184,7 @@ function SeccionArtes({
   alQuitar,
   alRestaurar,
   alLiberarRenglon,
+  alResponder,
 }: {
   receta: RecetaOrden;
   idOrden: number;
@@ -1573,8 +2193,21 @@ function SeccionArtes({
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
   alLiberarRenglon: (id: number) => void;
+  /** ⭐ 0.085: cada respuesta reporta su aviso de «ya está comprado» al panel. */
+  alResponder: ReportarReceta;
 }): React.JSX.Element {
-  const editar = useEditarRenglonReceta();
+  const editar = recordandoElAviso(useEditarRenglonReceta(), alResponder);
+  /*
+   * ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP. Daniel: *"un modelo de desarrollo que se va a
+   * usar para 4 órdenes diferentes no puede usar la misma foto ni del modelo ni de arte para todas
+   * las OP… la OP es de donde cuelgan las fotos directamente, no del desarrollo"*.
+   *
+   * UNA sola consulta para TODOS los renglones (nunca una por fila): el servidor devuelve ya
+   * resuelto qué enseña cada uno —heredado del arte del modelo, apagado por esta OP, o subido a
+   * ella—. Aquí no se decide nada (A1); sólo se reparte por renglón.
+   */
+  const fotosPorRenglon = useFotosArteOrden(idOrden);
+  const fotosDe = new Map((fotosPorRenglon.data ?? []).map((a) => [a.idOrdenArte, a]));
   return (
     <Seccion titulo="Arte" testid="receta-seccion-artes" vacio={receta.artes.length === 0}>
       <TablaDensa>
@@ -1602,6 +2235,16 @@ function SeccionArtes({
                   ({a.tipoArte.toLocaleLowerCase('es')}
                   {a.posicion === null ? '' : ` · ${a.posicion}`})
                 </span>
+                {/* ⭐ §Post-F9.177 — las fotos de ESTE arte EN ESTA OP. Se heredan del arte del
+                    modelo, se pueden apagar (sin borrarlas de él, D3) y se pueden agregar propias
+                    —lo único que le da foto a un arte agregado a mano—. Un renglón EXCLUIDO ya no
+                    se lleva: sus fotos no se pueden tocar. */}
+                <FotosArteOrden
+                  idOrden={idOrden}
+                  arte={fotosDe.get(a.id)}
+                  puedeAdministrar={editable && !a.excluido}
+                  ocupado={ocupado}
+                />
               </TablaDensaCelda>
               <TablaDensaCelda>
                 <ChipsRenglon

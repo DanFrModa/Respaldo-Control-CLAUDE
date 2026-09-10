@@ -11,8 +11,9 @@ import {
   TIPOS_ALMACEN,
 } from '@/api/esquemas';
 import { useActualizarAlmacen, useCrearAlmacen } from '@/api/almacenes';
-import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import type { Almacen } from '@/api/tipos';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -68,13 +69,6 @@ export function DialogoAlmacen({
   const [idCortador, setIdCortador] = useState<number | null>(null);
   const tipoElegido = formulario.watch('tipo');
   const esDeTela = tipoElegido === 'TELA';
-
-  // Solo terceros con el rol "corte" (el backend exige lo mismo).
-  const cortadores = useProveedoresPorRol(COD_ROL_PROVEEDOR.corte);
-  const listaCortadores = cortadores.data?.datos ?? [];
-  // El cortador ya ligado se conserva como opción aunque no venga en la página cargada.
-  const ligadoFueraDeLista =
-    idCortador !== null && !listaCortadores.some((p) => p.id === idCortador);
 
   // Al abrir, sincroniza el formulario con el almacen en edicion (o lo limpia
   // para un alta). `reset` corre solo cuando cambia la apertura o el almacen.
@@ -174,27 +168,22 @@ export function DialogoAlmacen({
             {esDeTela ? (
               <Field>
                 <FieldLabel htmlFor="almacen-cortador">Cortador (opcional)</FieldLabel>
-                <SelectNativo
-                  id="almacen-cortador"
-                  value={idCortador === null ? '' : String(idCortador)}
-                  onChange={(e) =>
-                    setIdCortador(e.target.value === '' ? null : Number(e.target.value))
-                  }
-                  disabled={guardando}
-                  data-testid="almacen-cortador"
-                >
-                  <option value="">— Sin cortador —</option>
-                  {ligadoFueraDeLista && idCortador !== null ? (
-                    <option value={String(idCortador)}>
-                      {almacen?.cortador ?? 'Cortador actual'}
-                    </option>
-                  ) : null}
-                  {listaCortadores.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
+                {/* V1-E7g (§Post-F9.52 punto 7): el cortador se busca por CUALQUIER palabra, en
+                    el SERVIDOR. El `<select>` de aquí sólo dejaba teclear el prefijo. El ya ligado
+                    se conserva por su `nombreInicial` aunque no venga en la página cargada. */}
+                <FiltroProveedor
+                  rol={COD_ROL_PROVEEDOR.corte}
+                  idProveedor={idCortador}
+                  nombreInicial={almacen?.cortador ?? undefined}
+                  alCambiar={(cortador) => {
+                    setIdCortador(cortador?.id ?? null);
+                  }}
+                  deshabilitado={guardando}
+                  etiqueta="Cortador"
+                  placeholder="— Sin cortador —"
+                  idInput="almacen-cortador"
+                  testid="almacen-cortador"
+                />
                 <FieldDescription>
                   Si este almacén es el del taller de un cortador, ligarlo hace que al capturar su
                   corte la descarga de tela salga de aquí. Un cortador solo puede tener un almacén.

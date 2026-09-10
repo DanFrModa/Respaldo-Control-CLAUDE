@@ -4,40 +4,72 @@
  * rutas REST solo validan permiso + Zod y delegan. Cuenta el físico contra el KARDEX de v2, no
  * contra un saldo materializado (D3). Reglas del negocio (D6/D3/D4):
  *
- *  1. El ALTA CONGELA el teórico (D6): al dar de alta, enumera los artículos con existencia ≠ 0 del
- *     almacén en el alcance elegido y guarda `cantTeorica` = Σ de movimientos EN ESE INSTANTE, bajo
- *     bloqueo por artículo (`bloquearArticuloPt` + `existenciaPtBloqueada`, suma directa NUNCA la
- *     vista para el valor congelado). Si se leyera al consultar, el teórico cambiaría mientras cuentan.
- *  2. Conteo CIEGO: el capturista NO ve el teórico (ni en pantalla ni en la hoja de conteo PDF). Las
- *     respuestas del conteo ({@link obtenerConteo}/{@link capturarConteo}) NO incluyen `cantTeorica`.
+ *  1. El ALTA CONGELA el teórico (D6): enumera los artículos con existencia ≠ 0 del almacén en el
+ *     alcance elegido y guarda `cantTeorica` = Σ de movimientos EN ESE INSTANTE, bajo bloqueo por
+ *     artículo (suma directa, NUNCA la vista, para el valor congelado). Si se leyera al consultar,
+ *     el teórico cambiaría mientras cuentan.
+ *  2. Se captura LO CONTADO, nunca una diferencia. En PRODUCTO TERMINADO el conteo es CIEGO (el
+ *     capturista no ve el teórico); en TELAS y AVÍOS va CON EL SALDO A LA VISTA (§Post-F9.193
+ *     punto 4) — es la misma decisión que la fila 0.098 aplicó al ajuste de telas por color.
  *  3. Exactitud = cantReal − cantTeorica (solo en la vista de consulta, {@link consultarExactitud}).
  *  4. El ajuste se aplica SOLO como MOVIMIENTO de kardex (D3, motor común): JAMÁS se edita un saldo.
  *
- * Granularidad (decisión del lead F7-E5): el detalle está a la granularidad REAL del artículo de
- * kardex, INCLUYENDO `idOrden` (nullable; F6-E2 "PT por orden", ADR-0014). Así el teórico se congela
- * por artículo con `existenciaPtBloqueada(...,idOrden)` y el ajuste es un movimiento de kardex 1:1 por
- * artículo sobre esa MISMA llave — no hay que repartir el delta entre órdenes y la validación
- * no-negativo funciona por artículo (Gabriel/Daniel confirman esto en la verificación).
+ * ⭐ **FILA 0.099 — LAS TRES DIMENSIONES.** Hasta esta fila todo esto existía SÓLO para producto
+ * terminado; telas y avíos se ajustaban a mano. Ahora la MISMA hoja cuenta PT, telas o avíos, y lo
+ * que decide cuál es el **TIPO DEL ALMACÉN** —no un campo que teclee nadie—: un almacén guarda una
+ * sola clase de mercancía (fila 0.137), así que un conteo suyo sólo puede ser de ésa. La dimensión
+ * se DERIVA al dar de alta y se PERSISTE en el encabezado; de ahí en adelante manda ella, y
+ * `exigirAlmacenDelTipo` es la única puerta que la verifica. Se pasa por ella **TRES veces**: al dar
+ * de alta ({@link crearInventarioCiclico}), al agregar un renglón a mano
+ * ({@link agregarRenglonCiclico}) y al cerrar ({@link generarAjusteCiclico}). No es redundancia: una
+ * hoja vive días, y en ese rato el almacén pudo desactivarse o cambiar de tipo
+ * (`api/admin/almacenes` lo permite mientras no tenga movimientos), sin que exista una segunda
+ * barrera más abajo — el motor de kardex NO valida el almacén.
+ *
+ * Lo que depende de la LLAVE del artículo —enumerar, congelar bajo bloqueo, aplicar el ajuste al
+ * kardex y describir el artículo— vive detrás de un ADAPTADOR por dimensión (`ciclico/tipos.ts`);
+ * lo que no depende de ella —folio, estados, cancelación suave, auditoría, exactitud, hoja impresa
+ * y el aviso de «el almacén se movió»— vive AQUÍ, una sola vez.
+ *
+ * ⭐ **EL AVISO DE LA DECISIÓN 6** (§Post-F9.193): si el almacén se movió entre el alta y el cierre,
+ * el sistema **avisa y deja decidir, NO bloquea**. Antes nadie avisaba —en NINGUNA dimensión, PT
+ * incluida—: el delta se calculaba contra el teórico congelado y se aplicaba a ciegas, así que un
+ * conteo de 95 sobre un teórico de 100 con 20 piezas entradas de verdad en medio dejaba 115 en el
+ * sistema mientras el anaquel decía 95, sin una palabra. Ahora el primer intento vuelve con el
+ * aviso —artículo por artículo, con lo congelado, lo que hay AHORA, lo contado y en cuánto quedará—
+ * y SIN escribir nada; el segundo, con `confirmarMovimiento`, aplica.
+ *
+ * ⭐ **RENGLONES A MANO** (§Post-F9.193): se puede anotar mercancía que el sistema cree que NO tiene
+ * ({@link agregarRenglonCiclico}). Por eso el alta ya NO rechaza una hoja vacía: contar un almacén
+ * que el sistema cree vacío —el día del arranque, exactamente— es el caso de uso, no un error.
  *
  * Innegociables aplicados: A1 (dominio), A2 (transacción), A3/A7 (folio + bitácora), A4 (permiso por
  * operación), A9 (empresa activa), D3 (existencia = Σ movimientos; ajuste = movimiento, nunca edición).
  */
 import {
-  esquemaInventarioCiclicoCrear,
-  esquemaInventarioCiclicoConteo,
+  esquemaCiclicoRenglonAgregar,
+  esquemaInventarioCiclicoAjuste,
   esquemaInventarioCiclicoCancelar,
+  esquemaInventarioCiclicoConteo,
+  esquemaInventarioCiclicoCrear,
   esquemaInventariosCiclicosQuery,
-  type DatosInventarioCiclicoConteo,
-  type DatosInventarioCiclicoCancelar,
-  type InventarioCiclicoResumen,
-  type InventariosCiclicosQuery,
-  type InventariosCiclicosPagina,
+  type AjusteCiclicoSalida,
+  type CiclicoArticuloMovido,
   type ConteoSalida,
+  type DatosCiclicoRenglonAgregar,
+  type DatosInventarioCiclicoAjuste,
+  type DatosInventarioCiclicoCancelar,
+  type DatosInventarioCiclicoConteo,
+  type DimensionCiclicoValor,
   type ExactitudSalida,
+  type InventarioCiclicoResumen,
+  type InventariosCiclicosPagina,
+  type InventariosCiclicosQuery,
 } from '../../contrato/index.js';
-import { Prisma, type EstadoInventarioCiclico } from '../../datos/index.js';
+import type { EstadoInventarioCiclico, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { exigirAlmacenDelTipo, tipoDeAlmacenUsable } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import {
   ErrorConflicto,
@@ -45,31 +77,35 @@ import {
   ErrorPermiso,
   ErrorValidacion,
 } from '../../comun/errores.js';
-import {
-  bloquearArticuloPt,
-  existenciaPtBloqueada,
-  registrarMovimientoPt as registrarMovimientoPtMotor,
-  type LineaMovimientoPt,
-} from '../../comun/kardex.js';
-import { ORIGEN } from '../../comun/origenes.js';
-import { siguienteFolio } from '../../comun/secuencias.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
   enTransaccion,
+  type ClienteLectura,
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { aDateColumna, hoyIso } from './ciclico/comun.js';
+import { adaptadorDe, dimensionDeAlmacen } from './ciclico/registro.js';
+import {
+  redondear,
+  textoClave,
+  type AdaptadorCiclico,
+  type CapturaRenglon,
+  type ClaveArticulo,
+  type Componentes,
+  type ContextoDimension,
+  type LineaAjuste,
+  type RenglonCiclico,
+} from './ciclico/tipos.js';
+
 /** Clave de la secuencia de folios de los cíclicos (A3, por empresa). */
 const CLAVE_SECUENCIA_CICLICO = 'inventario-ciclico';
-/** Tipo de movimiento del ajuste con existencia FALTANTE (real > teórico → entra). */
-const COD_AJUSTE_ENTRADA = 'ajuste-ciclico-entrada';
-/** Tipo de movimiento del ajuste con existencia SOBRANTE (real < teórico → sale). */
-const COD_AJUSTE_SALIDA = 'ajuste-ciclico-salida';
 
-// ── Helpers de permiso/fecha ─────────────────────────────────────────────────────────────────────
+// ── Helpers de permiso ───────────────────────────────────────────────────────────────────────────
 
 /**
  * Exige AL MENOS UNO de los tres permisos del módulo cíclico (alta/conteo/consulta). Lo usan las
@@ -97,184 +133,7 @@ function exigirPermisoHoja(sesion: SesionUsuario): void {
   }
 }
 
-/** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
-function aDateColumna(valor: string): Date {
-  return new Date(`${valor}T00:00:00.000Z`);
-}
-
-/** Fecha de HOY como `YYYY-MM-DD` (UTC). */
-function hoyIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Resuelve un tipo de movimiento por su `codigo`, exigiéndolo activo. Lanza si no existe/inactivo. */
-async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nombre: string }> {
-  const tipo = await tx.tipoMovimientoInventario.findUnique({
-    where: { codigo },
-    select: { id: true, nombre: true, activo: true },
-  });
-  if (tipo === null) {
-    throw new ErrorValidacion(
-      `Falta el tipo de movimiento "${codigo}" en el catálogo (re-sembrar con SEED_ON_START).`,
-    );
-  }
-  if (!tipo.activo) {
-    throw new ErrorValidacion(`El tipo de movimiento "${tipo.nombre}" está desactivado.`);
-  }
-  return { id: tipo.id, nombre: tipo.nombre };
-}
-
-// ── Un artículo enumerado (llave real del kardex) ────────────────────────────────────────────────
-
-/** Un artículo de kardex a su granularidad real (…×orden). `idOrden` NULL = bucket "sin orden". */
-interface Articulo {
-  idModelo: number;
-  idColor: number;
-  idTalla: number;
-  idOrden: number | null;
-}
-
-/** Orden DETERMINISTA para tomar los locks (evita deadlocks entre operaciones que compiten). */
-function ordenarArticulos<T extends Articulo>(articulos: T[]): T[] {
-  return [...articulos].sort(
-    (a, b) =>
-      a.idModelo - b.idModelo ||
-      a.idColor - b.idColor ||
-      a.idTalla - b.idTalla ||
-      (a.idOrden ?? -1) - (b.idOrden ?? -1),
-  );
-}
-
-// ── ALTA ─────────────────────────────────────────────────────────────────────────────────────────
-
-/** Datos del alta de un cíclico (campos del esquema compartido). */
-export type EntradaCrearCiclico = z.input<typeof esquemaInventarioCiclicoCrear>;
-
-/**
- * Da de alta un inventario cíclico y CONGELA el teórico (D6). En UNA transacción (A2): enumera los
- * artículos con existencia ≠ 0 del almacén (todo el almacén o filtrado por `idsModelo`), congela
- * `cantTeorica` por artículo bajo lock (`bloquearArticuloPt` → `existenciaPtBloqueada`, incluye
- * `idOrden`) y siembra el detalle por LOTES (`createMany`). Folio atómico (A3) + bitácora (A7).
- * Permiso `indicadores.ciclicos-alta` (A4). Rechaza si el alcance no tiene nada que contar.
- */
-export async function crearInventarioCiclico(
-  sesion: SesionUsuario,
-  entrada: EntradaCrearCiclico,
-  bd?: ContextoBd,
-): Promise<InventarioCiclicoResumen> {
-  verificarPermiso(sesion, 'indicadores.ciclicos-alta');
-  const datos = validarEntrada(esquemaInventarioCiclicoCrear, entrada);
-  const idEmpresa = sesion.idEmpresaActiva;
-
-  const idCreado = await enTransaccion(async (tx) => {
-    // Verifica que el almacén exista (FK lo cubriría, pero da un mensaje claro).
-    const almacen = await tx.almacen.findUnique({
-      where: { id: datos.idAlmacen },
-      select: { id: true },
-    });
-    if (almacen === null) {
-      throw new ErrorNoEncontrado('Almacen', datos.idAlmacen);
-    }
-
-    // Candidatos: artículos con existencia ≠ 0 en el almacén, en el alcance de modelos (la vista
-    // `existencia_pt` agrega por …×orden×almacén; aquí SÍ se usa la vista — es una CONSULTA para
-    // enumerar; el valor congelado luego se re-lee DIRECTO bajo lock, ADR-0010 §3).
-    const condiciones: Prisma.Sql[] = [
-      Prisma.sql`e."id_empresa" = ${idEmpresa}`,
-      Prisma.sql`e."id_almacen" = ${datos.idAlmacen}`,
-      Prisma.sql`e."existencia" <> 0`,
-    ];
-    if (datos.idsModelo !== undefined && datos.idsModelo.length > 0) {
-      condiciones.push(Prisma.sql`e."id_modelo" IN (${Prisma.join(datos.idsModelo)})`);
-    }
-    const candidatos = await tx.$queryRaw<
-      { idModelo: number; idColor: number; idTalla: number; idOrden: number | null }[]
-    >(Prisma.sql`
-      SELECT e."id_modelo" AS "idModelo", e."id_color" AS "idColor", e."id_talla" AS "idTalla",
-             e."id_orden" AS "idOrden"
-      FROM "existencia_pt" e
-      WHERE ${Prisma.join(condiciones, ' AND ')}
-    `);
-    if (candidatos.length === 0) {
-      throw new ErrorConflicto(
-        'No hay existencias que contar en el alcance elegido (ni un artículo con existencia ≠ 0).',
-      );
-    }
-
-    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_CICLICO);
-    const inventario = await tx.inventarioCiclico.create({
-      data: {
-        folio,
-        idEmpresa,
-        idAlmacen: datos.idAlmacen,
-        fecha: aDateColumna(hoyIso()),
-        estado: 'abierto',
-        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
-        creadoPorId: sesion.id,
-        modificadoPorId: sesion.id,
-      },
-      select: { id: true },
-    });
-
-    // Congela el teórico por artículo, en orden determinista (locks sin deadlock). Si un artículo
-    // corrió a 0 entre la lectura de la vista y el lock, se OMITE (no se cuenta lo que ya no existe).
-    const renglones: Prisma.InventarioCiclicoDetCreateManyInput[] = [];
-    for (const art of ordenarArticulos(candidatos)) {
-      await bloquearArticuloPt(
-        tx,
-        idEmpresa,
-        datos.idAlmacen,
-        art.idModelo,
-        art.idColor,
-        art.idTalla,
-        art.idOrden,
-      );
-      const cantTeorica = await existenciaPtBloqueada(
-        tx,
-        idEmpresa,
-        datos.idAlmacen,
-        art.idModelo,
-        art.idColor,
-        art.idTalla,
-        art.idOrden,
-      );
-      if (cantTeorica === 0) continue;
-      renglones.push({
-        idInventarioCiclico: inventario.id,
-        idModelo: art.idModelo,
-        idColor: art.idColor,
-        idTalla: art.idTalla,
-        idOrden: art.idOrden,
-        cantTeorica,
-        creadoPorId: sesion.id,
-        modificadoPorId: sesion.id,
-      });
-    }
-    if (renglones.length === 0) {
-      throw new ErrorConflicto(
-        'No quedó ningún artículo con existencia al congelar el teórico (todo corrió a 0).',
-      );
-    }
-    await tx.inventarioCiclicoDet.createMany({ data: renglones });
-
-    await registrarBitacora(tx, sesion, {
-      entidad: 'InventarioCiclico',
-      idEntidad: inventario.id,
-      accion: 'CREAR',
-      datos: {
-        folio: folio.toString(),
-        idAlmacen: datos.idAlmacen,
-        renglones: renglones.length,
-      },
-    });
-
-    return inventario.id;
-  }, bd);
-
-  return obtenerResumen(sesion, idCreado, bd);
-}
-
-// ── Lecturas: RESUMEN / LISTADO ──────────────────────────────────────────────────────────────────
+// ── Encabezado ───────────────────────────────────────────────────────────────────────────────────
 
 /** `include` mínimo para el encabezado (con nombre de almacén). */
 const incluirEncabezado = {
@@ -283,6 +142,22 @@ const incluirEncabezado = {
 type EncabezadoConAlmacen = Prisma.InventarioCiclicoGetPayload<{
   include: typeof incluirEncabezado;
 }>;
+
+/** Lee el encabezado de la empresa activa (A9) o lanza. */
+async function leerEncabezado(
+  cliente: ClienteLectura,
+  id: number,
+  idEmpresa: number,
+): Promise<EncabezadoConAlmacen> {
+  const inv = await cliente.inventarioCiclico.findFirst({
+    where: { id, idEmpresa },
+    include: incluirEncabezado,
+  });
+  if (inv === null) {
+    throw new ErrorNoEncontrado('InventarioCiclico', id);
+  }
+  return inv;
+}
 
 /** Proyecta un encabezado + contadores a la forma del resumen del contrato. */
 function aResumen(
@@ -296,6 +171,7 @@ function aResumen(
     idEmpresa: inv.idEmpresa,
     idAlmacen: inv.idAlmacen,
     almacen: inv.almacen.nombre,
+    dimension: inv.dimension,
     fecha: inv.fecha.toISOString().slice(0, 10),
     estado: inv.estado,
     observaciones: inv.observaciones,
@@ -309,6 +185,118 @@ function aResumen(
 }
 
 /**
+ * Estado que le toca a la hoja según su avance. Una hoja SIN renglones se queda `abierto`: está
+ * vacía, no terminada — y esa distinción importa desde que se puede abrir una hoja de un almacén
+ * que el sistema cree vacío y llenarla a mano.
+ */
+function estadoPorAvance(total: number, contados: number): EstadoInventarioCiclico {
+  return total > 0 && contados >= total ? 'contado' : 'abierto';
+}
+
+/** Recalcula y persiste el estado de la hoja tras un cambio en su detalle. */
+async function refrescarEstado(
+  tx: Tx,
+  ad: AdaptadorCiclico,
+  inv: { id: number; estado: EstadoInventarioCiclico },
+  sesion: SesionUsuario,
+): Promise<{ total: number; contados: number }> {
+  const conteo = await ad.contar(tx, inv.id);
+  const nuevoEstado = estadoPorAvance(conteo.total, conteo.contados);
+  if (nuevoEstado !== inv.estado) {
+    await tx.inventarioCiclico.update({
+      where: { id: inv.id },
+      data: { estado: nuevoEstado, modificadoPorId: sesion.id },
+    });
+  }
+  return conteo;
+}
+
+// ── ALTA ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** Datos del alta de un cíclico (campos del esquema compartido). */
+export type EntradaCrearCiclico = z.input<typeof esquemaInventarioCiclicoCrear>;
+
+/**
+ * Da de alta un inventario cíclico y CONGELA el teórico (D6). En UNA transacción (A2): deriva la
+ * DIMENSIÓN del tipo del almacén, enumera los artículos con existencia ≠ 0 en el alcance, congela
+ * `cantTeorica` por artículo bajo bloqueo (suma directa, NUNCA la vista, para el valor congelado) y
+ * siembra el detalle POR LOTES. Folio atómico (A3) + bitácora (A7). Permiso
+ * `indicadores.ciclicos-alta` (A4).
+ *
+ * ⚠️ Una hoja puede nacer VACÍA y eso NO es un error: es el arranque (contar un almacén que el
+ * sistema cree vacío y llenarlo a mano con {@link agregarRenglonCiclico}). Hasta la fila 0.099 el
+ * alta rechazaba ese caso — sin renglones a mano, una hoja vacía no servía para nada.
+ */
+export async function crearInventarioCiclico(
+  sesion: SesionUsuario,
+  entrada: EntradaCrearCiclico,
+  bd?: ContextoBd,
+): Promise<InventarioCiclicoResumen> {
+  verificarPermiso(sesion, 'indicadores.ciclicos-alta');
+  const datos = validarEntrada(esquemaInventarioCiclicoCrear, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  const idCreado = await enTransaccion(async (tx) => {
+    // QUÉ se cuenta lo manda el almacén: se lee su tipo (ya verificado existe + activo + A9) y de
+    // ahí sale la dimensión. Acto seguido se pasa por la ÚNICA puerta (`exigirAlmacenDelTipo`), que
+    // es la que de verdad autoriza — nunca un segundo criterio paralelo.
+    const tipo = await tipoDeAlmacenUsable(tx, datos.idAlmacen, idEmpresa);
+    const dimension = dimensionDeAlmacen(tipo);
+    const ad = adaptadorDe(dimension);
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, ad.tipoAlmacen, idEmpresa);
+
+    const ctx: ContextoDimension = { idEmpresa, idAlmacen: datos.idAlmacen };
+    const candidatos = await ad.enumerar(tx, ctx, ad.alcance(datos));
+
+    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_CICLICO);
+    const inventario = await tx.inventarioCiclico.create({
+      data: {
+        folio,
+        idEmpresa,
+        idAlmacen: datos.idAlmacen,
+        dimension,
+        fecha: aDateColumna(hoyIso()),
+        estado: 'abierto',
+        ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+      select: { id: true },
+    });
+
+    // Congela el teórico bajo bloqueo. Si un artículo corrió a 0 entre la lectura de la vista y el
+    // lock, se OMITE (no se cuenta lo que ya no existe); si el usuario sabe que sí hay algo ahí, lo
+    // agrega a mano — que es justo para lo que sirve `agregarRenglonCiclico`.
+    const existencias = await ad.leerExistenciasBloqueadas(tx, ctx, candidatos);
+    const renglones = candidatos
+      .map((clave) => ({ clave, teorico: existencias.get(textoClave(clave)) }))
+      .filter(
+        (r): r is { clave: ClaveArticulo; teorico: Componentes } =>
+          r.teorico !== undefined && (r.teorico.cuerpo !== 0 || (r.teorico.complemento ?? 0) !== 0),
+      );
+    await ad.sembrar(tx, sesion, inventario.id, renglones);
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'InventarioCiclico',
+      idEntidad: inventario.id,
+      accion: 'CREAR',
+      datos: {
+        folio: folio.toString(),
+        idAlmacen: datos.idAlmacen,
+        dimension,
+        renglones: renglones.length,
+      },
+    });
+
+    return inventario.id;
+  }, bd);
+
+  return obtenerResumen(sesion, idCreado, bd);
+}
+
+// ── Lecturas: RESUMEN / LISTADO ──────────────────────────────────────────────────────────────────
+
+/**
  * Resumen (encabezado + contadores) de un cíclico de la empresa activa (A9). Cabecera de las
  * pantallas de conteo/consulta. Permiso: cualquiera de los tres del módulo.
  */
@@ -319,20 +307,78 @@ export async function obtenerResumen(
 ): Promise<InventarioCiclicoResumen> {
   exigirAlgunPermisoCiclico(sesion);
   const cliente = clienteLectura(bd);
-  const inv = await cliente.inventarioCiclico.findFirst({
-    where: { id, idEmpresa: sesion.idEmpresaActiva },
-    include: incluirEncabezado,
-  });
-  if (inv === null) {
-    throw new ErrorNoEncontrado('InventarioCiclico', id);
+  const inv = await leerEncabezado(cliente, id, sesion.idEmpresaActiva);
+  const { total, contados } = await adaptadorDe(inv.dimension).contar(cliente, id);
+  return aResumen(inv, total, contados);
+}
+
+/** Filas de un `groupBy` por hoja (la forma común de las tres tablas de detalle). */
+type ConteoAgrupado = { idInventarioCiclico: number; _count: { _all: number } }[];
+
+/**
+ * Contadores (total/contados) de VARIAS hojas de la MISMA dimensión, en dos consultas agrupadas —
+ * no una por hoja. El `groupBy` se escribe literal en cada rama: Prisma tipa el argumento contra SU
+ * modelo y pasarlo por una variable compartida pierde la inferencia del `_count`.
+ */
+async function contadoresPorDimension(
+  cliente: ClienteLectura,
+  dimension: DimensionCiclicoValor,
+  ids: number[],
+): Promise<Map<number, { total: number; contados: number }>> {
+  const mapa = new Map<number, { total: number; contados: number }>();
+  if (ids.length === 0) return mapa;
+  const todos = { idInventarioCiclico: { in: ids } };
+  const contadas = { idInventarioCiclico: { in: ids }, cantReal: { not: null } };
+
+  let totales: ConteoAgrupado;
+  let contados: ConteoAgrupado;
+  if (dimension === 'TELA') {
+    [totales, contados] = await Promise.all([
+      cliente.inventarioCiclicoDetTela.groupBy({
+        by: ['idInventarioCiclico'],
+        where: todos,
+        _count: { _all: true },
+      }),
+      cliente.inventarioCiclicoDetTela.groupBy({
+        by: ['idInventarioCiclico'],
+        where: contadas,
+        _count: { _all: true },
+      }),
+    ]);
+  } else if (dimension === 'AVIO') {
+    [totales, contados] = await Promise.all([
+      cliente.inventarioCiclicoDetAvio.groupBy({
+        by: ['idInventarioCiclico'],
+        where: todos,
+        _count: { _all: true },
+      }),
+      cliente.inventarioCiclicoDetAvio.groupBy({
+        by: ['idInventarioCiclico'],
+        where: contadas,
+        _count: { _all: true },
+      }),
+    ]);
+  } else {
+    [totales, contados] = await Promise.all([
+      cliente.inventarioCiclicoDet.groupBy({
+        by: ['idInventarioCiclico'],
+        where: todos,
+        _count: { _all: true },
+      }),
+      cliente.inventarioCiclicoDet.groupBy({
+        by: ['idInventarioCiclico'],
+        where: contadas,
+        _count: { _all: true },
+      }),
+    ]);
   }
-  const [totalRenglones, renglonesContados] = await Promise.all([
-    cliente.inventarioCiclicoDet.count({ where: { idInventarioCiclico: id } }),
-    cliente.inventarioCiclicoDet.count({
-      where: { idInventarioCiclico: id, cantReal: { not: null } },
-    }),
-  ]);
-  return aResumen(inv, totalRenglones, renglonesContados);
+
+  const totMap = new Map(totales.map((t) => [t.idInventarioCiclico, t._count._all]));
+  const conMap = new Map(contados.map((c) => [c.idInventarioCiclico, c._count._all]));
+  for (const id of ids) {
+    mapa.set(id, { total: totMap.get(id) ?? 0, contados: conMap.get(id) ?? 0 });
+  }
+  return mapa;
 }
 
 /** Lista paginada de cíclicos de la empresa activa (A9), con sus contadores. Permiso: cualquiera de los tres. */
@@ -353,6 +399,7 @@ export async function listarInventariosCiclicos(
     almacen: { activo: true },
     ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
     ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
+    ...(filtros.dimension === undefined ? {} : { dimension: filtros.dimension }),
   };
   const [total, filas] = await Promise.all([
     cliente.inventarioCiclico.count({ where }),
@@ -364,24 +411,26 @@ export async function listarInventariosCiclicos(
       take: filtros.porPagina,
     }),
   ]);
-  const ids = filas.map((f) => f.id);
-  const [totCounts, conCounts] = await Promise.all([
-    cliente.inventarioCiclicoDet.groupBy({
-      by: ['idInventarioCiclico'],
-      where: { idInventarioCiclico: { in: ids } },
-      _count: { _all: true },
-    }),
-    cliente.inventarioCiclicoDet.groupBy({
-      by: ['idInventarioCiclico'],
-      where: { idInventarioCiclico: { in: ids }, cantReal: { not: null } },
-      _count: { _all: true },
-    }),
-  ]);
-  const totMap = new Map(totCounts.map((c) => [c.idInventarioCiclico, c._count._all]));
-  const conMap = new Map(conCounts.map((c) => [c.idInventarioCiclico, c._count._all]));
+
+  // Los contadores viven en TRES tablas distintas (una por dimensión): se agrupan por dimensión y
+  // no fila por fila.
+  const porDimension = await Promise.all(
+    (['PT', 'TELA', 'AVIO'] as const).map(async (d) => ({
+      dimension: d,
+      mapa: await contadoresPorDimension(
+        cliente,
+        d,
+        filas.filter((f) => f.dimension === d).map((f) => f.id),
+      ),
+    })),
+  );
+  const contadores = new Map(porDimension.map((p) => [p.dimension, p.mapa]));
 
   return {
-    datos: filas.map((f) => aResumen(f, totMap.get(f.id) ?? 0, conMap.get(f.id) ?? 0)),
+    datos: filas.map((f) => {
+      const c = contadores.get(f.dimension)?.get(f.id);
+      return aResumen(f, c?.total ?? 0, c?.contados ?? 0);
+    }),
     total,
     pagina: filtros.pagina,
     porPagina: filtros.porPagina,
@@ -389,74 +438,50 @@ export async function listarInventariosCiclicos(
   };
 }
 
-// ── Lectura: CONTEO CIEGO (sin teórico) ──────────────────────────────────────────────────────────
+// ── Lectura: CONTEO ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Lee la vista de CONTEO — CIEGA: encabezado + renglones SIN `cantTeorica` (no se selecciona siquiera,
- * defensa en profundidad). Interna: la usan {@link obtenerConteo} (permiso conteo) y la hoja PDF
- * (permiso alta/conteo). Empresa activa (A9). Ordena por modelo→color→talla para un recorrido natural.
+ * Lee la vista de CONTEO. En PT es CIEGA: los renglones salen SIN `cantTeorica` — la clave ni
+ * siquiera existe en la respuesta (defensa en profundidad, D6). En telas y avíos el teórico SÍ va:
+ * es la columna «Sistema» que Daniel pidió tener a la vista al capturar (§Post-F9.193 punto 4).
+ * Interna: la usan {@link obtenerConteo} (permiso conteo) y la hoja PDF (permiso alta/conteo).
  */
 async function leerConteo(id: number, idEmpresa: number, bd?: ContextoBd): Promise<ConteoSalida> {
-  const inv = await clienteLectura(bd).inventarioCiclico.findFirst({
-    where: { id, idEmpresa },
-    select: {
-      id: true,
-      folio: true,
-      idAlmacen: true,
-      fecha: true,
-      estado: true,
-      almacen: { select: { nombre: true } },
-      detalles: {
-        // SIN cantTeorica (conteo ciego).
-        select: {
-          id: true,
-          idModelo: true,
-          idColor: true,
-          idTalla: true,
-          idOrden: true,
-          cantReal: true,
-          modelo: { select: { codigo: true } },
-          color: { select: { nombre: true } },
-          talla: { select: { etiqueta: true, orden: true } },
-          orden: { select: { folio: true } },
-        },
-        orderBy: [
-          { modelo: { codigo: 'asc' } },
-          { color: { nombre: 'asc' } },
-          { talla: { orden: 'asc' } },
-          { id: 'asc' },
-        ],
-      },
-    },
-  });
-  if (inv === null) {
-    throw new ErrorNoEncontrado('InventarioCiclico', id);
-  }
+  const cliente = clienteLectura(bd);
+  const inv = await leerEncabezado(cliente, id, idEmpresa);
+  const ad = adaptadorDe(inv.dimension);
+  const renglones = await ad.leer(cliente, id);
   return {
     id: inv.id,
     folio: Number(inv.folio),
     idAlmacen: inv.idAlmacen,
     almacen: inv.almacen.nombre,
+    dimension: inv.dimension,
     fecha: inv.fecha.toISOString().slice(0, 10),
     estado: inv.estado,
-    renglones: inv.detalles.map((d) => ({
-      idDet: d.id,
-      idModelo: d.idModelo,
-      modelo: d.modelo.codigo,
-      idColor: d.idColor,
-      color: d.color.nombre,
-      idTalla: d.idTalla,
-      etiquetaTalla: d.talla.etiqueta,
-      ordenTalla: d.talla.orden,
-      idOrden: d.idOrden,
-      folioOrden: d.orden === null ? null : Number(d.orden.folio),
-      cantReal: d.cantReal,
-      contado: d.cantReal !== null,
+    renglones: renglones.map((r) => ({
+      idDet: r.idDet,
+      titulo: r.titulo,
+      subtitulo: r.subtitulo,
+      unidad: r.unidad,
+      // El conteo ciego NO omite el valor: omite la CLAVE. Ver el comentario del contrato.
+      ...(ad.conteoCiego
+        ? {}
+        : {
+            cantTeorica: r.cantTeorica,
+            ...(r.cantTeoricaComplemento === null
+              ? {}
+              : { cantTeoricaComplemento: r.cantTeoricaComplemento }),
+          }),
+      cantReal: r.cantReal,
+      nombreComplemento: r.nombreComplemento,
+      cantRealComplemento: r.cantRealComplemento,
+      contado: r.cantReal !== null,
     })),
   };
 }
 
-/** Vista de CONTEO ciego de un cíclico. Permiso `indicadores.ciclicos-conteo` (A4). */
+/** Vista de CONTEO de un cíclico. Permiso `indicadores.ciclicos-conteo` (A4). */
 export async function obtenerConteo(
   sesion: SesionUsuario,
   id: number,
@@ -466,7 +491,7 @@ export async function obtenerConteo(
   return leerConteo(id, sesion.idEmpresaActiva, bd);
 }
 
-/** Vista de CONTEO ciego para la HOJA de conteo (PDF). Permiso alta O conteo. */
+/** Vista de CONTEO para la HOJA de conteo (PDF). Permiso alta O conteo. */
 export async function leerConteoParaHoja(
   sesion: SesionUsuario,
   id: number,
@@ -478,12 +503,50 @@ export async function leerConteoParaHoja(
 
 // ── Escritura: CAPTURAR CONTEO ───────────────────────────────────────────────────────────────────
 
+/** Lee el encabezado BAJO BLOQUEO de fila y exige que la hoja siga viva (ni cerrada ni cancelada). */
+async function encabezadoVivoBloqueado(
+  tx: Tx,
+  id: number,
+  idEmpresa: number,
+  accion: string,
+): Promise<{
+  id: number;
+  folio: bigint;
+  idAlmacen: number;
+  estado: EstadoInventarioCiclico;
+  dimension: DimensionCiclicoValor;
+}> {
+  const filas = await tx.$queryRaw<
+    {
+      id: number;
+      folio: bigint;
+      idAlmacen: number;
+      estado: EstadoInventarioCiclico;
+      dimension: DimensionCiclicoValor;
+    }[]
+  >`
+    SELECT "id", "folio", "id_almacen" AS "idAlmacen", "estado", "dimension"
+    FROM "inventarios_ciclicos"
+    WHERE "id" = ${id} AND "id_empresa" = ${idEmpresa}
+    FOR UPDATE
+  `;
+  const inv = filas[0];
+  if (inv === undefined) {
+    throw new ErrorNoEncontrado('InventarioCiclico', id);
+  }
+  if (inv.estado === 'cerrado' || inv.estado === 'cancelado') {
+    throw new ErrorConflicto(`El inventario cíclico está ${inv.estado} y ya no admite ${accion}.`);
+  }
+  return inv;
+}
+
 /**
- * Captura el conteo físico de uno o varios renglones (cantidad real, ciega). Guarda `cantReal` +
- * `contadoEn`/`contadoPorId`; recalcula el estado (todos contados → `contado`, si no → `abierto`).
- * Rechaza si el cíclico ya está `cerrado`/`cancelado`, si algún renglón no le pertenece o si se
- * repite un renglón en la captura. Permiso `indicadores.ciclicos-conteo` (A4). A2 en transacción.
- * NO devuelve el teórico (conteo ciego).
+ * Captura el conteo físico de uno o varios renglones: LO CONTADO, nunca una diferencia. Guarda
+ * `cantReal` (+ el complemento en telas que lo llevan) con `contadoEn`/`contadoPorId` y recalcula el
+ * estado. Rechaza si el cíclico ya está `cerrado`/`cancelado`, si algún renglón no le pertenece o si
+ * se repite un renglón en la misma captura. Permiso `indicadores.ciclicos-conteo` (A4). A2 en
+ * transacción; la escritura es UNA sentencia por lote, no una por renglón (esta pantalla carga
+ * inventarios completos).
  */
 export async function capturarConteo(
   sesion: SesionUsuario,
@@ -501,60 +564,106 @@ export async function capturarConteo(
   }
 
   await enTransaccion(async (tx) => {
-    const inv = await tx.inventarioCiclico.findFirst({
-      where: { id, idEmpresa },
-      select: { id: true, estado: true },
-    });
-    if (inv === null) {
-      throw new ErrorNoEncontrado('InventarioCiclico', id);
-    }
-    if (inv.estado === 'cerrado' || inv.estado === 'cancelado') {
-      throw new ErrorConflicto(
-        `El inventario cíclico está ${inv.estado} y ya no admite captura de conteo.`,
-      );
-    }
+    const inv = await encabezadoVivoBloqueado(tx, id, idEmpresa, 'captura de conteo');
+    const ad = adaptadorDe(inv.dimension);
 
-    // Todos los renglones deben pertenecer a ESTE cíclico (A9 + no capturar sobre otro).
-    const propios = await tx.inventarioCiclicoDet.count({
-      where: { id: { in: ids }, idInventarioCiclico: inv.id },
-    });
-    if (propios !== ids.length) {
-      throw new ErrorValidacion('Algún renglón no pertenece a este inventario cíclico.');
-    }
-
-    const ahora = new Date();
+    // Todos los renglones deben pertenecer a ESTE cíclico (A9 + no capturar sobre otro). De paso,
+    // el detalle leído dice qué renglones llevan complemento (D5).
+    const detalle = await ad.leer(tx, id);
+    const porId = new Map(detalle.map((d) => [d.idDet, d]));
+    const capturas: CapturaRenglon[] = [];
     for (const r of datos.renglones) {
-      await tx.inventarioCiclicoDet.update({
-        where: { id: r.idDet },
-        data: {
-          cantReal: r.cantReal,
-          contadoEn: ahora,
-          contadoPorId: sesion.id,
-          modificadoPorId: sesion.id,
-        },
+      const renglon = porId.get(r.idDet);
+      if (renglon === undefined) {
+        throw new ErrorValidacion('Algún renglón no pertenece a este inventario cíclico.');
+      }
+      // ⚠️ Quién lleva SEGUNDO COMPONENTE lo dice el teórico CONGELADO, no el catálogo de hoy: una
+      // hoja abierta ya decidió su forma al congelarse, y el ajuste sólo puede mover el componente
+      // que congeló. Si se decidiera por el catálogo, ponerle `nombreComplemento` a una tela
+      // DESPUÉS del alta obligaría a capturar un número que el ajuste ignoraría en silencio.
+      const llevaComplemento = renglon.cantTeoricaComplemento !== null;
+      if (!llevaComplemento && r.cantRealComplemento !== undefined) {
+        throw new ErrorValidacion(`«${renglon.titulo}» no tiene un segundo componente que contar.`);
+      }
+      if (llevaComplemento && r.cantRealComplemento === undefined) {
+        // Dar por contado un renglón con la mitad sin contar dejaría un componente fuera del
+        // ajuste sin que nadie lo note: se pide entero o no se captura.
+        throw new ErrorValidacion(
+          `«${renglon.titulo}» lleva ${renglon.nombreComplemento ?? 'complemento'}: captura también lo contado de ese componente.`,
+        );
+      }
+      capturas.push({
+        idDet: r.idDet,
+        cantReal: r.cantReal,
+        cantRealComplemento: r.cantRealComplemento ?? null,
       });
     }
 
-    // Recalcula el estado: todos contados → `contado`; si falta alguno → `abierto`.
-    const [total, contados] = await Promise.all([
-      tx.inventarioCiclicoDet.count({ where: { idInventarioCiclico: inv.id } }),
-      tx.inventarioCiclicoDet.count({
-        where: { idInventarioCiclico: inv.id, cantReal: { not: null } },
-      }),
-    ]);
-    const nuevoEstado: EstadoInventarioCiclico = contados >= total ? 'contado' : 'abierto';
-    if (nuevoEstado !== inv.estado) {
-      await tx.inventarioCiclico.update({
-        where: { id: inv.id },
-        data: { estado: nuevoEstado, modificadoPorId: sesion.id },
-      });
-    }
+    await ad.guardarConteo(tx, sesion, id, capturas);
+    const conteo = await refrescarEstado(tx, ad, inv, sesion);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'InventarioCiclico',
       idEntidad: inv.id,
       accion: 'OTRO',
-      datos: { conteo: datos.renglones.length, contados, total },
+      datos: { conteo: capturas.length, contados: conteo.contados, total: conteo.total },
+    });
+  }, bd);
+
+  return leerConteo(id, idEmpresa, bd);
+}
+
+// ── Escritura: AGREGAR un renglón que la enumeración no trajo ────────────────────────────────────
+
+/**
+ * Agrega a la hoja un artículo que el alta NO enumeró — mercancía que el sistema cree que NO tiene
+ * (§Post-F9.193: *«se puede anotar mercancía con existencia cero»*). El teórico del renglón nuevo se
+ * CONGELA igual que el del alta: bajo bloqueo, por Σ directa de movimientos. En el caso normal eso
+ * ES 0 —la enumeración sólo omite lo que no tiene existencia—, y si entre el alta y ahora ese
+ * artículo se movió de verdad, el renglón nace con lo que hay y el aviso de la decisión 6 lo dirá al
+ * cerrar; congelar un 0 a la fuerza sería inventar un teórico que la BD desmiente.
+ *
+ * El encabezado se bloquea con `FOR UPDATE` ANTES de comprobar el duplicado: dos altas simultáneas
+ * del mismo artículo no pueden pasar las dos (en PT la unicidad de la BD no alcanza — Postgres
+ * trata los NULL de `id_orden` como distintos). Permiso `indicadores.ciclicos-conteo` (A4).
+ */
+export async function agregarRenglonCiclico(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: DatosCiclicoRenglonAgregar,
+  bd?: ContextoBd,
+): Promise<ConteoSalida> {
+  verificarPermiso(sesion, 'indicadores.ciclicos-conteo');
+  const datos = validarEntrada(esquemaCiclicoRenglonAgregar, cuerpo);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  await enTransaccion(async (tx) => {
+    const inv = await encabezadoVivoBloqueado(tx, id, idEmpresa, 'renglones nuevos');
+    const ad = adaptadorDe(inv.dimension);
+    // El almacén sigue teniendo que ser del tipo de la hoja: si cambió o se desactivó, no se le
+    // agregan renglones (misma puerta que el alta y el cierre).
+    await exigirAlmacenDelTipo(tx, inv.idAlmacen, ad.tipoAlmacen, idEmpresa);
+
+    const clave = await ad.resolverClaveNueva(tx, { idEmpresa, idAlmacen: inv.idAlmacen }, datos);
+    const yaEstan = new Set((await ad.leer(tx, id)).map((r) => textoClave(r.clave)));
+    if (yaEstan.has(textoClave(clave))) {
+      throw new ErrorConflicto(`Ese ${ad.nombreArticulo} ya está en la hoja de conteo.`);
+    }
+
+    const ctx: ContextoDimension = { idEmpresa, idAlmacen: inv.idAlmacen };
+    const existencias = await ad.leerExistenciasBloqueadas(tx, ctx, [clave]);
+    const teorico = existencias.get(textoClave(clave));
+    if (teorico === undefined) {
+      throw new ErrorValidacion('No se pudo leer la existencia del artículo que se agrega.');
+    }
+    await ad.sembrar(tx, sesion, id, [{ clave, teorico }]);
+    await refrescarEstado(tx, ad, inv, sesion);
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'InventarioCiclico',
+      idEntidad: inv.id,
+      accion: 'OTRO',
+      datos: { renglonAgregado: clave, cantTeorica: teorico.cuerpo },
     });
   }, bd);
 
@@ -563,71 +672,45 @@ export async function capturarConteo(
 
 // ── Lectura: EXACTITUD (teórico vs real) ─────────────────────────────────────────────────────────
 
-/**
- * Vista de EXACTITUD de un cíclico: por renglón `cantTeorica`/`cantReal`/`exactitud` (= real−teórico)
- * + su ajuste (si ya se generó) + totales. Permiso `indicadores.ciclicos-consulta` (A4). A9.
- */
-export async function consultarExactitud(
-  sesion: SesionUsuario,
-  id: number,
-  bd?: ContextoBd,
-): Promise<ExactitudSalida> {
-  verificarPermiso(sesion, 'indicadores.ciclicos-consulta');
-  const inv = await clienteLectura(bd).inventarioCiclico.findFirst({
-    where: { id, idEmpresa: sesion.idEmpresaActiva },
-    include: {
-      almacen: { select: { nombre: true } },
-      detalles: {
-        include: {
-          modelo: { select: { codigo: true } },
-          color: { select: { nombre: true } },
-          talla: { select: { etiqueta: true, orden: true } },
-          orden: { select: { folio: true } },
-          movimientoAjuste: { select: { folio: true } },
-        },
-        orderBy: [
-          { modelo: { codigo: 'asc' } },
-          { color: { nombre: 'asc' } },
-          { talla: { orden: 'asc' } },
-          { id: 'asc' },
-        ],
-      },
-    },
-  });
-  if (inv === null) {
-    throw new ErrorNoEncontrado('InventarioCiclico', id);
-  }
-
+/** Proyecta el detalle a la vista de exactitud + sus totales. */
+function aExactitud(
+  inv: EncabezadoConAlmacen,
+  ad: AdaptadorCiclico,
+  renglones: readonly RenglonCiclico[],
+): ExactitudSalida {
   let contados = 0;
   let exactos = 0;
   let diferencias = 0;
   let teorico = 0;
   let real = 0;
-  const renglones = inv.detalles.map((d) => {
-    teorico += d.cantTeorica;
-    const exactitud = d.cantReal === null ? null : d.cantReal - d.cantTeorica;
-    if (d.cantReal !== null) {
+  const filas = renglones.map((r) => {
+    teorico = redondear(teorico + r.cantTeorica, ad.escala);
+    const exactitud = r.cantReal === null ? null : redondear(r.cantReal - r.cantTeorica, ad.escala);
+    const exactitudComplemento =
+      r.cantTeoricaComplemento === null || r.cantRealComplemento === null
+        ? null
+        : redondear(r.cantRealComplemento - r.cantTeoricaComplemento, ad.escala);
+    if (r.cantReal !== null) {
       contados += 1;
-      real += d.cantReal;
-      if (exactitud === 0) exactos += 1;
+      real = redondear(real + r.cantReal, ad.escala);
+      // Un renglón sólo es EXACTO si cuadran sus DOS componentes: mirar sólo el cuerpo daría por
+      // bueno un conteo al que le sobra medio rollo de cardigan.
+      if (exactitud === 0 && (exactitudComplemento ?? 0) === 0) exactos += 1;
       else diferencias += 1;
     }
     return {
-      idDet: d.id,
-      idModelo: d.idModelo,
-      modelo: d.modelo.codigo,
-      idColor: d.idColor,
-      color: d.color.nombre,
-      idTalla: d.idTalla,
-      etiquetaTalla: d.talla.etiqueta,
-      ordenTalla: d.talla.orden,
-      idOrden: d.idOrden,
-      folioOrden: d.orden === null ? null : Number(d.orden.folio),
-      cantTeorica: d.cantTeorica,
-      cantReal: d.cantReal,
+      idDet: r.idDet,
+      titulo: r.titulo,
+      subtitulo: r.subtitulo,
+      unidad: r.unidad,
+      cantTeorica: r.cantTeorica,
+      cantReal: r.cantReal,
       exactitud,
-      idMovimientoAjuste: d.idMovimientoAjuste,
-      folioMovimientoAjuste: d.movimientoAjuste === null ? null : Number(d.movimientoAjuste.folio),
+      nombreComplemento: r.nombreComplemento,
+      cantTeoricaComplemento: r.cantTeoricaComplemento,
+      cantRealComplemento: r.cantRealComplemento,
+      exactitudComplemento,
+      ajustes: r.ajustes,
     };
   });
 
@@ -637,53 +720,203 @@ export async function consultarExactitud(
     idEmpresa: inv.idEmpresa,
     idAlmacen: inv.idAlmacen,
     almacen: inv.almacen.nombre,
+    dimension: inv.dimension,
     fecha: inv.fecha.toISOString().slice(0, 10),
     estado: inv.estado,
     observaciones: inv.observaciones,
     canceladoEn: inv.canceladoEn === null ? null : inv.canceladoEn.toISOString(),
     motivoCancelacion: inv.motivoCancelacion,
-    renglones,
-    totales: { total: renglones.length, contados, exactos, diferencias, teorico, real },
+    renglones: filas,
+    totales: { total: filas.length, contados, exactos, diferencias, teorico, real },
   };
 }
 
-// ── Escritura: GENERAR AJUSTE ────────────────────────────────────────────────────────────────────
-
 /**
- * Genera el AJUSTE del cíclico (D3): por cada renglón contado con exactitud ≠ 0 aplica el delta como
- * MOVIMIENTO de kardex — entrada (`ajuste-ciclico-entrada`) si real > teórico, salida
- * (`ajuste-ciclico-salida`) si real < teórico —, JAMÁS editando un saldo. Agrupa los deltas del mismo
- * signo en UN solo movimiento por almacén (entradas juntas / salidas juntas) para no explotar el
- * folio; cada renglón queda enlazado a su movimiento por `idMovimientoAjuste`. Las SALIDAS validan
- * no-negativo bajo lock por artículo (suma directa, NUNCA la vista — D3). Exige estado `contado`
- * (todo el conteo terminado) y RECHAZA re-generar (`cerrado`/`cancelado`). Permiso
- * `indicadores.ciclicos-consulta` (A4). Todo en UNA transacción (A2/A3/A7).
+ * Vista de EXACTITUD de un cíclico: por renglón `cantTeorica`/`cantReal`/`exactitud` (= real−teórico)
+ * + los movimientos de ajuste que lo reconciliaron + totales. Permiso `indicadores.ciclicos-consulta`
+ * (A4). A9.
  */
-export async function generarAjusteCiclico(
+export async function consultarExactitud(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<ExactitudSalida> {
   verificarPermiso(sesion, 'indicadores.ciclicos-consulta');
+  const cliente = clienteLectura(bd);
+  const inv = await leerEncabezado(cliente, id, sesion.idEmpresaActiva);
+  const ad = adaptadorDe(inv.dimension);
+  return aExactitud(inv, ad, await ad.leer(cliente, id));
+}
+
+// ── Escritura: GENERAR AJUSTE ────────────────────────────────────────────────────────────────────
+
+/** Un componente de un renglón, ya con su diferencia calculada. */
+interface DeltaComponente {
+  cantTeorica: number;
+  cantReal: number | null;
+  existenciaActual: number;
+  diferencia: number;
+}
+
+/** Lo que el ajuste va a escribir, ya repartido en sus dos patas + el aviso de la decisión 6. */
+interface PlanAjuste {
+  entradas: { linea: LineaAjuste; idDet: number }[];
+  salidas: { linea: LineaAjuste; idDet: number }[];
+  movidos: CiclicoArticuloMovido[];
+}
+
+/**
+ * ARITMÉTICA PURA del cierre (sin BD, sin sesión): por renglón y por componente calcula la
+ * diferencia CONTADO − TEÓRICO CONGELADO, la reparte en las dos patas del ajuste y arma el AVISO con
+ * los artículos cuya existencia ACTUAL ya no es la que se congeló.
+ *
+ * ⚠️ **La diferencia se calcula contra el teórico CONGELADO, no contra la existencia de ahora**, y
+ * eso es a propósito: el conteo físico es contemporáneo del congelado, así que ésa es la diferencia
+ * que el conteo midió. Lo que la fila 0.099 arregla no es el número — es que ANTES nadie decía nada
+ * cuando el almacén se había movido en medio. Ahora el aviso pone las tres cifras juntas (congelado,
+ * actual, contado) y **dice en cuánto va a quedar la existencia si se aplica**, que es exactamente
+ * lo que hace falta para decidir entre aplicar o volver a contar.
+ */
+export function planearAjuste(
+  renglones: readonly RenglonCiclico[],
+  existencias: ReadonlyMap<string, Componentes>,
+  escala: 0 | 4,
+): PlanAjuste {
+  const entradas: PlanAjuste['entradas'] = [];
+  const salidas: PlanAjuste['salidas'] = [];
+  const movidos: PlanAjuste['movidos'] = [];
+
+  for (const r of renglones) {
+    const actual = existencias.get(textoClave(r.clave));
+    if (actual === undefined) {
+      throw new ErrorValidacion(`No se pudo leer la existencia actual de «${r.titulo}».`);
+    }
+    const llevaComplemento = r.cantTeoricaComplemento !== null;
+    const componentes: { nombre: 'cuerpo' | 'complemento'; datos: DeltaComponente }[] = [
+      {
+        nombre: 'cuerpo',
+        datos: {
+          cantTeorica: r.cantTeorica,
+          cantReal: r.cantReal,
+          existenciaActual: actual.cuerpo,
+          diferencia: r.cantReal === null ? 0 : redondear(r.cantReal - r.cantTeorica, escala),
+        },
+      },
+    ];
+    if (llevaComplemento) {
+      const teoricoComp = r.cantTeoricaComplemento ?? 0;
+      componentes.push({
+        nombre: 'complemento',
+        datos: {
+          cantTeorica: teoricoComp,
+          cantReal: r.cantRealComplemento,
+          existenciaActual: actual.complemento ?? 0,
+          diferencia:
+            r.cantRealComplemento === null
+              ? 0
+              : redondear(r.cantRealComplemento - teoricoComp, escala),
+        },
+      });
+    }
+
+    for (const c of componentes) {
+      if (redondear(c.datos.existenciaActual - c.datos.cantTeorica, escala) !== 0) {
+        movidos.push({
+          idDet: r.idDet,
+          titulo: r.titulo,
+          subtitulo: r.subtitulo,
+          componente: c.nombre,
+          cantTeorica: c.datos.cantTeorica,
+          existenciaActual: c.datos.existenciaActual,
+          cantReal: c.datos.cantReal,
+          ajuste: c.datos.diferencia,
+          existenciaResultante: redondear(c.datos.existenciaActual + c.datos.diferencia, escala),
+        });
+      }
+    }
+
+    const difCuerpo = componentes[0]?.datos.diferencia ?? 0;
+    const difComplemento = llevaComplemento ? (componentes[1]?.datos.diferencia ?? 0) : 0;
+    // Los CUATRO cuadrantes: cada componente decide su pata por separado, así que un renglón puede
+    // caer en las dos a la vez (sobra cuerpo y falta complemento, o su espejo). Escribir sólo una
+    // de las dos diagonales cruzadas es la trampa de la rama gemela que la fila 0.098 ya pisó.
+    if (difCuerpo > 0 || difComplemento > 0) {
+      entradas.push({
+        idDet: r.idDet,
+        linea: {
+          clave: r.clave,
+          cuerpo: Math.max(difCuerpo, 0),
+          complemento: llevaComplemento ? Math.max(difComplemento, 0) : null,
+        },
+      });
+    }
+    if (difCuerpo < 0 || difComplemento < 0) {
+      salidas.push({
+        idDet: r.idDet,
+        linea: {
+          clave: r.clave,
+          cuerpo: Math.max(-difCuerpo, 0),
+          complemento: llevaComplemento ? Math.max(-difComplemento, 0) : null,
+        },
+      });
+    }
+  }
+
+  return { entradas, salidas, movidos };
+}
+
+/**
+ * Genera el AJUSTE del cíclico (D3): por cada renglón contado con diferencia ≠ 0 aplica el delta
+ * como MOVIMIENTO de kardex — entrada (`ajuste-ciclico-entrada`) si real > teórico, salida
+ * (`ajuste-ciclico-salida`) si real < teórico —, JAMÁS editando un saldo. Agrupa los deltas del
+ * mismo signo en UN solo movimiento por almacén (entradas juntas / salidas juntas) para no explotar
+ * el folio; cada renglón queda enlazado a su(s) movimiento(s). Exige estado `contado` y RECHAZA
+ * re-generar (`cerrado`/`cancelado`). Todo en UNA transacción (A2/A3/A7).
+ *
+ * ⭐ **El AVISO de la decisión 6.** Antes de escribir nada compara la existencia ACTUAL (bajo el
+ * mismo bloqueo con el que va a escribir) contra el teórico congelado. Si algo se movió y el
+ * llamador no lo ha confirmado, **devuelve el aviso y NO aplica** — es un dato de la respuesta, no
+ * un error: la decisión de Daniel es *avisar y dejar decidir, no bloquear*. Con
+ * `confirmarMovimiento: true` aplica igual.
+ *
+ * Permisos: `indicadores.ciclicos-consulta` (A4) y, en telas y avíos, ADEMÁS el `.mover` de esa
+ * dimensión — el ajuste escribe en SU kardex, y abrir el cíclico a telas no debía regalarle esa
+ * llave a quien no la tenía. En PT no cambia nada (no había permiso extra y sigue sin haberlo).
+ */
+export async function generarAjusteCiclico(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaInventarioCiclicoAjuste> = {},
+  bd?: ContextoBd,
+): Promise<AjusteCiclicoSalida> {
+  verificarPermiso(sesion, 'indicadores.ciclicos-consulta');
+  const datos: DatosInventarioCiclicoAjuste = validarEntrada(
+    esquemaInventarioCiclicoAjuste,
+    cuerpo,
+  );
   const idEmpresa = sesion.idEmpresaActiva;
 
-  await enTransaccion(async (tx) => {
-    // B1 — SERIALIZA la generación del ajuste (anti doble-ajuste concurrente, D3): bloquea la FILA del
-    // encabezado con `FOR UPDATE` ANTES de decidir por el estado. Dos POST `/ajuste` casi simultáneos
-    // del MISMO cíclico ya no pueden leer ambos `contado` y aplicar el delta 2×: el 2º espera al commit
-    // del 1º y, al re-leer BAJO el lock, ve `cerrado` y aborta. El delta se precalcula sobre la teórica
-    // CONGELADA (no es idempotente) y el ajuste de solo-entrada no toma lock por-artículo, así que este
-    // lock del encabezado —no los advisory por-artículo— es la garantía de "se ajusta una sola vez".
-    // A9 por empresa activa.
-    const bloqueadas = await tx.$queryRaw<
-      { folio: bigint; idAlmacen: number; estado: EstadoInventarioCiclico }[]
+  const resultado = await enTransaccion(async (tx) => {
+    // SERIALIZA la generación del ajuste (anti doble-ajuste concurrente, D3): bloquea la FILA del
+    // encabezado con `FOR UPDATE` ANTES de decidir por el estado. Dos POST `/ajuste` casi
+    // simultáneos del MISMO cíclico ya no pueden leer ambos `contado` y aplicar el delta 2×: el 2º
+    // espera al commit del 1º y, al re-leer BAJO el lock, ve `cerrado` y aborta. El delta se calcula
+    // sobre la teórica CONGELADA (no es idempotente), así que este lock —no los advisory por
+    // artículo— es la garantía de "se ajusta una sola vez". A9 por empresa activa.
+    const filas = await tx.$queryRaw<
+      {
+        folio: bigint;
+        idAlmacen: number;
+        estado: EstadoInventarioCiclico;
+        dimension: DimensionCiclicoValor;
+      }[]
     >`
-      SELECT "folio", "id_almacen" AS "idAlmacen", "estado"
+      SELECT "folio", "id_almacen" AS "idAlmacen", "estado", "dimension"
       FROM "inventarios_ciclicos"
       WHERE "id" = ${id} AND "id_empresa" = ${idEmpresa}
       FOR UPDATE
     `;
-    const inv = bloqueadas[0];
+    const inv = filas[0];
     if (inv === undefined) {
       throw new ErrorNoEncontrado('InventarioCiclico', id);
     }
@@ -696,137 +929,109 @@ export async function generarAjusteCiclico(
         'El inventario cíclico está cancelado: no se puede generar el ajuste.',
       );
     }
+
+    const ad = adaptadorDe(inv.dimension);
+    if (ad.permisoAjuste !== null) {
+      verificarPermiso(sesion, ad.permisoAjuste);
+    }
+    // El ajuste escribe en el almacén CONGELADO al dar de alta. Se re-valida aquí (activo + de esta
+    // empresa + del tipo de la hoja) por la misma razón que la nota de salida lo hace al confirmar:
+    // entre el alta y el cierre alguien pudo desactivarlo o cambiarlo de tipo.
+    await exigirAlmacenDelTipo(tx, inv.idAlmacen, ad.tipoAlmacen, idEmpresa);
+
+    const renglones = await ad.leer(tx, id);
+    if (renglones.length === 0) {
+      throw new ErrorConflicto(
+        'La hoja de conteo no tiene ningún renglón: agrega lo que contaste antes de ajustar.',
+      );
+    }
     if (inv.estado !== 'contado') {
       throw new ErrorConflicto(
         'Faltan renglones por contar: termina el conteo antes de generar el ajuste.',
       );
     }
 
-    // Detalle contado (ya bajo el lock del encabezado).
-    const detalles = await tx.inventarioCiclicoDet.findMany({
-      where: { idInventarioCiclico: id, cantReal: { not: null } },
-      select: {
-        id: true,
-        idModelo: true,
-        idColor: true,
-        idTalla: true,
-        idOrden: true,
-        cantTeorica: true,
-        cantReal: true,
-      },
-    });
+    const ctx: ContextoDimension = { idEmpresa, idAlmacen: inv.idAlmacen };
+    // La existencia ACTUAL se re-lee con la FORMA CONGELADA de la hoja (qué renglones llevan
+    // segundo componente), no con el catálogo de hoy: si a una tela le quitaron el complemento con
+    // la hoja abierta, su saldo sigue estando en el kardex y el cierre tiene que verlo.
+    const existencias = await ad.leerExistenciasBloqueadas(
+      tx,
+      ctx,
+      renglones.map((r) => r.clave),
+      new Map(renglones.map((r) => [textoClave(r.clave), r.cantTeoricaComplemento !== null])),
+    );
+    const plan = planearAjuste(renglones, existencias, ad.escala);
 
-    // Deltas por artículo: entrada (real>teórico) / salida (real<teórico). cantReal no es null (filtro).
-    interface Delta extends Articulo {
-      idDet: number;
-      cantidad: number;
+    // DECISIÓN 6 — avisar y dejar decidir, NO bloquear. Se sale ANTES de escribir nada; los locks
+    // se sueltan al commit de esta transacción sin efectos.
+    if (plan.movidos.length > 0 && !datos.confirmarMovimiento) {
+      return { aplicado: false, aviso: { articulos: plan.movidos } };
     }
-    const entradas: Delta[] = [];
-    const salidas: Delta[] = [];
-    for (const d of detalles) {
-      const delta = (d.cantReal ?? 0) - d.cantTeorica;
-      if (delta === 0) continue;
-      const base = {
-        idDet: d.id,
-        idModelo: d.idModelo,
-        idColor: d.idColor,
-        idTalla: d.idTalla,
-        idOrden: d.idOrden,
-      };
-      if (delta > 0) entradas.push({ ...base, cantidad: delta });
-      else salidas.push({ ...base, cantidad: -delta });
+
+    // Las SALIDAS no pueden dejar la existencia en negativo (D3). Se valida contra la existencia
+    // ACTUAL leída bajo el MISMO bloqueo con el que se va a escribir — nunca contra la vista.
+    for (const s of plan.salidas) {
+      const actual = existencias.get(textoClave(s.linea.clave));
+      const renglon = renglones.find((r) => r.idDet === s.idDet);
+      const nombre = renglon?.titulo ?? 'un artículo';
+      if (actual === undefined) {
+        throw new ErrorValidacion(`No se pudo leer la existencia actual de «${nombre}».`);
+      }
+      if (redondear(actual.cuerpo - s.linea.cuerpo, ad.escala) < 0) {
+        throw new ErrorConflicto(
+          `El ajuste de salida dejaría el inventario en negativo: se intenta bajar ` +
+            `${String(s.linea.cuerpo)} de «${nombre}», que tiene ${String(actual.cuerpo)}.`,
+        );
+      }
+      const complemento = s.linea.complemento ?? 0;
+      if (complemento > 0 && redondear((actual.complemento ?? 0) - complemento, ad.escala) < 0) {
+        throw new ErrorConflicto(
+          `El ajuste de salida dejaría en negativo el segundo componente de «${nombre}»: se ` +
+            `intenta bajar ${String(complemento)} de ${String(actual.complemento ?? 0)}.`,
+        );
+      }
     }
 
     const observaciones = `Ajuste por inventario cíclico #${inv.folio.toString()}`;
-    const aLineas = (ds: Delta[]): LineaMovimientoPt[] =>
-      ds.map((d) => ({
-        idModelo: d.idModelo,
-        idColor: d.idColor,
-        idTalla: d.idTalla,
-        idOrden: d.idOrden,
-        cantidad: d.cantidad,
-      }));
+    const fecha = aDateColumna(hoyIso());
 
     let idMovSalida: number | null = null;
-    if (salidas.length > 0) {
-      const tipoSalida = await tipoPorCodigo(tx, COD_AJUSTE_SALIDA);
-      // Valida no-negativo bajo lock por artículo (los locks se mantienen hasta el commit → la
-      // escritura de la salida no se cuela con otra operación del mismo artículo).
-      for (const s of ordenarArticulos(salidas)) {
-        await bloquearArticuloPt(
-          tx,
-          idEmpresa,
-          inv.idAlmacen,
-          s.idModelo,
-          s.idColor,
-          s.idTalla,
-          s.idOrden,
-        );
-        const existencia = await existenciaPtBloqueada(
-          tx,
-          idEmpresa,
-          inv.idAlmacen,
-          s.idModelo,
-          s.idColor,
-          s.idTalla,
-          s.idOrden,
-        );
-        if (existencia - s.cantidad < 0) {
-          throw new ErrorConflicto(
-            `El ajuste de salida dejaría el inventario en negativo: se intenta bajar ${s.cantidad} ` +
-              `pza(s) de un artículo con ${existencia} en existencia.`,
-          );
-        }
-      }
-      const mov = await registrarMovimientoPtMotor(
+    if (plan.salidas.length > 0) {
+      idMovSalida = await ad.registrarAjuste(
+        tx,
         sesion,
-        {
-          idEmpresa,
-          idTipoMov: tipoSalida.id,
-          idAlmacen: inv.idAlmacen,
-          fecha: aDateColumna(hoyIso()),
-          origenTipo: ORIGEN.ajusteCiclico,
-          origenId: String(id),
-          lineas: aLineas(salidas),
-          observaciones,
-        },
-        { tx },
+        ctx,
+        'salida',
+        plan.salidas.map((s) => s.linea),
+        { observaciones, idCiclico: id, fecha },
       );
-      idMovSalida = mov.id;
+      await ad.enlazar(
+        tx,
+        sesion,
+        plan.salidas.map((s) => s.idDet),
+        idMovSalida,
+        'salida',
+      );
     }
 
     let idMovEntrada: number | null = null;
-    if (entradas.length > 0) {
-      const tipoEntrada = await tipoPorCodigo(tx, COD_AJUSTE_ENTRADA);
-      const mov = await registrarMovimientoPtMotor(
+    if (plan.entradas.length > 0) {
+      idMovEntrada = await ad.registrarAjuste(
+        tx,
         sesion,
-        {
-          idEmpresa,
-          idTipoMov: tipoEntrada.id,
-          idAlmacen: inv.idAlmacen,
-          fecha: aDateColumna(hoyIso()),
-          origenTipo: ORIGEN.ajusteCiclico,
-          origenId: String(id),
-          lineas: aLineas(entradas),
-          observaciones,
-        },
-        { tx },
+        ctx,
+        'entrada',
+        plan.entradas.map((e) => e.linea),
+        { observaciones, idCiclico: id, fecha },
       );
-      idMovEntrada = mov.id;
-    }
-
-    // Enlaza cada renglón con su movimiento de ajuste (traza; por lotes con updateMany).
-    if (idMovEntrada !== null) {
-      await tx.inventarioCiclicoDet.updateMany({
-        where: { id: { in: entradas.map((e) => e.idDet) } },
-        data: { idMovimientoAjuste: idMovEntrada, modificadoPorId: sesion.id },
-      });
-    }
-    if (idMovSalida !== null) {
-      await tx.inventarioCiclicoDet.updateMany({
-        where: { id: { in: salidas.map((s) => s.idDet) } },
-        data: { idMovimientoAjuste: idMovSalida, modificadoPorId: sesion.id },
-      });
+      await ad.enlazar(
+        tx,
+        sesion,
+        plan.entradas.map((e) => e.idDet),
+        idMovEntrada,
+        'entrada',
+      );
     }
 
     await tx.inventarioCiclico.update({
@@ -840,15 +1045,26 @@ export async function generarAjusteCiclico(
       accion: 'OTRO',
       datos: {
         ajuste: true,
-        entradas: entradas.length,
-        salidas: salidas.length,
+        dimension: inv.dimension,
+        entradas: plan.entradas.length,
+        salidas: plan.salidas.length,
+        articulosMovidos: plan.movidos.length,
         idMovEntrada,
         idMovSalida,
       },
     });
+
+    return {
+      aplicado: true,
+      aviso: plan.movidos.length > 0 ? { articulos: plan.movidos } : null,
+    };
   }, bd);
 
-  return consultarExactitud(sesion, id, bd);
+  return {
+    aplicado: resultado.aplicado,
+    aviso: resultado.aviso,
+    exactitud: await consultarExactitud(sesion, id, bd),
+  };
 }
 
 // ── Escritura: CANCELAR ──────────────────────────────────────────────────────────────────────────

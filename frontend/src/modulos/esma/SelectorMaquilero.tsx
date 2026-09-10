@@ -4,8 +4,12 @@ import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBusca
 import { Field, FieldLabel } from '@/components/ui/field';
 import { SelectNativo } from '@/components/ui/native-select';
 
-/** Tipo de maquilero del selector: costura, estampado o cualquier rol de maquila (''). */
-export type TipoMaquilero = '' | 'costura' | 'estampado';
+/**
+ * Tipo de maquilero del selector: costura, estampado, corte, empaque, o cualquier rol de maquila
+ * (''). Corte y empaque entraron en 0.114, cuando Daniel los puso del lado de la maquila
+ * (*«corte es parte de maquilas, no de proveedores … y una maquila de empaque también»*).
+ */
+export type TipoMaquilero = '' | 'costura' | 'estampado' | 'corte' | 'empaque';
 
 /** Opción del combobox de maquilero: id + nombre + clave corta (línea secundaria). */
 interface OpcionMaquilero {
@@ -70,10 +74,28 @@ export function ComboboxMaquilero({
 }
 
 /**
- * Selector reutilizable de MAQUILERO (F6-E5, ex `QueTipoMaq`): un select de TIPO (costura/estampado)
- * + el {@link ComboboxMaquilero} buscable del tipo elegido (`GET /api/esma/maquileros?tipo=`). Al
- * cambiar el tipo se limpia el maquilero (avisando por `onCambioTipo`). Lo usan el estado de cuenta, el
- * desglosado y los recibos semanales.
+ * Los tipos que el selector ofrece cuando NO se acota (0.114): los cinco roles de maquila, con el
+ * corte y el empaque incluidos porque Daniel los puso de ese lado.
+ */
+const TIPOS_TODOS = ['costura', 'estampado', 'corte', 'empaque'] as const;
+
+/** Etiqueta visible de cada tipo (el vocabulario de Daniel: la aplicación se llama ARTE). */
+const ETIQUETA_TIPO: Record<Exclude<TipoMaquilero, ''>, string> = {
+  costura: 'Costura',
+  estampado: 'Prov. de Arte',
+  corte: 'Corte',
+  empaque: 'Empaque',
+};
+
+/**
+ * Selector reutilizable de MAQUILERO (F6-E5, ex `QueTipoMaq`): un select de TIPO (costura/estampado
+ * y, desde 0.114, corte/empaque) + el {@link ComboboxMaquilero} buscable del tipo elegido
+ * (`GET /api/esma/maquileros?tipo=`). Al cambiar el tipo se limpia el maquilero (avisando por
+ * `onCambioTipo`). Lo usan el estado de cuenta, el desglosado y los recibos semanales.
+ *
+ * `tipos` acota qué opciones se ofrecen; por default, todas. Los recibos semanales le pasan
+ * `TIPOS_IDA_Y_VUELTA` (de `./comun`) porque su reporte sale de los RECIBOS y el corte/empaque no
+ * tienen.
  */
 export function SelectorMaquilero({
   tipo,
@@ -81,12 +103,15 @@ export function SelectorMaquilero({
   idMaquilero,
   onCambioMaquilero,
   idPrefijo = 'sel',
+  tipos = TIPOS_TODOS,
 }: {
   tipo: TipoMaquilero;
   onCambioTipo: (tipo: TipoMaquilero) => void;
   idMaquilero: string;
   onCambioMaquilero: (id: string) => void;
   idPrefijo?: string;
+  /** Qué tipos ofrecer (además de «Todos»). Default: todos los roles de maquila. */
+  tipos?: readonly Exclude<TipoMaquilero, ''>[];
 }): React.JSX.Element {
   return (
     <>
@@ -98,9 +123,15 @@ export function SelectorMaquilero({
           onChange={(e) => onCambioTipo(e.target.value as TipoMaquilero)}
           data-testid={`${idPrefijo}-tipo`}
         >
+          {/* «Todos» significa "cualquier rol de maquila", y eso incluye SIEMPRE a cortadores y
+              empacadores: es el backend quien resuelve el conjunto (`ROLES_MAQUILA_ESMA`), no esta
+              lista. Acotar `tipos` sólo quita opciones de FILTRO, no esconde a nadie de «Todos». */}
           <option value="">Todos</option>
-          <option value="costura">Costura</option>
-          <option value="estampado">Prov. de Arte</option>
+          {tipos.map((t) => (
+            <option key={t} value={t}>
+              {ETIQUETA_TIPO[t]}
+            </option>
+          ))}
         </SelectNativo>
       </Field>
       <Field>

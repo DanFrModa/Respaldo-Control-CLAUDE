@@ -56,7 +56,9 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
       proveedor limpia las telas capturadas. El servidor es la autoridad (A1); el filtro es ayuda.
   - `mrp.ts` — el **corazón MRP** (R3/R7):
     - `explosionarOrden` — requerido = `consumoPorPrenda` del BOM con bandera `paraProduccion` ×
-      Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. Persiste el
+      Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. ⭐⭐ Desde V1-E8c
+      (§Post-F9.126) hay **un renglón por (material, color)** también en los avíos: el color de la
+      PRENDA, con las piezas de ESE color; y si el avío se pide por medida, con su desglose. Persiste el
       snapshot `RequerimientoOrden` (borra+reescribe en UNA tx → congela la explosión aunque el BOM
       cambie) y devuelve el **diff** vs el snapshot previo.
     - **Genéricos (decisión (d)):** un avío `esGenerico` se **netea contra existencia REAL** del
@@ -130,9 +132,12 @@ para que un estatus nuevo obligue a decidir a mano).
 cuenta `autorizada` y `recibida_*`, porque ahí la pregunta es *"¿qué precio pagó de verdad la empresa?"*.
 **Dos preguntas distintas, dos criterios distintos**, cada uno escrito donde se usa.
 
-En la salida de la explosión eso se traduce en dos campos por renglón: **`cantidadEnOc`** y
-**`cantidadPendiente` = max(0, cantidadAComprar − cantidadEnOc)**. Sólo lo pendiente se compra. **Nada de
-esto se persiste**: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar.
+En la salida de la explosión eso se traduce en tres campos por renglón: **`cantidadEnOc`**,
+**`cantidadCubierta`** (⭐⭐ V1-E8e, ver abajo) y **`cantidadPendiente` = max(0, cantidadAComprar −
+cantidadEnOc − cantidadCubierta)**. Sólo lo pendiente se compra, y esa resta vive en **una sola
+función** (`pendienteDeComprar`, en este mismo archivo): **UN criterio, no dos**. `cantidadEnOc` **no se
+persiste** — cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar;
+`cantidadCubierta` **sí** vive en su propia tabla, y ahí está su gracia (§Post-F9.99).
 
 ### 1bis. 🔴 La ESCALA manda desde el DESTINO (`Decimal(14,2)`)
 
@@ -146,7 +151,7 @@ La regla, en `reparto-ordenes.ts`:
 
 - **`ESCALA_CANTIDAD_COMPRA = 2`**, y `redondearCantidadCompra` **se deriva de ella** (una constante
   que no gobierna lo que dice gobernar es una mentira con otro disfraz).
-- **Lo PENDIENTE** (`max(0, aComprar − enOc)`) se calcula y se compara en esa escala, en la explosión
+- **Lo PENDIENTE** (`max(0, aComprar − enOc − cubierto)`) se calcula y se compara en esa escala, en la explosión
   y en el plan — los dos tienen que decir el mismo número.
 - **El reparto cierra la Σ en esa escala**, con la última OP absorbiendo el residuo: la suma de lo
   GUARDADO es exactamente lo comprado.
@@ -156,8 +161,9 @@ La regla, en `reparto-ordenes.ts`:
 - **Una línea que se guardaría como `0.00` no se escribe**, y un ajuste por debajo del mínimo **se
   rechaza diciendo por qué** en vez de crear un documento vacío.
 
-**El mismo hueco vivía en el PRECIO** (`OrdenCompraLinea.precio Decimal(12,2)`): el precio sugerido
-sale de `precio ÷ factorConversion` (R1) y trae colas larguísimas, así que la previa prometía
+**El mismo hueco vivía en el PRECIO** (`OrdenCompraLinea.precio Decimal(12,2)`): un precio de cola
+larga —hasta V1-E8a lo producía el factor de conversión; hoy, el que **teclea el comprador**
+(§Post-F9.94) o el **promedio de medidas** del avío (R5/B11)— hacía que la previa prometiera
 **5,999.99** donde la OC guardaba **5,999.40**. El precio se redondea a la escala de su columna
 (`redondearPrecioCompra`) y el **importe** se calcula con `redondear2(cantidad × precio)` — **la misma
 función** con la que `aCompraSalida` deriva el subtotal de la línea, para que los dos totales no
@@ -250,6 +256,7 @@ dato con el que decidir cuál era el precio**.
 | Color de **PRENDA** | `Color` + `OrdenLinea.idColor`/`.pantone` | el de la matriz color×talla de la OP |
 | Color de **TELA** | `TelaColor` (nombre libre, pantone, precio, precio de complemento) | lo que el proveedor manda y el almacén recibe |
 | **El puente** ⭐ | **`OrdenTelaColor`** (`idOrdenTela` + `idColor` → `idTelaColor`) | *"para ESTA OP, el marino de la matriz es este color de esta tela"* |
+| Color de **AVÍO** ⭐⭐ | **no hay catálogo** (§Post-F9.91): `OrdenCompraLinea.idColorPrenda` (identidad) + `colorAvio` (texto) | V1-E8c: el avío se pide por el color de la **PRENDA**, y lo que el proveedor lee es texto editable |
 
 El puente vive **en la orden**, no en el catálogo ni en el BOM: el modelo define la TELA (y eso está
 bien), el COLOR es de cada pedido. Mismo criterio que `OrdenTela.idProveedorCompra` (§Post-F9.82).
@@ -276,6 +283,88 @@ regla nueva para *valuar* movería números del precosteo que nadie pidió mover
   renglón sin color, para que la OP no se quede corta por un dato pendiente de capturar.
 - **La agrupación es `material|color|proveedor`**: dos OP que piden el mismo color caen en un renglón
   (decisión (c) de Daniel) y **siguen guardándose una línea de OC por OP** (§Post-F9.86 intacta).
+
+---
+
+## ⭐⭐ El AVÍO también se compra POR COLOR, y se pide POR MEDIDA (V1-E8c — §Post-F9.126)
+
+Daniel, probando: *"le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la
+OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*. Y el caso completo: *"ese modelo
+nos lo piden en **4 variantes de color**… se juntan las 4 OP en **una sola OC**… **cada color es
+diferente y cada color tiene cantidades por medida**… **en la receta no viene definido el color, eso
+viene hasta que nos hacen el pedido**"* (igual con jaretas y cintas palmita).
+
+### 🔴 La regla que decide dónde vive cada cosa
+
+> **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al proveedor
+> va en la TABLITA.**
+
+| | Dónde vive | Por qué ahí |
+|---|---|---|
+| **COLOR** | parte el **renglón** (`idColorPrenda` + `colorAvio`) | se **recibe contra la LÍNEA, que lleva el color** (⚠️ el **kardex de avíos NO lleva color**: `MovimientoDetAvio` no tiene esa columna y `existencia_avio` agrupa sin ella — por eso el stock del genérico se netea una vez y se consume color por color) y `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que aprender a leer una tabla** |
+| **MEDIDA** | **tablita** bajo el renglón (`OrdenCompraLineaMedida`) | **no se recibe por medida**: llegan *"3,200 cierres"* y el proveedor los cortó según el desglose. Es información **para él** |
+
+⚠️ **LA MEDIDA NO MULTIPLICA NUNCA.** La cantidad de una medida sale de **cuántas prendas la llevan**
+(curva × consumo por prenda), jamás del NÚMERO de la medida — leer el `50` de *"50 cm"* como consumo es
+de donde salieron los **133,095** cierres de §Post-F9.105. Por eso el desglose se calcula **abriendo la
+MISMA regla R18** (`produccion/receta-avios.ts` devuelve `porTalla`) y no con una cuenta paralela.
+
+### Las dos nociones de color, otra vez — y por qué NO hay catálogo de color de avío
+
+El avío **no tiene colores en ningún catálogo**, y es decisión de Daniel (§Post-F9.91): *"los avíos no
+llevan catálogo de color: **el color va en su descripción**"*. Así que el color que identifica al
+renglón es el **de la PRENDA** (`Color`, el de la matriz color×talla de la OP, D4) y lo que el proveedor
+lee es un **texto editable**:
+
+| Pieza | Qué es | Quién la usa |
+|---|---|---|
+| `idColorPrenda` | la **identidad** del renglón | el neteo (`colorDelRenglon`), la agrupación, el diff, el reparto por OP |
+| `colorAvio` | el **texto que lee el proveedor** | el impreso y las pantallas. Nace con el nombre del color de la prenda y **se corrige en la revisión previa** (el avío puede ir en **contraste**) |
+
+🔴 **No hay una segunda clave de agrupación.** Es la MISMA `claveAgrupada` de V1-E3u
+(`material | color | proveedor`) con un concepto de color más ancho: `colorDelRenglon` devuelve el de
+tela en las telas y el de prenda en los avíos. Nunca se confunden porque el número viaja **dentro** de
+la clave del material (`tela-5` / `avio-9`), que ya separa los dos mundos.
+
+### La invariante del desglose
+
+**Σ de las medidas = cantidad de la línea, EXACTAMENTE.** Se reparte con la misma función que reparte
+una compra entre las OP (`repartirEntreOrdenes`: la última absorbe el residuo, a la escala de la
+columna). Hace falta porque el total del renglón **no siempre es el requerido**: se le resta lo que ya
+está en otra OC (§Post-F9.85) y el comprador lo puede editar antes de generar (§Post-F9.94). Un desglose
+que siguiera diciendo el requerido viejo **contradiría a su propio renglón**.
+
+⚠️ **Se desglosan CANTIDADES, no precios** (§Post-F9.113): un solo precio para todo el renglón, y el
+importe cuadra sin excepciones.
+
+### Las tres salidas
+
+| Dónde | Qué enseña |
+|---|---|
+| **Explosión** | el chip del color junto al material y *"Por medida: 53 cm: 10 · 60 cm: 20"* bajo el requerido |
+| **Revisión previa** | lo mismo, **más el campo editable del color** — es la última pantalla antes de comprometer el dinero |
+| **Impreso PDF del proveedor** | el color pegado al material (*"CIE-53 — Cierre · Rojo"*) y una sub-tabla *"Desglose por medida"*, **consolidado** (§Post-F9.102: una cantidad por color+medida, **sin** el reparto interno por OP) |
+
+🔴 **El papel agrupa por el TEXTO del color, no por `idColorPrenda`** — lo destapó una mutación que
+sobrevivió. Dos líneas que el comprador corrigió al mismo color ("Negro contraste" para el rojo y para
+el azul) salían como **dos renglones idénticos**: al proveedor no le sirven nuestros ids. El reparto
+interno sigue guardado intacto; lo que se agrupa es sólo el documento.
+
+⚠️ **La orden de compra NO tiene export a Excel** (sólo PDF): no se inventó uno en esta etapa.
+
+🔴 **Y una cuarta, que no es "salida" pero es donde más duele: la RECEPCIÓN.** Con cuatro renglones del
+mismo cierre, quien recibe leía *"CIE-53 — Cierre"* cuatro veces y no tenía con qué elegir. El nombre
+del renglón lleva su color en los dos sitios que lo arman (`nombreMaterialDeLinea` de las OC recibibles
+y la proyección de la recepción) y en la pantalla, que ya comparte el helper `descripcionMaterial`.
+
+### ⚠️ El límite, declarado y aceptado por Daniel
+
+Una **entrega parcial sabrá el COLOR pero NO la MEDIDA**: la recepción cruza contra la LÍNEA (que lleva
+su color) y la medida es informativa — no hay dimensión de medida ni en la recepción ni en el kardex de
+avíos. **No es un callejón sin salida**: el día que importe, la medida sube de la tablita al renglón con
+este mismo mecanismo, igual que el color acaba de subir.
+
+---
 
 ### El desvío AVISA a quien autoriza — y NO bloquea
 
@@ -365,6 +454,106 @@ Es otra etapa (catálogo + kardex + recepción + migración) y queda **propuesta
 | `PUT` | `/api/ordenes/:id/colores-tela` | `compras.administrar` |
 | `PUT` | `/api/telas-colores/:idTelaColor/precio` | `compras.administrar` |
 
+## ⭐⭐ «Con esto queda cubierto»: el faltante chico que alguien decide no perseguir (V1-E8e — §Post-F9.99)
+
+Daniel, usando la explosión en `prueba`:
+
+> *"En las telas, compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que
+> me falta comprar 1 kilo… no sé cómo manejar eso, pero **a veces pasa eso en la realidad**. Y **no voy
+> a hacer otra OC por 1 kilo**."*
+
+Hasta esta etapa `RequerimientoOrden` sólo guardaba **cuánto se necesita**. No existía el concepto de
+*"esto ya lo doy por surtido aunque falte un pedacito"*, así que el faltante **lo perseguía para
+siempre**: cada explosión volvía a ofrecerle comprar 1 kilo.
+
+### La regla, con su razón
+
+- ⭐ **Se pregunta EN EL MOMENTO de decidir.** Cuando el comprador **baja la cantidad** en la revisión
+  previa por debajo de lo que se necesitaba, la pantalla pregunta qué significa:
+  *"el resto **sigue pendiente**"* o *"**con esto queda cubierto** — no me lo vuelvas a pedir"*. Ahí es
+  cuando la persona sabe la respuesta; un interruptor escondido en otra pantalla la obligaría a
+  acordarse y a buscarlo.
+- **Se pregunta SIEMPRE que se baja, sin umbral.** Un umbral sería otro número inventado, y de todos
+  modos es un clic.
+- 🔴 **El default es «sigue pendiente». NUNCA se cierra solo.**
+- **Con rastro (A7):** quién lo dio por cubierto, cuándo, con qué cantidad comprada y contra qué
+  requerido.
+- **Y una segunda puerta desde el renglón de la explosión**, para los faltantes **que ya se escaparon**
+  —como el que originó esto, que ya estaba generado—, con su **«volver a pedirlo»**.
+
+🔴 **Por qué NO una tolerancia automática** (es lo primero que se le ocurre a uno, y está descartado con
+razón): **1 kg de 481 es nada, pero 1 kg de 5 es el 20 %**. Un porcentaje único **o tapa faltantes de
+verdad o no sirve**. *Que la persona lo diga es más barato y más honesto que adivinarlo.*
+
+### 🔴 Dónde vive la marca — y por qué no donde parecía
+
+**NO puede vivir en `RequerimientoOrden`.** Ese snapshot se **borra y se reescribe ENTERO en cada
+explosión** (`deleteMany` + recreación en `mrp.ts`, la misma razón por la que sus ids cambian). Una
+bandera ahí **se borraría la próxima vez que alguien explotara la orden**, y el faltante volvería sin
+que nadie entendiera por qué.
+
+Vive en su **propia tabla, `RequerimientoCubierto`**, con una identidad **durable**: *(orden, material,
+color)* — la MISMA que usan el neteo y la agrupación (`claveMaterialColor`, en `comprometido-en-oc.ts`).
+
+⚠️ **El COLOR está en esa identidad, y no es adorno.** Desde §Post-F9.89 (telas) y §Post-F9.126 (avíos)
+un renglón de explosión ES *(material, color)*: una marca por material a secas **cubriría el cierre rojo
+y seguiría pidiendo los otros tres** — o peor, los taparía todos.
+
+⚠️ **Es un LIBRO de actos, no un estado que se pisa** (D3, el criterio del kardex): cada «dar por
+cubierto» **inserta** un renglón, y lo cubierto es la **Σ de los vivos**. *"Volver a pedirlo"* sella
+`canceladoEn` y deja de contar — **nunca borra**, así el rastro sobrevive a la corrección.
+
+### UN criterio, no dos
+
+> El requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**.
+
+Esa resta se hace en **un solo sitio**: `pendienteDeComprar(aComprar, enOc, cubierto)`, en
+`comprometido-en-oc.ts`, junto a la única verdad sobre *"cuánto ya compré"*. Antes la fórmula vivía
+**repetida** en la proyección de la explosión y en el plan de compra; con un tercer sumando, el día que
+una de las dos se quedara atrás la explosión y la revisión previa dirían números distintos sobre lo
+mismo — el defecto exacto que §Post-F9.85 vino a cerrar.
+
+### Y el renglón cerrado dice SU razón, no la de otro
+
+`motivoDeOmision` gana el motivo **`dado-por-cubierto`**, que **manda sobre `ya-en-oc` y
+`menor-al-minimo`** cuando hay marca. No es cosmético: `ya-en-oc` diría *"si esa OC se cancela, vuelve a
+aparecer"* —mandando a cancelar una compra correcta— y `menor-al-minimo` diría que falta menos de 0.01,
+cuando puede faltar un kilo entero. **No basta con no callarse (D3): hay que no mentir.** La frase dice
+quién lo cerró, cuánto, y **cómo se deshace**.
+
+### Lo que esta etapa NO toca, declarado
+
+- **El tablero R7 («qué tengo / qué falta») NO cuenta la marca**, y es a propósito: ese tablero mide lo
+  **FÍSICO** —qué llegó al almacén— y dar por cubierto **no mueve ni un gramo de material**. Si se
+  compraron 4 de 5, el semáforo sigue diciendo *recibido parcial*, que es la verdad. Es la misma
+  distinción que ya separa el criterio del **costo** del criterio de *"¿hace falta volver a comprar?"*.
+- **Cancelar la OC no deshace la marca.** Si se cancela la compra de 480, el faltante vuelve a ser 480
+  (la OC deja de cubrir) pero el kilo cerrado **sigue cerrado**. Consecuencia declarada: se compraría 1
+  kg de menos. Se corrige con **«volver a pedirlo»**, que existe justo para eso.
+- **Cambiar el color de una tela reabre su faltante.** La marca cuelga de *(material, color)*: si el
+  renglón pasa de *sin color* a *marino*, la marca vieja ya no le corresponde — y es correcto, porque es
+  **otro renglón** (la premisa de §Post-F9.89).
+- **Sin backfill.** No hay dato del que deducir qué faltantes históricos alguien habría dado por
+  cubiertos; los que ya se escaparon se cierran a mano desde el renglón, que es la segunda puerta.
+- **Dos actos simultáneos sobre el mismo renglón pueden cubrir de más.** No hay lock, a propósito: la
+  marca sólo **resta** y el pendiente clampa en 0, así que **no rompe ninguna invariante**, y las dos
+  personas pidieron dejar de perseguirlo. Los dos actos quedan en la tabla con su autor y **«volver a
+  pedirlo» los deshace**. Poner un `pg_advisory_xact_lock` protegería una invariante que no existe.
+
+### Endpoints
+
+| Método | Ruta | Permiso | Qué hace |
+|---|---|---|---|
+| `PUT` | `/api/explosion/dado-por-cubierto` | `compras.administrar` | Cierra (`cubierto: true`) o reabre (`false`) el faltante de unos renglones. **Idempotente**: la segunda vez ya no falta nada que cubrir |
+
+La primera puerta **no tiene endpoint propio**: viaja como el campo `restoCubierto` del **ajuste** en
+`POST /api/explosion/previo` y `POST /api/explosion/generar-oc`, y la marca se escribe **dentro de la
+misma transacción que crea las OC** (A2). O se emiten las compras y se cierran los faltantes, o no pasa
+ninguna de las dos cosas.
+
+⚠️ **La cantidad NO viaja desde el cliente** en ninguna de las dos puertas: la calcula el servidor
+(A1). Lo que la pantalla dice es *"esto ya no me lo pidas"*, no un número.
+
 ## Enganche con Desarrollo (F8-E6)
 
 El MRP dejó de tratar la explosión como un cálculo "a ciegas": ahora **hereda los amarres de precio
@@ -378,7 +567,8 @@ de Desarrollo** (módulo 15, ver [`desarrollo-cotizacion.md`](desarrollo-cotizac
   al comprar, D5; captura manual). Así las telas **dejan de capturarse a mano** en la explosión cuando
   vienen del amarre.
 - **Prioriza el amarre de avío.** Los avíos anteponen el amarre `ModeloAvio.idAvioProveedor`
-  (`resolverPrecioAvio`, precio ÷ `factorConversion`); **sin amarre usable, caen al "más barato" de F4**
+  (`resolverPrecioAvio`, el precio **tal cual**, en unidad de consumo — §Post-F9.97); **sin amarre
+  usable, caen al "más barato" de F4**
   (fallback intacto → NO-REGRESIÓN; ese fallback sí filtra `activo`).
 - **Avíos por medida × talla (R18).** El consumo de avío por talla se compra por la **medida × la curva**
   de la orden (piezas agrupadas por talla), no por un consumo plano por prenda.
@@ -484,12 +674,36 @@ Seis reglas que el **dominio** impone (la UI solo ayuda; el servidor es la autor
 | Una OC liga **varias OP** | `OrdenCompraLinea.idOrden` → N:N derivado | Ya existía; se hizo visible en la UI y quedó probado. |
 | La tela se compra **con su complemento** | `validarLineas` + `exigirComplementosCapturados` | `cantidadComplemento`/`precioComplemento` por renglón; el importe suma al subtotal. |
 
-**El complemento y la explosión MRP** (la única excepción, cerrada sin inventar datos): el BOM guarda
-un solo `consumoPorPrenda` por tela, así que la explosión **no sabe** cuánto complemento comprar. Sus
-OC nacen con `cantidadComplemento` en NULL —vía la bandera interna `automatica` de `crearOC`, que NO
-viaja por el API— y **`autorizarOC` las detiene** hasta que alguien capture la cantidad. La fecha de
-entrega y la dirección de esas OC salen de la **orden de producción** y de la **favorita** del
-catálogo; si falta alguna, el error dice exactamente qué falta.
+**El complemento y la explosión MRP** — ⭐⭐ **CERRADO EN LA FILA 0.156** (§Post-F9.214 /
+§Post-F9.219). Hasta la v0.129 el BOM guardaba **un solo** `consumoPorPrenda` por tela, así que la
+explosión **no sabía** cuánto complemento comprar y todas sus OC nacían con `cantidadComplemento` en
+NULL. Ahora la receta lo trae (`ModeloTela.consumoComplementoPorPrenda` → congelado en
+`OrdenTela.consumoComplementoPorPrenda`) y la explosión calcula la cantidad como una **razón sobre el
+cuerpo de esa línea**: `cárdigan = cuerpo × (consumo del cárdigan ÷ consumo de la felpa)`
+(`razonDeComplemento` + `cantidadComplementoDeLinea`, ambas puras). Es una razón —y no
+`piezas × consumo`— porque **el cárdigan viaja con su felpa**: mismo renglón, mismo proveedor, mismo
+lote; si el comprador ajusta el cuerpo a 480 kg, lo que hace falta es el cárdigan de esos 480.
+
+⭐ **El número nace en el PLAN, no en la generación**, y no es un detalle de implementación: el
+subtotal de una línea de OC es `cantidad × precio + complemento × (precioComplemento ?? precio)`, así
+que en cuanto el cárdigan deja de ir vacío **empieza a costar**. Calcularlo al generar dejaría la
+**revisión previa** prometiendo un total menor del que la orden guarda — lo que §Post-F9.85 prohíbe.
+La previa lo lleva en `PlanLineaOrden.cantidadComplemento` y en su `importe`; la generación **lo
+copia**. La OC automática no captura precio del complemento, así que se valúa **al precio del cuerpo**.
+Y como la previa pinta literalmente `cantidad × precio = importe`, cada renglón dice **cuánto
+complemento incluye** su importe (`PlanRenglon.nombreComplemento` da el nombre): sin eso, la cuenta
+dejaría de cerrar a la vista justo en la última pantalla antes de comprometer el dinero.
+
+La línea **sigue naciendo pendiente** en los tres casos en que no hay nada que calcular: la tela ya no
+declara complemento en el catálogo, la receta no lo capturó, o el consumo del cuerpo es 0. Para eso se
+conserva intacta la bandera interna `automatica` de `crearOC` (que NO viaja por el API) y
+**`autorizarOC` sigue deteniendo** esas OC hasta que alguien capture la cantidad. La
+**dirección** de esas OC sale de la **favorita** del catálogo; la **fecha de entrega** hay que
+capturarla a mano al generar las compras (la de arriba para todas, o una por proveedor) — 🔴 desde
+**V1-E7f (§Post-F9.120) NO se hereda de la orden de producción**: la fecha de la OP es cuándo se le
+entrega al CLIENTE y la de la OC es cuándo tiene que llegar la TELA, así que copiarla dejaba el campo
+lleno con un número imposible que se ve legítimo. Si falta, el error nombra a los proveedores que se
+quedarían sin fecha y no se genera nada.
 
 **El catálogo de direcciones nace vacío** a propósito (una dirección es dato del negocio): se captura
 en *Catálogos › Direcciones de entrega* antes de la primera OC.

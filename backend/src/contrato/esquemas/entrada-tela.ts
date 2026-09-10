@@ -1,11 +1,16 @@
 import { z } from 'zod';
 
 /**
- * Esquemas Zod de la ENTRADA DE TELA por FACTURA/REMISIÓN, SIN orden de compra (etapa B1 — Daniel
- * `DECISIONES.md` §Post-F9.9 punto 7: *"permitir las dos vías (con orden de compra y por
- * factura/remisión sin OC), con una cabecera por documento y N partidas (cada una con su color y
- * sus telas al tono)"*; §Post-F9.11 para la reestructura por color). UNA definición de reglas para
- * UI y servidor (alimenta el OpenAPI). Toda la lógica vive en el dominio (A1); aquí sólo las FORMAS.
+ * Esquemas Zod de la ENTRADA DE TELA por FACTURA/REMISIÓN (etapa B1; §Post-F9.11 para la
+ * reestructura por color). UNA definición de reglas para UI y servidor (alimenta el OpenAPI). Toda
+ * la lógica vive en el dominio (A1); aquí sólo las FORMAS.
+ *
+ * 🔴 **SIEMPRE CONTRA UNA ORDEN DE COMPRA** (§Post-F9.159(a), Daniel 30-ago-2026: *«es imposible.
+ * Porque sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*). El
+ * documento SIGUE siendo la factura/remisión del proveedor —con su número, su PDF y su CFDI—, pero
+ * **cada renglón tiene que apuntar al renglón de OC que surte**: `idOrdenCompraLinea` es
+ * OBLIGATORIO. La línea de §Post-F9.9 punto 7 que permitía *"las dos vías… sin OC"* quedó
+ * **SUPERADA** por esa decisión y ya no se cita como vigente.
  *
  * Modelo del documento:
  *  • CABECERA: tipo (factura|remisión) + número del documento del proveedor + proveedor + fecha +
@@ -84,17 +89,23 @@ export const esquemaEntradaTelaLineaEntrada = z
       .optional()
       .describe('Número de lote del proveedor de esta partida (opcional).'),
     /**
-     * Renglón de ORDEN DE COMPRA que surte este renglón (§Post-F9.14). Omitirlo o mandarlo `null` =
-     * tela SIN orden de compra, que sigue siendo válido. Al confirmar el documento, los renglones
-     * con OC generan la recepción de esa orden y la marcan como recibida.
+     * Renglón de ORDEN DE COMPRA que surte este renglón (§Post-F9.14) — **OBLIGATORIO**
+     * (§Post-F9.159(a)). Antes se podía omitir o mandar `null` ("tela suelta"); esa vía **se cerró**:
+     * sin OC no hay de quién recibir. El error se pone aquí, en el contrato, para que llegue ANTES
+     * de tocar la base y señalando el renglón exacto; el dominio lo vuelve a exigir en su embudo
+     * (`validarCabeceraYLineas`), que es lo que también cubre al CONFIRMAR un borrador viejo.
      */
     idOrdenCompraLinea: z
-      .number({ error: 'El renglón de la orden de compra debe ser un número' })
+      .number({
+        error:
+          'No se puede recibir tela que no se haya comprado: liga el renglón a la orden de compra que surte',
+      })
       .int({ error: 'El renglón de la orden de compra debe ser un id entero' })
       .positive({ error: 'El renglón de la orden de compra debe ser un id positivo' })
-      .nullable()
-      .optional()
-      .describe('Renglón de OC que surte este renglón, o null si la tela no viene de una OC.'),
+      .describe(
+        'Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra ' +
+          '(§Post-F9.159(a)).',
+      ),
   })
   .refine((l) => l.cantidad > 0 || (l.cantidadComplemento ?? 0) > 0, {
     error: 'Captura cantidad de cuerpo o de complemento (al menos una mayor que 0)',
@@ -153,7 +164,10 @@ export const esquemaEntradaTelaCrear = z
       .array(esquemaEntradaTelaLineaEntrada)
       .min(1, { error: 'Captura al menos un renglón de tela y color' }),
   })
-  .describe('Alta de una entrada de tela por factura/remisión (sin orden de compra).');
+  .describe(
+    'Alta de una entrada de tela por factura/remisión, SIEMPRE contra órdenes de compra ' +
+      '(§Post-F9.159(a): no se recibe tela que no se haya comprado).',
+  );
 
 /** Datos validados de alta de entrada de tela. */
 export type DatosEntradaTelaCrear = z.infer<typeof esquemaEntradaTelaCrear>;
@@ -218,11 +232,19 @@ export const esquemaEntradaTelaLineaSalida = z
     loteProveedor: z.string().nullable(),
     idPartida: z.number().int().nullable().describe('Partida creada al confirmar, o null.'),
     partidaFolio: z.number().int().nullable().describe('Folio de la partida, o null.'),
+    /**
+     * SIGUE SIENDO `nullable` en la SALIDA a propósito (D3 — lo guardado es inmutable): los
+     * documentos capturados ANTES de §Post-F9.159(a) tienen renglones sin OC y **se siguen
+     * listando, consultando e imprimiendo**. La puerta que se cerró es de ESCRITURA.
+     */
     idOrdenCompraLinea: z
       .number()
       .int()
       .nullable()
-      .describe('Renglón de OC que surte este renglón (§Post-F9.14), o null si es tela suelta.'),
+      .describe(
+        'Renglón de OC que surte este renglón (§Post-F9.14). null SOLO en documentos anteriores a ' +
+          '§Post-F9.159(a): capturar hoy sin OC ya no se puede.',
+      ),
     numCompra: z
       .number()
       .int()

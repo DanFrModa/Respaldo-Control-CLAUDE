@@ -55,6 +55,15 @@ export const MODULOS_PERMISO = {
   // pagos/abonos/descuentos/notas de crédito/entradas sin factura. `ver` (consulta, roles que ya ven
   // EsMa/terceros) y `administrar` (captura/cancelación, solo Administración/Dirección).
   cxp: 'Cuentas por pagar (Finanzas)',
+  // Catálogo de conceptos de pago que NO son proveedores (fila 0.125, §Post-F9.189(c)) — nóminas por
+  // fuera, gratificaciones, servicios, caja chica. Catálogo MAESTRO propio: NO se gobierna con
+  // `proveedores.*` porque Daniel fue explícito en que *«sean un catálogo aparte, no proveedores»*, y
+  // porque quien administra el padrón de proveedores no tiene por qué poder inventar destinos de pago.
+  'conceptos-pago': 'Conceptos de pago (no proveedores)',
+  // La corrida semanal de pagos (fila 0.113, §Post-F9.189(g)) — la relación con la que Daniel decide
+  // cada semana a quién se le paga y cuánto. `corrida-armar` la arma, cierra y ejecuta (él);
+  // `corrida-ver` la consulta (finanzas, sólo lectura).
+  pagos: 'Corrida semanal de pagos',
   // Cuentas por cobrar de clientes (Finanzas, Módulo 14, F9-E4) — el uso de negocio del motor de
   // terceros para el CLIENTE: bandeja "por cobrar" con aging, estado de cuenta e importación de CFDI de
   // ventas. `ver` (consulta, roles que ya ven EsMa/terceros) y `administrar` (captura/cancelación/
@@ -99,6 +108,13 @@ export const MODULOS_PERMISO = {
   // módulos NUEVOS del kardex de materiales de v2 (D3). Mismo esquema ver/mover que `inventario-pt`.
   'inventario-telas': 'Inventario de telas (kardex)',
   'inventario-avios': 'Inventario de avíos (kardex)',
+  // ── LA SALIDA QUE NO ES POR OP (fila 0.104, §Post-F9.193 respuesta 12) ──
+  // Módulo APARTE, y de una sola clave, a propósito: sacar material SIN orden es un acto
+  // excepcional que Daniel reservó para sí («siempre autorizada sólo por mí. Nadie más»), y
+  // colgarlo de `inventario-telas`/`inventario-avios` lo habría metido en la misma bolsa que el
+  // `.mover` que hoy tiene medio organigrama. Cubre las DOS dimensiones (telas y avíos) porque la
+  // decisión de Daniel es UNA («Lo mismo en telas»): un solo permiso que se da o no se da.
+  'salida-material': 'Salidas de material sin orden',
   // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
   // El documento de envío de materiales a un maquilero contra una orden de producción.
   notas: 'Notas de salida',
@@ -264,6 +280,12 @@ export const CATALOGO_PERMISOS = [
     clave: 'ordenes.cancelar',
     modulo: 'ordenes',
     descripcion: 'Cancelar (suave) una orden de producción con su motivo',
+  },
+  {
+    clave: 'ordenes.cerrar',
+    modulo: 'ordenes',
+    descripcion:
+      'CERRAR una orden de producción (deja de admitir captura y CONGELA su costo unitario) y reabrirla — acto explícito y auditado (0.061)',
   },
 
   // ── Clientes / Proveedores ───────────────────────────────────────────────────
@@ -524,8 +546,9 @@ export const CATALOGO_PERMISOS = [
   },
   // Motor de la RUTA VIVA por orden (Módulo 8, F5-E3, A4) — permisos NUEVOS de v2. Gobiernan la
   // programación (generar/re-generar/ajustar la ruta de una orden) y su consulta. Son OPERATIVOS
-  // (producción/IP los usa día a día): cascadean a los roles como los `produccion.*`, no se restan a
-  // los bajos. Distintos del catálogo configurable (`rc.catalogo-*`, que define las plantillas).
+  // (producción/IP los usa día a día): en `prisma/seed.ts` los llevan los mismos perfiles que los
+  // `produccion.*` — todos menos `Basico`. Distintos del catálogo configurable (`rc.catalogo-*`,
+  // que define las plantillas).
   {
     clave: 'rc.programar',
     modulo: 'rc',
@@ -540,7 +563,8 @@ export const CATALOGO_PERMISOS = [
   },
   // Captura de avance de la RUTA VIVA por orden (Módulo 8, F5-E4, A4) — permiso NUEVO de v2. Gobierna
   // marcar/revertir la fecha REAL de cumplimiento de un proceso y los ítems de su checklist. Es
-  // OPERATIVO (producción/IP lo usa día a día); cascadea a los roles como `rc.programar`/`produccion.*`.
+  // OPERATIVO (producción/IP lo usa día a día); en el seed lo llevan los mismos perfiles que
+  // `rc.programar`/`produccion.*` — todos menos `Basico`.
   // Además, el dominio exige que ALGUNO de los roles del usuario sea responsable del proceso
   // (`ProcesoDefRol`, N:M); el admin (`roles.administrar`) captura cualquier proceso.
   {
@@ -905,6 +929,29 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación)',
   },
+  // ⭐ V1-E7b (§Post-F9.110) — APROBAR el cambio de receta: crear la VERSIÓN de un modelo
+  // (`CYA-26-71-001` → `CYA-26-71-001-01`, receta heredada, el original intacto).
+  //
+  // ⚠️ Es un permiso APARTE a propósito, y la tensión hay que entenderla antes de tocarlo:
+  // aprobar **precios** de lista (`listas.aprobar`) es SÓLO DEL DUEÑO y a Gerencial se le quitó a
+  // propósito (F8-E4, decisión (h)). Aprobar la **receta** es OTRA COSA —es trabajo de desarrollo
+  // de producto, no una firma comercial— y Daniel lo repartió más ancho: *"los que tengan
+  // facultad… de entrada Aurora podría hacerlo aparte de mí"*, y Aurora es Gerencial. Por eso
+  // este permiso lo llevan Administrador, AdministracionDireccion, Directivo y Gerencial (ver
+  // `prisma/seed.ts`), mientras `listas.aprobar` se queda en los tres primeros.
+  //
+  // ⚠️ Y NO se pide junto con `modelos.administrar`, que es un permiso SEPARADO: cuando esto se
+  // escribió, `modelos.administrar` no le llegaba a Gerencial (se repartía como los catálogos
+  // maestros), así que exigirlo además habría dejado a Aurora fuera de justo lo que Daniel le
+  // encargó. Desde §Post-F9.123 ella SÍ lo lleva —medido en `definirRoles()`—, pero siguen
+  // separados a propósito: son dos decisiones distintas y una no debe arrastrar a la otra.
+  // Crear la versión es su ÚNICA puerta.
+  {
+    clave: 'modelos.aprobar-receta',
+    modulo: 'modelos',
+    descripcion:
+      'Aprobar un cambio de receta creando la VERSIÓN del modelo (nace con sufijo -01 y hereda la receta; el modelo original no se toca)',
+  },
 
   // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────
   // Permisos NUEVOS de v2 (A4). El esquema y motor nacen en F3-E1; los flujos que cada permiso
@@ -926,6 +973,12 @@ export const CATALOGO_PERMISOS = [
     clave: 'produccion.corte',
     modulo: 'produccion',
     descripcion: 'Capturar el corte de una orden de producción (F3-E2)',
+  },
+  {
+    clave: 'produccion.empaque',
+    modulo: 'produccion',
+    descripcion:
+      'Capturar el empaque de una orden (servicio sobre la orden, hermano del corte: no toca inventario y genera su cargo de maquila) (0.114)',
   },
   {
     clave: 'produccion.envio',
@@ -991,12 +1044,62 @@ export const CATALOGO_PERMISOS = [
     descripcion: 'Capturar ajustes y traspasos de avíos (F4-E1, R4)',
   },
 
-  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permiso NUEVO de v2 ──────
+  // ── ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104) ────────────────────────────────────────────────
+  //
+  // DANIEL, 2-sep-2026: *«el 99 % sale por medio de una OP pero deberíamos tener la opción de
+  // sacar alguna venta o cualquier otra cosa»*. Y al cerrarlo, 3-sep: *«por ahora que toque sólo
+  // inventarios… pero sí debe existir una salida por otro medio que sólo ajuste de inventario…
+  // siempre autorizada sólo por mí. Nadie más»*. El 4-sep (§Post-F9.193 respuesta 12) nombró los
+  // casos: *«sacar por ejemplo una devolución, o una venta de avíos que ya no se usen… Lo mismo
+  // en telas»*.
+  //
+  // 🔑 POR QUÉ ES UN PERMISO PROPIO Y NO `inventario-telas.mover` / `inventario-avios.mover`: esos
+  // dos los lleva hoy medio organigrama (hasta `Secretarial`, herencia de la cascada vieja — ver
+  // `prisma/seed.ts`), así que reusarlos habría sido justo lo contrario de lo que Daniel pidió.
+  // Éste nace en `SOLO_ADMINISTRADOR`: sólo `Administrador` y `AdministracionDireccion` (los
+  // niveles 1 y 20 del sistema viejo) lo llevan; ningún perfil operativo lo otorga.
+  //
+  // 🔑 Y GOBIERNA TAMBIÉN LA CANCELACIÓN de esas salidas: cancelar es el movimiento INVERSO que
+  // vuelve a meter el material al inventario (D3), o sea deshacer la decisión de sacarlo. Si eso
+  // se quedara sólo con `.mover`, cualquiera podría revertir lo que sólo Daniel puede autorizar.
+  {
+    clave: 'salida-material.registrar',
+    modulo: 'salida-material',
+    descripcion:
+      'Sacar telas o avíos SIN orden de producción (devolución al proveedor, venta de material ' +
+      'que ya no se usa u otra causa) y cancelar esas salidas. Sólo ajusta inventario (F4/0.104)',
+  },
+
+  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permisos NUEVOS de v2 ────
+  //
+  // ⭐ LOS DOS PERMISOS DE ESTA PAREJA SON «VALIDAR», Y VALIDAR ES DE DANIEL (fila 0.128,
+  // §Post-F9.192(1), 4-sep-2026):
+  //
+  // > *«La entrada la da la persona responsable de recibos o de producción. Pero la validación
+  // > sólo la doy yo. O sea, es UN permiso para meter lo recibido y OTRO para validarlo.»*
+  //
+  // La entrada ya tenía el suyo (`produccion.recibo`: capturar el recibo de maquila, que propone
+  // el cargo). Lo que faltaba era separar el otro lado en dos actos distintos:
+  //  • `esma.cargo-validar` — fijar la CANTIDAD y el PRECIO reales del cargo propuesto por el
+  //    recibo (la cola de validación). Ya existía como permiso propio desde F3-E4.
+  //  • `esma.revisar` — autorizar una PARTIDA capturada (abono / descuento / pago) para que entre
+  //    al saldo. Antes lo regía `esma.modificar`, el MISMO permiso que capturarla: quien capturaba
+  //    se auto-autorizaba, que es justo lo que Daniel prohibió.
+  //
+  // `esma.modificar` se quedó donde le toca: CAPTURAR abonos/descuentos y forzar el estatus
+  // «pagada» de una orden. Capturar no es validar.
   {
     clave: 'esma.cargo-validar',
     modulo: 'esma',
     descripcion:
       'Validar (o ajustar/cancelar) los cargos propuestos de EsMa desde los recibos (F3-E4)',
+  },
+  {
+    clave: 'esma.revisar',
+    modulo: 'esma',
+    descripcion:
+      'Revisar y autorizar partidas de maquila: convertir lo capturado en deuda o pago real ' +
+      '(desde la 0.115 sólo lo revisado suma al saldo). Sólo el dueño y su círculo',
   },
 
   // ── Notas de salida estructuradas (Módulo 5, F4-E5 — doc 03-Produccion §Notas de Salida; R4/R9) ──
@@ -1004,7 +1107,8 @@ export const CATALOGO_PERMISOS = [
   // confirmar descuenta los avíos del kardex; la tela solo se referencia, decisión (e)) y `cancelar`
   // (cancelación suave con motivo + reverso auditado de los avíos, D3). Mismo reparto que compras:
   // ver es lectura, administrar muta/confirma, cancelar es su propio permiso (acción que revierte
-  // movimientos de kardex). Operativos (no se restan a los roles bajos, como `compras.recibir`).
+  // movimientos de kardex). Operativos: en el seed los llevan los mismos perfiles que
+  // `compras.recibir` — todos menos `Basico`.
   {
     clave: 'notas.ver',
     modulo: 'notas',
@@ -1165,6 +1269,53 @@ export const CATALOGO_PERMISOS = [
     modulo: 'cxc',
     descripcion:
       'Capturar/cancelar movimientos de cuentas por cobrar (cobros/abonos/descuentos/NC/cargos) e importar CFDI de venta (F9-E4)',
+  },
+
+  // ── Catálogo de conceptos de pago que no son proveedores (fila 0.125, A4) ──────────────────────
+  //    Daniel: *«quiero dejar pagos para cosas que no necesariamente están dadas de alta como
+  //    proveedores (nóminas por fuera, gratificaciones, pago de algún servicio como agua…). Debería
+  //    de poder tener como un catálogo de otras cosas que no son proveedores»* — *«que sean un
+  //    catálogo aparte, no proveedores»*. `ver` lo lleva quien arma o consulta la corrida (los
+  //    conceptos son renglones de la relación); `administrar` es de catálogo maestro: sólo el
+  //    administrador (dar de alta un destino de pago es dar de alta a dónde puede salir dinero).
+  {
+    clave: 'conceptos-pago.ver',
+    modulo: 'conceptos-pago',
+    descripcion:
+      'Consultar el catálogo de conceptos de pago que no son proveedores (nómina por fuera, servicios, caja chica) (0.125)',
+  },
+  {
+    clave: 'conceptos-pago.administrar',
+    modulo: 'conceptos-pago',
+    descripcion:
+      'Dar de alta y editar conceptos de pago que no son proveedores y sus cuentas/destinos (0.125)',
+  },
+
+  // ── La corrida semanal de pagos (fila 0.113, A4 — §Post-F9.189(g): *«correcto»*) ───────────────
+  //    DOS permisos, como pidió Daniel: *armar y cerrar la corrida* (él) y *ver la relación*
+  //    (finanzas, sólo lectura). Armar es decidir a quién se le paga y cuánto: es la decisión más
+  //    cara del sistema y no se reparte. Ver es lo que necesita quien hace las transferencias.
+  //    Deny-by-default (A4). ⚠️ Requiere `SEED_ON_START=true` al desplegar.
+  //    ⭐ RAZÓN DE DISEÑO (revisión de 0.113, R2): `pagos.corrida-ver` **NO exige además `cxp.ver`
+  //    ni `esma.ver-pagos`**, aunque la pantalla enseñe saldos de EsMa y de CxP al lado del campo de
+  //    captura. Es deliberado: la corrida ES la lista de saldos de la semana con una columna para
+  //    decidir — pedir los otros dos permisos no protegería nada (quien puede ver la relación ya ve
+  //    lo que se le paga a cada quien, que es el dato sensible) y sí dejaría a finanzas con una
+  //    pantalla a medias, llena de columnas en blanco, justo cuando tiene que ejecutar las
+  //    transferencias. Este permiso significa, por definición, «ver los saldos de la semana».
+  //    Lo que sigue gobernando el DINERO en pantalla es `consultas.ver-importes`: sin él, los
+  //    importes viajan en null igual que en el resto del sistema.
+  {
+    clave: 'pagos.corrida-ver',
+    modulo: 'pagos',
+    descripcion:
+      'Consultar las corridas semanales de pago y su relación ejecutable, con los saldos de la semana como referencia (finanzas, sólo lectura) (0.113)',
+  },
+  {
+    clave: 'pagos.corrida-armar',
+    modulo: 'pagos',
+    descripcion:
+      'Armar, cerrar y ejecutar la corrida semanal de pagos: decidir a quién se le paga y cuánto (0.113)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

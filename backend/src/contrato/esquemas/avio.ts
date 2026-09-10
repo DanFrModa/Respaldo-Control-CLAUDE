@@ -18,7 +18,8 @@ import { z } from 'zod';
  * Reglas de negocio que SÍ van en el contrato (las repite el dominio, A1):
  *  • `clave` única global (clave de negocio).
  *  • favorito ⇒ `cantFav` obligatoria (>0): se valida con un `.refine()` (alta y edición).
- *  • `esGenerico` (R4) y `precioReferencia` (fallback) son opcionales.
+ *  • `esGenerico` (R4), `seCompraSinColor` (fila 0.158) y `precioReferencia` (fallback) son
+ *    opcionales (banderas con default `false` en el alta).
  */
 
 // ── Proveedores inline (N:N con datos propios por renglón, R1) ────────────────
@@ -137,6 +138,14 @@ export const esquemaAvioCrear = z
       .optional(),
     /** Avío genérico de stock (R4 / Make-to-Order). */
     esGenerico: z.boolean({ error: '¿Genérico? debe ser verdadero o falso' }).default(false),
+    /**
+     * ⭐⭐ fila 0.158 — ¿se compra SIN tomar en cuenta el color? (la etiqueta de lavado). Marcado, la
+     * explosión emite UN solo renglón por orden en vez de uno por color. NO es `esGenerico`: aquél
+     * contesta "¿contra stock o contra la orden?", éste "¿el color forma parte de lo que pido?".
+     */
+    seCompraSinColor: z
+      .boolean({ error: '¿Se compra sin color? debe ser verdadero o falso' })
+      .default(false),
     /** Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009). */
     precioReferencia: z
       .number({ error: 'El precio de referencia debe ser un número' })
@@ -191,6 +200,10 @@ const baseAvioEditar = z
       .optional()
       .nullable(),
     esGenerico: z.boolean({ error: '¿Genérico? debe ser verdadero o falso' }).optional(),
+    /** ⭐⭐ fila 0.158 — bandera: omitir = no tocar (no es nullable). */
+    seCompraSinColor: z
+      .boolean({ error: '¿Se compra sin color? debe ser verdadero o falso' })
+      .optional(),
     precioReferencia: z
       .number({ error: 'El precio de referencia debe ser un número' })
       .nonnegative({ error: 'El precio de referencia no puede ser negativo' })
@@ -238,15 +251,6 @@ export const esquemaAvioProveedorSalida = z
     nombreProveedor: z.string().describe('Nombre del proveedor (para la UI).'),
     precio: z.number().nullable().describe('Precio al que este proveedor surte el avío, o null.'),
     condiciones: z.string().nullable().describe('Condiciones de este proveedor, o null.'),
-    /**
-     * El `precio` ya dividido entre el factor de conversión (R1): el costo POR UNIDAD DE CONSUMO
-     * del BOM. Solo lo resuelve el endpoint dedicado `GET /avios/{id}/proveedores` (en el listado
-     * de avíos viaja `null`), que es el que alimenta el amarre de precio de la receta.
-     */
-    precioUnidadConsumo: z
-      .number()
-      .nullable()
-      .describe('Precio por unidad de consumo (precio ÷ factor R1), o null.'),
     habitual: z
       .boolean()
       .describe(
@@ -274,6 +278,12 @@ export const esquemaAvioSalida = z
     favorito: z.boolean().describe('¿Avío de uso frecuente?'),
     cantFav: z.number().nullable().describe('Cantidad preestablecida si es favorito, o null.'),
     esGenerico: z.boolean().describe('¿Avío genérico de stock (R4)?'),
+    seCompraSinColor: z
+      .boolean()
+      .describe(
+        '⭐⭐ fila 0.158: ¿se compra SIN tomar en cuenta el color? Marcado, la explosión emite un ' +
+          'solo renglón por orden (sin color) en vez de uno por color de la matriz.',
+      ),
     precioReferencia: z.number().nullable().describe('Precio de referencia (fallback), o null.'),
     proveedores: z
       .array(esquemaAvioProveedorSalida)
@@ -301,9 +311,14 @@ export const esquemaListarAvios = z
       .number()
       .int()
       .min(1)
-      .max(500)
+      // ⚠️ 100 es el tope REAL, el del dominio (`comun/paginacion.ts`: "nadie lee más y protege la
+      // base"). El contrato decía 500 y era MENTIRA: el servicio re-valida con el esquema del
+      // dominio, así que quien leía el OpenAPI y pedía 500 recibía un 400. No es un cambio de
+      // conducta —hoy ya fallaba—: es dejar de prometer lo que nunca se cumplió. Que los dos lados
+      // sigan de acuerdo lo vigila `paginacion-honesta.test.ts`.
+      .max(100)
       .default(20)
-      .describe('Renglones por página (máx 500).'),
+      .describe('Renglones por página (máx 100).'),
     busqueda: z
       .string()
       .trim()

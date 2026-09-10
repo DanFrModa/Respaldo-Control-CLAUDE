@@ -3,6 +3,7 @@ import {
   Copy,
   FileSpreadsheet,
   MinusCircle,
+  Pencil,
   PlusCircle,
   Printer,
   Wallet,
@@ -14,15 +15,22 @@ import { toast } from 'sonner';
 import {
   descargarExcelEstadoCuenta,
   imprimirEstadoCuenta,
+  useCorregirMovimientoEsMa,
   useEstadoCuenta,
   useRevisarMovimiento,
 } from '@/api/esma';
 import { useExistenciaMaquilero } from '@/api/wip';
 import type {
+  EsMaConceptoCorregible,
   EsMaConceptoRevisable,
   EsMaEstadoCuentaMovimiento,
   EsMaEstadoCuentaQuery,
+  EsMaIncompletasBloque,
 } from '@/api/tipos';
+import {
+  CajonCorregirSinFactura,
+  type CuerpoCorreccion,
+} from '@/components/dominio/CajonCorregirSinFactura';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -70,16 +78,25 @@ function esRevisable(
  * maquilero, la línea de tiempo unificada de los 4 conceptos con sus marcas de pendiente, la tarjeta
  * de saldo, botones para agregar cada concepto, "Duplicar partida", accesos al desglosado/PDF/Excel y
  * a las existencias en poder del maquilero. RESPONSIVE: tabla en escritorio, tarjetas en móvil; desde
- * el móvil se puede AUTORIZAR una partida pendiente (revisar, `esma.modificar`).
+ * el móvil se puede AUTORIZAR una partida pendiente (revisar, `esma.revisar`).
  *
  * Lectura de cuenta con `esma.ver-pagos` (el backend re-verifica, A1). Importes "—" sin
- * `consultas.ver-importes`. Revisar exige `esma.modificar`.
+ * `consultas.ver-importes`.
+ *
+ * ⭐ **DOS PERMISOS, NO UNO (fila 0.128 — Daniel, §Post-F9.192(1)):** *«La entrada la da la persona
+ * responsable de recibos o de producción. Pero la validación sólo la doy yo.»* CAPTURAR (los
+ * botones «Abono», «Descuento» y «Duplicar») es `esma.modificar`; AUTORIZAR (el botón «Autorizar»,
+ * el que mete la partida al saldo desde la 0.115) es **`esma.revisar`**. Quien no lo tiene NO ve el
+ * botón —no un botón que truena—: hasta la 0.127 los dos actos compartían permiso y el capturista
+ * se auto-autorizaba.
  */
 export function EstadoCuentaPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { tienePermiso } = useSesion();
+  // CAPTURAR (abono/descuento/duplicar) ≠ AUTORIZAR (fila 0.128): dos permisos distintos.
   const puedeModificar = tienePermiso('esma.modificar');
+  const puedeRevisar = tienePermiso('esma.revisar');
   const puedePagar = tienePermiso('esma.ver-pagos');
   const verWip = tienePermiso('produccion.wip-ver');
 
@@ -101,6 +118,11 @@ export function EstadoCuentaPagina(): React.JSX.Element {
   };
   const estado = useEstadoCuenta(idNum, filtro);
   const revisar = useRevisarMovimiento();
+  const corregir = useCorregirMovimientoEsMa();
+  // ⭐ Fila 0.145 — el renglón que se está corrigiendo. Quién puede corregirlo NO lo decide esta
+  // pantalla: cada renglón viene con su `corregible` calculado en el servidor (bandera de la
+  // persona + sin factura + vivo + no ser un cargo de recibo).
+  const [movACorregir, setMovACorregir] = useState<EsMaEstadoCuentaMovimiento | null>(null);
 
   const movimientos = estado.data?.movimientos ?? [];
 
@@ -123,6 +145,24 @@ export function EstadoCuentaPagina(): React.JSX.Element {
       observaciones: m.referencia,
     };
     void navigate(RUTA_CAPTURA[m.concepto], { state: inicial });
+  }
+
+  /** Manda la corrección al concepto del renglón (el cargo nunca llega aquí: no es corregible). */
+  function guardarCorreccion(cuerpo: CuerpoCorreccion): void {
+    if (movACorregir === null || movACorregir.concepto === 'cargo') {
+      return;
+    }
+    const concepto: EsMaConceptoCorregible = movACorregir.concepto;
+    corregir.mutate(
+      { concepto, id: movACorregir.id, cuerpo },
+      {
+        onSuccess: () => {
+          toast.success('Movimiento corregido (queda el rastro del anterior).');
+          setMovACorregir(null);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   }
 
   function autorizar(m: EsMaEstadoCuentaMovimiento): void {
@@ -313,7 +353,7 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                           ) : (
                             <Badge variant="secondary">Revisado</Badge>
                           )}
-                          {puedeModificar && m.pendienteRevision && esRevisable(m.concepto) ? (
+                          {puedeRevisar && m.pendienteRevision && esRevisable(m.concepto) ? (
                             <Button
                               type="button"
                               size="sm"
@@ -322,6 +362,17 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                               data-testid="edc-autorizar"
                             >
                               <BadgeCheck aria-hidden /> Autorizar
+                            </Button>
+                          ) : null}
+                          {m.corregible ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setMovACorregir(m)}
+                              data-testid="edc-corregir-movil"
+                            >
+                              <Pencil aria-hidden /> Corregir
                             </Button>
                           ) : null}
                         </div>
@@ -372,9 +423,18 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                                     <Copy aria-hidden /> Duplicar
                                   </Button>
                                 ) : null}
-                                {puedeModificar &&
-                                m.pendienteRevision &&
-                                esRevisable(m.concepto) ? (
+                                {m.corregible ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setMovACorregir(m)}
+                                    data-testid="edc-corregir"
+                                  >
+                                    <Pencil aria-hidden /> Corregir
+                                  </Button>
+                                ) : null}
+                                {puedeRevisar && m.pendienteRevision && esRevisable(m.concepto) ? (
                                   <Button
                                     type="button"
                                     size="sm"
@@ -396,16 +456,111 @@ export function EstadoCuentaPagina(): React.JSX.Element {
             </CardContent>
           </Card>
 
+          <IncompletasSeccion incompletas={estado.data?.incompletas} />
+
           {verWip ? <ExistenciasMaquileroSeccion idMaquilero={idNum} /> : null}
         </>
       )}
+
+      {/* ⭐ Fila 0.145 — corregir un movimiento SIN FACTURA: un gesto de edición que por dentro
+          anula el viejo y captura el bueno, en una transacción y con su rastro. */}
+      <CajonCorregirSinFactura
+        valores={
+          movACorregir === null
+            ? null
+            : {
+                // El importe GUARDADO, que el servidor manda ya en positivo — no `monto`, que en
+                // descuentos y pagos va negativo y se vacía si el renglón no aporta al saldo.
+                importeGuardado: movACorregir.importeGuardado,
+                fecha: movACorregir.fecha,
+                // El CRUDO, no `referencia`: ésta es texto para LEER («Abono» cuando no hay nota),
+                // y arrancar de ahí guardaría «Abono» dentro del movimiento.
+                observaciones: movACorregir.observacionesGuardadas,
+                importeCorregible: movACorregir.importeCorregible,
+              }
+        }
+        titulo="Corregir movimiento"
+        subtitulo={
+          movACorregir
+            ? `${ETIQUETA_CONCEPTO[movACorregir.concepto]} · ${moneda(movACorregir.monto)}`
+            : undefined
+        }
+        enviando={corregir.isPending}
+        alCerrar={() => setMovACorregir(null)}
+        alGuardar={guardarCorreccion}
+      />
     </div>
   );
 }
 
 /**
- * Existencias EN PODER del maquilero (enviado − recibido, F3). Componente aparte para que el hook solo
- * se dispare cuando hay maquilero elegido y el usuario tiene `produccion.wip-ver`.
+ * PRENDAS INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k, §Post-F9.136).
+ *
+ * Daniel las pidió justo aquí: *"sólo quisiera ver reflejado en algún lado que sí las entrego, para
+ * revisar los temas de pago"*. Van en su PROPIA tarjeta, fuera de la tabla de movimientos y sin
+ * columna de importe: no son dinero, no suman ni restan al saldo, y no se pagan. La tarjeta solo
+ * aparece si hubo alguna — en la inmensa mayoría de los estados de cuenta no las hay.
+ */
+function IncompletasSeccion({
+  incompletas,
+}: {
+  incompletas: EsMaIncompletasBloque | undefined;
+}): React.JSX.Element | null {
+  if (incompletas === undefined || incompletas.filas.length === 0) {
+    return null;
+  }
+  return (
+    <Card data-testid="edc-incompletas">
+      <CardHeader>
+        <CardTitle>Prendas incompletas entregadas</CardTitle>
+        <CardDescription>
+          Prendas que llegaron sin terminar de coser. Se entregaron, pero <b>no se pagan</b> ni
+          entran a inventario: <b>no afectan el saldo</b> de arriba.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <TablaDensa data-testid="edc-incompletas-tabla">
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead>Fecha</TablaDensaHead>
+                <TablaDensaHead>Recibo</TablaDensaHead>
+                <TablaDensaHead>Orden</TablaDensaHead>
+                <TablaDensaHead>Modelo</TablaDensaHead>
+                <TablaDensaHead>Proceso</TablaDensaHead>
+                <TablaDensaHead numerica>Piezas</TablaDensaHead>
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {incompletas.filas.map((f) => (
+                <TablaDensaFila key={f.idRecibo} data-testid="edc-incompletas-fila">
+                  <TablaDensaCelda>{f.fecha}</TablaDensaCelda>
+                  <TablaDensaCelda>#{f.folioRecibo}</TablaDensaCelda>
+                  <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
+                  <TablaDensaCelda className="max-w-xs truncate">
+                    {f.descripcionModelo
+                      ? `${f.codigoModelo} — ${f.descripcionModelo}`
+                      : f.codigoModelo}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>{f.piezas.toLocaleString('es-MX')}</TablaDensaCelda>
+                </TablaDensaFila>
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
+        </div>
+        <p className="mt-3 text-sm font-medium" data-testid="edc-incompletas-total">
+          Total de prendas incompletas: {incompletas.totalPiezas.toLocaleString('es-MX')}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Existencias EN PODER del maquilero (enviado − recibido − incompletas − faltantes saldados;
+ * F3/V1-E8v + fila 0.109). Componente aparte para que el hook solo se dispare cuando hay maquilero
+ * elegido y el usuario tiene `produccion.wip-ver`.
  */
 function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): React.JSX.Element {
   const consulta = useExistenciaMaquilero({ idMaquilero });
@@ -436,6 +591,11 @@ function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): 
                   <TablaDensaHead>Proceso</TablaDensaHead>
                   <TablaDensaHead numerica>Enviado</TablaDensaHead>
                   <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                  {/* V1-E8v (§Post-F9.147): ÉSTE es el papel donde se discute el pago con el
+                      maquilero (regla 4 de §Post-F9.136). Sin esta columna, el hueco entre lo
+                      enviado y lo recibido se quedaba sin nombre justo en la conversación en la
+                      que hay que explicarlo. */}
+                  <TablaDensaHead numerica>Incompletas</TablaDensaHead>
                   <TablaDensaHead numerica>En poder</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -447,6 +607,9 @@ function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): 
                     <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{f.enviado.toLocaleString('es-MX')}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{f.recibido.toLocaleString('es-MX')}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {f.incompletas.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
                     <TablaDensaCelda numerica className="font-semibold">
                       {f.enPoder.toLocaleString('es-MX')}
                     </TablaDensaCelda>

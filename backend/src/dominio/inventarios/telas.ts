@@ -46,6 +46,7 @@ import {
 import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -65,6 +66,11 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
+import {
+  exigirPermisoParaCancelarSalidaSinOrden,
+  rechazarTipoReservado,
+} from './salida-sin-orden.js';
 
 // ── Códigos estables de los tipos de movimiento que el dominio resuelve por nombre ───────────────
 
@@ -350,6 +356,16 @@ export async function ajustarInventarioTela(
   }
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // Fila 0.137 — el almacén del ajuste tiene que ser de TELA (además de existir, estar activo y
+    // ser de esta empresa, A9). Antes no se miraba nada de eso aquí.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
+    // Fila 0.104 — un ajuste NO puede estampar «Devolución a Proveedor» ni «Venta de Material»:
+    // esos dos rótulos sólo los escribe la salida sin orden, que exige la llave del dueño.
+    // ⚠️ Va TAMBIÉN aquí, y no sólo en el ajuste por color: esta vista LEGADA por lote sigue viva
+    // y expuesta (`POST /inventarios/telas/ajustes`, con el mismo `inventario-telas.mover`), así
+    // que cerrar sólo el flujo nuevo dejaba el rótulo igual de falsificable por la puerta de al
+    // lado. Es la misma simetría que ya se aplicó a la CANCELACIÓN unas líneas más abajo.
+    await rechazarTipoReservado(tx, datos.idTipoMov);
     const tipo = await tipoPorId(tx, datos.idTipoMov);
     if (tipo.direccion === DireccionMovimiento.traspaso) {
       throw new ErrorValidacion(
@@ -434,6 +450,8 @@ export async function registrarSalidaTelaAOrden(
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', datos.idOrden);
     }
+    // Fila 0.137 — la tela sale de un almacén de TELA, no de uno de PT ni de avíos.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'TELA', idEmpresa);
     const tipo = await tipoPorCodigo(tx, COD_SALIDA_A_ORDEN);
 
     await validarNoNegativoTela(
@@ -493,6 +511,10 @@ export async function traspasarTela(
   const { idSalida, idEntrada } = await enTransaccion(async (tx) => {
     const tipoSalida = await tipoPorCodigo(tx, COD_TRANSFERENCIA_SALIDA);
     const tipoEntrada = await tipoPorCodigo(tx, COD_TRANSFERENCIA_ENTRADA);
+    // Fila 0.137 — LOS DOS extremos del traspaso deben ser de TELA (si no, la tela acabaría
+    // "existiendo" en un almacén de PT o de avíos).
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenOrigen, 'TELA', idEmpresa);
+    await exigirAlmacenDelTipo(tx, datos.idAlmacenDestino, 'TELA', idEmpresa);
 
     await validarNoNegativoTela(
       tx,
@@ -552,6 +574,8 @@ export async function cancelarMovimientoTela(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
+        idMovimientoInverso: true,
         tipoMov: { select: { direccion: true } },
         detallesTela: { select: { id: true } },
       },
@@ -559,6 +583,15 @@ export async function cancelarMovimientoTela(
     if (original === null || original.detallesTela.length === 0) {
       throw new ErrorNoEncontrado('Movimiento de tela', idMovimiento);
     }
+    // 🔴 Fila 0.104 — LA PUERTA DE ATRÁS. Esta cancelación LEGADA acepta cualquier movimiento con
+    // renglones de tela, y los del flujo por COLOR también lo son: sin esta línea, una salida sin
+    // orden —que sólo el dueño puede registrar— se podría deshacer desde aquí con el
+    // `inventario-telas.mover` que lleva medio organigrama, aunque `cancelarMovimientoTelaColor` la
+    // proteja. La llave tiene que pedirse en TODAS las puertas, no en la principal.
+    // Fila 0.099 — el ajuste de un cíclico NO se deshace desde Inventarios (la hoja quedaría
+    // `cerrado` mientras el kardex dice otra cosa). Misma puerta de atrás que cerró la 0.104.
+    exigirCancelableFueraDelCiclico(original.origenTipo);
+    await exigirPermisoParaCancelarSalidaSinOrden(tx, sesion, original);
     const codigoInverso =
       original.tipoMov.direccion === DireccionMovimiento.entrada
         ? COD_AJUSTE_SALIDA

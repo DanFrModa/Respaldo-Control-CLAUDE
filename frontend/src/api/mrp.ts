@@ -20,6 +20,8 @@ import type {
   AsignarProveedorResultado,
   ColoresDeTela,
   ColorTelaCreado,
+  DarPorCubiertoCuerpo,
+  DarPorCubiertoResultado,
   FijarPrecioColorCuerpo,
   FijarPrecioColorResultado,
   EstatusMateriales,
@@ -211,6 +213,41 @@ export function useGenerarOc(): UseMutationResult<GenerarOcResultado, ErrorDeApi
         void queryClient.invalidateQueries({ queryKey: claveEstatus(idOrden) });
       }
       void queryClient.invalidateQueries({ queryKey: CLAVE_OC });
+    },
+  });
+}
+
+/**
+ * ⭐⭐ V1-E8e (§Post-F9.99) — «con esto queda cubierto» / «volver a pedirlo»
+ * (`PUT /api/explosion/dado-por-cubierto`).
+ */
+async function darPorCubierto(cuerpo: DarPorCubiertoCuerpo): Promise<DarPorCubiertoResultado> {
+  const { data, error } = await api.PUT('/api/explosion/dado-por-cubierto', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * ⭐⭐ **V1-E8e (§Post-F9.99)** — cierra (o reabre) el faltante de unos renglones e **invalida la
+ * explosión**: el renglón tiene que volver a pintarse con lo que el SERVIDOR calcula (A1), que es lo
+ * único que sabe cuánto quedó pendiente. Recomponerlo en el cliente sería la segunda verdad que este
+ * módulo lleva tres etapas evitando.
+ *
+ * ⚠️ El estatus R7 **no se invalida**, y no es un olvido: ese tablero mide lo FÍSICO —qué llegó al
+ * almacén— y esta decisión no mueve ni un gramo de material (ver `docs/modulos/compras-mrp.md`).
+ */
+export function useDarPorCubierto(): UseMutationResult<
+  DarPorCubiertoResultado,
+  ErrorDeApi,
+  DarPorCubiertoCuerpo
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cuerpo: DarPorCubiertoCuerpo) => darPorCubierto(cuerpo),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
     },
   });
 }

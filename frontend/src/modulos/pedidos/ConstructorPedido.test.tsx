@@ -86,8 +86,14 @@ const RENGLON: AnalizarPdf['renglones'][number] = {
   codigoModeloSugerido: null,
   descripcionModeloSugerido: null,
   colorNuevo: true,
+  colorFusionadoEn: null,
   tallasNuevas: [],
   advertencias: [],
+  // ⭐ Fila 0.151 — de esta OC NACE el modelo de producción de su color, con el nº propuesto.
+  modeloDeProduccion: 'nacido',
+  numeroProduccionPropuesto: 71_001,
+  numeroProduccionModelo: null,
+  avisosNumeroProduccion: [],
   yaImportado: null,
 };
 

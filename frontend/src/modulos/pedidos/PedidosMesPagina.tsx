@@ -35,6 +35,7 @@ import { AdjuntosPedido } from './AdjuntosPedido';
 import { ConstructorPedido } from './ConstructorPedido';
 import { ImportadorPedido } from './ImportadorPedido';
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
+import { notaSinExpedienteDesarrollo, numerosDeProduccion } from './numeros-produccion';
 import { PanelGenerarOP } from './PanelGenerarOP';
 
 /**
@@ -564,17 +565,26 @@ export function PedidosMesPagina(): React.JSX.Element {
                                 ) : (
                                   <span
                                     className="num font-medium"
-                                    title="modelo anterior al módulo de Desarrollo"
+                                    /* Fila 0.151: sólo lo comprobable (en qué catálogo vive el
+                                       modelo), nunca su edad. Ver `notaSinExpedienteDesarrollo`. */
+                                    title={notaSinExpedienteDesarrollo(renglon) ?? undefined}
                                   >
                                     {renglon.codigoModelo}
                                   </span>
                                 )}
-                                {renglon.numeroProduccion !== null ? (
+                                {/* ⭐⭐ V1-E3 (§Post-F9.172(b)): los nº de producción de los MODELOS
+                                    que nacieron de este renglón, uno por color/OP. El renglón
+                                    sigue apuntando a su modelo de DESARROLLO —que ya nunca se
+                                    promueve—, así que `numeroProduccion` es null para siempre en
+                                    ese caso: sin esta línea la pantalla enseñaría el código de
+                                    desarrollo y nada más. Se cae a `numeroProduccion` para el
+                                    renglón legado que todavía no tiene OP. */}
+                                {numerosDeProduccion(renglon) !== '' ? (
                                   <span
                                     className="num ml-2 text-[10.5px] text-faint"
-                                    title="Nº interno de producción"
+                                    title="Nº interno de producción del modelo de cada OP (uno por color)"
                                   >
-                                    prod. #{renglon.numeroProduccion}
+                                    prod. #{numerosDeProduccion(renglon)}
                                   </span>
                                 ) : null}
                                 {renglon.descripcionModelo !== null ? (
@@ -886,6 +896,8 @@ function DetalleRenglon({
       ? Math.min(100, Math.round((renglon.cortado / renglon.cantidad) * 100))
       : 0;
   const chip = chipRenglon(renglon);
+  // V1-E3: los nº de producción de los modelos del renglón (uno por color/OP), ya formateados.
+  const numerosProduccion = numerosDeProduccion(renglon);
 
   const nodos: NodoTraza[] = [
     ...(pedido.ocCliente !== null
@@ -911,7 +923,7 @@ function DetalleRenglon({
                 void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
             }
           : {}
-        : { titulo: 'modelo anterior al módulo de Desarrollo' }),
+        : { titulo: notaSinExpedienteDesarrollo(renglon) ?? '' }),
     },
     {
       clave: 'lista',
@@ -929,7 +941,9 @@ function DetalleRenglon({
       valor:
         renglon.folioOrden !== null
           ? `#${renglon.folioOrden}` +
-            (renglon.numeroProduccion !== null ? ` · mod. ${renglon.numeroProduccion}` : '')
+            // V1-E3: el modelo que enseña la cadena es el de PRODUCCIÓN (uno por color), no el del
+            // renglón — que desde esta etapa se queda en desarrollo y nunca tiene número.
+            (numerosProduccion === '' ? '' : ` · mod. ${numerosProduccion}`)
           : 'por generar',
       activo: renglon.folioOrden !== null,
       ...(renglon.idOrden !== null
@@ -952,9 +966,14 @@ function DetalleRenglon({
         <div className="grid grid-cols-1 gap-x-3 gap-y-2 text-xs sm:grid-cols-2">
           <Campo k="No. orden" v={renglon.folioOrden !== null ? String(renglon.folioOrden) : '—'} />
           <Campo k="OC del cliente" v={pedido.ocCliente ?? '—'} />
+          {/* V1-E3: uno por color (los modelos de producción del renglón), no el del renglón. */}
           <Campo
-            k="Nº de producción"
-            v={renglon.numeroProduccion !== null ? `#${renglon.numeroProduccion}` : '—'}
+            k={
+              renglon.numerosProduccion.length > 1
+                ? 'Nº de producción (por color)'
+                : 'Nº de producción'
+            }
+            v={numerosProduccion === '' ? '—' : `#${numerosProduccion}`}
           />
           <Campo k="Cantidad pedida" v={renglon.cantidad.toLocaleString('es-MX')} />
           {puedeVerImportes ? (

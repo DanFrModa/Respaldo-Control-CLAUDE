@@ -11,13 +11,18 @@ import { Badge } from '@/components/ui/badge';
 /** Texto + variante del badge de estado DERIVADO de la orden. */
 function badgeEstado(estado: EstadoOrden): {
   texto: string;
-  variante: 'default' | 'secondary' | 'destructive';
+  variante: 'default' | 'secondary' | 'destructive' | 'outline';
 } {
   if (estado === 'completa') {
     return { texto: 'Completa', variante: 'default' };
   }
   if (estado === 'cancelada') {
     return { texto: 'Cancelada', variante: 'destructive' };
+  }
+  if (estado === 'cerrada') {
+    // 0.061: la orden terminó su vida administrativa y su costo quedó CONGELADO. `outline` la
+    // distingue de la cancelada (que es un fracaso) sin gritar: cerrar es el final NORMAL.
+    return { texto: 'Cerrada', variante: 'outline' };
   }
   return { texto: 'Capturada', variante: 'secondary' };
 }

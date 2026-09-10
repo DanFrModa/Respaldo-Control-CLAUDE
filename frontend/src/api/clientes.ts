@@ -8,19 +8,27 @@ import {
 } from '@tanstack/react-query';
 
 import { api } from './cliente';
+import { CLAVE_COTIZACIONES } from './cotizaciones';
 import { ErrorDeApi } from './errores';
+import { CLAVE_LISTAS } from './listas-precios';
+import { CLAVE_PROYECTOS } from './proyectos';
 import type {
   Cliente,
   ClienteCampo,
+  ClienteContacto,
+  ClienteContactoCrear,
+  ClienteContactoEditar,
   ClienteCampoCrear,
   ClienteCampoEditar,
   ClienteCrear,
   ClienteDepartamento,
   ClienteDepartamentoCrear,
   ClienteDepartamentoEditar,
+  ClienteDepartamentoFusionar,
   ClienteEditar,
   ClientesPagina,
   ClientesQuery,
+  FusionDepartamentosPrevia,
 } from './tipos';
 
 /**
@@ -100,6 +108,15 @@ async function reactivarCliente(id: number): Promise<Cliente> {
   return data;
 }
 
+/** Trae UN cliente por id (`GET /api/clientes/{id}`), con sus campos de referencia embebidos. */
+async function obtenerCliente(id: number): Promise<Cliente> {
+  const { data, error } = await api.GET('/api/clientes/{id}', { params: { path: { id } } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 // ── Hooks de cliente ──────────────────────────────────────────────────────────
 
 /** Lista clientes con los filtros dados (mantiene la pagina previa al paginar/buscar). */
@@ -108,6 +125,20 @@ export function useClientes(query: ClientesQuery): UseQueryResult<ClientesPagina
     queryKey: claveListaClientes(query),
     queryFn: () => listarClientes(query),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Trae UN cliente por id; deshabilitada sin id. La usa el DEEP-LINK de `ClientesPagina`
+ * (V1-E8t, §Post-F9.145): la puerta «Capturar factores» puede apuntar a un cliente que no está en
+ * la página visible del listado —hay ~117—, y sin su ficha el cajón se abriría VACÍO. Mismo patrón
+ * que `useFichaModelo` en el deep-link de Modelos.
+ */
+export function useCliente(id: number | undefined): UseQueryResult<Cliente, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CLIENTES, 'uno', id ?? 0],
+    queryFn: () => obtenerCliente(id as number),
+    enabled: id !== undefined,
   });
 }
 
@@ -485,5 +516,213 @@ export function useReactivarDepartamentoCliente(): UseMutationResult<
   return useMutation({
     mutationFn: reactivarDepartamento,
     onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
+  });
+}
+
+// ── FUSION de departamentos duplicados (§Post-F9.122a) ──────────────────────────
+
+/** Argumentos de la fusion (y de su vista previa): el cliente + el cuerpo canonico/absorbidos. */
+export interface ArgsFusionarDepartamentos {
+  idCliente: number;
+  cuerpo: ClienteDepartamentoFusionar;
+}
+
+/**
+ * VISTA PREVIA de la fusion (`POST .../departamentos/fusionar/previa`). Solo lectura: dice cuantos
+ * proyectos, listas y cotizaciones se moverian y si los factores del absorbido se descartan.
+ *
+ * Va por POST porque el cuerpo es la seleccion (canonico + N absorbidos), no un filtro de URL.
+ */
+async function previaFusionDepartamentos({
+  idCliente,
+  cuerpo,
+}: ArgsFusionarDepartamentos): Promise<FusionDepartamentosPrevia> {
+  const { data, error } = await api.POST(
+    '/api/clientes/{idCliente}/departamentos/fusionar/previa',
+    { params: { path: { idCliente } }, body: cuerpo },
+  );
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Consulta la vista previa de una fusion. Deshabilitada mientras no haya canonico y al menos un
+ * absorbido marcado — asi el dialogo no pregunta por una seleccion incompleta.
+ *
+ * 🔴 Es la MISMA cuenta que el servidor usa al fusionar (`previsualizarFusionDepartamentos` recorre
+ * las mismas referencias que el repunte): la pantalla NO calcula el impacto por su cuenta.
+ */
+export function usePreviaFusionDepartamentos(
+  idCliente: number | undefined,
+  idDestino: number | null,
+  origenes: readonly number[],
+): UseQueryResult<FusionDepartamentosPrevia, ErrorDeApi> {
+  const habilitada = idCliente !== undefined && idDestino !== null && origenes.length > 0;
+  return useQuery({
+    queryKey: [
+      ...CLAVE_CLIENTES,
+      'fusion-departamentos-previa',
+      idCliente,
+      idDestino,
+      [...origenes],
+    ],
+    queryFn: () =>
+      previaFusionDepartamentos({
+        idCliente: idCliente as number,
+        cuerpo: { idDestino: idDestino as number, origenes: [...origenes] },
+      }),
+    enabled: habilitada,
+  });
+}
+
+/** Fusiona departamentos duplicados (`POST .../departamentos/fusionar`). */
+async function fusionarDepartamentos({
+  idCliente,
+  cuerpo,
+}: ArgsFusionarDepartamentos): Promise<ClienteDepartamento> {
+  const { data, error } = await api.POST('/api/clientes/{idCliente}/departamentos/fusionar', {
+    params: { path: { idCliente } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Fusiona departamentos duplicados en el canonico e invalida TODO lo que colgaba de ellos: los
+ * departamentos del cliente, y ademas proyectos/listas/cotizaciones, que acaban de cambiar de
+ * departamento y estaban cacheados con el viejo.
+ */
+export function useFusionarDepartamentos(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsFusionarDepartamentos
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fusionarDepartamentos,
+    onSuccess: (_resultado, variables) => {
+      invalidarDepartamentos(queryClient, variables.idCliente);
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_LISTAS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_COTIZACIONES });
+    },
+  });
+}
+
+// ── ⭐ CONTACTOS del cliente (V1-E8y, §Post-F9.152 — la compradora) ───────────
+
+/** Clave de cache de los contactos de un cliente. */
+function claveContactosCliente(idCliente: number): readonly unknown[] {
+  return [...CLAVE_CLIENTES, 'contactos', idCliente];
+}
+
+/** Lista los contactos de un cliente (`GET /api/clientes/{id}/contactos`). */
+async function listarContactosCliente(
+  id: number,
+  incluirInactivos: boolean,
+): Promise<ClienteContacto[]> {
+  const { data, error } = await api.GET('/api/clientes/{id}/contactos', {
+    params: { path: { id }, query: { incluirInactivos: String(incluirInactivos) } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Agrega un contacto (`POST /api/clientes/{id}/contactos`). */
+async function crearContactoCliente(
+  id: number,
+  cuerpo: ClienteContactoCrear,
+): Promise<ClienteContacto> {
+  const { data, error } = await api.POST('/api/clientes/{id}/contactos', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Edita (o ARCHIVA con `activo: false`) un contacto del cliente. */
+async function actualizarContactoCliente(
+  id: number,
+  idContacto: number,
+  cuerpo: ClienteContactoEditar,
+): Promise<ClienteContacto> {
+  const { data, error } = await api.PATCH('/api/clientes/{id}/contactos/{idContacto}', {
+    params: { path: { id, idContacto } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Contactos ACTIVOS de un cliente; deshabilitada hasta que haya id.
+ *
+ * Se piden aparte (no vienen en la ficha del cliente, a diferencia de los del proveedor) porque el
+ * consumidor natural es la MESA de negociación, que sólo conoce el `idCliente` de la lista y no
+ * quiere arrastrar el cliente entero con sus campos de referencia para leer dos nombres.
+ */
+export function useContactosCliente(
+  idCliente: number | undefined,
+  incluirInactivos = false,
+): UseQueryResult<ClienteContacto[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...claveContactosCliente(idCliente ?? 0), incluirInactivos],
+    queryFn: () => listarContactosCliente(idCliente as number, incluirInactivos),
+    enabled: idCliente !== undefined,
+  });
+}
+
+/** Argumentos del alta de contacto de cliente. */
+export interface ArgsCrearContactoCliente {
+  idCliente: number;
+  cuerpo: ClienteContactoCrear;
+}
+
+/** Agrega un contacto al cliente e invalida su lista de contactos. */
+export function useCrearContactoCliente(): UseMutationResult<
+  ClienteContacto,
+  ErrorDeApi,
+  ArgsCrearContactoCliente
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idCliente, cuerpo }: ArgsCrearContactoCliente) =>
+      crearContactoCliente(idCliente, cuerpo),
+    onSuccess: (_resultado, variables) =>
+      queryClient.invalidateQueries({ queryKey: claveContactosCliente(variables.idCliente) }),
+  });
+}
+
+/** Argumentos de la edición/archivado de contacto de cliente. */
+export interface ArgsActualizarContactoCliente {
+  idCliente: number;
+  idContacto: number;
+  cuerpo: ClienteContactoEditar;
+}
+
+/** Edita o archiva un contacto e invalida su lista. */
+export function useActualizarContactoCliente(): UseMutationResult<
+  ClienteContacto,
+  ErrorDeApi,
+  ArgsActualizarContactoCliente
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idCliente, idContacto, cuerpo }: ArgsActualizarContactoCliente) =>
+      actualizarContactoCliente(idCliente, idContacto, cuerpo),
+    onSuccess: (_resultado, variables) =>
+      queryClient.invalidateQueries({ queryKey: claveContactosCliente(variables.idCliente) }),
   });
 }

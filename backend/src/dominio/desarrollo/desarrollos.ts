@@ -26,7 +26,8 @@ import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -37,7 +38,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { crearModelo } from '../modelos/modelos.js';
-import { mintearCodigoDesarrollo } from '../modelos/nomenclatura.js';
+import { digitosDeNomenclatura, mintearCodigoDesarrollo } from '../modelos/nomenclatura.js';
 
 /** Alta: campos del esquema compartido. */
 export type EntradaCrearDesarrollo = z.input<typeof esquemaDesarrolloCrear>;
@@ -129,8 +130,18 @@ export type DesarrolloConDetalle = Prisma.DesarrolloGetPayload<{
   include: typeof incluirDesarrollo;
 }>;
 
-/** Proyecta un desarrollo (con detalle) a la forma JSON del contrato, calculando su estado derivado. */
-export function aDesarrolloSalida(desarrollo: DesarrolloConDetalle): DesarrolloSalida {
+/**
+ * Proyecta un desarrollo (con detalle) a la forma JSON del contrato, calculando su estado derivado.
+ *
+ * `nombrePorId` llega YA RESUELTO del llamador (esta función es SÍNCRONA y no consulta la base): el
+ * detalle de un proyecto trae N desarrollos y resolver el nombre uno por uno sería N+1. El mapa es
+ * OBLIGATORIO a propósito (sin default): un llamador nuevo que lo olvide debe ser error de
+ * compilación, no un `nombreApagadoPor: null` silencioso.
+ */
+export function aDesarrolloSalida(
+  desarrollo: DesarrolloConDetalle,
+  nombrePorId: ReadonlyMap<string, string>,
+): DesarrolloSalida {
   return {
     id: desarrollo.id,
     idProyecto: desarrollo.idProyecto,
@@ -148,6 +159,7 @@ export function aDesarrolloSalida(desarrollo: DesarrolloConDetalle): DesarrolloS
     apagado: desarrollo.apagado,
     apagadoEn: desarrollo.apagadoEn === null ? null : desarrollo.apagadoEn.toISOString(),
     apagadoPorId: desarrollo.apagadoPorId,
+    nombreApagadoPor: nombreDeUsuario(nombrePorId, desarrollo.apagadoPorId),
     motivoApagado: desarrollo.motivoApagado,
     creadoEn: desarrollo.creadoEn.toISOString(),
     creadoPorId: desarrollo.creadoPorId,
@@ -275,9 +287,11 @@ export async function crearDesarrollo(
  * las dos escrituras son atómicas: si el desarrollo falla, el modelo tampoco queda.
  *
  * El alta del modelo REUSA `crearModelo` (misma validación de temporada/curva/género/tipo, misma
- * bitácora) dentro de la transacción; encima se marcan `origen = desarrollo` y `codigoDesarrollo`.
- * Exige los DOS permisos porque hace las dos cosas: `desarrollo.administrar` y —vía `crearModelo`—
- * `modelos.administrar`.
+ * bitácora) dentro de la transacción. ⭐ **Desde V1-E8j (§Post-F9.134) `crearModelo` ya pone él mismo
+ * `origen = desarrollo` y `codigoDesarrollo`**, así que aquí se quitó el `update` que lo hacía
+ * encima; lo propio de este camino es que el código lo ARMA el sistema (`mintearCodigoDesarrollo`)
+ * en vez de teclearlo el usuario. Exige los DOS permisos porque hace las dos cosas:
+ * `desarrollo.administrar` y —vía `crearModelo`— `modelos.administrar`.
  */
 export async function crearDesarrolloConModeloNuevo(
   sesion: SesionUsuario,
@@ -305,40 +319,17 @@ export async function crearDesarrolloConModeloNuevo(
 
     // Los dos dígitos salen del CATÁLOGO (tipo de prenda + género), que es de donde los toma
     // después el número de producción: así los dos códigos del modelo dicen lo mismo.
-    const [tipo, genero] = await Promise.all([
-      tx.tipoProducto.findUnique({
-        where: { id: datos.idTipoProducto },
-        select: { nombre: true, activo: true, digitoConcepto: true },
-      }),
-      tx.genero.findUnique({
-        where: { id: datos.idGenero },
-        select: { nombre: true, activo: true, digitoNomenclatura: true },
-      }),
-    ]);
-    if (tipo === null || !tipo.activo) {
-      throw new ErrorValidacion('El tipo de producto seleccionado no existe o está desactivado.');
-    }
-    if (genero === null || !genero.activo) {
-      throw new ErrorValidacion('El género seleccionado no existe o está desactivado.');
-    }
-    if (tipo.digitoConcepto === null) {
-      throw new ErrorValidacion(
-        `El tipo de producto "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él no ` +
-          `se puede armar el código del modelo. Captúralo en su catálogo.`,
-      );
-    }
-    if (genero.digitoNomenclatura === null) {
-      throw new ErrorValidacion(
-        `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él no se ` +
-          `puede armar el código del modelo. Captúralo en su catálogo.`,
-      );
-    }
+    //
+    // ⭐ V1-E8y: el bloque que leía y validaba los dos dígitos vive ahora en
+    // `digitosDeNomenclatura` (`modelos/nomenclatura.ts`), COMPARTIDO con el alta desde la mesa de
+    // negociación (§Post-F9.152). Eran la misma comprobación palabra por palabra; copiarla habría
+    // sido la enésima copia reducida que después deriva.
+    const digitos = await digitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
 
     const { codigo } = await mintearCodigoDesarrollo(tx, {
       idCliente: proyecto.idCliente,
       anioEntrega: datos.anioEntrega,
-      concepto: tipo.digitoConcepto,
-      genero: genero.digitoNomenclatura,
+      ...digitos,
     });
 
     const modelo = await crearModelo(
@@ -354,12 +345,12 @@ export async function crearDesarrolloConModeloNuevo(
       },
       { tx },
     );
-    // La marca de origen + el nº de desarrollo. Van aparte de `crearModelo` a propósito: el alta
-    // normal del catálogo NO puede fabricar modelos de desarrollo (su código no lo arma nadie).
-    await tx.modelo.update({
-      where: { id: modelo.id },
-      data: { origen: 'desarrollo', codigoDesarrollo: codigo },
-    });
+    // ⭐ V1-E8j (§Post-F9.134) — la marca de origen y el nº de desarrollo YA los pone `crearModelo`:
+    // desde esa decisión **todo modelo nace en desarrollo**, con `codigoDesarrollo = codigo`. Aquí
+    // había un `update` que lo hacía aparte (cuando el alta normal fabricaba modelos de
+    // PRODUCCIÓN); se retiró en vez de dejarlo escribiendo lo mismo dos veces. Lo único propio de
+    // este camino sigue siendo el código: aquí lo ARMA el sistema (`mintearCodigoDesarrollo`) y en
+    // el catálogo lo teclea el usuario.
 
     let desarrolloId: number;
     try {
@@ -540,5 +531,6 @@ export async function obtenerDesarrollo(
   if (desarrollo === null) {
     throw new ErrorNoEncontrado('Desarrollo', id);
   }
-  return aDesarrolloSalida(desarrollo);
+  const nombrePorId = await nombresDeUsuarios(clienteLectura(bd), [desarrollo.apagadoPorId]);
+  return aDesarrolloSalida(desarrollo, nombrePorId);
 }

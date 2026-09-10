@@ -9,7 +9,7 @@ import {
 } from '@/api/adjuntos-desarrollo';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatearFechaHora, formatearTamano } from '@/lib/formato';
+import { formatearFechaHora, formatearTamano, nombreDeAutor } from '@/lib/formato';
 
 /** Tamaño máximo del adjunto (50 MB), espejo del límite de captura del backend. */
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -111,48 +111,52 @@ export function TechPackDesarrollo({
         </p>
       ) : (
         <ul className="space-y-2" data-testid="lista-tech-pack">
-          {adjuntos.map((adjunto) => (
-            <li
-              key={adjunto.idArchivo}
-              data-testid="fila-tech-pack"
-              className="flex items-center gap-3 rounded-lg border p-2.5"
-            >
-              <span
-                aria-hidden
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          {adjuntos.map((adjunto) => {
+            // El NOMBRE de quien lo subió, no su id (V1). `null` = nadie ⇒ se omite el « · por ».
+            const autor = nombreDeAutor(adjunto.subidoPorId, adjunto.nombreSubidoPor);
+            return (
+              <li
+                key={adjunto.idArchivo}
+                data-testid="fila-tech-pack"
+                className="flex items-center gap-3 rounded-lg border p-2.5"
               >
-                <FileTextIcon className="size-4" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <a
-                  href={adjunto.urlDescarga}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-sm font-medium underline-offset-4 hover:underline"
-                  data-testid="descargar-tech-pack"
+                <span
+                  aria-hidden
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
                 >
-                  {adjunto.nombreOriginal}
-                </a>
-                <span className="block text-xs text-muted-foreground">
-                  {formatearTamano(adjunto.tamanoBytes)} · {formatearFechaHora(adjunto.creadoEn)}
-                  {adjunto.subidoPorId ? ` · por ${adjunto.subidoPorId}` : ''}
+                  <FileTextIcon className="size-4" aria-hidden />
                 </span>
-              </div>
-              {puedeAdministrar ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={quitar.isPending}
-                  onClick={() => alQuitar(adjunto.idArchivo, adjunto.nombreOriginal)}
-                  aria-label={`Quitar adjunto ${adjunto.nombreOriginal}`}
-                  data-testid="quitar-tech-pack"
-                >
-                  <Trash2Icon className="text-destructive" aria-hidden />
-                </Button>
-              ) : null}
-            </li>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={adjunto.urlDescarga}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate text-sm font-medium underline-offset-4 hover:underline"
+                    data-testid="descargar-tech-pack"
+                  >
+                    {adjunto.nombreOriginal}
+                  </a>
+                  <span className="block text-xs text-muted-foreground">
+                    {formatearTamano(adjunto.tamanoBytes)} · {formatearFechaHora(adjunto.creadoEn)}
+                    {autor === null ? '' : ` · por ${autor}`}
+                  </span>
+                </div>
+                {puedeAdministrar ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={quitar.isPending}
+                    onClick={() => alQuitar(adjunto.idArchivo, adjunto.nombreOriginal)}
+                    aria-label={`Quitar adjunto ${adjunto.nombreOriginal}`}
+                    data-testid="quitar-tech-pack"
+                  >
+                    <Trash2Icon className="text-destructive" aria-hidden />
+                  </Button>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

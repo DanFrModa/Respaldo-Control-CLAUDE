@@ -7,8 +7,11 @@ import {
   cancelarMovimientoPt,
   consultarExistenciasPt,
   kardexPt,
+  MESES_VENTANA_KARDEX_PT,
   registrarMovimientoPt,
   registrarTraspasoPt,
+  resolverVentanaKardexPt,
+  TOPE_RENGLONES_KARDEX_PT,
 } from './movimientos-pt.js';
 
 /**
@@ -51,6 +54,7 @@ describe('dominio Inventario PT (F3-E3) — permisos (deny-by-default, A4)', () 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -67,6 +71,7 @@ describe('dominio Inventario PT (F3-E3) — permisos (deny-by-default, A4)', () 
           idAlmacenDestino: 2,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -103,6 +108,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         bdTipoTraspaso(),
@@ -119,6 +125,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacenDestino: 1, // mismo almacén
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -135,6 +142,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [],
         },
         {},
@@ -151,6 +159,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-06-19',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: -3 }] }],
         },
         {},
@@ -167,6 +176,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '19-06-2026',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -188,6 +198,7 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacen: 1,
           idModelo: 1,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, idOrden: 0, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
@@ -204,10 +215,219 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
           idAlmacenDestino: 2,
           idModelo: 1,
           fecha: '2026-08-12',
+          motivo: 'Ajuste de la prueba',
           lineas: [{ idColor: 1, idOrden: -7, tallas: [{ idTalla: 1, cantidad: 5 }] }],
         },
         {},
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+/**
+ * `tx` de mentiras que resuelve los tipos de movimiento del traspaso y devuelve, para cada id de
+ * almacén, la fila que diga `porAlmacen` (o una de PT usable, si no está en el mapa). Sirve para
+ * pinchar el guard de tipo (fila 0.137) SIN Postgres: se corta en la primera lectura de almacén.
+ */
+function bdConAlmacenes(porAlmacen: Record<number, { nombre: string; tipo: string }>): {
+  bd: ContextoBd;
+  almacenesLeidos: number[];
+} {
+  const almacenesLeidos: number[] = [];
+  const tx = {
+    tipoMovimientoInventario: {
+      findUnique: vi.fn(({ where }: { where: { codigo: string } }) =>
+        Promise.resolve({
+          id: where.codigo === 'transferencia-salida' ? 1 : 2,
+          nombre: where.codigo,
+          direccion: where.codigo === 'transferencia-salida' ? 'salida' : 'entrada',
+          activo: true,
+        }),
+      ),
+    },
+    almacen: {
+      findUnique: vi.fn(({ where }: { where: { id: number } }) => {
+        almacenesLeidos.push(where.id);
+        const fila = porAlmacen[where.id] ?? { nombre: `Almacén ${String(where.id)}`, tipo: 'PT' };
+        return Promise.resolve({ ...fila, activo: true, idEmpresa: null });
+      }),
+    },
+  } as unknown as Tx;
+  return { bd: { tx }, almacenesLeidos };
+}
+
+describe('Motivo OBLIGATORIO al mover PT a mano (fila 0.100, §Post-F9.193 decisión 3)', () => {
+  // El motivo lo exige el DOMINIO (`validarEntrada` corre AQUÍ, no solo en el Zod de la ruta — A1),
+  // así que estas pruebas pasan `{}` como `bd`: revientan ANTES de tocar la base.
+  const movimiento = {
+    idTipoMov: 1,
+    idAlmacen: 1,
+    idModelo: 1,
+    fecha: '2026-09-04',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+  const traspaso = {
+    idAlmacenOrigen: 1,
+    idAlmacenDestino: 2,
+    idModelo: 1,
+    fecha: '2026-09-04',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+
+  it('un movimiento manual SIN motivo se rechaza', async () => {
+    await expect(
+      registrarMovimientoPt(sesionMover(), movimiento as never, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  /** Captura el error de una promesa para poder inspeccionar sus `detalles` (patrón de telas). */
+  async function errorDe(promesa: Promise<unknown>): Promise<unknown> {
+    return promesa.then(
+      () => null,
+      (e: unknown) => e,
+    );
+  }
+
+  it('un movimiento manual con motivo DEMASIADO CORTO se rechaza (mínimo 3, como en telas)', async () => {
+    // El mensaje LEGIBLE por campo viaja en `detalles.fieldErrors` (formato de `validarEntrada`):
+    // el `message` del error es siempre el genérico, así que afirmar sobre él no probaría nada.
+    const error = await errorDe(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: 'ab' }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['Explica el motivo (mínimo 3 caracteres)'] },
+    });
+  });
+
+  it('un motivo de PUROS ESPACIOS se rechaza (se recorta antes de medir)', async () => {
+    await expect(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: '     ' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('un traspaso SIN motivo se rechaza', async () => {
+    await expect(registrarTraspasoPt(sesionMover(), traspaso as never, {})).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('un traspaso con motivo DEMASIADO CORTO se rechaza', async () => {
+    const error = await errorDe(
+      registrarTraspasoPt(sesionMover(), { ...traspaso, motivo: 'ab' }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['Explica el motivo (mínimo 3 caracteres)'] },
+    });
+  });
+
+  it('un motivo de MÁS de 500 caracteres se rechaza', async () => {
+    const error = await errorDe(
+      registrarMovimientoPt(sesionMover(), { ...movimiento, motivo: 'x'.repeat(501) }, {}),
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect((error as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { motivo: ['El motivo no puede tener más de 500 caracteres'] },
+    });
+  });
+});
+
+describe('Traspaso de PT — el guard de TIPO cubre LAS DOS patas (fila 0.137)', () => {
+  const traspaso = {
+    idModelo: 1,
+    fecha: '2026-06-20',
+    motivo: 'Ajuste de la prueba',
+    lineas: [{ idColor: 1, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+  };
+
+  it('el ORIGEN de TELA se rechaza', async () => {
+    const { bd } = bdConAlmacenes({ 1: { nombre: 'Naucalpan', tipo: 'TELA' } });
+    await expect(
+      registrarTraspasoPt(
+        sesionMover(),
+        { ...traspaso, idAlmacenOrigen: 1, idAlmacenDestino: 2 },
+        bd,
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+  });
+
+  it('el DESTINO de TELA se rechaza (el origen sí es de PT)', async () => {
+    // Éste es el que se cuela si alguien valida solo el origen: el destino no se lee nunca.
+    const { bd, almacenesLeidos } = bdConAlmacenes({ 2: { nombre: 'Naucalpan', tipo: 'TELA' } });
+    await expect(
+      registrarTraspasoPt(
+        sesionMover(),
+        { ...traspaso, idAlmacenOrigen: 1, idAlmacenDestino: 2 },
+        bd,
+      ),
+    ).rejects.toThrow(/"Naucalpan" es de telas; este movimiento es de producto terminado/);
+    expect(almacenesLeidos).toEqual([1, 2]);
+  });
+});
+
+/**
+ * ⭐ FILA 0.138 — EL PERIODO DEL KARDEX. Aquí se prueba la parte PURA: qué ventana queda cuando el
+ * usuario pide una, cuando pide media, y cuando no pide nada. Que el `WHERE` de verdad recorte (y
+ * que los bordes se comporten como dice este archivo) se prueba contra Postgres en el `.int.test`.
+ *
+ * Nació de un defecto medido: sin ventana, el kardex de un modelo con diez años cargados devolvía
+ * 25 000 renglones y 8.3 MB en UNA respuesta. La regla que lo evita es la de abajo, y vive en el
+ * dominio (A1) — ni la ruta ni la pantalla deciden el periodo.
+ */
+describe('dominio Inventario PT — el PERIODO del kardex (fila 0.138)', () => {
+  /** Un instante cualquiera del 5 de septiembre de 2026, ya de día en México. */
+  const cincoDeSeptiembre = new Date('2026-09-05T18:00:00.000Z');
+
+  it('⭐ sin `desde`: la ventana son los últimos 12 meses — el kardex NUNCA arranca sin piso', () => {
+    const ventana = resolverVentanaKardexPt({}, cincoDeSeptiembre);
+    expect(ventana.desde).toBe('2025-09-05');
+    expect(ventana.porOmision).toBe(true);
+    // Sin techo: un movimiento con fecha futura (se capturan con la fecha del documento) sigue saliendo.
+    expect(ventana.hasta).toBeNull();
+    expect(MESES_VENTANA_KARDEX_PT).toBe(12);
+  });
+
+  it('con `desde` explícito, manda el usuario (y deja de ser ventana por omisión)', () => {
+    const ventana = resolverVentanaKardexPt(
+      { desde: '2016-01-01', hasta: '2016-12-31' },
+      cincoDeSeptiembre,
+    );
+    expect(ventana).toEqual({ desde: '2016-01-01', hasta: '2016-12-31', porOmision: false });
+  });
+
+  it('`hasta` sin `desde`: son los 12 meses que TERMINAN en `hasta`, no «todo hasta esa fecha»', () => {
+    // La garantía de piso vale también aquí: pedir solo el techo no puede destapar diez años.
+    const ventana = resolverVentanaKardexPt({ hasta: '2020-03-31' }, cincoDeSeptiembre);
+    expect(ventana).toEqual({ desde: '2019-03-31', hasta: '2020-03-31', porOmision: true });
+  });
+
+  it('el ancla es el día del NEGOCIO (México), no el del servidor en UTC', () => {
+    // 05-sep 03:00 UTC son todavía las 21:00 del 04-sep en Ciudad de México. El servidor corre en
+    // UTC; si la ventana se anclara en su día, el periodo se correría 24 h respecto a lo que la
+    // gente ve en la pantalla — el mismo desfase que `comun/fecha-negocio` vino a cerrar.
+    const ventana = resolverVentanaKardexPt({}, new Date('2026-09-05T03:00:00.000Z'));
+    expect(ventana.desde).toBe('2025-09-04');
+  });
+
+  it('un periodo AL REVÉS (desde > hasta) → ErrorValidacion (no se consulta nada)', async () => {
+    await expect(
+      kardexPt(sesionSoloVer(), { idModelo: 1, desde: '2026-09-01', hasta: '2026-08-01' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('una fecha que no es fecha → ErrorValidacion', async () => {
+    await expect(
+      kardexPt(sesionSoloVer(), { idModelo: 1, desde: '01/09/2026' }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('el TOPE de renglones no se puede desbordar por parámetro', async () => {
+    await expect(
+      kardexPt(sesionSoloVer(), { idModelo: 1, limite: TOPE_RENGLONES_KARDEX_PT + 1 }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(kardexPt(sesionSoloVer(), { idModelo: 1, limite: 0 }, {})).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
   });
 });

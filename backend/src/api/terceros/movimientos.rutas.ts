@@ -6,6 +6,15 @@
  * Endpoints (por la empresa activa = A9):
  *  • `POST /terceros/movimientos`              (perm `terceros.administrar`) → registra un movimiento.
  *  • `POST /terceros/movimientos/:id/cancelar` (perm `terceros.administrar`) → cancela por inverso.
+ *  • `POST /terceros/movimientos/:id/corregir`  (perm `terceros.administrar` **+ bandera de la
+ *    persona**) → corrige un movimiento SIN FACTURA: anula el viejo y captura el bueno, ligados
+ *    (fila 0.145). La BANDERA no es un permiso y la exige el DOMINIO, no esta ruta.
+ *    ⚠️ Como `cancelar`, esta ruta del MOTOR es genérica: sirve a un movimiento de cliente (CxC) igual
+ *    que a uno de proveedor. Daniel pidió la corrección **para los proveedores**, y por eso la
+ *    OFRECEN sólo las pantallas de CxP y de maquila; CxC no pinta el botón. Se dejó genérica por
+ *    simetría con la cancelación —el motor no conoce el uso— y porque acotarla aquí no añadiría
+ *    ninguna guarda: para llegar hacen falta `terceros.administrar` **y** la bandera, que hoy tiene
+ *    una sola persona.
  *  • `GET  /terceros/:tipo/:id/saldo`          (perm `terceros.ver`)         → saldo derivado (motor + EsMa).
  *  • `GET  /terceros/:tipo/:id/estado-cuenta`  (perm `terceros.ver`)         → saldo + movimientos paginados.
  *    (la vista `fiscal` del estado de cuenta exige, además, `terceros.fiscal`; lo valida el dominio.)
@@ -15,6 +24,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   TIPOS_TERCERO,
+  esquemaCorreccionSinFactura,
   esquemaMovimientoTerceroCrear,
   esquemaMovimientoTerceroCancelar,
   esquemaMovimientoTerceroSalida,
@@ -28,6 +38,7 @@ import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
   registrarMovimientoTercero,
   cancelarMovimientoTercero,
+  corregirMovimientoTercero,
   calcularSaldoTercero,
   estadoDeCuentaTercero,
 } from '../../dominio/terceros/cuenta-terceros.js';
@@ -105,6 +116,30 @@ export const rutasTerceros: FastifyPluginCallbackZod = (app, _opciones, done) =>
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return cancelarMovimientoTercero(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/terceros/movimientos/:id/corregir',
+    // `terceros.administrar` es el permiso del MÓDULO; la autorización de verdad —la bandera
+    // `Usuario.puedeCorregirSinFactura`— la exige el dominio (A1), porque no es un permiso y no
+    // existe un `conPermiso` que la sepa leer.
+    preHandler: app.conPermiso('terceros.administrar'),
+    schema: {
+      tags: ['terceros'],
+      summary: 'Corregir un movimiento SIN FACTURA (anula el viejo y captura el bueno, D3)',
+      description:
+        'Reservado a la dirección por una bandera de la persona que no se otorga con ningún ' +
+        'permiso ni desde ninguna pantalla. Sólo movimientos sin factura: uno con CFDI se rechaza.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaCorreccionSinFactura,
+      response: { 200: esquemaMovimientoTerceroSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return corregirMovimientoTercero(sesion, request.params.id, request.body);
     },
   });
 

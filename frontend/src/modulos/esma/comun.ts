@@ -2,6 +2,26 @@
  * Utilidades compartidas de las pantallas de EsMa (F6-E4). Vive aparte de los componentes para no
  * mezclar exportaciones de funciones con las de componentes (regla fast-refresh).
  */
+import type { EsMaPendienteRevision } from '@/api/tipos';
+
+import type { TipoMaquilero } from './SelectorMaquilero';
+
+/**
+ * 🔴 Los tipos de maquilero de IDA Y VUELTA: los servicios que de verdad tienen un ENVÍO y un
+ * RECIBO (0.114).
+ *
+ * Existe para la pantalla de **Recibos semanales**, cuyo reporte se arma leyendo `EtapaMovimiento`
+ * de tipo `recibo_maquila` (`esma/semanales.ts`). El corte y el empaque **no generan recibos** —ésa
+ * es su definición: *«no va y viene»*—, así que ofrecerlos ahí sólo produce un reporte vacío sin
+ * explicación. Acotar el selector es más honesto que dejar al usuario preguntándose qué hizo mal.
+ *
+ * ⚠️ NO aplica a las otras dos pantallas que usan el mismo selector: el estado de cuenta y el
+ * desglosado leen CARGOS, y los de corte/empaque son justo lo que la 0.114 vino a hacer visible ahí.
+ *
+ * (Vive aquí y no junto al selector por la misma razón que `moneda`: ese archivo exporta
+ * COMPONENTES, y mezclar constantes rompe el fast-refresh — es la regla que encabeza este módulo.)
+ */
+export const TIPOS_IDA_Y_VUELTA: readonly Exclude<TipoMaquilero, ''>[] = ['costura', 'estampado'];
 
 /**
  * Formatea un importe en pesos (o "—" si es `null`). El backend devuelve `null` cuando el usuario
@@ -12,6 +32,79 @@ export function moneda(monto: number | null): string {
     return '—';
   }
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(monto);
+}
+
+/**
+ * ¿Hay algo capturado esperando revisión? (V1, fila 0.115). Lo decide el CONTEO de partidas que
+ * manda el servidor, no los importes: dos partidas pueden netear cero —un abono y un pago iguales, o
+ * dos abonos de +500 y −500 como los que carga el ETL— y seguir siendo dos cosas que alguien tiene
+ * que decidir. Por eso `partidas` NO se oculta aunque los importes sí: sin ver el dinero se sigue
+ * sabiendo que hay algo pendiente. Es exactamente el mismo criterio que usa el backend
+ * (`dominio/esma/formula-saldo.ts::hayPendiente`) y el que decide qué filas trae el tablero.
+ */
+export function hayPendienteDeRevision(p: EsMaPendienteRevision): boolean {
+  return p.partidas > 0;
+}
+
+/** «1 partida» / «3 partidas» — el conteo con su sustantivo, que se repite en varias pantallas. */
+export function partidas(n: number): string {
+  return `${String(n)} ${n === 1 ? 'partida' : 'partidas'}`;
+}
+
+/** «1 cargo» / «3 cargos» — el conteo de cargos propuestos con su sustantivo. */
+function cargos(n: number): string {
+  return `${String(n)} ${n === 1 ? 'cargo' : 'cargos'}`;
+}
+
+/**
+ * DESGLOSE de los CARGOS POR VALIDAR dentro de «por revisar» (V1, fila 0.111), o `null` si no hay
+ * ninguno — que es el caso de casi todas las filas.
+ *
+ * Los cargos `propuesto` entran al mismo bloque que los movimientos capturados, así que sin este
+ * desglose el número de la columna crecería sin decir por qué. Dice las tres cosas que importan y
+ * en ese orden: CUÁNTOS cargos esperan la decisión de Daniel, CUÁNTO suman los que se pueden valuar
+ * y —sólo si aplica— cuántos NO se pueden valuar por falta de precio.
+ *
+ * 🔴 Se dice «cargos» y NO «recibos» a propósito (0.114). Un recibo de maquila propone un cargo,
+ * pero el CORTE y el EMPAQUE también proponen el suyo y **no generan recibos** —ésa es su
+ * definición, la misma que encabeza `TIPOS_IDA_Y_VUELTA` en este archivo—. Llamarle «1 recibo por
+ * validar» a la fila de un cortador sería nombrarle algo que no existe; «cargo» es además la
+ * palabra que él ya ve en la pantalla que los valida («Validación de cargos»).
+ *
+ * ⚠️ Los que no tienen precio se anuncian aparte a propósito: aportan 0 al importe, y sin decirlo un
+ * maquilero con tres cargos sin precio enseñaría «$0.00» y parecería que no hay nada que decidir.
+ * El importe se omite cuando viaja en `null` (sin `consultas.ver-importes`): el conteo NO es dinero
+ * y se sigue viendo.
+ */
+export function textoCargosPorValidar(
+  p: Pick<EsMaPendienteRevision, 'cargos' | 'cargosPartidas' | 'cargosSinPrecio'>,
+): string | null {
+  if (p.cargosPartidas === 0) {
+    return null;
+  }
+  const piezas = [
+    `${cargos(p.cargosPartidas)} por validar`,
+    ...(p.cargos === null ? [] : [moneda(p.cargos)]),
+    ...(p.cargosSinPrecio > 0 ? [`${String(p.cargosSinPrecio)} sin precio`] : []),
+  ];
+  return piezas.join(' · ');
+}
+
+/**
+ * TEXTO de un bloque «por revisar» (V1, fila 0.115) — el mismo en el tablero de EsMa y en la bandeja
+ * de CxP, escritorio y móvil. Lleva SIEMPRE el CONTEO de partidas, y el importe sólo cuando se puede
+ * ver. Las dos mitades hacen falta:
+ *
+ *  • sin el conteo, quien no tiene `consultas.ver-importes` vería un «—» y no sabría que hay algo
+ *    esperando decisión (el servidor oculta el neto, nunca `partidas`);
+ *  • sin el importe no se sabe de cuánto se habla; y sin el conteo, dos partidas que NETEAN cero —un
+ *    abono y un pago capturados iguales, o los ±500 que carga el ETL— se leerían como «$0.00», o sea
+ *    como si no hubiera nada que revisar. Justo lo que esta fila vino a destapar.
+ *
+ * Se llama sólo cuando {@link hayPendienteDeRevision} dice que sí (si no, la celda va vacía).
+ */
+export function textoPorRevisar(p: Pick<EsMaPendienteRevision, 'neto' | 'partidas'>): string {
+  return p.neto === null ? partidas(p.partidas) : `${moneda(p.neto)} · ${partidas(p.partidas)}`;
 }
 
 /**

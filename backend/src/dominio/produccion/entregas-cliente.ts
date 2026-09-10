@@ -49,7 +49,7 @@ import {
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { exigirAlmacen } from '../../comun/almacenes.js';
+import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -77,6 +77,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
 import { rechazarAlmacenDeTransito } from './transito.js';
 
@@ -126,7 +127,10 @@ async function resolverOrden(
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
       idEmpresa: true,
+      folio: true,
       estado: true,
+      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
+      cerradaEn: true,
       idModelo: true,
       idCliente: true,
       lineas: { select: { idColor: true, tallas: { select: { idTalla: true } } } },
@@ -138,6 +142,8 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
+  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
+  exigirOrdenAbierta(orden, 'le pueden capturar entregas');
   const colores = new Set<number>();
   const tallasPorColor = new Map<number, Set<number>>();
   for (const linea of orden.lineas) {
@@ -383,7 +389,11 @@ export async function registrarEntregaCliente(
     const orden = await resolverOrden(tx, datos.idOrden, sesion.idEmpresaActiva);
     const celdas = aplanarYValidar(datos.lineas, orden);
 
-    await exigirAlmacen(tx, datos.idAlmacen, orden.idEmpresa);
+    // El tipo del almacén (fila 0.137, segunda pasada): la entrega SACA producto terminado (el
+    // kardex PT del modelo de la orden), así que el origen tiene que ser un almacén de PT. Antes
+    // solo se comprobaba que existiera, estuviera activo y fuera de la empresa: nada impedía
+    // "entregar" desde la bodega de telas, donde ese artículo no puede estar.
+    await exigirAlmacenDelTipo(tx, datos.idAlmacen, 'PT', orden.idEmpresa);
     // V1-E4b: no se le entrega al cliente desde el almacén de TRÁNSITO — ahí está lo que sigue
     // físicamente en el taller de un tercero. Antes esto no podía pasar (el tránsito nunca tenía
     // existencia); desde que el envío de prendas terminadas lo alimenta, sí.
@@ -508,6 +518,9 @@ export async function cancelarEntregaCliente(
     if (entrega.canceladoEn !== null) {
       throw new ErrorConflicto(`La entrega ${Number(entrega.folio)} ya está cancelada.`);
     }
+    // ⭐ 0.061: cancelar una entrega mueve el inventario Y el divisor `vendido`. Sobre una orden
+    // CERRADA hay que reabrirla primero (acto inverso auditado, no una edición).
+    await exigirOrdenAbiertaPorId(tx, entrega.idOrden, 'puede cancelar su entrega');
 
     // Revierte la(s) SALIDA(s) de PT que generó la entrega con inverso(s) de entrada (re-entra lo que
     // salió). El inverso es un movimiento de corrección: SIEMPRE puede registrarse (no valida tope).

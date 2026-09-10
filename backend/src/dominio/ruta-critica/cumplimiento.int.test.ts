@@ -129,9 +129,11 @@ describe('recalcularRutaOrden (CPM)', () => {
   });
 
   it('dos recálculos en paralelo de la misma orden dejan un resultado consistente (idempotencia)', async () => {
-    // NOTA: la SERIALIZACIÓN real de jobs la garantiza pg-boss por singletonKey (no se ejercita aquí:
-    // el motor de jobs está inactivo en tests). Este test prueba que el CÁLCULO es idempotente: dos
-    // ejecuciones del handler sobre la misma orden, en paralelo, dejan las mismas fechas. La clave de
+    // NOTA: la SERIALIZACIÓN real de jobs la da pg-boss por `singletonKey` SOBRE UNA COLA `stately`
+    // —la clave sola no restringiría nada— y no se ejercita aquí (el motor de jobs está inactivo en
+    // tests). Este test prueba que el CÁLCULO es idempotente: dos ejecuciones del handler sobre la
+    // misma orden, en paralelo, dejan las mismas fechas. Importa de verdad, porque `stately` permite
+    // ≤1 corriendo + ≤1 esperando: el que espera vuelve a calcular sobre la misma orden. La clave de
     // serialización (lo que pg-boss usa) se valida aparte abajo.
     const idOrden = await crearOrdenConRc('2026-06-29');
     const a = await crearProcesoDef('a');

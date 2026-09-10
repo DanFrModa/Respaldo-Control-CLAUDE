@@ -12,6 +12,8 @@ import { ErrorDeApi } from './errores';
 import type {
   AjusteAvioCrear,
   AjusteTelaColorCrear,
+  ConteoTelaColor,
+  ConteoTelaColorCrear,
   ExistenciasAvio,
   ExistenciasAvioQuery,
   ExistenciasTela,
@@ -30,14 +32,18 @@ import type {
   MovimientoTelaColor,
   PartidasTela,
   PartidasTelaQuery,
+  PreviaSalidaTelaColor,
+  PreviaSalidaTelaColorCrear,
+  SaldosTelaColor,
+  SaldosTelaColorQuery,
+  SalidaAvioSinOrdenCrear,
   SalidaTelaColorCrear,
+  SalidaTelaColorSinOrdenCrear,
   SalidaTelaCrear,
   TraspasoAvio,
   TraspasoAvioCrear,
-  TraspasoTela,
   TraspasoTelaColor,
   TraspasoTelaColorCrear,
-  TraspasoTelaCrear,
 } from './tipos';
 
 /**
@@ -56,12 +62,6 @@ export const CLAVE_INVENTARIO_MATERIALES = ['inventario-materiales'] as const;
 
 async function salidaTelaAOrden(cuerpo: SalidaTelaCrear): Promise<MovimientoTela> {
   const { data, error } = await api.POST('/api/inventarios/telas/salidas-orden', { body: cuerpo });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
-
-async function traspasarTela(cuerpo: TraspasoTelaCrear): Promise<TraspasoTela> {
-  const { data, error } = await api.POST('/api/inventarios/telas/traspasos', { body: cuerpo });
   if (!data) throw new ErrorDeApi(error);
   return data;
 }
@@ -100,8 +100,52 @@ async function ajustarTelaColor(cuerpo: AjusteTelaColorCrear): Promise<Movimient
   return data;
 }
 
+async function registrarConteoTelaColor(cuerpo: ConteoTelaColorCrear): Promise<ConteoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/conteos', { body: cuerpo });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function obtenerSaldosTelaColor(query: SaldosTelaColorQuery): Promise<SaldosTelaColor> {
+  const { data, error } = await api.GET('/api/inventarios/telas/color/saldos', {
+    params: { query },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 async function salidaTelaColorAOrden(cuerpo: SalidaTelaColorCrear): Promise<MovimientoTelaColor> {
   const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-orden', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐ Salida de tela por color que NO va a ninguna orden (fila 0.104): devolución al proveedor,
+ * venta de material que ya no se usa u otra causa. El backend exige el permiso PROPIO
+ * `salida-material.registrar` — no basta `inventario-telas.mover` — y es él quien decide (A1).
+ */
+async function salidaTelaColorSinOrden(
+  cuerpo: SalidaTelaColorSinOrdenCrear,
+): Promise<MovimientoTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-sin-orden', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐⭐ PREVIA de la salida por color (fila 0.101): manda LA CAPTURA EN CURSO y trae los DOS avisos
+ * ya decididos. Va por POST porque el cuerpo son N renglones, no un filtro de URL — mismo patrón
+ * que la vista previa de la fusión de departamentos.
+ */
+async function previaSalidaTelaColor(
+  cuerpo: PreviaSalidaTelaColorCrear,
+): Promise<PreviaSalidaTelaColor> {
+  const { data, error } = await api.POST('/api/inventarios/telas/color/salidas-orden/previa', {
     body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
@@ -160,6 +204,18 @@ async function ajustarAvio(cuerpo: AjusteAvioCrear): Promise<MovimientoAvio> {
   return data;
 }
 
+/**
+ * ⭐ Salida de avío que NO va a ninguna orden (fila 0.104) — el caso que Daniel nombró: *«una
+ * venta de avíos que ya no se usen»*. Gate del backend: `salida-material.registrar`.
+ */
+async function salidaAvioSinOrden(cuerpo: SalidaAvioSinOrdenCrear): Promise<MovimientoAvio> {
+  const { data, error } = await api.POST('/api/inventarios/avios/salidas-sin-orden', {
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 async function traspasarAvio(cuerpo: TraspasoAvioCrear): Promise<TraspasoAvio> {
   const { data, error } = await api.POST('/api/inventarios/avios/traspasos', { body: cuerpo });
   if (!data) throw new ErrorDeApi(error);
@@ -192,8 +248,15 @@ async function obtenerKardexAvio(query: KardexAvioQuery): Promise<KardexAvio> {
   return data;
 }
 
-/** URL de descarga del PDF 'Inventario de telas' (R9). Acepta los mismos filtros de existencias. */
-export function urlImpresoInventarioTelas(query: ExistenciasTelaQuery = {}): string {
+/**
+ * URL de descarga del PDF 'Inventario de telas' (R9). Acepta los MISMOS filtros que «Inventario de
+ * telas» (existencias por COLOR), que es la pantalla de la que cuelga su botón.
+ *
+ * ⚠️ Hasta v0.097 recibía los filtros del inventario LEGADO por lote y el backend imprimía ESA
+ * consulta —la del inventario legado, no la de esta pantalla—: la hoja salía prácticamente en
+ * blanco. El defecto era imprimir OTRA cosa con el nombre de ésta, no que aquélla estuviera muerta.
+ */
+export function urlImpresoInventarioTelas(query: ExistenciasTelaColorQuery = {}): string {
   const params = new URLSearchParams();
   for (const [clave, valor] of Object.entries(query)) {
     if (valor !== undefined && valor !== null && valor !== '') {
@@ -264,6 +327,52 @@ export function useKardexTelaColor(
   });
 }
 
+/**
+ * SALDOS del sistema para el CONTEO físico (fila 0.098): TODOS los colores de la pantalla en UNA
+ * llamada. El backend los calcula por Σ de movimientos —nunca la vista— con la MISMA aritmética que
+ * usa al aplicar la diferencia. Apagado hasta que haya almacén y al menos un color.
+ *
+ * ⚠️ Antes era un hook POR COLOR (uno por renglón) con `staleTime: 0`: cargar el inventario del
+ * arranque eran cientos de GET, cada uno abriendo su transacción y tomando un lock exclusivo, y se
+ * re-disparaban al volver el foco. Ahora es UNA consulta, y por eso su `queryKey` lleva la lista
+ * completa de colores.
+ */
+export function useSaldosTelaColor(
+  query: SaldosTelaColorQuery | undefined,
+): UseQueryResult<SaldosTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'saldos', query],
+    queryFn: () => obtenerSaldosTelaColor(query as SaldosTelaColorQuery),
+    enabled: query !== undefined,
+  });
+}
+
+/**
+ * ⭐⭐ LOS DOS AVISOS de la salida de tela a orden (fila 0.101 — Daniel §Post-F9.193, dec. 8 y 9).
+ *
+ * 🔴 La pantalla NO compara nada (A1): manda lo capturado y el SERVIDOR devuelve los veredictos
+ * (`sobreSalida` / `riesgoTono`) con los números y las partidas que los sostienen. «Lo que la orden
+ * pide» sale del snapshot de la explosión —la MISMA cifra que ve el comprador—, no de una segunda
+ * cuenta hecha aquí. Deshabilitada mientras no haya orden, almacén y al menos un renglón: sin eso
+ * no hay nada que avisar.
+ *
+ * ⚠️ Si la consulta falla, la pantalla **no enseña ningún aviso y no interrumpe a nadie**: es una
+ * advertencia, no una guarda. Lo que protege el inventario (no-negativo bajo lock, D3) vive en el
+ * registro de la salida, que sí falla en voz alta.
+ */
+export function usePreviaSalidaTelaColor(
+  cuerpo: PreviaSalidaTelaColorCrear | undefined,
+): UseQueryResult<PreviaSalidaTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'salida-previa', cuerpo],
+    queryFn: () => previaSalidaTelaColor(cuerpo as PreviaSalidaTelaColorCrear),
+    enabled: cuerpo !== undefined,
+    // Mientras se recalcula, el aviso anterior sigue en pantalla: quitarlo y devolverlo hace que
+    // el bloque parpadee cada vez que se agrega un renglón.
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** Búsqueda de partidas (folio / lote del proveedor / factura). */
 export function usePartidasTela(
   query: PartidasTelaQuery,
@@ -320,15 +429,6 @@ export function useSalidaTelaAOrden(): UseMutationResult<
   });
 }
 
-/** Registra un traspaso de tela e invalida existencias/kardex. */
-export function useTraspasarTela(): UseMutationResult<TraspasoTela, ErrorDeApi, TraspasoTelaCrear> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: traspasarTela,
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
-  });
-}
-
 /** Argumentos de una cancelación de movimiento de material. */
 export interface ArgsCancelarMaterial {
   id: number;
@@ -363,6 +463,22 @@ export function useAjustarTelaColor(): UseMutationResult<
   });
 }
 
+/**
+ * Registra un CONTEO físico por color: se manda LO CONTADO y el servidor aplica la diferencia
+ * (fila 0.098). Invalida existencias/kardex/saldos.
+ */
+export function useRegistrarConteoTelaColor(): UseMutationResult<
+  ConteoTelaColor,
+  ErrorDeApi,
+  ConteoTelaColorCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: registrarConteoTelaColor,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
 /** Registra una salida por color a orden e invalida existencias/kardex. */
 export function useSalidaTelaColorAOrden(): UseMutationResult<
   MovimientoTelaColor,
@@ -372,6 +488,19 @@ export function useSalidaTelaColorAOrden(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: salidaTelaColorAOrden,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** ⭐ Registra una salida de tela por color SIN orden e invalida existencias/kardex (fila 0.104). */
+export function useSalidaTelaColorSinOrden(): UseMutationResult<
+  MovimientoTelaColor,
+  ErrorDeApi,
+  SalidaTelaColorSinOrdenCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salidaTelaColorSinOrden,
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
   });
 }
@@ -418,6 +547,19 @@ export function useTraspasarAvio(): UseMutationResult<TraspasoAvio, ErrorDeApi, 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: traspasarAvio,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** ⭐ Registra una salida de avío SIN orden e invalida existencias/kardex (fila 0.104). */
+export function useSalidaAvioSinOrden(): UseMutationResult<
+  MovimientoAvio,
+  ErrorDeApi,
+  SalidaAvioSinOrdenCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: salidaAvioSinOrden,
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
   });
 }

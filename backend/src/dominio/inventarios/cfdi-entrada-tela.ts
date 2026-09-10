@@ -30,7 +30,11 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
 import { rfcEmpresaActiva, uuidYaImportado } from '../terceros/cfdi/cfdi-comun.js';
-import { admiteCfdi, exigirProveedorQueFactura } from '../terceros/facturacion-proveedor.js';
+import {
+  admiteCfdi,
+  exigirProveedorQueFactura,
+  exigirRfcDelProveedor,
+} from '../terceros/facturacion-proveedor.js';
 import { validarReceptorCfdi } from '../terceros/cfdi/cfdi-proveedor.js';
 import { normalizarRfc, parsearCfdi, type CfdiConcepto } from '../terceros/cfdi/parser-cfdi.js';
 import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
@@ -213,6 +217,34 @@ function cruzarConceptos(
 }
 
 /**
+ * 🔴 **EL AVISO DE «no hay nada pendiente», atado a HASTA DÓNDE SE PREGUNTÓ** (§Post-F9.159(a),
+ * segundo hallazgo del reviewer de esta etapa).
+ *
+ * `lineasTelaPendientesDeProveedor` va ACOTADA a una orden cuando la lectura llegó desde ella
+ * (`idOrdenCompra`, §Post-F9.15). Con ese acotamiento, una respuesta vacía significa *«esta orden
+ * no tiene tela pendiente»* y **no** *«este proveedor no tiene nada»* — y el imperativo *«levanta
+ * (o autoriza) la orden»* es además imposible por ese camino, porque a él sólo se llega desde el
+ * botón «Dar entrada a la tela», que sólo aparece en órdenes YA autorizadas.
+ *
+ * ⚠️ La lección de la ronda anterior, escrita aquí para que no se repita: **al corregir una frase
+ * falsa haciéndola más específica se la vuelve MÁS falsable**. La versión anterior de este aviso
+ * afirmaba en plural sobre *todas* las órdenes del proveedor con un dato que podía cubrir una
+ * sola. Una frase más fuerte necesita un disparador más estrecho, no más ancho.
+ *
+ * Es pura a propósito: así el texto y su disparador se prueban sin Postgres.
+ */
+export function avisoSinPendientesDeTela(acotadoAUnaOrden: boolean): string {
+  return acotadoAUnaOrden
+    ? 'Esta orden de compra ya no tiene renglones de tela pendientes de recibir, así que la ' +
+        'factura NO se puede capturar contra ella: no se recibe tela que no se haya comprado. Si ' +
+        'lo que llegó es de OTRA orden, captúralo desde «Entradas de tela por factura › Nueva ' +
+        'entrada», eligiendo el proveedor.'
+    : 'Ese proveedor no tiene renglones de tela pendientes en órdenes de compra abiertas, así que ' +
+        'esta factura NO se puede capturar todavía: no se recibe tela que no se haya comprado. ' +
+        'Levanta (o autoriza) la orden de compra de esta tela y vuelve.';
+}
+
+/**
  * Lee un CFDI y devuelve la propuesta para llenar la captura de la entrada de tela. **No escribe
  * nada**: la persona revisa, corrige y captura el color antes de guardar.
  */
@@ -237,7 +269,7 @@ export async function leerCfdiParaEntradaTela(
 
   const proveedor = await cliente.proveedor.findFirst({
     where: { rfc: { equals: parsed.emisorRfc, mode: 'insensitive' } },
-    select: { id: true, nombre: true, activo: true, factura: true },
+    select: { id: true, nombre: true, activo: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     // OJO CON LO QUE SE ACONSEJA AQUÍ (revisión del 11-ago-2026): *"elige el proveedor a mano"* —lo
@@ -256,14 +288,15 @@ export async function leerCfdiParaEntradaTela(
     avisos.push(`El proveedor "${proveedor.nombre}" está desactivado en el catálogo.`);
   }
   // §Post-F9.22 — contradicción entre el catálogo y la realidad: el proveedor está marcado como que
-  // NO factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML es
-  // prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir el
-  // catálogo en vez de corregirlo solos, porque la casilla la define quien da de alta al proveedor.
-  if (proveedor !== null && !admiteCfdi(proveedor.factura)) {
+  // NUNCA factura, pero acaba de mandar un CFDI. AQUÍ solo se AVISA (leer no escribe nada, y el XML
+  // es prueba de que sí timbra): guardar la entrada con esa factura sí lo rechaza. Se pide corregir
+  // el catálogo en vez de corregirlo solos, porque la modalidad la define quien da de alta al
+  // proveedor (fila 0.124: `modalidadFacturacion` es la única que contesta esta pregunta).
+  if (proveedor !== null && !admiteCfdi(proveedor.modalidadFacturacion)) {
     avisos.push(
-      `El proveedor "${proveedor.nombre}" está dado de alta como que NO emite factura, pero este ` +
-        `CFDI es suyo. Corrige la casilla "¿Emite factura (CFDI)?" en el catálogo de proveedores: ` +
-        `si no, no vas a poder guardar la entrada con esta factura.`,
+      `El proveedor "${proveedor.nombre}" está dado de alta como que NUNCA factura, pero este ` +
+        `CFDI es suyo. Corrige "¿Cómo factura?" en el catálogo de proveedores: si no, no vas a ` +
+        `poder guardar la entrada con esta factura.`,
     );
   }
 
@@ -292,17 +325,28 @@ export async function leerCfdiParaEntradaTela(
       : await lineasTelaPendientesDeProveedor(sesion, proveedor.id, entrada.idOrdenCompra, bd);
   const conceptos = cruzarConceptos(parsed.conceptos, pendientes);
 
+  // 🔴 §Post-F9.159(a) — este aviso PROMETÍA lo que ahora está prohibido: *"la tela de esta factura
+  // entrará como tela SUELTA (sin cerrar ninguna orden)"*. Desde que no se recibe tela sin OC, esa
+  // entrada ni siquiera se puede guardar: el mensaje mandaba a un callejón. Ahora dice lo que de
+  // verdad pasa y a dónde ir.
+  //
+  // 🔴 Y **dice hasta dónde alcanza lo que se preguntó**: `pendientes` sale acotado a UNA orden
+  // cuando la lectura llegó desde ella (`entrada.idOrdenCompra`, §Post-F9.15), así que su vacío NO
+  // sostiene ninguna frase sobre el proveedor entero — ni el imperativo de «levanta (o autoriza) la
+  // orden», que en ese camino es imposible: el botón «Dar entrada a la tela» sólo aparece en
+  // órdenes YA autorizadas. Al corregir una frase falsa haciéndola más específica se la vuelve más
+  // falsable, y esa versión se coló en la ronda anterior.
   if (proveedor !== null && pendientes.length === 0) {
-    avisos.push(
-      'Ese proveedor no tiene renglones de tela pendientes en órdenes de compra abiertas: la tela ' +
-        'de esta factura entrará como tela SUELTA (sin cerrar ninguna orden).',
-    );
+    avisos.push(avisoSinPendientesDeTela(entrada.idOrdenCompra !== undefined));
   }
   const sinCruce = conceptos.filter((c) => c.sugerencia === null).length;
   if (pendientes.length > 0 && sinCruce > 0) {
+    // También se corrigió por §Post-F9.159(a): decía *"elígelos a mano"*, y capturar un renglón a
+    // mano —sin orden de compra— dejó de existir. El camino real es el panel de pendientes.
     avisos.push(
       `${String(sinCruce)} concepto(s) de la factura no se pudieron cruzar con un renglón de la ` +
-        `orden de compra: elígelos a mano (puede ser flete, otro material o un nombre distinto).`,
+        `orden de compra: captúralos desde el panel "Pendiente de la orden de compra" (puede ser ` +
+        `flete, otro material o un nombre distinto, y entonces no se capturan aquí).`,
     );
   }
 
@@ -383,7 +427,7 @@ export async function sellarCfdiEnEntrada(
   // quien no facturó. Se valida aquí porque el proveedor lo elige la pantalla, no el XML.
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: datos.idProveedor },
-    select: { nombre: true, rfc: true, factura: true },
+    select: { nombre: true, rfc: true, modalidadFacturacion: true },
   });
   // §Post-F9.22 — el que NO factura no puede traer factura. Se corta antes de subir nada a R2.
   if (proveedor !== null) {
@@ -468,36 +512,6 @@ export async function exigirUuidLibreEnEntradas(
   }
 }
 
-/**
- * Exige que el PROVEEDOR tenga su RFC capturado cuando hay un CFDI de por medio, y lo devuelve ya
- * comprobado (para que quien llama compare sin volver a preguntar por el null).
- *
- * POR QUÉ NO BASTA CON *"si tiene RFC, que coincida"* (hallazgo de la revisión del 11-ago-2026): los
- * **155 proveedores** que sobreviven a la depuración (§Post-F9.23) llegan del Access con **todo lo
- * fiscal al 0 %** — el viejo nunca tuvo RFC. Con la comparación condicionada a *"si el proveedor
- * tiene RFC"*, la regla "el emisor DEBE ser el proveedor" era un **NO-OP el día 1**: se leía el XML
- * de *Textiles del Norte*, se elegía a mano a *Avíos del Centro* (rfc NULL), se confirmaba… y nacía
- * un cargo **FISCAL** contra Avíos del Centro con el `rfcTercero` de Textiles del Norte. El contador
- * veía un tercero cuyo nombre y RFC no coinciden, y el UUID quedaba consumido para siempre.
- *
- * Por eso, con CFDI, el RFC del proveedor **es obligatorio**: sin él no hay contra qué comprobar
- * quién facturó, y una validación que no puede comprobar nada no debe dejar pasar (A4).
- */
-export function exigirRfcDelProveedor(
-  proveedor: { nombre: string; rfc: string | null },
-  queSeIntento: string,
-): string {
-  const rfc = proveedor.rfc?.trim() ?? '';
-  if (rfc === '') {
-    throw new ErrorValidacion(
-      `No se puede ${queSeIntento}: el proveedor "${proveedor.nombre}" no tiene RFC capturado, así ` +
-        `que no hay contra qué comprobar quién emitió el comprobante. Captúrale el RFC en ` +
-        `Catálogos › Proveedores (es el mismo que trae el XML) y vuelve a intentarlo.`,
-    );
-  }
-  return rfc;
-}
-
 /** El sello que ya vive en una entrada (lo que queda del CFDI cuando la edición no trae XML). */
 export interface SelloGuardado {
   uuidCfdi: string | null;
@@ -531,7 +545,7 @@ export async function exigirSelloCompatibleConProveedor(
   const cliente = clienteLectura(bd);
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: idProveedorNuevo },
-    select: { nombre: true, rfc: true, factura: true },
+    select: { nombre: true, rfc: true, modalidadFacturacion: true },
   });
   if (proveedor === null) {
     return; // `validarCabeceraYLineas` ya truena por proveedor inexistente, con mejor mensaje.
@@ -539,10 +553,10 @@ export async function exigirSelloCompatibleConProveedor(
   // §Post-F9.22 — el que NO factura no puede quedarse con una factura amarrada.
   //
   // EL CALLEJÓN QUE ESTO ABRE (dicho a propósito, no es un descuido): si a un proveedor migrado se
-  // le marca `factura = false` DESPUÉS de que ya tenía un borrador con CFDI, ese borrador deja de
-  // poder editarse. Tiene DOS salidas reales, y las dos están al alcance de quien captura: (1) si el
-  // proveedor sí timbra —y el XML es la prueba de que sí—, corregir la casilla del catálogo, que es
-  // justo lo que pide el mensaje de abajo; o (2) cancelar el borrador y recapturarlo sin el XML,
+  // le pone la modalidad `solo_sin` DESPUÉS de que ya tenía un borrador con CFDI, ese borrador deja
+  // de poder editarse. Tiene DOS salidas reales, y las dos están al alcance de quien captura: (1) si
+  // el proveedor sí timbra —y el XML es la prueba de que sí—, corregir "¿Cómo factura?" en el
+  // catálogo, que es justo lo que pide el mensaje de abajo; o (2) cancelar el borrador y recapturarlo sin el XML,
   // que es lo que corresponde si de verdad no factura. NO se agrega una tercera puerta para
   // "desamarrar" el CFDI: soltar un dato fiscal desde la edición es la superficie que se acaba de
   // cerrar (el `uuidCfdi` salió del PUT), y un borrador no cuesta nada de recapturar.

@@ -57,6 +57,7 @@ import {
   leerUltimosPreciosCompra,
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
+import { conRecetaCompartidaDeUno } from '../modelos/receta-compartida.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaLineaManual = z.input<typeof esquemaPrecostoLineaManualCrear>;
@@ -74,7 +75,7 @@ const NAMESPACE_LOCK_PRECOSTO = 20_531;
  * siembra el seed con `fijo=true` salvo `bordado`. `corte` es el renglón nuevo de R5 (costo de corte
  * separado de la costura; decisión Daniel).
  */
-const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'corte', 'bordado'] as const;
+const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'corte', 'empaque', 'bordado'] as const;
 
 /** Ids de los conceptos base resueltos por código (se leen una vez por operación). */
 interface ConceptosBase {
@@ -83,6 +84,8 @@ interface ConceptosBase {
   maquila: number;
   /** Corte (rediseño R5, B8): costo fijo por prenda separado de la maquila. */
   corte: number;
+  /** ⭐ Empaque (V1-E8w, §Post-F9.153): la TERCERA ancla fija, *"como si fuera corte"*. */
+  empaque: number;
   bordado: number;
 }
 
@@ -118,8 +121,7 @@ const incluirBomModelo = {
           clave: true,
           descripcion: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           // R5, B11: medidas ACTIVAS del avío "por medida". Si trae ≥1, el precosto usa el PROMEDIO
           // SIMPLE de sus precios (decisión Daniel) en vez de la cascada por proveedor.
           medidas: { where: { activo: true }, select: { precio: true } },
@@ -138,6 +140,30 @@ const incluirBomModelo = {
 
 type ModeloConBom = Prisma.ModeloGetPayload<{ include: typeof incluirBomModelo }>;
 
+/**
+ * 🔴 V1-E9b (§Post-F9.167) — Lee el modelo con su BOM **de quien de verdad es la receta**.
+ *
+ * Las TRES puertas del precosto (generar, recalcular y restaurar un renglón) leían el modelo con
+ * `include: incluirBomModelo`, que trae `telas`/`avios`/`avios.tallas`/`artes` **por nombre de
+ * relación, sin nombrar jamás la tabla**: la clase de lectura invisible que el conteo del plan
+ * omitió. Con un modelo de producción derivado (V1-E9a) eso habría precosteado con la receta
+ * VACÍA — sólo corte, maquila y empaque—, *sin lanzar*, y de ahí sale el precio del cliente.
+ *
+ * ⚠️ Hoy las tres entran por `Desarrollo.idModelo`, que apunta a un modelo de DESARROLLO ⇒ el
+ * resolver es la IDENTIDAD y no cambia nada. Va igual, y a propósito: la regla se cumple **por
+ * construcción**, no porque alguien recuerde que hoy ese modelo nunca es un hijo. El día que un
+ * desarrollo pueda colgar de un modelo de producción, esto ya está bien.
+ */
+async function leerModeloConBom(tx: Tx, idModelo: number): Promise<ModeloConBom | null> {
+  const propio = await tx.modelo.findUnique({ where: { id: idModelo }, include: incluirBomModelo });
+  if (propio === null) {
+    return null;
+  }
+  return conRecetaCompartidaDeUno(propio, (idPadre) =>
+    tx.modelo.findUnique({ where: { id: idPadre }, include: incluirBomModelo }),
+  );
+}
+
 /** Un renglón nuevo (sin `idPrecosto`, que se agrega al insertar en lote). */
 type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
 
@@ -147,11 +173,9 @@ type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
  */
 interface AvioParaValuar {
   precioReferencia: Prisma.Decimal | null;
-  factorConversion: Prisma.Decimal | null;
   proveedores: {
     idProveedor: number;
     precio: Prisma.Decimal | null;
-    factorConversion: Prisma.Decimal | null;
   }[];
   /** Medidas ACTIVAS del avío "por medida" (R5, B11). */
   medidas: { precio: Prisma.Decimal }[];
@@ -202,13 +226,11 @@ function precioAvioDeCatalogo(
   // solo se aplica el redondeo, que sigue siendo decisión del llamador.
   const resuelto = resolverPrecioAvioCatalogo({
     precioReferencia: numOrNull(avio.precioReferencia),
-    factorConversionAvio: numOrNull(avio.factorConversion),
     idAvioProveedor,
     medidas: avio.medidas.map((m) => num(m.precio)),
     proveedores: avio.proveedores.map((p) => ({
       idProveedor: p.idProveedor,
       precio: numOrNull(p.precio),
-      factorConversion: numOrNull(p.factorConversion),
     })),
     ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', idAvio)),
     ultimaCompraProveedorAmarrado:
@@ -216,12 +238,11 @@ function precioAvioDeCatalogo(
         ? null
         : aCompraReal(ultimos, claveMaterialProveedor('avio', idAvio, idAvioProveedor), true),
   });
-  // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. La cascada
-  // DIVIDE (`precio ÷ factorConversion`, R1: el avío comprado por caja/rollo), así que devuelve
-  // decimales infinitos: $100 la caja de 144 → 0.694444… Si ese número saliera de aquí, se guardaría
-  // en `Decimal(12,2)` como 0.69 mientras el importe se calcularía con 0.694444… → con consumo 6, la
-  // fila mostraría 4.17 en vez de 4.14, y ese importe entra al `costoTotal` que se persiste al
-  // congelar y de ahí al precio del cliente.
+  // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. El promedio
+  // de medidas (R5/B11) DIVIDE, así que devuelve decimales infinitos: tres medidas a $1 / $1 / $1.10
+  // → 1.0333… Si ese número saliera de aquí, se guardaría en `Decimal(12,2)` como 1.03 mientras el
+  // importe se calcularía con 1.0333… → la fila mostraría un importe que no cuadra con su unitario,
+  // y ese importe entra al `costoTotal` que se persiste al congelar y de ahí al precio del cliente.
   return {
     precio: resuelto.precio === null ? null : redondear2(resuelto.precio),
     idProveedor: resuelto.idProveedor,
@@ -231,17 +252,59 @@ function precioAvioDeCatalogo(
 /** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
 const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
 
-/** Códigos de los conceptos ANCLA fijos (rediseño R5): un renglón `manual` por prenda, único, que se
- * EDITA pero NO se elimina ni se agrega dos veces (maquila/costura y corte). */
-const CONCEPTOS_ANCLA = ['maquila', 'corte'] as const;
+/**
+ * Código del concepto de EMPAQUE. Vive en su propia constante porque **dos** reglas distintas lo
+ * miran: la de ancla fija ({@link CONCEPTOS_ANCLA}) y la del contenido mínimo para congelar
+ * ({@link exigirCostoCongelable}) — y la segunda existe justamente porque el empaque es la única
+ * de las tres anclas que nace con un valor **puesto por el sistema**, no capturado por nadie.
+ */
+const CONCEPTO_EMPAQUE = 'empaque';
 
 /**
- * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de maquila y corte: origen `manual`
- * + concepto fijo `maquila`/`corte`. Son ÚNICOS por precosto, editables pero NO eliminables (a
- * diferencia del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ * Códigos de los conceptos ANCLA fijos (rediseño R5 + V1-E8w): un renglón `manual` por prenda, ÚNICO,
+ * que se EDITA pero NO se elimina ni se agrega dos veces — maquila/costura, corte y **empaque**.
+ *
+ * ⭐ **`empaque` es el tercero** (§Post-F9.153, Daniel 30-ago-2026): *"nos falto meter el costo del
+ * empaque. Es un campo adicional…. como si fuera corte"* · *"el empaque no es de catalogo…. es
+ * simplemente un campo que casi siempre es el mismo costo"*. Su importe default NO está clavado
+ * aquí: sale de `ConfiguracionEmpresa.costoEmpaqueBase` (ver {@link costoEmpaqueDeEmpresa}).
+ */
+const CONCEPTOS_ANCLA = ['maquila', 'corte', CONCEPTO_EMPAQUE] as const;
+
+/**
+ * Costo de empaque por prenda de RESPALDO, para una empresa que todavía no tiene fila de
+ * `ConfiguracionEmpresa`. Es **el mismo 2.20 del `ADD COLUMN … DEFAULT` de la migración** —el número
+ * que dio Daniel— y no una segunda opinión: si divergieran, una empresa sin configuración costearía
+ * distinto que una con la configuración recién sembrada. **El valor de verdad vive en la BD**; esto
+ * sólo cubre el hueco de la fila ausente.
+ */
+export const COSTO_EMPAQUE_DEFECTO = 2.2;
+
+/**
+ * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de origen `manual` bajo uno de los
+ * conceptos de {@link CONCEPTOS_ANCLA} — hoy **tres**: `maquila`, `corte` y `empaque` (este último
+ * desde V1-E8w / §Post-F9.153). Son ÚNICOS por precosto, editables pero NO eliminables (a diferencia
+ * del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ *
+ * ⚠️ La lista NO se repite aquí a propósito: se lee de `CONCEPTOS_ANCLA`, para que agregar una cuarta
+ * ancla no deje este docstring mintiendo — que es justo lo que pasó cuando entró `empaque`.
  */
 function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
   return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
+}
+
+/**
+ * ¿Es el renglón del ancla de EMPAQUE, la que el sistema pone SOLO? Hermana de {@link esAnclaFija},
+ * pero para una pregunta distinta: no *"¿se puede borrar?"* sino *"¿esto lo costeó una persona?"*.
+ *
+ * La respuesta es NO: `generarPrecosto` mete este renglón en TODO precosto nuevo con el default de
+ * la empresa (§Post-F9.153), sin que nadie capture nada. Por eso {@link exigirCostoCongelable} lo
+ * descuenta al medir si el precosto tiene contenido. Un `manual` bajo `empaque` agregado a mano en
+ * un borrador viejo (el camino de V1-E8w) cuenta igual: sigue siendo el costo del empaque, que por
+ * sí solo no es el costeo de una prenda.
+ */
+function esAnclaEmpaque(linea: { origen: string; conceptoCodigo: string }): boolean {
+  return linea.origen === 'manual' && linea.conceptoCodigo === CONCEPTO_EMPAQUE;
 }
 
 /** Clave de identidad de un renglón BOM (origen + insumo) para casar ajustes con la regeneración. */
@@ -437,6 +500,52 @@ function lineaCorte(
   };
 }
 
+/**
+ * ⭐⭐ Renglón de EMPAQUE (V1-E8w, §Post-F9.153): la TERCERA ancla fija por prenda, hermana de
+ * `lineaCorte` y `lineaMaquila`. Concepto fijo `empaque`, origen `manual` (editable luego;
+ * sobrevive al recalcular desde el BOM). SIN consumo y SIN proveedor.
+ *
+ * 🔴 **El importe NO viene de ningún catálogo ni de ninguna constante de este archivo**: lo trae
+ * {@link costoEmpaqueDeEmpresa} desde `ConfiguracionEmpresa.costoEmpaqueBase`. Daniel: *"Ponle 2.20
+ * pesos por default, y ya si cambia, que se pueda modificar"* — y va a cambiar, así que el número
+ * tiene que poderse mover **sin un deploy** (mismo patrón que `pctDesvioCompra`).
+ *
+ * 🔴 **Y por eso el importe se COPIA aquí, en el renglón.** Cambiar el default de la empresa mañana
+ * NO reescribe ninguna receta ya hecha: cada precosto se lleva su copia y este valor sólo alimenta
+ * los renglones que NACEN después. Los precostos ya congelados —la foto de lo que se cotizó— nunca
+ * se tocan (D3).
+ */
+function lineaEmpaque(
+  costoEmpaque: number,
+  conceptos: ConceptosBase,
+  sesion: SesionUsuario,
+): LineaNueva {
+  const empaque = redondear2(costoEmpaque);
+  return {
+    idConceptoCosto: conceptos.empaque,
+    origen: 'manual',
+    descripcion: 'Empaque',
+    consumo: null,
+    precioUnit: empaque,
+    importe: empaque,
+    ...datosCreacion(sesion),
+  };
+}
+
+/**
+ * Costo de EMPAQUE por prenda VIGENTE de la empresa (§Post-F9.153). Vive en `ConfiguracionEmpresa`
+ * para que Daniel lo mueva sin un deploy; si la empresa todavía no tiene fila de configuración se
+ * usa el mismo default que sembraría el `ADD COLUMN … DEFAULT` de la migración. Mismo patrón que
+ * `pctDesvioDeEmpresa` en compras.
+ */
+async function costoEmpaqueDeEmpresa(tx: Tx, idEmpresa: number): Promise<number> {
+  const config = await tx.configuracionEmpresa.findUnique({
+    where: { idEmpresa },
+    select: { costoEmpaqueBase: true },
+  });
+  return config === null ? COSTO_EMPAQUE_DEFECTO : num(config.costoEmpaqueBase);
+}
+
 /** Resuelve los ids de los conceptos BASE por código (falla claro si el seed no los sembró). */
 async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
   const filas = await tx.conceptoCosto.findMany({
@@ -458,6 +567,7 @@ async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
     avios: exigir('avios'),
     maquila: exigir('maquila'),
     corte: exigir('corte'),
+    empaque: exigir('empaque'),
     bordado: exigir('bordado'),
   };
 }
@@ -503,7 +613,7 @@ function aLineaSalida(
     // R5, B12: en la calculadora de negociación CUALQUIER renglón de un borrador se puede editar
     // (los BOM pasan a `ajustado`). La UI gatea la edición tras `precosto.congelado`.
     editable: true,
-    // Todo se puede quitar en un borrador SALVO los anclas fijos (maquila/corte: se editan, no se
+    // Todo se puede quitar en un borrador SALVO los anclas fijos (maquila/corte/empaque: se editan, no se
     // borran). Los BOM quitados reaparecen al recalcular (reset al BOM del modelo); los ajustados no.
     eliminable: !esAncla,
     // R5, B12: renglón de origen BOM ajustado a mano (recalcular no lo pisa; se puede restaurar).
@@ -647,10 +757,7 @@ export async function generarPrecosto(
     });
     const version = (ultima._max.version ?? 0) + 1;
 
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
@@ -660,6 +767,7 @@ export async function generarPrecosto(
       ...lineasBomDesdeModelo(modelo, conceptos, sesion, ultimos),
       lineaCorte(modelo, conceptos, sesion),
       lineaMaquila(modelo, conceptos, sesion),
+      lineaEmpaque(await costoEmpaqueDeEmpresa(tx, sesion.idEmpresaActiva), conceptos, sesion),
     ];
 
     let precostoId: number;
@@ -722,10 +830,7 @@ export async function recalcularDesdeBom(
     if (desarrollo === null) {
       throw new ErrorNoEncontrado('Desarrollo', precosto.idDesarrollo);
     }
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
@@ -736,7 +841,8 @@ export async function recalcularDesdeBom(
     // Se borran sólo los BOM no ajustados y se re-generan del modelo, SALTANDO los insumos que ya
     // tienen un renglón ajustado (evita duplicar la misma tela/avío/arte). Los quitados a mano SÍ
     // reaparecen (recalcular = reset explícito al BOM del modelo); para conservar un cambio definitivo
-    // se edita el BOM del modelo. Los `manual` (maquila/corte/procesos) nunca los toca este recalcular.
+    // se edita el BOM del modelo. Los `manual` (maquila/corte/empaque/procesos) nunca los toca este
+    // recalcular — y de ahí que subir el `costoEmpaqueBase` de la empresa no mueva una receta ya hecha.
     const ajustadas = await tx.precostoLinea.findMany({
       where: { idPrecosto, ajustado: true, origen: { in: [...ORIGENES_BOM] } },
       select: {
@@ -783,12 +889,15 @@ export async function recalcularDesdeBom(
 }
 
 /**
- * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` activo y NO
- * fijo. El importe = `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un
- * BORRADOR. Requiere `desarrollo.precostear`.
+ * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` ACTIVO — el
+ * `fijo` del catálogo NO veta ya (lo que manda es la regla de las anclas de aquí abajo). El importe =
+ * `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un BORRADOR. Requiere
+ * `desarrollo.precostear`.
  *
- * Se RECHAZAN sólo los conceptos ANCLA (`maquila`/`corte`): son ÚNICOS por prenda y ya tienen su
- * renglón auto-creado (se EDITA, no se duplica). Cualquier otro concepto activo se puede agregar a
+ * De los TRES conceptos ANCLA (`maquila`/`corte`/`empaque`) sólo se rechaza el que YA ESTÉ PUESTO en
+ * este precosto: son ÚNICOS por prenda, así que el que ya tiene su renglón se EDITA, no se duplica —
+ * pero el que falta SÍ se puede agregar a mano (V1-E8w: `empaque` es ancla desde entonces, y los
+ * borradores anteriores nacieron sin él). Cualquier otro concepto activo se puede agregar a
  * mano — incluidos tela/avíos como renglón de la calculadora de negociación (R5, B12): un manual bajo
  * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
  * (`eliminable = !esAncla`), así que no queda atrapado como antes.
@@ -821,7 +930,9 @@ export async function agregarLineaManual(
 
     const concepto = await tx.conceptoCosto.findUnique({
       where: { id: datos.idConceptoCosto },
-      select: { id: true, codigo: true, nombre: true, activo: true, fijo: true },
+      // `fijo` ya NO se trae: la regla de anclas mira `CONCEPTOS_ANCLA` + la presencia en ESTE
+      // precosto, no la bandera del catálogo (V1-E8w). Quedaba muerto en el select.
+      select: { id: true, codigo: true, nombre: true, activo: true },
     });
     if (concepto === null) {
       throw new ErrorNoEncontrado('ConceptoCosto', datos.idConceptoCosto);
@@ -829,10 +940,22 @@ export async function agregarLineaManual(
     if (!concepto.activo) {
       throw new ErrorConflicto(`El concepto de costo "${concepto.nombre}" está desactivado.`);
     }
+    // ⭐ ANCLA = ÚNICA por precosto, no PROHIBIDA (V1-E8w). La regla real siempre fue "no dos veces"
+    // —se edita el que ya está, no se agrega otro—, pero estaba escrita como un veto al concepto, y
+    // eso dejaba sin salida a los borradores que NACIERON sin el ancla: el `empaque` de §Post-F9.153
+    // es ancla desde hoy, así que todo borrador anterior a esta versión no lo tiene y, con el veto,
+    // no habría manera de ponérselo (ni a mano ni recalculando, que no toca los `manual`). Se
+    // comprueba la PRESENCIA en ESTE precosto: si ya está, se rechaza igual que antes.
     if ((CONCEPTOS_ANCLA as readonly string[]).includes(concepto.codigo)) {
-      throw new ErrorConflicto(
-        `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
-      );
+      const yaExiste = await tx.precostoLinea.findFirst({
+        where: { idPrecosto, origen: 'manual', idConceptoCosto: concepto.id },
+        select: { id: true },
+      });
+      if (yaExiste !== null) {
+        throw new ErrorConflicto(
+          `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
+        );
+      }
     }
 
     // Renglón LIGADO a un avío del catálogo: el dominio resuelve descripción y precio (cascada de E1).
@@ -851,8 +974,7 @@ export async function agregarLineaManual(
           descripcion: true,
           activo: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           medidas: { where: { activo: true }, select: { precio: true } },
         },
       });
@@ -1007,7 +1129,7 @@ export async function editarLinea(
 /**
  * Quita un renglón de un borrador (rediseño R5, B12): en la calculadora de negociación se puede
  * quitar CUALQUIER renglón (una tela/avío/proceso — "se quitan bolsas traseras") SALVO los ANCLAS
- * fijos (maquila/corte: se editan, no se borran). Un renglón de origen BOM quitado reaparece al
+ * fijos (maquila/corte/empaque: se editan, no se borran). Un renglón de origen BOM quitado reaparece al
  * `recalcularDesdeBom` (reset al BOM del modelo); para quitarlo definitivamente se edita el BOM del
  * modelo. Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
  */
@@ -1098,10 +1220,7 @@ export async function restaurarLineaBom(
     if (desarrollo === null) {
       throw new ErrorNoEncontrado('Desarrollo', precosto.idDesarrollo);
     }
-    const modelo = await tx.modelo.findUnique({
-      where: { id: desarrollo.idModelo },
-      include: incluirBomModelo,
-    });
+    const modelo = await leerModeloConBom(tx, desarrollo.idModelo);
     if (modelo === null) {
       throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
     }
@@ -1153,8 +1272,18 @@ export async function restaurarLineaBom(
   return obtenerPrecosto(sesion, idPrecosto, bd);
 }
 
+/** Renglón visto por el GUARD del congelado: sólo lo que decide si hay contenido costeado. */
+export interface RenglonCongelable {
+  /** `bom_tela` / `bom_avio` / `bom_arte` / `manual`. */
+  origen: string;
+  /** Código del concepto de costo (`tela`, `maquila`, `corte`, `empaque`, …). */
+  conceptoCodigo: string;
+  /** Importe del renglón, ya en número (la columna es `Decimal(12,2)`). */
+  importe: number;
+}
+
 /**
- * ⭐ V1-E4 (punto 2) — GUARD del congelado: un precosto NO se congela en CERO.
+ * ⭐ V1-E4 (punto 2) — GUARD del congelado: un precosto NO se congela SIN NADA COSTEADO.
  *
  * El caso real: se genera el precosto de un modelo cuya receta todavía está vacía (o cuyos insumos
  * no tienen precio), así que sus renglones nacen en $0.00 — incluidas las anclas de maquila y
@@ -1165,15 +1294,64 @@ export async function restaurarLineaBom(
  * Nadie lo nota probando a mano porque el congelado "funciona": la pantalla no truena, solo miente.
  * Es dominio PURO a propósito, para que la regresión se pueda cementar sin base de datos.
  *
+ * 🔴🔴 **Por qué mira los RENGLONES y no sólo el total (candado del 31-ago-2026).** La versión 0.060
+ * metió el EMPAQUE como tercera ancla fija, con un default de la empresa ($2.20) que `generarPrecosto`
+ * pone en **todo** precosto nuevo sin que nadie capture nada (§Post-F9.153). Desde entonces un modelo
+ * con la receta vacía ya no suma $0.00: suma $2.20 — **y pasaba esta guarda sin protestar**. La
+ * versión se congelaba INMUTABLE, y de ese precosto salía el precio al cliente: una prenda cotizada
+ * a su bolsa. El guard seguía en pie, pero ya no protegía de nada real, y el escenario nativo de lo
+ * que viene (cotizar en la cita un modelo que se crea en ese momento) es justamente ése.
+ *
+ * **La regla:** el total, DESCONTANDO el ancla de empaque, tiene que ser **> 0**. O sea, la SUMA de
+ * todo lo que no es el empaque automático tiene que aportar:
+ * - cualquier renglón de la receta (tela / avío / arte) valuado, **o**
+ * - el ancla de **maquila** o la de **corte** con costo capturado, **o**
+ * - cualquier renglón MANUAL que la persona haya agregado en la calculadora de negociación.
+ *
+ * Es EXACTAMENTE la guarda de antes de 0.060 con el empaque descontado: nada que fuera congelable
+ * entonces deja de serlo ahora. Y por eso la regla es sobre el CONTENIDO, no sobre el monto:
+ * - un precosto de sólo maquila y corte, con la receta vacía, SÍ congela (costeo por proceso: no
+ *   toda prenda lleva BOM);
+ * - un precosto con receta real cuyo total sea bajísimo ($0.01) SÍ congela;
+ * - un empaque subido a $50 a mano NO alcanza: sigue siendo el costo de la bolsa, no el de la prenda.
+ *
  * Negativo también se rechaza: un total bajo cero solo puede salir de renglones mal capturados, y
  * congelarlo dejaría un precio de venta por debajo del costo, igual de inmutable.
  */
-export function exigirCostoCongelable(costoTotal: number): void {
-  if (costoTotal > 0) return;
+export function exigirCostoCongelable(
+  costoTotal: number,
+  renglones: readonly RenglonCongelable[],
+): void {
+  if (costoTotal < 0) {
+    throw new ErrorConflicto(
+      `El precosto suma un total NEGATIVO ($${costoTotal.toFixed(2)}); revisa los renglones antes de congelar.`,
+    );
+  }
+  if (costoTotal === 0) {
+    throw new ErrorConflicto(
+      'El precosto suma $0.00; congelarlo dejaría una versión INMUTABLE en cero, y de ahí sale el precio al cliente. Captura la receta del modelo (telas/avíos) o los costos de maquila y corte antes de congelar.',
+    );
+  }
+  // ⭐ El candado que 0.060 dejó hacer falta: ¿hay algo costeado, o el total es puro empaque?
+  //
+  // Se SUMA lo que no es empaque, en vez de buscar "algún renglón > 0", para que esto sea LITERAL
+  // la guarda de antes de 0.060 con el empaque descontado. Hoy las dos formas dan lo mismo porque
+  // todo importe es ≥ 0 por contrato (`precioUnit` y `consumo` son `.nonnegative()` en el esquema,
+  // y `maquilaBase`/`costoEmpaqueBase` también), pero el día que entre un renglón NEGATIVO —un
+  // descuento en la mesa de negociación, un ETL de precostos— "alguno > 0" dejaría congelar
+  // `tela 30 + descuento −30 + empaque 2.20`: un precosto que vale su bolsa, justo el defecto que
+  // este candado vino a cerrar. La suma no depende de que esa suposición siga siendo cierta.
+  const sinEmpaque = redondear2(
+    renglones.reduce((suma, linea) => (esAnclaEmpaque(linea) ? suma : suma + linea.importe), 0),
+  );
+  if (sinEmpaque > 0) return;
+  // El importe del empaque se calcula de los RENGLONES (no restando del total), para que el mensaje
+  // diga el número real de la empresa —que es configurable— y no dependa del total que le pasaron.
+  const empaque = redondear2(
+    renglones.reduce((suma, linea) => (esAnclaEmpaque(linea) ? suma + linea.importe : suma), 0),
+  );
   throw new ErrorConflicto(
-    costoTotal === 0
-      ? 'El precosto suma $0.00; congelarlo dejaría una versión INMUTABLE en cero, y de ahí sale el precio al cliente. Captura la receta del modelo (telas/avíos) o los costos de maquila y corte antes de congelar.'
-      : `El precosto suma un total NEGATIVO ($${costoTotal.toFixed(2)}); revisa los renglones antes de congelar.`,
+    `Fuera del EMPAQUE ($${empaque.toFixed(2)}) —que el sistema pone por su cuenta— el precosto no suma NADA costeado. Congelarlo dejaría una versión INMUTABLE de la que sale el precio al cliente. Captura la receta del modelo (telas/avíos/arte) o los costos de maquila y corte antes de congelar.`,
   );
 }
 
@@ -1197,18 +1375,25 @@ export async function congelarVersion(
     const precosto = await exigirPrecosto(tx, idPrecosto, sesion.idEmpresaActiva);
     exigirBorrador(precosto);
 
+    // El `origen` + el código del concepto viajan junto al importe porque la guarda de abajo no
+    // mira sólo cuánto suma, sino QUÉ lo suma (el ancla automática de empaque no cuenta).
     const lineas = await tx.precostoLinea.findMany({
       where: { idPrecosto },
-      select: { importe: true },
+      select: { importe: true, origen: true, conceptoCosto: { select: { codigo: true } } },
     });
     if (lineas.length === 0) {
       throw new ErrorConflicto(
         'El precosto no tiene renglones; agrega al menos uno antes de congelar.',
       );
     }
-    const costoTotal = redondear2(lineas.reduce((suma, l) => suma + l.importe.toNumber(), 0));
+    const renglones: RenglonCongelable[] = lineas.map((l) => ({
+      origen: l.origen,
+      conceptoCodigo: l.conceptoCosto.codigo,
+      importe: l.importe.toNumber(),
+    }));
+    const costoTotal = redondear2(renglones.reduce((suma, l) => suma + l.importe, 0));
     // V1-E4 (punto 2): la versión que se congela es INMUTABLE y alimenta el precio al cliente.
-    exigirCostoCongelable(costoTotal);
+    exigirCostoCongelable(costoTotal, renglones);
 
     await tx.precosto.update({
       where: { id: idPrecosto },

@@ -21,6 +21,16 @@ const notasLista = z
   .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' });
 
 /**
+ * ⭐ V1-E8y (§Post-F9.152) — DÓNDE fue la cita ("oficinas de C&A Santa Fe", "showroom", "Zoom").
+ * Texto libre y opcional: meses después, *dónde fue* es lo que ayuda a acordarse de qué se habló.
+ * No es catálogo (el lugar de una junta no se administra) y no bloquea nada.
+ */
+const lugarCita = z
+  .string()
+  .trim()
+  .max(200, { error: 'El lugar no puede tener más de 200 caracteres' });
+
+/**
  * Un porcentaje de factor de la lista: 0 ≤ % (finito). El tope fino (`margen < 100`; suma de los
  * otros tres `< 100`) lo valida el dominio con mensaje claro; aquí el piso y el rango físico
  * `Decimal(5,2)`.
@@ -61,14 +71,26 @@ export const esquemaListaPreciosCrear = z.object({
     .optional()
     .describe('Fecha de la lista (YYYY-MM-DD); default = hoy.'),
   notas: notasLista.nullable().optional().describe('Notas de la lista (opcional).'),
+  lugar: lugarCita.nullable().optional().describe('Dónde fue la cita (opcional, texto libre).'),
 });
 
 /** Datos validados de alta de una lista. */
 export type DatosListaPreciosCrear = z.infer<typeof esquemaListaPreciosCrear>;
 
 /**
- * Editar el SNAPSHOT de factores de una lista (decisión (a)): recalcula `precioCalculado` de TODOS los
- * renglones, sin tocar los `precioAprobado`. Los cuatro porcentajes son obligatorios.
+ * Editar el SNAPSHOT de factores de una lista (§Post-F9.125 (a) y (d)): recalcula `precioCalculado`
+ * de los renglones **VIVOS** (abiertos y en negociación) **y TUMBA sus `precioAprobado`**,
+ * devolviéndolos a pendiente con nota de qué los invalidó y cuándo. La firma vieja no se borra (D3):
+ * va al `NegociacionEvento` inmutable. Requiere `listas.aprobar` — el precio de venta es SÓLO del
+ * dueño. Los cuatro % son obligatorios.
+ *
+ * 🔴 **V1-E8x: los renglones CERRADOS y DROPEADOS no se tocan** (Daniel: *«No se tocan: lo cerrado
+ * es un compromiso»*). Un precio pactado no se mueve porque cambió un porcentaje interno; para
+ * cambiarlo se revive el renglón, y eso deja rastro.
+ *
+ * ⚠️ Este comentario decía *"sin tocar los `precioAprobado`"* —cierto hasta V1-E8b, falso después— y
+ * sobrevivió al cambio que lo desmintió, justo encima del esquema de la operación que lo cambió. Es
+ * la misma cicatriz de V1-E8a: *el barrido de la prosa se detuvo antes que el del código.*
  */
 export const esquemaListaFactoresEditar = z.object({
   margenPct: porcentajeFactor.describe('% de margen sobre la venta (debe ser < 100).'),
@@ -91,7 +113,122 @@ export const esquemaAjustarPrecioLinea = z.object({
 /** Datos validados del ajuste de precio de un renglón. */
 export type DatosAjustarPrecioLinea = z.infer<typeof esquemaAjustarPrecioLinea>;
 
+/**
+ * ⭐ V1-E8w (§Post-F9.150) — FIJAR (o BORRAR) el TARGET PRICE que el cliente dio para un renglón.
+ *
+ * `null` **borra** el target, y tiene que poder borrarse: *"si es que nos lo dio"* — quien capturó
+ * un número por error no puede quedarse atrapado con él, y un target falso en la mesa es peor que
+ * ninguno. Lo captura Aurora (`listas.administrar`), no el dueño en la mesa.
+ */
+export const esquemaPrecioTargetLinea = z.object({
+  precioTarget: z
+    .number({ error: 'El target debe ser un número' })
+    .positive({ error: 'El target debe ser mayor a cero' })
+    .nullable()
+    .describe('Precio objetivo que dio el cliente (> 0), o null para borrarlo.'),
+});
+
+/** Datos validados del target del cliente. */
+export type DatosPrecioTargetLinea = z.infer<typeof esquemaPrecioTargetLinea>;
+
 // ── Salida ──────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — LOS CUATRO ESTADOS DEL **MODELO** dentro de la lista, en el orden en
+ * que ocurren. Daniel: *«Que empiece todo en "Abierto", y luego estan los otros 3 estados. En
+ * negociacion, cerrado, dropeado. en total son 4 estados»*.
+ *
+ * 🔴 Conjunto **CERRADO** (por eso es un enum de Prisma y no un catálogo con CRUD como
+ * `EstadoLista`): *«en total son 4 estados»*. Los valores van en `snake_case` como el resto de los
+ * enums del esquema (`bom_tela`, `estado_precosto`…), no en kebab como los CÓDIGOS del catálogo de
+ * estados de lista — y esa diferencia ayuda: `en_negociacion` (renglón) no se confunde con
+ * `en-negociacion` (lista) ni siquiera al leer un JSON.
+ */
+export const ESTADOS_RENGLON_LISTA = ['abierto', 'en_negociacion', 'cerrado', 'dropeado'] as const;
+
+/** Estado de un renglón (modelo) dentro de la lista de precios. */
+export const esquemaEstadoRenglonLista = z
+  .enum(ESTADOS_RENGLON_LISTA)
+  .describe(
+    'Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → ' +
+      'dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni ' +
+      'la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.',
+  );
+
+/** Estado de un renglón de lista de precios. */
+export type EstadoRenglonListaSalida = z.infer<typeof esquemaEstadoRenglonLista>;
+
+/**
+ * ⭐ CAMBIAR el estado de un renglón (§Post-F9.151 / .155). Requiere `listas.negociar` — el mismo
+ * que ya gobierna el estado de la lista; SIN permiso nuevo.
+ *
+ * Desde `cerrado`/`dropeado` el único destino permitido es REVIVIR (`abierto` o `en_negociacion`),
+ * conservando toda la historia de precios y comentarios (§Post-F9.155 punto 3).
+ */
+export const esquemaCambiarEstadoRenglon = z.object({
+  estado: esquemaEstadoRenglonLista.describe('Estado destino del renglón.'),
+});
+
+/** Datos validados del cambio de estado de un renglón. */
+export type DatosCambiarEstadoRenglon = z.infer<typeof esquemaCambiarEstadoRenglon>;
+
+// ── ⭐ V1-E8y (§Post-F9.152) — PENDIENTES POR MODELO ────────────────────────────────────────────
+//
+// Daniel eligió **por modelo, no por cita**: *«falta muestra de color»* y *«pedir precio de jareta»*
+// son de un modelo concreto, y una nota general de la junta los revolvería todos.
+//
+// 🔴 **NO es `NegociacionEvento.acuerdo`**, y no se reusa: aquél es el libro INMUTABLE de lo que se
+// pactó con el cliente (D3, obligatorio, nunca se edita). Esto es la LIBRETA de la cita: se escribe
+// a la carrera, se corrige, se tacha y se borra.
+
+/** Texto de un pendiente (lo que falta, en palabras de quien lo anotó). */
+const textoPendiente = z
+  .string({ error: 'Escribe qué falta' })
+  .trim()
+  .min(1, { error: 'Escribe qué falta' })
+  .max(500, { error: 'El pendiente no puede tener más de 500 caracteres' });
+
+/** Alta de un pendiente en un renglón (el renglón va en la URL). */
+export const esquemaPendienteLineaCrear = z
+  .object({ texto: textoPendiente.describe('Qué falta (texto libre).') })
+  .describe('Alta de un pendiente del modelo dentro de la lista.');
+
+/** Datos validados del alta de un pendiente. */
+export type DatosPendienteLineaCrear = z.infer<typeof esquemaPendienteLineaCrear>;
+
+/**
+ * Edición PARCIAL de un pendiente: el TEXTO se corrige y `resuelto` lo TACHA/destacha. Omitir = no
+ * tocar. Los dos en el mismo PATCH porque son el mismo acto de libreta.
+ */
+export const esquemaPendienteLineaEditar = z
+  .object({
+    texto: textoPendiente.optional().describe('Nuevo texto (omitir = no tocar).'),
+    resuelto: z
+      .boolean({ error: 'Resuelto debe ser verdadero o falso' })
+      .optional()
+      .describe('true lo TACHA, false lo devuelve a pendiente (omitir = no tocar).'),
+  })
+  .describe('Edición de un pendiente del modelo.');
+
+/** Datos validados de la edición de un pendiente. */
+export type DatosPendienteLineaEditar = z.infer<typeof esquemaPendienteLineaEditar>;
+
+/** Un pendiente tal como sale de la API. */
+export const esquemaPendienteLineaSalida = z
+  .object({
+    id: z.number().int().describe('Id del pendiente.'),
+    idListaLinea: z.number().int().describe('Renglón (modelo) al que pertenece.'),
+    texto: z.string().describe('Qué falta.'),
+    resuelto: z.boolean().describe('¿Ya se tachó?'),
+    resueltoEn: z.iso.datetime().nullable().describe('Cuándo se tachó (ISO 8601), o null.'),
+    resueltoPorId: z.string().nullable().describe('Quién lo tachó, o null.'),
+    creadoEn: z.iso.datetime().describe('Cuándo se anotó (ISO 8601).'),
+    creadoPorId: z.string().nullable().describe('Quién lo anotó, o null.'),
+  })
+  .describe('Un pendiente anotado sobre un modelo de la lista.');
+
+/** Forma de un pendiente. */
+export type PendienteLineaSalida = z.infer<typeof esquemaPendienteLineaSalida>;
 
 /** Un renglón de la lista (con datos del desarrollo/modelo y los precios; importes ocultos sin permiso). */
 export const esquemaListaPreciosLineaSalida = z
@@ -114,9 +251,111 @@ export const esquemaListaPreciosLineaSalida = z
       .describe(
         'Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes).',
       ),
+    /**
+     * ⭐ V1-E8w (§Post-F9.150) — TARGET PRICE del CLIENTE: el precio objetivo que ÉL nos dio, si nos
+     * lo dio. Lo captura **Aurora al armar la lista** (`listas.administrar`), NO Daniel en la mesa.
+     * **INFORMA, NO BLOQUEA.** Es un importe → sale `null` sin `consultas.ver-importes`, como el
+     * resto; para saber si HAY target sin ver el número está `tieneTarget`.
+     *
+     * 🔴 No delata ningún factor: es un número que puso el cliente, no uno que calcule el sistema.
+     */
+    precioTarget: z
+      .number()
+      .nullable()
+      .describe('Precio objetivo que dio el cliente (o null si no lo dio / sin importes).'),
+    tieneTarget: z
+      .boolean()
+      .describe('¿El cliente dio un target? (independiente de ver importes).'),
     aprobado: z.boolean().describe('¿Ya tiene precio aprobado? (independiente de ver importes).'),
     aprobadoPorId: z.string().nullable().describe('Quién aprobó el precio, o null.'),
     aprobadoEn: z.iso.datetime().nullable().describe('Cuándo se aprobó (ISO 8601), o null.'),
+    /**
+     * ⭐⭐ **EL PRECIO QUE QUEDÓ EN LA NEGOCIACIÓN** (fila 0.153) — Daniel, textual:
+     *
+     * > *«Después de haber cerrado la negociación de un modelo, debería de cambiar el precio que se
+     * > ve afuera. Ese fue el precio que quedó, ya deja de ser con el que venía (o estaría bien
+     * > poner los dos, mejor). Está muy confuso cuál es el precio. **Dice precio aprobado, pero
+     * > dentro de la negociación quedó otro.** Debe de haber congruencia.»*
+     *
+     * Es el `precioNuevo` del ÚLTIMO `NegociacionEvento` del renglón que registró un precio. Hasta
+     * ahora ese número **sólo se veía abriendo el diálogo de la negociación**: la lista de afuera
+     * enseñaba `precioCalculado` y `precioAprobado` y nada más, así que la pantalla podía decir
+     * «aprobado 137» mientras la última fila del historial decía «95». Poniendo los dos, la de
+     * afuera dice lo mismo que la de adentro.
+     *
+     * 🔴 **NO sustituye a `precioAprobado` ni lo escribe.** Aprobar es un acto APARTE, de otra
+     * persona y con otro permiso (`listas.aprobar`): el negociador pacta, el dueño firma. Este
+     * campo es SÓLO LECTURA —una proyección del historial— y **nada aguas abajo lo lee**: el PDF,
+     * el Excel, la cotización y el precio que viaja a la orden siguen usando
+     * `precioAprobado ?? precioCalculado`.
+     *
+     * 🔴 Es un importe ⇒ sale `null` sin `consultas.ver-importes`. Para saber que HAY un precio
+     * negociado sin ver cuánto está `tienePrecioNegociado` (mismo reparto que
+     * `precioTarget`/`tieneTarget`).
+     */
+    precioNegociado: z
+      .number()
+      .nullable()
+      .describe(
+        'Último precio registrado en la negociación del renglón (o null si nunca se negoció un ' +
+          'precio / sin importes). NO es el aprobado y nada aguas abajo lo lee.',
+      ),
+    tienePrecioNegociado: z
+      .boolean()
+      .describe('¿El historial de negociación trae algún precio? (independiente de ver importes).'),
+    /**
+     * Cuándo se registró ese precio. **No es un importe** (no lo tapa la reja), y es lo que vuelve
+     * comparables los dos números: puesto al lado de `aprobadoEn` dice CUÁL de los dos es el más
+     * reciente, que es justo la pregunta que Daniel no podía contestar.
+     */
+    precioNegociadoEn: z.iso
+      .datetime()
+      .nullable()
+      .describe('Cuándo se registró el último precio de la negociación (ISO 8601), o null.'),
+    /**
+     * ⭐⭐ V1-E8x (§Post-F9.151) — EL SEGUNDO EJE DEL RENGLÓN: en qué punto va **este modelo**
+     * dentro de la lista. Convive con `aprobado` (la firma del dueño sobre el precio), **no lo
+     * sustituye**: un modelo `cerrado` puede seguir sin firmar, y un `dropeado` conserva la firma
+     * que ya tenía (por eso revivirlo no pierde nada).
+     *
+     * 🔴 NO es el estado de la LISTA (`codigoEstado`/`nombreEstado`, arriba), aunque «En
+     * negociación» sea el MISMO string: aquél es del documento y éste de cada modelo. La pantalla
+     * los separa con forma distinta y rótulo propio.
+     *
+     * 🔴 NO es un importe: se ve completo sin `consultas.ver-importes` — quien no ve precios
+     * igual necesita saber que ese modelo ya no va en el papel.
+     */
+    estado: esquemaEstadoRenglonLista,
+    nombreEstado: z
+      .string()
+      .describe('Nombre legible del estado del renglón (lo redacta el servidor, criterio único).'),
+    estadoPorId: z.string().nullable().describe('Quién dejó el renglón en este estado, o null.'),
+    estadoEn: z.iso
+      .datetime()
+      .nullable()
+      .describe('Cuándo se puso este estado (ISO 8601), o null si nunca se movió.'),
+    // ⭐ V1-E8d (§Post-F9.127) — la frase la arma el SERVIDOR (`dominio/desarrollo/costo-viejo.ts`)
+    // para que la pantalla no la degrade a un semáforo mudo ni escriba una segunda redacción.
+    avisoCostoViejo: z
+      .string()
+      .nullable()
+      .describe(
+        'AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el ' +
+          'que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la ' +
+          'receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: ' +
+          'no bloquea aprobar ni bajar documentos (§Post-F9.127).',
+      ),
+    /**
+     * ⭐ V1-E8y (§Post-F9.152) — LOS PENDIENTES DE ESTE MODELO. Daniel los quiso **por modelo, no
+     * por cita**: *«falta muestra de color»*, *«pedir precio de jareta»* son de un modelo concreto.
+     *
+     * Viajan EMBEBIDOS en el renglón a propósito: la mesa los enseña fila por fila, y pedirlos
+     * aparte serían N llamadas para pintar una lista de 20 modelos. No son importes ni factores —
+     * se ven completos sin `consultas.ver-importes`.
+     */
+    pendientes: z
+      .array(esquemaPendienteLineaSalida)
+      .describe('Pendientes anotados de este modelo (los tachados incluidos).'),
   })
   .describe('Renglón de una lista de precios.');
 
@@ -136,14 +375,25 @@ export const esquemaListaPreciosDetalle = z
     idEstadoLista: z.number().int().describe('Estado de la lista.'),
     codigoEstado: z.string().describe('Código del estado (ej. "abierta").'),
     nombreEstado: z.string().describe('Nombre del estado.'),
-    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin importes).'),
-    descuentosPct: z.number().nullable().describe('Snapshot % descuentos (o null sin importes).'),
-    regaliasPct: z.number().nullable().describe('Snapshot % regalías (o null sin importes).'),
+    // §Post-F9.125(b): los CUATRO factores son del dueño. La reja NO es `consultas.ver-importes`
+    // (Desarrollo lo tiene y lo necesita), es `listas.aprobar`.
+    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin `listas.aprobar`).'),
+    descuentosPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % descuentos (o null sin `listas.aprobar`).'),
+    regaliasPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % regalías (o null sin `listas.aprobar`).'),
     costoVentasPct: z
       .number()
       .nullable()
-      .describe('Snapshot % costo de ventas (o null sin importes).'),
+      .describe('Snapshot % costo de ventas (o null sin `listas.aprobar`).'),
     notas: z.string().nullable().describe('Notas de la lista, o null.'),
+    // ⭐ V1-E8y (§Post-F9.152): DÓNDE fue la cita. No es un importe ni un factor: lo ve todo el que
+    // puede abrir la lista.
+    lugar: z.string().nullable().describe('Dónde fue la cita (texto libre), o null.'),
     lineas: z.array(esquemaListaPreciosLineaSalida).describe('Renglones (uno por desarrollo).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),
@@ -169,7 +419,22 @@ export const esquemaListaPreciosResumen = z
     codigoEstado: z.string().describe('Código del estado.'),
     nombreEstado: z.string().describe('Nombre del estado.'),
     totalRenglones: z.number().int().describe('Cuántos renglones tiene la lista.'),
-    renglonesAprobados: z.number().int().describe('Cuántos renglones ya tienen precio aprobado.'),
+    /**
+     * ⭐ V1-E8x (§Post-F9.155): cuántos modelos se DROPEARON — los que ya no salen en el papel.
+     * `totalRenglones - renglonesDropeados` = los VIGENTES, que es el universo contra el que se
+     * lee `renglonesAprobados`.
+     */
+    renglonesDropeados: z
+      .number()
+      .int()
+      .describe('Cuántos renglones están dropeados (no salen en el papel).'),
+    renglonesAprobados: z
+      .number()
+      .int()
+      .describe(
+        'Cuántos renglones VIGENTES (no dropeados) ya tienen precio aprobado. Cuando iguala a ' +
+          '`totalRenglones - renglonesDropeados` y hay al menos uno, de la lista ya sale papel.',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
   })
   .describe('Resumen de una lista de precios (para el listado).');
@@ -223,12 +488,81 @@ export const esquemaCandidatoLista = z
 /** Forma de un candidato. */
 export type CandidatoLista = z.infer<typeof esquemaCandidatoLista>;
 
-/** Respuesta de los candidatos para una lista. */
+/**
+ * ⭐ V1-E8f (§Post-F9.128) — POR QUÉ un desarrollo NO es candidato. Daniel: *"Justo me sale la
+ * leyenda de que no hay desarrollos disponibles"*. Un aviso que dice "no hay X" sin decir por qué ni
+ * qué hacer ES el defecto (§Post-F9.96), así que el servidor CLASIFICA cada desarrollo descartado y
+ * devuelve el motivo; el texto lo pone el frontend (la lógica es del dominio, la redacción de la UI —
+ * mismo reparto que el estado derivado del desarrollo).
+ *
+ * Los cuatro motivos son EXHAUSTIVOS y se evalúan en este orden de precedencia:
+ *  • `apagado`           — el desarrollo está apagado (se reactiva con «Mostrar apagados»).
+ *  • `ya-en-lista`       — ya tiene renglón en una lista (un desarrollo vive en A LO MÁS UNA, D13);
+ *                          se devuelven `idLista`/`folioLista` para PODER LLEVAR AHÍ al usuario.
+ *  • `precosto-borrador` — tiene precosto(s) pero NINGUNO congelado: es EL caso de Daniel. Se
+ *                          devuelve `versionPrecosto` = la versión borrador más reciente, para que el
+ *                          aviso pueda nombrarla ("v2 sigue en borrador").
+ *  • `sin-precosto`      — el modelo no tiene ni un precosto todavía.
+ */
+export const MOTIVOS_NO_CANDIDATO = [
+  'apagado',
+  'ya-en-lista',
+  'precosto-borrador',
+  'sin-precosto',
+] as const;
+
+/** Motivo por el que un desarrollo NO puede entrar a una lista de precios. */
+export const esquemaMotivoNoCandidato = z
+  .enum(MOTIVOS_NO_CANDIDATO)
+  .describe(
+    'Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto).',
+  );
+
+/** Forma del motivo. */
+export type MotivoNoCandidato = z.infer<typeof esquemaMotivoNoCandidato>;
+
+/** Un desarrollo DESCARTADO, con el motivo que lo descartó y con qué llevar al usuario al remedio. */
+export const esquemaDescartadoLista = z
+  .object({
+    idDesarrollo: z.number().int().describe('Desarrollo descartado.'),
+    idProyecto: z.number().int().describe('Proyecto del desarrollo.'),
+    folioProyecto: z.number().int().describe('Folio del proyecto.'),
+    nombreProyecto: z.string().describe('Nombre/tema del proyecto.'),
+    codigoModelo: z.string().describe('Código del modelo.'),
+    numeroCliente: z.string().nullable().describe('Número del cliente para este modelo, o null.'),
+    motivo: esquemaMotivoNoCandidato,
+    versionPrecosto: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Versión del precosto BORRADOR más reciente (motivo precosto-borrador), o null.'),
+    idLista: z.number().int().nullable().describe('Lista que ya lo contiene (motivo ya-en-lista).'),
+    folioLista: z.number().int().nullable().describe('Folio de esa lista, o null.'),
+  })
+  .describe('Desarrollo que NO es candidato, con el motivo exacto que lo dejó fuera (V1-E8f).');
+
+/** Forma de un descartado. */
+export type DescartadoLista = z.infer<typeof esquemaDescartadoLista>;
+
+/** Respuesta de los candidatos para una lista: los que SÍ, y los que no con su motivo. */
 export const esquemaCandidatosLista = z
   .object({
     datos: z.array(esquemaCandidatoLista).describe('Desarrollos candidatos.'),
+    descartados: z
+      .array(esquemaDescartadoLista)
+      .describe('Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo.'),
+    // ⭐ V1-E8t (§Post-F9.145): el SEGUNDO requisito para armar la lista, que hasta la 0.056 sólo
+    // se descubría al apretar «Crear lista» y volvía como un 400. Se dice ANTES, y con él la
+    // pantalla enciende la puerta «Capturar factores».
+    faltanFactores: z
+      .boolean()
+      .describe(
+        'Verdadero si este cliente+departamento NO tiene factores (ni override ni default): sin ellos la lista se rechaza.',
+      ),
   })
-  .describe('Candidatos para una lista de precios (cotizados sin renglón en una lista).');
+  .describe(
+    'Candidatos para una lista de precios, los descartados con su motivo (V1-E8f) y si faltan los factores (V1-E8t).',
+  );
 
 /** Forma de la lista de candidatos. */
 export type CandidatosLista = z.infer<typeof esquemaCandidatosLista>;
@@ -257,16 +591,56 @@ export type CandidatosQuery = z.infer<typeof esquemaCandidatosQuery>;
  * Procesos · Corte · Maquila = costo total. Para que el dueño "vea que hace sentido" antes de aprobar.
  * Los subtotales/total se OCULTAN (null) sin `consultas.ver-importes`.
  */
+/**
+ * ⭐⭐ V1-E8w (§Post-F9.149 y siguientes) — UN RENGLÓN del precosto, **sin aplastar**.
+ *
+ * El desglose de §4.8 sumaba por concepto y devolvía sólo el subtotal; el detalle existía en
+ * `precosto.lineas` y la mesa **nunca lo veía**. Daniel, con el cliente enfrente, pidió las dos
+ * cosas que ese aplastamiento le quitaba:
+ *
+ * > *«es importante poner precio de la tela, y consumo…. por que muchas veces voy estimando el nuevo
+ * > peso en lugar del costo de multiplicar el consumo por el precio de la tela. O a veces decido
+ * > meter una tela mas barata, pero el consumo es el mismo.»*
+ *
+ * > *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover
+ * > los costos ahi. Desglosados… no solo el total, por que no se bien de que elementos se compone.»*
+ *
+ * Por eso viajan `consumo` y `precioUnit` **separados** del `importe`: son las dos perillas que él
+ * mueve por su cuenta. El `consumo` NO se oculta (es una cantidad, no un importe — mismo criterio
+ * que `PrecostoLineaSalida`); `precioUnit` e `importe` sí salen `null` sin `consultas.ver-importes`.
+ */
+export const esquemaLineaDesgloseCosto = z
+  .object({
+    id: z.number().int().describe('Id del renglón del precosto (traza al detalle real).'),
+    descripcion: z.string().describe('Qué es este costo (la tela, el avío, el proceso…).'),
+    consumo: z
+      .number()
+      .nullable()
+      .describe('Consumo por prenda, o null cuando el costo va a secas (maquila, corte, empaque).'),
+    precioUnit: z.number().nullable().describe('Precio unitario del insumo (o null sin importes).'),
+    importe: z.number().nullable().describe('Importe del renglón (o null sin importes).'),
+  })
+  .describe('Un renglón del precosto dentro de su concepto (V1-E8w).');
+
+/** Forma de un renglón del desglose. */
+export type LineaDesgloseCosto = z.infer<typeof esquemaLineaDesgloseCosto>;
+
 export const esquemaGrupoDesgloseCosto = z
   .object({
-    codigo: z.string().describe('Código del concepto de costo (tela/avios/maquila/corte/…).'),
+    codigo: z
+      .string()
+      .describe('Código del concepto de costo (tela/avios/maquila/corte/empaque/…).'),
     nombre: z.string().describe('Nombre legible del concepto.'),
     subtotal: z
       .number()
       .nullable()
       .describe('Suma de importes del concepto (o null sin importes).'),
+    /** ⭐ V1-E8w: el DETALLE que antes se aplastaba. Nunca vacío para un concepto con renglones. */
+    lineas: z
+      .array(esquemaLineaDesgloseCosto)
+      .describe('Los renglones del precosto de ESTE concepto, con consumo y precio separados.'),
   })
-  .describe('Un concepto del desglose de costo con su subtotal.');
+  .describe('Un concepto del desglose de costo con su subtotal Y sus renglones.');
 
 /** Forma de un grupo del desglose. */
 export type GrupoDesgloseCosto = z.infer<typeof esquemaGrupoDesgloseCosto>;
@@ -280,8 +654,228 @@ export const esquemaDesgloseCostoLinea = z
       .array(esquemaGrupoDesgloseCosto)
       .describe('Conceptos agrupados por tipo, ordenados por su orden de catálogo.'),
     costoTotal: z.number().nullable().describe('Costo total del renglón (o null sin importes).'),
+    codigoModelo: z.string().describe('Código del modelo del renglón (para rotular la mesa).'),
+    /**
+     * ⭐ V1-E8w — LA FOTO PRINCIPAL del modelo, prefirmada. Daniel: *«Me gustaria ir viendo la foto
+     * del modelo. La principal.»* Se resuelve AQUÍ y no en la lista completa porque la firma cuesta
+     * un viaje a R2 por renglón: la mesa pide el desglose de UN renglón cuando se abre, así que se
+     * firma una sola foto y sólo cuando hace falta. `null` = el modelo no tiene fotos.
+     * NO es un importe: se ve con `listas.ver`, sin `consultas.ver-importes`.
+     */
+    urlFotoModelo: z
+      .string()
+      .nullable()
+      .describe('URL prefirmada de la foto principal del modelo, o null si no tiene fotos.'),
   })
-  .describe('Desglose de costo por concepto de un renglón de lista (§4.8).');
+  .describe('Desglose de costo por concepto de un renglón de lista (§4.8 + V1-E8w).');
 
 /** Forma del desglose de costo. */
 export type DesgloseCostoLinea = z.infer<typeof esquemaDesgloseCostoLinea>;
+
+// ── ⭐⭐ V1-E8y (§Post-F9.152) — LA MESA ABIERTA: AGREGAR RENGLONES A UNA LISTA YA CREADA ────────
+//
+// 🔴 **Éste era el hueco de verdad.** Hasta hoy el ÚNICO escritor de `lista_precios_linea` era el
+// `createMany` de `crearLista`: una lista nacía con sus modelos y **no admitía ni uno más**. Sin
+// esto, *«el modelo nace dentro de la lista que está negociando»* (§Post-F9.152 punto 2) es
+// literalmente imposible — habría que borrar la lista y rehacerla, perdiendo aprobaciones,
+// negociación e historial.
+
+/** Agregar uno o varios desarrollos YA COTIZADOS a una lista existente (la lista va en la URL). */
+export const esquemaAgregarLineasLista = z
+  .object({
+    idsDesarrollo: z
+      .array(
+        z
+          .number({ error: 'El id del desarrollo debe ser un número' })
+          .int({ error: 'El id del desarrollo debe ser entero' })
+          .positive({ error: 'El id del desarrollo debe ser positivo' }),
+      )
+      .min(1, { error: 'Selecciona al menos un modelo para agregar' })
+      .describe('Desarrollos (cotizados) a agregar como renglones nuevos.'),
+  })
+  .describe('Agregar renglones a una lista de precios ya creada.');
+
+/** Datos validados de agregar renglones. */
+export type DatosAgregarLineasLista = z.infer<typeof esquemaAgregarLineasLista>;
+
+/**
+ * Editar el ENCABEZADO de la lista: el LUGAR de la cita y las NOTAS. PATCH parcial (M1): omitir =
+ * no tocar, `null`/'' = vaciar.
+ *
+ * ⚠️ `notas` existía en la tabla desde F8-E4 pero **sólo se escribía al crear la lista**: quien se
+ * equivocaba al teclearlas no tenía cómo corregirlas. Se abre aquí junto al lugar, que es el mismo
+ * acto (los datos de la junta), en vez de dejar media puerta.
+ */
+export const esquemaListaEncabezadoEditar = z
+  .object({
+    lugar: lugarCita.nullable().optional().describe('Dónde fue la cita (null para vaciarlo).'),
+    notas: notasLista.nullable().optional().describe('Notas de la lista (null para vaciarlas).'),
+  })
+  .describe('Editar el lugar de la cita y las notas de una lista de precios.');
+
+/** Datos validados de la edición del encabezado. */
+export type DatosListaEncabezadoEditar = z.infer<typeof esquemaListaEncabezadoEditar>;
+
+/**
+ * ⭐⭐ **COTIZAR EN LA CITA UN MODELO QUE NO EXISTE** (§Post-F9.152) — el cuerpo del alta desde la
+ * mesa. Daniel: *«a veces estando en la cita, me piden cotizar algún modelo que no tengamos en
+ * muestrario… Necesito armarlo desde cero estimando cosas. O bien podría copiar algún modelo de los
+ * que ya tenemos desarrollados y cambiarle cosas»*.
+ *
+ * Son SUS DOS CAMINOS, y los distingue un solo campo:
+ *  • **desde cero** → sin `idModeloOrigen`: hay que decir el tipo de prenda y el género (los dos
+ *    dígitos del número; §Post-F9.134). El código NO se teclea: lo mintea el sistema.
+ *  • **copiando** → con `idModeloOrigen`: el tipo, el género, la curva, la composición, **la maquila
+ *    y el corte** y la RECETA entera se heredan del modelo copiado. Se pueden pisar mandándolos.
+ *
+ * 🔴 **La copia hereda los COSTOS de la ficha, no sólo la receta.** `copiarBom` copia telas, avíos y
+ * arte —pero `maquilaBase`, `corteBase`, `numOperaciones`, `composicion` y `idCurvaTalla` son
+ * columnas de `Modelo`, no del BOM—, así que un modelo copiado con él precostearía con **maquila $0
+ * y corte $0, en silencio**, y de ahí sale el precio que se le dice al cliente en la cara. Por eso
+ * este camino copia la FICHA además del BOM. Está medido, no supuesto.
+ *
+ * El desarrollo tiene que vivir en un PROYECTO (es su dueño natural, y de él sale el cliente para
+ * armar el código). En la cita casi siempre ya hay uno: se manda `idProyecto`. Si no lo hay, se
+ * manda `nombreProyectoNuevo` y **se crea en la misma transacción** — nunca dos llamadas sueltas
+ * desde la pantalla (la lección de §Post-F9.34: si la segunda falla, la primera no puede quedar).
+ */
+export const esquemaModeloNuevoEnLista = z
+  .object({
+    idModeloOrigen: z
+      .number({ error: 'El id del modelo a copiar debe ser un número' })
+      .int({ error: 'El id del modelo a copiar debe ser entero' })
+      .positive({ error: 'El id del modelo a copiar debe ser positivo' })
+      .optional()
+      .describe('Modelo del que se COPIA la ficha + la receta. Omitir = armarlo desde cero.'),
+    anioEntrega: z
+      .number({ error: 'El año de entrega es obligatorio' })
+      .int({ error: 'El año de entrega debe ser entero' })
+      .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
+      .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' })
+      .describe('Año de ENTREGA (el que se congela en el código del modelo).'),
+    idTipoProducto: z
+      .number({ error: 'El id del tipo de prenda debe ser un número' })
+      .int({ error: 'El id del tipo de prenda debe ser entero' })
+      .positive({ error: 'El id del tipo de prenda debe ser positivo' })
+      .optional()
+      .describe('Tipo de prenda (1er dígito). Obligatorio desde cero; al copiar se hereda.'),
+    idGenero: z
+      .number({ error: 'El id del género debe ser un número' })
+      .int({ error: 'El id del género debe ser entero' })
+      .positive({ error: 'El id del género debe ser positivo' })
+      .optional()
+      .describe('Género (2º dígito). Obligatorio desde cero; al copiar se hereda.'),
+    descripcion: z
+      .string()
+      .trim()
+      .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Descripción del modelo (al copiar, hereda la del origen si se omite).'),
+    idCurvaTalla: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Curva de tallas (al copiar, hereda la del origen si se omite).'),
+    numeroCliente: z
+      .string()
+      .trim()
+      .max(100, { error: 'El número del cliente no puede tener más de 100 caracteres' })
+      .optional()
+      .describe('Número que el cliente le da a este modelo (opcional).'),
+    idProyecto: z
+      .number({ error: 'El id del proyecto debe ser un número' })
+      .int({ error: 'El id del proyecto debe ser entero' })
+      .positive({ error: 'El id del proyecto debe ser positivo' })
+      .optional()
+      .describe('Proyecto donde nace el desarrollo. O manda `nombreProyectoNuevo`.'),
+    nombreProyectoNuevo: z
+      .string()
+      .trim()
+      .min(1, { error: 'El nombre del proyecto es obligatorio' })
+      .max(200, { error: 'El nombre del proyecto no puede tener más de 200 caracteres' })
+      .optional()
+      .describe(
+        'Nombre del proyecto NUEVO a crear (en la misma transacción). O manda `idProyecto`.',
+      ),
+  })
+  .superRefine((datos, ctx) => {
+    // Exactamente UN destino: ni cero (el desarrollo no tendría dónde vivir) ni los dos (¿cuál
+    // gana?). Se valida aquí y no en el dominio porque es forma de la ENTRADA, no regla de negocio.
+    const tieneProyecto = datos.idProyecto !== undefined;
+    const tieneNombre = datos.nombreProyectoNuevo !== undefined;
+    if (tieneProyecto === tieneNombre) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['idProyecto'],
+        message: tieneProyecto
+          ? 'Elige un proyecto existente o escribe el nombre de uno nuevo, no las dos cosas.'
+          : 'Elige el proyecto donde nace el modelo (o escribe el nombre de uno nuevo).',
+      });
+    }
+    // Desde cero, los DOS DÍGITOS son obligatorios (§Post-F9.134): sin ellos el modelo nace sin
+    // poder recibir su nº de producción. Al COPIAR se heredan del origen, así que no se piden.
+    if (datos.idModeloOrigen === undefined) {
+      if (datos.idTipoProducto === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['idTipoProducto'],
+          message: 'El tipo de prenda es obligatorio (o copia un modelo que ya lo tenga).',
+        });
+      }
+      if (datos.idGenero === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['idGenero'],
+          message: 'El género es obligatorio (o copia un modelo que ya lo tenga).',
+        });
+      }
+    }
+  })
+  .describe('Alta de un modelo NUEVO (desde cero o copiando otro) desde la mesa de negociación.');
+
+/** Datos validados del alta de un modelo nuevo desde la mesa. */
+export type DatosModeloNuevoEnLista = z.infer<typeof esquemaModeloNuevoEnLista>;
+
+/**
+ * Lo que devuelve el alta desde la mesa: **el desarrollo recién nacido y su precosto BORRADOR ya
+ * generado**, listo para teclearle los estimados.
+ *
+ * ⚠️ **No agrega el renglón a la lista, y es a propósito.** Un renglón de lista necesita un precosto
+ * CONGELADO (`ListaPreciosLinea.idPrecosto` no es nullable) y un precosto sólo se puede congelar
+ * cuando algo que no sea el empaque aporta importe (§Post-F9.153 punto 8 + el candado de la 0.063).
+ * Un modelo recién nacido desde cero **no cumple todavía**: primero se teclean los estimados. Así
+ * que la mesa hace dos actos visibles —«créalo» y «agrégalo»— en vez de uno que a veces funciona.
+ */
+export const esquemaModeloNuevoEnListaSalida = z
+  .object({
+    idDesarrollo: z.number().int().describe('Desarrollo recién creado.'),
+    idModelo: z.number().int().describe('Modelo recién creado.'),
+    codigoModelo: z.string().describe('Código que le minteó el sistema (ej. CYA-26-71-004).'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    idProyecto: z.number().int().describe('Proyecto donde quedó el desarrollo.'),
+    folioProyecto: z.number().int().describe('Folio del proyecto.'),
+    nombreProyecto: z.string().describe('Nombre del proyecto.'),
+    proyectoCreado: z.boolean().describe('¿El proyecto se creó en esta misma llamada?'),
+    idPrecosto: z.number().int().describe('Precosto BORRADOR generado, listo para estimar.'),
+    versionPrecosto: z.number().int().describe('Versión del precosto generado.'),
+    copiadoDeIdModelo: z.number().int().nullable().describe('Modelo del que se copió, o null.'),
+    copiadoDeCodigo: z.string().nullable().describe('Código del modelo del que se copió, o null.'),
+    receta: z
+      .object({
+        telas: z.number().int().describe('Renglones de tela copiados.'),
+        avios: z.number().int().describe('Renglones de avío copiados.'),
+        medidas: z.number().int().describe('Medidas por talla copiadas.'),
+        artes: z.number().int().describe('Artes copiados.'),
+      })
+      .describe('Qué se copió de la receta (todo en cero si nació desde cero).'),
+  })
+  .describe('Modelo nuevo creado desde la mesa, con su precosto borrador.');
+
+/** Forma de la respuesta del alta desde la mesa. */
+export type ModeloNuevoEnListaSalida = z.infer<typeof esquemaModeloNuevoEnListaSalida>;
+
+/** Respuesta del listado de pendientes de un renglón. */
+export const esquemaPendientesLineaLista = z
+  .object({ datos: z.array(esquemaPendienteLineaSalida).describe('Pendientes del modelo.') })
+  .describe('Pendientes de un modelo dentro de la lista.');

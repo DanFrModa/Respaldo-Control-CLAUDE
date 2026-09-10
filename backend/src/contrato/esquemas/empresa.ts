@@ -41,6 +41,28 @@ export const esquemaEmpresaCrear = z.object({
       error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
     })
     .optional(),
+  /**
+   * ⭐ RÉGIMEN FISCAL del SAT de ESTA empresa como RECEPTOR (fila 0.118). Clave del catálogo del SAT
+   * (p. ej. `601`). Validación SUAVE —sólo el largo, igual que la del proveedor (R15)— porque el
+   * catálogo del SAT cambia y no vive aquí. Vacío ('') = no capturado / limpiarlo.
+   */
+  regimenFiscalSat: z
+    .string()
+    .trim()
+    .max(10, { error: 'El régimen fiscal no puede tener más de 10 caracteres' })
+    .optional(),
+  /**
+   * ⭐ CÓDIGO POSTAL del DOMICILIO FISCAL de esta empresa (fila 0.118). Obligatorio en el CFDI 4.0
+   * que nos emite el proveedor. Vacío ('') = no capturado; si viene, 5 dígitos (mismo criterio que
+   * `Proveedor.codigoPostalExpedicion`, que es OTRA cosa: el lugar de expedición del EMISOR).
+   */
+  codigoPostalFiscal: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{5}$/.test(v), {
+      error: 'El código postal debe tener 5 dígitos',
+    })
+    .optional(),
   identificador: z
     .string()
     .trim()
@@ -84,6 +106,14 @@ export const esquemaEmpresaSalida = z
     nombre: z.string().describe('Nombre corto de uso diario.'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
     rfc: z.string().nullable().describe('RFC fiscal de la empresa (F9-E3), o null.'),
+    regimenFiscalSat: z
+      .string()
+      .nullable()
+      .describe('Régimen fiscal del SAT como RECEPTOR (fila 0.118), o null si no se ha capturado.'),
+    codigoPostalFiscal: z
+      .string()
+      .nullable()
+      .describe('CP del domicilio fiscal del receptor (fila 0.118), o null si no se ha capturado.'),
     identificador: z.string().nullable().describe('Identificador corto para folios, o null.'),
     favorita: z.boolean().describe('Empresa propuesta por defecto al iniciar sesión.'),
     paraIpt: z.boolean().describe('Participa en el inventario de producto terminado.'),
@@ -159,6 +189,16 @@ export const esquemaConfiguracionEmpresaActualizar = z.object({
         'y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca ' +
         'impide autorizar.',
     ),
+  costoEmpaqueBase: z
+    .number({ error: 'El costo de empaque debe ser un número' })
+    .nonnegative({ error: 'El costo de empaque no puede ser negativo' })
+    .max(100000)
+    .optional()
+    .describe(
+      '⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda, la tercera ancla fija del precosto. ' +
+        'Daniel: *"Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar"*. Default ' +
+        '2.20. 🔴 Cambiarlo alimenta sólo los renglones NUEVOS: ninguna receta ya hecha se mueve.',
+    ),
   fechaInventarioTelas: z.iso
     .datetime()
     .nullable()
@@ -211,6 +251,12 @@ export const esquemaConfiguracionEmpresaSalida = z
       .describe(
         '⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). ' +
           'Siempre presente (default 10).',
+      ),
+    costoEmpaqueBase: z
+      .number()
+      .describe(
+        '⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos ' +
+          '(§Post-F9.153). Siempre presente (default 2.20).',
       ),
     fechaInventarioTelas: z.iso
       .datetime()

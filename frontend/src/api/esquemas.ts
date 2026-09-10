@@ -173,6 +173,25 @@ export const ETIQUETAS_METODO_PAGO: Record<MetodoPagoClave, string> = {
   PPD: 'PPD — Pago en parcialidades o diferido',
 };
 
+/**
+ * MODALIDAD DE FACTURACIÓN del proveedor (espejo de `MODALIDADES_FACTURACION` del backend).
+ *
+ * ⭐ Es OBLIGATORIA en el alta (fila 0.110). Daniel (3-sep-2026, §Post-F9.186(a)): *"es un campo
+ * **obligatorio** de llenar. **A fuerzas hay que definir si es con, sin o ambas**"*. No es una
+ * preferencia de vista: decide **de dónde sale el pago** del proveedor — CON factura el pago nace
+ * del estado de cuenta del BANCO; SIN factura, de la RELACIÓN que Daniel define y que se ejecuta
+ * tal cual (§Post-F9.184(f)).
+ */
+export const MODALIDADES_FACTURACION = ['solo_con', 'solo_sin', 'ambos'] as const;
+/** Clave de modalidad de facturación. */
+export type ModalidadFacturacionClave = (typeof MODALIDADES_FACTURACION)[number];
+/** Etiquetas para UI de cada modalidad, en el lenguaje del negocio. */
+export const ETIQUETAS_MODALIDAD_FACTURACION: Record<ModalidadFacturacionClave, string> = {
+  solo_con: 'Solo CON factura',
+  solo_sin: 'Solo SIN factura',
+  ambos: 'De las dos formas (con y sin factura)',
+};
+
 /** Tipos documentales de adjunto de proveedor (espejo del backend, R15 §4). */
 export const TIPOS_ARCHIVO_PROVEEDOR = ['CONSTANCIA', 'CONTRATO', 'OTRO'] as const;
 /** Clave de tipo de adjunto. */
@@ -212,8 +231,11 @@ function esRfcValido(rfc: string): boolean {
 /**
  * ¿Es una CLABE interbancaria válida? Espejo de `esClabeValida` del backend: 18
  * dígitos con dígito de control (algoritmo Banxico, pesos 3-7-1).
+ *
+ * Exportada desde 0.112 para que el editor de CUENTAS del proveedor dé el aviso al momento. Es
+ * cortesía de captura, no la regla: el backend revalida y es la autoridad (A1).
  */
-function esClabeValida(clabe: string): boolean {
+export function esClabeValida(clabe: string): boolean {
   const limpio = clabe.trim();
   if (!/^\d{18}$/.test(limpio)) {
     return false;
@@ -237,8 +259,13 @@ function esClabeValida(clabe: string): boolean {
  * Operativo). Los numéricos se capturan como texto (patron `numeroOpcional`) y los
  * enum-opcionales como string ("" = sin elegir); `aCuerpo` del dialogo convierte.
  *
- * Refleja las reglas del backend (factura ⇒ RFC + régimen; RFC/CLABE válidos),
- * pero es SOLO UX: el servidor re-valida y es la autoridad (A1).
+ * Refleja las reglas del backend (RFC/CLABE válidos, modalidad de facturación obligatoria), pero
+ * es SOLO UX: el servidor re-valida y es la autoridad (A1).
+ *
+ * ⚠️ Sin `factura` desde la fila 0.124: la pregunta *"¿este proveedor factura?"* la contesta
+ * `modalidadFacturacion` y nadie más. Con la casilla se fue también la regla de captura
+ * `factura ⇒ RFC + régimen` (el backend tampoco la tiene ya): el RFC se exige donde de verdad
+ * decide dinero —al capturarle un CFDI—, no al clasificar a un proveedor migrado que nunca lo tuvo.
  */
 export const esquemaProveedorFormulario = z
   .object({
@@ -262,7 +289,6 @@ export const esquemaProveedorFormulario = z
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
     // ── Fiscal ──────────────────────────────────────────────────────────────────
-    factura: z.boolean(),
     rfc: z
       .string()
       .trim()
@@ -312,18 +338,17 @@ export const esquemaProveedorFormulario = z
       mensajeMax: 'Los días de crédito no pueden ser más de 365',
     }).describe('Días de crédito (vacío o 0 = contado).'),
     moneda: z.string(),
-    formaPago: z
-      .string()
-      .trim()
-      .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' }),
+    // ⭐ EFECTIVO o TRANSFERENCIA por omisión para la corrida semanal (0.113, §Post-F9.189(c)).
+    // Sustituye al TEXTO LIBRE con la clave del SAT ("03 — Transferencia"), que contestaba la
+    // misma pregunta sin poder gobernar nada; el campo viejo sigue en el contrato pero ya no se
+    // captura (REGLA 0-B: lo viejo no se migra ni se repara). '' = sin preferencia.
+    formaPagoPreferida: z.enum(['', 'efectivo', 'transferencia'], {
+      error: 'La forma de pago debe ser efectivo o transferencia',
+    }),
     metodoPago: z.string(),
-    banco: z.string().trim().max(100, { error: 'El banco no puede tener más de 100 caracteres' }),
-    clabe: z
-      .string()
-      .trim()
-      .refine((v) => v === '' || esClabeValida(v), {
-        error: 'La CLABE debe tener 18 dígitos con dígito de control válido',
-      }),
+    // `banco`/`clabe` YA NO se capturan aquí (0.112): el dato bancario vive en las CUENTAS del
+    // proveedor (`ProveedorCuentaPago`), que tienen beneficiario, tipo (CLABE/tarjeta), marca
+    // fiscal y una default. Los campos siguen existiendo en el contrato pero nadie los escribe.
     limiteCredito: numeroOpcional({
       min: 0,
       mensajeNoNumero: 'El límite de crédito debe ser un número',
@@ -354,11 +379,26 @@ export const esquemaProveedorFormulario = z
       .string()
       .trim()
       .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' }),
+    // ── Facturación (fila 0.110) ─────────────────────────────────────────────────
+    /**
+     * ⭐ El ÚNICO enum del formulario que NO admite "sin elegir": *"a fuerzas hay que definir si es
+     * con, sin o ambas"* (Daniel, §Post-F9.186(a)). Se captura como string —un `<select>` siempre
+     * entrega string— y el `.refine` de abajo exige que no quede vacío. El backend re-valida y es
+     * la autoridad (A1): `esquemaProveedorCrear` la pide obligatoria y `esquemaProveedorEditar`
+     * rechaza vaciarla.
+     *
+     * En un proveedor MIGRADO llega vacía y la ficha se ve igual que siempre (REGLA 0-B: los datos
+     * viejos se leen sin estorbo); lo que pasa es que al GUARDAR hay que elegirla.
+     */
+    modalidadFacturacion: z.string(),
   })
   .refine(
-    // Regla de captura R15 (espejo del backend): si emite CFDI, exige RFC + régimen.
-    (datos) => !datos.factura || (datos.rfc !== '' && datos.regimenFiscalSat !== ''),
-    { error: 'Si el proveedor factura, captura su RFC y su régimen fiscal', path: ['rfc'] },
+    // Fila 0.110: la modalidad de facturación no puede quedar sin elegir.
+    (datos) => (MODALIDADES_FACTURACION as readonly string[]).includes(datos.modalidadFacturacion),
+    {
+      error: 'Indica cómo factura este proveedor: solo con, solo sin, o de las dos formas',
+      path: ['modalidadFacturacion'],
+    },
   );
 
 /** Datos del formulario de proveedor. */
@@ -609,7 +649,8 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social, RFC e identificador son opcionales. Las
+ * `nombre` es obligatorio; razon social, RFC, ficha fiscal (regimen + CP, fila
+ * 0.118) e identificador son opcionales. Las
  * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
  * schema de texto. El RFC (F9-E3) valida su forma en el backend (A1); aquí solo el largo.
  */
@@ -628,6 +669,21 @@ export const esquemaEmpresaFormulario = z.object({
     .trim()
     .toUpperCase()
     .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
+  /**
+   * ⭐ Régimen fiscal del SAT de la empresa como RECEPTOR (fila 0.118). Sin él, el proveedor no
+   * puede timbrar a su nombre y el documento para facturar no se emite. Vacío = no capturado.
+   */
+  regimenFiscalSat: z
+    .string()
+    .trim()
+    .max(10, { error: 'El régimen fiscal no puede tener más de 10 caracteres' }),
+  /** ⭐ CP del domicilio fiscal (fila 0.118). Vacío = no capturado; si viene, 5 dígitos. */
+  codigoPostalFiscal: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{5}$/.test(v), {
+      error: 'El código postal debe tener 5 dígitos',
+    }),
   identificador: z
     .string()
     .trim()
@@ -677,6 +733,14 @@ export const esquemaConfiguracionEmpresa = z.object({
   }).describe(
     '⭐⭐ V1-E3u (§Post-F9.89(a)): % de diferencia entre lo calculado y lo pedido a partir del cual ' +
       'se avisa a quien autoriza la OC. Sólo avisa; nunca bloquea.',
+  ),
+
+  costoEmpaqueBase: numeroOpcional({
+    min: 0,
+    mensajeNoNumero: 'El costo de empaque debe ser un número',
+    mensajeMin: 'El costo de empaque no puede ser negativo',
+  }).describe(
+    '⭐ V1-E8w (§Post-F9.153): costo de empaque por prenda con el que nacen los precostos nuevos.',
   ),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),

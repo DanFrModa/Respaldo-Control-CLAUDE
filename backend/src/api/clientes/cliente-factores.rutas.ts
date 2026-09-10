@@ -4,13 +4,18 @@
  * compartido), autorizan (`conPermiso`, A4) y delegan al dominio `dominio/desarrollo/cliente-factores`.
  *
  * RBAC (los factores viven en el MÓDULO de listas, no en `clientes.*`): LEER exige `listas.ver`;
- * GUARDAR exige `listas.administrar` Y `listas.ver` (preHandler en arreglo = AND; mutar implica leer,
+ * GUARDAR exige **`listas.aprobar`** Y `listas.ver` (preHandler en arreglo = AND; mutar implica leer,
  * así nunca se guarda para responder 403 al releer). Los porcentajes se OCULTAN (null) server-side sin
- * `consultas.ver-importes` (mismo criterio que precosto/lista).
+ * `listas.aprobar`.
+ *
+ * ⭐ **V1-E8b (§Post-F9.125)** — antes se guardaban con `listas.administrar` y se veían con
+ * `consultas.ver-importes`, los dos permisos que Desarrollo (Aurora) sí tiene. Daniel: *"los factores
+ * sólo yo los puedo mover y no son visibles para nadie más"*. La reja de las dos cosas es hoy el
+ * permiso del dueño, y la decide el DOMINIO (la ruta sólo devuelve lo proyectado).
  *
  * Endpoints:
- *  • `GET /clientes/:idCliente/factores`  (listas.ver)          → default + overrides.
- *  • `PUT /clientes/:idCliente/factores`  (listas.administrar)  → upsert por [cliente, departamento?].
+ *  • `GET /clientes/:idCliente/factores`  (listas.ver)      → default + overrides (% sólo al dueño).
+ *  • `PUT /clientes/:idCliente/factores`  (listas.aprobar)  → upsert por [cliente, departamento?].
  * Se registra en `app.ts`.
  */
 import { z } from 'zod';
@@ -82,7 +87,7 @@ export const rutasClienteFactores: FastifyPluginCallbackZod = (app, _opciones, d
   app.route({
     method: 'PUT',
     url: '/clientes/:idCliente/factores',
-    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    preHandler: [app.conPermiso('listas.aprobar'), app.conPermiso('listas.ver')],
     schema: {
       tags: ['listas'],
       summary: 'Guardar los factores de lista de un cliente/departamento (upsert)',

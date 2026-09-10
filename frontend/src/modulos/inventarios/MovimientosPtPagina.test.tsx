@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -69,13 +69,45 @@ function existenciasPorConsulta(
 const TIPOS_MOV_OK = {
   data: {
     datos: [
-      { id: 1, codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
-      { id: 5, codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+      {
+        id: 1,
+        codigo: 'inventario-inicial',
+        nombre: 'Inventario Inicial',
+        direccion: 'entrada',
+        capturaManual: true,
+      },
+      {
+        id: 5,
+        codigo: 'entrega-cliente',
+        nombre: 'Entrega a Cliente',
+        direccion: 'salida',
+        capturaManual: true,
+      },
       {
         id: 9,
         codigo: 'transferencia-almacenes',
         nombre: 'Transferencia entre almacenes',
         direccion: 'traspaso',
+        capturaManual: true,
+      },
+      // ⛔ Fila 0.104 — los dos rótulos RESERVADOS a la salida de material sin orden. El catálogo
+      // de tipos es GLOBAL, así que el API los DEVUELVE también aquí; lo que no puede pasar es que
+      // esta pantalla los OFREZCA (el servidor los rechaza igual, pero no se enseña una puerta que
+      // no abre). Van con dirección `salida` a propósito: el filtro viejo, que sólo miraba
+      // `direccion !== 'traspaso'`, los dejaba pasar.
+      {
+        id: 30,
+        codigo: 'devolucion-proveedor',
+        nombre: 'Devolución a Proveedor',
+        direccion: 'salida',
+        capturaManual: false,
+      },
+      {
+        id: 31,
+        codigo: 'venta-material',
+        nombre: 'Venta de Material',
+        direccion: 'salida',
+        capturaManual: false,
       },
     ],
   },
@@ -83,8 +115,28 @@ const TIPOS_MOV_OK = {
   refetch: vi.fn(),
 };
 
+/**
+ * Catálogo de mentiras con LOS TRES tipos de almacén (fila 0.137). El mock de `useAlmacenes` filtra
+ * por el `tipo` que pide la pantalla: si la pantalla se olvidara de pedirlo, los tres saldrían en el
+ * desplegable y la prueba lo cazaría — que es justo lo que se quiere fijar, y no un
+ * `toHaveBeenCalledWith` que solo mira la consulta.
+ */
+const ALMACENES_TODOS = [
+  { id: 3, nombre: 'Primeras', tipo: 'PT' },
+  { id: 5, nombre: 'Naucalpan', tipo: 'TELA' },
+  { id: 7, nombre: 'Almacén de avíos', tipo: 'AVIO' },
+];
+
+/** Los del `tipo` pedido (o todos si la pantalla no filtra — el caso que la prueba caza). */
+function almacenesDelTipo(query: { tipo?: string } | undefined) {
+  const tipo = query?.tipo;
+  return tipo === undefined ? ALMACENES_TODOS : ALMACENES_TODOS.filter((a) => a.tipo === tipo);
+}
+
 vi.mock('@/api/almacenes', () => ({
-  useAlmacenes: () => ({ data: { datos: [{ id: 3, nombre: 'Primeras' }] } }),
+  useAlmacenes: (query: { tipo?: string } | undefined) => ({
+    data: { datos: almacenesDelTipo(query) },
+  }),
 }));
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] } }),
@@ -110,6 +162,14 @@ vi.mock('@/api/modelos', () => ({
 
 const sesion = () => estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover']);
 
+/** Fila 0.100 — el motivo es OBLIGATORIO: sin él el botón de guardar no se habilita. */
+async function ponerMotivo(
+  usuario: ReturnType<typeof userEvent.setup>,
+  texto = 'Conteo físico de septiembre',
+): Promise<void> {
+  await usuario.type(screen.getByTestId('mov-motivo'), texto);
+}
+
 async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
   // El selector es un combobox POPOVER (R9): la lista abre al enfocar el input de búsqueda.
   await usuario.click(screen.getByTestId('selector-modelo-busqueda'));
@@ -123,6 +183,22 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     useTiposMovimientoMock.mockReturnValue(TIPOS_MOV_OK);
     useExistenciasPtMock.mockReset();
     useExistenciasPtMock.mockImplementation(existenciasPorConsulta);
+  });
+
+  /**
+   * Fila 0.137 — el desplegable de almacenes sólo ofrece los de PT. El filtro lo aplica el SERVIDOR
+   * (la pantalla pide la lista ya acotada): si se olvidara, el mock devolvería los tres tipos y la
+   * bodega de telas aparecería aquí — el mismo cruce que el dominio ya rechaza con un 400.
+   */
+  it('el desplegable de almacenes SOLO ofrece los de PT (fila 0.137)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const selector = within(screen.getByTestId('mov-almacen'));
+    expect(selector.getByRole('option', { name: 'Primeras' })).toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Naucalpan' })).not.toBeInTheDocument();
+    expect(selector.queryByRole('option', { name: 'Almacén de avíos' })).not.toBeInTheDocument();
   });
 
   it('avisa (reintentable) si falla un catálogo de la captura', () => {
@@ -145,6 +221,29 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(textos.some((t) => t.includes('Transferencia entre almacenes'))).toBe(false);
   });
 
+  it('⛔ el dropdown NO ofrece los rótulos RESERVADOS a la salida sin orden (fila 0.104)', async () => {
+    // «Devolución a Proveedor» y «Venta de Material» nacieron en la 0.104 para telas y avíos, pero
+    // el catálogo de tipos es GLOBAL: se colaban aquí, y cualquiera con `inventario-pt.mover`
+    // —que son 8 de los 9 perfiles— podía estampar el rótulo que Daniel se reservó. Quien luego
+    // leyera el kardex creería que esa salida la autorizó él. La venta de producto terminado tiene
+    // su propia fila (0.130), con cliente y precio.
+    //
+    // Ojo con lo que fija esta prueba: NO basta con excluir por dirección (las dos son `salida`,
+    // igual que «Entrega a Cliente», que sí debe estar). La pantalla se fía de la bandera
+    // `capturaManual` que decide el SERVIDOR, para no repetir los códigos aquí.
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const textos = [...screen.getByTestId('mov-tipo').querySelectorAll('option')].map(
+      (o) => o.textContent ?? '',
+    );
+    expect(textos.some((t) => t.includes('Devolución a Proveedor'))).toBe(false);
+    expect(textos.some((t) => t.includes('Venta de Material'))).toBe(false);
+    // Y las salidas legítimas siguen ahí: la reserva no se llevó por delante lo de siempre.
+    expect(textos.some((t) => t.includes('Entrega a Cliente'))).toBe(true);
+  });
+
   it('guardar arranca DESHABILITADO y se habilita al completar la captura', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
@@ -160,6 +259,8 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '12');
+
+    await ponerMotivo(usuario);
 
     const guardar = screen.getByTestId('mov-guardar');
     expect(guardar).toBeEnabled();
@@ -217,6 +318,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '100');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
@@ -250,6 +352,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '4');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idOrden?: number }[] }];
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
@@ -268,6 +371,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.clear(celda);
     await usuario.type(celda, '3');
 
+    await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: Record<string, unknown>[] }];
     expect(cuerpo.lineas[0]).not.toHaveProperty('idOrden');
@@ -288,5 +392,71 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(screen.getByTestId('mov-orden-error')).toBeInTheDocument();
     const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
     expect(opciones.map((o) => o.value)).toEqual(['sin']);
+  });
+
+  // ── Fila 0.100: motivo obligatorio al meter o sacar PT a mano (§Post-F9.193) ─
+  describe('Fila 0.100 · el motivo es obligatorio', () => {
+    /** Deja la pantalla lista para guardar, SIN motivo. */
+    async function capturaSinMotivo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-color'), '7');
+      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+      const celda = screen.getByTestId('mov-matriz-celda');
+      await usuario.clear(celda);
+      await usuario.type(celda, '12');
+    }
+
+    it('el campo existe y está rotulado como obligatorio', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+
+      expect(screen.getByTestId('mov-motivo')).toBeInTheDocument();
+      expect(screen.getByText(/Motivo \(obligatorio\)/i)).toBeInTheDocument();
+    });
+
+    it('SIN motivo no deja guardar, aunque todo lo demás esté capturado', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+
+      expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+      expect(crearMutate).not.toHaveBeenCalled();
+    });
+
+    it('un motivo DEMASIADO CORTO tampoco habilita (mismo mínimo que el servidor)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+      await ponerMotivo(usuario, 'ab');
+
+      expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+    });
+
+    it('⭐ con motivo lo MANDA recortado, y al guardar el campo QUEDA VACÍO', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+      await ponerMotivo(usuario, '  Merma por manchas  ');
+
+      await usuario.click(screen.getByTestId('mov-guardar'));
+      const [cuerpo, opciones] = crearMutate.mock.calls[0] as [
+        Record<string, unknown>,
+        { onSuccess: (mov: unknown) => void },
+      ];
+      expect(cuerpo.motivo).toBe('Merma por manchas');
+      expect(cuerpo.observaciones).toBeUndefined();
+
+      // ⭐ Y el campo se VACÍA al guardar. Si ese reset se perdiera, el motivo del movimiento
+      // anterior quedaría pegado, seguiría siendo válido (≥3 caracteres) y se adjuntaría EN
+      // SILENCIO al siguiente: una palabra equivocada en el rastro es peor que ninguna, y el
+      // rastro es justo lo que esta fila vino a construir.
+      act(() => {
+        opciones.onSuccess({ folio: 4321, totalPiezas: 12 });
+      });
+      expect(screen.getByTestId('mov-motivo')).toHaveValue('');
+    });
   });
 });

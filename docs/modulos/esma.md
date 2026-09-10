@@ -20,7 +20,10 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
 ## Modelo de datos (`backend/prisma/schema.prisma`)
 
 - **`EsMaCargo`** — lo que se le debe al maquilero por una orden+proceso. Nace de un **recibo** de
-  maquila (`idEtapaRecibo`, F3-E4) como `propuesto`; el admin lo **valida** fijando `cantidadReal` y
+  maquila (`idEtapaRecibo`, F3-E4) **o de un SERVICIO SOBRE LA ORDEN** —corte o empaque, fila
+  0.114— con `idTipoProceso` NULL y `servicio` lleno; el CHECK `esma_cargo_proceso_o_servicio`
+  exige exactamente uno de los dos. En los dos casos nace como `propuesto`; el admin lo **valida**
+  fijando `cantidadReal` y
   `precioReal`. `sinCosto` = 2ª sin costo (decisión (f), se excluye del saldo). `cantidadPagada` =
   cache de prendas ya pagadas (para derivar "pagado"; el dato de verdad son las `PagoAplicacion`).
   `conFactura` se fija al validar según la modalidad del proveedor (decisión (h)). En el histórico
@@ -32,9 +35,113 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
   (`capturado`/`revisado`, ex asteriscos `Rev` del viejo).
 - **`PagoAplicacion`** — puente N:N pago↔cargo (decisión (g)): cuántas prendas de un cargo cubrió un
   pago y por qué importe. PK `(idPago, idCargo)`.
+- ⭐ **`DescuentoMaquilero.idCierreMaquila` + su cancelación suave** (V1, fila 0.109) — el descuento
+  puede **nacer de un acto de producción**: CERRAR la orden con un maquilero cobrándole las prendas
+  **faltantes** (las que nunca devolvió). `idCierreMaquila` (único) es su origen, y
+  `canceladoEn`/`canceladoPorId`/`motivoCancelacion` permiten **deshacer** ese cierre sin borrar nada
+  (D3). Es el único de los tres movimientos planos que se cancela, porque es el único que nace de un
+  acto reversible.
 
-El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no sin-costo) + Σabonos −
-Σpagos − Σdescuentos`.
+El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σcargos + Σabonos − Σpagos − Σdescuentos`,
+y al saldo **sólo entra lo YA REVISADO, en los CUATRO conceptos** — cargo `validado` y no `sinCosto`;
+abono, pago y descuento `revisado`. Lo `capturado` (y el cargo `propuesto`) **no suma**.
+
+### La fórmula vive UNA vez: `dominio/esma/formula-saldo.ts` (V1, fila 0.115)
+
+El criterio de cada concepto —qué renglones cuentan al saldo y cuáles siguen pendientes— se declara
+**una sola vez**, en el objeto `DEFINICION`. De ahí salen las cláusulas de Prisma (`WHERE_CUENTA_*` /
+`WHERE_PENDIENTE_*`), los fragmentos de SQL crudo (`sqlCuenta`/`sqlPendiente`, **generados** del mismo
+objeto y no escritos aparte), los predicados de un renglón suelto (`cuentaAlSaldoPlano`,
+`pendienteDeRevisionCargo`, `aporteCargoAlSaldo`…) y la aritmética (`SIGNO_SALDO`, `saldoDeTotales`,
+`tieneSaldo`, `redondear2`).
+
+- **Por qué:** la fórmula estaba escrita TRES veces (`saldos.ts` con Prisma + los dos SQL crudos de
+  `saldos-todos.ts`) y el estado de revisión sólo se había puesto en los CARGOS: abonos, pagos y
+  descuentos `capturado` movían el saldo sin que nadie los hubiera autorizado —y el detalle ya los
+  marcaba «pendiente» mientras la suma los contaba—. Arreglar un archivo pasaba en verde dejando mal
+  los otros dos, y con ellos CxP/terceros, que reusan los de EsMa.
+- Una **guardia** (`formula-saldo.test.ts`) recorre `src/` + `migracion/` y falla si un archivo agrega
+  sobre las cuatro tablas de EsMa sin pedirle el criterio a la definición única (o pidiéndoselo y
+  escribiendo además una condición a mano). Garantiza que nadie **reescriba** el criterio; no que todo
+  el que sume lo aplique — `migracion/cuadre-f6.ts` suma los planos sin filtrar por revisión a
+  propósito, porque compara contra un Access que no conocía el concepto.
+
+### ⭐ El FALTANTE del maquilero es un DESCUENTO, no un cargo (V1, fila 0.109)
+
+Cuando una orden se **cierra** con un maquilero cobrándole lo que nunca devolvió
+(`dominio/produccion/cierre-maquila.ts`), lo que nace aquí es un **`DescuentoMaquilero` `capturado`**.
+Las dos mitades de esa frase importan:
+
+- **Descuento y no cargo, por el SIGNO.** `SIGNO_SALDO` pone el cargo en `+1`: un cargo **sube** lo que
+  se le debe al maquilero. Cobrarle las prendas perdidas lo **baja**. Un cargo le habría pagado las
+  prendas que no devolvió, además de dejárselas. Y es la palabra de Daniel: *«se le quita a mando
+  (normalmente **descontandole** esas prendas faltantes)»* (§Post-F9.147).
+- **`capturado` y no `revisado`, porque PROPONE.** Daniel: el botón *«nunca cobra solo»*. Un descuento
+  `capturado` no cuenta al saldo y aparece en el estado de cuenta marcado como **pendiente de
+  revisión**: el visto bueno se da con el flujo que ya existía (`revisarMovimiento`), sin pantalla
+  nueva. Ese visto bueno exige **`esma.revisar`** —no `esma.modificar`, que es el de capturar—
+  desde la fila 0.128: quien propone el descuento no puede aprobárselo él mismo.
+- **Se ve de qué es**: sus `observaciones` las redacta el dominio — *«Faltante de la orden #77 ·
+  Costura: 5 pza(s) que no se devolvieron»* — y ésa es la `referencia` del renglón en la línea de
+  tiempo.
+- **Deshacer el cierre lo CANCELA** (`canceladoEn`), no lo borra. Un descuento cancelado no cuenta al
+  saldo **ni** como pendiente de revisión: la condición `canceladoEn: null` entró en los **dos**
+  criterios del concepto dentro de `formula-saldo.ts`, así que viaja sola a las cinco sumas (Prisma y
+  SQL crudo) y a las pantallas que listan descuentos (`WHERE_VIVO_DESCUENTO`). 🔴 Si el descuento
+  **ya se revisó**, el deshacer se **rechaza**: ese importe ya está en el saldo y puede estar pagado.
+- ⭐ **Y las dos escrituras son CONDICIONALES** (`updateMany` con el estado esperado en el `where`,
+  fallando si `count === 0`), no `update` por id. `revisarMovimiento` **no** toma el lock de la orden
+  —no sabe nada de órdenes—, así que no se serializa con el deshacer del cierre: entre la lectura que
+  da el mensaje y la escritura cabe la otra transacción. Sin la condición, deshacer podía cancelar un
+  descuento recién revisado (dinero que ya está en el saldo, desapareciendo en silencio) y revisar
+  podía marcar `revisado` uno ya cancelado. La lectura da el MENSAJE; la condición da la GARANTÍA
+  (precedente F8-E3, `CLAUDE.md` §7.3). De paso, la revisión de abono y pago quedó con la misma
+  guarda de idempotencia.
+- **Precio**: el `precioPactado` del ENVÍO vivo a ese maquilero, congelado en el cierre. Si no lo hay
+  (histórico migrado), el cierre salda el pendiente pero **no** crea el descuento, y lo dice con
+  nombre — no inventa un precio (REGLA 0-B).
+
+Detalle completo del acto (la cubeta, el tope del recibo, el deshacer): `docs/modulos/produccion-wip.md`.
+
+### `pendienteRevision`: el dinero excluido se VE
+
+Lo capturado y aún sin revisar no suma al saldo, pero **tampoco desaparece**: viaja junto a él, con su
+desglose por concepto (`abonos`/`pagos`/`descuentos`), su `neto` —mismos signos del saldo— y el CONTEO
+de `partidas`.
+
+- **Manda el conteo, no el neto:** dos partidas pueden netear cero (un abono y un pago capturados del
+  mismo importe, o los montos negativos que carga el ETL) y seguir siendo dos cosas que alguien tiene
+  que decidir. `hayPendiente` mira `partidas > 0`, y es el único criterio de «hay algo pendiente».
+- **Los importes se ocultan sin `consultas.ver-importes`; el CONTEO no** (`pendienteParaSalida`): no es
+  dinero, y sin él quien no ve importes tampoco sabría que hay algo esperando decisión.
+- Se ve en la tarjeta del saldo, la columna «Por revisar» del tablero, el estado de cuenta (que marca
+  cada renglón pendiente con el MISMO criterio de la suma), el PDF/Excel y la bandeja de CxP.
+- ⭐ **§Post-F9.188(a) (Daniel):** un maquilero con TODO sin revisar tiene saldo 0 y **NO desaparece**.
+  El tablero de EsMa y la bandeja de CxP lo listan igual: el corte es `tieneSaldo(saldo) ||
+  hayPendiente(pendiente)`, no `saldo ≠ 0`.
+- Los cargos `propuesto` **no** entran al bloque: todavía no tienen importe (`cantidadReal`/
+  `precioReal` son NULL hasta validarlos) — su lugar es la cola de validación de cargos.
+
+### Prendas INCOMPLETAS: lo que se ve pero NO es dinero (V1-E8k, §Post-F9.136)
+
+*"Sólo quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**."*
+Las prendas que el maquilero entrega **sin terminar de coser** aparecen en el estado de cuenta, pero
+**FUERA de los cargos y sin tocar el saldo** — *"tampoco se pagan"*.
+
+- El dato vive en producción (`EtapaMovimientoDet.cantidadIncompletas`), no en EsMa: aquí solo se
+  **lee**, con `incompletasDeMaquilero` (`dominio/produccion/incompletas.ts`). Las **dos** vistas del
+  estado de cuenta —unificada y desglosada— llaman a **esa misma función**, para no acabar diciendo
+  números distintos en la pantalla y en el papel.
+- Se ve en: el **bloque `incompletas`** de las dos vistas → sección propia del **PDF** (sin columna de
+  importe) y hoja **«Prendas incompletas»** del **Excel**; y un aviso en la **cola de validación de
+  cargos**, que es donde alguien teclea `cantidadReal` (`aCargoSalida` expone `incompletas` como
+  número informativo, **nunca** dentro de `cantidadPropuesta` ni de `importePropuesto`).
+- Un recibo que trae **solo** incompletas **no genera cargo**: por eso el bloque se consulta contra los
+  recibos, no colgado del cargo — si colgara del cargo, esa entrega no aparecería en ningún lado.
+- ⚠️ **No se segmenta por `conFactura`**, a propósito: una incompleta no es dinero, no lleva factura y
+  no pertenece a ninguno de los dos segmentos. Se muestra completa en los dos.
+- ❌ **El cobro del faltante NO está automatizado.** Daniel explicó *por qué* pide que se las entreguen
+  (*"los faltantes se los cobro"*), pero no pidió que el sistema haga ese cargo.
 
 ## Capas (A1 — lógica solo en dominio)
 
@@ -44,18 +151,26 @@ El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no 
     `esma.cargo-validar`.
   - `movimientos.ts` — `crearAbonoMaquilero` / `crearDescuentoMaquilero` + **revisión**
     (`revisarMovimiento`: `capturado`→`revisado`). `conFactura` se resuelve de la modalidad del
-    proveedor (`facturacion.ts`, decisión (h)). Permiso `esma.modificar`.
+    proveedor (`facturacion.ts`, decisión (h)). **Dos permisos, no uno** (fila 0.128): capturar es
+    `esma.modificar`; REVISAR es `esma.revisar`.
   - `pagos.ts` — `crearPagoMaquilero`: **anti-doble-pago DURO** (decisión (g)). `porPagar =
     cantidadReal − Σ(PagoAplicacion.cantidad)` por **suma directa bajo `pg_advisory_xact_lock` por
     maquilero** (nunca una columna cacheada como verdad, D3); pagar de más lanza `ErrorConflicto`. El
     `monto` = Σ(cantidad × precioReal); actualiza `cantidadPagada` y **recalcula `Orden.pagada`**
-    (derivada, decisión (f), `orden-pagada.ts`). Permiso `esma.ver-pagos`.
+    (derivada, decisión (f), `orden-pagada.ts` — sus cargos «pagables» son `WHERE_CUENTA_CARGO`, el
+    MISMO conjunto que le cuenta al saldo). Permiso `esma.ver-pagos`.
+  - `formula-saldo.ts` — ⭐ la **definición ÚNICA** del criterio del saldo y del pendiente (arriba).
+    Sin dependencias de negocio: la consumen `saldos.ts`, `saldos-todos.ts`, `estado-cuenta.ts`,
+    `orden-pagada.ts`, `convivencia-esma.ts`, CxP y el cuadre del ETL.
   - `saldos.ts` (`saldoDeMaquilero`) y `saldos-todos.ts` (`saldosDeTodosMaquileros`, SQL agregado, sin
-    N+1) — el saldo DERIVADO, segmentable por `conFactura` (decisión (h)). Ocultan importes sin
-    `consultas.ver-importes` (server-side).
+    N+1; + `saldosEsMaPorMaquilero`, el lote que consume la bandeja de CxP) — el saldo DERIVADO y su
+    `pendienteRevision`, segmentables por `conFactura` (decisión (h)). Ocultan importes sin
+    `consultas.ver-importes` (server-side); el conteo de partidas nunca.
   - `conciliacion.ts` (`conciliarEsMa`) — cuadra por periodo+orden+maquilero+proceso lo **recibido**
     (F3) vs lo **cargado** a EsMa; lista los `cargosSinRecibo` (histórico/manual).
-  - `estado-cuenta.ts` / `semanales.ts` — estado de cuenta detallado + vistas semanales (F6-E5).
+  - `estado-cuenta.ts` / `semanales.ts` — estado de cuenta detallado + vistas semanales (F6-E5). El
+    estado de cuenta trae además el bloque **`incompletas`** (V1-E8k, arriba), informativo y fuera del
+    saldo.
   - `maquileros.ts` — selector de maquileros de EsMa (activos con rol de maquila).
   - `migracion.ts` — **modo migración** (F3-E6 + F6-E6): `crearCargoEsMaMigrado` (cargo histórico) +
     `crearAbonoMigrado` / `crearDescuentoMigrado` / `crearPagoMigrado` (movimientos planos históricos).
@@ -67,14 +182,25 @@ El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no 
 - **Frontend** `frontend/src/modulos/esma/` (F6-E5) — saldos de todos + drill-down al estado de
   cuenta, captura de movimientos y pagos, validación y conciliación de cargos, recibos/pagos
   semanales, desglosado, vista móvil.
-- **Impresos R9** `backend/src/dominio/esma/impresos/` — estado de cuenta (PDF) + recibo de pago (PDF)
-  + export a **Excel** del estado de cuenta.
+- **Impresos R9** `backend/src/dominio/esma/impresos/` — estado de cuenta (PDF, con su sección de
+  prendas incompletas) + recibo de pago (PDF) + export a **Excel** del estado de cuenta (4 hojas:
+  Cargos, Movimientos, Prendas incompletas, Resumen).
 
 ## Permisos (A4)
 
-`esma.ver-pagos` (ver estado de cuenta + meter pagos) · `esma.modificar` (capturar/revisar
-abonos/descuentos) · `esma.cargo-validar` (validar cargos). Importes ocultos sin
-`consultas.ver-importes`.
+`esma.ver-pagos` (ver estado de cuenta + meter pagos) · `esma.modificar` (**capturar** abonos y
+descuentos, y forzar el estatus «pagada» de una orden) · **`esma.revisar`** (autorizar una partida
+capturada: `capturado`→`revisado`) · `esma.cargo-validar` (validar los cargos propuestos por los
+recibos, fijando cantidad y precio reales). Importes ocultos sin `consultas.ver-importes`.
+
+⭐ **Los dos últimos son «validar», y validar es de Daniel** (fila 0.128, §Post-F9.192(1)): *«La
+entrada la da la persona responsable de recibos o de producción. Pero la validación sólo la doy yo.
+O sea, es un permiso para meter lo recibido y otro para validarlo.»* En el seed los llevan sólo
+`Administrador`, `AdministracionDireccion` y `Directivo`; los cinco perfiles operativos capturan
+(`esma.modificar`) y reciben de maquila (`produccion.recibo`), pero ya no autorizan lo que capturan.
+Hasta la 0.127 revisar exigía `esma.modificar` —el mismo permiso de capturar—, así que el
+capturista se auto-autorizaba; y desde la 0.115 **sólo lo revisado suma al saldo**, o sea que
+autorizar es el acto que convierte un renglón en deuda o en pago real.
 
 ## Migración del histórico (F6-E6)
 

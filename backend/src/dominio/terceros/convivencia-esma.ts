@@ -21,8 +21,24 @@ import type { MovimientoTerceroSalida } from '../../contrato/index.js';
 import { type Tx } from '../../comun/transaccion.js';
 import type { PrismaClient } from '../../datos/index.js';
 
+import {
+  aporteCargoAlSaldo,
+  cuentaAlSaldoPlano,
+  type ConceptoSaldo,
+  WHERE_VIVO_ABONO,
+  WHERE_VIVO_DESCUENTO,
+  WHERE_VIVO_PAGO,
+  whereSegmentoFactura,
+  type SegmentoFactura,
+  type WhereSegmentoFactura,
+} from '../esma/formula-saldo.js';
+import { etiquetaProcesoDelCargo } from '../esma/etiqueta-cargo.js';
+import { esSinFactura, importeGuardadoDe } from '../finanzas/correccion-comun.js';
+import { vencimientoEsMa } from './dias-vencidos.js';
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
-import { saldosEsMaPorMaquilero } from '../esma/saldos-todos.js';
+import { saldosEsMaPorMaquilero, type AporteEsMaLote } from '../esma/saldos-todos.js';
+
+export type { AporteEsMaLote };
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -67,33 +83,17 @@ function rangoCreado(
 }
 
 /**
- * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa (V1-E3f pieza B).
+ * Cláusula `where` del SEGMENTO de facturación sobre los movimientos EsMa — pedida a la definición
+ * ÚNICA (`formula-saldo.ts` §segmento).
  *
- * ⚠️ `EsMaCargo.conFactura` es NULLABLE ("sin definir": así quedaron los movimientos que migraron
- * del Access, donde la pregunta jamás se hizo). El segmento `sin` tiene que traer los `false`
- * **Y** los sin definir, porque los dos segmentos deben ser una PARTICIÓN EXACTA del saldo —es lo
- * que pidió Daniel (*"quisiera tener por separado los que son con factura y los sin factura"*)— y
- * porque el encabezado ya los cuenta ahí: `saldoSinFactura = saldo − saldoFiscal`. Si la lista los
- * dejara fuera, el total y los renglones se contradirían. Toca dinero.
- *
- * 🔴 **Por eso NO se usa `{ not: true }`, que es lo que parecía natural y estuvo aquí un rato.**
- * En lógica de tres valores `NULL <> true` evalúa a NULL, así que la fila se descarta igual que
- * con `= false`: **las dos formas son idénticas en efecto** y ninguna incluye los NULL. Verificado
- * en Postgres sobre `(true, false, NULL)`: `<> true` → 1 fila, `= false` → 1 fila, el OR → 2.
- * La única forma que sí los trae es la explícita.
- *
- * Es también la diferencia deliberada con la pantalla propia de EsMa (`esma/estado-cuenta.ts`, que
- * filtra `= false`): allí el segmento es un filtro de consulta; aquí es una partición que debe
- * cuadrar con un saldo.
+ * ⭐ Este archivo TENÍA la respuesta correcta (`false` **o** sin definir) y `esma/estado-cuenta.ts`
+ * y `esma/saldos.ts` tenían la otra (`= false`). El comentario de aquí llamaba a esa diferencia
+ * «deliberada» —allá un filtro de consulta, aquí una partición—, y no lo era: los dos segmentos son
+ * SIEMPRE una partición, porque Daniel arma DOS relaciones de pago por semana (§Post-F9.189(a)) y
+ * un movimiento que no cae en ninguna no se paga nunca. La fila 0.113 lo unificó: gana ésta.
  */
-function facturaWhere(segmento: 'todos' | 'con' | 'sin'): {
-  conFactura?: boolean;
-  OR?: { conFactura: boolean | null }[];
-} {
-  if (segmento === 'todos') return {};
-  if (segmento === 'con') return { conFactura: true };
-  // Explícito a propósito: `{ not: true }` NO trae los NULL (ver arriba).
-  return { OR: [{ conFactura: false }, { conFactura: null }] };
+function facturaWhere(segmento: 'todos' | 'con' | 'sin'): WhereSegmentoFactura {
+  return whereSegmentoFactura(segmento === 'todos' ? undefined : segmento);
 }
 
 /**
@@ -118,15 +118,19 @@ export async function aporteEsMaSaldo(
 /**
  * APORTE EsMa al saldo de CADA proveedor con movimientos EsMa, en UN agregado (NUNCA N+1) — la versión
  * EN LOTE de {@link aporteEsMaSaldo}, para la BANDEJA de CxP (F9-E2). Reusa {@link saldosEsMaPorMaquilero}
- * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→saldo EsMa (solo ≠ 0), vista
- * operativa. Es el aporte que la bandeja muestra como cubeta "Maquila" (sin antigüedad: los cargos EsMa
- * no traen fecha de vencimiento por ítem — el aging fino llega cuando EsMa registre por el motor).
+ * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→{saldo, pendiente}: el saldo EsMa
+ * (sólo lo REVISADO) y lo capturado que aún espera revisión; entra quien tenga saldo ≠ 0 **o** algo
+ * pendiente (§Post-F9.188a: el maquilero con todo sin revisar no desaparece de la bandeja). Vista
+ * operativa. El saldo es lo que la bandeja muestra como cubeta "Maquila", que sigue sin repartirse en
+ * las cuatro cubetas del aging. ⭐ Los **días vencidos** de esa maquila sí se calculan desde la fila
+ * 0.121, derivando el vencimiento de cada cargo (`dias-vencidos.ts`).
  */
 export async function aportesEsMaSaldoLote(
   cliente: Tx | PrismaClient,
   idEmpresa: number,
-): Promise<Map<number, number>> {
-  return saldosEsMaPorMaquilero(cliente, idEmpresa);
+  segmento?: SegmentoFactura,
+): Promise<Map<number, AporteEsMaLote>> {
+  return saldosEsMaPorMaquilero(cliente, idEmpresa, segmento);
 }
 
 /** Opciones de la proyección del detalle EsMa. */
@@ -137,6 +141,13 @@ export interface OpcionesProyeccionEsMa {
   segmento: 'todos' | 'con' | 'sin';
   /** Si false, los `monto` viajan en null (se ocultan importes). */
   puedeVerImportes: boolean;
+  /**
+   * ⭐ Fila 0.145 — la BANDERA de quien pregunta (`Usuario.puedeCorregirSinFactura`). Decide el
+   * `corregible` de cada renglón proyectado: sin ella, todos viajan en `false` y la pantalla no
+   * pinta el botón. Es la MISMA regla que el servidor exige al corregir, para que nunca se ofrezca
+   * un botón que después se rechaza.
+   */
+  puedeCorregir: boolean;
 }
 
 /**
@@ -144,6 +155,11 @@ export interface OpcionesProyeccionEsMa {
  * "esma"). El `monto` de cada renglón es su aporte al saldo (cargo +, abono +, pago −, descuento −),
  * de modo que su Σ = el aporte EsMa del saldo. Los cargos `propuesto` (aún sin importe real) salen
  * con `monto = null`; los `sinCosto`, en 0. Filtra los cargos `cancelado`.
+ *
+ * ⭐ Un abono/pago/descuento CAPTURADO sin revisar tampoco aporta al saldo (criterio único de
+ * `esma/formula-saldo.ts`), así que su `monto` va en null —igual que un cargo `propuesto`— para que
+ * la promesa de arriba (Σ renglones = saldo) siga siendo cierta. Para que ese "—" no parezca un
+ * error, el renglón lo DICE en sus observaciones: el dinero no se esconde, se explica.
  */
 export async function proyectarMovimientosEsMa(
   cliente: Tx | PrismaClient,
@@ -152,11 +168,21 @@ export async function proyectarMovimientosEsMa(
   nombre: string,
   opciones: OpcionesProyeccionEsMa,
 ): Promise<MovimientoTerceroSalida[]> {
-  const { desde, hasta, segmento, puedeVerImportes } = opciones;
+  const { desde, hasta, segmento, puedeVerImportes, puedeCorregir } = opciones;
   const factura = facturaWhere(segmento);
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
+  /** Texto del renglón, avisando cuando está capturado y todavía no cuenta al saldo. */
+  const conNota = (texto: string | null, cuenta: boolean): string | null =>
+    cuenta ? texto : `${texto ?? ''} (pendiente de revisión)`.trim();
 
-  const [cargos, abonos, descuentos, pagos] = await Promise.all([
+  const [proveedor, cargos, abonos, descuentos, pagos] = await Promise.all([
+    // ⭐ Fila 0.121 — EL PLAZO ES SIEMPRE DEL PROVEEDOR (Daniel: «las inconsistencias son errores de
+    // Lupita») ⇒ la fecha de vencimiento de un renglón de EsMa se DERIVA de aquí, nunca se teclea.
+    // Se lee en la MISMA consulta paralela que los movimientos: ni una ida más a la base.
+    cliente.proveedor.findUnique({
+      where: { id: idProveedor },
+      select: { diasCredito: true },
+    }),
     cliente.esMaCargo.findMany({
       where: {
         idEmpresa,
@@ -176,46 +202,86 @@ export async function proyectarMovimientosEsMa(
         creadoEn: true,
         creadoPorId: true,
         orden: { select: { folio: true } },
+        // 0.114: el cargo puede colgar de un proceso de maquila O de un servicio de la orden
+        // (corte/empaque). Se traen los dos y la etiqueta la redacta `etiquetaProcesoDelCargo`.
+        servicio: true,
         tipoProceso: { select: { nombre: true } },
       },
     }),
     cliente.abonoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (fila 0.145): un abono sustituido por una corrección no es movimiento.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_ABONO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
       },
     }),
     cliente.descuentoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (V1, fila 0.109): un descuento cancelado por un deshacer de cierre no es movimiento.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_DESCUENTO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
+        // Fila 0.145: el descuento que PROPUSO un cierre de orden no se corrige suelto (su dueño es
+        // el cierre, que puede deshacerse). Se trae para poder decirlo en el renglón.
+        idCierreMaquila: true,
       },
     }),
     cliente.pagoMaquilero.findMany({
-      where: { idEmpresa, idMaquilero: idProveedor, ...factura, ...rangoFecha(desde, hasta) },
+      // VIVOS (fila 0.145): ver la nota del abono.
+      where: {
+        idEmpresa,
+        idMaquilero: idProveedor,
+        ...WHERE_VIVO_PAGO,
+        ...factura,
+        ...rangoFecha(desde, hasta),
+      },
       select: {
         id: true,
         monto: true,
         fecha: true,
         conFactura: true,
         observaciones: true,
+        estadoRevision: true,
         creadoEn: true,
         creadoPorId: true,
+        // Fila 0.145: un pago APLICADO a cargos no cambia de importe (sale de las prendas por el
+        // precio del cargo). El conteo basta para decirlo, sin traerse el detalle.
+        _count: { select: { aplicaciones: true } },
       },
     }),
   ]);
+
+  // ⭐ Fila 0.121 — el plazo del proveedor. Sin plazo capturado, contado (vence el mismo día): la
+  // MISMA convención que `exigirTercero` aplica en el motor.
+  const diasCredito = proveedor?.diasCredito ?? 0;
+  /** El vencimiento derivado de un renglón, en el `YYYY-MM-DD` que usa el contrato (o null). */
+  const vence = (concepto: ConceptoSaldo, fecha: Date): string | null =>
+    vencimientoEsMa(concepto, fecha, diasCredito)?.toISOString().slice(0, 10) ?? null;
 
   const base = (id: number, conFactura: boolean | null) => ({
     fuente: 'esma' as const,
@@ -225,7 +291,11 @@ export async function proyectarMovimientosEsMa(
     tipoTercero: 'proveedor' as const,
     idTercero: idProveedor,
     tercero: nombre,
-    fechaVencimiento: null,
+    // 🔴 ERA `null` PARA TODO, y ése era el hueco de la fila 0.121: Daniel SÍ envejece a los
+    // maquileros con plazo pactado y el estado de cuenta les enseñaba «—» en la columna de
+    // vencimiento. Cada concepto lo pone abajo con `vence()`; aquí se deja en null como piso porque
+    // los créditos (pago/descuento) no vencen nunca.
+    fechaVencimiento: null as string | null,
     esFiscal: conFactura === true,
     uuidCfdi: null,
     rfcTercero: null,
@@ -234,6 +304,13 @@ export async function proyectarMovimientosEsMa(
     refId: id,
     cancelado: false,
     esInverso: false,
+    idMovimientoCorregido: null,
+    // Fila 0.145: por defecto NADA de EsMa es corregible; cada concepto lo levanta si aplica, y con
+    // él el texto CRUDO de sus observaciones (el de `observaciones` lleva adornos de lectura).
+    observacionesGuardadas: null,
+    importeGuardado: null,
+    corregible: false,
+    importeCorregible: false,
   });
 
   const filas: MovimientoTerceroSalida[] = [];
@@ -244,21 +321,19 @@ export async function proyectarMovimientosEsMa(
         ? null
         : c.cantidadReal.toNumber() * c.precioReal.toNumber();
     // Signo + (cargo): validado con costo → importe real; sin costo → 0; propuesto → sin importe.
-    const monto =
-      c.estado !== 'validado'
-        ? null
-        : c.sinCosto
-          ? oculto(0)
-          : importeReal === null
-            ? null
-            : oculto(importeReal);
+    // El criterio es el de la suma (formula-saldo.ts), no una copia local.
+    const aporte = aporteCargoAlSaldo(c, importeReal);
+    const monto = aporte === null ? null : oculto(aporte);
     filas.push({
       ...base(c.id, c.conFactura),
+      // El cargo de EsMa no tiene columna de fecha propia: su fecha ES `creadoEn` (la misma que
+      // viaja abajo en `fecha`), así que el plazo se cuenta desde ahí.
+      fechaVencimiento: vence('cargo', c.creadoEn),
       origen: 'recibo_maquila',
       monto,
       observaciones:
         c.observaciones ??
-        `Orden #${String(Number(c.orden.folio))} · ${c.tipoProceso.nombre}${c.sinCosto ? ' (sin costo)' : ''}`,
+        `Orden #${String(Number(c.orden.folio))} · ${etiquetaProcesoDelCargo(c)}${c.sinCosto ? ' (sin costo)' : ''}`,
       fecha: c.creadoEn.toISOString().slice(0, 10),
       creadoEn: c.creadoEn.toISOString(),
       creadoPorId: c.creadoPorId,
@@ -266,12 +341,26 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const a of abonos) {
-    // Signo + (abono EsMa = cargo extra al maquilero, convención F6).
+    // Signo + (abono EsMa = cargo extra al maquilero, convención F6). Sin revisar: no aporta.
+    const cuentaA = cuentaAlSaldoPlano(a.estadoRevision);
+    // Fila 0.145: un abono vivo y sin factura se corrige entero (importe incluido).
+    const corrigeA = puedeCorregir && esSinFactura(a.conFactura);
     filas.push({
       ...base(a.id, a.conFactura),
+      corregible: corrigeA,
+      importeCorregible: corrigeA,
+      observacionesGuardadas: a.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(a.monto.toNumber(), puedeVerImportes),
+      // ⚠️ En EsMa el abono SUMA (es un cargo extra al maquilero): sí vence. Quien lo decide es
+      // `SIGNO_SALDO`, no la etiqueta `origen` de aquí abajo —que es la del motor, donde resta—.
+      fechaVencimiento: vence('abono', a.fecha),
       origen: 'abono',
-      monto: oculto(a.monto.toNumber()),
-      observaciones: a.observaciones,
+      monto: cuentaA ? oculto(a.monto.toNumber()) : null,
+      observaciones: conNota(a.observaciones, cuentaA),
       fecha: a.fecha.toISOString().slice(0, 10),
       creadoEn: a.creadoEn.toISOString(),
       creadoPorId: a.creadoPorId,
@@ -279,12 +368,27 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const d of descuentos) {
-    // Signo − (descuento resta).
+    // Signo − (descuento resta). Sin revisar: no aporta.
+    const cuentaD = cuentaAlSaldoPlano(d.estadoRevision);
+    // Fila 0.145: el descuento que nació del CIERRE de una orden es del cierre (su liga es única y
+    // el sustituto no podría heredarla): se arregla deshaciendo el cierre, no corrigiendo aquí.
+    const corrigeD = puedeCorregir && esSinFactura(d.conFactura) && d.idCierreMaquila === null;
     filas.push({
       ...base(d.id, d.conFactura),
+      corregible: corrigeD,
+      importeCorregible: corrigeD,
+      observacionesGuardadas: d.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(d.monto.toNumber(), puedeVerImportes),
+      // Crédito: no vence. Se pregunta igual, en vez de escribir `null`, para que los cuatro
+      // conceptos salgan de la MISMA definición de signos.
+      fechaVencimiento: vence('descuento', d.fecha),
       origen: 'descuento',
-      monto: oculto(-d.monto.toNumber()),
-      observaciones: d.observaciones,
+      monto: cuentaD ? oculto(-d.monto.toNumber()) : null,
+      observaciones: conNota(d.observaciones, cuentaD),
       fecha: d.fecha.toISOString().slice(0, 10),
       creadoEn: d.creadoEn.toISOString(),
       creadoPorId: d.creadoPorId,
@@ -292,12 +396,25 @@ export async function proyectarMovimientosEsMa(
   }
 
   for (const p of pagos) {
-    // Signo − (pago resta).
+    // Signo − (pago resta). Sin revisar: no aporta.
+    const cuentaP = cuentaAlSaldoPlano(p.estadoRevision);
+    // Fila 0.145: el pago se corrige; su IMPORTE, sólo si no está aplicado a cargos.
+    const corrigeP = puedeCorregir && esSinFactura(p.conFactura);
     filas.push({
       ...base(p.id, p.conFactura),
+      corregible: corrigeP,
+      importeCorregible: corrigeP && p._count.aplicaciones === 0,
+      observacionesGuardadas: p.observaciones,
+      // ⭐ El importe GUARDADO. Lo normaliza `importeGuardadoDe` (positivo + oculto sólo por
+      // permiso): la regla NO se escribe aquí, porque cuando estaba en cada sitio el motor la
+      // cumplía y estas seis ramas no. A diferencia de `monto`, no se vacía por estar sin revisar
+      // —que es, por definición, el caso de lo capturado por error—.
+      importeGuardado: importeGuardadoDe(p.monto.toNumber(), puedeVerImportes),
+      // Crédito: no vence (ver la nota del descuento).
+      fechaVencimiento: vence('pago', p.fecha),
       origen: 'pago',
-      monto: oculto(-p.monto.toNumber()),
-      observaciones: p.observaciones,
+      monto: cuentaP ? oculto(-p.monto.toNumber()) : null,
+      observaciones: conNota(p.observaciones, cuentaP),
       fecha: p.fecha.toISOString().slice(0, 10),
       creadoEn: p.creadoEn.toISOString(),
       creadoPorId: p.creadoPorId,

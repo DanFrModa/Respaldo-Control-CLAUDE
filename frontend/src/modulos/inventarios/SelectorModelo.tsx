@@ -11,11 +11,14 @@ import { useDebounce } from '@/lib/useDebounce';
  * POPOVER del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera,
  * no infla el layout del toolbar). Presentación pura (A1): solo consulta y emite.
  *
- * ⚠️ **Busca en los DOS catálogos (`origen: 'todos'`) a propósito** (V1-E3n). El default del API es
- * `produccion` porque §Post-F9.34 punto 2 habla del **catálogo y la galería** —lo que se NAVEGA—, y
- * ahí Daniel no quiere "basura". Esto es otra cosa: un buscador donde alguien TECLEA un código que ya
- * conoce; si escondiera los de desarrollo, ligar un modelo de desarrollo a un proyecto o mover una
- * muestra de PT sería imposible sin explicación. Las opciones marcan cuál es de desarrollo.
+ * ⚠️ **Busca en los DOS catálogos (`origen: 'todos'`) a propósito** (V1-E3n). Nació así porque el
+ * default del API era `produccion` —§Post-F9.34 punto 2 habla del **catálogo y la galería**, lo que se
+ * NAVEGA, y ahí Daniel no quería "basura"—, y esto es otra cosa: un buscador donde alguien TECLEA un
+ * código que ya conoce; si escondiera los de desarrollo, ligar un modelo de desarrollo a un proyecto o
+ * mover una muestra de PT sería imposible sin explicación. **Desde V1-E8j (§Post-F9.134) el default del
+ * API ya es `todos`**, así que este valor dejó de ser necesario y se queda como CANDADO: es explícito,
+ * y lo fija una prueba (`origen-buscadores.test.tsx`), para que un default futuro no vuelva a acotarlo.
+ * Las opciones marcan cuál es de desarrollo.
  */
 export function SelectorModelo({
   idSeleccionado,

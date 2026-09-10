@@ -158,6 +158,20 @@ export function DialogoPasarAProduccion({
               tocan.
             </p>
           ) : null}
+
+          {/* ⭐⭐ V1-E3 (§Post-F9.172(b)): pulsar esto es lo CONTRARIO del camino normal, y no tiene
+              vuelta atrás. Se dice aquí, antes del clic, porque el daño era silencioso: el modelo
+              quedaba con UN número para todos sus colores y sus OP ya no hacían nacer ninguno. */}
+          <p
+            className="rounded-md border border-amber-400/50 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+            data-testid="aviso-un-numero-para-todos-los-colores"
+          >
+            <b>Esto le da UN número a todo el modelo, no uno por color.</b> Lo normal es dejar que
+            el número se lo dé su <b>OP</b>: al generar la orden de cada color nace su propio modelo
+            de producción, con su número y compartiendo esta receta. <b>No hay vuelta atrás:</b> un
+            modelo ya pasado a producción no vuelve a desarrollo y sus OP no harán nacer modelos por
+            color.
+          </p>
         </div>
 
         <DialogFooter>

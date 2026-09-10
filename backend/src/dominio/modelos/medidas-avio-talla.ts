@@ -24,7 +24,7 @@
  *    manda `tallas:[]` se vacían las medidas; si se mandan tallas con `consumoPorTalla=false`,
  *    quedan LATENTES (se guardan aunque el toggle esté off). Así apagar el toggle no obliga a
  *    perder las medidas ya capturadas.
- *  • Auditoría A7 + bitácora (entidad `'Modelo'`, `MODIFICAR`) y `tocarModelo` cuando algo cambia.
+ *  • Auditoría A7 + bitácora (entidad `'Modelo'`, `MODIFICAR`) y `tocarModeloPorCambioDeReceta` cuando algo cambia.
  *
  * ⭐ **V1-E3g (§Post-F9.66) — dos modos, nunca los dos vivos a la vez.** El número por talla no
  * siempre significa lo mismo, y ahí nacía la confusión que Daniel encontró capturando un cierre:
@@ -66,6 +66,8 @@ import {
 
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
 export type EntradaMedidasAvio = z.input<typeof esquemaMedidasAvioGuardar>;
@@ -122,11 +124,6 @@ interface ContextoAvioTalla {
   modoCaptura: ModoCapturaTalla;
   unidadConsumo: string | null;
   unidadMedida: string | null;
-}
-
-/** Marca la auditoría del modelo (modificadoPorId/En) cuando cambian sus medidas por talla. */
-async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
 }
 
 /**
@@ -210,11 +207,21 @@ async function leerMedidasAvio(
   idAvio: number,
   contexto: ContextoAvioTalla,
   idEmpresa: number,
+  /**
+   * ⭐ V1-E9b — de qué modelo salen las MEDIDAS (`ModeloAvioTalla`), que con un hijo del linaje 1:N
+   * no es el mismo del que sale la CURVA. Va como parámetro explícito, sin default, porque las dos
+   * puertas de este archivo quieren cosas distintas y ninguna debe heredarla por descuido: la
+   * LECTURA resuelve al modelo de la receta; el GUARDADO escribe donde escribe (V1-E9b pieza B).
+   *
+   * ⚠️ `idModelo` sigue mandando en la CURVA y en los avisos: la curva y las órdenes son del
+   * modelo que se está mirando, no de su padre de receta.
+   */
+  idModeloReceta: number,
 ): Promise<MedidasAvio> {
   const [curva, filas, avisosCurva] = await Promise.all([
     leerTallasCurvaModelo(tx, idModelo),
     tx.modeloAvioTalla.findMany({
-      where: { idModelo, idAvio },
+      where: { idModelo: idModeloReceta, idAvio },
       select: {
         idTalla: true,
         consumo: true,
@@ -294,7 +301,14 @@ function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDet
       // la explosión (`catalogos/unidades-avio.ts`): tres redacciones distintas del mismo hecho se
       // leerían como tres reglas distintas. Aquí no hay orden detrás, así que no hay magnitud que
       // decir — el "cuánto de más" sólo existe contra las piezas de una OP.
-      avisos.push(avisoAvioPorMedidaConCantidadesPorTalla('Guarda para normalizarlo.'));
+      // ⭐ V1-E8h (§Post-F9.130): el remedio NOMBRA EL BOTÓN que está en esta misma pantalla. El
+      // texto viejo —*"guarda para normalizarlo"*— era un conjuro: quien lo lee no es programador y
+      // «normalizar» no es una palabra del negocio ni el rótulo de nada.
+      avisos.push(
+        avisoAvioPorMedidaConCantidadesPorTalla(
+          'Se arregla aquí mismo con el botón «Guardar medida por talla».',
+        ),
+      );
     }
     // En modo `medida` las cantidades no se capturan aquí, así que revisarlas sería ruido: el
     // aviso del número absurdo de la MEDIDA vive en el catálogo del avío, que es donde se teclea.
@@ -484,8 +498,11 @@ export async function obtenerMedidasAvio(
 ): Promise<MedidasAvio> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
-  const contexto = await exigirRenglonAvio(cliente, idModelo, idAvio);
-  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva);
+  // V1-E9b — el renglón del BOM y sus medidas salen del modelo de la RECETA (con un hijo del
+  // linaje 1:N son del padre); la CURVA y los avisos siguen siendo del modelo que se mira.
+  const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
+  const contexto = await exigirRenglonAvio(cliente, idReceta, idAvio);
+  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva, idReceta);
 }
 
 /**
@@ -494,7 +511,7 @@ export async function obtenerMedidasAvio(
  * tallas deben existir y estar activas, sin repetir. Actualiza el toggle `consumoPorTalla` y
  * sincroniza las filas `ModeloAvioTalla` con las tallas dadas (la lista SIEMPRE reemplaza el set,
  * independiente del toggle). Conserva la auditoría de los renglones sin cambios (diff). Bitácora y
- * `tocarModelo` si hubo cambio; las medidas que el set-completo RETIRA quedan ÍNTEGRAS en la
+ * `tocarModeloPorCambioDeReceta` si hubo cambio; las medidas que el set-completo RETIRA quedan ÍNTEGRAS en la
  * bitácora (`tallasRetiradas`: talla, consumo y amarre previos), porque vaciar el campo de una
  * talla la borra y esa es la única forma de reconstruirla (D3). Devuelve el set resultante.
  */
@@ -510,6 +527,11 @@ export async function guardarMedidasAvio(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — VA ANTES de `exigirRenglonAvio`, y el orden es el mensaje: sobre un hijo
+    // del linaje 1:N el renglón del BOM no existe (vive en el padre), así que sin esta línea la
+    // respuesta era un 404 «Avío en el BOM del modelo» sobre un avío que la ficha ACABA de enseñar.
+    // Primero se explica de quién es la receta; el 404 queda para el avío que de verdad no está.
+    await exigirRecetaPropia(tx, idModelo);
     const contexto = await exigirRenglonAvio(tx, idModelo, idAvio);
 
     // ⭐ En modo `medida` la cantidad NO varía por talla (el cierre es 1 pza), así que el toggle se
@@ -530,7 +552,7 @@ export async function guardarMedidasAvio(
     const medidas = await sincronizarMedidas(tx, sesion, idModelo, idAvio, datos.tallas, contexto);
 
     if (cambiaBandera || medidas.cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'medidas-por-talla');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -558,6 +580,10 @@ export async function guardarMedidasAvio(
       idAvio,
       { ...contexto, consumoPorTalla: consumoPorTallaFinal },
       sesion.idEmpresaActiva,
+      // El GUARDADO acaba de escribir sobre `idModelo`: relee lo que él mismo dejó. Redirigir esto
+      // a la receta del padre es cosa de la pieza B (los escritores), no de ésta — hacerlo aquí
+      // enseñaría un resultado que no es el que se guardó.
+      idModelo,
     );
     if (forzado) {
       resultado.avisos.push(

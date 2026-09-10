@@ -183,7 +183,7 @@ function bdConsulta(): ContextoBd {
   return { tx };
 }
 
-/** Stub para `consultarIncompletas`: 1 orden capturada con la `creadoEn` dada (sin matriz). */
+/** Stub para `consultarIncompletas`: 1 orden `capturada` con la `creadoEn` dada (aquí, sin matriz). */
 function bdIncompletas(creadoEn: Date): ContextoBd {
   const tx = {
     orden: {
@@ -192,8 +192,9 @@ function bdIncompletas(creadoEn: Date): ContextoBd {
         Promise.resolve([{ ...filaLigera(creadoEn), estado: 'capturada' as const }]),
       ),
     },
-    // Desde que el estado es automático, una incompleta PUEDE tener matriz (le puede faltar la
-    // receta de avíos): las piezas se agregan igual que en el listado normal. Aquí no tiene.
+    // Desde que el estado es automático, una incompleta PUEDE tener matriz (le puede faltar que la
+    // receta esté liberada, o el arte): las piezas se agregan igual que en el listado normal. Aquí
+    // no tiene.
     ordenLineaTalla: { groupBy: vi.fn(() => Promise.resolve([])) },
     ordenLinea: { findMany: vi.fn(() => Promise.resolve([])) },
   } as unknown as Tx;

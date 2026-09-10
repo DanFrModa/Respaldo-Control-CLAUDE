@@ -20,7 +20,6 @@ import {
   RESULTADOS_AUDITORIA,
   TIPOS_AUDITORIA,
 } from '@/api/esquemas';
-import { useProveedores } from '@/api/proveedores';
 import type {
   AuditoriaResumen,
   AuditoriasQuery,
@@ -44,6 +43,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { ChipFiltro } from '@/components/dominio/ChipsFiltro';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
@@ -90,6 +90,8 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
   const [textoFolio, setTextoFolio] = useState('');
   const folioDebounce = useDebounce(textoFolio.trim(), 300);
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);
+  // Nombre del maquilero filtrado: con búsqueda server-side el combobox sólo conoce su página.
+  const [nombreMaquilero, setNombreMaquilero] = useState<string | undefined>(undefined);
   const [resultado, setResultado] = useState<ResultadoAuditoria | ''>('');
   const [tipo, setTipo] = useState<TipoAuditoria | ''>('');
   const [desde, setDesde] = useState('');
@@ -100,8 +102,6 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
   const [seleccionId, setSeleccionId] = useState<number | null>(null);
   const [modificar, setModificar] = useState<AuditoriaResumen | null>(null);
   const [cancelar, setCancelar] = useState<AuditoriaResumen | null>(null);
-
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const folioNum = Number(folioDebounce);
   const buscaFolio =
@@ -250,23 +250,22 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
           >
             Incluir canceladas
           </ChipFiltro>
-          <SelectNativo
-            className="w-44 h-[30px] text-xs"
-            aria-label="Filtrar por maquilero"
-            value={idMaquilero === null ? '' : String(idMaquilero)}
-            onChange={(e) => {
-              setIdMaquilero(e.target.value === '' ? null : Number(e.target.value));
-              reiniciar();
-            }}
-            data-testid="filtro-maquilero-auditoria"
-          >
-            <option value="">Todos los maquileros</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER palabra, en el
+              SERVIDOR. El `<select>` de aquí topaba en 100 y sólo dejaba teclear el prefijo. */}
+          <div className="w-44">
+            <FiltroProveedor
+              idProveedor={idMaquilero}
+              nombreInicial={nombreMaquilero}
+              alCambiar={(maquilero) => {
+                setIdMaquilero(maquilero?.id ?? null);
+                setNombreMaquilero(maquilero?.nombre);
+                reiniciar();
+              }}
+              etiqueta="Filtrar por maquilero"
+              placeholder="Todos los maquileros"
+              testid="filtro-maquilero-auditoria"
+            />
+          </div>
           <SelectNativo
             className="w-36 h-[30px] text-xs"
             aria-label="Filtrar por resultado"

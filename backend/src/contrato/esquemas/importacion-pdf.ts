@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { LARGO_MAX_PACK } from './pack.js';
+
 import { esquemaPorcentajeAdicional } from './importacion-pedido.js';
 
 /**
@@ -50,36 +52,62 @@ export const esquemaAjusteTallaPdf = z
   .describe('Ajuste manual del total a fabricar de una talla.');
 
 /**
- * Un RENGLÓN-PACK de la matriz de la OP: su letra (A/B/C…, la del PDF) y su corrida editada. Las OCs de
- * C&A traen UN renglón POR PACK (convención `{color} {letra}`); por eso la matriz es una lista de packs,
- * no un total sumado. `letra` null/vacía = un solo pack (color SIN sufijo, como los pedidos históricos de
- * un solo pack). Un renglón cuyas tallas queden todas en 0 no genera línea (así se "integra" un pack en
- * otro: el usuario mueve los números entre renglones).
+ * Un RENGLÓN-PACK de la vista previa: su letra (A/B/C…, la del PDF) y su corrida editada. Las OCs de C&A
+ * traen varios PACKS (tendidos) del MISMO color, y la vista previa los muestra separados para poder
+ * cotejarla contra el papel; por eso la matriz viaja como lista de packs y no como un total sumado.
+ * `letra` null/vacía = la OC trae un solo pack.
+ *
+ * ⭐ §Post-F9.10 — CADA PACK ES UN RENGLÓN DE LA OP. Al persistir, el backend crea un `OrdenLinea` POR
+ * TENDIDO, todos sobre el MISMO `Color` del catálogo (`Negro`, ya no `Negro A`/`Negro B` — §Post-F9.129:
+ * todo aguas abajo agrupa por color y dos colores partían las compras de una misma orden), con la letra
+ * en el campo propio `pack`. Así el tendido viaja al corte y a la entrega a maquila, que es donde Daniel
+ * pidió que viajara. La tabla SKU completa se sigue conservando aparte en `Orden.packsCliente` (base del
+ * futuro módulo de empaque). Un renglón cuyas tallas queden todas en 0 NO genera renglón en la OP (así
+ * se "integra" un pack en otro: el usuario mueve los números entre renglones), y dos renglones con la
+ * MISMA letra se suman en uno.
  */
 export const esquemaRenglonMatrizPdf = z
   .object({
     letra: z
       .string()
       .trim()
-      .max(8)
+      // El MISMO tope que el campo al que va a parar (`OrdenLinea.pack`): desde §Post-F9.10 esta
+      // letra ES el pack, así que un tope propio sólo podría divergir del que valida la matriz.
+      .max(LARGO_MAX_PACK)
       .nullable()
       .describe(
-        'Letra del pack que sufija el color (A/B/C…); null/vacía = un solo pack sin sufijo.',
+        'Letra del pack en la vista previa (A/B/C…); null/vacía = un solo pack. NO forma parte del nombre del color.',
       ),
     tallas: z
       .array(esquemaAjusteTallaPdf)
-      .describe('Corrida EDITADA de ese pack (total por talla).'),
+      .describe(
+        'Corrida EDITADA de ese pack (total por talla); es la del renglón que ese tendido tendrá en la OP.',
+      ),
   })
-  .describe('Un renglón-pack de la matriz de la OP (su letra + su corrida).');
+  .describe('Un renglón-pack de la vista previa (su letra + su corrida).');
 
 /** Forma de un renglón-pack de la matriz. */
 export type RenglonMatrizPdf = z.infer<typeof esquemaRenglonMatrizPdf>;
 
 /**
+ * Nº de producción de 5 dígitos tal como VIAJA por el importador de PDF (fila 0.151). Es la MISMA
+ * forma que pide `esquemaSalidaProduccionCuerpo.numeroProduccion` —el panel manual «Generar OP»—
+ * porque acaba en la MISMA puerta (`salidaAProduccion` → `derivarModeloDeProduccion`): dos formas
+ * distintas para el mismo dato es como se empiezan a aceptar números que la otra puerta rechaza.
+ */
+const esquemaNumeroProduccionPdf = z
+  .number({ error: 'El número de producción debe ser un número' })
+  .int({ error: 'El número de producción debe ser entero' })
+  .min(10_000, { error: 'El número de producción debe tener 5 dígitos' })
+  .max(99_999, { error: 'El número de producción debe tener 5 dígitos' });
+
+/**
  * Un PDF al CONFIRMAR: el PDF + (opcional) la matriz EDITADA en la vista previa y el pantone. Si `matriz`
  * viene, la OP se fabrica con ESOS renglones-pack (Daniel: el sistema propone el sobre-pedido por packs,
  * el usuario decide celda por celda y renglón por renglón); si se omite, se usa la propuesta calculada.
- * `pantone` PREFILLEA/edita el pantone del color de la OP (vacío = sin pantone).
+ * En ambos casos cada pack se persiste como su propio renglón del MISMO color, con su campo `pack`
+ * (§Post-F9.10).
+ * `pantone` PREFILLEA/edita el pantone del color de la OP (uno por OC; vacío = sin pantone).
  */
 export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
   .extend({
@@ -87,7 +115,7 @@ export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
       .array(esquemaRenglonMatrizPdf)
       .optional()
       .describe(
-        'Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs.',
+        'Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Cada pack nace como un renglón propio del MISMO color, con su campo pack.',
       ),
     pantone: z
       .string()
@@ -95,6 +123,16 @@ export const esquemaArchivoPdfConfirmar = esquemaArchivoPdf
       .max(60)
       .optional()
       .describe('Código PANTONE del color de la OP (editado/prefilleado); vacío = sin pantone.'),
+    numeroProduccion: esquemaNumeroProduccionPdf
+      .optional()
+      .describe(
+        'Nº de producción CONFIRMADO por el usuario para el modelo que va a NACER de ESTA OC ' +
+          '(fila 0.151, §Post-F9.46: el sistema lo precarga en la vista previa y el usuario lo ' +
+          'puede cambiar). Omitir = aceptar el que proponga el sistema al confirmar. ⚠️ Se IGNORA ' +
+          '—con aviso, sin bloquear— cuando el desenlace NO es `nacido`: si ese color ya tenía ' +
+          'modelo de producción (se reusa el suyo) o si el modelo ligado ya era de producción (la ' +
+          'OP lo hereda). El número es del MODELO, no de la orden.',
+      ),
   })
   .describe('Un PDF con su ajuste manual opcional al confirmar.');
 
@@ -212,9 +250,10 @@ export const esquemaAdvertenciaPdf = z
         'liga-inactiva',
         'sobrepedido',
         'duplicado',
+        'color-fusionado',
       ])
       .describe(
-        'Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, y "duplicado": esa OC del cliente ya se importó).',
+        'Qué validación falló (incluye "liga-inactiva", "sobrepedido": packs que no cuadran / proporción no entera, "duplicado": esa OC del cliente ya se importó, y "color-fusionado": el color del papel lo absorbió una fusión y la OP va a nacer en el canónico).',
       ),
     mensaje: z.string().describe('Mensaje legible para la vista previa.'),
   })
@@ -240,6 +279,28 @@ export const esquemaOcYaImportada = z
 
 /** Forma de la OP duplicada. */
 export type OcYaImportada = z.infer<typeof esquemaOcYaImportada>;
+
+/**
+ * Qué le va a pasar al MODELO DE PRODUCCIÓN de la OP que nazca de un PDF (fila 0.151). Son los
+ * MISMOS tres desenlaces que devuelve `salidaAProduccion.modeloDeProduccion`, y a propósito: la
+ * vista previa tiene que anunciar exactamente lo que el confirm va a hacer.
+ *
+ *  • `nacido`   — el color de esta OC todavía no tiene modelo de producción: va a nacer uno, con su
+ *                 nº de 5 dígitos. **Es el ÚNICO caso en que el número se puede teclear.**
+ *  • `reusado`  — ese color ya tiene modelo (u otro PDF de esta misma tanda lo hace nacer antes):
+ *                 la OP usa el suyo y un número capturado NO se aplicaría. ⚠️ Si ese modelo está
+ *                 DESCONTINUADO, el confirm **rechaza la importación entera** (§Post-F9.119): el
+ *                 renglón llega igual como `reusado`, pero con `numeroProduccionModelo` en null y
+ *                 el motivo en `avisosNumeroProduccion` — no hay reuso que prometer.
+ *  • `heredado` — el modelo ligado ya es de producción (el histórico del Access): la OP lo lleva tal
+ *                 cual y nada nace.
+ */
+export const esquemaDesenlaceModeloPdf = z
+  .enum(['nacido', 'reusado', 'heredado'])
+  .describe('Qué le pasa al modelo de producción de la OP de este PDF.');
+
+/** Forma del desenlace del modelo de un PDF. */
+export type DesenlaceModeloPdf = z.infer<typeof esquemaDesenlaceModeloPdf>;
 
 /** Un renglón de la vista previa = un PDF parseado, con su liga sugerida y sus advertencias. */
 export const esquemaRenglonPdfPreview = z
@@ -301,12 +362,61 @@ export const esquemaRenglonPdfPreview = z
     colorNuevo: z
       .boolean()
       .describe('true si el color no existe en el catálogo (se creará al confirmar).'),
+    /**
+     * 🔴 El color del papel EXISTE, pero una fusión se lo llevó: la OP va a nacer en OTRO color, con
+     * OTRO nombre — y la cadena de precio casa por NOMBRE, así que el precosto puede salir distinto
+     * al del papel del cliente. Antes esto sólo constaba en la bitácora, DESPUÉS de confirmar.
+     */
+    colorFusionadoEn: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre del color CANÓNICO al que la fusión va a redirigir el color del papel al confirmar, o null si no hay desvío (lo normal).',
+      ),
     tallasNuevas: z
       .array(z.string())
       .describe('Tallas del PDF que no existen en el catálogo (se crearán al confirmar).'),
     advertencias: z
       .array(esquemaAdvertenciaPdf)
       .describe('Advertencias de validación (no bloquean).'),
+    // ── ⭐ Nº de producción del modelo de ESTA OC (fila 0.151) ──
+    modeloDeProduccion: esquemaDesenlaceModeloPdf
+      .nullable()
+      .describe(
+        'Qué le va a pasar al MODELO de la OP de este PDF si se confirma con la liga que hoy trae ' +
+          'el renglón, o null si todavía no hay ninguna liga (no hay modelo del que hablar). ' +
+          'SOLO en `nacido` tiene sentido teclear un número.',
+      ),
+    numeroProduccionPropuesto: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de 5 dígitos que el sistema PROPONE para el modelo que nacería de esta OC, con el que ' +
+          'la pantalla precarga el campo. Null si el desenlace no es `nacido` o si la serie está ' +
+          'llena. ⚠️ Es INFORMATIVO: se calcula sin el candado del par y sin escribir nada, así ' +
+          'que entre esta consulta y el confirm otro puede tomarlo. Quien decide de verdad es el ' +
+          'confirm, que vuelve a proponer bajo candado y BLOQUEA si el número capturado ya está ' +
+          'ocupado. La pantalla NO debe prometer que el número queda apartado.',
+      ),
+    numeroProduccionModelo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de producción del modelo con el que la OP va a quedar cuando NO nace uno nuevo: el del ' +
+          'modelo que ya existe para ese color (`reusado`) o el del modelo de producción ya ligado ' +
+          '(`heredado`). También trae el número que va a estrenar OTRO PDF de esta misma tanda ' +
+          'cuando dos OC comparten modelo y color. Null si no aplica, si el modelo histórico no ' +
+          'tiene número, o si el modelo de ese color está DESCONTINUADO (ahí no hay reuso que ' +
+          'prometer: el confirm rechaza la importación; el motivo va en `avisosNumeroProduccion`).',
+      ),
+    avisosNumeroProduccion: z
+      .array(z.string())
+      .describe(
+        'Avisos de la numeración de ESTE PDF (serie cerca del tope, color que ya tiene modelo, ' +
+          'modelo sin dígitos para numerar…). NUNCA bloquean.',
+      ),
     yaImportado: esquemaOcYaImportada
       .nullable()
       .describe(
@@ -409,7 +519,7 @@ export const esquemaOrdenPdfImportada = z
       .int()
       .nullable()
       .describe(
-        'Nº de producción del modelo (asignado si venía de desarrollo, heredado si ya estaba en producción), o null si su código histórico no es numérico de 5 dígitos.',
+        'Nº de producción del modelo CON EL QUE QUEDÓ LA OP, o null si su código histórico no es numérico de 5 dígitos. ⚠️ V1-E3 (§Post-F9.172(b)): cuando el renglón es de un modelo de DESARROLLO, este número es del modelo de producción que NACIÓ para el color de esta OC —el desarrollo se queda como está, no se transforma—; en el caso legado es el que el modelo del renglón ya tenía. Es el camino de C&A: un PDF = una OC = un color = un modelo.',
       ),
     codigoModelo: z.string().describe('Nº de desarrollo de NUESTRO modelo.'),
     modeloCliente: z.string().describe('Modelo ID del cliente (del PDF).'),
@@ -417,6 +527,18 @@ export const esquemaOrdenPdfImportada = z
     nombreArchivo: z.string().describe('Nombre del PDF de origen (adjunto a esta OP).'),
     totalPiezas: z.number().int().describe('Piezas de la OP (Σ de la matriz).'),
     adjuntado: z.boolean().describe('true si el PDF se adjuntó a la OP.'),
+    modeloDeProduccion: esquemaDesenlaceModeloPdf.describe(
+      'Qué pasó DE VERDAD con el modelo de la OP (fila 0.151). Puede no coincidir con lo que ' +
+        'anunció la vista previa: entre analizar y confirmar el color pudo estrenar modelo por ' +
+        'otra puerta, y entonces un `nacido` anunciado sale `reusado`.',
+    ),
+    avisosNumeroProduccion: z
+      .array(z.string())
+      .describe(
+        'Avisos de la numeración de ESTA OP (dígitos que no cuadran, serie cerca del tope, número ' +
+          'capturado que NO se usó porque el color ya tenía modelo). NUNCA bloquean, pero hay que ' +
+          'enseñarlos: son la única señal de que un número tecleado no se aplicó.',
+      ),
   })
   .describe('Una OP creada por la importación de un PDF.');
 

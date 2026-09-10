@@ -57,6 +57,15 @@ import {
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
   esquemaModeloFichaSalida,
+  esquemaModeloVersionCuerpo,
+  esquemaRevisionAprobarCuerpo,
+  esquemaRevisionRechazarCuerpo,
+  esquemaRevisionModeloSalida,
+  esquemaRecetasPorRevisarQuery,
+  esquemaRecetasPorRevisarPagina,
+  esquemaPromesasIncumplidasQuery,
+  esquemaPromesasIncumplidasPagina,
+  esquemaMetaPrometida,
   esquemaModeloFotoCrear,
   esquemaModeloFotoEditarCuerpo,
   esquemaModeloFotoSubida,
@@ -117,6 +126,16 @@ import {
   aceptarAviosFavoritos,
   sugerirAviosFavoritos,
 } from '../../dominio/modelos/avios-favoritos.js';
+import { crearVersionDeModelo } from '../../dominio/modelos/versiones.js';
+import {
+  aprobarRevisionModelo,
+  rechazarRevisionModelo,
+} from '../../dominio/modelos/revision-modelo.js';
+import { consultarRecetasPorRevisar } from '../../dominio/modelos/recetas-por-revisar.js';
+import {
+  consultarMetaPrometida,
+  consultarPromesasIncumplidas,
+} from '../../dominio/modelos/meta-negociada.js';
 import {
   actualizarFoto,
   listarFotos,
@@ -135,6 +154,32 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     origen: modelo.origen,
     codigoDesarrollo: modelo.codigoDesarrollo,
     numeroProduccion: modelo.numeroProduccion,
+    // Linaje de versiones (V1-E7b): el sufijo lo dice a la vista, estas dos columnas lo dicen
+    // consultable, y `codigoPadre` es lo que la ficha necesita para poner la liga al padre.
+    idModeloPadre: modelo.idModeloPadre,
+    codigoPadre: modelo.modeloPadre?.codigo ?? null,
+    versionDesarrollo: modelo.versionDesarrollo,
+    // ⭐ V1-E9a — linaje 1:N: de qué DESARROLLO nació este modelo de producción (y de quién es, por
+    // lo tanto, la receta que la ficha va a enseñar). Null en todo lo demás = la receta es la suya.
+    idModeloDesarrollo: modelo.idModeloDesarrollo,
+    codigoModeloDesarrollo: modelo.modeloDesarrollo?.codigo ?? null,
+    // ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Viajan los cuatro campos
+    // del acto (estado + quién + cuándo + observación) para que la ficha pueda enseñar la firma
+    // completa. En un modelo que no es versión vienen todos en null: no lleva revisión.
+    revisionEstado: modelo.revisionEstado,
+    idRevisadoPor: modelo.idRevisadoPor,
+    revisadoPor: modelo.revisadoPor?.nombre ?? null,
+    revisadoEn: modelo.revisadoEn === null ? null : modelo.revisadoEn.toISOString(),
+    revisionNota: modelo.revisionNota,
+    // ⭐⭐ V1-E9p (§Post-F9.144(b)) — EL DESENLACE DE LA PROMESA de la mesa. `metaResultado` en null
+    // NO significa «se cumplió»: significa que nadie lo declaró (REGLA 0-B), que es el estado de
+    // todo lo firmado antes de esta etapa.
+    metaResultado: modelo.metaResultado,
+    metaCostoPrometido:
+      modelo.metaCostoPrometido === null ? null : modelo.metaCostoPrometido.toNumber(),
+    metaCostoConseguido:
+      modelo.metaCostoConseguido === null ? null : modelo.metaCostoConseguido.toNumber(),
+    metaNota: modelo.metaNota,
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
@@ -176,6 +221,8 @@ function aTelaBomSalida(
     idTela: t.idTela,
     nombre: t.nombre,
     consumoPorPrenda: t.consumoPorPrenda,
+    nombreComplemento: t.nombreComplemento,
+    consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
@@ -611,6 +658,192 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         numeroCapturado: promovido.numeroCapturado,
         avisos: promovido.avisos,
       };
+    },
+  });
+
+  // ── ⭐ V1-E7b: crear la VERSIÓN del modelo (nace con sufijo; el original queda igual) ──
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/version',
+    // `modelos.aprobar-receta` y NO `modelos.administrar`: aprobar la RECETA llega hasta Gerencial
+    // (Daniel: *"Aurora podría hacerlo aparte de mí"*), mientras administrar catálogos se corta en
+    // Directivo. El porqué completo, y su tensión con `listas.aprobar`, en `contrato/permisos.ts`.
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Crear la versión de un modelo (CYA-26-71-001 → CYA-26-71-001-01)',
+      description:
+        'Nace un modelo NUEVO con el siguiente sufijo de la familia, que HEREDA la receta ' +
+        'completa (telas, avíos con sus medidas por talla y arte). El modelo original NO se toca. ' +
+        'La numeración es PLANA: versionar un -01 da -02, nunca -01-01. Exige que el modelo tenga ' +
+        'número de DESARROLLO (el sufijo cuelga de él).',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaModeloVersionCuerpo,
+      response: { 201: esquemaModeloSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const version = await crearVersionDeModelo(sesion, request.params.id, request.body);
+      return reply.code(201).send(aModeloBase(version));
+    },
+  });
+
+  // ── ⭐ V1-E7d: LA REVISIÓN antes de mandar a producir (§Post-F9.110) ──────────
+  //
+  // ⚠️ **V1-E9c (§Post-F9.169) — estas dos rutas firman un REGISTRO, no abren una puerta.** Hasta
+  // aquí, la firma levantaba la compuerta que `promoverAProduccionNucleo` le ponía a la versión sin
+  // revisar; Daniel la disolvió (*"no detiene ni la producción ni los demás renglones ya
+  // firmados"*) y lo único que frena el gasto es la firma POR RENGLÓN de la receta de la orden. La
+  // revisión sigue existiendo porque dice que alguien miró lo que se negoció — y por eso ahora
+  // también se puede firmar con el modelo YA en producción.
+  //
+  // El permiso es el MISMO de «crear versión» (`modelos.aprobar-receta`, hasta Gerencial: *"Aurora
+  // podría hacerlo aparte de mí"*) y NO `listas.aprobar`, que es el PRECIO y es sólo del dueño.
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/revision/aprobar',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Aprobar la revisión de la receta de una versión de modelo',
+      description:
+        'Firma la revisión (quién y cuándo): deja constancia de que alguien miró la receta que se ' +
+        'acordó en la negociación. NO es una compuerta — no condiciona producir ni comprar (eso ' +
+        'lo gobierna la liberación por renglón de la receta de la orden). Sólo aplica a VERSIONES ' +
+        '(modelos con sufijo), se puede firmar aunque el modelo ya esté en producción, y aprobar ' +
+        'dos veces es conflicto.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaRevisionAprobarCuerpo,
+      response: { 200: esquemaRevisionModeloSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aprobarRevisionModelo(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/revision/rechazar',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Rechazar la revisión de la receta de una versión de modelo (con motivo)',
+      description:
+        'Devuelve la versión con observaciones: sigue existiendo y editándose, y queda en la ' +
+        'bandeja «Recetas por revisar» hasta que se corrija y se firme. El motivo es obligatorio; ' +
+        'el rechazo anterior no se pierde (queda en la bitácora).',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaRevisionRechazarCuerpo,
+      response: { 200: esquemaRevisionModeloSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return rechazarRevisionModelo(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E8r (§Post-F9.140, DANIEL) — LA BANDEJA «Recetas por revisar».
+  //
+  // Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta original…
+  // de alguna manera deberia de pasar un filtro"*. La firma ya existía (V1-E7d) pero nadie podía
+  // LISTAR lo que esperaba revisión. Esto es esa lista — y desde V1-E9c, que disolvió el muro que
+  // había detrás (§Post-F9.169), es lo ÚNICO que hace que la revisión se levante.
+  //
+  // 🔴 De SOLO LECTURA: la bandeja NO firma, LLEVA (§Post-F9.80, la regla que Daniel fijó al
+  // quitarle el botón de bloque a la bandeja hermana). Firmar sigue siendo `POST
+  // /modelos/:id/revision/aprobar`, con `modelos.aprobar-receta`, desde la ficha del modelo.
+  //
+  // Va a nivel raíz y NO bajo `/modelos/:id` porque no es de UN modelo: es la cartera entera.
+  // Gate `modelos.ver`: el MISMO permiso que abre la ficha a la que lleva, así que el camino nunca
+  // es un enlace muerto.
+  app.route({
+    method: 'GET',
+    url: '/recetas-por-revisar',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Bandeja «Recetas por revisar»: versiones negociadas sin firmar',
+      description:
+        'Las VERSIONES cuya revisión no está firmada (pendientes, sin firma y rechazadas), estén ' +
+        'todavía en desarrollo o ya en producción, ordenadas por la fecha comprometida del pedido ' +
+        'que está esperando. Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la ' +
+        'receta.',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaRecetasPorRevisarQuery,
+      response: { 200: esquemaRecetasPorRevisarPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarRecetasPorRevisar(sesion, request.query);
+    },
+  });
+
+  // ⭐ V1-E9p (§Post-F9.144(b)) — LA META de una versión, para poder contestar «¿se logró lo
+  // prometido?» VIENDO contra qué. La columna congelada del modelo no sirve para esto: sólo existe
+  // DESPUÉS de declarar un desenlace, o sea nunca en la primera firma, que es cuando se pregunta.
+  //
+  // Gate `modelos.aprobar-receta` (quien firma); el dominio exige además `consultas.ver-importes`
+  // porque es un importe. En el seed los dos los llevan EXACTAMENTE los mismos cuatro perfiles
+  // (Administrador, AdministracionDireccion, Directivo y Gerencial), así que la pareja no cierra
+  // ninguna puerta que estuviera abierta. Sin permisos nuevos.
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/meta-prometida',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'La META con la que se vendió esta versión (el costo con el que se cerró la mesa)',
+      description:
+        'Resuelve EN VIVO el `costoEstimado` del último cierre de mesa de la negociación de la que ' +
+        'salió esta versión — la del expediente propio si lo tiene, si no la del modelo PADRE (la ' +
+        'mesa pasó antes de que la versión existiera). Null si no viene de una negociación registrada.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaMetaPrometida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarMetaPrometida(sesion, request.params.id);
+    },
+  });
+
+  // ⭐⭐ V1-E9p (§Post-F9.144(b), DANIEL) — «PROMESAS INCUMPLIDAS»: la lista del DUEÑO.
+  //
+  // Daniel: *«todo eso se intentará hacer así, pero **no es seguro que se consiga**»*. La bandeja
+  // «Recetas por revisar» contesta *«¿ya lo cuadraste?»* y se VACÍA al firmar; esto contesta *«¿se
+  // logró?»* y **se queda**, porque un margen que se perdió no deja de haberse perdido porque
+  // alguien firme. La decisión lo dice con esas palabras: la brecha le importa **al dueño**, que ya
+  // le dio ese precio al cliente — no a quien despacha la cola.
+  //
+  // 🔴 De SOLO LECTURA, igual que la bandeja: aquí no se firma nada (§Post-F9.140 punto 4).
+  //
+  // Permisos SIN INVENTAR NINGUNO: `modelos.ver` (es una lista de modelos) **y**
+  // `consultas.ver-importes`, el permiso transversal que ya gobierna ver precios e importes. Los dos
+  // porque esta pantalla ES el dinero: ocultar las columnas de costo dejaría una lista sin sentido
+  // en vez de una puerta honesta. El dominio los vuelve a verificar (A1).
+  app.route({
+    method: 'GET',
+    url: '/promesas-incumplidas',
+    preHandler: app.conPermiso('consultas.ver-importes'),
+    schema: {
+      tags: ['modelos'],
+      summary: '«Promesas incumplidas»: lo que se negoció y NO se consiguió, con su brecha',
+      description:
+        'Las VERSIONES cuya revisión se firmó declarando que NO se consiguió el costo prometido ' +
+        'en la mesa, con la brecha por prenda (conseguido − prometido) y el IMPACTO en dinero ' +
+        '(brecha × piezas ya pedidas), ordenadas por lo que más cuesta. El `impactoTotal` es el de ' +
+        'toda la cartera, no el de la página: lo agrega el servidor.',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaPromesasIncumplidasQuery,
+      response: { 200: esquemaPromesasIncumplidasPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarPromesasIncumplidas(sesion, request.query);
     },
   });
 

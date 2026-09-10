@@ -6,7 +6,7 @@
  *  • Genérico (decisión d): se netea contra el kardex real (D3) — cubierto por stock vs faltante
  *    parcial a compra.
  *  • Snapshot regenerable + diff: regenerar tras cambiar el BOM reporta cantidad-cambiada/nuevo.
- *  • Proveedor sugerido R1: el AvioProveedor más barato (precio ÷ factor); telas → null.
+ *  • Proveedor sugerido: el AvioProveedor más barato; telas → null.
  *  • Generar OC: una OC por proveedor, líneas ligadas a la orden, folio atómico (reúsa crearOC).
  *  • Estatus R7: cruce requerido vs en-oc vs recibido; línea libre → 'no-identificado'.
  */
@@ -93,7 +93,9 @@ async function crearOrden(folio = 1n): Promise<number> {
       idCliente: clienteNegocioId,
       estado: 'completa',
       fechaCompletada: new Date(),
-      // §Post-F9.18: la OC que genera el MRP hereda ESTA fecha de entrega (toda OC la exige).
+      // La entrega AL CLIENTE de la OP. 🔴 V1-E7f (§Post-F9.120): la OC del MRP **ya no la hereda**
+      // —es cuándo se entrega la prenda, no cuándo debe llegar la tela—; se siembra porque las OP
+      // reales la traen, y porque la prueba decisiva necesita justo eso: una OP CON fecha.
       fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
       lineas: {
         create: [
@@ -169,7 +171,7 @@ beforeEach(async () => {
     data: { clave: 'HIL-01', descripcion: 'Hilo', unidad: 'm', esGenerico: true },
   });
 
-  // Precios del botón por proveedor (R1): barato $2, caro $3. Sin factor → costo por unidad = precio.
+  // Precios del botón por proveedor: barato $2, caro $3 — ya por unidad de consumo (§Post-F9.97).
   await cliente.avioProveedor.createMany({
     data: [
       { idAvio: avioBoton.id, idProveedor: provBarato.id, precio: 2 },
@@ -339,7 +341,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -365,7 +367,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     // Selecciona solo el botón explícitamente.
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     expect(resultado.ordenesCompra).toHaveLength(1);
@@ -386,7 +388,7 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
     // 2) Genera la OC del botón y autorízala.
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const idOc = gen.ordenesCompra[0]!.idOrdenCompra;
@@ -484,7 +486,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const ocFelpa = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id);
@@ -622,28 +624,18 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
   });
 });
 
-describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = más barato)', () => {
-  it('el fallback "más barato" usa el Avio.factorConversion cuando el proveedor no fija el suyo', async () => {
-    // avío con factor 2 y un proveedor SIN factor propio: precio 10 ÷ 2 = 5 por unidad de consumo.
+describe('MRP — el amarre y el "más barato" dan el MISMO precio (§Post-F9.97)', () => {
+  /**
+   * Lo que este `describe` probaba en F8-E6 era que los dos escalones NORMALIZABAN igual el «factor
+   * de conversión» presentación→consumo. Ese factor se retiró en V1-E8a: `AvioProveedor.precio` ya
+   * está en unidad de consumo y ninguna de las dos rutas lo toca. Lo que sí sigue importando —y es
+   * lo único que queda de aquellos dos casos— es que amarrar al proveedor no cambie el precio
+   * respecto de llegar a él por "más barato": si las dos rutas divergieran, amarrar movería el
+   * dinero sin que nadie lo pidiera.
+   */
+  it('amarrar al mismo proveedor no mueve el precio sugerido', async () => {
     const avioZip = await cliente.avio.create({
-      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza', factorConversion: 2 },
-    });
-    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres' } });
-    await cliente.avioProveedor.create({
-      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
-    });
-    await cliente.modeloAvio.create({
-      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
-    });
-    const ex = await explosionarConRecetaFresca();
-    const zip = renglonAvio(ex, avioZip.id);
-    // Antes de F8-E6 el fallback ignoraba el factor del avío (habría dado 10); ahora 10 ÷ 2 = 5.
-    expect(zip?.precioSugerido).toBeCloseTo(5);
-  });
-
-  it('el amarre y el "más barato" normalizan IDÉNTICO (mismo proveedor)', async () => {
-    const avioZip = await cliente.avio.create({
-      data: { clave: 'ZIP-02', descripcion: 'Cierre', unidad: 'pza', factorConversion: 4 },
+      data: { clave: 'ZIP-02', descripcion: 'Cierre', unidad: 'pza' },
     });
     const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres2' } });
     await cliente.avioProveedor.create({
@@ -662,7 +654,8 @@ describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = 
     });
     const exCon = await explosionarConRecetaFresca();
     const zipCon = renglonAvio(exCon, avioZip.id);
-    expect(zipSin?.precioSugerido).toBeCloseTo(5); // 20 ÷ 4
+    // 20 es el precio del catálogo TAL CUAL: con el factor vivo esto habría dado 5 (20 ÷ 4).
+    expect(zipSin?.precioSugerido).toBeCloseTo(20);
     expect(zipCon?.precioSugerido).toBeCloseTo(zipSin!.precioSugerido!);
   });
 });
@@ -762,9 +755,13 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
     // …pero ya no en silencio, y el aviso viaja PEGADO al renglón (no al pie).
     expect(boton?.avisos).toHaveLength(1);
     expect(boton?.avisos[0]).toContain('POR MEDIDA');
-    expect(boton?.avisos[0]).toContain('1,590');
-    expect(boton?.avisos[0]).toContain('en vez de 180'); // 6 por prenda × 30 piezas
-    expect(boton?.avisos[0]).toContain('receta de la orden');
+    // ⭐⭐ V1-E8h (§Post-F9.130): la magnitud va PRIMERO y en lenguaje de negocio. Se afirman las
+    // DOS cifras EN UNA SOLA FRASE —la inflada y la buena, en orden— a propósito: dos `toContain`
+    // sueltos pasarían aunque el texto las dijera al revés o separadas por media pantalla.
+    expect(boton?.avisos[0]).toContain('Esta orden pide 1,590 pza y deberían ser 180 pza'); // 6 × 30
+    // Y el remedio NOMBRA el botón que lo arregla (antes mandaba a «guardar el renglón», un conjuro).
+    expect(boton?.avisos[0]).toContain('receta de esta orden');
+    expect(boton?.avisos[0]).toContain('«Corregir»');
     // 🔴 Y NO se cuela en la caja gris del pie, donde se leería como un apunte de valuación más.
     expect(ex.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
   });
@@ -841,11 +838,38 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
   // La orden y el catálogo los siembra el `beforeEach` del archivo (`idOrden` es del módulo):
   // volver a crear la orden aquí chocaría contra el unique (idEmpresa, folio).
 
-  it('hereda la fecha de entrega de la ORDEN y la dirección FAVORITA del catálogo', async () => {
+  /**
+   * 🔴🔴🔴 **LA PRUEBA DE V1-E7f (§Post-F9.120) — LA FECHA DE LA OP *NO* SE HEREDA, Y LA OP LA TIENE.**
+   *
+   * Es el caso EXACTO de Daniel: la orden del `beforeEach` trae `fechaEntrega` 2026-09-30 (su 7970
+   * también la traía), y por eso la OC de tela nacía con ella — *"tomó la fecha de entrega de la OC
+   * del cliente"*. Esa fecha dice cuándo se le entrega **al cliente**; la de la OC dice cuándo tiene
+   * que llegar **la tela**: pedirle al proveedor la materia prima el día de la entrega final es
+   * imposible por definición, y el campo quedaba LLENO con un número que se ve legítimo y nadie
+   * revisa.
+   *
+   * Hasta hoy esta misma prueba afirmaba lo contrario (*"hereda la fecha de entrega de la ORDEN"*) y
+   * pasaba. Ahora: se RECHAZA y **no se escribe ni una OC**. Si alguien devuelve el respaldo a
+   * `planearCompra`, esto se pone rojo.
+   */
+  it('🔴🔴🔴 la OP CON fecha NO se la presta a la OC: sin capturarla, se RECHAZA (§Post-F9.120)', async () => {
+    await explosionarConRecetaFresca();
+    // La orden sí tiene fecha de entrega — se comprueba aquí para que la prueba no dependa de una
+    // siembra que alguien cambie sin darse cuenta (sin fecha, probaría otra cosa).
+    const op = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(op.fechaEntrega).not.toBeNull();
+
+    await expect(
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+    ).rejects.toThrow(/Falta la fecha de entrega de la compra/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('con la fecha capturada, la OC nace con ELLA y con la dirección FAVORITA del catálogo', async () => {
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -856,7 +880,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     expect(oc.direccionEntregaNombre).toBe('Naucalpan');
   });
 
-  it('lo que manda la pantalla GANA sobre los respaldos', async () => {
+  it('lo que manda la pantalla GANA (la fecha de arriba y la dirección elegida)', async () => {
     const otra = await cliente.direccionEntrega.create({
       data: { nombre: 'Bodega Montaño', direccion: 'Calle 5 #10' },
     });
@@ -877,13 +901,30 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     expect(oc.direccionEntregaNombre).toBe('Bodega Montaño');
   });
 
-  it('sin fecha en la orden Y sin fecha capturada, dice QUÉ falta (no genera a medias)', async () => {
+  /**
+   * La gemela de arriba con la OP SIN fecha: el resultado es el MISMO —y ése es el punto—. Además
+   * fija **lo que el mensaje NO puede volver a decir**: *"captúrala en la orden"* era el consejo del
+   * respaldo y hoy es FALSO (capturarla ahí no desbloquea nada), así que mandar ahí al comprador
+   * sería peor que no decirle nada.
+   */
+  it('sin fecha en la orden tampoco: el mensaje dice dónde SÍ se captura, y no en la orden', async () => {
     await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
     await explosionarConRecetaFresca();
 
-    await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
-    ).rejects.toThrow(/no tiene fecha de entrega/);
+    const error: unknown = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toMatch(/Falta la fecha de entrega de la compra/);
+    // Dice DÓNDE se captura (aquí, al generar) y a QUIÉN le falta — nombrado, no "falta la fecha".
+    expect(mensaje).toMatch(/al generar las compras/);
+    expect(mensaje).toMatch(/Sin fecha se quedarían: /);
+    // 🔴 Y NO manda a la orden de producción: ahí capturarla ya no desbloquea nada.
+    expect(mensaje).not.toMatch(/Captúrala en la orden/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
 
@@ -892,7 +933,11 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(
+        sesion(),
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      ),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -914,7 +959,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -996,8 +1041,9 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     expect(await fechaDeLaOcDe(resultado, provCaro.id)).toBe('2026-11-30');
   });
 
-  it('sin fecha de arriba NI en la orden, basta con que cada proveedor traiga la suya', async () => {
-    await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
+  it('sin fecha de arriba, basta con que cada proveedor traiga la suya', async () => {
+    // (Antes esta prueba vaciaba la fecha de la OP para que no hiciera de respaldo. Ya no hay
+    // respaldo que neutralizar — §Post-F9.120 —, así que la OP se deja como está.)
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
@@ -1016,8 +1062,13 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     expect(await fechaDeLaOcDe(resultado, provCaro.id)).toBe('2026-12-20');
   });
 
-  it('si a un proveedor no le queda fecha por ningún lado, lo dice CON SU NOMBRE y no crea nada', async () => {
-    await cliente.orden.update({ where: { id: idOrden }, data: { fechaEntrega: null } });
+  /**
+   * 🔴 V1-E7f (§Post-F9.120): esta prueba vaciaba la fecha de la OP para poder llegar aquí — el
+   * respaldo tapaba el hueco. Ahora la OP **conserva la suya** y el bloqueo ocurre igual: es la
+   * misma regla de la prueba decisiva, vista desde la compra a DOS proveedores (uno con fecha y
+   * otro sin ella).
+   */
+  it('si a un proveedor no le queda fecha capturada, lo dice CON SU NOMBRE y no crea nada', async () => {
     await dosProveedoresComprables();
 
     await expect(
@@ -1590,7 +1641,7 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
 
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
       bd(),
     );
     expect(ordenesCompra).toHaveLength(1);
@@ -1918,7 +1969,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const primera = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(primera.ordenesCompra).toHaveLength(1);
@@ -1927,7 +1978,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     // Segunda vuelta: el snapshot sigue diciendo "180 a comprar", pero YA están en una OC viva.
     const segunda = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 SIN el neteo aquí saldría OTRA OC con las MISMAS 180 piezas (el defecto de Daniel).
@@ -1941,7 +1992,11 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
 
   it('⭐ la explosión enseña el renglón YA COMPRADO con pendiente 0 (no invita a recomprar)', async () => {
     await explotar();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex = await explotar();
     const fila = boton(ex);
@@ -1959,12 +2014,14 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -1980,7 +2037,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     // Y la segunda compra pide exactamente los 80 que faltan.
     const segunda = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const oc = await obtenerOC(sesion(), segunda.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
@@ -1991,7 +2048,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(boton(await explotar()).cantidadPendiente).toBe(0);
@@ -2012,7 +2069,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const oc = await cliente.ordenCompra.findFirstOrThrow({
@@ -2026,7 +2083,11 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
 
   it('el tablero R7 y la explosión dicen el MISMO "en OC" (una sola verdad)', async () => {
     await explotar();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex = await explotar();
     const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
@@ -2051,7 +2112,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 Lo esencial: revisar no compra.
@@ -2060,7 +2121,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(plan.proveedores).toHaveLength(1);
     const oc = plan.proveedores[0];
     expect(oc?.idProveedor).toBe(provBarato.id);
-    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la fecha de entrega de la OP
+    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la CAPTURADA (V1-E7f: no se hereda de la OP)
     expect(oc?.renglones[0]?.cantidadTotal).toBeCloseTo(180);
     expect(oc?.total).toBeCloseTo(360); // 180 × $2
     expect(oc?.ordenes).toEqual([1]); // el folio de la OP del fixture
@@ -2091,15 +2152,16 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
     const aviso = plan.avisos.find((a) => a.includes('POR MEDIDA'));
     expect(aviso).toBeDefined();
     expect(aviso).toContain('BOT-01');
-    expect(aviso).toContain('1,590'); // 53 × 30 piezas
-    expect(aviso).toContain('en vez de 180'); // 6 por prenda × 30
+    // ⭐⭐ V1-E8h: las dos cifras juntas y en orden (53 × 30 inflado contra 6 × 30 real).
+    expect(aviso).toContain('Esta orden pide 1,590 pza y deberían ser 180 pza');
+    expect(aviso).toContain('«Corregir»');
     // Y no bloquea: se puede seguir comprando (avisar no es frenar, §Post-F9.64).
     expect(plan.bloqueos).toEqual([]);
   });
@@ -2108,7 +2170,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
@@ -2134,7 +2196,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
@@ -2174,7 +2236,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const plan = await previoCompraDesdeExplosion(
       sesion(),
       // Selección REAL: sólo el botón. El cierre SÍ se podía marcar y no se marcó; la Felpa no.
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
@@ -2213,7 +2275,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const boton = renglonAvio(ex, avioBoton.id)!;
     await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     const ex2 = await explosionarConRecetaFresca();
@@ -2225,7 +2287,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const zip = renglonAvio(ex2, avioZip.id)!;
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [zip.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [zip.id] },
       bd(),
     );
 
@@ -2240,13 +2302,17 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.bloqueos.join(' ')).toMatch(/favorita/);
     // …y generar con ese mismo bloqueo SÍ se rechaza, con la misma frase.
     await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(
+        sesion(),
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      ),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -2255,7 +2321,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await expect(
       previoCompraDesdeExplosion(
         sesion(['compras.ver']),
-        { idsOrden: [idOrden], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
@@ -2341,7 +2407,9 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         idPedidoLinea: lineaPedido.id,
         estado: 'completa',
         fechaCompletada: new Date(),
-        // Entrega ANTES que la primera: la OC debe salir con la fecha MÁS PRÓXIMA.
+        // Entrega ANTES que la primera. Ya NO decide la fecha de la OC (V1-E7f, §Post-F9.120: no
+        // se hereda ninguna); se conserva distinta a propósito, porque así son las OP de verdad y
+        // porque una compra que junta dos entregas distintas es el escenario que este bloque prueba.
         fechaEntrega: new Date('2026-09-15T00:00:00.000Z'),
         lineas: {
           create: [
@@ -2410,16 +2478,19 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     // Un solo aviso —el de la OP 2— y DICE que es de la OP 2: sin eso, el comprador tendría que
     // adivinar cuál de las dos órdenes del renglón agrupado es la que está pidiendo de más.
     expect(boton?.avisos).toHaveLength(1);
-    expect(boton?.avisos[0]).toMatch(/^Orden 2: /);
-    expect(boton?.avisos[0]).toContain('1,060 pza'); // 53 × 20 piezas de la OP 2
-    expect(boton?.avisos[0]).toContain('en vez de 120 pza'); // 6 × 20
+    // ⭐⭐ V1-E8h: el prefijo de la OP y, PEGADA a él, la magnitud con sus dos cifras. Va como UNA
+    // expresión regular anclada al principio porque lo que se fija es el ORDEN: quién habla primero
+    // (la orden) y qué se lee enseguida (los dos números), no que las piezas estén sueltas por ahí.
+    expect(boton?.avisos[0]).toMatch(
+      /^Orden 2: Esta orden pide 1,060 pza y deberían ser 120 pza/, // 53 × 20 contra 6 × 20
+    );
   });
 
   it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     expect(gen.ordenesCompra).toHaveLength(1);
@@ -2438,26 +2509,12 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     );
   });
 
-  it('la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP (el material llega a tiempo)', async () => {
-    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
-    const gen = await generarOCDesdeExplosion(
-      sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
-      bd(),
-    );
-    const oc = await cliente.ordenCompra.findFirstOrThrow({
-      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
-      select: { fechaEntrega: true },
-    });
-    // 🔴 La 2026-09-15 (orden B), no la 2026-09-30 (orden A): tomar la más lejana llegaría tarde.
-    expect(oc.fechaEntrega?.toISOString().slice(0, 10)).toBe('2026-09-15');
-  });
-
   it('⭐ el SOBRANTE de compra se reparte entre las OP (el rollo completo, §Post-F9.86)', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idOrdenB],
         idsRequerimiento: [],
         // Se pide la caja completa de 400 en vez de las 300 que salen del BOM.
@@ -2465,6 +2522,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 400,
           },
@@ -2533,7 +2591,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        { idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
@@ -2576,12 +2634,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idC, idD],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -2614,12 +2674,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idOrdenB, idC],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 1000,
           },
@@ -2652,12 +2714,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
   it('⭐ lo que la revisión previa promete es lo que la OC guarda (cantidades e importe)', async () => {
     const idC = await ordenExtra(3n, 30);
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden, idOrdenB, idC],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 100,
         },
@@ -2687,12 +2751,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
   it('⭐⭐ el precio que fija el comprador es el que promete la previa Y el que guarda la OC', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           precioUnitario: 7.25,
         },
@@ -2732,12 +2798,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             precioUnitario: 99.99,
           },
@@ -2763,12 +2831,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             precioUnitario: 7.25,
           },
@@ -2791,12 +2861,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
   it('🔴 un precio que se guardaría como 0.00 BLOQUEA: la previa lo dice y la generación se niega', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           precioUnitario: 0.004,
         },
@@ -2818,12 +2890,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
    */
   it('🔴 el renglón bloqueado por su cantidad SIGUE en la previa (para poder corregirlo ahí)', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.004,
         },
@@ -2843,7 +2917,11 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
   it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     // Se compra SÓLO lo de la orden A.
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
@@ -2869,12 +2947,14 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -2886,7 +2966,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
@@ -2942,7 +3022,11 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     // Lo PENDIENTE ya viene en la escala en la que se puede comprar (3.70, no 3.7020).
     expect(boton(ex1)?.cantidadPendiente).toBe(3.7);
 
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex2 = await explosionarOrdenes(sesion(), [idOrden], bd());
     expect(boton(ex2)?.cantidadEnOc).toBe(3.7);
@@ -2953,14 +3037,18 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('🔴 volver a generar NO crea OC basura ni quema folios (la cadena infinita)', async () => {
     await consumoDeBotonCon4Decimales(0.1234);
     await explosionarOrdenes(sesion(), [idOrden], bd());
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     const ocsTrasLaPrimera = await cliente.ordenCompra.count();
 
     for (let i = 0; i < 3; i += 1) {
       await explosionarOrdenes(sesion(), [idOrden], bd());
       const g = await generarOCDesdeExplosion(
         sesion(),
-        { idsOrden: [idOrden], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
         bd(),
       );
       // Nada que comprar, y se DICE por qué (no se calla, D3).
@@ -2978,25 +3066,42 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   });
 
   /**
-   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, pero el precio
-   * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas: 100 ÷ 3 =
-   * 33.333333… Si la previa calcula el importe con el precio LARGO y la OC guarda el corto, **el
-   * total prometido no es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`. Si la previa
+   * calcula el importe con un precio de cola larga y la OC guarda el corto, **el total prometido no
+   * es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   *
+   * ⚠️ De dónde sale hoy la cola larga. Hasta V1-E8a salía del «factor de conversión» (100 ÷ 3 =
+   * 33.333333…); ese factor se retiró en §Post-F9.97 y todos los precios del catálogo son
+   * `Decimal(12,2)`, así que por ahí ya no entra ninguna cola. La que SÍ queda viva —y por eso la
+   * prueba sigue teniendo sentido— es el precio que TECLEA el comprador en la previa
+   * (§Post-F9.94): `precioUnitario` es un `number` del cuerpo, sin tope de decimales.
    */
-  it('⭐ con un precio de cola larga (100 ÷ 3), el total de la previa es el que la OC guarda', async () => {
-    // 100 ÷ 3 = 33.333333… por unidad de consumo (R1). El otro proveedor se encarece para que el
-    // elegido sea justo el del precio de cola larga (si no, el "más barato" se lo lleva y la prueba
-    // no probaría nada — pasó en la primera escritura de este caso).
+  it('⭐ con un precio de cola larga tecleado por el comprador, el total de la previa es el que la OC guarda', async () => {
+    // El otro proveedor se encarece para que el elegido sea justo el del ajuste (si no, el "más
+    // barato" se lo lleva y la prueba no probaría nada — pasó en la primera escritura de este caso).
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
-      data: { precio: 100, factorConversion: 3 },
+      data: { precio: 100 },
     });
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
-      data: { precio: 999, factorConversion: null },
+      data: { precio: 999 },
     });
     await explosionarConRecetaFresca();
-    const cuerpo = { idsOrden: [idOrden], idsRequerimiento: [] };
+    const cuerpo = {
+      fechaEntrega: '2026-09-30',
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
+          idProveedor: provBarato.id,
+          precioUnitario: 33.333333,
+        },
+      ],
+    };
     const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
     const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
     expect(prometido).toBeDefined();
@@ -3016,20 +3121,22 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('⭐ el importe de la previa usa la regla de la OC (0.6 × 12.35 no deja polvo)', async () => {
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
-      data: { precio: 12.35, factorConversion: null },
+      data: { precio: 12.35 },
     });
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
-      data: { precio: 999, factorConversion: null },
+      data: { precio: 999 },
     });
     await explosionarConRecetaFresca();
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.6,
         },
@@ -3048,12 +3155,14 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
     await explosionarOrdenes(sesion(), [idOrden], bd());
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.004,
         },
@@ -3186,7 +3295,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     // …y la felpa acaba en DOS órdenes de compra distintas, una por proveedor.
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idB], idsRequerimiento: [] },
       bd(),
     );
     const proveedoresConFelpa = new Set<number>();
@@ -3210,6 +3319,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idB],
         idsRequerimiento: [],
         // 0.01 entre dos OP: a una le toca todo y a la otra 0.00.
@@ -3217,6 +3327,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 0.01,
           },
@@ -3242,12 +3353,14 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
   it('⭐ la previa MARCA la línea que la generación va a saltarse (sin bloqueo de por medio)', async () => {
     const idB = await ordenExtraSimple(12n, 20);
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden, idB],
       idsRequerimiento: [],
       ajustes: [
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.01,
         },
@@ -3288,10 +3401,17 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       await generarOCDesdeExplosion(
         sesion(),
         {
+          fechaEntrega: '2026-09-30',
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
-            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+            {
+              tipo: 'avio',
+              idMaterial: avioBoton.id,
+              idColor: colorRojo.id,
+              idProveedor: provBarato.id,
+              cantidadTotal,
+            },
           ],
         },
         bd(),
@@ -3329,7 +3449,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3349,12 +3469,16 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       data: { consumoPorPrenda: 0.1234 },
     });
     await explosionarConRecetaFresca();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     await explosionarConRecetaFresca();
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3388,7 +3512,11 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       data: { consumoPorPrenda: 0.1234 },
     });
     await explosionarConRecetaFresca();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     // 2) Desarrollo CORRIGE el consumo a la baja: ahora sólo hacen falta 0.003 — por debajo del
     //    mínimo pedible— pero el material YA está comprado.
@@ -3400,7 +3528,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3427,10 +3555,17 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       await generarOCDesdeExplosion(
         sesion(),
         {
+          fechaEntrega: '2026-09-30',
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
-            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+            {
+              tipo: 'avio',
+              idMaterial: avioBoton.id,
+              idColor: colorRojo.id,
+              idProveedor: provBarato.id,
+              cantidadTotal,
+            },
           ],
         },
         bd(),
@@ -3464,7 +3599,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     await explosionarConRecetaFresca();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
@@ -3497,7 +3632,11 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
     const sesionAjena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
     await expect(
-      previoCompraDesdeExplosion(sesionAjena, { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      previoCompraDesdeExplosion(
+        sesionAjena,
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      ),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });
@@ -3523,3 +3662,796 @@ async function ordenExtraSimple(folio: bigint, piezas: number): Promise<number> 
   await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
   return orden.id;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ V1-E8c (§Post-F9.126) — LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 🔴 **EL AJUSTE QUE NO CASA NO SE TRAGA EN SILENCIO** (V1-E8c, corrección post-CI).
+ *
+ * Al partir el renglón de avío por color, la clave del ajuste del comprador pasó a llevar el color.
+ * Un cuerpo que no lo nombra **dejó de casar**, y lo que el sistema hacía entonces era lo peor
+ * posible: **nada**. Se tecleaba «comprar 0.1» y se compraban **180**. Ocho pruebas de esta misma
+ * batería se cayeron en CI por eso, y —peor— alrededor de diez más **seguían en verde con su ajuste
+ * convertido en un no-op**.
+ *
+ * La REGLA (a quién se le reclama y a quién no) es pura y está mutada en
+ * `ajuste-comprador.test.ts`; el camino completo, con el doble de transacción, en `mrp.test.ts`.
+ * Aquí se comprueba contra Postgres, que es donde vive el color de verdad.
+ */
+describe('V1-E8c — un ajuste que no nombra el color BLOQUEA (§Post-F9.126)', () => {
+  it('🔴 el ajuste SIN color sobre un avío que SÍ tiene color se rechaza, nombrando el material', async () => {
+    await explosionarConRecetaFresca();
+    const cuerpo = {
+      fechaEntrega: '2026-09-30',
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      // ⚠️ A propósito SIN `idColor`: es exactamente lo que mandaban las pruebas viejas (y lo que
+      // mandaría cualquier cliente que no se haya enterado de que el renglón cambió de identidad).
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 100,
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    // 🔴 El valor que la pone roja: `[]` — el silencio con el que se compraban 180 en vez de 100.
+    expect(plan.bloqueos.join(' ')).toContain('BOT-01 — Botón');
+    // Y la generación se niega, con la misma frase: no nace ninguna OC.
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo, bd())).rejects.toThrow(/BOT-01/);
+    expect(await cliente.ordenCompra.count({ where: { idEmpresa: empresa.id } })).toBe(0);
+  });
+
+  it('con el color nombrado, el MISMO ajuste se aplica y no bloquea nada', async () => {
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      {
+        fechaEntrega: '2026-09-30',
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio' as const,
+            idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    expect(plan.bloqueos).toEqual([]);
+    const renglon = plan.proveedores
+      .find((p) => p.idProveedor === provBarato.id)
+      ?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglon?.cantidadTotal).toBeCloseTo(100);
+    expect(renglon?.ajustado).toBe(true);
+  });
+});
+
+/**
+ * ⭐⭐ **EL CASO COMPLETO QUE DANIEL DICTÓ EL 26-AGO-2026.**
+ *
+ * *"Se cotiza un cierre de un modelo. Ese modelo nos lo piden en **4 variantes de color**. Se
+ * generan 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en **una sola
+ * OC**. Los cierres se compran todos al mismo proveedor, pero **cada color es diferente y cada
+ * color tiene cantidades por medida** de acuerdo a lo que nos pide por talla el cliente en cada OP.
+ * **En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido.**"*
+ *
+ * Y su queja de origen: *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al
+ * hacer la OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*.
+ *
+ * 🔴 **ESTA ES LA PRUEBA QUE MÁS VALE DE LA ETAPA.** Si alguien vuelve a fundir los colores en un
+ * renglón, o el desglose deja de cuadrar con la cantidad, se cae aquí.
+ *
+ * ⚠️ Necesita Postgres (testcontainers): corre en CI, no en la máquina de nadie.
+ */
+describe('⭐⭐ V1-E8c — 4 OP, 4 colores, mismo cierre, UNA OC (§Post-F9.126)', () => {
+  let cierre: Avio;
+  let medida53: number;
+  let medida60: number;
+  let colores: Color[];
+  let idsOrden: number[];
+
+  /** Una OP de UN color: CH 10 + M 20 = 30 piezas (la misma curva para las cuatro). */
+  async function ordenDeColor(folio: bigint, idColor: number): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 10 },
+                  { idTalla: tallaM.id, cantidad: 20 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  beforeEach(async () => {
+    // El cierre: se CONSUME en piezas (1 por prenda) y se PIDE por su largo en cm (§Post-F9.66).
+    cierre = await cliente.avio.create({
+      data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza', unidadMedida: 'cm' },
+    });
+    const m53 = await cliente.avioMedida.create({
+      data: { idAvio: cierre.id, medida: '53 cm', valor: 53, precio: 6, orden: 1 },
+    });
+    const m60 = await cliente.avioMedida.create({
+      data: { idAvio: cierre.id, medida: '60 cm', valor: 60, precio: 6, orden: 2 },
+    });
+    medida53 = m53.id;
+    medida60 = m60.id;
+    await cliente.avioProveedor.create({
+      data: { idAvio: cierre.id, idProveedor: provBarato.id, precio: 6, habitual: true },
+    });
+    // En el BOM: 1 cierre por prenda, y la MEDIDA amarrada por talla (la CH lleva el de 53, la M el
+    // de 60). ⚠️ `consumoPorTalla` se queda en FALSE: el consumo es el mismo en todas las tallas —
+    // lo que cambia con la talla es QUÉ MEDIDA se pide, no CUÁNTO se gasta. Es exactamente el caso
+    // que §Post-F9.105 dejó a medias y que Daniel volvió a reportar.
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: cierre.id, consumoPorPrenda: 1 },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        {
+          idModelo: modelo.id,
+          idAvio: cierre.id,
+          idTalla: tallaCH.id,
+          consumo: 1,
+          idAvioMedida: medida53,
+        },
+        {
+          idModelo: modelo.id,
+          idAvio: cierre.id,
+          idTalla: tallaM.id,
+          consumo: 1,
+          idAvioMedida: medida60,
+        },
+      ],
+    });
+
+    // Las 4 variantes de color del modelo (Rojo ya existe del fixture general).
+    const azul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    const verde = await cliente.color.create({ data: { nombre: 'Verde' } });
+    const negro = await cliente.color.create({ data: { nombre: 'Negro' } });
+    colores = [colorRojo, azul, verde, negro];
+    idsOrden = [];
+    for (const [i, c] of colores.entries()) {
+      idsOrden.push(await ordenDeColor(BigInt(100 + i), c.id));
+    }
+  });
+
+  /** Los renglones de CIERRE de la explosión del conjunto (los otros materiales no interesan aquí). */
+  async function renglonesDeCierre() {
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    return ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idAvio === cierre.id)
+      .sort((a, b) => (a.colorPrenda ?? '').localeCompare(b.colorPrenda ?? '', 'es'));
+  }
+
+  it('⭐ DOS OP del MISMO color caen en UN renglón y sus MEDIDAS SE SUMAN', async () => {
+    // 🔴 Nació de una MUTACIÓN QUE SOBREVIVIÓ (la cazó el reviewer de V1-E8c): se podía borrar la
+    // suma de desgloses entre OP y las 2 086 pruebas seguían verdes. Los cuatro casos de Daniel
+    // tienen UNA OP por color, así que esa rama NUNCA se ejecutaba aquí.
+    //
+    // Sin la suma, el renglón diría «60» arriba y un desglose de «30» abajo: el papel se contradice
+    // a sí mismo, que es justo lo que esta etapa vino a impedir.
+    const quinta = await ordenDeColor(200n, colores[0]!.id); // otra OP del MISMO rojo
+    const ex = await explosionarOrdenes(sesion(), [...idsOrden, quinta], bd());
+    const rojos = ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idAvio === cierre.id && r.colorPrenda === 'Rojo');
+
+    // Sigue siendo UN renglón: mismo avío, mismo color, mismo proveedor ⇒ misma clave.
+    expect(rojos).toHaveLength(1);
+    const rojo = rojos[0]!;
+    expect(rojo.cantidadAComprar).toBe(60); // 30 + 30
+
+    // ⭐ Y el desglose acompañó a la cantidad, medida por medida.
+    const porMedida = Object.fromEntries((rojo.medidas ?? []).map((m) => [m.etiqueta, m.cantidad]));
+    expect(porMedida).toEqual({ '53 cm': 20, '60 cm': 40 }); // (10+10) CH y (20+20) M
+
+    // 🔑 La invariante que hace que el papel no se contradiga: Σ desglose = cantidad del renglón.
+    const suma = (rojo.medidas ?? []).reduce((acc, m) => acc + m.cantidad, 0);
+    expect(suma).toBe(rojo.cantidadAComprar);
+  });
+
+  it('⭐ un avío GENÉRICO consume su stock color por color, sin comprar de más ni de menos', async () => {
+    // 🔴 La otra mutación que sobrevivió: se podía dejar de consumir el stock entre colores y nada
+    // se ponía rojo, porque todos los fixtures de este archivo eran de UN color y el bloque de
+    // V1-E8c usa un avío que no es genérico.
+    //
+    // La existencia de un genérico es de la EMPRESA, no de la orden. Con 4 colores pidiendo 30 cada
+    // uno (120) y 50 en existencia, hay que comprar 70 — ni 120 (ignorando el stock) ni 0 (dándolo
+    // por bueno cuatro veces, una por color).
+    const hilo = await cliente.avio.create({
+      // ⚠️ Clave PROPIA: el fixture general de este archivo ya siembra `HIL-01` (línea ~171) y
+      // `Avio.clave` es único GLOBAL. Con la misma clave, esta prueba reventaba con P2002 DENTRO
+      // del andamiaje —antes de llegar a la aserción— y no probaba nada. Lo cazó el CI.
+      data: { clave: 'HIL-E8C', descripcion: 'Hilo', unidad: 'pza', esGenerico: true },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: hilo.id, idProveedor: provBarato.id, precio: 2, habitual: true },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: hilo.id, consumoPorPrenda: 1 },
+    });
+    // 🔴 Y AHORA A LA RECETA DE CADA ORDEN, que es lo que el MRP de verdad lee.
+    //
+    // La receta vive CONGELADA en la orden desde V1-E3d: las cuatro OP ya copiaron la suya en el
+    // `beforeEach`, así que agregar el hilo al MODELO no las alcanza — y `sembrarRecetaDeOrden` es
+    // idempotente a propósito ("si la orden ya tiene renglones, no hace nada"), así que llamarla de
+    // nuevo tampoco. La primera versión de esta prueba hacía justo eso y salían CERO renglones.
+    // ⚠️ Con su FIRMA: la puerta de compra pregunta renglón por renglón (§Post-F9.72), y un renglón
+    // sin firmar no llega a la explosión.
+    const firmadoEn = new Date();
+    for (const idOrden of idsOrden) {
+      await cliente.ordenAvio.create({
+        data: {
+          idOrden,
+          idAvio: hilo.id,
+          consumoPorPrenda: 1,
+          liberadoEn: firmadoEn,
+          liberadoPorId: null,
+        },
+      });
+    }
+    // 50 en existencia, por el mismo camino que el resto del archivo: un ajuste de entrada real
+    // al kardex (Σ movimientos, D3) — no una escritura directa a la vista.
+    await ajustarInventarioAvio(
+      sesion(),
+      {
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        lineas: [{ idAvio: hilo.id, cantidad: 50 }],
+        motivo: 'conteo inicial',
+      },
+      bd(),
+    );
+
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    const renglones = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === hilo.id);
+
+    // Se parte por color igual que el cierre: TODO avío se parte, lleve medidas o no.
+    expect(renglones).toHaveLength(4);
+    // 🔴 Lo que de verdad se compra. Los valores que la ponen roja: 120 (ignorar el stock) o 0
+    // (regalarle los 50 a cada color).
+    const total = renglones.reduce((acc, r) => acc + r.cantidadAComprar, 0);
+    expect(total).toBe(70);
+  });
+
+  it('⭐ la explosión saca CUATRO renglones del mismo cierre, uno por color', async () => {
+    const renglones = await renglonesDeCierre();
+    // 🔴 EL VALOR QUE LA PONE ROJA: `1` — un solo renglón de 120 cierres, que es literalmente lo
+    // que Daniel vio (*"sólo veo un solo renglón"*).
+    expect(renglones).toHaveLength(4);
+    expect(renglones.map((r) => r.colorPrenda)).toEqual(['Azul', 'Negro', 'Rojo', 'Verde']);
+    // Cada color pide 30 piezas (10 CH + 20 M), y la Σ es la misma de siempre: partirse no compra
+    // ni una pieza de más ni de menos.
+    expect(renglones.map((r) => r.cantidadAComprar)).toEqual([30, 30, 30, 30]);
+  });
+
+  it('⭐ cada renglón trae su DESGLOSE POR MEDIDA, y la medida NO multiplica', async () => {
+    const [azul] = await renglonesDeCierre();
+    // 10 prendas CH llevan el de 53 cm y 20 M el de 60 cm. 🔴 El valor que la pone roja: 530/1200
+    // (leer el número de la medida como consumo) — los 133,095 cierres de §Post-F9.105.
+    expect(azul?.medidas).toEqual([
+      { idAvioMedida: medida53, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+      { idAvioMedida: medida60, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+    ]);
+    expect(azul?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(azul?.cantidadPendiente);
+  });
+
+  it('⭐⭐ UNA sola OC con CUATRO renglones, cada uno con su color y su desglose que CUADRA', async () => {
+    const renglones = await renglonesDeCierre();
+    const cuerpo = {
+      idsOrden,
+      idsRequerimiento: renglones.flatMap((r) => r.idsRequerimiento),
+      fechaEntrega: '2026-09-01',
+    };
+
+    // 1) La REVISIÓN PREVIA ya lo enseña partido (es la última pantalla antes del dinero).
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.proveedores).toHaveLength(1);
+    const delPlan = (plan.proveedores[0]?.renglones ?? [])
+      .slice()
+      .sort((a, b) => (a.colorTexto ?? '').localeCompare(b.colorTexto ?? '', 'es'));
+    expect(delPlan).toHaveLength(4);
+    // El texto que lee el proveedor nace del color de la prenda (Daniel: *"en la descripción del
+    // avío ponerle el color"*).
+    expect(delPlan.map((r) => r.colorTexto)).toEqual(['Azul', 'Negro', 'Rojo', 'Verde']);
+    for (const r of delPlan) {
+      expect(r.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(r.cantidadTotal);
+    }
+
+    // 2) Y la OC se GUARDA igual: una sola OC (un proveedor), cuatro líneas.
+    const { ordenesCompra } = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    expect(ordenesCompra).toHaveLength(1);
+    const idOc = ordenesCompra[0]?.idOrdenCompra as number;
+
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: idOc, idAvio: cierre.id },
+      include: { medidas: { orderBy: { orden: 'asc' } }, colorPrenda: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(lineas).toHaveLength(4);
+    // 🔴 Cuatro colores DISTINTOS: si alguien vuelve a fundirlos, este set tiene 1 elemento.
+    expect(new Set(lineas.map((l) => l.idColorPrenda)).size).toBe(4);
+    for (const l of lineas) {
+      // El color del proveedor y el de la prenda arrancan iguales (nadie tocó el texto).
+      expect(l.colorAvio).toBe(l.colorPrenda?.nombre);
+      // 🔴 **LA INVARIANTE DE LA ETAPA**: Σ del desglose = cantidad del renglón, EXACTAMENTE.
+      const suma = l.medidas.reduce((s, m) => s + Number(m.cantidad), 0);
+      expect(suma).toBe(Number(l.cantidad));
+      expect(l.medidas.map((m) => m.etiqueta)).toEqual(['53 cm', '60 cm']);
+    }
+    // Y el total de cierres es el de siempre: 4 OP × 30 prendas × 1 cierre.
+    expect(lineas.reduce((s, l) => s + Number(l.cantidad), 0)).toBe(120);
+  });
+
+  it('⭐ el comprador puede CORREGIR el color (el avío en contraste) antes de generar', async () => {
+    const renglones = await renglonesDeCierre();
+    const azul = renglones.find((r) => r.colorPrenda === 'Azul');
+    const cuerpo = {
+      idsOrden,
+      idsRequerimiento: azul?.idsRequerimiento ?? [],
+      fechaEntrega: '2026-09-01',
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: cierre.id,
+          idColor: azul?.idColorPrenda ?? null,
+          idProveedor: provBarato.id,
+          colorTexto: 'Negro contraste',
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const renglon = plan.proveedores[0]?.renglones[0];
+    expect(renglon?.colorTexto).toBe('Negro contraste');
+    expect(renglon?.colorAjustado).toBe(true);
+    // El color de la PRENDA no se toca: lo que cambia es lo que se le dice al proveedor.
+    expect(renglon?.colorPrenda).toBe('Azul');
+
+    const { ordenesCompra } = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: ordenesCompra[0]?.idOrdenCompra as number, idAvio: cierre.id },
+    });
+    expect(lineas.every((l) => l.colorAvio === 'Negro contraste')).toBe(true);
+    expect(lineas.every((l) => l.idColorPrenda === azul?.idColorPrenda)).toBe(true);
+  });
+
+  it('⭐ UNA sola OP con VARIOS colores también sale renglón por color (Daniel lo confirmó)', async () => {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 200n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colores[0]?.id as number,
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+            },
+            {
+              idColor: colores[1]?.id as number,
+              tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    const ex = await explosionarOrden(sesion(), orden.id, bd());
+    const delCierre = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === cierre.id);
+    expect(delCierre).toHaveLength(2);
+    // El Rojo sólo pide CH (medida de 53) y el Azul sólo M (medida de 60): el desglose lo dice.
+    const porColor = new Map(delCierre.map((r) => [r.colorPrenda, r.medidas]));
+    expect(porColor.get('Rojo')?.map((m) => m.etiqueta)).toEqual(['53 cm']);
+    expect(porColor.get('Azul')?.map((m) => m.etiqueta)).toEqual(['60 cm']);
+  });
+
+  it('un avío SIN medidas amarradas no gana tablita (pero SÍ se parte por color)', async () => {
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    const botones = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === avioBoton.id);
+    expect(botones).toHaveLength(4);
+    expect(botones.every((r) => r.medidas.length === 0)).toBe(true);
+  });
+});
+
+describe('⭐⭐ 0.158 — el avío que se compra SIN tomar en cuenta el color (la etiqueta de lavado)', () => {
+  /**
+   * DANIEL (7-sep-2026), mirando la Explosión de materiales con datos reales: *«hay ciertos avíos
+   * que NO se compran por color. Debería de sumar todos. Como la etiqueta de lavado. En este caso me
+   * los pone por separado, yo creo que porque es otro color. ¿Cómo le puedo hacer para definirle que
+   * algunas cosas se compran juntas sin tomar en cuenta el color?»* — en su pantalla, bajo
+   * «Etiquetas Industrial», el mismo `E01 — Etiqueta de lavado` salía dos veces: 11,771 pz con un
+   * color y 1,387 pz con otro.
+   *
+   * Estas pruebas van CONTRA POSTGRES por el camino real (explosión → snapshot → OC → neteo), no
+   * sembrando renglones a mano: lo que hay que demostrar es que el renglón colapsado **llega hasta
+   * la orden de compra** y que después el neteo **no lo vuelve a ofrecer**.
+   */
+  let etiqueta: Avio; // marcado: se compra SIN color
+  let elastico: Avio; // marcado también, y CON medidas por talla (para el desglose)
+  let medidaCorta: number;
+  let medidaLarga: number;
+  let azul: Color;
+  let negro: Color;
+  /** Las tres OP de un color cada una — literalmente las 5565/5566/5567 de Daniel. */
+  let idsTresOp: number[];
+
+  /** Una OP con las líneas de color que se le pidan. */
+  async function ordenCon(
+    folio: bigint,
+    lineas: { idColor: number; ch: number; m: number }[],
+  ): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: lineas.map((l) => ({
+            idColor: l.idColor,
+            tallas: {
+              create: [
+                { idTalla: tallaCH.id, cantidad: l.ch },
+                { idTalla: tallaM.id, cantidad: l.m },
+              ],
+            },
+          })),
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  /** La curva de las tres OP: Rojo 30 (10+20), Azul 50 (20+30), Negro 20 (5+15) → 100 piezas. */
+  const CURVA = [
+    { ch: 10, m: 20 }, // Rojo
+    { ch: 20, m: 30 }, // Azul
+    { ch: 5, m: 15 }, // Negro
+  ];
+
+  beforeEach(async () => {
+    azul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    negro = await cliente.color.create({ data: { nombre: 'Negro' } });
+
+    // La etiqueta de lavado: una por prenda, la MISMA en todos los colores.
+    etiqueta = await cliente.avio.create({
+      data: {
+        clave: 'ETI-LAV',
+        descripcion: 'Etiqueta de lavado',
+        unidad: 'pza',
+        seCompraSinColor: true,
+      },
+    });
+    // El elástico: también se compra sin color (es blanco en todas las prendas), pero SÍ cambia de
+    // largo con la talla — es lo que hace visible el desglose del renglón colapsado.
+    elastico = await cliente.avio.create({
+      data: {
+        clave: 'ELA-158',
+        descripcion: 'Elástico',
+        unidad: 'pza',
+        unidadMedida: 'cm',
+        seCompraSinColor: true,
+      },
+    });
+    const corta = await cliente.avioMedida.create({
+      data: { idAvio: elastico.id, medida: '40 cm', valor: 40, precio: 3, orden: 1 },
+    });
+    const larga = await cliente.avioMedida.create({
+      data: { idAvio: elastico.id, medida: '50 cm', valor: 50, precio: 3, orden: 2 },
+    });
+    medidaCorta = corta.id;
+    medidaLarga = larga.id;
+
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: etiqueta.id, idProveedor: provBarato.id, precio: 0.5, habitual: true },
+        { idAvio: elastico.id, idProveedor: provBarato.id, precio: 3, habitual: true },
+      ],
+    });
+    await cliente.modeloAvio.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: etiqueta.id, consumoPorPrenda: 1 },
+        { idModelo: modelo.id, idAvio: elastico.id, consumoPorPrenda: 1 },
+      ],
+    });
+    // La CH lleva el elástico de 40 cm y la M el de 50: el consumo es el mismo, lo que cambia con la
+    // talla es QUÉ MEDIDA se pide.
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        {
+          idModelo: modelo.id,
+          idAvio: elastico.id,
+          idTalla: tallaCH.id,
+          consumo: 1,
+          idAvioMedida: medidaCorta,
+        },
+        {
+          idModelo: modelo.id,
+          idAvio: elastico.id,
+          idTalla: tallaM.id,
+          consumo: 1,
+          idAvioMedida: medidaLarga,
+        },
+      ],
+    });
+
+    idsTresOp = [];
+    for (const [i, color] of [colorRojo, azul, negro].entries()) {
+      const c = CURVA[i] as { ch: number; m: number };
+      idsTresOp.push(await ordenCon(BigInt(500 + i), [{ idColor: color.id, ch: c.ch, m: c.m }]));
+    }
+  });
+
+  /** Los renglones de UN avío de la explosión de las OP que se le pasen. */
+  async function renglonesDe(idAvio: number, ids: number[]) {
+    const ex = await explosionarOrdenes(sesion(), ids, bd());
+    return ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === idAvio);
+  }
+
+  it('⭐ MARCADO: una OP con TRES colores da UN SOLO renglón, sin color y con la suma', async () => {
+    const idTricolor = await ordenCon(600n, [
+      { idColor: colorRojo.id, ch: 10, m: 20 },
+      { idColor: azul.id, ch: 20, m: 30 },
+      { idColor: negro.id, ch: 5, m: 15 },
+    ]);
+
+    const renglones = await renglonesDe(etiqueta.id, [idTricolor]);
+
+    // 🔴 EL VALOR QUE LA PONE ROJA: `3` — la etiqueta partida por color, que es lo que Daniel vio.
+    expect(renglones).toHaveLength(1);
+    expect(renglones[0]?.idColorPrenda).toBeNull();
+    expect(renglones[0]?.colorPrenda).toBeNull();
+    // 100 piezas = 30 + 50 + 20. Partirse o no NO cambia cuánto se compra, sólo en cuántos renglones.
+    expect(renglones[0]?.cantidadRequerida).toBeCloseTo(100);
+    expect(renglones[0]?.cantidadAComprar).toBeCloseTo(100);
+  });
+
+  it('⭐ SIN MARCAR: el MISMO avío en la MISMA OP vuelve a salir en TRES renglones', async () => {
+    // 🔴 La otra mitad de la regla, sin la cual colapsar para TODO el mundo pasaría igual de verde
+    // — y los cierres de §Post-F9.126, que SÍ se compran por color, volverían a fundirse en uno.
+    await cliente.avio.update({
+      where: { id: etiqueta.id },
+      data: { seCompraSinColor: false },
+    });
+    const idTricolor = await ordenCon(601n, [
+      { idColor: colorRojo.id, ch: 10, m: 20 },
+      { idColor: azul.id, ch: 20, m: 30 },
+      { idColor: negro.id, ch: 5, m: 15 },
+    ]);
+
+    const renglones = await renglonesDe(etiqueta.id, [idTricolor]);
+
+    expect(renglones).toHaveLength(3);
+    expect(renglones.map((r) => r.colorPrenda).sort()).toEqual(['Azul', 'Negro', 'Rojo']);
+    expect(renglones.map((r) => r.cantidadRequerida).sort((a, b) => a - b)).toEqual([20, 30, 50]);
+    // Y la Σ es la misma que la del renglón colapsado: 100.
+    expect(renglones.reduce((s, r) => s + r.cantidadRequerida, 0)).toBeCloseTo(100);
+  });
+
+  it('⭐⭐ TRES OP de colores distintos (5565/5566/5567) caen en UN renglón que las SUMA', async () => {
+    const renglones = await renglonesDe(etiqueta.id, idsTresOp);
+
+    // 🔴 EL CASO LITERAL DE DANIEL. Rojo, Azul y Negro son tres órdenes distintas; sin la marca son
+    // tres renglones (uno por color) y hay que sumarlos a mano antes de pedirle al proveedor.
+    expect(renglones).toHaveLength(1);
+    expect(renglones[0]?.idColorPrenda).toBeNull();
+    expect(renglones[0]?.cantidadRequerida).toBeCloseTo(100); // 30 + 50 + 20
+    // El reparto por OP NO se pierde al agrupar: el renglón se ve junto y se guarda repartido.
+    expect(renglones[0]?.porOrden).toHaveLength(3);
+    expect(renglones[0]?.porOrden.reduce((s, o) => s + o.cantidadRequerida, 0)).toBeCloseTo(100);
+  });
+
+  it('⭐ el DESGLOSE POR TALLA del renglón colapsado es el de TODA la orden, no el de un color', async () => {
+    // Es la mitad que se cuela: se puede colapsar el renglón y dejarle el desglose del PRIMER color.
+    // El renglón diría 100 arriba y su tablita sumaría 30 abajo — el papel contradiciéndose solo.
+    const idTricolor = await ordenCon(602n, [
+      { idColor: colorRojo.id, ch: 10, m: 20 },
+      { idColor: azul.id, ch: 20, m: 30 },
+      { idColor: negro.id, ch: 5, m: 15 },
+    ]);
+
+    const renglones = await renglonesDe(elastico.id, [idTricolor]);
+    expect(renglones).toHaveLength(1);
+
+    // 🔴 Los valores que la ponen roja: `{40 cm: 10, 50 cm: 20}` — el desglose de UN solo color.
+    expect(renglones[0]?.medidas).toEqual([
+      { idAvioMedida: medidaCorta, etiqueta: '40 cm', cantidad: 35, orden: 1 }, // 10 + 20 + 5
+      { idAvioMedida: medidaLarga, etiqueta: '50 cm', cantidad: 65, orden: 2 }, // 20 + 30 + 15
+    ]);
+    // 🔑 La invariante: Σ del desglose = lo que pide el renglón.
+    const suma = (renglones[0]?.medidas ?? []).reduce((s, m) => s + m.cantidad, 0);
+    expect(suma).toBe(renglones[0]?.cantidadPendiente);
+  });
+
+  it('⭐⭐ el renglón colapsado LLEGA A LA OC SIN COLOR, y el neteo no lo vuelve a ofrecer', async () => {
+    // 1) La explosión de las tres OP deja el snapshot (el camino real, nada sembrado a mano).
+    const antes = await renglonesDe(etiqueta.id, idsTresOp);
+    expect(antes).toHaveLength(1);
+
+    const cuerpo = {
+      idsOrden: idsTresOp,
+      idsRequerimiento: antes.flatMap((r) => r.idsRequerimiento),
+      fechaEntrega: '2026-09-01',
+    };
+
+    // 2) La REVISIÓN PREVIA —la última pantalla antes del dinero— lo enseña JUNTO: un renglón de
+    // 100 piezas, sin color.
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const delPlan = (plan.proveedores[0]?.renglones ?? []).filter(
+      (r) => r.tipo === 'avio' && r.idMaterial === etiqueta.id,
+    );
+    expect(delPlan).toHaveLength(1);
+    expect(delPlan[0]?.idColorPrenda).toBeNull();
+    expect(delPlan[0]?.cantidadTotal).toBeCloseTo(100);
+
+    // 3) Y la OC se guarda con SUS TRES líneas… pero **ninguna lleva color**.
+    //
+    // ⚠️ Las tres NO son las tres de Daniel: la OC guarda **una línea por (material, OP)** desde
+    // §Post-F9.86 —así cada OP conserva su liga y su reparto—, y eso pasa igual con un material sin
+    // color. Lo que esta etapa cambia es OTRA cosa, y es lo que se mide abajo: **cuántos COLORES
+    // distintos** hay en esas líneas. Sin la marca serían tres (Rojo, Azul, Negro) y el proveedor
+    // recibiría tres pedidos de etiquetas donde hay uno solo.
+    const { ordenesCompra } = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    expect(ordenesCompra).toHaveLength(1);
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: {
+        idOrdenCompra: ordenesCompra[0]?.idOrdenCompra as number,
+        idAvio: etiqueta.id,
+      },
+    });
+    expect(lineas).toHaveLength(3); // una por OP (§Post-F9.86), no una por color
+    // 🔴 EL VALOR QUE LA PONE ROJA: 3 colores distintos — el defecto de Daniel llegando al papel.
+    expect(new Set(lineas.map((l) => l.idColorPrenda))).toEqual(new Set([null]));
+    expect(lineas.every((l) => l.colorAvio === null)).toBe(true);
+    // Y el total pedido es el de siempre: 30 + 50 + 20.
+    expect(lineas.reduce((s, l) => s + Number(l.cantidad), 0)).toBeCloseTo(100);
+
+    // 4) EL NETEO: la segunda vuelta ya no tiene qué comprar de esta etiqueta.
+    const despues = await renglonesDe(etiqueta.id, idsTresOp);
+    expect(despues).toHaveLength(1);
+    expect(despues[0]?.cantidadEnOc).toBeCloseTo(100);
+    // 🔴 Si esto valiera 100, la pantalla volvería a invitar a comprar lo que ya está pedido.
+    expect(despues[0]?.cantidadPendiente).toBe(0);
+
+    const segunda = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const otra = segunda.ordenesCompra.flatMap((oc) => oc.renglones);
+    expect(otra).toEqual([]);
+    // Los omitidos son por REQUERIMIENTO (uno por OP, como las líneas): las tres OP quedan fuera
+    // con el mismo motivo, y entre las tres suman las 100 piezas que ya están pedidas.
+    const omitidos = segunda.omitidos.filter((o) => o.material.includes('ETI-LAV'));
+    expect(omitidos).toHaveLength(3);
+    expect(omitidos.every((o) => o.motivo === 'ya-en-oc')).toBe(true);
+    expect(omitidos.reduce((s, o) => s + o.cantidadEnOc, 0)).toBeCloseTo(100);
+  });
+
+  it('⭐ SIN MARCAR, esa misma OC lleva TRES colores distintos (el contraste que mide la marca)', async () => {
+    // La mitad que da sentido a la de arriba: con el avío sin marcar, las líneas de la OC salen
+    // con Rojo, Azul y Negro. Es lo que Daniel veía, viajando hasta el papel del proveedor.
+    await cliente.avio.update({ where: { id: etiqueta.id }, data: { seCompraSinColor: false } });
+
+    const renglones = await renglonesDe(etiqueta.id, idsTresOp);
+    expect(renglones).toHaveLength(3);
+
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: idsTresOp,
+        idsRequerimiento: renglones.flatMap((r) => r.idsRequerimiento),
+        fechaEntrega: '2026-09-01',
+      },
+      bd(),
+    );
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: ordenesCompra[0]?.idOrdenCompra as number, idAvio: etiqueta.id },
+      include: { colorPrenda: true },
+    });
+    expect(new Set(lineas.map((l) => l.colorPrenda?.nombre))).toEqual(
+      new Set(['Rojo', 'Azul', 'Negro']),
+    );
+  });
+
+  /**
+   * ⭐⭐ **MARCARLO CUANDO YA HAY OC POR COLOR — el primer uso real de esta fila.** Daniel no va a
+   * estrenar la casilla en un avío virgen: la va a marcar en la etiqueta de lavado que YA se compró
+   * por color en las OP que tiene abiertas. En ese instante la explosión deja de partir el avío y
+   * las cubetas de color de `comprometidoEnOc` (Rojo, Azul, Negro) **se quedan sin dueño**.
+   *
+   * 🔴 **Medido antes de corregirlo: `enOc: 0` y `pendiente: 100`** con las 100 piezas ya pedidas en
+   * una OC viva — la pantalla invitando a comprar otra vez lo ya comprado, que es §Post-F9.85 por
+   * otra puerta. Si el comprador aceptaba, **se compraba dos veces**. La regla 3 de
+   * `repartirComprometidoPorColor` es la que lo cierra.
+   */
+  it('⭐⭐ marcarlo CON OC POR COLOR ya hecha: el neteo la cuenta y NO la vuelve a ofrecer', async () => {
+    // 1) Se compra como hasta hoy: por color. Tres OP → tres renglones → una OC de tres colores.
+    await cliente.avio.update({ where: { id: etiqueta.id }, data: { seCompraSinColor: false } });
+    const porColor = await renglonesDe(etiqueta.id, idsTresOp);
+    expect(porColor).toHaveLength(3);
+
+    const primera = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: idsTresOp,
+        idsRequerimiento: porColor.flatMap((r) => r.idsRequerimiento),
+        fechaEntrega: '2026-09-01',
+      },
+      bd(),
+    );
+    const lineasPorColor = await cliente.ordenCompraLinea.findMany({
+      where: {
+        idOrdenCompra: primera.ordenesCompra[0]?.idOrdenCompra as number,
+        idAvio: etiqueta.id,
+      },
+    });
+    // Las 100 piezas quedan pedidas, repartidas en líneas que SÍ dicen su color.
+    expect(new Set(lineasPorColor.map((l) => l.idColorPrenda)).size).toBe(3);
+    expect(lineasPorColor.reduce((s, l) => s + Number(l.cantidad), 0)).toBeCloseTo(100);
+
+    // 2) Y AHORA Daniel marca la casilla.
+    await cliente.avio.update({ where: { id: etiqueta.id }, data: { seCompraSinColor: true } });
+
+    // 3) La explosión colapsa a un renglón… que tiene que SEGUIR VIENDO lo ya pedido.
+    const colapsado = await renglonesDe(etiqueta.id, idsTresOp);
+    expect(colapsado).toHaveLength(1);
+    expect(colapsado[0]?.idColorPrenda).toBeNull();
+    // 🔴 LOS VALORES QUE LA PONEN ROJA: `enOc: 0` y `pendiente: 100`.
+    expect(colapsado[0]?.cantidadEnOc).toBeCloseTo(100);
+    expect(colapsado[0]?.cantidadPendiente).toBe(0);
+
+    // 4) Y la segunda generación no escribe NADA: no se compra dos veces.
+    const segunda = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: idsTresOp,
+        idsRequerimiento: colapsado.flatMap((r) => r.idsRequerimiento),
+        fechaEntrega: '2026-09-01',
+      },
+      bd(),
+    );
+    expect(segunda.ordenesCompra.flatMap((oc) => oc.renglones)).toEqual([]);
+    const omitidos = segunda.omitidos.filter((o) => o.material.includes('ETI-LAV'));
+    expect(omitidos.length).toBeGreaterThan(0);
+    expect(omitidos.every((o) => o.motivo === 'ya-en-oc')).toBe(true);
+    expect(omitidos.reduce((s, o) => s + o.cantidadEnOc, 0)).toBeCloseTo(100);
+  });
+});

@@ -20,13 +20,20 @@ const esquemaKpiOrdenesAbiertas = z.object({
     .describe('Órdenes vivas con algo pendiente por etapa (criterio del tablero WIP).'),
 });
 
-/** Piezas EN PRODUCCIÓN (en poder de maquileros) = enviado − recibido (suma directa, D3). */
+/** Piezas EN PRODUCCIÓN (en poder de maquileros) = enviado − recibido − incompletas − faltantes saldados (directa, D3). */
 const esquemaKpiWipMaquila = z.object({
-  piezas: z.number().int().describe('Piezas en poder de maquila (enviado − recibido, vivos).'),
+  piezas: z
+    .number()
+    .int()
+    .describe(
+      'Piezas en poder de maquila (enviado − recibido − incompletas − faltantes saldados, vivos; V1-E8v).',
+    ),
   maquileros: z
     .number()
     .int()
-    .describe('Maquileros con saldo ≠ 0 en su poder (enviado − recibido por tercero).'),
+    .describe(
+      'Maquileros con saldo ≠ 0 en su poder (enviado − recibido − incompletas − faltantes saldados por tercero, V1-E8v).',
+    ),
 });
 
 /** Piezas CORTADAS esta semana (lun–dom ISO) + la semana anterior para la tendencia. */

@@ -36,6 +36,7 @@ import { rutasAdjuntosDesarrollo } from './api/desarrollo/adjuntos-desarrollo.ru
 import { rutasDificultad } from './api/desarrollo/dificultad.rutas.js';
 // Desarrollo (Módulo 15, F8-E4): listas de precios por Cliente+Departamento (factores + aprobación
 // del dueño + PDF/Excel) y los factores del cliente (sub-recurso del cliente).
+import { rutasCotizaciones } from './api/desarrollo/cotizaciones.rutas.js';
 import { rutasListasPrecios } from './api/desarrollo/listas-precios.rutas.js';
 // Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción — ligar orden↔desarrollo, sugerencia
 // de liga + precio, vista 360 desde la orden y tablero de desarrollos por estado.
@@ -67,6 +68,8 @@ import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
 import { rutasEstadoCuentaEsMa } from './api/esma/estado-cuenta.rutas.js';
 import { rutasTerceros } from './api/terceros/movimientos.rutas.js';
 import { rutasCxp } from './api/terceros/cxp.rutas.js';
+import { rutasConceptosPago } from './api/pagos/conceptos-pago.rutas.js';
+import { rutasCorridaPagos } from './api/pagos/corrida.rutas.js';
 import { rutasCfdi } from './api/terceros/cfdi.rutas.js';
 import { rutasCxc } from './api/terceros/cxc.rutas.js';
 import { rutasCfdiVentas } from './api/terceros/cfdi-ventas.rutas.js';
@@ -78,6 +81,9 @@ import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
+import { rutasFotosArteOrden } from './api/produccion/fotos-arte-orden.rutas.js';
+import { rutasFotosOcultasOrden } from './api/produccion/fotos-ocultas-orden.rutas.js';
+import { rutasCierreMaquila } from './api/produccion/cierre-maquila.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
@@ -223,6 +229,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // ligados a una orden vía presigned. Permisos `ordenes.ver` (listar/descargar) / `ordenes.administrar`
   // (subir/eliminar); el DELETE borra también el objeto físico de R2 (best-effort). Sin permisos nuevos.
   await app.register(rutasAdjuntosOrden, { prefix: '/api' });
+  // Órdenes — FOTOS DEL MODELO OCULTAS en la OP (§Post-F9.169(b)): la orden puede dejar de enseñar
+  // una foto HEREDADA del modelo, y traerla de vuelta. NO borra nada (D3) y NO toca R2: pone/quita
+  // una marca por (orden, foto). Permisos `ordenes.ver` / `ordenes.administrar`; sin permisos nuevos.
+  await app.register(rutasFotosOcultasOrden, { prefix: '/api' });
+  await app.register(rutasFotosArteOrden, { prefix: '/api' });
   // Órdenes — CONSULTAS/TABLEROS/BÚSQUEDA (F2-E4 PIEZA B): consulta ligera, incompletas con
   // semáforo, tablero "pedidos por mes" y buscador global. Solo lectura (`ordenes.ver`). Sus paths
   // estáticos se registran ANTES de nada que choque con `/ordenes/:id` (Fastify los prioriza).
@@ -266,9 +277,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // inverso (D3), existencias (vistas) y kardex. Importes de telas ocultos sin telas.ver-totales
   // (ex-acceso #7). RBAC inventario-telas/.avios ver/.mover.
   await app.register(rutasInventarioTelas, { prefix: '/api' });
-  // ENTRADA de tela por FACTURA/REMISIÓN sin orden de compra (B1, DECISIONES §Post-F9.9 p.7): la
-  // segunda vía de entrada del inventario por color — documento con cabecera + N partidas, PDF de
-  // la factura adjunto en R2, confirmación que crea partidas + kardex y cancelación por inverso.
+  // ENTRADA de tela por FACTURA/REMISIÓN del proveedor, SIEMPRE contra su orden de compra (B1;
+  // §Post-F9.159(a) cerró la vía sin OC) — documento con cabecera + N partidas, PDF de la factura
+  // adjunto en R2, confirmación que crea partidas + kardex y cancelación por inverso.
   await app.register(rutasEntradasTela, { prefix: '/api' });
   await app.register(rutasInventarioAvios, { prefix: '/api' });
   // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),
@@ -281,13 +292,14 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // kardex; pendientes por recibir; recibos semanales por maquilero; PDF de recibo. RBAC por ruta
   // (produccion.recibo/.cancelar/.wip-ver).
   await app.register(rutasRecibosProduccion, { prefix: '/api' });
+  await app.register(rutasCierreMaquila, { prefix: '/api' });
   // Producción / WIP — ENTREGA a cliente (F3-E5): cierre del ciclo de la orden. Salida de PT
   // (kardex) no-negativa bajo lock, seguimiento del pedido DERIVADO (pedido − entregado),
   // cancelación con inverso de kardex y comprobante PDF. RBAC produccion.entrega/.cancelar/.wip-ver.
   await app.register(rutasEntregasCliente, { prefix: '/api' });
   // Producción / WIP — TABLERO de avance + existencias en poder del maquilero (F3-E5): el WIP de las
-  // órdenes (derivado por suma) y lo enviado − recibido a cada maquilero. Solo lectura
-  // (produccion.wip-ver).
+  // órdenes (derivado por suma) y lo que cada maquilero todavía tiene —enviado − recibido −
+  // incompletas − faltantes saldados (V1-E8v + fila 0.109)—. Solo lectura (produccion.wip-ver).
   await app.register(rutasWip, { prefix: '/api' });
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
   // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
@@ -300,7 +312,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasCuentaEsMa, { prefix: '/api' });
   // EsMa (F6-E5) — experiencia de usuario: estado de cuenta unificado + desglosado (+ PDF R9 + Excel),
   // saldos de todos, pagos/recibos semanales, selector de maquileros y revisión de partidas. Consulta
-  // con esma.ver-pagos; revisar con esma.modificar. Importes ocultos sin consultas.ver-importes.
+  // con esma.ver-pagos; REVISAR con esma.revisar (su propio permiso desde la fila 0.128: capturar es
+  // de quien recibe, validar es de Daniel). Importes ocultos sin consultas.ver-importes.
   await app.register(rutasEstadoCuentaEsMa, { prefix: '/api' });
   // FINANZAS (Módulo 14, F9-E1) — MOTOR único de cuenta corriente de terceros (CxC/CxP) que
   // generaliza EsMa (D12/D15/R10): registrar/cancelar movimientos (terceros.administrar), saldo
@@ -311,6 +324,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // bandeja "por pagar" con antigüedad de saldos (aging server-side), estado de cuenta (+ PDF) y
   // captura/cancelación de movimientos (cxp.ver / cxp.administrar; la vista fiscal exige terceros.fiscal).
   await app.register(rutasCxp, { prefix: '/api' });
+  // La corrida semanal de pagos y el catálogo de conceptos que no son proveedores (0.113 / 0.125).
+  await app.register(rutasConceptosPago, { prefix: '/api' });
+  await app.register(rutasCorridaPagos, { prefix: '/api' });
   // FINANZAS (Módulo 14, F9-E3) — Importación de CFDI de proveedores (R11): parser/validador CFDI 4.0,
   // previsualización con conciliación (proveedor por RFC + OC por total cercano) e importación
   // transaccional (XML en R2 + cargo FISCAL de CxP por el total del CFDI). Reusa cxp.administrar.
@@ -430,6 +446,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // E1); importes ocultos sin consultas.ver-importes.
   await app.register(rutasClienteFactores, { prefix: '/api' });
   await app.register(rutasListasPrecios, { prefix: '/api' });
+  await app.register(rutasCotizaciones, { prefix: '/api' });
   // Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción (ligar/quitar orden↔desarrollo,
   // sugerencia de liga + precio propuesto, vista 360 y tablero por estado). RBAC desarrollo.ver/
   // .administrar (ya sembrados en E1); importes ocultos sin consultas.ver-importes.

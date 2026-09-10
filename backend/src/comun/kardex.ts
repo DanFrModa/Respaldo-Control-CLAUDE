@@ -20,14 +20,14 @@
  *    vista `existencia_pt` (que es solo para consulta/tableros).
  *  • Cancelación = movimiento INVERSO auditado (D3/A7), JAMÁS edición/borrado del original.
  */
-import { DireccionMovimiento, type Movimiento, type Prisma } from '../datos/index.js';
+import { DireccionMovimiento, Prisma, type Movimiento } from '../datos/index.js';
 
 import { registrarBitacora } from './auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from './errores.js';
 import { ORIGEN, type OrigenMovimiento } from './origenes.js';
 import type { SesionUsuario } from './permisos.js';
 import { siguienteFolio } from './secuencias.js';
-import { enTransaccion, type ContextoBd, type Tx } from './transaccion.js';
+import { enTransaccion, type ClienteLectura, type ContextoBd, type Tx } from './transaccion.js';
 
 /** Clave de la secuencia de folios del kardex (A3, por empresa). */
 const CLAVE_SECUENCIA_MOVIMIENTO = 'movimiento';
@@ -702,21 +702,22 @@ export interface ExistenciaTelaColor {
 }
 
 /**
- * Existencia ACTUAL de un tela-color en un almacén — AMBOS componentes (cuerpo y complemento) —
- * sumando `movimiento_det_tela` DIRECTO (NUNCA la vista `existencia_tela_color` — ADR-0010 §3).
- * Tómala SIEMPRE tras {@link bloquearTelaColor}: es la base de la validación de no-negativo de
- * los DOS componentes en salidas/traspasos del flujo nuevo (D3).
+ * Las DOS Σ con signo de un tela-color (cuerpo y complemento), en UNA sola definición.
+ *
+ * ⚠️ Existe para que NINGÚN lector de esta aritmética sea una copia: si mañana cambia el tratamiento
+ * de una dirección, cambia AQUÍ y todos los caminos se mueven juntos. Es exactamente la trampa de
+ * "la rama gemela" — dos cosas simétricas donde se arregla una sola.
+ *
+ * **Quién la usa hoy — la lista se mantiene, porque es la que hace verificable la promesa:**
+ *  1. {@link existenciaTelaColorBloqueada} — el lector BAJO LOCK (valida no-negativo, D3).
+ *  2. {@link existenciasTelaColorPorColor} — el lector POR LOTES (consulta y cíclico).
+ *  3. `dominio/inventarios/partidas-telas.ts` → `saldosPorPartidaTela` — la MISMA Σ agrupada por
+ *     PARTIDA (fila 0.142: el saldo vivo de cada lote). Por eso se EXPORTA: se copió a mano en esa
+ *     fila y el reviewer lo cazó — quedaban tres copias y este comentario, que promete lo contrario,
+ *     se había vuelto falso. La guía *«no toques `kardex.ts`»* era para no meterse en el motor; la
+ *     INVARIANTE es no duplicar la aritmética, y manda la invariante.
  */
-export async function existenciaTelaColorBloqueada(
-  tx: Tx,
-  idEmpresa: number,
-  idAlmacen: number,
-  idTelaColor: number,
-): Promise<ExistenciaTelaColor> {
-  const filas = await tx.$queryRaw<
-    { cuerpo: Prisma.Decimal | null; complemento: Prisma.Decimal | null }[]
-  >`
-    SELECT
+export const SUMAS_TELA_COLOR = Prisma.sql`
       COALESCE(SUM(
         d."cantidad" * CASE t."direccion"
           WHEN 'entrada' THEN 1
@@ -730,18 +731,95 @@ export async function existenciaTelaColorBloqueada(
           WHEN 'salida'  THEN -1
           ELSE 0
         END
-      ), 0) AS complemento
+      ), 0) AS complemento`;
+
+/**
+ * Existencia ACTUAL de un tela-color en un almacén — AMBOS componentes (cuerpo y complemento) —
+ * sumando `movimiento_det_tela` DIRECTO (NUNCA la vista `existencia_tela_color` — ADR-0010 §3).
+ * Tómala SIEMPRE tras {@link bloquearTelaColor}: es la base de la validación de no-negativo de
+ * los DOS componentes en salidas/traspasos del flujo nuevo (D3).
+ */
+export async function existenciaTelaColorBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTelaColor: number,
+): Promise<ExistenciaTelaColor> {
+  const filas = await tx.$queryRaw<
+    { cuerpo: Prisma.Decimal | null; complemento: Prisma.Decimal | null }[]
+  >(Prisma.sql`
+    SELECT
+${SUMAS_TELA_COLOR}
     FROM "movimiento_det_tela" d
     JOIN "movimientos" m ON m."id" = d."id_movimiento"
     JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
     WHERE m."id_empresa" = ${idEmpresa}
       AND m."id_almacen" = ${idAlmacen}
       AND d."id_tela_color" = ${idTelaColor}
-  `;
+  `);
   return {
     cuerpo: Number(filas[0]?.cuerpo ?? 0),
     complemento: Number(filas[0]?.complemento ?? 0),
   };
+}
+
+/** Existencia de UN color dentro de la respuesta por lotes. */
+export interface ExistenciaTelaColorDeLote extends ExistenciaTelaColor {
+  idTelaColor: number;
+}
+
+/**
+ * Existencias de VARIOS tela-colores en un almacén, en UNA sola consulta (`GROUP BY`), sumando
+ * `movimiento_det_tela` DIRECTO — NUNCA la vista `existencia_tela_color` (ADR-0010 §3). Comparte
+ * {@link SUMAS_TELA_COLOR} con {@link existenciaTelaColorBloqueada}: misma aritmética, un solo sitio.
+ *
+ * 🔴 **ESTA FUNCIÓN NO TOMA EL LOCK: lo toma —o no— quien la llama.** Tiene dos usos, y sólo por eso
+ * la responsabilidad vive fuera:
+ *
+ *  1. **Lectura de consulta, SIN lock** (la columna «Sistema» de la pantalla de conteo por color).
+ *     Un `pg_advisory_xact_lock` exclusivo por color no le añadiría garantía ninguna —bajo Read
+ *     Committed la Σ ya ve un snapshot consistente, y el lock se soltaría al commit de la propia
+ *     lectura, o sea antes de que el usuario teclee nada— y en cambio sí cuesta: cargar un
+ *     inventario completo son cientos de renglones. La garantía contra "dos personas ajustando
+ *     contra un saldo viejo" no vive aquí: vive en que el conteo RECALCULA el delta bajo lock al
+ *     aplicar.
+ *  2. **Lectura AUTORITATIVA bajo lock** (fila 0.099, `dominio/indicadores/ciclico/tela.ts`): el
+ *     adaptador del inventario cíclico toma `bloquearTelaColor` por CADA id —en orden ascendente,
+ *     el mismo que `partidas-telas.ts`— y sólo entonces llama aquí, una vez, para congelar el
+ *     teórico al abrir la hoja y para re-leer la existencia al cerrarla. Con todos los locks ya
+ *     tomados, esta Σ agrupada ES el valor bajo lock, y por eso el cierre puede decidir con ella.
+ *
+ * ⇒ Al añadir un llamador nuevo, la pregunta no es si esta función bloquea (no lo hace nunca), sino
+ * si ESE llamador necesita el lock y lo tomó antes.
+ *
+ * Los colores sin NINGÚN movimiento no salen del `GROUP BY`: el llamador los completa con 0.
+ */
+export async function existenciasTelaColorPorColor(
+  cliente: ClienteLectura,
+  idEmpresa: number,
+  idAlmacen: number,
+  idsTelaColor: readonly number[],
+): Promise<ExistenciaTelaColorDeLote[]> {
+  if (idsTelaColor.length === 0) return [];
+  const filas = await cliente.$queryRaw<
+    { idTelaColor: number; cuerpo: Prisma.Decimal | null; complemento: Prisma.Decimal | null }[]
+  >(Prisma.sql`
+    SELECT
+      d."id_tela_color" AS "idTelaColor",
+${SUMAS_TELA_COLOR}
+    FROM "movimiento_det_tela" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_tela_color" IN (${Prisma.join([...idsTelaColor])})
+    GROUP BY d."id_tela_color"
+  `);
+  return filas.map((f) => ({
+    idTelaColor: f.idTelaColor,
+    cuerpo: Number(f.cuerpo ?? 0),
+    complemento: Number(f.complemento ?? 0),
+  }));
 }
 
 /**

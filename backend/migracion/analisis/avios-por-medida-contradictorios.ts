@@ -28,8 +28,10 @@
  *
  * **NO escribe absolutamente nada.** Ni apaga banderas, ni toca recetas, ni borra medidas: es
  * `findMany` + aritmética + `console.log`. Se puede correr en producción cuando sea. La corrección
- * se hace **guardando el renglón** en la receta de la orden (desde §Post-F9.105, CUALQUIER guardado
- * del renglón normaliza), que es donde queda auditada y con su bitácora.
+ * se hace **con el botón «Corregir»** del renglón, en la receta de la orden (V1-E8h, §Post-F9.130),
+ * que es donde queda auditada y con su bitácora. ⚠️ Es **por renglón**: no existe —a propósito— una
+ * reparación EN BLOQUE, porque tocaría datos de muchas órdenes vivas a la vez y eso necesita la
+ * palabra de Daniel. Este reporte es justamente el insumo para pedírsela con números.
  *
  * ── CORRER (desde `backend/`) ──────────────────────────────────────────────────────────────────
  *
@@ -313,13 +315,17 @@ export function formatearReporte(r: ReporteContradicciones): string {
   p.push('  OC  = órdenes de compra VIVAS de ese avío ligadas a esa OP (ahí el dinero ya salió).');
   p.push('');
   p.push('  ── CÓMO SE ARREGLA (por renglón) ──');
-  p.push('  Receta de la OP › renglón del avío › guardar (cualquier guardado lo normaliza desde');
-  p.push('  §Post-F9.105) y volver a explotar. Ojo con dos consecuencias que sí muerden:');
-  p.push('   (a) guardar el renglón REVOCA su liberación → hay que volver a Liberar o el avío');
+  // ⭐⭐ V1-E8h (§Post-F9.130): ya hay un BOTÓN. Antes esto decía «guardar el renglón (cualquier
+  // guardado lo normaliza)» — cierto, pero un conjuro: nadie que no lea el código lo adivina.
+  p.push('  Receta de la OP › renglón del avío › botón «Corregir», y volver a explotar. Ojo con');
+  p.push('  dos consecuencias que sí muerden:');
+  p.push('   (a) corregir el renglón REVOCA su liberación → hay que volver a Liberar o el avío');
   p.push('       desaparece de la explosión (que sólo lee lo liberado);');
-  p.push('   (b) si el consumo por prenda fuera 0 y ese avío ya tiene OC, el guardado se RECHAZA:');
-  p.push('       hay que capturar el consumo por prenda (en un cierre, normalmente 1) en el mismo');
-  p.push('       guardado. El error lo dice con esas palabras.');
+  p.push(
+    '   (b) si el consumo por prenda fuera 0 y ese avío ya tiene OC, la corrección se RECHAZA:',
+  );
+  p.push('       hay que capturar antes el consumo por prenda (en un cierre, normalmente 1). El');
+  p.push('       error lo dice con esas palabras.');
   return p.join('\n');
 }
 

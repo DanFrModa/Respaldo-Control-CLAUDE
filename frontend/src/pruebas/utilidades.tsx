@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  type RenderOptions,
+  type RenderResult,
+  screen,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import type { EstadoSesion } from '@/sesion/contexto';
@@ -78,4 +84,51 @@ export function renderConProveedores(
     </QueryClientProvider>,
     opciones,
   );
+}
+
+/**
+ * Elige una opción en un {@link ComboboxBuscable} (o en cualquiera de los selectores que lo
+ * envuelven: `SelectorProveedor`, `FiltroProveedor`, `SelectorCliente`…).
+ *
+ * Nace con V1-E7g, cuando los `<select>` nativos de proveedor pasaron a comboboxes con búsqueda en
+ * SERVIDOR y una docena de pruebas tuvo que dejar de usar `fireEvent.change` sobre un `<select>`.
+ * Encapsula las tres trampas del combobox, para no re-tropezarlas en cada archivo:
+ *
+ *  - la lista SOLO existe con el campo enfocado (`focus` la abre);
+ *  - vive en un PORTAL colgado del `body`, así que se busca desde `screen` y NO desde el
+ *    contenedor ni desde el diálogo que la contiene;
+ *  - elige en `mousedown`, no en `click` (gana antes del `blur` del input); y en jsdom, sin CSS,
+ *    un diálogo de radix le pone `pointer-events: none` a todo lo que cuelga del body, con lo que
+ *    un `click` de `userEvent` ni siquiera llegaría.
+ *
+ * `findAllByTestId` cubre además el debounce de 300 ms de la búsqueda server-side.
+ *
+ * @param testid  el `testid` base del selector (el input es `${testid}-busqueda`).
+ * @param texto   lo que se TECLEA (puede casar en MEDIO del nombre: eso es justo lo que se prueba).
+ * @param nombre  nombre de la opción a elegir; por defecto, el mismo `texto`.
+ */
+export async function elegirEnCombobox(
+  testid: string,
+  texto: string,
+  nombre = texto,
+): Promise<void> {
+  const input = screen.getByTestId(`${testid}-busqueda`);
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: texto } });
+  const opciones = await screen.findAllByTestId(`${testid}-opcion`);
+  const elegida = opciones.find((opcion) => (opcion.textContent ?? '').includes(nombre));
+  if (elegida === undefined) {
+    throw new Error(
+      `El combobox "${testid}" no ofreció "${nombre}" al teclear "${texto}"; ofreció: ${opciones
+        .map((o) => o.textContent)
+        .join(' · ')}`,
+    );
+  }
+  fireEvent.mouseDown(elegida);
+}
+
+/** Limpia la selección de un combobox (el botón ✕ que sale cuando hay algo elegido). */
+export function limpiarCombobox(testid: string): void {
+  fireEvent.mouseDown(screen.getByTestId(`${testid}-limpiar`));
+  fireEvent.click(screen.getByTestId(`${testid}-limpiar`));
 }

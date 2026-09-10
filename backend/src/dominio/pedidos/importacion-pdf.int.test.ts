@@ -1,8 +1,9 @@
 /**
  * Tests de INTEGRACIÓN del IMPORTADOR de OC por PDF (petición Daniel — plantilla C&A) contra el
  * Postgres efímero (testcontainers), usando el fixture REAL `__fixtures__/cya-620884.pdf`. Cubre:
- *  • CONFIRMAR 1 PDF: nace el pedido + su OP con matriz UN RENGLÓN POR PACK (Blanco A/B/C, convención
- *    C&A `{color} {letra}`, resuelto-o-creado), el nº de orden de C&A en `Orden.ocCliente`, el
+ *  • CONFIRMAR 1 PDF: nace el pedido + su OP con UN RENGLÓN POR TENDIDO, todos del MISMO color
+ *    (§Post-F9.10: los packs A/B/C nacen como tres líneas de "Blanco" con su campo `pack`; la letra
+ *    no fabrica colores desde §Post-F9.129), el nº de orden de C&A en `Orden.ocCliente`, el
  *    departamento (División) + las referencias (D7) configuradas, el PDF ADJUNTO a la OP, y la LIGA
  *    aprendida (modelo del cliente → nuestro modelo),
  *  • COMPOSICIÓN (Daniel 24-jul-2026): la del MODELO manda; la del PDF sólo entra de RESPALDO
@@ -29,6 +30,8 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { crearColor, fusionarColores } from '../catalogos/colores.js';
+import { obtenerOrden } from '../produccion/ordenes.js';
 import { analizarImportacionPdf, confirmarImportacionPdf } from './importacion-pdf.js';
 
 const PDF_BASE64 = readFileSync(
@@ -74,6 +77,10 @@ const PERMISOS: ClavePermiso[] = [
 const sesion = (permisos: ClavePermiso[] = PERMISOS): SesionUsuario =>
   sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: [...permisos] });
 const bd = () => ({ cliente });
+
+/** Sesión del CATÁLOGO de colores (fusionar es de Daniel, no del importador: otro gate, A4). */
+const sesionColores = (): SesionUsuario =>
+  sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: ['colores.ver', 'colores.administrar'] });
 
 /**
  * Contador de keys del fake de archivos, GLOBAL al archivo de pruebas.
@@ -190,7 +197,7 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     expect(orden0.totalPiezas).toBe(1903);
     expect(orden0.adjuntado).toBe(true);
 
-    // La OP: nº de orden de C&A en ocCliente, composición del PDF, matriz color×talla POR PACK.
+    // La OP: nº de orden de C&A en ocCliente, composición del PDF, matriz color×talla (UN color).
     const orden = await cliente.orden.findUniqueOrThrow({
       where: { id: orden0.idOrden },
       include: {
@@ -204,31 +211,32 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     // del PDF entra como RESPALDO y queda marcada como override (no deriva del modelo).
     expect(orden.composicion).toContain('ALGOD');
     expect(orden.compForzada).toBe(true);
-    // UN renglón por pack (convención C&A `{color} {letra}`): la OC 620884 trae 3 packs (A/B/C). El
-    // sobre-pedido NO cambia la ESTRUCTURA de renglones (sólo las cantidades) → 3 líneas aun a pct 0.
+    // ⭐ §Post-F9.10 — UN RENGLÓN POR TENDIDO, TODOS DEL MISMO COLOR: la OC 620884 trae 3 packs
+    // (A/B/C) y nacen 3 líneas de "Blanco" con su `pack`. Antes de §Post-F9.129 nacían 3 COLORES de
+    // catálogo ("Blanco A/B/C") y eso partía en tres las compras de una misma orden aguas abajo;
+    // entre §Post-F9.129 y §Post-F9.10 nacía UNA sola línea y el tendido desaparecía del corte.
     expect(orden.lineas).toHaveLength(3);
-    expect([...orden.lineas.map((l) => l.color.nombre)].sort()).toEqual([
-      'Blanco A',
-      'Blanco B',
-      'Blanco C',
-    ]);
+    expect(orden.lineas.map((l) => l.color.nombre)).toEqual(['Blanco', 'Blanco', 'Blanco']);
+    expect([...orden.lineas].map((l) => l.pack).sort()).toEqual(['A', 'B', 'C']);
     const totalMatriz = orden.lineas.reduce(
       (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
       0,
     );
     expect(totalMatriz).toBe(1903);
-    // La OC real de C&A NO trae pantone → cada renglón-pack del color queda sin pantone.
+    // La OC real de C&A NO trae pantone → los renglones del color quedan sin pantone.
     for (const l of orden.lineas) expect(l.pantone).toBeNull();
     // El desglose SKU/packs del cliente quedó persistido con la orden (aun sin % adicional).
     expect(orden.packsCliente).not.toBeNull();
     // El PDF quedó adjunto a SU orden.
     expect(orden.archivos).toHaveLength(1);
 
-    // Colores POR PACK y tallas se resolvieron-o-crearon (D14c: colores abiertos capturados en la OP).
-    const coloresPack = await cliente.color.count({
+    // El color (D14c: abiertos capturados en la OP) y las tallas se resolvieron-o-crearon. UN SOLO
+    // color: la letra del pack ya no fabrica catálogo ("Blanco", no "Blanco A/B/C").
+    const coloresBlanco = await cliente.color.findMany({
       where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
+      select: { nombre: true },
     });
-    expect(coloresPack).toBe(3);
+    expect(coloresBlanco.map((c) => c.nombre)).toEqual(['Blanco']);
     const tallas = await cliente.talla.findMany({ where: { etiqueta: { in: ['5-6', '13-14'] } } });
     expect(tallas).toHaveLength(2);
 
@@ -278,13 +286,25 @@ describe('confirmar importación por PDF (1 PDF)', () => {
     });
     expect(liga?.idModelo).toBe(idModelo);
 
-    // ⭐ El modelo PASÓ A PRODUCCIÓN al generar la OP (§Post-F9.34): serie 71 vacía → 71001, el
-    // código sustituido y el de desarrollo conservado (D3).
-    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).toBe(71_001);
-    expect(modelo.codigo).toBe('71001');
-    expect(modelo.origen).toBe('produccion');
-    expect(modelo.codigoDesarrollo).toBe('DEV-CYA-1');
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)): generar la OP hace NACER el modelo de producción DE ESE COLOR
+    // —serie 71 vacía → 71001— y el DESARROLLO se queda como estaba, en su catálogo y con su código.
+    // Éste es el camino que le importa a Daniel: un PDF de C&A = una OC = una OP = UN color.
+    const desarrollo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
+    expect(desarrollo.origen).toBe('desarrollo');
+    expect(desarrollo.codigo).toBe('DEV-CYA-1');
+    expect(desarrollo.numeroProduccion).toBeNull();
+
+    const hijo = await cliente.modelo.findFirstOrThrow({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijo.numeroProduccion).toBe(71_001);
+    expect(hijo.codigo).toBe('71001');
+    expect(hijo.origen).toBe('produccion');
+    // El color del PDF (uno solo por OP) es la IDENTIDAD del hijo…
+    expect(hijo.idColor).not.toBeNull();
+    // …y la ORDEN lleva al hijo, mientras el renglón del pedido sigue con su desarrollo.
+    const ordenDelPdf = await cliente.orden.findFirstOrThrow({
+      where: { idPedidoLinea: linea.id },
+    });
+    expect(ordenDelPdf.idModelo).toBe(hijo.id);
     // Evento outbox de la RC (orden-creada) encolado.
     const eventos = await cliente.eventoOutbox.count();
     expect(eventos).toBeGreaterThanOrEqual(1);
@@ -352,13 +372,13 @@ describe('confirmar importación por PDF (multi-PDF)', () => {
     expect(await cliente.pedidoLinea.count({ where: { idPedido: res.idPedido } })).toBe(2);
     expect(await cliente.ordenArchivo.count()).toBe(2);
 
-    // ⭐ Catálogos REUSADOS dentro de la tx: los 3 colores por pack (BLANCO A/B/C) y la talla 5-6
-    // se crean UNA vez en la primera OP y la segunda los REUSA (3 colores, no 6).
+    // ⭐ Catálogos REUSADOS dentro de la tx: el color BLANCO y la talla 5-6 se crean UNA vez en la
+    // primera OP y la segunda los REUSA (1 color, no 2 — y ya no 3 ni 6: §Post-F9.129).
     expect(
       await cliente.color.count({
         where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
       }),
-    ).toBe(3);
+    ).toBe(1);
     expect(await cliente.talla.count({ where: { etiqueta: '5-6' } })).toBe(1);
     expect(
       await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
@@ -489,9 +509,10 @@ describe('⭐ la misma OC del cliente NO se importa dos veces (V1-E4)', () => {
     expect(await cliente.pedido.count()).toBe(1);
     expect(await cliente.orden.count()).toBe(1);
     expect(await cliente.pedidoLinea.count()).toBe(1);
-    // Y el modelo se promovió UNA sola vez: el primer libre de la serie, no el segundo.
-    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
-    expect(modelo.numeroProduccion).toBe(71_001);
+    // Y nació UN solo modelo de producción, con el primer libre de la serie (no el segundo).
+    const hijos = await cliente.modelo.findMany({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijos).toHaveLength(1);
+    expect(hijos[0]?.numeroProduccion).toBe(71_001);
   });
 
   it('la OC de OTRO cliente no bloquea (el nº de orden solo identifica dentro de su cliente)', async () => {
@@ -538,53 +559,42 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
       where: { id: res.ordenes[0]!.idOrden },
       include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    // UN renglón por pack: Blanco A/B/C con la corrida propuesta de SU pack (canónicos, NO sumados).
-    const porColor = new Map(
+    // ⭐ §Post-F9.10 — TRES renglones de "Blanco", uno por tendido, cada uno con SU corrida del
+    // sobre-pedido POR PACK (A 119→127 = 254-127-127-381-381-254; B 57→61 = 61-0-0-122-122-122;
+    // C SKU +7% = 11-7-11-18-20-14 — cementados pack por pack en el unit `sobrepedido-cya.test.ts`).
+    // Entre §Post-F9.129 y §Post-F9.10 la OP recibía su SUMA en una sola línea y el tendido se
+    // perdía; antes de §Post-F9.129, tres COLORES de catálogo distintos.
+    expect(orden.lineas).toHaveLength(3);
+    expect(new Set(orden.lineas.map((l) => l.color.nombre))).toEqual(new Set(['Blanco']));
+    const porPack = new Map(
       orden.lineas.map(
         (l) =>
-          [
-            l.color.nombre,
-            new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const)),
-          ] as const,
+          [l.pack, new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const))] as const,
       ),
     );
-    expect([...porColor.keys()].sort()).toEqual(['Blanco A', 'Blanco B', 'Blanco C']);
-    // Pack A 119→127: 254-127-127-381-381-254 (= 1524).
-    const a = porColor.get('Blanco A')!;
-    expect(['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map((t) => a.get(t) ?? 0)).toEqual([
-      254, 127, 127, 381, 381, 254,
+    const tallasCya = ['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'];
+    const corrida = (pack: string): number[] =>
+      tallasCya.map((t) => porPack.get(pack)?.get(t) ?? 0);
+    // 🔑 Cada tendido con LO SUYO, no la suma: si el importador siguiera fundiendo, estas tres
+    // aserciones serían imposibles de satisfacer a la vez.
+    expect(corrida('A')).toEqual([254, 127, 127, 381, 381, 254]);
+    expect(corrida('B')).toEqual([61, 0, 0, 122, 122, 122]);
+    expect(corrida('C')).toEqual([11, 7, 11, 18, 20, 14]);
+    // Ninguna talla se duplicó DENTRO de un tendido (sería el defecto que `sincronizarMatriz` aborta).
+    // El pack B trae dos tallas en 0, que no generan celda: 4, no 6.
+    expect(orden.lineas.map((l) => `${l.pack}:${l.tallas.length}`).sort()).toEqual([
+      'A:6',
+      'B:4',
+      'C:6',
     ]);
-    // Pack B 57→61: 61-0-0-122-122-122 (las tallas en 0 no generan celda) (= 427).
-    const b = porColor.get('Blanco B')!;
-    expect(b.get('5-6')).toBe(61);
-    expect(b.get('9-10')).toBe(122);
-    expect(b.get('11-12')).toBe(122);
-    expect(b.get('13-14')).toBe(122);
-    expect(b.get('6-7')).toBeUndefined();
-    expect(b.get('7-8')).toBeUndefined();
-    expect([...b.values()].reduce((s, n) => s + n, 0)).toBe(427);
-    // Pack C (SKU) +7%: 11-7-11-18-20-14 (= 81).
-    const c = porColor.get('Blanco C')!;
-    expect(['5-6', '6-7', '7-8', '9-10', '11-12', '13-14'].map((t) => c.get(t) ?? 0)).toEqual([
-      11, 7, 11, 18, 20, 14,
-    ]);
-
-    // Reconciliación: el TOTAL por talla (suma de los 3 packs) reproduce los canónicos 326-134-…-390.
-    const sumaTalla = (etq: string): number =>
-      orden.lineas.reduce(
-        (s, l) => s + (l.tallas.find((t) => t.talla.etiqueta === etq)?.cantidad ?? 0),
-        0,
-      );
-    expect(sumaTalla('5-6')).toBe(326);
-    expect(sumaTalla('6-7')).toBe(134);
-    expect(sumaTalla('7-8')).toBe(138);
-    expect(sumaTalla('9-10')).toBe(521);
-    expect(sumaTalla('11-12')).toBe(523);
-    expect(sumaTalla('13-14')).toBe(390);
     const totalMatriz = orden.lineas.reduce(
       (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
       0,
     );
+    // Y la SUMA de los tres tendidos sigue siendo la propuesta total: 326-134-138-521-523-390.
+    expect(
+      tallasCya.map((t) => ['A', 'B', 'C'].reduce((s, p) => s + (porPack.get(p)?.get(t) ?? 0), 0)),
+    ).toEqual([326, 134, 138, 521, 523, 390]);
     expect(totalMatriz).toBe(2032);
 
     // El RENGLÓN del pedido conserva la cantidad ORIGINAL del cliente (lo contractual) y el precio.
@@ -679,17 +689,42 @@ describe('sobre-pedido por packs (C&A = 7%)', () => {
       where: { id: res.ordenes[0]!.idOrden },
       include: { lineas: { include: { tallas: { include: { talla: true } }, color: true } } },
     });
-    // 2 renglones (Blanco A, Blanco B); el pack C vaciado NO generó línea.
-    expect([...orden.lineas.map((l) => l.color.nombre)].sort()).toEqual(['Blanco A', 'Blanco B']);
-    const porColor = new Map(
+    // ⭐ §Post-F9.10 por la PUERTA DE LA MATRIZ EDITADA: nacen DOS renglones (A y B) del MISMO
+    // color, cada uno con la corrida que tecleó el usuario. El pack C vaciado NO genera renglón:
+    // así se "integra" un pack en otro. Antes de §Post-F9.129 salían 2 COLORES de catálogo
+    // ("Blanco A" y "Blanco B"); entre §Post-F9.129 y §Post-F9.10, un solo renglón con la suma.
+    expect(orden.lineas).toHaveLength(2);
+    expect(new Set(orden.lineas.map((l) => l.color.nombre))).toEqual(new Set(['Blanco']));
+    const porPack = new Map(
       orden.lineas.map(
-        (l) => [l.color.nombre, l.tallas.reduce((s, t) => s + t.cantidad, 0)] as const,
+        (l) =>
+          [l.pack, new Map(l.tallas.map((t) => [t.talla.etiqueta, t.cantidad] as const))] as const,
       ),
     );
-    expect(porColor.get('Blanco A')).toBe(500);
-    expect(porColor.get('Blanco B')).toBe(100);
-    // El pantone editado quedó sellado en CADA renglón del color de la OP.
-    for (const l of orden.lineas) expect(l.pantone).toBe('11-0601 TCX');
+    expect([...porPack.keys()].sort()).toEqual(['A', 'B']);
+    // A: 5-6 100, 6-7 100, 9-10 150, 13-14 150 — TAL CUAL, sin sumarle el B.
+    expect([...(porPack.get('A') ?? [])].sort()).toEqual([
+      ['13-14', 150],
+      ['5-6', 100],
+      ['6-7', 100],
+      ['9-10', 150],
+    ]);
+    // B: 5-6 50, 9-10 50.
+    expect([...(porPack.get('B') ?? [])].sort()).toEqual([
+      ['5-6', 50],
+      ['9-10', 50],
+    ]);
+    expect(
+      orden.lineas.reduce((s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0), 0),
+    ).toBe(600);
+    // Y el color quedó UNO SOLO en el catálogo (la letra del pack ya no lo fabrica).
+    expect(
+      await cliente.color.count({
+        where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
+      }),
+    ).toBe(1);
+    // El pantone editado se sella en TODOS los renglones (es UNO por OC, no por tendido).
+    expect(orden.lineas.map((l) => l.pantone)).toEqual(['11-0601 TCX', '11-0601 TCX']);
     // El renglón del pedido SIGUE conservando lo pedido (1903).
     const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido: res.idPedido } });
     expect(linea.cantidadPedida).toBe(1903);
@@ -828,10 +863,9 @@ describe('sin reconocer y transaccionalidad', () => {
 describe('idempotencia de catálogos', () => {
   it('reusa color/talla/departamento/campo ya existentes (no los duplica)', async () => {
     const idModelo = await crearModelo('DEV-CYA-IDEM');
-    // Los colores por pack ya existen (BLANCO A/B/C) → se reusan, no se duplican.
-    await cliente.color.create({ data: { nombre: 'BLANCO A' } });
-    await cliente.color.create({ data: { nombre: 'BLANCO B' } });
-    await cliente.color.create({ data: { nombre: 'BLANCO C' } });
+    // El color ya existe (BLANCO, en MAYÚSCULAS) → se REUSA, no se duplica: `resolverOCrearColor`
+    // busca sin distinguir mayúsculas, así que "Blanco" cae en el "BLANCO" ya sembrado.
+    await cliente.color.create({ data: { nombre: 'BLANCO' } });
     await cliente.talla.create({ data: { etiqueta: '5-6', orden: 5 } });
     await cliente.clienteDepartamento.create({
       data: { idCliente: idClienteNegocio, nombre: '3- KIDS' },
@@ -855,7 +889,7 @@ describe('idempotencia de catálogos', () => {
       await cliente.color.count({
         where: { nombre: { startsWith: 'BLANCO', mode: 'insensitive' } },
       }),
-    ).toBe(3);
+    ).toBe(1);
     expect(await cliente.talla.count({ where: { etiqueta: '5-6' } })).toBe(1);
     expect(
       await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
@@ -865,6 +899,483 @@ describe('idempotencia de catálogos', () => {
         where: { idCliente: idClienteNegocio, etiqueta: 'Semana C&A' },
       }),
     ).toBe(1);
+  });
+
+  it('🔴 NO resucita un departamento DESACTIVADO: la fusión de §Post-F9.122(a) tiene que durar más que la siguiente OC', async () => {
+    const idModelo = await crearModelo('DEV-CYA-FUSION');
+    // Así queda un departamento ABSORBIDO por una fusión: existe, pero apagado (borrado suave, D3).
+    const absorbido = await cliente.clienteDepartamento.create({
+      data: { idCliente: idClienteNegocio, nombre: '3- KIDS', activo: false },
+    });
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // Sigue apagado: el importador lo REUSA (no duplica) pero ya no lo reactiva, que era como
+    // deshacía la fusión en silencio y devolvía el catálogo revuelto que Daniel acababa de limpiar.
+    const despues = await cliente.clienteDepartamento.findUnique({ where: { id: absorbido.id } });
+    expect(despues?.activo).toBe(false);
+    expect(
+      await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
+    ).toBe(1);
+  });
+
+  it('🔴🔴 NO resucita un COLOR absorbido: lo manda al canónico, y la fusión sigue siendo REPETIBLE', async () => {
+    const idModelo = await crearModelo('DEV-CYA-COLOR-FUSION');
+    // El mundo real: el PDF de C&A dice "BLANCO", y ese es justo el color que una importación
+    // anterior dio de alta. Daniel lo declara duplicado y lo fusiona en su canónico.
+    const absorbido = await crearColor(sesionColores(), { nombre: 'Blanco' }, bd());
+    const canonico = await crearColor(sesionColores(), { nombre: 'Blanco Optico' }, bd());
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: canonico.id, origenes: [absorbido.id] },
+      bd(),
+    );
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // 1) El absorbido sigue APAGADO: la limpieza de Daniel dura más que la siguiente OC.
+    const despues = await cliente.color.findUniqueOrThrow({ where: { id: absorbido.id } });
+    expect(despues.activo).toBe(false);
+    // 2) …y NO acumuló referencias nuevas (era la vuelta de tuerca de este resolver: el id se
+    //    amarra a la matriz color×talla de la OP).
+    expect(await cliente.ordenLinea.count({ where: { idColor: absorbido.id } })).toBe(0);
+    // 3) La OP quedó amarrada al color BUENO, que es lo que la fusión quiso decir. Son TRES
+    //    renglones —uno por tendido (§Post-F9.10)— pero del MISMO color, que es lo que se afirma.
+    const lineas = await cliente.ordenLinea.findMany();
+    expect(lineas).toHaveLength(3);
+    expect(new Set(lineas.map((l) => l.idColor))).toEqual(new Set([canonico.id]));
+    // 4) Tampoco se fabricó un color nuevo para esquivar el problema (`nombre` es único global).
+    expect(await cliente.color.count()).toBe(2);
+    // 5) 🔴 EL DESVÍO QUEDA ANOTADO (A7). Es el caso NORMAL —el canónico ya está activo, así que no
+    //    se toca ningún `activo`— y sin esta bitácora el desvío pasaría en silencio: el papel dice
+    //    «Blanco» y la OP dice «Blanco Optico», y nadie tendría dónde enterarse de por qué.
+    const bitDesvio = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Color', idEntidad: String(absorbido.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    expect(bitDesvio.datos).toMatchObject({
+      operacion: 'redirigido-por-fusion',
+      a: { id: canonico.id, nombre: 'Blanco Optico' },
+      origen: 'importacion-pdf',
+    });
+    expect(bitDesvio.idUsuario).toBe(sesion().id);
+    // 6) ⭐ LA CORONA: la fusión sigue siendo REPETIBLE. Con el defecto, el color revivido ya
+    //    tenía órdenes encima y §Post-F9.129 se negaba a fusionarlo NUNCA MÁS.
+    await expect(
+      fusionarColores(sesionColores(), { idDestino: canonico.id, origenes: [absorbido.id] }, bd()),
+    ).resolves.toMatchObject({ id: canonico.id });
+  });
+
+  it('un color apagado A MANO (sin fusión) SÍ se reactiva: la guarda no se pasa de lista', async () => {
+    const idModelo = await crearModelo('DEV-CYA-COLOR-APAGADO');
+    // Nadie se lo llevó: lo apagó su dueño. No hay fusión que deshacer, y la matriz exige color
+    // activo — no reactivarlo tumbaría el import por nada.
+    const apagado = await cliente.color.create({ data: { nombre: 'Blanco', activo: false } });
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const despues = await cliente.color.findUniqueOrThrow({ where: { id: apagado.id } });
+    expect(despues.activo).toBe(true);
+    // Tres renglones (uno por tendido, §Post-F9.10), todos sobre ESE color reactivado.
+    expect(await cliente.ordenLinea.count({ where: { idColor: apagado.id } })).toBe(3);
+    // Y la reactivación quedó DICHA (A7), no en silencio.
+    const bit = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'MODIFICAR' },
+    });
+    expect(bit.datos).toMatchObject({ operacion: 'reactivar', origen: 'importacion-pdf' });
+    // …y NO se anota ningún desvío: aquí no hubo fusión que seguir (la anotación tampoco se excede).
+    expect(
+      await cliente.bitacora.count({
+        where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'OTRO' },
+      }),
+    ).toBe(0);
+  });
+
+  it('🔴🔴 la VISTA PREVIA avisa del desvío por fusión ANTES de confirmar (de ahí sale el precio)', async () => {
+    // Mismo mundo que la prueba del confirm, pero mirando la PREVIA: el papel dice "BLANCO" y ese
+    // color ya no existe por su cuenta. Hasta esta etapa la previa lo daba por bueno en silencio —
+    // no lo marcaba ni lo advertía— y el desvío sólo constaba en la bitácora, DESPUÉS de confirmar.
+    // Como el precio de la tela casa por NOMBRE de color, el precosto podía salir de otro renglón.
+    const absorbido = await crearColor(sesionColores(), { nombre: 'Blanco' }, bd());
+    const canonico = await crearColor(sesionColores(), { nombre: 'Blanco Optico' }, bd());
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: canonico.id, origenes: [absorbido.id] },
+      bd(),
+    );
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    // 1) Se MARCA, con el nombre del color en el que de verdad va a nacer la OP.
+    expect(renglon.colorFusionadoEn).toBe('Blanco Optico');
+    // 2) Y se ADVIERTE, nombrando los dos colores y por qué importa.
+    const aviso = renglon.advertencias.find((a) => a.tipo === 'color-fusionado');
+    expect(aviso?.mensaje).toContain('Blanco Optico');
+    expect(aviso?.mensaje).toContain('POR NOMBRE');
+    // 3) NO es un color "nuevo": existe, sólo que se lo llevaron. Confundirlos diría al usuario que
+    //    se va a crear un color que no se va a crear.
+    expect(renglon.colorNuevo).toBe(false);
+    // 4) La previa sólo LEE: no reactiva, no crea, no desfusiona nada. Las tres se comprueban —
+    //    `activo` no cubre la tercera: `actualizarColor` DESAMARRA el rastro al reactivar, así que
+    //    un `idFusionadoEn` borrado con el color aún apagado sería una fusión deshecha a medias que
+    //    esta prueba no vería si sólo mirara `activo`.
+    const trasLaPrevia = await cliente.color.findUniqueOrThrow({ where: { id: absorbido.id } });
+    expect(trasLaPrevia.activo).toBe(false);
+    expect(trasLaPrevia.idFusionadoEn).toBe(canonico.id);
+    expect(await cliente.color.count()).toBe(2);
+  });
+
+  it('⚠️ la RAMA GEMELA en la previa: un color apagado A MANO no dispara el aviso de fusión', async () => {
+    // Apagado sin rastro de fusión: al confirmar se REACTIVA y la OP se queda en ÉL — mismo id,
+    // mismo nombre, mismo precio. No hay desvío que avisar, y si esta prueba no existiera bastaría
+    // con marcar "todo color inactivo" para que la de arriba pasara por la razón equivocada.
+    const apagado = await cliente.color.create({ data: { nombre: 'Blanco', activo: false } });
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    expect(renglon.colorFusionadoEn).toBeNull();
+    expect(renglon.advertencias.some((a) => a.tipo === 'color-fusionado')).toBe(false);
+    expect(renglon.colorNuevo).toBe(false);
+    expect((await cliente.color.findUniqueOrThrow({ where: { id: apagado.id } })).activo).toBe(
+      false,
+    );
+  });
+
+  it('un color que NO existe sigue saliendo como nuevo, sin aviso de fusión', async () => {
+    // El tercer estado, para que "nuevo" y "fusionado" no se confundan entre sí: el catálogo está
+    // vacío de "Blanco", así que se va a CREAR y no hay ningún desvío.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    const renglon = previa.renglones[0]!;
+    expect(renglon.colorNuevo).toBe(true);
+    expect(renglon.colorFusionadoEn).toBeNull();
+    expect(renglon.advertencias.some((a) => a.tipo === 'color-fusionado')).toBe(false);
+  });
+});
+
+// ── ⭐⭐ Fila 0.151 — EL Nº DE PRODUCCIÓN LO PONE EL USUARIO ────────────────────────────
+
+/**
+ * DANIEL, después de importar un PDF: *«me generó el pedido y la OP **sin preguntar el número de
+ * modelo interno**… **quedamos que ese lo ponía yo, con una sugerencia previa**… No me gustó que
+ * todo sea completamente automático antes de poder verificar»*.
+ *
+ * `salidaAProduccion` ya aceptaba `numeroProduccion` (§Post-F9.46) y el panel manual «Generar OP»
+ * ya lo usaba; lo que faltaba era que el importador por PDF **lo mandara**. Aquí se demuestra que
+ * viaja, que sigue funcionando sin él, y —lo que de verdad importa— **dónde NO se aplica**.
+ */
+describe('⭐ nº de producción confirmado por el usuario (fila 0.151)', () => {
+  it('con el número TECLEADO, la OP nace con ESE número (no con el propuesto)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-1');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        // La serie 71 está vacía: el sistema propondría 71001. El usuario pide el 71042.
+        archivos: [{ ...archivoPdf(), numeroProduccion: 71_042 }],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_042);
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('nacido');
+    expect(res.ordenes[0]?.avisosNumeroProduccion).toEqual([]);
+
+    const hijo = await cliente.modelo.findFirstOrThrow({ where: { idModeloDesarrollo: idModelo } });
+    expect(hijo.numeroProduccion).toBe(71_042);
+    expect(hijo.codigo).toBe('71042');
+    // Y la OP quedó sellada con ÉL.
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: res.ordenes[0]!.idOrden },
+      select: { idModelo: true },
+    });
+    expect(orden.idModelo).toBe(hijo.id);
+  });
+
+  it('SIN teclearlo, la OP sigue naciendo con el propuesto (la conducta de antes, intacta)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-2');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_001);
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('nacido');
+  });
+
+  it('la VISTA PREVIA llega con el número PROPUESTO y el desenlace `nacido`', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-PREV');
+    // La liga se APRENDE con una importación previa de OTRA OC del cliente… así que aquí se siembra
+    // a mano (la previa sólo propone números para lo que ya sabe ligar).
+    await cliente.clienteModeloLiga.create({
+      data: { idCliente: idClienteNegocio, modeloCliente: '3138277', idModelo },
+    });
+
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf()] },
+      bd(),
+    );
+
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'nacido',
+      numeroProduccionPropuesto: 71_001,
+      numeroProduccionModelo: null,
+      avisosNumeroProduccion: [],
+    });
+  });
+
+  /**
+   * ⭐⭐ EL CASO QUE HABRÍA PASADO EN VERDE SIN ESTA PRUEBA.
+   *
+   * Si el color ya tiene modelo de producción, `obtenerODerivarModeloDeProduccion` **descarta** el
+   * número capturado y avisa. Ofrecer el campo ahí sería prometer algo que la capa de abajo tira:
+   * por eso la vista previa dice `reusado` y **no propone número**, y por eso el confirm devuelve
+   * el aviso en vez de callárselo. Las dos mitades se prueban juntas — la que apaga el campo y la
+   * que explica lo que pasó.
+   */
+  it('⭐ desenlace REUSADO: el número tecleado se IGNORA (con aviso) y la previa no ofrece campo', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-3');
+
+    // 1ª OC: nace el modelo de "Blanco" con el 71001.
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // La VISTA PREVIA de la 2ª OC (otro papel, MISMO modelo y MISMO color) ya no ofrece número.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf2()] },
+      bd(),
+    );
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'reusado',
+      numeroProduccionPropuesto: null,
+      numeroProduccionModelo: 71_001,
+    });
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('71001');
+
+    // Y si alguien lo manda de todas formas (carrera entre la previa y el confirm), NO se aplica:
+    // la OP se hace con el modelo que ya existía, y el confirm lo DICE.
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [{ ...archivoPdf2(), numeroProduccion: 71_099 }],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(res.ordenes[0]?.modeloDeProduccion).toBe('reusado');
+    expect(res.ordenes[0]?.numeroProduccion).toBe(71_001);
+    expect(res.ordenes[0]?.avisosNumeroProduccion.join(' ')).toContain('71099');
+    // No nació un segundo modelo: el número es del MODELO, no de la orden.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(1);
+    expect(await cliente.modelo.count({ where: { numeroProduccion: 71_099 } })).toBe(0);
+  });
+
+  it('un número REPETIDO bloquea toda la importación, y dice quién lo tiene', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-4');
+    await cliente.modelo.create({
+      data: { codigo: '71042', origen: 'produccion', numeroProduccion: 71_042 },
+    });
+
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          archivos: [{ ...archivoPdf(), numeroProduccion: 71_042 }],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(),
+      ),
+    ).rejects.toThrow(/71042 ya está ocupado por el modelo "71042"/);
+
+    // A2: no quedó NADA (ni pedido, ni OP, ni modelo hijo).
+    expect(await cliente.pedido.count()).toBe(0);
+    expect(await cliente.orden.count()).toBe(0);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
+  });
+
+  /**
+   * ⭐⭐ LA PREVIA Y EL CONFIRM, MEDIDOS EN LA MISMA PRUEBA.
+   *
+   * Con el hijo del color DESCONTINUADO, `obtenerODerivarModeloDeProduccion` lanza conflicto
+   * (§Post-F9.119) y A2 revierte la tanda ENTERA. Mientras la previa no miraba `activo` anunciaba
+   * *«la OP se va a hacer con él»*: prometía un reuso que el confirm rechaza. Las dos mitades van
+   * juntas a propósito — una prueba que sólo mirara la previa dejaría volver el desacuerdo.
+   */
+  it('⭐ modelo del color DESCONTINUADO: la previa avisa el rechazo y el confirm lo cumple', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NUM-5');
+
+    // 1ª OC: nace el modelo de "Blanco"… y después alguien lo descontinúa.
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    await cliente.modelo.updateMany({
+      where: { idModeloDesarrollo: idModelo },
+      data: { activo: false },
+    });
+
+    // La PREVIA de la 2ª OC no promete ningún reuso: avisa que se va a rechazar.
+    const previa = await analizarImportacionPdf(
+      sesion(),
+      { idCliente: idClienteNegocio, archivos: [archivoPdf2()] },
+      bd(),
+    );
+    expect(previa.renglones[0]).toMatchObject({
+      modeloDeProduccion: 'reusado',
+      numeroProduccionModelo: null,
+    });
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('DESCONTINUADO');
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).toContain('se va a rechazar');
+    expect(previa.renglones[0]?.avisosNumeroProduccion[0]).not.toContain(
+      'la OP se va a hacer con él',
+    );
+
+    // Y el CONFIRM hace exactamente eso.
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          archivos: [archivoPdf2()],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(),
+      ),
+    ).rejects.toThrow(/descontinuado/i);
+
+    // A2: la 2ª importación no dejó ni pedido ni OP nuevos (sólo viven los de la 1ª).
+    expect(await cliente.pedido.count()).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+});
+
+// ── ⭐ Fila 0.151 — LA OP ENSEÑA DE QUÉ DESARROLLO NACIÓ ───────────────────────────────
+
+/**
+ * DANIEL: *«¿qué pasa si me equivoqué con el modelo de desarrollo al que lo relacioné?… **en la OP
+ * no veo el modelo de desarrollo**»*. El dato existía en la base desde V1-E3 (`Modelo
+ * .idModeloDesarrollo`) y sólo salía en la respuesta del alta, ese instante y nunca más: el
+ * contrato de la ORDEN no lo transportaba.
+ */
+describe('⭐ el linaje del modelo viaja en la orden (fila 0.151)', () => {
+  it('una OP nacida del PDF dice de qué modelo de DESARROLLO salió', async () => {
+    const idModelo = await crearModelo('DEV-CYA-LINAJE');
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const orden = await obtenerOrden(sesion(), res.ordenes[0]!.idOrden, bd());
+    // La OP lleva el HIJO (el modelo de producción de su color)…
+    expect(orden.codigoModelo).toBe('71001');
+    // …y ahora dice de quién es hijo, que es lo que Daniel no podía ver.
+    expect(orden.idModeloDesarrollo).toBe(idModelo);
+    expect(orden.codigoModeloDesarrollo).toBe('DEV-CYA-LINAJE');
+  });
+
+  it('una OP SIN linaje lo trae en null (nada que inventar en la pantalla)', async () => {
+    // Modelo del catálogo de PRODUCCIÓN (la rama legado: los migrados del Access). Su OP no nace de
+    // ningún desarrollo, y el contrato tiene que poder decirlo sin ambigüedad.
+    const legado = await cliente.modelo.create({
+      data: { codigo: '51783', origen: 'produccion', numeroProduccion: 51_783 },
+      select: { id: true },
+    });
+
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo: legado.id }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const orden = await obtenerOrden(sesion(), res.ordenes[0]!.idOrden, bd());
+    expect(orden.codigoModelo).toBe('51783');
+    expect(orden.idModeloDesarrollo).toBeNull();
+    expect(orden.codigoModeloDesarrollo).toBeNull();
   });
 });
 

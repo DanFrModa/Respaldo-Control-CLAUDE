@@ -5,12 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderConProveedores } from '@/pruebas/utilidades';
 
 /**
- * ⭐ EL DEFAULT `origen: 'produccion'` DEL API NO PUEDE COMERSE LOS BUSCADORES (V1-E3n).
+ * ⭐ NINGÚN DEFAULT DE `origen` PUEDE COMERSE LOS BUSCADORES (V1-E3n).
  *
- * §Post-F9.34 punto 2 pide que **el catálogo y la galería** —lo que se NAVEGA— enseñen producción por
+ * §Post-F9.34 punto 2 pedía que **el catálogo y la galería** —lo que se NAVEGA— enseñaran producción por
  * default, para que las muestras que nunca salen no llenen la vitrina. Pero el default vive en el
- * servidor, así que se aplica también a las **cajas de búsqueda por texto**, donde alguien teclea un
+ * servidor, así que se aplicaba también a las **cajas de búsqueda por texto**, donde alguien teclea un
  * código que ya conoce. Ahí esconder los de desarrollo no es limpieza: es romper el camino.
+ *
+ * 🔁 **V1-E8j (§Post-F9.134): el default del servidor pasó a `'todos'`**, así que hoy estos buscadores
+ * no dependen de él para funcionar. **Las aserciones se quedan, y a propósito:** son el candado de que
+ * ninguno de los cinco vuelva a heredar un default que los acote. Que el peligro esté dormido no es
+ * razón para quitarle la reja — y el `'produccion'` de la última prueba sigue midiendo lo mismo: que el
+ * llamador PUEDE acotar cuando de verdad quiere una sola cara.
  *
  * En especial el **combo del renglón del pedido**: si un modelo de desarrollo no se puede poner en un
  * pedido, entonces *no hay manera manual de llegar a «generar la OP»* — que es justo lo que pasa el

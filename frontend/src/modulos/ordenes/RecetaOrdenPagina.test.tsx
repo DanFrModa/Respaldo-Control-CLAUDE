@@ -13,6 +13,8 @@ import { RecetaOrdenPagina } from './RecetaOrdenPagina';
 const useRecetaOrdenMock = vi.fn<(id: number | undefined) => unknown>();
 
 vi.mock('@/api/receta-orden', () => ({
+  // ⭐ fila 0.068: `PanelRecetaOrden` la usa para re-leer la receta al des-autorizar una OC.
+  CLAVE_RECETA_ORDEN: ['ordenes', 'receta'],
   useRecetaOrden: (id: number | undefined) => useRecetaOrdenMock(id),
   useMarcarRecetaRevisada: () => ({ mutate: vi.fn(), isPending: false }),
   useLiberarReceta: () => ({ mutate: vi.fn(), isPending: false }),
@@ -21,6 +23,12 @@ vi.mock('@/api/receta-orden', () => ({
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useTraerDelModelo: () => ({ mutate: vi.fn(), isPending: false }),
+  useCorregirCapturaAvio: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐⭐ V1-E8z — el candado de compra. `PanelRecetaOrden` los consume, así que el mock los tiene
+  // que exportar o el módulo entero revienta al montar (no es un detalle del mock: es la lista
+  // completa de lo que la pantalla necesita del API).
+  useAbrirReceta: () => ({ mutate: vi.fn(), isPending: false }),
+  useCerrarReceta: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/api/medidas-avio', () => ({
@@ -41,6 +49,14 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaPor: null,
     puedeComprar: false,
     todoLiberado: false,
+    // ⭐⭐ V1-E8z: la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaPor: null,
+    abiertaMotivo: null,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)): por default esta orden NO tiene compra comprometida.
+    ocsComprometidas: [],
+    avisoCompraComprometida: null,
+    avisoCambioSobreLoComprado: null,
     resumen: {
       sinRevisar: 1,
       revisados: 0,
@@ -75,12 +91,21 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1.5,
         precioModelo: 50,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     avios: [],
     artes: [],
     avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
     ...over,
   };
 }

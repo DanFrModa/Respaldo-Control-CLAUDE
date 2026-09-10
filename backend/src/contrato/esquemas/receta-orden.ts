@@ -11,10 +11,18 @@
  * ⚠️ La DESALINEACIÓN contra el BOM del modelo se calcula **AL VUELO**, sin evento, sin outbox y sin
  * estado acumulado (§Post-F9.43(d)): la receta está congelada y el BOM está vivo, así que la
  * diferencia sale de compararlos cuando alguien abre la pantalla.
+ *
+ * ⭐⭐ Y desde la fila 0.068 (a) la salida trae **una segunda comparación, perpendicular a aquélla**:
+ * `frenteAlGrupo` (contrato en `hermanas-op.ts`), que dice si esta OP lleva lo mismo que sus **OP
+ * HERMANAS** del mismo linaje de modelo. `desalineacion` mira al PADRE; `frenteAlGrupo`, a los
+ * HERMANOS. No se implican y no se sustituyen.
  */
 import { z } from 'zod';
 
+import { esquemaEstatusOrdenCompra } from './compra.js';
+import { esquemaFrenteAlGrupo } from './hermanas-op.js';
 import { esquemaEstadoOrden } from './orden.js';
+import { esquemaTipoRenglonReceta } from './renglon-receta.js';
 
 // ── Vocabulario ────────────────────────────────────────────────────────────────
 
@@ -30,13 +38,11 @@ export const esquemaEstadoRenglonReceta = z
 /** Clave del estado de un renglón de la receta. */
 export type EstadoRenglonRecetaClave = z.infer<typeof esquemaEstadoRenglonReceta>;
 
-/** Qué clase de renglón es (las tres secciones de la receta). */
-export const esquemaTipoRenglonReceta = z
-  .enum(['tela', 'avio', 'arte'])
-  .describe('Sección de la receta a la que pertenece el renglón.');
-
-/** Clave del tipo de renglón. */
-export type TipoRenglonRecetaClave = z.infer<typeof esquemaTipoRenglonReceta>;
+// ⚠️ El enum de las tres secciones se MUDÓ a `renglon-receta.ts` (fila 0.068 (a)): lo necesitan
+// también los esquemas de la comparación horizontal (`hermanas-op.ts`), y este archivo importa los
+// SUYOS — dejarlo aquí haría un ciclo que revienta al construir los esquemas de Zod. Se re-exporta
+// para que nada de lo que ya lo importaba de aquí tenga que cambiar.
+export { esquemaTipoRenglonReceta, type TipoRenglonRecetaClave } from './renglon-receta.js';
 
 /**
  * QUÉ cambió respecto de lo congelado en la orden (§Post-F9.43(d): el aviso tiene que decir *qué*
@@ -60,6 +66,69 @@ export const esquemaTipoCambioReceta = z
 
 /** Clave del tipo de cambio. */
 export type TipoCambioRecetaClave = z.infer<typeof esquemaTipoCambioReceta>;
+
+/**
+ * ⭐⭐⭐ **UNA OC QUE YA COMPROMETIÓ LA COMPRA** (0.085, §Post-F9.173(a)).
+ *
+ * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado**… **No se puede cancelar la OC
+ * en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * ⚖️ **Sólo entran `autorizada`, `recibida_parcial` y `recibida_total`** (`ESTATUS_OC_COMPROMETIDA`,
+ * la MISMA lista que usan las guardas de §Post-F9.79 y V1-E4c). Un `borrador` NO entra: no hay
+ * tercero con quien negociar, se corrige o se borra sin llamarle a nadie — y avisar sobre él sería
+ * gritar en falso, que es como se entrena a la gente a ignorar los avisos.
+ *
+ * ⚠️ Se calcula **EN VIVO** en cada lectura, nunca se guarda: si la OC se des-autoriza después, el
+ * aviso tiene que callarse solo.
+ *
+ * 🔴 El `estatus` viaja porque **decide el camino**: una `autorizada` se puede des-autorizar (con el
+ * permiso de Dirección); una **recibida NO** —el material ya entró al inventario— y ahí lo honesto
+ * es una devolución o un ajuste. Sin este campo, la pantalla mandaría a la mitad de la gente a un
+ * botón que va a rebotar.
+ */
+export const esquemaOcComprometida = z
+  .object({
+    idOrdenCompra: z.number().int().describe('Id de la OC (para poder llevar a ella).'),
+    folio: z.number().int().describe('`numCompra`: el folio con el que se nombra la OC.'),
+    /*
+     * ⚠️ **REUSA EL ENUM COMPLETO A PROPÓSITO, aunque el servidor sólo emita tres.**
+     *
+     * Estrechar aquí a `['autorizada','recibida_parcial','recibida_total']` obligaría a escribir esa
+     * lista **por segunda vez** —y a una tercera (un guard de estrechamiento) en el dominio, porque
+     * `ordenCompra.estatus` llega tipado con los seis—. Tres copias de *"qué significa estar
+     * comprometido"* es exactamente lo que `ESTATUS_OC_COMPROMETIDA` existe para impedir. En un
+     * campo de SALIDA un superconjunto no promete de más: ningún cliente puede mandar nada por
+     * aquí, y quien lo lea con los seis casos cubiertos nunca se rompe.
+     *
+     * 🔑 Y sobre todo: **la pantalla no tiene que ramificar sobre este valor** — para decidir el
+     * camino está `recibida`, que llega ya calculado por el dominio.
+     */
+    estatus: esquemaEstatusOrdenCompra.describe(
+      'Estatus real de la OC. En la práctica el servidor sólo emite `autorizada`, ' +
+        '`recibida_parcial` o `recibida_total` (`ESTATUS_OC_COMPROMETIDA`), porque son los únicos ' +
+        'que comprometen frente al proveedor; el enum es el completo para no duplicar esa lista.',
+    ),
+    recibida: z
+      .boolean()
+      .describe(
+        '⭐ ¿Esta OC YA SE RECIBIÓ? Lo decide el SERVIDOR (`algunaRecibida`), no la pantalla — y ' +
+          'DECIDE EL CAMINO: una autorizada se puede des-autorizar (permiso de Dirección); una ' +
+          'recibida NO, ahí lo honesto es una devolución o un ajuste. 🔴 Es el techo del aviso: el ' +
+          'sistema NO puede saber si además ya se PAGÓ (ningún modelo de CxP liga a una OC).',
+      ),
+  })
+  .describe('Una orden de compra que ya comprometió la compra frente al proveedor.');
+
+/** Una OC ya comprometida frente al proveedor. */
+export type OcComprometida = z.infer<typeof esquemaOcComprometida>;
+
+/** Las OC comprometidas que cubren UN renglón de la receta (vacío = ese material no se ha comprado). */
+const ocsDelRenglon = z
+  .array(esquemaOcComprometida)
+  .describe(
+    '⭐ 0.085: las OC ya comprometidas que compraron ESTE material para esta orden (vacío = ' +
+      'ninguna). Es el dato que convierte "cambió algo" en "cambió algo que ya está comprado".',
+  );
 
 // ── Salida: los renglones ──────────────────────────────────────────────────────
 
@@ -143,6 +212,7 @@ export const esquemaRecetaOrdenTela = z
         '¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una ' +
           'diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo.',
       ),
+    ocsComprometidas: ocsDelRenglon,
   })
   .describe('Renglón de tela de la receta congelada de una orden.');
 
@@ -215,6 +285,17 @@ export const esquemaRecetaOrdenAvio = z
         'Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción ' +
           'heredada entre modo y toggle, o un número absurdo para la unidad), o null.',
       ),
+    capturaReparable: z
+      .boolean()
+      .describe(
+        '⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se ' +
+          'compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que ' +
+          'el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al ' +
+          'aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo ' +
+          'decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO ' +
+          'todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la ' +
+          'unidad, que se arregla capturando bien, no con un botón.',
+      ),
     idAvioProveedor: z
       .number()
       .int()
@@ -237,6 +318,7 @@ export const esquemaRecetaOrdenAvio = z
     precioModeloDeCompra: z
       .boolean()
       .describe('¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela).'),
+    ocsComprometidas: ocsDelRenglon,
   })
   .describe('Renglón de avío de la receta congelada de una orden.');
 
@@ -401,11 +483,41 @@ export const esquemaRecetaOrden = z
       .describe(
         '⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se ' +
           'compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado ' +
-          'nada de esta receta y no hay qué comprar.',
+          'nada de esta receta y no hay qué comprar. ⭐⭐ V1-E8z: **también es `false` mientras la ' +
+          'receta está ABIERTA para corregirse** (`abiertaEn` no es null) — el nombre del campo es ' +
+          'una promesa, y el servidor rechazaría la compra igual (A1: la pantalla no lo deduce).',
       ),
     todoLiberado: z
       .boolean()
       .describe('¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null).'),
+    /*
+     * ⭐⭐ V1-E8z (0.067) — EL CANDADO DE COMPRA (§Post-F9.160(a), §Post-F9.165).
+     *
+     * DANIEL: *"pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra
+     * vez**"*. La receta ya liberada se REABRE para corregirla y la compra de la orden se congela
+     * hasta que se cierre. Reabrir **sólo marca: NO desfirma** — así cerrar es un clic y no
+     * cuarenta (§Post-F9.80 retiró la liberación en bloque).
+     *
+     * ⚠️ **No es `liberadaEn` puesto en null.** Ese derivado ya NO gobierna la compra (la puerta
+     * pregunta renglón por renglón), así que apagarlo cambiaría el letrero de la pantalla y dejaría
+     * salir la orden de compra igual.
+     */
+    abiertaEn: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E8z: cuándo se REABRIÓ esta receta para corregirla (ISO). **No null = la compra de ' +
+          'esta orden está CONGELADA** (MRP, generar OC y OC a mano ligada). null = cerrada. ' +
+          'Cortar, enviar a maquila, recibir y entregar NO se bloquean nunca.',
+      ),
+    abiertaPor: z.string().nullable().describe('Quién la reabrió (id de usuario), o null.'),
+    abiertaMotivo: z
+      .string()
+      .nullable()
+      .describe(
+        'POR QUÉ se reabrió (obligatorio al abrir). Es lo que ve el comprador en el 409 cuando ' +
+          'intenta comprar: sin él, la compra se congela sin explicación.',
+      ),
     avisoCurva: z
       .string()
       .nullable()
@@ -415,11 +527,61 @@ export const esquemaRecetaOrden = z
           'sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, ' +
           'o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda.',
       ),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **SI YA SE COMPRÓ, AVISA.**
+     *
+     * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+     * cancelar la OC interna, o que **el comprador sepa que cambió**… **No se puede cancelar la OC
+     * en automático… eso hay que negociarlo con el proveedor.**"*
+     *
+     * Las OC comprometidas de TODA la orden (unión de las de sus renglones más las líneas libres),
+     * sin repetir y por folio. Vacío = esta orden no tiene compra comprometida.
+     *
+     * 🔴 **NO es lo mismo que `desalineacion.critico`.** Aquél pregunta *"¿el MODELO se movió?"*;
+     * éste, *"¿ya hay dinero comprometido con un proveedor?"* — y por eso no cuenta borradores.
+     */
+    ocsComprometidas: z
+      .array(esquemaOcComprometida)
+      .describe('OC ya comprometidas de esta orden (vacío = ninguna). En vivo, nunca guardado.'),
+    avisoCompraComprometida: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ 0.085: aviso REDACTADO POR EL SERVIDOR (A1) para pintarlo **ANTES** de reabrir la ' +
+          'receta — nombra las OC y su estado, y dice a quién pedirle qué. `null` = no hay compra ' +
+          'comprometida. NUNCA bloquea: reabrir sigue siendo legítimo.',
+      ),
+    avisoCambioSobreLoComprado: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ 0.085 — el ECO de LA MUTACIÓN QUE ACABA DE CORRER: qué renglones ya comprados ' +
+          'cambiaron y qué hacer con su OC. **En una LECTURA es siempre `null`**: no es estado de ' +
+          'la receta, es la respuesta a lo que se acaba de hacer (por eso no se guarda ni se ' +
+          'recalcula al recargar). AVISA, no bloquea (§Post-F9.173(a)).',
+      ),
     resumen: esquemaResumenReceta,
     telas: z.array(esquemaRecetaOrdenTela),
     avios: z.array(esquemaRecetaOrdenAvio),
     artes: z.array(esquemaRecetaOrdenArte),
     desalineacion: esquemaDesalineacionReceta,
+    /*
+     * ⭐⭐ fila 0.068 (a) (§Post-F9.146 pregunta 4) — **CÓMO VA ESTA OP FRENTE A SUS HERMANAS.**
+     *
+     * DANIEL: *"Normalmente todas las OP deben de ir iguales. Puede pasar que una OP del grupo se le
+     * cambie algún avío (por ejemplo, no hubo cierre de ese tono y se compró otro tipo de cierre
+     * sólo para la café)… **se debe de poder hacer, pero advirtiendo de la diferencia**"*.
+     *
+     * 🔴 **Es PERPENDICULAR a `desalineacion`, el campo de arriba, y confundirlos es el error fácil:**
+     * aquél compara esta receta congelada contra la del **MODELO** (vertical, padre ↔ hijo, a lo
+     * largo del tiempo); éste, contra la de sus **OP HERMANAS** del mismo linaje (horizontal, en el
+     * mismo momento). Dos hermanas pueden estar las dos perfectamente alineadas con el padre y aun
+     * así diferir entre ellas — ninguna de las dos preguntas implica la otra.
+     *
+     * INFORMATIVO: no bloquea nada, no toca `puedeComprar` y no entra en ninguna guarda. Se calcula
+     * al vuelo en cada lectura y **nunca se guarda**.
+     */
+    frenteAlGrupo: esquemaFrenteAlGrupo,
   })
   .describe('Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43).');
 
@@ -599,6 +761,33 @@ export const esquemaLiberarRecetaCuerpo = z
 /** Datos de una liberación. */
 export type DatosLiberarReceta = z.input<typeof esquemaLiberarRecetaCuerpo>;
 
+// ── V1-E8z · EL CANDADO DE COMPRA: ABRIR y CERRAR la receta (§Post-F9.160(a)) ──
+
+/**
+ * Cuerpo de ABRIR la receta. **El motivo es OBLIGATORIO**, y no es simetría con «quitar» (donde es
+ * opcional): abrir CONGELA LA COMPRA DE UNA ORDEN ENTERA, y el comprador que se topa con el 409 sólo
+ * tiene este texto para saber qué está esperando. Un candado anónimo se vuelve un misterio a las dos
+ * horas.
+ *
+ * CERRAR **no lleva cuerpo**: no se pide motivo para terminar de corregir — la razón ya se dio al
+ * abrir, y pedir dos textos por una sola corrección es la fricción que entrena a escribir «ok».
+ */
+export const esquemaAbrirRecetaCuerpo = z
+  .object({
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(1, { error: 'Di por qué se reabre: congela la compra de toda la orden' })
+      .max(2000)
+      .describe('Por qué se reabre la receta. Obligatorio: es lo que ve el comprador en el 409.'),
+  })
+  .describe(
+    'Reabre la receta de la orden y CONGELA su compra hasta que se cierre (§Post-F9.160(a)).',
+  );
+
+/** Datos al abrir la receta. */
+export type DatosAbrirReceta = z.input<typeof esquemaAbrirRecetaCuerpo>;
+
 // ── V1-E3h · TRAER DEL MODELO lo que le falta a la receta (§Post-F9.73) ────────
 
 /**
@@ -702,8 +891,47 @@ export const esquemaRecetaPorLiberar = z
           'receta, así que alguien está comprando y esperando el resto. No es lo mismo que una ' +
           'orden recién nacida a la que todavía nadie le pide nada.',
       ),
+    /*
+     * 🔴 V1-E8z — POR QUÉ LA BANDEJA TUVO QUE CRECER (§Post-F9.165 punto 7).
+     *
+     * Reabrir **sólo marca, no desfirma**, así que una orden en corrección **no tiene ni un renglón
+     * sin firmar** y esta bandeja —que lista por renglones pendientes— no la vería jamás. Quedaría
+     * con la compra congelada, invisible e indefinidamente: exactamente el silencio que la bandeja
+     * vino a romper. Por eso la consulta también trae las reabiertas, y por eso van ARRIBA: una
+     * receta abierta congela la compra de TODA la orden, no de un renglón.
+     */
+    abiertaEn: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E8z: la receta está ABIERTA para corregirse desde esta fecha (ISO) y la compra de ' +
+          'la orden está congelada. null = no está abierta (la fila salió por renglones pendientes).',
+      ),
+    abiertaMotivo: z.string().nullable().describe('Por qué se reabrió, o null.'),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **LA COLUMNA POR LA QUE EL AVISO LLEGA AL COMPRADOR.**
+     *
+     * El 409 de la puerta de compra sólo alcanza a quien INTENTA gastar; si ya compró, no va a
+     * volver a intentarlo, así que ese camino no puede alcanzarlo jamás. Esta bandeja sí: la ve con
+     * `desarrollo.ver` —que el comprador ya tiene— y ya lista solas tanto las recetas reabiertas
+     * como las órdenes con un renglón desfirmado (que es como queda un material cuyo consumo,
+     * precio o amarre acaba de cambiar).
+     *
+     * ⚠️ **NO es `conOrdenCompra`, y la diferencia es la etapa entera.** Aquella bandera pregunta
+     * *"¿hay ALGUIEN esperando esta firma?"* y por eso cuenta cualquier OC no cancelada —un
+     * borrador incluido: alguien ya se sentó a escribirlo—. Ésta pregunta *"¿hay que negociar con un
+     * proveedor?"*, y ahí un borrador **no cuenta**: se corrige o se borra sin llamarle a nadie.
+     */
+    ocsComprometidas: z
+      .array(esquemaOcComprometida)
+      .describe(
+        '⭐ 0.085: las OC YA COMPROMETIDAS (autorizada / recibida) de esta orden, con folio y ' +
+          'estado. Vacío = no hay nada negociado con un proveedor todavía.',
+      ),
   })
-  .describe('Una orden con renglones de receta pendientes de liberar (§Post-F9.72).');
+  .describe(
+    'Una orden con receta pendiente de liberar o ABIERTA para corregirse (§Post-F9.72/165).',
+  );
 
 /** Fila de la bandeja «Recetas por liberar». */
 export type RecetaPorLiberar = z.infer<typeof esquemaRecetaPorLiberar>;

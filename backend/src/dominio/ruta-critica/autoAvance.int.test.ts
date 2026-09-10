@@ -286,7 +286,12 @@ describe('recibo de costura: cuadra WIP+IPT+EsMa+RC y auto-completa (F5-E6)', ()
     const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
     expect(existencias.totalExistencia).toBe(30); // IPT subió.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
-    expect(cola.filas).toHaveLength(1); // EsMa propuesto.
+    // fila 0.114: en la cola hay DOS cargos propuestos —el del CORTE, que desde esa fila también se
+    // paga desde la orden, y el del RECIBO—. Lo que este punto de integración mide es el del recibo,
+    // así que se elige por su etapa en vez de contar «uno» (y de paso se afirma el del corte).
+    expect(cola.filas.filter((f) => f.servicio === 'corte')).toHaveLength(1);
+    const cargosDelRecibo = cola.filas.filter((f) => f.idEtapaRecibo === idRecibo);
+    expect(cargosDelRecibo).toHaveLength(1); // EsMa propuesto.
     expect(idRecibo).toBeGreaterThan(0); // WIP (recibo) existe.
 
     // Antes de drenar, la RC sigue activa (el outbox aún no se consumió).

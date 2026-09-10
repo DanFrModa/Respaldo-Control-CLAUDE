@@ -39,8 +39,10 @@ export const ORIGEN = {
   /** Entrada de tela/avío por recepción de compra (F4-E3 — el `origenId` es la recepción/OC). */
   recepcionCompra: 'recepcion-compra',
   /**
-   * Entrada de TELA por FACTURA/REMISIÓN del proveedor, SIN orden de compra (B1 — la segunda vía de
-   * entrada que pidió Daniel, §Post-F9.9 punto 7). El `origenId` es el id del documento `EntradaTela`.
+   * Entrada de TELA por FACTURA/REMISIÓN del proveedor (B1), SIEMPRE contra sus órdenes de compra
+   * (§Post-F9.159(a) cerró la vía sin OC de §Post-F9.9 punto 7). El `origenId` es el id del
+   * documento `EntradaTela`. ⚠️ Los movimientos ya escritos con este origen antes de esa decisión
+   * pueden no tener OC detrás: son historia, y se leen igual (D3).
    */
   entradaTela: 'entrada-tela',
   /** Salida de avío por una nota de salida a maquilero (F4-E5 — el `origenId` es la nota). */
@@ -49,6 +51,27 @@ export const ORIGEN = {
   migracion: 'migracion',
   /** Ajuste de kardex PT generado por un inventario cíclico (F7-E5). El `origenId` es el id del cíclico. */
   ajusteCiclico: 'ajuste-ciclico',
+  /**
+   * Ajuste de kardex de TELA generado por un CONTEO FÍSICO por color (fila 0.098): la persona
+   * capturó lo CONTADO y el servidor aplicó la diferencia. Sin `origenId` (el conteo no es una
+   * entidad: es la captura que produjo estos movimientos). Se distingue del ajuste a mano
+   * (`movimiento-manual`) porque ahí la cantidad la decidió quien capturó, y aquí la calculó el
+   * sistema contra el saldo que leyó bajo lock.
+   */
+  conteoTela: 'conteo-tela',
+  /**
+   * ⭐ Salida de TELA o de AVÍO que NO va a ninguna orden (fila 0.104, §Post-F9.193 resp. 12):
+   * devolución al proveedor, venta de material que ya no se usa u otra causa. SIN `origenId`: no
+   * hay entidad detrás — el hecho es la captura misma, y el *por qué* viaja en el tipo de
+   * movimiento (`devolucion-proveedor` / `venta-material` / `otras-salidas`) más el motivo
+   * obligatorio de las observaciones.
+   *
+   * 🔑 Este discriminador NO es decorativo: es lo que permite que la CANCELACIÓN de una de estas
+   * salidas exija el permiso `salida-material.registrar` y no baste con `inventario-*.mover`
+   * (`dominio/inventarios/salida-sin-orden.ts`). Sin él, cualquiera con `.mover` podría deshacer
+   * lo que sólo el dueño puede autorizar.
+   */
+  salidaSinOrden: 'salida-sin-orden',
 } as const;
 
 /** Discriminador válido de `Movimiento.origenTipo`. */

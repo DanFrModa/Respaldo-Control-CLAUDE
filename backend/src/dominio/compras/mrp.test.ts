@@ -13,10 +13,13 @@ import {
   prefijarConLaOrden,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
+  claveAgrupada,
   estadoGenerico,
+  gruposDeCompraDelAvio,
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
   requeridoAvio,
   resolverFechasDeOc,
   type AvioDeLaExplosion,
@@ -117,9 +120,13 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     precioSugerido: null,
     origenProveedor: 'sin-proveedor' as const,
     proveedorSugeridoInactivo: false,
-    // V1-E3u: los avíos no llevan color (ver la nota del dominio).
+    // V1-E3u: el color de TELA no aplica a un avío.
     idTelaColor: null,
     telaColor: null,
+    // ⭐⭐ V1-E8c: el avío SÍ lleva color desde §Post-F9.126 — el de la prenda. Aquí, ninguno.
+    idColorPrenda: null,
+    colorPrenda: null,
+    desglose: [],
     // §Post-F9.105: avisos del renglón (aquí, ninguno).
     avisos: [],
   };
@@ -145,6 +152,12 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
  * ⭐ §Post-F9.71 (V1-E3i) — LA FECHA DE CADA OC. Daniel: *"cada OC interna va a tener una fecha de
  * entrega diferente"*. La regla es pura (no toca BD) para poder probarla aquí; el efecto real sobre
  * las OC creadas va en `mrp.int.test.ts`.
+ *
+ * 🔴 **V1-E7f (§Post-F9.120): la cascada tiene DOS peldaños, no tres.** Había un tercero —la fecha
+ * de entrega de las OP— y se retiró: es la fecha del CLIENTE, no la del proveedor. Aquí eso se ve
+ * en negativo (la función ya ni siquiera recibe las OP); **lo que fija la regla es la prueba de
+ * `generarOCDesdeExplosion` de más abajo**, que entra por la puerta de verdad — el respaldo vivía
+ * en QUIEN LLAMABA, así que sólo ahí se puede matar.
  */
 describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
   it('cada proveedor recibe la SUYA cuando la manda la pantalla', () => {
@@ -232,6 +245,8 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
       cantidadPendiente: 180,
       cantidadAComprar: 180,
       cantidadEnOc: 0,
+      // ⭐⭐ V1-E8e (§Post-F9.99): el default de la marca — nadie dio nada por cubierto.
+      cantidadCubierta: 0,
       esGenerico: false,
       ...over,
     };
@@ -270,6 +285,71 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
   it('lo que falta por debajo del mínimo SIN OC detrás no miente diciendo «ya-en-oc»', () => {
     const migaja = renglon({ cantidadPendiente: 0, cantidadEnOc: 0, cantidadAComprar: 0.003 });
     expect(motivoDeOmision(migaja, NO_MARCADO)).toBe('menor-al-minimo');
+  });
+
+  /**
+   * 🔴 **V1-E8m — EL ORDEN ENTRE «SIN PROVEEDOR» Y EL PELDAÑO DE LO QUE YA NO SE PIDE**, que hasta
+   * hoy no fijaba nadie (cabo declarado por el reviewer del #209: *no bloqueante, pero no menor*).
+   *
+   * `sin-proveedor` se pregunta **DESPUÉS** de lo que ya está en una OC viva / se dio por cubierto /
+   * es una migaja, y **el estado que los distingue existe en producción** — un material ya cubierto
+   * por una OC viva y con `idProveedorSugerido` en `null`. Se llega por dos caminos, y el principal
+   * **no pasa por la pantalla**:
+   *
+   *  - **(b), el que manda:** `idProveedorSugerido` es **DERIVADO**, no un campo que alguien apague.
+   *    `elegirProveedorTela`/`elegirProveedorAvio` (`proveedor-material.ts`) lo resuelven en cascada
+   *    —amarre de Desarrollo → dueño/habitual → más barato → asignación de Compras— y devuelven
+   *    `origen: 'sin-proveedor'` en cuanto ningún peldaño tiene candidato. Basta con que el CATÁLOGO
+   *    pierda el amarre o el dueño **después** de la compra (o, en el peldaño «más barato», que el
+   *    proveedor se desactive o se quede sin precio) para que el renglón ya comprado amanezca sin
+   *    proveedor **sin que nadie toque la explosión**.
+   *  - **(a), el operativo:** con pendiente todavía > 0 se usa «Quitar la asignación»
+   *    (`guardarProveedor(…, null)`) y **después** se cierra ese pendiente con «dar por cubierto»
+   *    —que sí se ofrece con `cantidadPendiente > 0 || cantidadCubierta > 0`—: es exactamente el
+   *    4º caso de esta prueba.
+   *
+   * ⚠️ **Y lo que NO es, para que nadie lo revise al revés y borre esta prueba:** con el pendiente
+   * ya en 0 la pantalla **no** deja quitar el proveedor — el control vive detrás de `ofreceAsignar`,
+   * que exige `cantidadPendiente > 0` (`ExplosionMaterialesPagina.tsx`). El orden *"primero se cubre
+   * y luego se le quita el proveedor **en la explosión**"* es imposible; los de arriba, no.
+   *
+   * Con la escalera al revés, la previa le diría al comprador *"No hay a quién comprarle"* sobre
+   * algo **YA COMPRADO**, mandándolo a buscar proveedor para una compra que ya hizo. Es §Post-F9.85
+   * otra vez: **no basta con no callarse; hay que no mentir.**
+   *
+   * Ninguna de las pruebas de arriba lo veía: todas dejan el proveedor puesto (`11`), así que subir
+   * `sin-proveedor` un peldaño pasaba en verde — incluso la invariante de "nada no seleccionable
+   * entra", porque el motivo cambiado sigue sin ser `null`.
+   */
+  it('🔴 sin proveedor PERO ya comprado dice «ya-en-oc»: el hecho de la compra manda sobre la falta de proveedor (si se invierte el orden, la previa miente sobre algo YA COMPRADO)', () => {
+    const yaCompradoSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadEnOc: 180,
+    });
+    expect(motivoDeOmision(yaCompradoSinProveedor, NO_MARCADO)).toBe('ya-en-oc');
+    // …y sin selección de por medio, igual. (Misma ruta: sin proveedor la marca ni se consulta
+    // — se deja como red por si la escalera empieza a mirar la selección más abajo.)
+    expect(motivoDeOmision(yaCompradoSinProveedor, SIN_SELECCION)).toBe('ya-en-oc');
+
+    // La segunda rama del mismo peldaño: la migaja sin OC detrás sigue siendo «menor-al-minimo».
+    // Pedirle proveedor a alguien para comprar 0.003 es mandarlo a trabajar en balde.
+    const migajaSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadEnOc: 0,
+      cantidadAComprar: 0.003,
+    });
+    expect(motivoDeOmision(migajaSinProveedor, NO_MARCADO)).toBe('menor-al-minimo');
+
+    // Y la tercera —la marca de una PERSONA (§Post-F9.99)—, que tampoco la borra la falta de
+    // proveedor: quien lo dio por cubierto necesita leer eso, no "no hay a quién comprarle".
+    const dadoPorCubiertoSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadCubierta: 180,
+    });
+    expect(motivoDeOmision(dadoPorCubiertoSinProveedor, NO_MARCADO)).toBe('dado-por-cubierto');
   });
 
   /**
@@ -344,12 +424,20 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
             idMaterial: 21,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            colorTexto: null,
+            colorAjustado: false,
+            medidas: [],
             cantidadEnOcSinColor: 0,
             material: 'CIE-53 — Cierre 53 cm',
+            nombreComplemento: null,
             unidad: 'pza',
             cantidadTotal: 30,
             cantidadPropuesta: 30,
             ajustado: false,
+            cantidadFaltante: 0,
+            restoCubierto: false,
             precioUnitario: 3,
             precioPropuesto: 3,
             precioAjustado: false,
@@ -362,7 +450,9 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
                 cantidad: 30,
                 cantidadPropuesta: 30,
                 precio: 3,
+                cantidadComplemento: null,
                 importe: 90,
+                medidas: [],
                 seEscribe,
               },
             ],
@@ -472,12 +562,20 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
       idMaterial: 4,
       idTelaColor: null,
       telaColor: null,
+      idColorPrenda: null,
+      colorPrenda: null,
+      colorTexto: null,
+      colorAjustado: false,
+      medidas: [],
       cantidadEnOcSinColor: 0,
       material: 'Felpa',
+      nombreComplemento: null,
       unidad: 'm',
       cantidadTotal: 45,
       cantidadPropuesta: 45,
       ajustado: false,
+      cantidadFaltante: 0,
+      restoCubierto: false,
       precioUnitario: 50,
       precioPropuesto: 50,
       precioAjustado: false,
@@ -490,7 +588,9 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
           cantidad: 45,
           cantidadPropuesta: 45,
           precio: 50,
+          cantidadComplemento: null,
           importe: 2250,
+          medidas: [],
           seEscribe: true,
         },
       ],
@@ -570,7 +670,9 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
           cantidad: 45,
           cantidadPropuesta: 45,
           precio: 50,
+          cantidadComplemento: null,
           importe: 2250,
+          medidas: [],
           seEscribe: true,
         },
       ],
@@ -623,9 +725,12 @@ describe('MRP unit — aviso de avío POR MEDIDA con cantidades por talla (§Pos
     expect(requerido).toBe(1590);
     expect(avisosRenglon).toHaveLength(1);
     expect(avisosRenglon[0]).toContain('POR MEDIDA');
-    expect(avisosRenglon[0]).toContain('1,590 pza');
-    expect(avisosRenglon[0]).toContain('en vez de 30 pza');
-    expect(avisosRenglon[0]).toContain('receta de la orden');
+    expect(avisosRenglon[0]).toContain('Esta orden pide 1,590 pza y deberían ser 30 pza');
+    // ⭐⭐ V1-E8h (§Post-F9.130): el remedio NOMBRA EL BOTÓN. El texto viejo mandaba a «guardar el
+    // renglón (con eso se normaliza)» — un conjuro que un no-programador no puede adivinar.
+    expect(avisosRenglon[0]).toContain('receta de esta orden');
+    expect(avisosRenglon[0]).toContain('«Corregir»');
+    expect(avisosRenglon[0]).not.toContain('normaliza');
     // 🔴 Y NO se cuela en la caja gris del pie ("notas de precios y proveedores"): ahí se perdería.
     expect(avisos).toEqual([]);
   });
@@ -757,12 +862,20 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
       idMaterial: 3,
       idTelaColor: null,
       telaColor: null,
+      idColorPrenda: null,
+      colorPrenda: null,
+      colorTexto: null,
+      colorAjustado: false,
+      medidas: [],
       cantidadEnOcSinColor: 0,
       material: 'CIE-53 — Cierre 53 cm',
+      nombreComplemento: null,
       unidad: 'pza',
       cantidadTotal: 1590,
       cantidadPropuesta: 1590,
       ajustado: false,
+      cantidadFaltante: 0,
+      restoCubierto: false,
       precioUnitario: 6,
       precioPropuesto: 6,
       precioAjustado: false,
@@ -775,7 +888,9 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
           cantidad: 1590,
           cantidadPropuesta: 1590,
           precio: 6,
+          cantidadComplemento: null,
           importe: 9540,
+          medidas: [],
           seEscribe: true,
         },
       ],
@@ -799,8 +914,9 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
     expect(halladas).toHaveLength(1);
     expect(halladas[0]?.folioOrden).toBe(5559);
     // 53 × 30 piezas contra 1 × 30: el mismo cálculo (y el mismo texto) que el del renglón.
-    expect(halladas[0]?.aviso).toContain('1,590 pza');
-    expect(halladas[0]?.aviso).toContain('en vez de 30 pza');
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 1,590 pza y deberían ser 30 pza');
+    // El mismo remedio con botón que en el renglón (V1-E8h): una sola redacción para las dos.
+    expect(halladas[0]?.aviso).toContain('«Corregir»');
   });
 
   it('🔴 SUMA las tallas de TODAS las líneas de la OP (una por color), no la última', () => {
@@ -827,8 +943,8 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
       },
     ];
     const halladas = contradiccionesDeLasOrdenes([renglonCierre()], dosColores, folioDe);
-    expect(halladas[0]?.aviso).toContain('2,120 pza'); // 53 × 40
-    expect(halladas[0]?.aviso).toContain('en vez de 40 pza'); // 1 × 40
+    // 53 × 40 contra 1 × 40.
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 2,120 pza y deberían ser 40 pza');
   });
 
   it('se abstiene si el renglón NO trae la bandera (no hay contradicción que medir)', () => {
@@ -903,7 +1019,9 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
           cantidad: 1590,
           cantidadPropuesta: 1590,
           precio: 6,
+          cantidadComplemento: null,
           importe: 9540,
+          medidas: [],
           seEscribe: true,
         },
       ],
@@ -914,5 +1032,733 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
         plan([otraOp]),
       ),
     ).toEqual([]);
+  });
+});
+
+/**
+ * 🔴🔴🔴 **V1-E7f (§Post-F9.120) — LA FECHA DE LA OC NO SE HEREDA DE LA ORDEN DE PRODUCCIÓN.**
+ *
+ * Ésta es LA prueba de la etapa, y por eso NO se conformó con la parte pura: `resolverFechasDeOc`
+ * ya no puede heredar nada —le quitaron el parámetro—, pero el defecto que Daniel encontró no vivía
+ * ahí, vivía en **quien la llamaba** (`planearCompra` armaba el respaldo con la fecha de las OP y se
+ * lo pasaba). Una prueba de la función pura se quedaría verde con el respaldo de vuelta: hay que
+ * entrar por la puerta de verdad, `generarOCDesdeExplosion`.
+ *
+ * Se entra con un **doble de la transacción**, no con Postgres, porque el rechazo ocurre ANTES de
+ * escribir una sola fila: el plan devuelve el bloqueo y la generación lo convierte en error. El
+ * doble no inventa comportamiento — responde a las mismas consultas que hace `planearCompra`,
+ * honrando su `where` (una OP que no está en el `in` no existe, un `count` de firmados cuenta lo
+ * firmado) — y **cualquier tabla o método que no implemente REVIENTA con su nombre**: si mañana el
+ * plan consulta algo nuevo, esta prueba lo dice en vez de seguir con un `undefined` que se parezca
+ * a un dato.
+ *
+ * 🔴 El caso es EXACTAMENTE el de Daniel: la OP **sí** trae fecha de entrega (la 7970 la traía) y
+ * aun así la compra se rechaza. Devolver el respaldo pone esta prueba en rojo por partida doble: no
+ * lanzaría, y el doble tronaría al intentar ESCRIBIR la OC.
+ */
+describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)', () => {
+  const ID_ORDEN = 50;
+  const ID_PROVEEDOR = 11;
+  /** La fecha de entrega AL CLIENTE de la OP. La que se colaba a la OC. */
+  const ENTREGA_AL_CLIENTE = new Date('2026-09-30T00:00:00.000Z');
+
+  /**
+   * Doble de `Tx` con lo que `planearCompra` consulta, y NADA más. Cada tabla responde como
+   * responde Prisma para este escenario: una OP viva de la empresa 1, con la receta firmada (1
+   * renglón liberado, 0 pendientes) y un requerimiento de botones con proveedor y precio.
+   */
+  function txFalso(): { tx: never; consultadas: string[] } {
+    const consultadas: string[] = [];
+    const orden = {
+      id: ID_ORDEN,
+      folio: 7970,
+      idEmpresa: 1,
+      idModelo: 900,
+      fechaEntrega: ENTREGA_AL_CLIENTE,
+      modelo: { codigo: 'MJD-1' },
+      pedidoLinea: null,
+      lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+    };
+    const tablas: Record<string, Record<string, (args?: never) => Promise<unknown>>> = {
+      orden: {
+        // Honra el `where`: sólo devuelve la OP si de verdad la están pidiendo (y de su empresa).
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { id: { in: number[] }; idEmpresa: number } })
+            .where;
+          const casa = w.id.in.includes(ID_ORDEN) && w.idEmpresa === orden.idEmpresa;
+          return Promise.resolve(casa ? [orden] : []);
+        },
+        findFirst: (args?: never) => {
+          const w = (args as unknown as { where: { id: number; idEmpresa: number } }).where;
+          const casa = w.id === ID_ORDEN && w.idEmpresa === orden.idEmpresa;
+          // ⭐⭐ V1-E8z: el `select` real de la puerta trae también las columnas del CANDADO DE
+          // COMPRA. El stub las devuelve en NULL (= receta no reabierta), que es el caso de esta
+          // batería; devolver menos de lo que el `select` pide sería mentirle a la función.
+          return Promise.resolve(
+            casa ? { folio: orden.folio, recetaAbiertaEn: null, recetaAbiertaMotivo: null } : null,
+          );
+        },
+      },
+      // La receta: NADA pendiente de liberar y UN renglón de tela ya firmado (así la puerta de
+      // `exigirRecetaLiberada` abre, que es lo que pasa en el caso real de Daniel).
+      ordenTela: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(1) },
+      ordenAvio: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      ordenArte: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      direccionEntrega: { findFirst: () => Promise.resolve({ id: 3 }) },
+      requerimientoOrden: {
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { idOrden: { in: number[] } } }).where;
+          if (!w.idOrden.in.includes(ID_ORDEN)) return Promise.resolve([]);
+          return Promise.resolve([
+            {
+              id: 1,
+              idOrden: ID_ORDEN,
+              idTela: null,
+              idAvio: 20,
+              idTelaColor: null,
+              // ⭐⭐ V1-E8c: el botón de este doble no se pide por color ni por medida.
+              idColorPrenda: null,
+              unidad: 'pza',
+              esGenerico: false,
+              cantidadAComprar: new Prisma.Decimal(100),
+              idProveedorSugerido: ID_PROVEEDOR,
+              precioSugerido: new Prisma.Decimal(2),
+              tela: null,
+              avio: { clave: 'BOT-01', descripcion: 'Botón' },
+              telaColor: null,
+              colorPrenda: null,
+              medidas: [],
+            },
+          ]);
+        },
+      },
+      // Nada comprometido en OC vivas: el botón entero está pendiente de comprar.
+      ordenCompraLinea: { findMany: () => Promise.resolve([]) },
+      // ⭐⭐ V1-E8e (§Post-F9.99): esta OP no tiene nada dado por cubierto — el DEFAULT.
+      requerimientoCubierto: { findMany: () => Promise.resolve([]) },
+      proveedor: {
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { id: { in: number[] } } }).where;
+          return Promise.resolve(
+            w.id.in.includes(ID_PROVEEDOR) ? [{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }] : [],
+          );
+        },
+      },
+    };
+    // 🔴 Todo lo que no esté arriba TRUENA con su nombre: un doble que devuelve `undefined` en
+    // silencio prueba la suposición de quien lo escribió, no el sistema.
+    const tx = new Proxy(
+      {},
+      {
+        get(_destino, tabla: string) {
+          const metodos = tablas[tabla];
+          if (metodos === undefined) {
+            throw new Error(`El doble de la transacción no implementa la tabla "${tabla}"`);
+          }
+          return new Proxy(
+            {},
+            {
+              get(_d, metodo: string) {
+                const fn = metodos[metodo];
+                if (fn === undefined) {
+                  throw new Error(`El doble no implementa "${tabla}.${metodo}"`);
+                }
+                return (args?: never) => {
+                  consultadas.push(`${tabla}.${metodo}`);
+                  return fn(args);
+                };
+              },
+            },
+          );
+        },
+      },
+    ) as never;
+    return { tx, consultadas };
+  }
+
+  it('🔴🔴🔴 la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA', async () => {
+    const { tx, consultadas } = txFalso();
+
+    const error: unknown = await generarOCDesdeExplosion(
+      sesionAdmin(),
+      { idsOrden: [ID_ORDEN], idsRequerimiento: [] },
+      { tx },
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toMatch(/Falta la fecha de entrega de la compra/);
+    // Nombra a quién le falta (no obliga a adivinar) …
+    expect(mensaje).toMatch(/Avíos Baratos/);
+    // … dice dónde SÍ se captura …
+    expect(mensaje).toMatch(/al generar las compras/);
+    // … y 🔴 NO manda a capturarla en la orden: eso ya no desbloquea nada.
+    expect(mensaje).not.toMatch(/Captúrala en la orden/);
+
+    // La OP se leyó de verdad (con su fecha dentro) y aun así no sirvió de nada: la prueba no está
+    // pasando porque el plan se cayera antes de mirarla.
+    expect(consultadas).toContain('orden.findMany');
+    // Y NADA se escribió: ni la OC ni su bitácora (el doble ni siquiera tiene con qué).
+    expect(consultadas.filter((c) => c.includes('create') || c.includes('update'))).toEqual([]);
+  });
+
+  it('con la fecha capturada arriba, el mismo plan SÍ avanza a escribir la OC', async () => {
+    const { tx } = txFalso();
+
+    // Ahora sí hay *cuándo*, así que el plan pasa el bloqueo y llega a la escritura — donde el
+    // doble truena a propósito. Ese trueno es la prueba de que la fecha era LO ÚNICO que faltaba:
+    // sin él, el rechazo de arriba podría venir de cualquier otro hueco del escenario.
+    const error: unknown = await generarOCDesdeExplosion(
+      sesionAdmin(),
+      { idsOrden: [ID_ORDEN], idsRequerimiento: [], fechaEntrega: '2026-08-20' },
+      { tx },
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/Falta la fecha de entrega/);
+    expect((error as Error).message).toMatch(/El doble .*no implementa/);
+  });
+});
+
+// ── ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR parte el renglón; la MEDIDA va en la tablita ───────────
+
+/**
+ * ⭐⭐ **V1-E8c — LA REGLA DE DANIEL, EN UNA CLAVE.** *"Ese modelo nos lo piden en 4 variantes de
+ * color. Se generan 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en una
+ * sola OC. Los cierres se compran todos al mismo proveedor, pero **cada color es diferente**"*.
+ *
+ * `claveAgrupada` es lo ÚNICO que decide si dos renglones se funden en uno o salen separados. Hasta
+ * esta etapa sólo la cubrían pruebas de integración (que necesitan Postgres): aquí se puede mutar.
+ */
+describe('V1-E8c — claveAgrupada: el color parte el renglón, también en los avíos', () => {
+  const avio = (idColorPrenda: number | null, idProveedorSugerido = 11) => ({
+    idTela: null,
+    idAvio: 3,
+    idTelaColor: null,
+    idColorPrenda,
+    idProveedorSugerido,
+  });
+
+  it('⭐ MISMO avío, MISMO proveedor, colores DISTINTOS ⇒ claves distintas (4 renglones)', () => {
+    // 🔴 EL VALOR QUE LO PONE ROJO: que `claveAgrupada` ignore el color de prenda (lo que hacía
+    // antes de esta etapa) — las cuatro OP de Daniel caerían en UN renglón y el proveedor recibiría
+    // "3,200 cierres" sin saber de qué color es cada cuál.
+    const claves = new Set([9, 10, 11, 12].map((c) => claveAgrupada(avio(c))));
+    expect(claves.size).toBe(4);
+  });
+
+  it('⭐ MISMO avío, MISMO color, MISMO proveedor (dos OP) ⇒ UNA sola clave: se suman', () => {
+    expect(claveAgrupada(avio(9))).toBe(claveAgrupada(avio(9)));
+  });
+
+  it('el proveedor sigue partiendo (V1-E3q): mismo color, dos proveedores ⇒ dos renglones', () => {
+    expect(claveAgrupada(avio(9, 11))).not.toBe(claveAgrupada(avio(9, 22)));
+  });
+
+  it('un avío SIN color no se funde con el MISMO avío CON color (no se adivina el tono)', () => {
+    expect(claveAgrupada(avio(null))).not.toBe(claveAgrupada(avio(9)));
+  });
+
+  it('🔴 el color de TELA y el de PRENDA no se confunden: el material ya separa los dos mundos', () => {
+    // Una tela con `idTelaColor: 9` y un avío con `idColorPrenda: 9` son ids de catálogos DISTINTOS
+    // que valen lo mismo. Si la clave no llevara el material, se pisarían.
+    const tela = {
+      idTela: 3,
+      idAvio: null,
+      idTelaColor: 9,
+      idColorPrenda: null,
+      idProveedorSugerido: 11,
+    };
+    expect(claveAgrupada(tela)).not.toBe(claveAgrupada(avio(9)));
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c — el requerido ABIERTO POR TALLA**, que es de donde sale el desglose por medida.
+ * Vive en la MISMA llamada que el requerido (`requeridoAvioReceta`) para que no puedan decir cosas
+ * distintas: la Σ del desglose tiene que ser el requerido, siempre.
+ */
+describe('V1-E8c — requeridoAvio abre el requerido por talla (base del desglose por medida)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+  const piezas = new Map([
+    [1, { piezas: 10, etiqueta: 'CH' }],
+    [2, { piezas: 20, etiqueta: 'M' }],
+  ]);
+
+  /** Un cierre NORMAL: 1 pza por prenda, sin cantidades por talla (el caso sano). */
+  function cierreSano(over: Partial<AvioDeLaExplosion> = {}): AvioDeLaExplosion {
+    return {
+      consumoPorPrenda: D(1),
+      consumoPorTalla: false,
+      tallas: [],
+      avio: { clave: 'CIE', descripcion: 'Cierre', unidad: 'pza', _count: { medidas: 2 } },
+      ...over,
+    };
+  }
+
+  it('⭐ SIN consumo por talla también hay desglose: cada talla lleva SU medida', () => {
+    // 🔴 Rojo si el brazo "no es por talla" devolviera `porTalla: []`: el cierre de consumo plano
+    // —el caso NORMAL— saldría a la OC sin desglose, que es lo que Daniel reportó.
+    const { requerido, porTalla } = requeridoAvio(cierreSano(), 30, piezas, []);
+    expect(requerido).toBe(30);
+    expect(porTalla).toEqual([
+      { idTalla: 1, requerido: 10 },
+      { idTalla: 2, requerido: 20 },
+    ]);
+  });
+
+  it('🔴 Σ porTalla = requerido (la invariante que hace que el desglose cuadre)', () => {
+    const { requerido, porTalla } = requeridoAvio(
+      cierreSano({ consumoPorPrenda: D(2) }),
+      30,
+      piezas,
+      [],
+    );
+    expect(porTalla.reduce((s, t) => s + t.requerido, 0)).toBe(requerido);
+  });
+
+  it('CON consumo por talla, cada talla aporta su propio consumo (y la Σ sigue cerrando)', () => {
+    const porTallaAvio = cierreSano({
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: D(1) },
+        { idTalla: 2, consumo: D(3) },
+      ],
+    });
+    const { requerido, porTalla } = requeridoAvio(porTallaAvio, 30, piezas, []);
+    expect(porTalla).toEqual([
+      { idTalla: 1, requerido: 10 },
+      { idTalla: 2, requerido: 60 },
+    ]);
+    expect(porTalla.reduce((s, t) => s + t.requerido, 0)).toBe(requerido);
+  });
+
+  it('una talla con CERO piezas no aporta renglón (nadie la va a cortar)', () => {
+    const conCero = new Map([...piezas, [3, { piezas: 0, etiqueta: 'G' }]]);
+    const { porTalla } = requeridoAvio(cierreSano(), 30, conCero, []);
+    expect(porTalla.map((t) => t.idTalla)).toEqual([1, 2]);
+  });
+});
+
+// ── ⭐⭐ V1-E8c — EL PLAN COMPLETO, SIN POSTGRES (el hueco que dejó pasar 8 rojas en CI) ──────────
+
+/**
+ * 🔴 **POR QUÉ EXISTE ESTA BATERÍA.** V1-E8c partió el renglón de avío por color, y con eso la clave
+ * del ajuste del comprador pasó a llevar el color. Ocho pruebas de INTEGRACIÓN se cayeron en CI y
+ * ninguna prueba de unidad podía verlo: `planearCompra` necesita una transacción. El resultado fue
+ * el peor posible — el sistema **se tragaba el ajuste en silencio** y compraba `180` donde el
+ * comprador había tecleado `0.1`.
+ *
+ * Se usa el MISMO doble de transacción que la batería de la fecha (arriba): responde lo que
+ * `planearCompra` consulta y **truena con nombre** ante cualquier tabla que no esté prevista. Con él
+ * la conducta que sólo vivía en Postgres se puede **poner roja aquí**, en 300 ms.
+ */
+describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Post-F9.126)', () => {
+  const ID_ORDEN = 4242;
+  const ID_PROVEEDOR = 77;
+  const ID_AVIO = 20;
+  const ID_COLOR = 9;
+
+  /** Una línea de OC **VIEJA**: pide el avío sin decir de qué color (todas las previas a V1-E8c). */
+  const lineaDeOcSinColor = (cantidad: number) => ({
+    idOrden: ID_ORDEN,
+    idTela: null,
+    idAvio: ID_AVIO,
+    idTelaColor: null,
+    idColorPrenda: null,
+    descripcionLibre: null,
+    cantidad: new Prisma.Decimal(cantidad),
+    tela: null,
+    avio: { clave: 'BOT-01', descripcion: 'Botón' },
+    recepcionLineas: [],
+  });
+
+  /**
+   * Doble de `Tx` para `planearCompra`: una OP viva con receta firmada y UN requerimiento de botón
+   * de 100 pza. `idColorPrenda` y las líneas de OC vivas se parametrizan — son las dos variables de
+   * todo lo que esta batería mide.
+   */
+  function txFalso(
+    idColorPrenda: number | null,
+    lineasOc: unknown[] = [],
+    // ⭐⭐ V1-E8e (§Post-F9.99): los actos de «con esto queda cubierto» vivos de esa OP. Vacío = el
+    // DEFAULT (nadie decidió nada), que es como corre el resto de esta batería.
+    cubiertos: unknown[] = [],
+  ): never {
+    const orden = {
+      id: ID_ORDEN,
+      folio: 7970,
+      idEmpresa: 1,
+      idModelo: 900,
+      fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+      modelo: { codigo: 'MJD-1' },
+      pedidoLinea: null,
+      lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+    };
+    const tablas: Record<string, Record<string, () => Promise<unknown>>> = {
+      orden: {
+        findMany: () => Promise.resolve([orden]),
+        // ⭐⭐ V1-E8z: las columnas del candado de compra, en NULL (receta no reabierta).
+        findFirst: () =>
+          Promise.resolve({
+            folio: orden.folio,
+            recetaAbiertaEn: null,
+            recetaAbiertaMotivo: null,
+          }),
+      },
+      ordenTela: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(1) },
+      ordenAvio: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      ordenArte: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      direccionEntrega: { findFirst: () => Promise.resolve({ id: 3 }) },
+      requerimientoOrden: {
+        findMany: () =>
+          Promise.resolve([
+            {
+              id: 1,
+              idOrden: ID_ORDEN,
+              idTela: null,
+              idAvio: ID_AVIO,
+              idTelaColor: null,
+              idColorPrenda,
+              unidad: 'pza',
+              esGenerico: false,
+              cantidadAComprar: new Prisma.Decimal(100),
+              idProveedorSugerido: ID_PROVEEDOR,
+              precioSugerido: new Prisma.Decimal(2),
+              tela: null,
+              avio: { clave: 'BOT-01', descripcion: 'Botón' },
+              telaColor: null,
+              colorPrenda: idColorPrenda === null ? null : { nombre: 'Rojo' },
+              medidas: [],
+            },
+          ]),
+      },
+      ordenCompraLinea: { findMany: () => Promise.resolve(lineasOc) },
+      // ⭐⭐ V1-E8e: la tabla DURABLE de la marca — la que sobrevive a reescribir el snapshot.
+      requerimientoCubierto: { findMany: () => Promise.resolve(cubiertos) },
+      proveedor: {
+        findMany: () => Promise.resolve([{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }]),
+      },
+    };
+    return new Proxy(
+      {},
+      {
+        get(_destino, tabla: string) {
+          const metodos = tablas[tabla];
+          if (metodos === undefined) {
+            throw new Error(`El doble de la transacción no implementa la tabla "${tabla}"`);
+          }
+          return new Proxy(
+            {},
+            {
+              get(_d, metodo: string) {
+                const f = metodos[metodo];
+                if (f === undefined) {
+                  throw new Error(`El doble no implementa "${tabla}.${metodo}"`);
+                }
+                return f;
+              },
+            },
+          );
+        },
+      },
+    ) as never;
+  }
+
+  const sesionCompras = () =>
+    sesionDePrueba({ idEmpresaActiva: 1, permisos: ['compras.ver', 'compras.administrar'] });
+
+  /** Pide el plan con (o sin) un ajuste de cantidad a 40. */
+  async function plan(
+    idColorPrenda: number | null,
+    ajuste?: { idColor?: number | null; restoCubierto?: boolean },
+    lineasOc: unknown[] = [],
+    cubiertos: unknown[] = [],
+  ) {
+    return previoCompraDesdeExplosion(
+      sesionCompras(),
+      {
+        idsOrden: [ID_ORDEN],
+        idsRequerimiento: [],
+        fechaEntrega: '2026-09-30',
+        ...(ajuste === undefined
+          ? {}
+          : {
+              ajustes: [
+                {
+                  tipo: 'avio' as const,
+                  idMaterial: ID_AVIO,
+                  ...(ajuste.idColor === undefined ? {} : { idColor: ajuste.idColor }),
+                  idProveedor: ID_PROVEEDOR,
+                  cantidadTotal: 40,
+                  ...(ajuste.restoCubierto === undefined
+                    ? {}
+                    : { restoCubierto: ajuste.restoCubierto }),
+                },
+              ],
+            }),
+      },
+      { tx: txFalso(idColorPrenda, lineasOc, cubiertos) },
+    );
+  }
+
+  it('⭐ un ajuste que NOMBRA el color se aplica (el camino que usa la pantalla)', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR });
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(40);
+    expect(p.proveedores[0]?.renglones[0]?.ajustado).toBe(true);
+    expect(p.bloqueos).toEqual([]);
+  });
+
+  it('🔴🔴 un ajuste SIN color sobre un renglón CON color **BLOQUEA** (antes se tragaba callado)', async () => {
+    const p = await plan(ID_COLOR, {});
+    // 🔴 EL VALOR QUE LA PONE ROJA: `bloqueos: []` — el estado MEDIDO antes del arreglo, con el que
+    // la compra salía en 100 (lo que propone el sistema) en vez de los 40 que se tecleron.
+    expect(p.bloqueos).toHaveLength(1);
+    expect(p.bloqueos[0]).toContain('BOT-01 — Botón · Rojo');
+    // Y el renglón NO adoptó el número: por eso el bloqueo es lo único que evita gastar de más.
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(100);
+    expect(p.proveedores[0]?.renglones[0]?.ajustado).toBe(false);
+  });
+
+  it('un avío SIN color sigue aceptando el ajuste sin color (cero regresión donde no hay matriz)', async () => {
+    const p = await plan(null, {});
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(40);
+    expect(p.bloqueos).toEqual([]);
+  });
+
+  /**
+   * ⭐⭐ **EL ESCENARIO GRAVE, ANCLADO SIN POSTGRES.** Daniel tiene órdenes de compra REALES en
+   * `prueba`, y todas nacieron antes de esta etapa: piden el avío **sin decir el color**. Si el
+   * acervo sin color dejara de netear, la explosión diría *"cómpralo otra vez"* sobre material ya
+   * comprado — el defecto exacto que §Post-F9.85 cerró, resucitado.
+   *
+   * 🔴 Antes de esta batería, eso **sólo lo cubría integración**. Ahora se cae aquí.
+   */
+  it('⭐⭐ una OC VIEJA sin color SIGUE neteando contra el renglón CON color (lo migrado no se recompra)', async () => {
+    const p = await plan(ID_COLOR, undefined, [lineaDeOcSinColor(60)]);
+    const renglon = p.proveedores[0]?.renglones[0];
+    // 100 requeridos − 60 ya comprados = 40. 🔴 El valor que la pone roja: 100 (el neteo caído).
+    expect(renglon?.cantidadTotal).toBe(40);
+    // Y se DICE que esos 60 el sistema se los atribuyó (la OC vieja no dice de qué color era).
+    expect(renglon?.cantidadEnOcSinColor).toBe(60);
+  });
+
+  // ── ⭐⭐ V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO», POR EL CAMINO REAL DEL PLAN ──────────
+
+  /** Un acto VIVO de «dado por cubierto» sobre ESTE renglón (avío + color de prenda). */
+  const marcaCubierta = (cantidad: number, idColorPrenda: number | null = ID_COLOR) => ({
+    idOrden: ID_ORDEN,
+    idTela: null,
+    idAvio: ID_AVIO,
+    idTelaColor: null,
+    idColorPrenda,
+    cantidad: new Prisma.Decimal(cantidad),
+  });
+
+  it('⭐⭐ EL CASO DE DANIEL: comprado + dado por cubierto ⇒ el renglón deja de pedirse', async () => {
+    // 100 requeridos, 99 ya en una OC viva y 1 dado por cubierto: no queda nada que comprar.
+    const p = await plan(ID_COLOR, undefined, [lineaDeOcSinColor(99)], [marcaCubierta(1)]);
+    // 🔴 El valor que la pone roja: un renglón con `cantidadTotal: 1` — el kilo persiguiéndolo.
+    expect(p.proveedores).toEqual([]);
+    const omitido = p.omitidos[0];
+    expect(omitido?.motivo).toBe('dado-por-cubierto');
+    expect(omitido?.cantidadCubierta).toBe(1);
+    // 🔴 Y la frase NO puede ser la de `ya-en-oc` (*"si esa OC se cancela, vuelve a aparecer"*):
+    // mandaría a cancelar una compra correcta. Dice quién lo cerró y cómo se deshace.
+    expect(omitido?.detalle).toContain('DADO POR CUBIERTO');
+    expect(omitido?.detalle).toContain('volver a pedirlo');
+  });
+
+  it('la marca RESTA, no cierra de más: cubrir 1 de 100 deja 99 por comprar', async () => {
+    const p = await plan(ID_COLOR, undefined, [], [marcaCubierta(1)]);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(99);
+  });
+
+  it('⭐ la marca de OTRO color NO cubre a éste (el color está en la identidad)', async () => {
+    // El sistema cerró el faltante del color 12; este renglón es del 9 y sigue pidiendo sus 100.
+    const p = await plan(ID_COLOR, undefined, [], [marcaCubierta(100, 12)]);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(100);
+  });
+
+  it('⭐ bajar la cantidad ANUNCIA el faltante — y el default NO lo cierra', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR });
+    const renglon = p.proveedores[0]?.renglones[0];
+    // 100 propuestos − 40 tecleados = 60 que se van a quedar sin comprar: es lo que dispara la
+    // pregunta en pantalla. 🔴 Rojo si valiera 0: la previa no tendría por qué preguntar nada.
+    expect(renglon?.cantidadFaltante).toBe(60);
+    // 🔴 EL DEFAULT: sin respuesta, el resto SIGUE PENDIENTE. Nunca se cierra solo.
+    expect(renglon?.restoCubierto).toBe(false);
+  });
+
+  it('comprar COMPLETO no dispara la pregunta (no hay faltante que interpretar)', async () => {
+    const p = await plan(ID_COLOR, undefined);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadFaltante).toBe(0);
+  });
+
+  it('la respuesta «con esto queda cubierto» VIAJA hasta el plan que se va a ejecutar', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR, restoCubierto: true });
+    expect(p.proveedores[0]?.renglones[0]?.restoCubierto).toBe(true);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadFaltante).toBe(60);
+  });
+});
+
+describe('⭐⭐ 0.158 — el avío que se compra SIN tomar en cuenta el color (gruposDeCompraDelAvio)', () => {
+  /**
+   * DANIEL (7-sep-2026), mirando la Explosión con datos reales: *«hay ciertos avíos que NO se
+   * compran por color. Debería de sumar todos. Como la etiqueta de lavado… ¿cómo le puedo hacer
+   * para definirle que algunas cosas se compran juntas sin tomar en cuenta el color?»*.
+   *
+   * La regla es de dos filos y las dos mitades se prueban aquí: **marcado ⇒ un solo renglón sin
+   * color**, y **SIN marcar ⇒ sigue partiéndose color por color** (V1-E8c, §Post-F9.126). Sin la
+   * segunda, colapsar para todo el mundo pasaría igual de verde — y los cierres de Daniel, que SÍ
+   * se compran por color, volverían a salir fundidos en un renglón.
+   */
+
+  /** Tallas de un color: `[idTalla, piezas, etiqueta]`. */
+  type Renglon = [number, number, string];
+
+  /** Arma el mapa color → {piezas, porTalla} tal como lo entrega `piezasPorColorYTallaOrden`. */
+  function matriz(
+    filas: { idColor: number; nombre: string; tallas: Renglon[] }[],
+  ): Map<
+    number,
+    { nombre: string; piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> }
+  > {
+    return new Map(
+      filas.map((f) => [
+        f.idColor,
+        {
+          nombre: f.nombre,
+          piezas: f.tallas.reduce((s, [, piezas]) => s + piezas, 0),
+          porTalla: new Map(
+            f.tallas.map(([idTalla, piezas, etiqueta]) => [idTalla, { piezas, etiqueta }]),
+          ),
+        },
+      ]),
+    );
+  }
+
+  /** El total de la orden (Σ de todos los colores), que es lo que recibe el grupo colapsado. */
+  function totalDe(m: ReturnType<typeof matriz>): {
+    piezas: number;
+    porTalla: Map<number, { piezas: number; etiqueta: string }>;
+  } {
+    const porTalla = new Map<number, { piezas: number; etiqueta: string }>();
+    let piezas = 0;
+    for (const g of m.values()) {
+      piezas += g.piezas;
+      for (const [idTalla, t] of g.porTalla) {
+        const previa = porTalla.get(idTalla);
+        if (previa === undefined) porTalla.set(idTalla, { ...t });
+        else previa.piezas += t.piezas;
+      }
+    }
+    return { piezas, porTalla };
+  }
+
+  /** La OP del ejemplo: 3 colores × (CH, M). Rojo 30, Azul 50, Negro 20 → 100 piezas. */
+  const TRES_COLORES = matriz([
+    {
+      idColor: 9,
+      nombre: 'Rojo',
+      tallas: [
+        [1, 10, 'CH'],
+        [2, 20, 'M'],
+      ],
+    },
+    {
+      idColor: 12,
+      nombre: 'Azul',
+      tallas: [
+        [1, 20, 'CH'],
+        [2, 30, 'M'],
+      ],
+    },
+    {
+      idColor: 15,
+      nombre: 'Negro',
+      tallas: [
+        [1, 5, 'CH'],
+        [2, 15, 'M'],
+      ],
+    },
+  ]);
+
+  it('⭐ MARCADO: tres colores caen en UN SOLO renglón, sin color y con la suma de las piezas', () => {
+    const grupos = gruposDeCompraDelAvio(true, TRES_COLORES, totalDe(TRES_COLORES));
+
+    // 🔴 EL VALOR QUE LA PONE ROJA: `3` — la etiqueta de lavado partida por color, que es
+    // exactamente lo que Daniel vio en pantalla (11,771 pz con un color y 1,387 con otro).
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0]?.idColor).toBeNull();
+    expect(grupos[0]?.nombre).toBeNull();
+    expect(grupos[0]?.piezas).toBe(100); // 30 + 50 + 20
+  });
+
+  it('⭐ SIN MARCAR: los mismos tres colores siguen saliendo en TRES renglones', () => {
+    // 🔴 La otra mitad de la regla. Sin esta prueba, colapsar para TODO avío pasaría igual de verde
+    // y los cierres de §Post-F9.126 volverían a fundirse en un renglón.
+    const grupos = gruposDeCompraDelAvio(false, TRES_COLORES, totalDe(TRES_COLORES));
+
+    expect(grupos).toHaveLength(3);
+    expect(grupos.map((g) => g.idColor)).toEqual([9, 12, 15]);
+    expect(grupos.map((g) => g.nombre)).toEqual(['Rojo', 'Azul', 'Negro']);
+    expect(grupos.map((g) => g.piezas)).toEqual([30, 50, 20]);
+  });
+
+  it('⭐ el DESGLOSE POR TALLA del renglón colapsado es el de TODA la orden, no el de un color', () => {
+    // Es la mitad que se cuela: se puede colapsar el renglón y dejarle el `porTalla` del PRIMER
+    // color. La cantidad de arriba diría 100 y la tablita de abajo sumaría 30 — el papel
+    // contradiciéndose a sí mismo, justo lo que V1-E8c vino a impedir.
+    const grupos = gruposDeCompraDelAvio(true, TRES_COLORES, totalDe(TRES_COLORES));
+    const porTalla = grupos[0]?.porTalla;
+
+    expect(porTalla?.get(1)).toEqual({ piezas: 35, etiqueta: 'CH' }); // 10 + 20 + 5
+    expect(porTalla?.get(2)).toEqual({ piezas: 65, etiqueta: 'M' }); // 20 + 30 + 15
+
+    // 🔑 La invariante: Σ del desglose = piezas del renglón. Con el `porTalla` de un solo color
+    // (30) esto se cae.
+    const suma = [...(porTalla ?? [])].reduce((s, [, t]) => s + t.piezas, 0);
+    expect(suma).toBe(grupos[0]?.piezas);
+  });
+
+  it('⭐ DOS OP de colores DISTINTOS con el avío marcado caen en la MISMA clave (se suman)', () => {
+    // Es el caso literal de Daniel: sus órdenes 5565/5566/5567, cada una de su color, con la misma
+    // etiqueta de lavado y el mismo proveedor. Al colapsar, las dos quedan sin color, y la clave de
+    // agrupación —que ya trataba el "sin" como un valor más— las junta en un solo renglón.
+    const op1 = matriz([{ idColor: 9, nombre: 'Rojo', tallas: [[1, 10, 'CH']] }]);
+    const op2 = matriz([{ idColor: 12, nombre: 'Azul', tallas: [[1, 40, 'CH']] }]);
+
+    const [g1] = gruposDeCompraDelAvio(true, op1, totalDe(op1));
+    const [g2] = gruposDeCompraDelAvio(true, op2, totalDe(op2));
+
+    const clave = (g: typeof g1) =>
+      claveAgrupada({
+        idTela: null,
+        idAvio: 77,
+        idTelaColor: null,
+        idColorPrenda: g?.idColor ?? null,
+        idProveedorSugerido: 5,
+      });
+
+    expect(clave(g1)).toBe(clave(g2));
+
+    // 🔴 Y sin la marca NO se juntan (la mitad que impide colapsar de más): dos claves distintas.
+    const [s1] = gruposDeCompraDelAvio(false, op1, totalDe(op1));
+    const [s2] = gruposDeCompraDelAvio(false, op2, totalDe(op2));
+    expect(clave(s1)).not.toBe(clave(s2));
+  });
+
+  it('sin matriz de colores hay UN renglón sin color, esté marcado o no (no-regresión)', () => {
+    // La OP sin matriz ya salía así desde F4: la marca no cambia nada aquí.
+    const vacia = matriz([]);
+    const toda = { piezas: 40, porTalla: new Map([[1, { piezas: 40, etiqueta: 'U' }]]) };
+
+    for (const marcado of [true, false]) {
+      const grupos = gruposDeCompraDelAvio(marcado, vacia, toda);
+      expect(grupos).toHaveLength(1);
+      expect(grupos[0]?.idColor).toBeNull();
+      expect(grupos[0]?.piezas).toBe(40);
+    }
   });
 });

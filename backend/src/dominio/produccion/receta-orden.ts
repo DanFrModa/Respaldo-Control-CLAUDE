@@ -63,6 +63,7 @@
 import type {
   CambioReceta,
   ChoqueTraerDelModelo,
+  DatosAbrirReceta,
   DatosLiberarReceta,
   DatosRecetaAgregar,
   DatosTraerDelModelo,
@@ -79,14 +80,16 @@ import type {
   TipoRenglonRecetaClave,
 } from '../../contrato/index.js';
 import {
+  esquemaAbrirRecetaCuerpo,
   esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
   esquemaRecetaEditarCuerpo,
   esquemaRecetaQuitarCuerpo,
   esquemaTraerDelModeloCuerpo,
 } from '../../contrato/index.js';
-import { EstadoRenglonReceta, Prisma } from '../../datos/index.js';
+import { EstadoRenglonReceta, Prisma, type EstadoOrden } from '../../datos/index.js';
 
+import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import {
   ErrorConflicto,
@@ -114,14 +117,34 @@ import {
 import {
   avisoAvioPorMedidaConCantidadesPorTalla,
   avisoValorFueraDeRango,
+  type RequeridoContradictorio,
 } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
-import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
+import { leerAviosBom, leerMedidasAvioBom, leerTelasBom } from '../modelos/bom-modelo.js';
+import { resolverIdRecetaDeModelo } from '../modelos/receta-compartida.js';
 // ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
 // junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
 // comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
 // de "qué es estar comprometido" se desincronizan en la primera corrección.
-import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from '../compras/comprometido-en-oc.js';
+import { algunaRecibida, claveMaterial } from '../compras/comprometido-en-oc.js';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — "si ya está comprado, solo avisa". La lectura EN VIVO de qué OC
+// ya comprometieron esta orden, y los textos que la nombran, viven en un módulo propio: los leen la
+// receta (aquí), la bandeja «Recetas por liberar» y la guarda de §Post-F9.79 — que desde esta etapa
+// **no vuelve a consultar por su cuenta**, para que "qué está comprado" tenga UNA sola respuesta.
+import {
+  avisoCambioSobreLoComprado,
+  avisoReabrirConCompraComprometida,
+  comprasComprometidasDeUnaOrden,
+  ocsDeMaterial,
+  type RenglonYaComprado,
+} from '../compras/aviso-ya-comprado.js';
+// ⭐⭐ fila 0.068 (a) — la comparación HORIZONTAL (esta OP contra sus HERMANAS del mismo linaje).
+// Vive en su propio módulo y NO aquí: es otra pregunta que la desalineación de este archivo (que es
+// la VERTICAL, contra la receta del modelo) y mezclarlas es como se apagaría el aviso justo en el
+// caso que lo justifica — ver el encabezado de `hermanas-de-la-op.ts`.
+// ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
+import { exigirOrdenAbierta } from './cierre-orden.js';
+import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
@@ -149,11 +172,21 @@ interface OrdenParaReceta {
   folio: bigint;
   idEmpresa: number;
   idModelo: number;
-  estado: 'capturada' | 'completa' | 'cancelada';
+  /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+  estado: EstadoOrden;
+  /** 0.061: cuándo se CERRÓ la orden (null = abierta). La guarda del cierre mira esto, no el estado. */
+  cerradaEn: Date | null;
   /** Sello histórico de "cuándo quedó lista por primera vez" (lo necesita el recálculo del estado). */
   fechaCompletada: Date | null;
   recetaLiberadaEn: Date | null;
   recetaLiberadaPorId: string | null;
+  /**
+   * ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)). No null = la receta está ABIERTA para
+   * corregirse y **la compra de esta orden está congelada**. Ver {@link exigirCompraNoCongelada}.
+   */
+  recetaAbiertaEn: Date | null;
+  recetaAbiertaPorId: string | null;
+  recetaAbiertaMotivo: string | null;
   /** V1-E3r: la CURVA del modelo viaja aquí para poder avisar cuando difiere de la de la orden. */
   modelo: {
     codigo: string;
@@ -178,9 +211,13 @@ async function exigirOrdenDeLaEmpresa(
       idEmpresa: true,
       idModelo: true,
       estado: true,
+      cerradaEn: true,
       fechaCompletada: true,
       recetaLiberadaEn: true,
       recetaLiberadaPorId: true,
+      recetaAbiertaEn: true,
+      recetaAbiertaPorId: true,
+      recetaAbiertaMotivo: true,
       modelo: {
         select: {
           codigo: true,
@@ -207,11 +244,17 @@ async function exigirOrdenDeLaEmpresa(
   return orden;
 }
 
-/** Una orden CANCELADA no se toca (misma regla que el resto del módulo de órdenes). */
+/**
+ * Una orden CANCELADA no se toca (misma regla que el resto del módulo de órdenes) — y desde 0.061,
+ * tampoco una CERRADA: la receta congelada de la orden es lo que sostiene su costo TEÓRICO, así que
+ * moverla después de congelar el unitario dejaría la ficha diciendo dos cosas distintas. Primero se
+ * reabre la orden (acto inverso auditado), y entonces sí.
+ */
 function exigirOrdenViva(orden: OrdenParaReceta): void {
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada: su receta ya no se puede modificar.');
   }
+  exigirOrdenAbierta(orden, 'puede modificar su receta');
 }
 
 // ── 1. COPIAR la receta del modelo al crear la orden ───────────────────────────────────────
@@ -270,12 +313,26 @@ export async function copiarRecetaDelModelo(
   }
 
   const sinPrecios = opciones.sinPrecios ?? false;
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA, en el sitio MÁS CALIENTE del sistema: por aquí pasa el 100 %
+  // de las órdenes. Un modelo de producción derivado (V1-E9a) copia la receta de su modelo de
+  // DESARROLLO, y por eso el id se resuelve UNA vez y manda en las cuatro lecturas de abajo —
+  // incluidas las MEDIDAS POR TALLA (`ModeloAvioTalla`, R18), que ninguna de las tres lecturas
+  // canónicas trae: sin esto, cada orden de un hijo nacería SIN medidas por talla, en silencio, y
+  // eso mueve el requerido del MRP.
+  const idReceta = await resolverIdRecetaDeModelo(tx, orden.idModelo);
   const [telas, avios, artes, medidas] = await Promise.all([
     sinPrecios
-      ? tx.modeloTela.findMany({ where: { idModelo: orden.idModelo } }).then((filas) =>
+      ? tx.modeloTela.findMany({ where: { idModelo: idReceta } }).then((filas) =>
           filas.map((f) => ({
             idTela: f.idTela,
             consumoPorPrenda: f.consumoPorPrenda.toNumber(),
+            // ⭐⭐ 0.156 — el consumo del COMPLEMENTO se congela con el resto de la receta. La
+            // explosión del MRP lee ESTA copia (V1-E3d), nunca el BOM del modelo: sin esto el
+            // número no llegaría jamás a la orden de compra.
+            consumoComplementoPorPrenda:
+              f.consumoComplementoPorPrenda === null
+                ? null
+                : f.consumoComplementoPorPrenda.toNumber(),
             precioCosteo: null as number | null,
             paraPreCosto: f.paraPreCosto,
             paraProduccion: f.paraProduccion,
@@ -283,9 +340,9 @@ export async function copiarRecetaDelModelo(
             idTelaProveedor: f.idTelaProveedor,
           })),
         )
-      : leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
+      : leerTelasBom(tx, idReceta, orden.idEmpresa),
     sinPrecios
-      ? tx.modeloAvio.findMany({ where: { idModelo: orden.idModelo } }).then((filas) =>
+      ? tx.modeloAvio.findMany({ where: { idModelo: idReceta } }).then((filas) =>
           filas.map((f) => ({
             idAvio: f.idAvio,
             consumoPorPrenda: f.consumoPorPrenda.toNumber(),
@@ -297,12 +354,9 @@ export async function copiarRecetaDelModelo(
             idAvioProveedor: f.idAvioProveedor,
           })),
         )
-      : leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
-    leerArtesModelo(tx, orden.idModelo),
-    tx.modeloAvioTalla.findMany({
-      where: { idModelo: orden.idModelo },
-      select: { idAvio: true, idTalla: true, consumo: true, idAvioMedida: true },
-    }),
+      : leerAviosBom(tx, idReceta, orden.idEmpresa),
+    leerArtesModelo(tx, idReceta),
+    leerMedidasAvioBom(tx, idReceta),
   ]);
 
   const auditoria = sesion === null ? {} : datosCreacion(sesion);
@@ -324,6 +378,10 @@ export async function copiarRecetaDelModelo(
         idOrden: orden.id,
         idTela: t.idTela,
         consumoPorPrenda: new Prisma.Decimal(t.consumoPorPrenda),
+        consumoComplementoPorPrenda:
+          t.consumoComplementoPorPrenda === null
+            ? null
+            : new Prisma.Decimal(t.consumoComplementoPorPrenda),
         precio: t.precioCosteo === null ? null : new Prisma.Decimal(t.precioCosteo),
         paraPreCosto: t.paraPreCosto,
         paraProduccion: t.paraProduccion,
@@ -548,27 +606,85 @@ function modoCapturaAvio(f: FilaAvio): 'consumo' | 'medida' {
 }
 
 /**
+ * ⭐⭐ **LA CONTRADICCIÓN HEREDADA, COMO UN SOLO HECHO** (V1-E8h, §Post-F9.130): un avío "por medida"
+ * con el toggle `consumoPorTalla` encendido de antes de V1-E3g. La pantalla ya no muestra esas
+ * cantidades (en modo `medida` no se capturan), pero **siguen mandando en el requerido del MRP**.
+ *
+ * Vive en una función con nombre porque ahora la usan DOS cosas que no pueden separarse: el AVISO
+ * que la dice ({@link avisoCapturaAvio}) y el botón que la REPARA ({@link corregirCapturaAvio}, vía
+ * la bandera `capturaReparable` del contrato). Si el aviso y el botón calcularan la condición por su
+ * cuenta, un día habría renglones con aviso y sin botón — o al revés.
+ */
+function capturaContradictoriaAvio(f: FilaAvio): boolean {
+  return modoCapturaAvio(f) === 'medida' && f.consumoPorTalla;
+}
+
+/**
  * AVISO —que NO bloquea— sobre la captura por talla de un renglón de avío.
  *
- * ⚠️ El caso que importa es la CONTRADICCIÓN HEREDADA: un avío "por medida" con el toggle
- * `consumoPorTalla` encendido de antes de V1-E3g. La pantalla ya no muestra esas cantidades (en
- * modo `medida` no se capturan), pero seguirían moviendo el requerido del MRP. No se apagan aquí a
- * la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin que nadie lo
- * pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga al guardar el renglón.
+ * ⚠️ El caso que importa es la CONTRADICCIÓN HEREDADA ({@link capturaContradictoriaAvio}). No se
+ * apaga aquí a la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin
+ * que nadie lo pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga cuando una
+ * persona lo pide, con el botón «Corregir» ({@link corregirCapturaAvio}) o guardando el renglón.
+ *
+ * ⭐⭐ **V1-E8h (§Post-F9.130) — el aviso ya NO manda a adivinar un conjuro.** Decía *"Guarda el
+ * renglón para normalizarlo"*: el sistema detectaba el error, sabía la solución y le pedía al
+ * usuario —que no es programador— que adivinara el hechizo. Ahora nombra el botón que está al lado.
  */
+/** Lo MÍNIMO de un renglón de avío para decidir la magnitud del aviso (`FilaAvio` lo cumple). */
+export interface RenglonParaMagnitud {
+  excluido: boolean;
+  paraProduccion: boolean;
+  consumoPorPrenda: Prisma.Decimal;
+  consumoPorTalla: boolean;
+  tallas: readonly { idTalla: number; consumo: Prisma.Decimal }[];
+  avio: { unidad: string | null };
+}
+
+/**
+ * 🔴 **H1 del review de V1-E8h — LA MAGNITUD SÓLO SE DICE SI LA ORDEN DE VERDAD PIDE ALGO.**
+ *
+ * El texto de §Post-F9.105 era **CONDICIONAL** (*"el requerido saldría en 1,590 en vez de 30"*), y un
+ * condicional que no aplica es a lo sumo ruido. V1-E8h lo volvió una **afirmación factual sobre la
+ * orden** —*"Esta orden **PIDE** 53,095 pza"*— y la puso **de primera**: sobre una **LÁPIDA**
+ * (`excluido`) o un renglón apagado para producción eso sería **FALSO**, porque esa orden pide CERO de
+ * ese material. Y con el botón «Corregir» al lado, quien lo lee lo aprieta, recibe *"ya pide lo que de
+ * verdad lleva"*… y la explosión no cambia en nada, porque un excluido ya valía 0. Peor: la bitácora
+ * del mismo acto guardaría `requeridoAntes: 0` / `requeridoDespues: 0`, **contradiciendo el número que
+ * el usuario acababa de leer**. *Un enunciado factual falso es exactamente el mecanismo por el que
+ * Daniel dejó de creerle al sistema.*
+ *
+ * ⚠️ **El criterio NO se re-escribe aquí.** `excluido || !paraProduccion` a mano sería una SEGUNDA
+ * definición de "qué pide este renglón", capaz de derivar de la primera; se le pregunta a
+ * {@link requeridoDelRenglon} — la MISMA función con la que la guarda de compra (§Post-F9.79) y la
+ * bitácora deciden lo mismo. Nótese que `requeridoContradictorioPorMedida` **no puede** decidirlo: su
+ * tipo de entrada (`AvioRecetaR18`) ni siquiera tiene esas dos banderas.
+ *
+ * `null` = no hay magnitud que decir, y el aviso cae en su variante **sin cifras**: la misma que ya usa
+ * el BOM del modelo, que tampoco tiene una orden detrás.
+ */
+export function magnitudDelAvisoDeCaptura(
+  f: RenglonParaMagnitud,
+  piezas: PiezasDeLaOrden,
+): RequeridoContradictorio | null {
+  if (requeridoDelRenglon(avioParaRequerido(f), piezas) <= 0) return null;
+  return requeridoContradictorioPorMedida(
+    { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: [...f.tallas] },
+    piezas.total,
+    piezas.porTalla,
+    f.avio.unidad,
+  );
+}
+
 function avisoCapturaAvio(f: FilaAvio, piezas: PiezasDeLaOrden): string | null {
-  if (modoCapturaAvio(f) === 'medida' && f.consumoPorTalla) {
-    // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y ahora
-    // trae la MAGNITUD: aquí sí hay orden detrás, así que se puede decir cuánto se está pidiendo
-    // de más —que es lo que Daniel necesitaba ver— en vez de sólo que hay una contradicción.
+  if (capturaContradictoriaAvio(f)) {
+    // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y trae la
+    // MAGNITUD **cuando la hay** (V1-E8h/H1, ver `magnitudDelAvisoDeCaptura`): aquí sí hay orden
+    // detrás, así que se puede decir cuánto se está pidiendo de más —que es lo que Daniel necesitaba
+    // ver— en vez de sólo que hay una contradicción.
     return avisoAvioPorMedidaConCantidadesPorTalla(
-      'Guarda el renglón para normalizarlo.',
-      requeridoContradictorioPorMedida(
-        { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: f.tallas },
-        piezas.total,
-        piezas.porTalla,
-        f.avio.unidad,
-      ),
+      'Se arregla con el botón «Corregir» de este renglón.',
+      magnitudDelAvisoDeCaptura(f, piezas),
     );
   }
   if (modoCapturaAvio(f) === 'consumo') {
@@ -863,8 +979,12 @@ export function resumirReceta(
  * desde la bandeja o desde la pantalla propia). Mismo patrón que las lecturas compartidas del
  * inventario cíclico (`exigirAlgunPermisoCiclico`): las MUTACIONES siguen exigiendo su permiso fino
  * con `verificarPermiso` — aquí no se afloja ninguna.
+ *
+ * Se EXPORTA para que las FOTOS DEL ARTE de la OP (`fotos-arte-orden.ts`, §Post-F9.177) apliquen
+ * exactamente la misma regla de lectura: son parte de la receta, y dos copias de este predicado se
+ * separarían en cuanto una de las dos cambiara.
  */
-function exigirVerLaReceta(sesion: SesionUsuario): void {
+export function exigirVerLaReceta(sesion: SesionUsuario): void {
   if (!tienePermiso(sesion, 'ordenes.ver') && !tienePermiso(sesion, 'desarrollo.ver')) {
     throw new ErrorPermiso(undefined, 'desarrollo.ver');
   }
@@ -911,6 +1031,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     tallasOrden,
     piezas,
     piezasPorTalla,
+    comprometidas,
+    frenteAlGrupo,
   ] = await Promise.all([
     tx.ordenTela.findMany({
       where: { idOrden: orden.id },
@@ -958,6 +1080,38 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // podía decir que había una contradicción, no cuánto se estaba pidiendo de más (que es lo que
     // hizo comprar 53 veces el cierre). Es la MISMA función que usan las guardas de la edición.
     piezasDeLaOrden(tx, orden.id),
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **QUÉ DE ESTA ORDEN YA ESTÁ COMPRADO EN FIRME**, en vivo.
+     *
+     * Va aquí, en la MISMA lectura que arma la receta, y no en una llamada aparte: es un dato del
+     * renglón (*"este material ya está comprado"*), y pedirlo por separado obligaría a la pantalla a
+     * cruzar dos respuestas para saber si lo que está tocando ya tiene dinero detrás — justo lo que
+     * A1 prohíbe. Una consulta más por lectura de receta, sin N+1.
+     *
+     * ⚠️ NO es el `ocs` de arriba: aquél CUENTA cualquier OC no cancelada (borrador incluido) para
+     * decidir si el aviso de desalineación va en rojo. Éste sólo cuenta las COMPROMETIDAS, porque
+     * la pregunta es otra: *"¿hay que negociar con un proveedor?"*.
+     */
+    comprasComprometidasDeUnaOrden(orden.idEmpresa, orden.id, { tx }),
+    /*
+     * ⭐⭐ fila 0.068 (a) — **CÓMO VA ESTA OP FRENTE A SUS HERMANAS** (§Post-F9.146 pregunta 4).
+     *
+     * DANIEL: *"Normalmente todas las OP deben de ir iguales… se debe de poder hacer, **pero
+     * advirtiendo de la diferencia**"*.
+     *
+     * 🔴 **No confundir con `desalineacion`, que se arma más abajo en esta misma función.** Aquélla compara
+     * esta receta congelada contra la del MODELO (vertical); ésta, contra la de sus **OP hermanas**
+     * del mismo linaje (horizontal). Dos hermanas pueden estar las dos alineadas con el padre y aun
+     * así diferir entre ellas — y al revés. Ninguna implica la otra.
+     *
+     * Va en la MISMA lectura, y no en una llamada aparte, por la misma razón que `ocsComprometidas`:
+     * después de tocar un renglón el aviso tiene que refrescarse solo (cambiar un consumo es
+     * exactamente lo que puede desviar la OP del grupo), y una segunda petición obligaría a la
+     * pantalla a cruzar dos respuestas. Son CINCO consultas fijas y sólo sobre ESTE linaje —pero
+     * ⚠️ corren **dentro de la transacción** cuando quien llama es una mutación (`enRecetaEditable`),
+     * y su volumen crece con el nº de OP no canceladas del modelo.
+     */
+    frenteAlGrupoDeOrdenes(tx, [orden.id], orden.idEmpresa),
   ]);
 
   // El nombre del proveedor amarrado del AVÍO se resuelve contra el `idAvioProveedor` de LA ORDEN
@@ -1015,6 +1169,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTA tela para esta orden.
+      ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: f.idTela, idAvio: null }),
     };
   });
 
@@ -1045,6 +1201,10 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       modoCaptura: modoCapturaAvio(f),
       unidadMedida: f.avio.unidadMedida,
       avisoCaptura: avisoCapturaAvio(f, piezasPorTalla),
+      // ⭐⭐ V1-E8h (§Post-F9.130): el aviso y el BOTÓN que lo repara salen del MISMO hecho. La
+      // pantalla no vuelve a deducirlo del texto (A1): el servidor dice si este renglón se puede
+      // corregir, y `corregirCapturaAvio` reaplica la misma condición al ejecutarlo.
+      capturaReparable: capturaContradictoriaAvio(f),
       idAvioProveedor: f.idAvioProveedor,
       proveedorAmarrado:
         f.idAvioProveedor === null ? null : (nombreProveedor.get(f.idAvioProveedor) ?? null),
@@ -1053,9 +1213,17 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTE avío para esta orden.
+      ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: null, idAvio: f.idAvio }),
     };
   });
 
+  /*
+   * ⚠️ EL ARTE **NO** LLEVA `ocsComprometidas`, y no es un olvido: una línea de OC sólo puede
+   * apuntar a una tela o a un avío del catálogo (o ser texto libre). No existe forma de ligar una
+   * orden de compra a un ARTE concreto de la receta — la misma razón por la que la guarda de
+   * §Post-F9.79 tampoco lo comprueba. Inventarle el campo sería prometer un dato que nunca sale.
+   */
   const artes: RecetaOrdenArte[] = filasArte.map((f) => {
     const delModelo = f.idModeloArte === null ? undefined : artePorTraza.get(f.idModeloArte);
     return {
@@ -1183,16 +1351,40 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // ⭐ V1-E3h: la puerta dejó de ser todo-o-nada. `puedeComprar` = **hay algo firmado**, que es
     // exactamente lo que el MRP necesita para tener qué explotar; `todoLiberado` es la bandera
     // DERIVADA de la orden ("no queda nada por firmar"), la que lee el semáforo de orden completa.
-    puedeComprar: resumen.liberados > 0,
+    //
+    // ⭐⭐ V1-E8z — Y CON LA RECETA ABIERTA, `puedeComprar` ES `false` AUNQUE TODO ESTÉ FIRMADO. El
+    // campo es una PROMESA de lo que el servidor va a contestar, y con el candado puesto contesta
+    // 409 en las cinco bocas de gasto. Dejarlo en `true` sería que la pantalla ofreciera comprar lo
+    // que el API va a rechazar — y peor: obligaría al frontend a deducir la puerta cruzando dos
+    // campos, que es justo lo que A1 prohíbe.
+    puedeComprar: resumen.liberados > 0 && orden.recetaAbiertaEn === null,
     todoLiberado: orden.recetaLiberadaEn !== null,
+    // ⭐⭐ V1-E8z — EL CANDADO, tal cual está guardado. `abiertaEn` no null = la compra de ESTA
+    // orden está congelada hasta que Desarrollo cierre la receta (§Post-F9.160(a)).
+    abiertaEn: orden.recetaAbiertaEn?.toISOString() ?? null,
+    abiertaPor: orden.recetaAbiertaPorId,
+    abiertaMotivo: orden.recetaAbiertaMotivo,
     // ⭐ V1-E3r: el aviso YA REDACTADO por el servidor (A1), o null si no hay nada que avisar. La
     // pantalla lo pinta tal cual — ni arma la frase, ni resuelve el plural, ni ordena las tallas.
     avisoCurva: aviso === null ? null : aviso.texto,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — lo comprometido de TODA la orden, y su aviso ya redactado
+    // (A1). El aviso se pinta ANTES de reabrir; la lista, en la fila y en la bandeja.
+    ocsComprometidas: comprometidas.ocs,
+    avisoCompraComprometida: avisoReabrirConCompraComprometida(comprometidas.ocs),
+    // ⚠️ En una LECTURA siempre `null`: el eco de "acabas de cambiar algo comprado" sólo lo puede
+    // escribir la mutación que lo hizo (`enRecetaEditable`), porque depende de QUÉ se tocó, no del
+    // estado de la receta. Recargar la pantalla no puede resucitar un aviso de algo ya pasado.
+    avisoCambioSobreLoComprado: null,
     resumen,
     telas,
     avios,
     artes,
     desalineacion,
+    // ⭐⭐ fila 0.068 (a) — la comparación HORIZONTAL (contra las OP hermanas), ya redactada por el
+    // servidor. `sinHermanas()` cuando la orden no está en el mapa: sólo puede pasar si está
+    // CANCELADA (una cancelada no es del grupo ni recibe aviso), y ahí lo honesto es no decir nada
+    // en vez de inventar un grupo. Es INFORMATIVO: no toca `puedeComprar` ni ninguna guarda.
+    frenteAlGrupo: frenteAlGrupo.get(orden.id) ?? sinHermanas(),
   };
 }
 
@@ -1222,6 +1414,85 @@ export async function desalineacionDeOrden(
 const DONDE_SE_LIBERA =
   'Se libera desde la receta de la orden (Centro de Órdenes → la orden → «Receta de la orden»), o ' +
   'de un jalón desde Desarrollo → «Recetas por liberar».';
+
+/** Dónde se CIERRA la receta reabierta, dicho una sola vez (misma pantalla que la firma). */
+const DONDE_SE_CIERRA =
+  'La cierra Desarrollo desde la receta de la orden (Centro de Órdenes → la orden → «Receta de la ' +
+  'orden»), o desde Desarrollo → «Recetas por liberar», donde sale marcada «En corrección».';
+
+/**
+ * ⭐⭐ EL CANDADO DE COMPRA (V1-E8z, §Post-F9.160(a)). DANIEL: *"pongamos un candado que **no se
+ * pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * 🔴 **POR QUÉ ES UNA COLUMNA NUEVA Y NO `recetaLiberadaEn` PUESTO EN NULL.** Ése es el atajo que
+ * PARECE funcionar y entrega la versión rota: desde V1-E3h ese campo es un DERIVADO ("no queda
+ * ningún renglón vivo sin firmar") y **la puerta de compra dejó de consultarlo** — pregunta renglón
+ * por renglón (`exigirRecetaLiberada`, unas líneas más abajo, nunca lo lee). Apagarlo cambiaría el
+ * letrero de la pantalla a *«receta no liberada»* y **la orden de compra saldría igual**.
+ *
+ * 🔴 **Y ES POR ORDEN, NO POR RENGLÓN**, que es lo que lo distingue de la firma de §Post-F9.158(b).
+ * La firma dice *"este renglón ya se puede comprar"* (de a uno, hacia adelante); esto **reabre lo ya
+ * firmado** y congela la compra de TODA la orden mientras dura la corrección. Confundirlas sería el
+ * error caro que §Post-F9.160(a) señala.
+ *
+ * QUÉ FRENA Y QUÉ NO:
+ *  • **FRENA el GASTO**: explotar el MRP, la previa/generación de OC, la OC capturada a mano ligada
+ *    a la orden, duplicarla y autorizarla. Todas pasan por aquí.
+ *  • **NO frena la LECTURA** (§Post-F9.165 punto 6): ver qué falta no cuesta dinero, así que el
+ *    tablero «qué tengo / qué falta», la receta y el estatus de materiales se consultan igual.
+ *  • **NO toca las OC ya autorizadas** (punto 5): se bloquean las NUEVAS. Des-autorizar sigue
+ *    siendo un acto manual de Dirección (`compras.desautorizar`).
+ *  • **NO frena la producción**: cortar, enviar a maquila, recibir y entregar siguen sin bloquearse,
+ *    igual que con la puerta de la firma.
+ *
+ * El mensaje es PROPIO y no reusa el de «todavía no la libera Desarrollo» (§Post-F9.165 punto 8):
+ * ese texto sería FALSO aquí —sí la liberaron, está en corrección— y mandaría al comprador a pedir
+ * una firma que ya existe.
+ *
+ * Se EXPORTA porque es pura (mismo criterio que `resumirReceta` y `recetaCompletamenteLiberada`):
+ * la regla y su redacción se prueban sin base, y lo que las pruebas de integración verifican es lo
+ * otro — que las bocas de gasto de verdad pasen por aquí.
+ */
+export function exigirCompraNoCongelada(orden: {
+  folio: bigint;
+  recetaAbiertaEn: Date | null;
+  recetaAbiertaMotivo: string | null;
+}): void {
+  if (orden.recetaAbiertaEn === null) return;
+  const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+  const motivo =
+    orden.recetaAbiertaMotivo === null ? '' : ` Motivo: "${orden.recetaAbiertaMotivo}".`;
+  throw new ErrorConflicto(
+    `La receta de la orden ${String(orden.folio)} está ABIERTA para corregirse (desde el ${desde}): ` +
+      `la compra de esta orden está CONGELADA hasta que Desarrollo la cierre.${motivo} ` +
+      `${DONDE_SE_CIERRA} Las órdenes de compra ya autorizadas no se tocan, y cortar y producir ` +
+      'no están bloqueados.',
+  );
+}
+
+/**
+ * EL CANDADO, para quien NO carga la orden (duplicar y autorizar una OC): comprueba de una sola
+ * consulta que ninguna de las órdenes ligadas tenga la receta abierta.
+ *
+ * **A9**: filtra por empresa, así que una orden ajena sencillamente no se comprueba (y no se nombra:
+ * nada de confirmar su existencia desde otra empresa). Un `idOrden` que no exista tampoco lanza 404
+ * aquí — no es trabajo de esta guarda decidir eso, y quien la llama ya validó sus propias ligas.
+ */
+export async function exigirComprasNoCongeladas(
+  tx: Tx,
+  idsOrden: Iterable<number>,
+  idEmpresa: number,
+): Promise<void> {
+  const ids = [...new Set(idsOrden)];
+  if (ids.length === 0) return;
+  const ordenes = await tx.orden.findMany({
+    where: { id: { in: ids }, idEmpresa, recetaAbiertaEn: { not: null } },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
+    orderBy: { folio: 'asc' },
+  });
+  const primera = ordenes[0];
+  if (primera !== undefined) exigirCompraNoCongelada(primera);
+}
 
 /** Un renglón VIVO de la receta que Desarrollo todavía no firma (V1-E3h, §Post-F9.72). */
 export interface RenglonPorLiberar {
@@ -1328,11 +1599,19 @@ export async function exigirRecetaLiberada(
 ): Promise<RenglonPorLiberar[]> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
-    select: { folio: true },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
+  // ⭐⭐ V1-E8z — EL CANDADO VA PRIMERO, y el orden importa. Con la receta abierta puede que no
+  // quede nada firmado (corregir un renglón le quita su firma), y entonces el mensaje de «todavía
+  // no la libera Desarrollo» sería el equivocado: sí la liberaron, está en corrección. El aviso
+  // tiene que describir la causa REAL, no la que se topó primero (§Post-F9.165 punto 8).
+  //
+  // Va aquí y no en las cinco bocas una por una: **cerrar la puerta en la puerta** es lo que hace
+  // que ninguna se quede fuera, hoy y el día que aparezca una sexta.
+  exigirCompraNoCongelada(orden);
   const [pendientes, liberados] = await Promise.all([
     leerPorLiberar(tx, idOrden),
     contarLiberados(tx, idOrden),
@@ -1377,11 +1656,16 @@ export async function exigirMaterialesLiberados(
 ): Promise<void> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
-    select: { folio: true },
+    select: { folio: true, recetaAbiertaEn: true, recetaAbiertaMotivo: true },
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
+  // ⭐⭐ V1-E8z — la MISMA guarda, también aquí. Hoy los dos llamadores de esta función pasan antes
+  // por `exigirRecetaLiberada`, así que sería redundante… hasta que alguien la llame sola. Una
+  // puerta que sólo cierra "porque la otra ya cerró" es la que se queda abierta en la etapa que
+  // viene, y cuesta una comparación contra un campo que la consulta ya trajo.
+  exigirCompraNoCongelada(orden);
   const pendientes = await leerPorLiberar(tx, idOrden);
   if (pendientes.length === 0) return;
   const telasPendientes = new Map(
@@ -1428,12 +1712,36 @@ async function enRecetaEditable<T>(
   idOrden: number,
   bd: ContextoBd | undefined,
   accion: (tx: Tx, orden: OrdenParaReceta, ctx: ContextoMutacionReceta) => Promise<T>,
-  opciones: { cambiaElContenido?: boolean } = {},
+  opciones: {
+    cambiaElContenido?: boolean;
+    /**
+     * ⭐⭐ V1-E8z — LA ÚNICA MUTACIÓN QUE SE PERMITE SOBRE UNA ORDEN QUE YA NO ESTÁ VIVA: **cerrar
+     * la receta**. Salta {@link exigirOrdenViva} ENTERO, y eso incluye sus DOS guardas: la de la
+     * orden CANCELADA y —desde 0.061— la de la orden CERRADA.
+     *
+     * 🔴 El caso es real y no tiene otra salida. Si una orden se cancela **o se cierra** con la
+     * receta ABIERTA, la guarda dejaría el candado puesto **para siempre**: no habría forma de
+     * cerrarlo, la orden seguiría en la bandeja marcada «En corrección» y su compra congelada, sin
+     * ningún camino que ofrecerle a nadie. Un candado que sólo se puede abrir es una trampa. Y para
+     * la CERRADA la trampa sería doble, porque la salida de emergencia —reabrir la orden— exige un
+     * permiso que quien está en esa bandeja puede no tener.
+     *
+     * Y no afloja nada, ni en un caso ni en el otro: cerrar **no toca ni un renglón** —limpia las
+     * tres columnas del candado y escribe su bitácora—, así que la receta sigue siendo tan
+     * inmutable como antes y el costo congelado de la orden cerrada **no se mueve** (no depende de
+     * la apertura de la receta, sino de `costoTotal` y del divisor). ABRIR sí exige la orden viva:
+     * reabrir para corregir lo que ya no se va a producir, o lo que ya se cerró, no significa nada.
+     *
+     * ⚠️ El nombre dice «NoViva», no «Cancelada», justo por esto: cuando sólo decía «Cancelada»,
+     * la opción ya se saltaba también la guarda del cierre y **nadie podía saberlo leyéndola**.
+     */
+    permitirOrdenNoViva?: boolean;
+  } = {},
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
   return enTransaccion(async (tx) => {
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
-    exigirOrdenViva(orden);
+    if (opciones.permitirOrdenNoViva !== true) exigirOrdenViva(orden);
     let sobreLapida = false;
     const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
     await accion(tx, orden, {
@@ -1488,8 +1796,88 @@ async function enRecetaEditable<T>(
       permitirDesCompletar: false,
     });
     const recargada = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
-    return armarReceta(tx, recargada);
+    const receta = await armarReceta(tx, recargada);
+
+    /*
+     * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **SI YA SE COMPRÓ, AVISA.**
+     *
+     * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+     * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que
+     * hacer. **No se puede cancelar la OC en automático… eso hay que negociarlo con el
+     * proveedor.**"*
+     *
+     * 🔴 **ÉSTE es el caso que se caía por el hueco, y no pasa por «reabrir».** `exigirNoSacarLoComprado`
+     * (§Post-F9.79) ya frena las siete bocas por las que un material SALE de la receta, pero
+     * cambiarle a un material ya comprado el **consumo por prenda, el precio o el amarre** no lo
+     * frena nada — ni debe: eso es legítimo—. Lo que pasaba era que ocurría **en silencio**: se le
+     * caía la firma (justo arriba) y ahí terminaba todo. La OC decía una cosa, la receta otra, y el
+     * único que puede negociarlo con el proveedor no se enteraba.
+     *
+     * **AVISA; NO BLOQUEA** (mismo espíritu que `compras/desvio-de-compra.ts`). Y va exactamente
+     * sobre `tocados`, la MISMA lista con la que se revoca la firma: lo que cambió de contenido y
+     * sigue vivo. Lo que se AGREGA o se TRAE del modelo no toca nada comprado (nace nuevo), y lo que
+     * se SACA ya lo rechazó la guarda de §Post-F9.79 antes de llegar aquí.
+     *
+     * A7/D3: el aviso queda además en la BITÁCORA. El toast se lo lleva el viento; el rastro de que
+     * alguien movió un material ya comprado —y qué OC quedaron descuadradas— tiene que sobrevivir.
+     */
+    if (opciones.cambiaElContenido === true && !sobreLapida && tocados.length > 0) {
+      const yaComprados = renglonesTocadosYaComprados(receta, tocados);
+      const aviso = avisoCambioSobreLoComprado(yaComprados);
+      if (aviso !== null) {
+        await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+          accion: 'cambio-sobre-material-ya-comprado',
+          renglones: yaComprados.map((r) => ({
+            material: r.material,
+            ocs: r.ocs.map((o) => ({ folio: o.folio, estatus: o.estatus })),
+          })),
+          aviso,
+        });
+        return { ...receta, avisoCambioSobreLoComprado: aviso };
+      }
+    }
+    return receta;
   }, bd);
+}
+
+/**
+ * ⭐⭐ De los renglones TOCADOS, cuáles ya estaban COMPRADOS — y con qué nombre se les llama
+ * (0.085, §Post-F9.173(a)). Función **PURA** sobre la receta ya armada: se prueba sin base.
+ *
+ * Lee `ocsComprometidas` de la fila en vez de volver a consultar, y eso es deliberado: la receta que
+ * se acaba de armar YA trae ese dato calculado en vivo dentro de la misma transacción, así que
+ * preguntarlo otra vez sería una segunda consulta que podría contestar distinto.
+ *
+ * ⚠️ El ARTE se ignora: ninguna línea de OC puede apuntar a un arte (ver `armarReceta`). Un renglón
+ * que ya no está en la receta —un `agregadoAMano` borrado— tampoco aparece, y está bien: quitarlo ya
+ * lo habría rechazado la guarda de §Post-F9.79 si estuviera comprado.
+ */
+export function renglonesTocadosYaComprados(
+  receta: Pick<RecetaOrden, 'telas' | 'avios'>,
+  tocados: readonly { tipo: TipoRenglonRecetaClave; idRenglon: number }[],
+): RenglonYaComprado[] {
+  const salida: RenglonYaComprado[] = [];
+  const vistos = new Set<string>();
+  for (const t of tocados) {
+    const llave = `${t.tipo}-${String(t.idRenglon)}`;
+    if (vistos.has(llave)) continue;
+    vistos.add(llave);
+    if (t.tipo === 'tela') {
+      const fila = receta.telas.find((f) => f.id === t.idRenglon);
+      if (fila !== undefined && fila.ocsComprometidas.length > 0) {
+        salida.push({ material: fila.nombre, ocs: fila.ocsComprometidas });
+      }
+    } else if (t.tipo === 'avio') {
+      const fila = receta.avios.find((f) => f.id === t.idRenglon);
+      if (fila !== undefined && fila.ocsComprometidas.length > 0) {
+        salida.push({
+          material: `${fila.clave} — ${fila.descripcion}`,
+          ocs: fila.ocsComprometidas,
+        });
+      }
+    }
+  }
+  return salida;
 }
 
 /**
@@ -1541,7 +1929,7 @@ export async function agregarRenglonReceta(
     sesion,
     idOrden,
     bd,
-    async (tx, orden) => {
+    async (tx, orden, ctx) => {
       const auditoria = { ...datosCreacion(sesion) };
       /**
        * Lo que marca a un renglón NUEVO (nunca a uno revivido: ése vino del modelo).
@@ -1603,6 +1991,20 @@ export async function agregarRenglonReceta(
         };
 
         if (previo !== null) {
+          /*
+           * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **REVIVIR NO ES CREAR: ES CAMBIARLE EL CONTENIDO A UN
+           * RENGLÓN QUE YA EXISTE**, y por eso declara lo que tocó (hallazgo del reviewer).
+           *
+           * 🔴 El caso NO es teórico. `exigirNoSacarLoComprado` impide EXCLUIR un material ya
+           * comprado, pero nada impide que Compras capture a mano una línea de OC contra un
+           * (orden, material) que YA estaba excluido. Revivirlo entonces le reescribe consumo,
+           * precio, banderas y amarre —justo lo que esta etapa vino a avisar— y hasta aquí lo hacía
+           * **en silencio**, porque esta rama nunca llamaba a `tocoRenglon`.
+           *
+           * ⚠️ Sin doble bitácora ni doble revocación: `comunesRevivido` ya pone `liberadoEn` en
+           * `null`, y `revocarFirmaDeRenglones` sólo revoca lo que la base diga que sigue firmado.
+           */
+          ctx.tocoRenglon('tela', previo.id);
           await tx.ordenTela.update({
             where: { id: previo.id },
             data: { ...soloDefinido(delCuerpo), ...comunesRevivido },
@@ -1613,6 +2015,14 @@ export async function agregarRenglonReceta(
               idOrden: orden.id,
               idTela: datos.idTela,
               consumoPorPrenda: delCuerpo.consumoPorPrenda,
+              // ⭐⭐ 0.156 — como el precio y las banderas (H5): si el material SÍ está en el BOM,
+              // el renglón nuevo se trae de ahí el consumo del complemento. Agregado a mano
+              // (`delModelo === undefined`) nace en NULL, y su OC sigue pidiendo el complemento a
+              // mano — que es exactamente lo que pasaba antes de esta fila.
+              consumoComplementoPorPrenda:
+                delModelo?.consumoComplementoPorPrenda == null
+                  ? null
+                  : new Prisma.Decimal(delModelo.consumoComplementoPorPrenda),
               precio: delCuerpo.precio ?? precioDecimal(delModelo?.precioCosteo ?? null),
               paraPreCosto: datos.paraPreCosto ?? delModelo?.paraPreCosto ?? true,
               paraProduccion: datos.paraProduccion ?? delModelo?.paraProduccion ?? true,
@@ -1675,6 +2085,8 @@ export async function agregarRenglonReceta(
           idAvioProveedor: datos.idAvioProveedor,
         };
 
+        // ⭐⭐⭐ 0.085: revivir una LÁPIDA de avío reescribe su contenido (ver la nota de la tela).
+        if (previo !== null) ctx.tocoRenglon('avio', previo.id);
         const id =
           previo !== null
             ? (
@@ -1721,10 +2133,9 @@ export async function agregarRenglonReceta(
         } else if (previo === null && delModeloAvio !== undefined) {
           // Renglón NUEVO que sí está en el modelo: se trae también su juego de medidas por talla
           // (lo que antes se perdía y había que recuperar con un "Restaurar" que nadie anunciaba).
-          const medidas = await tx.modeloAvioTalla.findMany({
-            where: { idModelo: orden.idModelo, idAvio: datos.idAvio },
-            select: { idTalla: true, consumo: true, idAvioMedida: true },
-          });
+          // V1-E9b — por la CUARTA lectura canónica: las medidas salen del modelo de la RECETA
+          // y esa resolución no vive aquí, así que no se puede perder al editar esta línea.
+          const medidas = await leerMedidasAvioBom(tx, orden.idModelo, datos.idAvio);
           if (medidas.length > 0) {
             await reemplazarMedidasAvio(
               tx,
@@ -2093,6 +2504,172 @@ export async function editarRenglonReceta(
 }
 
 /**
+ * ⭐⭐⭐ **EL BOTÓN «CORREGIR»: apaga la contradicción heredada de UN renglón de avío** (V1-E8h,
+ * §Post-F9.130). Permiso REUSADO `desarrollo.administrar` (el mismo que ya exige editar la receta:
+ * cero permisos nuevos ⇒ este deploy no requiere `SEED_ON_START`).
+ *
+ * 🔴 **POR QUÉ ESTA FUNCIÓN EXISTE, Y NO ES UN CÁLCULO MÁS.** El motor lleva sano desde el
+ * 18-ago-2026: `sembrarRecetaDeOrden` normaliza la bandera al NACER la orden, así que **una OP nueva
+ * sale bien**. Lo que nunca se tocó es el **dato ya congelado** en las órdenes viejas — se arregló
+ * el cálculo tres veces y el dato equivocado se quedó guardado. Daniel, 27-ago-2026: *"Sigue estando
+ * mal lo de los cierres… me sigue multiplicando por las medidas… Siento que estamos atorados en lo
+ * mismo desde hace varias versiones."*
+ *
+ * Y el defecto real ya no era el cálculo, era **el remedio**: el sistema DETECTABA el error, SABÍA
+ * cuánto debería pedir ({@link requeridoContradictorioPorMedida}) y cerraba el aviso con *"Guarda el
+ * renglón para normalizarlo"* — un conjuro que un no-programador no puede adivinar. Un sistema que
+ * detecta el error, sabe la solución y deja al usuario sin salida está PEOR que uno que no lo
+ * detecta: le enseña que hay algo roto y no le da la puerta.
+ *
+ * ⚠️ **SIGUE SIENDO UN ACTO EXPLÍCITO (D3).** Lo que NO cambia de §Post-F9.66 es la razón por la que
+ * la bandera no se apaga sola: *una lectura no cambia datos, y voltear el cálculo de una orden viva
+ * sin que nadie lo pida sería el cambio callado que D3 prohíbe*. Esto es un POST propio, disparado
+ * por una persona, auditado en la bitácora. Lo único que cambia es que el acto ahora es **un botón
+ * que se entiende**, no un hechizo.
+ *
+ * Lo que hace, y nada más que eso:
+ *  • apaga `consumoPorTalla` — exactamente lo mismo que ya hacía cualquier guardado del renglón;
+ *  • **NO borra las cantidades por talla** (D3: quedan, sólo dejan de mandar) ni toca el consumo por
+ *    prenda, el precio, el amarre ni las banderas de costo;
+ *  • **NO marca el renglón `ajustado`**. Editar sí lo marca —ahí una persona desvió el renglón a
+ *    propósito—, pero corregir no desvía nada del modelo: el consumo y el precio congelados siguen
+ *    idénticos. Marcarlo apagaría para siempre los avisos de *"el modelo cambió"* de ese renglón
+ *    ({@link desviadoAProposito}), o sea que reparar un defecto nuestro le costaría al usuario una
+ *    señal que sí necesita.
+ *  • **SÍ re-cierra la firma** de ese renglón (`cambiaElContenido`), porque el requerido cambia —y
+ *    mucho—: Desarrollo firmó un número que era 53 veces el bueno y tiene que ver el nuevo.
+ *
+ * Devuelve `ErrorConflicto` si el renglón NO trae la contradicción: el botón sólo aparece cuando
+ * `capturaReparable`, pero el dominio reaplica la condición (A1) para que este endpoint no pueda
+ * usarse como una puerta lateral para apagar el `consumoPorTalla` legítimo de un elástico.
+ */
+export async function corregirCapturaAvio(
+  sesion: SesionUsuario,
+  idOrden: number,
+  idRenglon: number,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  return enRecetaEditable(
+    sesion,
+    idOrden,
+    bd,
+    async (tx, orden, ctx) => {
+      const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+      const material = `${fila.avio.clave} — ${fila.avio.descripcion}`;
+      if (!capturaContradictoriaAvio(fila)) {
+        throw new ErrorConflicto(
+          `"${material}" no tiene nada que corregir: o el avío no se compra por medida, o su ` +
+            'renglón ya está normalizado. Si el aviso sigue en pantalla, vuelve a cargar la receta.',
+        );
+      }
+      // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de nadie (igual que en
+      // `editarRenglonReceta`). Corregir una lápida es inofensivo y se permite: el renglón puede
+      // revivir después, y más vale que reviva ya sano.
+      if (fila.excluido) ctx.cayoSobreLapida();
+      else ctx.tocoRenglon('avio', fila.id);
+
+      const piezas = await piezasDeLaOrden(tx, orden.id);
+      const antesRequerido = avioParaRequerido(fila);
+      const despuesRequerido: RenglonParaRequerido = {
+        ...antesRequerido,
+        consumoPorTalla: false,
+      };
+      // ⭐ V1-E3y/§Post-F9.79 — la misma puerta que cubre a la edición: corregir NO puede vaciar la
+      // compra de un material que ya tiene OC. Aquí la causa es SIEMPRE nuestra (la corrección es
+      // el único cambio), así que el mensaje no manda a des-autorizar una OC que está bien: dice
+      // qué capturar (§Post-F9.105, `laCulpaEsDeLaNormalizacion`).
+      if (sacaDeLaCompra(antesRequerido, despuesRequerido, piezas)) {
+        await exigirNoSacarLoComprado(
+          tx,
+          orden,
+          'avio',
+          fila.idAvio,
+          material,
+          'corregirlo sin decir antes cuánto lleva por prenda',
+          'Este renglón trae el consumo por prenda en 0, y todo lo que pide hoy sale de las ' +
+            'cantidades por talla: al corregirlo el requerido quedaría en 0. NO hace falta tocar ' +
+            'la orden de compra — captura primero el consumo por prenda que de verdad lleva (en ' +
+            'un cierre, normalmente 1) y vuelve a Corregir.',
+        );
+      }
+
+      await tx.ordenAvio.update({
+        where: { id: fila.id },
+        // Sólo la bandera + la marca de auditoría (A7). NADA más: ni `estado`, ni las tallas.
+        data: { consumoPorTalla: false, ...datosModificacion(sesion) },
+      });
+      await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+        accion: 'captura-por-medida-corregida',
+        tipo: 'avio' as TipoRenglonRecetaClave,
+        idRenglon,
+        material,
+        // D3: la foto ÍNTEGRA de lo que había —incluidas las cantidades por talla que dejan de
+        // mandar—, para que el número viejo se pueda reconstruir aunque nadie lo haya anotado.
+        antes: fotoAvio(fila),
+        cambios: { consumoPorTalla: false },
+        // La MAGNITUD que el usuario vio en el aviso, escrita en la bitácora: es la prueba de qué
+        // se estaba comprando de más y de qué se corrigió (A7).
+        requeridoAntes: requeridoDelRenglon(antesRequerido, piezas),
+        requeridoDespues: requeridoDelRenglon(despuesRequerido, piezas),
+      });
+    },
+    // Cambia QUÉ se compra (el requerido baja de golpe): el renglón se re-cierra y Desarrollo lo
+    // vuelve a firmar mirando el número bueno.
+    { cambiaElContenido: true },
+  );
+}
+
+/** Una foto PROPIA de un renglón de arte de la OP que se acaba de liberar (fila 0.091). */
+export interface FotoPropiaLiberada {
+  /** Key del objeto en R2, a soltar DESPUÉS del commit. */
+  key: string;
+  /** Nombre con el que se subió, para que la bitácora diga QUÉ se fue (D3). */
+  nombreOriginal: string;
+}
+
+/**
+ * ⭐⭐ FILA **0.091** — suelta las fotos PROPIAS de un renglón de arte de la OP **antes** de borrar
+ * el renglón, y devuelve las keys de R2 que quedaron libres.
+ *
+ * 🔴 **La trampa que tapa.** `OrdenArteFoto` cae en `onDelete: Cascade` hacia `OrdenArte`: borrar
+ * el renglón se lleva el puente **por el lado del padre** y deja la fila `Archivo` viva y su objeto
+ * en Cloudflare R2 **pagándose para siempre**, sin que nadie pueda verlo. El embudo de la 0.081(a)
+ * no lo atrapa porque cuelga de `archivo.delete`, no de la cascada.
+ *
+ * Se borra el **`Archivo`** (y la Cascade se lleva el `OrdenArteFoto`), que es el mismo trato que
+ * le da `quitarFotoArteOrden` en `fotos-arte-orden.ts`: un solo paso, sin huérfano posible entre
+ * dos borrados. Y se puede borrar a ciegas —sin la cuenta de `borrarArchivoSiQuedoHuerfano` que sí
+ * necesita el arte del MODELO— porque `OrdenArteFoto` lleva `@@unique([idArchivo])`: la foto NACIÓ
+ * en esta OP y no la comparte nadie.
+ *
+ * ⚠️ **Sólo toca las PROPIAS.** Las heredadas del arte del modelo no viven aquí (son
+ * `ModeloArteFoto`), así que ni se leen ni se tocan: D3, la galería del modelo queda intacta y las
+ * demás órdenes las siguen viendo.
+ *
+ * ⚠️ Vive en ESTE módulo y no en `fotos-arte-orden.ts` —su casa temática— porque aquél ya importa
+ * `exigirVerLaReceta` de aquí: ponerlo allá cerraría un ciclo de importación entre los dos.
+ *
+ * @returns una foto por cada `Archivo` borrado: su `key` para soltarla de R2 con
+ *   `eliminarObjetosBestEffort` **después** del commit, y su `nombreOriginal` para la bitácora
+ *   (D3: lo que se fue queda dicho con su nombre, no con un conteo).
+ */
+export async function liberarFotosPropiasDeArteOrden(
+  tx: Tx,
+  idOrdenArte: number,
+): Promise<FotoPropiaLiberada[]> {
+  const fotos = await tx.ordenArteFoto.findMany({
+    where: { idOrdenArte },
+    select: { idArchivo: true, archivo: { select: { key: true, nombreOriginal: true } } },
+  });
+  if (fotos.length === 0) return [];
+  await tx.archivo.deleteMany({ where: { id: { in: fotos.map((f) => f.idArchivo) } } });
+  return fotos.map((f) => ({
+    key: f.archivo.key,
+    nombreOriginal: f.archivo.nombreOriginal,
+  }));
+}
+
+/**
  * QUITA un renglón de la receta de ESTA orden (`desarrollo.administrar`) — el caso de la jareta.
  *
  * REGLA 4 del encabezado, y es la parte fina:
@@ -2101,6 +2678,12 @@ export async function editarRenglonReceta(
  *    agregó X"* — un aviso FALSO, y encima justo en el caso que la etapa vino a habilitar.
  *  • Un renglón AGREGADO A MANO se borra de verdad: no vino del modelo, no hay nada que recordar
  *    frente a él. Su copia ÍNTEGRA (no un conteo) queda en la bitácora, D3.
+ *
+ * ⚠️ **Y si ese renglón es de ARTE, se lleva sus FOTOS PROPIAS** — las que la OP subió, la única
+ * imagen que un arte agregado a mano puede tener. Sus `Archivo` se borran dentro de la transacción
+ * y los OBJETOS de R2, TRAS el commit y en modo best-effort (fila 0.091 + 0.081a). Por eso hay que
+ * llamarla SIEMPRE A NIVEL SUPERIOR, sin un `bd.tx` ya abierto: anidada, un rollback del llamador
+ * dejaría el objeto borrado y el registro vivo — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarRenglonReceta(
   sesion: SesionUsuario,
@@ -2109,9 +2692,17 @@ export async function quitarRenglonReceta(
   idRenglon: number,
   cuerpo: DatosRecetaQuitar = {},
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<RecetaOrden> {
   const datos = validarEntrada(esquemaRecetaQuitarCuerpo, cuerpo);
-  return enRecetaEditable(
+  /**
+   * Las keys de R2 que la transacción liberó de verdad (fila 0.091). Se llena DENTRO y se vacía
+   * FUERA: el bucket se toca **después** del commit (0.081a). Si `enRecetaEditable` revienta, la
+   * excepción sube y la línea de abajo no se alcanza — el objeto se queda en R2 junto a su fila,
+   * que es el lado seguro del error.
+   */
+  const keysR2: string[] = [];
+  const receta = await enRecetaEditable(
     sesion,
     idOrden,
     bd,
@@ -2181,8 +2772,22 @@ export async function quitarRenglonReceta(
       // D3: copia ÍNTEGRA con el MISMO helper del revivir.
       const copia = { tipo, idRenglon, ...fotoArte(fila), motivo: datos.motivo ?? null };
       if (fila.agregadoAMano) {
+        // ⭐ FILA 0.091 — soltar las fotos PROPIAS **antes** de borrar el renglón. La Cascade
+        // `OrdenArte → OrdenArteFoto` se lleva el puente y dejaría la fila `Archivo` viva con su
+        // objeto de R2 pagándose para siempre. Y es justo ESTE renglón —el agregado a mano— aquel
+        // cuyas fotos son todas propias: no hereda ninguna (`idModeloArte` NULL).
+        const fotosPropias = await liberarFotosPropiasDeArteOrden(tx, fila.id);
+        keysR2.push(...fotosPropias.map((f) => f.key));
         await tx.ordenArte.delete({ where: { id: fila.id } });
-        await bitacoraReceta(tx, sesion, orden.id, 'CANCELAR', { ...copia, borrado: true });
+        await bitacoraReceta(tx, sesion, orden.id, 'CANCELAR', {
+          ...copia,
+          borrado: true,
+          // D3: las fotos que la OP había subido a este renglón se van con él y no vuelven; que el
+          // rastro diga CUÁLES eran. Vacío = no tenía ninguna propia.
+          ...(fotosPropias.length === 0
+            ? {}
+            : { fotosPropiasBorradas: fotosPropias.map((f) => f.nombreOriginal) }),
+        });
       } else {
         await tx.ordenArte.update({ where: { id: fila.id }, data: marca });
         await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', { ...copia, excluido: true });
@@ -2194,6 +2799,17 @@ export async function quitarRenglonReceta(
     // lo que se acaba de excluir (ver `enRecetaEditable`).
     { cambiaElContenido: true },
   );
+
+  // FUERA de la transacción, siempre (0.081a): `DeleteObject` no participa del commit, así que
+  // dispararlo dentro dejaría el objeto borrado y su fila viva si el llamador revirtiera. Modo
+  // best-effort: un R2 caído no puede tumbar una operación que la base ya cerró.
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos propias del arte ${String(idRenglon)} de la orden ${String(idOrden)}`,
+  );
+
+  return receta;
 }
 
 /**
@@ -2267,6 +2883,13 @@ export async function restaurarRenglonReceta(
           where: { id: fila.id },
           data: {
             consumoPorPrenda: new Prisma.Decimal(delModelo.consumoPorPrenda),
+            // ⭐⭐ 0.156 — restaurar PISA con lo que dice el modelo HOY, y eso incluye el consumo
+            // del complemento: dejarlo con el valor viejo haría que el renglón «restaurado» no
+            // fuera el del modelo, que es justo lo único que este botón promete.
+            consumoComplementoPorPrenda:
+              delModelo.consumoComplementoPorPrenda === null
+                ? null
+                : new Prisma.Decimal(delModelo.consumoComplementoPorPrenda),
             precio:
               delModelo.precioCosteo === null ? null : new Prisma.Decimal(delModelo.precioCosteo),
             paraPreCosto: delModelo.paraPreCosto,
@@ -2313,10 +2936,8 @@ export async function restaurarRenglonReceta(
           : delModelo.consumoPorTalla;
         // Las medidas del MODELO se leen ANTES de escribir: son las que quedarán en el renglón
         // (`reemplazarMedidasAvio` más abajo) y por tanto las que deciden el requerido resultante.
-        const medidas = await tx.modeloAvioTalla.findMany({
-          where: { idModelo: orden.idModelo, idAvio: fila.idAvio },
-          select: { idTalla: true, consumo: true, idAvioMedida: true },
-        });
+        // V1-E9b — cuarta canónica: del modelo de la RECETA, el mismo del que salió `delModelo`.
+        const medidas = await leerMedidasAvioBom(tx, orden.idModelo, fila.idAvio);
         // ⭐ V1-E3y (§Post-F9.79): misma comprobación que en la tela, con las MEDIDAS del modelo
         // (R18) — restaurar puede vaciar el requerido tanto por el consumo como por las medidas.
         if (
@@ -2631,6 +3252,182 @@ export async function liberarReceta(
   });
 }
 
+// ── 4-bis. EL CANDADO DE COMPRA: ABRIR y CERRAR la receta (V1-E8z, §Post-F9.160(a)) ────────
+
+/**
+ * ⭐⭐⭐ **ABRE** la receta ya liberada de una orden para corregirla — y con eso **CONGELA LA COMPRA
+ * de esa orden** hasta que se cierre (`desarrollo.administrar`).
+ *
+ * DANIEL (§Post-F9.160(a)): *"pongamos un candado que **no se pueda comprar nada hasta que esté
+ * cerrado otra vez**"*.
+ *
+ * ⭐ **ABRIR SÓLO MARCA: NO DESFIRMA NADA**, y ésta es LA decisión de la etapa (§Post-F9.165 punto
+ * 1). Es lo único compatible con §Post-F9.80 —donde Daniel retiró la liberación en bloque y dejó
+ * que `liberarReceta` exija los renglones nombrados uno por uno—: si abrir desfirmara la receta
+ * entera, **cerrar una receta de 40 renglones costaría 40 clics**, y el candado que existe para
+ * proteger la compra se volvería el motivo para no abrirlo nunca. Conservando las firmas, cerrar es
+ * un clic y **sólo hay que re-firmar lo que se tocó** — que ya funciona solo: editar un renglón le
+ * quita su firma (`revocarFirmaDeRenglones`, disparado dentro de `enRecetaEditable`).
+ *
+ * LAS TRES CONDICIONES, y por qué cada una:
+ *  • **La orden tiene que estar VIVA.** Reabrir para corregir lo que ya no se va a producir no
+ *    significa nada (cerrar sí se permite sobre una orden cancelada O CERRADA: ver
+ *    `permitirOrdenNoViva`).
+ *  • **La receta tiene que estar LIBERADA COMPLETA** (`recetaLiberadaEn` no nulo). Y es la condición
+ *    que hace que el candado no tenga trampa: como al abrir no quedaba nada sin firmar, todo lo que
+ *    quede sin firmar al cerrar es **algo que esta corrección tocó**, así que siempre hay alguien
+ *    que puede volver a firmarlo. Si se pudiera abrir una receta a medio firmar, un renglón que el
+ *    cliente todavía no autoriza dejaría la orden **imposible de cerrar** — congelada para siempre,
+ *    que es justo lo que este candado no debe producir.
+ *
+ *    🔴 **PERO OJO: esto se DESVÍA de la letra de §Post-F9.165 punto 4, y deja un caso real fuera.**
+ *    Aquel punto decía *"no se puede abrir una receta que **nunca se liberó**"*, que literalmente es
+ *    `liberados === 0` — o sea, permitiría reabrir una receta liberada A MEDIAS. Aquí se exige que
+ *    esté COMPLETA, que es más estricto, y el caso que queda fuera es éste: **39 de 40 renglones
+ *    firmados y con OC emitidas, el 40 sin firmar; Desarrollo descubre que la tela está mal y NO
+ *    puede congelar la compra de los otros 39.** El único rodeo sería firmar el renglón 40 sin
+ *    revisarlo — exactamente lo que §Post-F9.80 vino a impedir.
+ *    Se eligió así por ser lo más seguro (la alternativa produce órdenes imposibles de cerrar), pero
+ *    **es una decisión de producto que está pendiente de que Daniel la confirme**: quien lea esto
+ *    mañana tiene que saber que la restricción es deliberada y qué cuesta.
+ *  • **No puede estar ya abierta.** Se dice desde cuándo y por qué, en vez de pisar el motivo de
+ *    quien la abrió (D3: lo guardado no se sobrescribe en silencio).
+ *
+ * **MOTIVO OBLIGATORIO** (punto 3): congelar la compra de una orden entera sin decir por qué deja al
+ * comprador adivinando — y ese texto es LITERALMENTE lo que el 409 le enseña
+ * ({@link exigirCompraNoCongelada}).
+ *
+ * D3/A7: abrir y cerrar **se registran** en la bitácora, los dos; las tres columnas son el ESTADO
+ * ("¿está abierta ahora?"), no el historial.
+ */
+export async function abrirReceta(
+  sesion: SesionUsuario,
+  idOrden: number,
+  cuerpo: DatosAbrirReceta,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  const datos = validarEntrada(esquemaAbrirRecetaCuerpo, cuerpo);
+  return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
+    if (orden.recetaAbiertaEn !== null) {
+      const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+      throw new ErrorConflicto(
+        `La receta de la orden ${String(orden.folio)} YA está abierta desde el ${desde}` +
+          (orden.recetaAbiertaMotivo === null ? '' : ` ("${orden.recetaAbiertaMotivo}")`) +
+          ': corrígela y ciérrala. La compra de esta orden ya está congelada.',
+      );
+    }
+    if (orden.recetaLiberadaEn === null) {
+      throw new ErrorConflicto(
+        `La receta de la orden ${String(orden.folio)} no está liberada completa: no hay nada que ` +
+          'reabrir. Lo que todavía no está firmado ya no se puede comprar, y corregirlo no ' +
+          `necesita candado. ${DONDE_SE_LIBERA}`,
+      );
+    }
+    const abiertaEn = new Date();
+    await tx.orden.update({
+      where: { id: orden.id },
+      data: {
+        recetaAbiertaEn: abiertaEn,
+        recetaAbiertaPorId: sesion.id,
+        recetaAbiertaMotivo: datos.motivo,
+        ...datosModificacion(sesion),
+      },
+    });
+    await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+      accion: 'abrir-receta',
+      motivo: datos.motivo,
+      abiertaEn: abiertaEn.toISOString(),
+      // Desde cuándo estaba liberada: es el dato que dice qué se está reabriendo.
+      liberadaEn: orden.recetaLiberadaEn.toISOString(),
+      // Se deja escrito que las firmas NO se tocaron: quien lea la bitácora dentro de un año no
+      // tiene por qué acordarse de cuál de las dos variantes se construyó.
+      firmasConservadas: true,
+      efecto: 'la compra de esta orden queda congelada hasta que se cierre la receta',
+    });
+  });
+}
+
+/**
+ * ⭐⭐⭐ **CIERRA** la receta reabierta y **descongela la compra** de la orden
+ * (`desarrollo.administrar`).
+ *
+ * **EXIGE QUE NO QUEDE NINGÚN RENGLÓN VIVO SIN FIRMAR** (§Post-F9.165 punto 2). No es una condición
+ * cara: al abrir estaba todo firmado, así que lo único que puede faltar es lo que ESTA corrección
+ * tocó —editar revoca la firma de ese renglón, y traer del modelo o agregar a mano nace sin ella—.
+ * Cerrar sin esa comprobación descongelaría la compra de material que nadie volvió a mirar, que es
+ * exactamente el agujero que la firma existe para tapar. El mensaje **nombra** lo que falta: mandar
+ * a alguien a buscar "algo sin firmar" en una receta de 40 renglones es no decirle nada.
+ *
+ * ⚠️ Una receta que quedó **sin renglones vivos** (todo excluido) SÍ se puede cerrar: no queda nada
+ * sin firmar. No abre ninguna puerta — la puerta vieja (`exigirRecetaLiberada`) sigue frenando la
+ * compra porque no hay nada liberado que comprar.
+ *
+ * 🔴 **NO exige la orden viva**, y es deliberado ({@link enRecetaEditable} `permitirOrdenNoViva`):
+ * si la orden se cancela —o se CIERRA (0.061)— con la receta abierta, ésta es la única salida del
+ * candado. Un candado que sólo se puede abrir es una trampa. Es la ÚNICA operación de receta que
+ * una orden cerrada admite, y no mueve ni un renglón ni un peso: sólo suelta el freno de la compra.
+ *
+ * **Sin cuerpo, sin motivo**: la razón ya se dio al abrir. Pedir un segundo texto por la misma
+ * corrección es la fricción que entrena a escribir "ok".
+ */
+export async function cerrarReceta(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  return enRecetaEditable(
+    sesion,
+    idOrden,
+    bd,
+    async (tx, orden) => {
+      const abiertaEn = orden.recetaAbiertaEn;
+      if (abiertaEn === null) {
+        throw new ErrorConflicto(
+          `La receta de la orden ${String(orden.folio)} no está abierta: no hay nada que cerrar. ` +
+            'Su compra se rige por la firma de cada renglón, como siempre.',
+        );
+      }
+      const pendientes = await leerPorLiberar(tx, orden.id);
+      if (pendientes.length > 0) {
+        // Se nombran hasta cinco: la lista completa de una receta grande convierte el aviso en un
+        // muro que nadie lee, y con cinco ya se sabe por dónde empezar.
+        const nombres = pendientes.slice(0, 5).map((p) => `"${p.material}"`);
+        const resto = pendientes.length - nombres.length;
+        throw new ErrorConflicto(
+          `Antes de cerrar la receta de la orden ${String(orden.folio)} hay que volver a firmar lo ` +
+            `que se corrigió: ${String(pendientes.length)} ` +
+            `${pendientes.length === 1 ? 'renglón sigue' : 'renglones siguen'} sin liberar ` +
+            `(${nombres.join(', ')}${resto > 0 ? ` y ${String(resto)} más` : ''}). Editar un ` +
+            'renglón le quita la firma a propósito: fírmalo en su fila y vuelve a cerrar.',
+        );
+      }
+      await tx.orden.update({
+        where: { id: orden.id },
+        data: {
+          recetaAbiertaEn: null,
+          recetaAbiertaPorId: null,
+          recetaAbiertaMotivo: null,
+          ...datosModificacion(sesion),
+        },
+      });
+      await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+        accion: 'cerrar-receta',
+        // Qué se está cerrando: la apertura que se limpia queda ÍNTEGRA aquí (D3), porque las tres
+        // columnas se vacían y en la orden ya no habrá rastro de ella.
+        abiertaEn: abiertaEn.toISOString(),
+        abiertaPorId: orden.recetaAbiertaPorId,
+        motivoDeApertura: orden.recetaAbiertaMotivo,
+        // Cerrar una orden CANCELADA es legal y raro: que quede dicho en la traza.
+        ordenCancelada: orden.estado === 'cancelada',
+        // 0.061: cerrar la receta de una orden CERRADA también es legal y raro — misma razón.
+        ordenCerrada: orden.cerradaEn !== null,
+        efecto: 'la compra de esta orden vuelve a regirse por la firma de cada renglón',
+      });
+    },
+    { permitirOrdenNoViva: true },
+  );
+}
+
 /**
  * ⭐ TRAE DEL MODELO lo que le falta a la receta (`desarrollo.administrar`) — §Post-F9.73.
  *
@@ -2721,6 +3518,11 @@ export async function traerDelModelo(
         fila: { estado: EstadoRenglonReceta; agregadoAMano: boolean; excluido: boolean },
       ): boolean => loPidieronPorSuNombre(tipo, id) || desviadoAProposito(fila);
 
+      // ⭐ V1-E9b — las CUATRO lecturas de la receta que hace este bloque son canónicas, y las
+      // cuatro resuelven POR DENTRO. Aquí NO se resuelve nada a propósito: un `idReceta` local
+      // sería una copia de la regla que alguien puede revertir sin que ninguna prueba caiga —que
+      // es exactamente la mutación que sobrevivió en la revisión de la etapa—. Lo que no está
+      // escrito aquí, no se puede romper aquí.
       const [telasModelo, aviosModelo, artesModelo] = await Promise.all([
         leerTelasBom(tx, orden.idModelo, orden.idEmpresa),
         leerAviosBom(tx, orden.idModelo, orden.idEmpresa),
@@ -2779,6 +3581,11 @@ export async function traerDelModelo(
             idOrden: orden.id,
             idTela: t.idTela,
             consumoPorPrenda: new Prisma.Decimal(t.consumoPorPrenda),
+            // ⭐⭐ 0.156 — se trae del modelo con todo lo suyo, complemento incluido.
+            consumoComplementoPorPrenda:
+              t.consumoComplementoPorPrenda === null
+                ? null
+                : new Prisma.Decimal(t.consumoComplementoPorPrenda),
             precio: precioDecimal(t.precioCosteo),
             paraPreCosto: t.paraPreCosto,
             paraProduccion: t.paraProduccion,
@@ -2833,10 +3640,7 @@ export async function traerDelModelo(
           },
           select: { id: true },
         });
-        const medidas = await tx.modeloAvioTalla.findMany({
-          where: { idModelo: orden.idModelo, idAvio: a.idAvio },
-          select: { idTalla: true, consumo: true, idAvioMedida: true },
-        });
+        const medidas = await leerMedidasAvioBom(tx, orden.idModelo, a.idAvio);
         if (medidas.length > 0) {
           await tx.ordenAvioTalla.createMany({
             data: medidas.map((m) => ({
@@ -3232,26 +4036,36 @@ async function exigirNoSacarLoComprado(
    */
   comoArreglarlo: string | null = null,
 ): Promise<void> {
-  const lineas = await tx.ordenCompraLinea.findMany({
-    where: {
-      idOrden: orden.id,
-      ...(tipo === 'tela' ? { idTela: idMaterial } : { idAvio: idMaterial }),
-      ordenCompra: {
-        idEmpresa: orden.idEmpresa,
-        estatus: { in: [...ESTATUS_OC_COMPROMETIDA] },
-      },
-    },
-    select: { ordenCompra: { select: { numCompra: true, estatus: true } } },
-    orderBy: { id: 'asc' },
-  });
-  if (lineas.length === 0) return;
+  /*
+   * ⭐⭐⭐ 0.085 — ESTA CONSULTA YA NO ES SUYA: la comparte con el AVISO (§Post-F9.173(a)).
+   *
+   * Hasta la 0.084 esta guarda tenía su propio `findMany` sobre `ordenCompraLinea`, idéntico al que
+   * la 0.085 necesitaba para avisar. Dos consultas con el mismo `where` son dos respuestas a *"¿qué
+   * está comprado?"* que coinciden **hoy**: el día que una cambie —un estatus nuevo, la empresa, el
+   * criterio de la línea— el sistema BLOQUEARÍA por un criterio y AVISARÍA por otro, que es la
+   * clase de contradicción que este módulo lleva dos etapas persiguiendo. Ahora hay una sola.
+   *
+   * ⚠️⚠️ **PERO EL FILTRO POR MATERIAL DEJÓ DE SER SQL: ahora es `claveMaterial` sobre el mapa.** Eso
+   * apoya esta guarda en un INVARIANTE DE DOMINIO —que una línea de OC lleve tela XOR avío— que la
+   * base **no** garantiza con un `CHECK`. Una línea con las dos se archivaría bajo `tela-N` y este
+   * bloqueo se apagaría **en silencio** para el avío. Los dos únicos escritores lo respetan hoy;
+   * la nota completa, con qué hacer si aparece un tercero, vive en `compras/aviso-ya-comprado.ts`.
+   */
+  const comprometidas = await comprasComprometidasDeUnaOrden(orden.idEmpresa, orden.id, { tx });
+  const ocs =
+    comprometidas.porMaterial.get(
+      claveMaterial(
+        tipo === 'tela'
+          ? { idTela: idMaterial, idAvio: null }
+          : { idTela: null, idAvio: idMaterial },
+      ),
+    ) ?? [];
+  if (ocs.length === 0) return;
 
-  const folios = [...new Set(lineas.map((l) => Number(l.ordenCompra.numCompra)))].sort(
-    (a, b) => a - b,
-  );
+  const folios = [...new Set(ocs.map((o) => o.folio))].sort((a, b) => a - b);
   const listaFolios = folios.map((f) => `#${String(f)}`).join(', ');
   const plural = folios.length > 1;
-  const recibida = algunaRecibida(lineas.map((l) => l.ordenCompra.estatus));
+  const recibida = algunaRecibida(ocs.map((o) => o.estatus));
 
   if (recibida) {
     throw new ErrorConflicto(

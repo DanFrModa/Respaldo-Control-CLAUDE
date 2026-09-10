@@ -178,6 +178,12 @@ export const esquemaDesarrolloSalida = z
     apagado: z.boolean().describe('Borrado suave: el desarrollo se conserva pero no cuenta.'),
     apagadoEn: z.iso.datetime().nullable().describe('Cuándo se apagó (ISO 8601), o null.'),
     apagadoPorId: z.string().nullable().describe('Quién lo apagó, o null.'),
+    nombreApagadoPor: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre de quien lo apagó; null si el id no resuelve (el desarrollo se sigue viendo).',
+      ),
     motivoApagado: z.string().nullable().describe('Motivo por el que se apagó, o null.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

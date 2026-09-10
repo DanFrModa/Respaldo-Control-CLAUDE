@@ -13,14 +13,16 @@ import {
   esquemaTiposMovimientoLista,
   esquemaTiposMovimientoQuery,
 } from '../../contrato/index.js';
-import type { TipoMovimientoInventario } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
-import { listarTiposMovimiento } from '../../dominio/inventarios/tipos-movimiento.js';
+import {
+  listarTiposMovimiento,
+  type TipoMovimientoConCaptura,
+} from '../../dominio/inventarios/tipos-movimiento.js';
 
 /** Proyecta el modelo Prisma a la forma JSON del contrato. */
 function aTipoMovimientoSalida(
-  tipo: TipoMovimientoInventario,
+  tipo: TipoMovimientoConCaptura,
 ): z.infer<typeof esquemaTipoMovimientoSalida> {
   return {
     id: tipo.id,
@@ -28,6 +30,7 @@ function aTipoMovimientoSalida(
     nombre: tipo.nombre,
     direccion: tipo.direccion,
     activo: tipo.activo,
+    capturaManual: tipo.capturaManual,
   };
 }
 

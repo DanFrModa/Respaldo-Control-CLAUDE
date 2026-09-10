@@ -1,4 +1,5 @@
 import {
+  Banknote,
   Boxes,
   CalendarRange,
   Contact,
@@ -66,6 +67,17 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     ruta: '/catalogos/proveedores',
     icono: Truck,
     permiso: 'proveedores.ver',
+  },
+  // El catálogo GEMELO del de proveedores (fila 0.125): lo que se paga cada semana y NO es un
+  // proveedor. Daniel: *«que sean un catálogo aparte, no proveedores»* — no tienen RFC ni estado de
+  // cuenta, y colarlos al padrón de proveedores contaminaría CxP y los reportes del contador.
+  {
+    clave: 'conceptos-pago',
+    titulo: 'Conceptos de pago',
+    descripcion: 'Nómina por fuera, servicios, caja chica… con sus cuentas de pago.',
+    ruta: '/catalogos/conceptos-pago',
+    icono: Banknote,
+    permiso: 'conceptos-pago.ver',
   },
   {
     clave: 'temporadas',

@@ -69,6 +69,12 @@ export const esquemaHitoOrdenSalida = z
     idOrden: z.number().int().describe('Orden a la que pertenece.'),
     tipo: z.enum(TIPOS_HITO_ORDEN).describe('Tipo de hito.'),
     registradoPorId: z.string().nullable().describe('Usuario que registró el hito (o null).'),
+    nombreRegistradoPor: z
+      .string()
+      .nullable()
+      .describe(
+        'Nombre de quien lo registró; null si el id no resuelve (el hito se sigue viendo).',
+      ),
     fecha: z.iso.date().describe('Fecha física del hito (YYYY-MM-DD).'),
     creadoEn: z.iso.datetime().describe('Sello de creación.'),
   })

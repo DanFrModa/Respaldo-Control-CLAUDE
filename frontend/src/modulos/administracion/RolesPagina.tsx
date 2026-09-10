@@ -1,4 +1,12 @@
-import { Lock, PencilIcon, SaveIcon, ShieldCheck, Trash2Icon, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  Lock,
+  PencilIcon,
+  SaveIcon,
+  ShieldCheck,
+  Trash2Icon,
+  Users,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -37,8 +45,10 @@ import { DialogoRol } from './DialogoRol';
  * semántica de REEMPLAZO) + botón Guardar. Alta/edición/eliminación en diálogos.
  *
  * Un rol de SISTEMA no se renombra ni se elimina (el backend es la autoridad, A1): la UI deshabilita
- * esas acciones con su razón, pero SÍ permite editar sus permisos. Los roles con usuarios asignados
- * tampoco se eliminan. Todo va gobernado por `roles.administrar` (no existe `.ver`).
+ * esas acciones con su razón, pero SÍ permite editar sus permisos — con un AVISO de que el seed se
+ * los va a restablecer en el siguiente deploy sembrado (ver `EditorPermisos`). Los roles con
+ * usuarios asignados tampoco se eliminan. Todo va gobernado por `roles.administrar` (no existe
+ * `.ver`).
  */
 export function RolesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -349,6 +359,12 @@ function AccionesRol({
  * que QUEDA (semántica de reemplazo): al Guardar, se envía el conjunto completo a
  * `asignarPermisos`. Mantiene su propio estado local; el padre lo remonta (key)
  * al cambiar de rol para partir siempre del set del rol seleccionado.
+ *
+ * ⚠️ Y AVISA cuando el rol es de SISTEMA: esos 9 los re-sincroniza el seed con su definición de
+ * `prisma/seed.ts` en cada arranque con `SEED_ON_START=true` (`deleteMany` de lo que sobre +
+ * `createMany` de lo que falte), así que un permiso palomeado a mano ahí se borra CALLADO en el
+ * siguiente deploy. La pantalla no lo bloquea —guardar sigue sirviendo para probar algo en el
+ * momento—, pero deja de mentir sobre cuánto dura. Para un permiso permanente: un rol propio.
  */
 function EditorPermisos({
   rol,
@@ -411,6 +427,38 @@ function EditorPermisos({
             Marca los permisos que otorga este rol. Lo marcado es lo que queda (reemplaza al
             conjunto actual).
           </p>
+
+          {/* ⚠️ Un perfil de SISTEMA se re-sincroniza con `definirRoles()` del seed en cada
+              arranque con `SEED_ON_START=true`: lo que se palomee aquí se pierde CALLADO en el
+              siguiente deploy. La pantalla no puede impedirlo (el backend sí lo permite, y hace
+              bien: sirve para probar), pero sí puede decirlo antes de que alguien crea que quedó.
+
+              🔴 Y TIENE QUE DECIR LA EXCEPCIÓN, que es donde durar es peligroso: `sembrarRoles`
+              NUNCA revoca `usuarios.administrar` ni `roles.administrar` (guard anti-lockout, ver
+              `prisma/seed.ts` → `deleteMany … notIn: [...idsPermisos, ...idsGobierno]`). O sea que
+              el escenario que el propio seed describe —darle «administrar roles» a Gerencial desde
+              ESTA pantalla— se queda para SIEMPRE. Un aviso que dijera «todo se borra» mentiría
+              justo en los dos permisos que más pesan (y `roles.administrar` es además el marcador
+              de «es admin» de la Ruta Crítica). */}
+          {rol.esSistema ? (
+            <p
+              // `bg-warn-soft` + texto normal es el patrón de aviso del rediseño (ChipEstado,
+              // EditorMedidasAvio). OJO: `text-warn-foreground` NO existe como token en index.css
+              // —sólo hay `--color-warn` y `--color-warn-soft`—, así que esa clase no pinta nada.
+              className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn-soft px-3 py-2 text-[12.5px]"
+              role="alert"
+              data-testid="aviso-rol-sistema"
+            >
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              <span>
+                <b>«{rol.nombre}» es un perfil de sistema.</b> Lo que marques aquí puede perderse:
+                estos perfiles vuelven a su definición de fábrica cada vez que se actualiza el
+                programa — <b>salvo administrar usuarios y administrar roles</b>, que el sistema
+                nunca retira de un perfil. Si el cambio debe ser permanente, crea un perfil propio,
+                dale los permisos que necesite y asígnaselo a la persona.
+              </span>
+            </p>
+          ) : null}
 
           {/* Rejilla FLUIDA al ancho del cajón (auto-fit): 1 columna en móvil, 2-3 en
               amplio/máximo. `min(100%,…)` evita que la columna mínima desborde cuando el

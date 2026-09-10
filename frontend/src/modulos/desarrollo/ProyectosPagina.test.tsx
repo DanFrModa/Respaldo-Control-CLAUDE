@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
 import type { Desarrollo, EstadoDesarrollo } from '@/api/desarrollos';
-import type { CandidatoLista } from '@/api/listas-precios';
+import type { CandidatoLista, DescartadoLista, DiagnosticoCandidatos } from '@/api/listas-precios';
 import type { Proyecto, ProyectoDetalle, ProyectosPagina as TipoPagina } from '@/api/proyectos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
@@ -72,7 +72,7 @@ vi.mock('@/api/calidad', () => ({
 // Candidatos a la lista: es la FUENTE DE VERDAD del botón «Generar lista de precios» (la misma
 // consulta que abre el diálogo). Se controla por prueba para cubrir los dos lados.
 let candidatos: {
-  data: CandidatoLista[] | undefined;
+  data: DiagnosticoCandidatos | undefined;
   isPending: boolean;
   isError: boolean;
   error: ErrorDeApi | null;
@@ -81,6 +81,30 @@ vi.mock('@/api/listas-precios', () => ({
   useCandidatosLista: () => candidatos,
   useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+
+/**
+ * Un DESCARTADO de ejemplo (V1-E8f): el backend ya clasificó POR QUÉ ese modelo no puede entrar a
+ * una lista, y el frontend sólo lo redacta.
+ */
+function descartado(
+  idDesarrollo: number,
+  codigoModelo: string,
+  motivo: DescartadoLista['motivo'],
+  versionPrecosto: number | null = null,
+): DescartadoLista {
+  return {
+    idDesarrollo,
+    idProyecto: 1,
+    folioProyecto: 101,
+    nombreProyecto: 'Joggers',
+    codigoModelo,
+    numeroCliente: null,
+    motivo,
+    versionPrecosto,
+    idLista: null,
+    folioLista: null,
+  };
+}
 
 /** Un candidato de ejemplo (el backend ya aplicó "congelado + sin renglón de lista"). */
 function candidato(idDesarrollo: number, codigoModelo: string): CandidatoLista {
@@ -117,6 +141,7 @@ function desarrollo(id: number, codigo: string, estado: EstadoDesarrollo): Desar
     apagado,
     apagadoEn: apagado ? '2026-07-04T00:00:00.000Z' : null,
     apagadoPorId: apagado ? 'usuario-x' : null,
+    nombreApagadoPor: apagado ? 'Ana Ruiz' : null,
     motivoApagado: apagado ? 'Fuera de temporada' : null,
     creadoEn: '2026-07-04T00:00:00.000Z',
     creadoPorId: null,
@@ -184,7 +209,18 @@ describe('<ProyectosPagina>', () => {
     archivarMutate.mockReset();
     ultimaQuery = undefined;
     // Por default: sin candidatos (el proyecto de `detalle` sólo tiene un modelo en desarrollo).
-    candidatos = { data: [], isPending: false, isError: false, error: null };
+    // Por default: ningún candidato y UN modelo descartado porque su precosto sigue en borrador
+    // (V1-E8f) — el caso con el que Daniel se topó, y el que la mayoría de las pruebas asume.
+    candidatos = {
+      data: {
+        datos: [],
+        descartados: [descartado(1, 'A-100', 'precosto-borrador', 1)],
+        faltanFactores: false,
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     detalle = {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [desarrollo(1, 'A-100', 'en-desarrollo')],
@@ -282,7 +318,12 @@ describe('<ProyectosPagina>', () => {
 
     // Regla §Post-F9.16: el botón NO se esconde — se ve deshabilitado y CON la explicación.
     expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
-    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(/precosto CONGELADO/i);
+    // V1-E8f: el motivo lo dicta el SERVIDOR y nombra el remedio con su nombre («Congelar
+    // versión»), en vez de la disyunción que antes se adivinaba en el cliente.
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(
+      /1 con el precosto en borrador/i,
+    );
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(/Congelar versión/i);
   });
 
   it('con candidatos del servidor el botón se habilita y abre el diálogo con el cliente del proyecto', async () => {
@@ -293,7 +334,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'cotizado')],
     };
     candidatos = {
-      data: [candidato(1, 'A-100')],
+      data: { datos: [candidato(1, 'A-100')], descartados: [], faltanFactores: false },
       isPending: false,
       isError: false,
       error: null,
@@ -324,7 +365,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'ligado-produccion')],
     };
     candidatos = {
-      data: [candidato(1, 'A-100')],
+      data: { datos: [candidato(1, 'A-100')], descartados: [], faltanFactores: false },
       isPending: false,
       isError: false,
       error: null,
@@ -336,11 +377,13 @@ describe('<ProyectosPagina>', () => {
     expect(screen.queryByTestId('motivo-sin-lista')).not.toBeInTheDocument();
   });
 
-  it('sin candidatos y con modelos ya avanzados, el motivo NO afirma que todos estén en una lista', async () => {
+  // ⭐ V1-E8f: la MEZCLA que antes obligaba a mentir. Con el estado derivado no se podía separar
+  // "ya está en una lista" de "le falta congelar", y el texto salía como disyunción. Ahora el
+  // servidor manda el motivo DE CADA MODELO, así que se dicen los dos hechos por separado y con su
+  // conteo — sin disyunción y sin adivinar.
+  it('con motivos MEZCLADOS los dice por separado, con su conteo, sin disyunción', async () => {
     const usuario = userEvent.setup();
     useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
-    // Mezcla en la que no se puede separar "ya está en lista" de "le falta congelar": el texto lo
-    // dice como disyunción, sin inventar una causa.
     detalle = {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [
@@ -348,13 +391,30 @@ describe('<ProyectosPagina>', () => {
         desarrollo(2, 'B-200', 'en-desarrollo'),
       ],
     };
+    candidatos = {
+      data: {
+        datos: [],
+        descartados: [
+          descartado(1, 'A-100', 'ya-en-lista'),
+          descartado(2, 'B-200', 'precosto-borrador', 2),
+        ],
+        faltanFactores: false,
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
     await usuario.click(screen.getByTestId('fila-proyecto'));
 
     expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
     const motivo = screen.getByTestId('motivo-sin-lista');
-    expect(motivo).toHaveTextContent(/no se vuelven a incluir/i);
-    expect(motivo).toHaveTextContent(/falta congelar/i);
+    expect(motivo).toHaveTextContent(/1 con el precosto en borrador/i);
+    expect(motivo).toHaveTextContent(/1 ya en una lista/i);
+    // El remedio ACCIONABLE va primero: lo que el usuario puede arreglar ahora mismo.
+    expect(motivo).toHaveTextContent(/Congelar versión/i);
+    // Y ya NO se ofrece la disyunción vieja ("…o les falta congelar su precosto").
+    expect(motivo).not.toHaveTextContent(/no se vuelven a incluir/i);
   });
 
   it('con TODOS los modelos apagados el motivo dice eso (no "no tiene modelos") y manda reactivar', async () => {
@@ -367,14 +427,74 @@ describe('<ProyectosPagina>', () => {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [desarrollo(1, 'A-100', 'apagado')],
     };
+    candidatos = {
+      data: { datos: [], descartados: [descartado(1, 'A-100', 'apagado')], faltanFactores: false },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
     await usuario.click(screen.getByTestId('fila-proyecto'));
 
     expect(screen.getByTestId('mostrar-apagados-desarrollos')).toBeInTheDocument();
     const motivo = screen.getByTestId('motivo-sin-lista');
     expect(motivo).toHaveTextContent(/apagados/i);
-    expect(motivo).toHaveTextContent(/reactiva/i);
+    expect(motivo).toHaveTextContent(/Reactívalos/i);
     expect(motivo).not.toHaveTextContent(/todavía no tiene modelos/i);
+  });
+
+  /**
+   * V1 «los nombres, en vez de los ids» — la tarjeta del desarrollo apagado pintaba
+   * `d.apagadoPorId`, o sea un cuid. Gemela de las tres del diálogo de orden (comentarios, hitos y
+   * adjuntos) y de la del tech pack: cada una lleva su prueba.
+   */
+  describe('quién apagó el desarrollo (V1)', () => {
+    /** Un id crudo con la pinta REAL de los del sistema (cuid) — no debe verse nunca. */
+    const ID_CRUDO = 'cm2f6x1d0000rrrr1357ijkl';
+
+    /** Abre el detalle del proyecto y despliega el bloque de apagados. */
+    async function abrirApagados(apagadoPorId: string | null, nombreApagadoPor: string | null) {
+      const usuario = userEvent.setup();
+      useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
+      detalle = {
+        ...proyecto(1, 101, 'Joggers'),
+        desarrollos: [{ ...desarrollo(1, 'A-100', 'apagado'), apagadoPorId, nombreApagadoPor }],
+      };
+      renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+      await usuario.click(screen.getByTestId('fila-proyecto'));
+      await usuario.click(screen.getByTestId('mostrar-apagados-desarrollos'));
+      return screen.getByTestId('fila-desarrollo-apagado');
+    }
+
+    it('pinta el NOMBRE de quien lo apagó, nunca su id', async () => {
+      const fila = await abrirApagados(ID_CRUDO, 'Ana Ruiz');
+
+      expect(fila).toHaveTextContent('por Ana Ruiz');
+      expect(document.body.textContent).not.toContain(ID_CRUDO);
+    });
+
+    /** 🔴 D3 — el desarrollo apagado se sigue viendo (y reactivable) sin el nombre de quien lo apagó. */
+    it('un autor cuyo id ya no resuelve: el desarrollo SIGUE visible y reactivable', async () => {
+      const fila = await abrirApagados(ID_CRUDO, null);
+
+      expect(fila).toHaveTextContent('por Usuario dado de baja');
+      // El motivo y el remedio no se pierden por no poder nombrar a quien lo apagó.
+      expect(fila).toHaveTextContent('Fuera de temporada');
+      expect(screen.getByTestId('reactivar-desarrollo')).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(ID_CRUDO);
+    });
+
+    it('sin autor, omite el « · por …» (no dice «Sistema»)', async () => {
+      const fila = await abrirApagados(null, null);
+
+      // 🔴 La aserción tiene que morder la OMISIÓN, no sólo el texto «Usuario dado de baja»: con
+      // `not.toHaveTextContent('por Usuario')` la prueba pasaba aunque la rama nula pintara
+      // « · por (nadie)». No se puede usar `'por'` a secas —el renglón dice «Fuera de temPORada»—,
+      // así que se asevera contra el separador completo, que sólo existe si hubo autor.
+      expect(fila).not.toHaveTextContent('· por');
+      // Y lo que sí tiene que seguir ahí.
+      expect(fila).toHaveTextContent('Fuera de temporada');
+    });
   });
 
   it('si la consulta de candidatos FALLA, lo dice en vez de inventar un motivo', async () => {

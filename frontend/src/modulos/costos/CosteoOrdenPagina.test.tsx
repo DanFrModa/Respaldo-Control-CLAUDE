@@ -70,7 +70,15 @@ function costoOrden(over: Partial<CostoOrden['real']> = {}): CostoOrden {
       ...over,
     },
     guardado: null,
-    unitario: { base: 'cortado', cantidadBase: 100, costoUnitario: 65 },
+    unitario: {
+      base: 'recibido',
+      cantidadBase: 100,
+      costoUnitario: 65,
+      motivoSinUnitario: null,
+      textoSinUnitario: null,
+      congeladoEn: null,
+    },
+    ordenCerrada: false,
   };
 }
 
@@ -206,5 +214,75 @@ describe('CosteoOrdenPagina — desglose del real', () => {
     expect(cajon).toHaveTextContent('Textiles del Bajío');
     expect(cajon).toHaveTextContent('OC 4001');
     expect(cajon).toHaveTextContent('Comprado para esta orden');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ 0.061 — EL COSTO CONGELADO Y EL «AÚN NO HAY PIEZAS RECIBIDAS» (§Post-F9.154(b)/(c)).
+// Con el divisor en `recibido`, una orden recién cortada tiene la base en 0 hasta el primer recibo
+// de costura: el unitario sale null y la pantalla tiene que DECIR POR QUÉ — con la frase que
+// redacta el SERVIDOR, no una inventada aquí. Y con la orden cerrada, el número que se enseña es
+// el CONGELADO, no la vista previa de lo que se teclea (porque ya no se puede teclear).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe('CosteoOrdenPagina — orden CERRADA y costo congelado (0.061)', () => {
+  it('sin piezas recibidas, enseña la FRASE DEL SERVIDOR en lugar del unitario', () => {
+    const costo = costoOrden();
+    montar({
+      ...costo,
+      cantidades: { ...costo.cantidades, recibido: 0 },
+      unitario: {
+        base: 'recibido',
+        cantidadBase: 0,
+        costoUnitario: null,
+        motivoSinUnitario: 'sin-base',
+        textoSinUnitario:
+          'Aún no hay piezas recibidas: el costo por prenda se calcula cuando llegue el primer recibo de costura.',
+        congeladoEn: null,
+      },
+    });
+
+    expect(screen.getByTestId('costeo-unitario')).toHaveTextContent(/Aún no hay piezas recibidas/);
+    // Y NO se cuela un importe: sin base no hay unitario que enseñar.
+    expect(screen.getByTestId('costeo-unitario')).not.toHaveTextContent('$');
+  });
+
+  it('la orden CERRADA avisa, bloquea la captura y enseña el unitario CONGELADO', () => {
+    const costo = costoOrden();
+    montar({
+      ...costo,
+      ordenCerrada: true,
+      cantidades: { ...costo.cantidades, recibido: 90 },
+      unitario: {
+        base: 'recibido',
+        cantidadBase: 80,
+        costoUnitario: 81.25,
+        motivoSinUnitario: null,
+        textoSinUnitario: null,
+        congeladoEn: '2026-09-03T18:00:00.000Z',
+      },
+    });
+
+    expect(screen.getByTestId('costeo-orden-cerrada')).toHaveTextContent(/CERRADA/);
+    // Solo lectura: ni los campos ni el botón de guardar.
+    expect(screen.getByTestId('costeo-tela')).toBeDisabled();
+    expect(screen.getByTestId('costeo-avios')).toBeDisabled();
+    expect(screen.getByTestId('costeo-base')).toBeDisabled();
+    expect(screen.getByTestId('costeo-guardar')).toBeDisabled();
+    // ⭐ El número es el CONGELADO del servidor (80 pzas × $81.25), NO el que saldría de dividir
+    // entre las 90 recibidas de hoy: eso es exactamente lo que "congelar" significa.
+    expect(screen.getByTestId('costeo-unitario')).toHaveTextContent('$81.25');
+    expect(screen.getByTestId('costeo-congelado')).toHaveTextContent(
+      /Congelado al cerrar la orden/,
+    );
+    // ⭐ Y las PIEZAS que se enseñan son las 80 del cierre, no las 90 de hoy: si el divisor
+    // siguiera vivo junto a un importe congelado, la pantalla diría dos cosas incompatibles.
+    expect(screen.getByText(/Costo unitario \(80 pzas\)/)).toBeInTheDocument();
+  });
+
+  it('la orden ABIERTA no avisa nada ni congela (la rama gemela)', () => {
+    montar(costoOrden());
+    expect(screen.queryByTestId('costeo-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('costeo-congelado')).not.toBeInTheDocument();
+    expect(screen.getByTestId('costeo-tela')).toBeEnabled();
   });
 });

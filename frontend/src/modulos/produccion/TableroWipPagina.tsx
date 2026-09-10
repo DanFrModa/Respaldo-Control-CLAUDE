@@ -61,6 +61,13 @@ function fmt(n: number): string {
  * drill-down de la orden. Se conserva "Órdenes en piso" para el contexto de conteo.
  *
  * `produccion.wip-ver` gobierna el acceso a la pantalla.
+ *
+ * ⚠️ HAY OTRO «TABLERO WIP» EN EL REPO, Y NO NECESITA EL PACK (§Post-F9.10). Es
+ * `modulos/indicadores/TableroWipPagina.tsx` (F7-E3, `indicadores.ver`): mismo nombre, otra cosa —
+ * KPI agregado, **una fila por ORDEN** (`key={o.idOrden}`, sin drill-down y sin superficie
+ * color×talla), servido pre-calculado por `kpisWip`. El tendido sólo puede confundir donde se
+ * enumeran CELDAS, y ahí no se enumera ninguna: quien busque «los dos tableros» y encuentre tocado
+ * sólo éste, ya sabe por qué.
  */
 export function TableroWipPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -424,10 +431,12 @@ function DrillDownOrden({
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
   const puedeEntregar = tienePermiso('produccion.entrega');
-  // El panel de avance captura corte, envío y recibo: basta poder capturar UNO para que el atajo
-  // sirva (el propio panel esconde después lo que la sesión no puede, A4; el servidor decide, A1).
+  // El panel de avance captura corte, empaque (0.114), envío y recibo: basta poder capturar UNO para
+  // que el atajo sirva (el propio panel esconde después lo que la sesión no puede, A4; el servidor
+  // decide, A1).
   const puedeCapturarAvance =
     tienePermiso('produccion.corte') ||
+    tienePermiso('produccion.empaque') ||
     tienePermiso('produccion.envio') ||
     tienePermiso('produccion.recibo');
 
@@ -502,12 +511,21 @@ function DrillDownOrden({
 function DetalleAvance({ detalle }: { detalle: WipOrden }): React.JSX.Element {
   return (
     <div className="space-y-5">
-      {/* Resumen de totales. */}
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+      {/* Resumen de totales. Las cuatro métricas del bloque de maquila —enviado, recibido,
+          incompletas y por recibir— cierran la TRAZABILIDAD que pidió Daniel (§Post-F9.147:
+          *"debemos de saber que paso con cada prenda despues"*): de lo que se mandó, esto volvió
+          bueno, esto volvió incompleto (y se perdió) y esto sigue en el taller del maquilero.
+          `enviado = recibido + incompletas + por recibir`, siempre. */}
+      <dl
+        className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3"
+        data-testid="wip-drill-totales"
+      >
         <Metrica etiqueta="Pedido" valor={detalle.pedido} />
         <Metrica etiqueta="Cortado" valor={detalle.cortado} />
         <Metrica etiqueta="Enviado" valor={detalle.enviado} />
         <Metrica etiqueta="Recibido" valor={detalle.recibido} />
+        <Metrica etiqueta="Incompletas" valor={detalle.incompletas} />
+        <Metrica etiqueta="Por recibir" valor={detalle.pendientePorRecibir} resaltar />
         <Metrica etiqueta="Recibido costura" valor={detalle.recibidoCostura} />
         <Metrica etiqueta="Entregado" valor={detalle.entregado} />
         <Metrica etiqueta="Por entregar" valor={detalle.porEntregar} resaltar />
@@ -536,7 +554,18 @@ function DetalleAvance({ detalle }: { detalle: WipOrden }): React.JSX.Element {
   );
 }
 
-/** Una matriz de celdas color×talla pendientes (o un mensaje si no hay). */
+/**
+ * Una matriz de celdas color×talla×PACK pendientes (o un mensaje si no hay).
+ *
+ * ⭐ EL PACK (§Post-F9.10) se pinta en su propia columna, y sólo cuando alguna celda lo trae: sin
+ * él, dos tendidos del mismo color×talla salían como DOS renglones idénticos con números distintos,
+ * que es exactamente lo que un drill-down no puede permitirse. La columna se OCULTA en las órdenes
+ * sin packs: ahí no diría nada y sólo estrecharía las tres que sí importan.
+ *
+ * ⚠️ En el desglose POR RECIBIR, la celda de pack vacío de una orden CON packs puede salir NEGATIVA:
+ * es lo que el maquilero ya devolvió sin decir de qué tendido era (residuo declarado de la v0.087).
+ * Se muestra tal cual, porque si no `Σ celdas` no daría el total pendiente.
+ */
 function MatrizPendiente({
   titulo,
   celdas,
@@ -546,6 +575,7 @@ function MatrizPendiente({
   celdas: WipOrden['porCortar'];
   vacio: string;
 }): React.JSX.Element {
+  const conPack = celdas.some((c) => c.pack !== '');
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-semibold">{titulo}</h3>
@@ -557,14 +587,21 @@ function MatrizPendiente({
             <TableHeader>
               <TableRow>
                 <TableHead>Color</TableHead>
+                {conPack ? <TableHead>Pack</TableHead> : null}
                 <TableHead>Talla</TableHead>
                 <TableHead className="text-right">Cantidad</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {celdas.map((c) => (
-                <TableRow key={`${c.idColor}-${c.idTalla}`}>
+                // La llave lleva el PACK: sin él, dos tendidos de la misma celda compartían `key`.
+                <TableRow key={`${c.idColor}-${c.idTalla}-${c.pack}`}>
                   <TableCell>{c.color}</TableCell>
+                  {conPack ? (
+                    <TableCell className="text-muted-foreground">
+                      {c.pack === '' ? '—' : c.pack}
+                    </TableCell>
+                  ) : null}
                   <TableCell>{c.etiquetaTalla}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">
                     {fmt(c.cantidad)}

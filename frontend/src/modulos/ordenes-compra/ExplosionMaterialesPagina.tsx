@@ -20,6 +20,7 @@ import {
   useAsignarProveedor,
   useAsignarProveedorEnBloque,
   useColoresDeVariasOrdenes,
+  useDarPorCubierto,
   useExplosion,
   useGenerarOc,
   useOrdenesDelPedido,
@@ -33,7 +34,10 @@ import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import { DialogoDireccionEntrega } from '@/modulos/direcciones-entrega/DialogoDireccionEntrega';
 // ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela, desde el renglón de la compra. Vive en
 // el módulo de Telas (el catálogo al que escribe), igual que el de dirección vive en el suyo.
-import { DialogoNuevoColorDeTela } from '@/modulos/telas/DialogoNuevoColorDeTela';
+import {
+  DialogoNuevoColorDeTela,
+  OPCION_NUEVO_COLOR,
+} from '@/modulos/telas/DialogoNuevoColorDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
   ColorDeLaOrden,
@@ -81,15 +85,6 @@ const MINIMO_GUARDABLE = 0.01;
  * clase de dato inventado que §Post-F9.86 prohíbe.
  */
 const OPCION_NUEVA_DIRECCION = 'nueva';
-
-/**
- * ⭐⭐ **V1-E6b (§Post-F9.104 + §Post-F9.106)** — el valor con el que el desplegable de color de la
- * tela dice *"quiero dar de alta un color nuevo"*. Mismo truco (y misma razón) que
- * {@link OPCION_NUEVA_DIRECCION}: NO es un id, se compara ANTES de convertir a número, porque un
- * `Number('nuevo')` sería `NaN` viajando como `idTelaColor`. Se llama distinto que el de dirección
- * a propósito: son dos desplegables distintos y confundirlos sería guardar un color en la dirección.
- */
-const OPCION_NUEVO_COLOR = 'nuevo-color';
 
 /**
  * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz
@@ -162,6 +157,25 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   const [precios, setPrecios] = useState<Record<string, string>>({});
   /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — **EL COLOR DEL AVÍO QUE CORRIGE EL COMPRADOR.** Daniel: *"poner 4
+   * veces el cierre y en la descripción del avío ponerle el color"*, y el sistema PROPONE el del
+   * color de la prenda. Va en su propio mapa —con la MISMA clave que la cantidad y el precio—
+   * porque los tres ajustes son independientes: se puede corregir sólo el color (el avío en
+   * contraste) sin tocar ni la cantidad ni el precio. Vacío = sale con el que propuso el servidor.
+   */
+  const [coloresAvio, setColoresAvio] = useState<Record<string, string>>({});
+  /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — LA RESPUESTA A «¿CON ESTO QUEDA CUBIERTO?».** Daniel: *"compré 480
+   * en lugar de 481… y me sigue poniendo que me falta comprar 1 kilo… no voy a hacer otra OC por 1
+   * kilo"*. Cuarto mapa, MISMA clave que los otros tres, por la misma razón: es una respuesta
+   * independiente de los números que la disparan.
+   *
+   * 🔴 **La AUSENCIA de la clave es «el resto sigue pendiente», y ése es el default.** No hay un
+   * valor que signifique "no contestó" distinto de no estar: el faltante se queda vivo mientras
+   * nadie diga lo contrario, y eso es exactamente lo que la decisión pide.
+   */
+  const [cubiertos, setCubiertos] = useState<Record<string, string>>({});
+  /**
    * Contador de peticiones del plan: sólo la ÚLTIMA puede pintar (ver {@link pedirPlan}). Es un
    * `ref` y no estado porque cambiarlo NO debe repintar nada — sólo sirve para descartar una
    * respuesta que llegó tarde.
@@ -211,6 +225,41 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * vale porque NO compromete dinero: la OC sigue pasando por la previa y su autorización.
    */
   const asignarBloque = useAsignarProveedorEnBloque();
+  /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — LA SEGUNDA PUERTA: cerrar (o reabrir) un faltante YA ESCAPADO.**
+   * Daniel: *"compré 480 en lugar de 481… y me sigue poniendo que me falta comprar 1 kilo"* — esa OC
+   * ya estaba hecha, así que la pregunta de la revisión previa llega tarde para ella. Desde el
+   * renglón se puede cerrar, y **deshacer** con «volver a pedirlo» (el rastro no se borra, D3).
+   */
+  const cubrir = useDarPorCubierto();
+
+  /** Cierra —o reabre— el faltante de UN renglón de la explosión, y lo dice con un toast. */
+  function cambiarDadoPorCubierto(renglon: Requerimiento, cubierto: boolean): void {
+    cubrir.mutate(
+      { idsRequerimiento: [...renglon.idsRequerimiento], cubierto },
+      {
+        onSuccess: (r) => {
+          // 🔴 Si el servidor no movió nada se DICE, en vez de festejar un acto que no ocurrió.
+          if (r.afectados.length === 0) {
+            toast.info(
+              cubierto
+                ? 'No quedaba nada por comprar de ese material: no había qué dar por cubierto.'
+                : 'Ese material no tenía nada dado por cubierto.',
+            );
+            return;
+          }
+          const total = r.afectados.reduce((suma, a) => suma + a.cantidad, 0);
+          const unidad = r.afectados[0]?.unidad;
+          toast.success(
+            cubierto
+              ? `«${renglon.material}»: ${formatearCantidad(total)}${unidad === null || unidad === undefined ? '' : ` ${unidad}`} quedan dados por cubiertos y dejan de pedirse.`
+              : `«${renglon.material}»: vuelven a pedirse ${formatearCantidad(total)}${unidad === null || unidad === undefined ? '' : ` ${unidad}`}.`,
+          );
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
 
   /**
    * ⭐ V1-E3x — **LA CONFIRMACIÓN SE DISPARA DESDE LA PÁGINA, NO DESDE EL PANEL.** Y no es un
@@ -276,9 +325,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /**
    * §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo, incluidas las que
-   * genera esta pantalla. Se piden AQUÍ para que el servidor nunca tenga que adivinarlas: si se
-   * dejan en blanco, el dominio cae a la fecha de entrega más próxima de las OP y a la dirección
-   * favorita, y si tampoco existen, dice qué falta.
+   * genera esta pantalla. Se piden AQUÍ porque **el servidor no las adivina**: la dirección en
+   * blanco cae a la FAVORITA del catálogo, pero la fecha —🔴 V1-E7f (§Post-F9.120)— **no cae a
+   * ningún lado**. Sin capturarla (aquí o por proveedor) la compra NO se genera, y el servidor dice
+   * a qué proveedores les falta.
    */
   const [fechaEntrega, setFechaEntrega] = useState('');
   /**
@@ -433,6 +483,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setFechasProveedor({});
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
@@ -445,6 +497,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -460,6 +514,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -521,7 +577,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (idMaterial === null || r.idProveedorSugerido === null) return null;
     // `== null` cubre null Y undefined: un renglón sin color tiene que producir SIEMPRE la misma
     // clave, y un `String(undefined)` acabaría mandando `NaN` al servidor.
-    return claveDeAjuste(r.tipo, idMaterial, r.idTelaColor ?? null, r.idProveedorSugerido);
+    // ⭐⭐ V1-E8c: el color del renglón —de tela o de prenda—, igual que lo arma el servidor.
+    return claveDeAjuste(r.tipo, idMaterial, colorDeRenglon(r), r.idProveedorSugerido);
   }
 
   /**
@@ -539,19 +596,46 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * criterio que ya usa la fecha por proveedor: guardar el vacío dejaría un estado que se ve igual
    * pero significa otra cosa, y nadie podría deshacer su cambio sin recargar.
    */
-  function ajustarDesdeLaPrevia(clave: string, campo: 'cantidad' | 'precio', valor: string): void {
+  function ajustarDesdeLaPrevia(
+    clave: string,
+    campo: 'cantidad' | 'precio' | 'color' | 'cubierto',
+    valor: string,
+  ): void {
     const limpio = valor.trim();
-    const nuevos = { ...(campo === 'cantidad' ? ajustes : precios) };
+    const actual =
+      campo === 'cantidad'
+        ? ajustes
+        : campo === 'precio'
+          ? precios
+          : campo === 'color'
+            ? coloresAvio
+            : cubiertos;
+    const nuevos = { ...actual };
     if (limpio === '') delete nuevos[clave];
     else nuevos[clave] = limpio;
     const nuevosAjustes = campo === 'cantidad' ? nuevos : ajustes;
     const nuevosPrecios = campo === 'precio' ? nuevos : precios;
+    // ⭐⭐ V1-E8c: el color del avío se corrige con el MISMO camino que la cantidad y el precio.
+    const nuevosColores = campo === 'color' ? nuevos : coloresAvio;
+    // ⭐⭐ V1-E8e (§Post-F9.99): y la respuesta a «¿con esto queda cubierto?», por el mismo camino.
+    let nuevosCubiertos = campo === 'cubierto' ? nuevos : cubiertos;
+    // 🔴 **BORRAR LA CANTIDAD BORRA LA RESPUESTA.** Sin la cantidad bajada no hay faltante, así que
+    // la respuesta deja de significar nada: dejarla guardada la haría revivir sola en cuanto el
+    // comprador volviera a bajar el número — un «queda cubierto» que él no volvió a decir.
+    if (campo === 'cantidad' && limpio === '' && nuevosCubiertos[clave] !== undefined) {
+      nuevosCubiertos = { ...nuevosCubiertos };
+      delete nuevosCubiertos[clave];
+      setCubiertos(nuevosCubiertos);
+    } else if (campo === 'cubierto') {
+      setCubiertos(nuevosCubiertos);
+    }
     setAjustes(nuevosAjustes);
     setPrecios(nuevosPrecios);
+    setColoresAvio(nuevosColores);
     // El cuerpo se arma con los valores NUEVOS y no con el estado: `setState` no es inmediato, y
     // leerlo aquí mandaría al servidor el número anterior (la previa diría una cosa y guardaría
     // otra — justo lo que §Post-F9.85 vino a impedir).
-    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios));
+    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios, nuevosColores, nuevosCubiertos));
   }
 
   /**
@@ -638,10 +722,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   function cuerpoDeCompra(
     ajustesActuales: Record<string, string> = ajustes,
     preciosActuales: Record<string, string> = precios,
+    coloresActuales: Record<string, string> = coloresAvio,
+    cubiertosActuales: Record<string, string> = cubiertos,
   ): GenerarOcCuerpo {
-    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
-    // tampoco hay, con la entrega más próxima de las OP. (Vaciar la fecha de un grupo BORRA su
-    // entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
+    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
+    // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
+    // nombra a los proveedores que se quedarían sin fecha. Aquí decía que caía a *"la entrega más
+    // próxima de las OP"* — la fecha del CLIENTE—, y ése es justo el camino por el que el respaldo
+    // volvería: alguien lo lee, lo cree, y deja de mandar la fecha. (Vaciar la fecha de un grupo
+    // BORRA su entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
     const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
       idProveedor: Number(id),
       fechaEntrega: fecha,
@@ -649,8 +738,19 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     // ⭐⭐ V1-E3z (§Post-F9.94): un renglón puede traer AJUSTADA la cantidad, el precio, o los dos,
     // así que la lista se arma sobre la UNIÓN de las dos claves. Antes bastaba recorrer `ajustes`;
     // hacerlo hoy perdería, sin decir nada, el precio de un renglón cuya cantidad nadie tocó.
+    // ⭐⭐ V1-E8c: y el COLOR del avío es el tercero — mismo argumento, tercera clave.
+    // ⭐⭐ V1-E8e (§Post-F9.99): la respuesta a «¿con esto queda cubierto?» **sí** agrega su propia
+    // clave. 🔴 Casi se deja fuera *"porque siempre acompaña a una cantidad bajada"*, y era falso:
+    // el faltante también aparece SIN ajuste ninguno cuando una OP del renglón se queda por debajo
+    // del mínimo guardable y su línea no se escribe (V1-E3z). Sin su clave, la respuesta del
+    // comprador se habría perdido ahí **en silencio** — cuarta clave, mismo argumento.
     const listaAjustes = [
-      ...new Set([...Object.keys(ajustesActuales), ...Object.keys(preciosActuales)]),
+      ...new Set([
+        ...Object.keys(ajustesActuales),
+        ...Object.keys(preciosActuales),
+        ...Object.keys(coloresActuales),
+        ...Object.keys(cubiertosActuales),
+      ]),
     ]
       .map((clave) => {
         const [material, color, proveedor] = clave.split('|');
@@ -677,21 +777,38 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         const precio = Number(preciosActuales[clave] ?? '');
         const hayCantidad = (ajustesActuales[clave] ?? '') !== '' && Number.isFinite(cantidad);
         const hayPrecio = (preciosActuales[clave] ?? '') !== '' && Number.isFinite(precio);
+        // ⭐⭐ V1-E8c: el color es TEXTO — no hay nada que juzgar, sólo "lo tecleó" o "no".
+        const colorTecleado = (coloresActuales[clave] ?? '').trim();
+        const hayColor = colorTecleado !== '';
         return {
           tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
           idMaterial: Number((material ?? '').slice(guion + 1)),
           // ⭐⭐ V1-E3u: el ajuste es POR COLOR (§Post-F9.89). Cualquier cosa que no sea un id
           // legible vuelve a "sin color": es mejor mandar el renglón sin color —que el servidor
           // entiende— que un `NaN` que rechazaría la compra entera.
-          idTelaColor: Number.isFinite(Number(color)) ? Number(color) : null,
+          // ⭐⭐ V1-E8c: se llama `idColor` desde §Post-F9.126 — es el color del RENGLÓN, de tela
+          // en las telas y de PRENDA en los avíos.
+          idColor: Number.isFinite(Number(color)) ? Number(color) : null,
           idProveedor: Number(proveedor),
           ...(hayCantidad ? { cantidadTotal: cantidad } : {}),
           ...(hayPrecio ? { precioUnitario: precio } : {}),
+          ...(hayColor ? { colorTexto: colorTecleado } : {}),
+          // ⭐⭐ V1-E8e (§Post-F9.99): sólo viaja el `true`. La AUSENCIA de la clave ya significa
+          // *"el resto sigue pendiente"*, que es el default del servidor — mandar `false` sería
+          // decir lo mismo dos veces.
+          ...(cubiertosActuales[clave] === 'si' ? { restoCubierto: true } : {}),
         };
       })
-      // Un ajuste que no quedó con ninguno de los dos campos no dice nada: el servidor lo rechaza
+      // Un ajuste que no quedó con ninguno de los tres campos no dice nada: el servidor lo rechaza
       // (el contrato lo exige), así que ni se manda.
-      .filter((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined);
+      .filter(
+        (a) =>
+          a.cantidadTotal !== undefined ||
+          a.precioUnitario !== undefined ||
+          a.colorTexto !== undefined ||
+          // ⭐⭐ V1-E8e: y el que sólo trae la respuesta, que el contrato acepta desde §Post-F9.99.
+          a.restoCubierto === true,
+      );
     return {
       idsOrden,
       idsRequerimiento: [...seleccion],
@@ -766,6 +883,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         setSeleccion(new Set());
         setAjustes({});
         setPrecios({});
+        setColoresAvio({});
+        setCubiertos({});
         cerrarPrevia();
       },
     });
@@ -845,7 +964,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
    * fuerzas**"*. Y con el matiz que §Post-F9.71 ya había fijado: **lo obligatorio es que cada OC
    * tenga fecha, no que se llene el campo de arriba**. Por eso esto se calcula sobre **el PLAN**
-   * (qué OC van a salir y de qué OP viven) y no sobre el formulario: un proveedor con su propia
+   * (qué OC van a salir, y con qué fecha queda cada una) y no sobre el formulario: un proveedor con su propia
    * fecha está completo aunque «Entrega (inicial)» esté en blanco.
    *
    * ⚠️ **Esto NO es la autoridad (A1).** Quien de verdad impide la compra es `planearCompra`, que
@@ -867,10 +986,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * sale en la revisión previa aunque esta barra no haya dicho nada. Lo que NO sería tolerable es lo
    * contrario —frenar una compra legítima por una OC que no existe—, y por eso todo el margen se
    * cargó a ese lado.
+   *
+   * 🔴🔴 **V1-E7f (§Post-F9.120) — Y LA FECHA DE LAS OP YA NO CUENTA.** Esta cuenta miraba también
+   * la entrega de las OP que surte cada OC (el respaldo del servidor) y se CALLABA cuando alguna la
+   * traía. Retirado el respaldo, callarse por eso sería el peor de los dos mundos: la pantalla en
+   * silencio y el servidor rechazando. Ahora sólo se miran las dos fechas que una PERSONA captura
+   * aquí: la de arriba y la de cada proveedor.
    */
   const ocSinFecha = ocSinFechaDeEntrega(
     ocPlaneadasEnPantalla(datos?.grupos ?? [], seleccion),
-    new Map(ordenesElegidas.map((o) => [o.idOrden, o.fechaEntrega])),
     fechaEntrega,
     fechasProveedor,
   );
@@ -882,8 +1006,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           ? `La orden de compra de «${ocSinFecha[0]?.proveedor ?? ''}» nacería sin fecha de entrega`
           : `Las órdenes de compra de ${ocSinFecha.map((o) => `«${o.proveedor}»`).join(', ')} ` +
             `nacerían sin fecha de entrega`) +
-        ', y toda orden de compra la necesita: sin ella no le pide nada al proveedor. ' +
-        'Captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
+        ', y toda orden de compra la necesita: es CUÁNDO tiene que llegar el material. ' +
+        'No se hereda de la orden de producción (ésa dice cuándo se le entrega al cliente): ' +
+        'captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
         'grupo de materiales.';
 
   return (
@@ -1063,10 +1188,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
                         llevar la suya en su propio grupo, y la suya GANA.
 
-                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y AHORA ES OBLIGATORIA.** Daniel: *"tiene que
-                        tener fecha de entrega a fuerzas"*. En blanco NO se cae al vacío: cada OC
-                        toma la entrega de sus propias OP, y sólo si tampoco la traen se reclama
-                        aquí —gris al abrir, amarillo al intentar generar (§Post-F9.96)—. */}
+                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y ES OBLIGATORIA.** Daniel: *"tiene que tener
+                        fecha de entrega a fuerzas"*.
+
+                        🔴🔴 **V1-E7f (§Post-F9.120) — EN BLANCO NO SE CAE A NINGÚN LADO.** Hasta
+                        hoy, la OC sin fecha se llevaba la de las OP que surte; Daniel lo cazó
+                        usando el sistema (*"tomó la fecha de entrega de la OC del cliente"*): ésa
+                        dice cuándo se le entrega al CLIENTE, no cuándo tiene que llegar la TELA.
+                        Ahora se reclama SIEMPRE que falte —gris al abrir, amarillo al intentar
+                        generar (§Post-F9.96)—, traigan o no fecha las OP. */}
                     <label className="text-xs text-muted-foreground">
                       Entrega (inicial)
                       <Input
@@ -1080,7 +1210,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                           setIntentoSinFecha(false);
                           setFechaEntrega(e.target.value);
                         }}
-                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
+                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha. Obligatoria: no se hereda de la orden de producción."
                         data-testid="exp-fecha-entrega"
                       />
                     </label>
@@ -1453,6 +1583,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                   )
                                 }
                                 onVerTodosLosColores={setIdOrdenColores}
+                                // ⭐⭐ V1-E8e (§Post-F9.99) — cerrar (o reabrir) el faltante que ya
+                                // se escapó, desde su propio renglón.
+                                puedeCubrir={puedeComprar}
+                                cubriendo={cubrir.isPending}
+                                onDarPorCubierto={(cubierto) => cambiarDadoPorCubierto(r, cubierto)}
                               />
                             );
                           })}
@@ -1614,12 +1749,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   );
 }
 
-/** Una OC del plan, vista desde la pantalla: quién la recibe y de qué OP vive. */
+/**
+ * Una OC del plan, vista desde la pantalla: quién la recibe.
+ *
+ * ⚠️ Aquí vivía `idsOrden` —las OP cuyas líneas entrarían en esta OC—, y existía por UNA razón: de
+ * ellas salía la fecha de respaldo. Muerto el respaldo (🔴 V1-E7f, §Post-F9.120), el dato no lo
+ * consulta nadie: la fecha de una OC sólo puede venir de lo que una persona capturó.
+ */
 export interface OcPlaneadaEnPantalla {
   idProveedor: number;
   proveedor: string;
-  /** Ids de las OP cuyas líneas entrarían en esta OC (de donde sale su fecha de respaldo). */
-  idsOrden: number[];
 }
 
 /**
@@ -1640,12 +1779,9 @@ export interface OcPlaneadaEnPantalla {
  * quita ninguna: **cada una queda fijada por separado** con una prueba DIRECTA de esta función, con
  * la forma incoherente que el servidor no produce pero el tipo sí permite.
  *
- * 🔴 **De qué OP sale la fecha de respaldo: sólo de las que de verdad aportan línea** (hallazgo del
- * reviewer). `porOrden` trae TODAS las OP del renglón agrupado, incluidas las que ya no tienen nada
- * pendiente (su material ya está en otra OC viva); el servidor omite ésas antes de calcular el
- * respaldo (`motivoDeOmision` mira el pendiente **de cada OP**), así que contarlas aquí hacía que la
- * pantalla se callara —con la fecha de una OP que el servidor no iba a mirar— mientras el servidor
- * bloqueaba. Se filtran con el MISMO corte que los renglones.
+ * ⚠️ 🔴 V1-E7f (§Post-F9.120): esta función devolvía además **de qué OP vive cada OC**, y con ellas
+ * llegaba un filtro por el pendiente de cada OP. Todo eso servía a la fecha de RESPALDO, que ya no
+ * existe — se retiró entero en vez de dejarlo calculándose para nadie.
  */
 export function ocPlaneadasEnPantalla(
   grupos: readonly {
@@ -1655,7 +1791,6 @@ export function ocPlaneadasEnPantalla(
       idProveedorSugerido: number | null;
       cantidadPendiente: number;
       idsRequerimiento: readonly number[];
-      porOrden: readonly { idOrden: number; cantidadPendiente: number }[];
     }[];
   }[],
   seleccion: ReadonlySet<number>,
@@ -1664,10 +1799,10 @@ export function ocPlaneadasEnPantalla(
   for (const grupo of grupos) {
     const idProveedor = grupo.idProveedor;
     if (idProveedor === null) continue;
-    // ⚠️ El `>=` de ESTE corte NO está fijado por prueba, y se dice para no prometer de más: si
-    // alguien lo volviera `>`, el renglón de exactamente 0.01 tiraría el grupo entero y la pantalla
-    // se **callaría** — el lado seguro (la autoridad es el servidor, que bloquea igual). El de abajo
-    // es harina de otro costal.
+    // 🔴 **EL `>=` ES INVARIANTE, y tiene prueba propia** (V1-E7f la heredó del corte por OP, que
+    // murió con el respaldo): `0.01` es justo lo mínimo que la columna guarda, así que ese renglón
+    // SÍ genera línea. Con `>` el grupo entero se caería y la pantalla se **callaría** mientras el
+    // servidor pide la fecha — el peor de los dos mundos ahora que nada se hereda.
     const entran = grupo.renglones.filter(
       (r) =>
         r.idProveedorSugerido !== null &&
@@ -1675,21 +1810,7 @@ export function ocPlaneadasEnPantalla(
         (seleccion.size === 0 || r.idsRequerimiento.some((id) => seleccion.has(id))),
     );
     if (entran.length === 0) continue;
-    planeadas.push({
-      idProveedor,
-      proveedor: grupo.proveedor,
-      idsOrden: [
-        ...new Set(
-          entran.flatMap((r) =>
-            // 🔴 **AQUÍ el `>=` SÍ es invariante, y tiene prueba propia** (2ª vuelta del reviewer):
-            // `0.01` es justo lo mínimo que la columna guarda. Con `>`, esa OP se caería del
-            // respaldo y —si era la única con fecha— la pantalla **frenaría una compra que el
-            // servidor acepta**: *bloquear de más*, lo único que esto no se puede permitir.
-            r.porOrden.filter((l) => l.cantidadPendiente >= MINIMO_GUARDABLE).map((l) => l.idOrden),
-          ),
-        ),
-      ],
-    });
+    planeadas.push({ idProveedor, proveedor: grupo.proveedor });
   }
   return planeadas;
 }
@@ -1698,22 +1819,24 @@ export function ocPlaneadasEnPantalla(
  * ⭐⭐ **V1-E4f (§Post-F9.103) — CUÁLES DE ESAS OC NACERÍAN SIN FECHA.**
  *
  * La cascada es la MISMA del servidor (`resolverFechasDeOc`), en su mismo orden, y ése es el punto
- * de §Post-F9.71: **la fecha propia del proveedor GANA**, la de arriba es sólo el *valor inicial de
- * todas*, y si no hay ninguna queda el respaldo de las OP que surte esa OC (§Post-F9.18). Por eso
- * la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el campo de arriba
- * sería reclamar un dato que ya está capturado en otro lado.
+ * de §Post-F9.71: **la fecha propia del proveedor GANA** y la de arriba es sólo el *valor inicial de
+ * todas*. Por eso la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el
+ * campo de arriba sería reclamar un dato que ya está capturado en otro lado.
+ *
+ * 🔴🔴 **V1-E7f (§Post-F9.120) — Y NO HAY TERCER PELDAÑO.** Aquí había uno: si alguna de las OP que
+ * surte la OC traía fecha de entrega, esto se callaba (el servidor la heredaba). Ese respaldo se
+ * retiró —la fecha de la OP es cuándo se le entrega al CLIENTE, no cuándo debe llegar la tela—, así
+ * que la pantalla tiene que reclamarla **aunque las OP la traigan**: callarse ahora dejaría al
+ * comprador chocando contra el rechazo del servidor tres clics después.
  */
 export function ocSinFechaDeEntrega(
   planeadas: readonly OcPlaneadaEnPantalla[],
-  fechaPorOrden: ReadonlyMap<number, string | null>,
   fechaBase: string,
   fechasProveedor: Readonly<Record<number, string>>,
 ): OcPlaneadaEnPantalla[] {
-  return planeadas.filter((oc) => {
-    if ((fechasProveedor[oc.idProveedor] ?? '') !== '') return false;
-    if (fechaBase !== '') return false;
-    return !oc.idsOrden.some((id) => (fechaPorOrden.get(id) ?? null) !== null);
-  });
+  return planeadas.filter(
+    (oc) => (fechasProveedor[oc.idProveedor] ?? '') === '' && fechaBase === '',
+  );
 }
 
 /**
@@ -1727,11 +1850,25 @@ export function ocSinFechaDeEntrega(
 function claveDeAjuste(
   tipo: 'tela' | 'avio',
   idMaterial: number,
-  idTelaColor: number | null,
+  idColor: number | null,
   idProveedor: number,
 ): string {
-  const color = idTelaColor == null ? 'sin' : String(idTelaColor);
+  const color = idColor == null ? 'sin' : String(idColor);
   return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
+}
+
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DE UN RENGLÓN, sea de lo que sea: de TELA en las telas
+ * (`idTelaColor`) y **de PRENDA en los avíos** (`idColorPrenda`, que el avío estrena en esta etapa
+ * porque no tiene catálogo de color propio, §Post-F9.91). Espejo de `colorDelRenglon` del dominio:
+ * las dos claves —la del ajuste y la de la identidad del renglón— tienen que razonar igual que el
+ * servidor, o un ajuste se aplicaría al color equivocado.
+ */
+function colorDeRenglon(r: {
+  idTelaColor?: number | null;
+  idColorPrenda?: number | null;
+}): number | null {
+  return r.idTelaColor ?? r.idColorPrenda ?? null;
 }
 
 /**
@@ -1743,7 +1880,10 @@ function claveDeAjuste(
  */
 function claveRenglonExplosion(r: Requerimiento): string {
   const material = String(r.idTela ?? r.idAvio);
-  const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+  // ⭐⭐ V1-E8c: el color del renglón —de tela o de prenda— entra en la identidad. Sin esto, los
+  // cuatro cierres de colores distintos del ejemplo de Daniel compartirían `key` de React.
+  const idColor = colorDeRenglon(r);
+  const color = idColor == null ? 'sin' : String(idColor);
   return `${r.tipo}-${material}-${color}-${String(r.idProveedorSugerido)}`;
 }
 
@@ -1766,6 +1906,7 @@ function CampoPrevia({
   minimo,
   marcador,
   testid,
+  tipo = 'number',
   onConfirmar,
 }: {
   /** Lo que dice el PLAN del servidor (cadena vacía = ese renglón no tiene ese número). */
@@ -1778,6 +1919,14 @@ function CampoPrevia({
   minimo: string;
   marcador?: string;
   testid: string;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): `'text'` para el COLOR del avío, que es texto libre. Es un campo MÁS
+   * de la previa, no un mecanismo nuevo: se confirma al salir igual que la cantidad y el precio,
+   * repinta lo que devuelve el servidor igual que ellos, y arrastra la MISMA disciplina de "sucio"
+   * y de reconciliación por revisión. Duplicar el componente para cambiar un `type` habría sido
+   * duplicar también las cuatro vueltas de correcciones que ese comportamiento costó.
+   */
+  tipo?: 'number' | 'text';
   onConfirmar: (valor: string) => void;
 }): React.JSX.Element {
   const [texto, setTexto] = useState(valor);
@@ -1831,11 +1980,9 @@ function CampoPrevia({
     <label className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
       {etiqueta}
       <Input
-        type="number"
-        step="0.01"
-        min={minimo}
-        inputMode="decimal"
-        className={`h-8 ${ancho} text-right`}
+        type={tipo}
+        {...(tipo === 'number' ? { step: '0.01', min: minimo, inputMode: 'decimal' as const } : {})}
+        className={`h-8 ${ancho} ${tipo === 'number' ? 'text-right' : ''}`}
         value={texto}
         {...(marcador === undefined ? {} : { placeholder: marcador })}
         onChange={(e) => {
@@ -1932,7 +2079,11 @@ function RevisionPrevia({
   onVolver: () => void;
   onConfirmar: () => void;
   /** Corrige un número de un renglón y vuelve a pedirle el plan al servidor (§Post-F9.94). */
-  onAjustar: (clave: string, campo: 'cantidad' | 'precio', valor: string) => void;
+  onAjustar: (
+    clave: string,
+    campo: 'cantidad' | 'precio' | 'color' | 'cubierto',
+    valor: string,
+  ) => void;
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
@@ -2089,6 +2240,14 @@ function RevisionPrevia({
                         {r.telaColor}
                       </ChipEstado>
                     )}
+                    {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO. Daniel: *"cada color es
+                        diferente"*: cuatro renglones del mismo cierre se leerían idénticos sin él,
+                        justo en la pantalla donde se decide qué se compra. */}
+                    {r.colorTexto === null ? null : (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color-avio">
+                        {r.colorTexto}
+                      </ChipEstado>
+                    )}
                     {r.ajustado ? (
                       <ChipEstado tono="info" sinPunto data-testid="exp-previa-ajustado">
                         Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})
@@ -2127,7 +2286,7 @@ function RevisionPrevia({
                       testid="exp-previa-cantidad"
                       onConfirmar={(v) =>
                         onAjustar(
-                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
                           'cantidad',
                           v,
                         )
@@ -2146,7 +2305,7 @@ function RevisionPrevia({
                       testid="exp-previa-precio"
                       onConfirmar={(v) =>
                         onAjustar(
-                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
                           'precio',
                           v,
                         )
@@ -2159,6 +2318,123 @@ function RevisionPrevia({
                     </span>
                   </span>
                 </div>
+                {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, EDITABLE. El sistema PROPONE el
+                    del color de la prenda; la persona lo corrige cuando el avío va en CONTRASTE
+                    (cierre negro en prenda roja) — igual que ya pasa con la cantidad y el precio.
+                    Sólo en avíos que traen color: en una tela el color es del catálogo y se dice en
+                    su propio bloque; en un avío sin color no hay nada que corregir. */}
+                {r.tipo === 'avio' && r.colorPrenda !== null ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <CampoPrevia
+                      valor={r.colorTexto ?? ''}
+                      revision={revision}
+                      etiqueta="Color del avío"
+                      tipo="text"
+                      minimo=""
+                      ancho="w-40"
+                      marcador={r.colorPrenda}
+                      titulo={`Color con el que se le pide ${r.material} al proveedor. Se propone el color de la prenda (${r.colorPrenda}); cámbialo si el avío va en contraste. En blanco se usa el propuesto.`}
+                      testid="exp-previa-color-avio-campo"
+                      onConfirmar={(v) =>
+                        onAjustar(
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                          'color',
+                          v,
+                        )
+                      }
+                    />
+                    {r.colorAjustado ? (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color-ajustado">
+                        Color ajustado (propuesto {r.colorPrenda})
+                      </ChipEstado>
+                    ) : null}
+                  </div>
+                ) : null}
+                {/* ⭐⭐ **V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?»**
+                    Daniel: *"compré **480 en lugar de 481** que era el cálculo de la tela. Y me
+                    sigue poniendo que me falta comprar 1 kilo… **a veces pasa eso en la realidad**.
+                    Y **no voy a hacer otra OC por 1 kilo**"*.
+
+                    ⭐ **Se pregunta EN EL MOMENTO de decidir**, aquí, pegado al número que se acaba
+                    de bajar — no en un interruptor de otra pantalla que obligue a acordarse y a
+                    buscarlo. Y **siempre que se baja, sin umbral**: *1 kg de 481 es nada, pero 1 kg
+                    de 5 es el 20 %*, así que un porcentaje único o tapa faltantes de verdad o no
+                    sirve. Que la persona lo diga es más barato y más honesto que adivinarlo.
+
+                    🔴 **El default es «sigue pendiente»**: la opción que viene marcada NO escribe
+                    nada, y sin tocar esto el faltante sigue vivo. Nunca se cierra solo. */}
+                {r.cantidadFaltante > 0 ? (
+                  <div
+                    className="mt-1.5 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs"
+                    data-testid="exp-previa-cubierto"
+                  >
+                    <p className="font-medium text-warn">
+                      Pediste {formatearCantidad(r.cantidadTotal)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} de los{' '}
+                      {formatearCantidad(r.cantidadPropuesta)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} que se necesitaban. ¿Qué hago con
+                      los {formatearCantidad(r.cantidadFaltante)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} que faltan?
+                    </p>
+                    <label className="mt-1 flex items-start gap-1.5">
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        name={`cubierto-${String(p.idProveedor)}-${r.tipo}-${String(r.idMaterial)}-${
+                          colorDeRenglon(r) ?? 'sin'
+                        }`}
+                        checked={!r.restoCubierto}
+                        onChange={() =>
+                          onAjustar(
+                            claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                            'cubierto',
+                            '',
+                          )
+                        }
+                        data-testid="exp-previa-sigue-pendiente"
+                      />
+                      <span>
+                        El resto <b>sigue pendiente</b> (lo compro después)
+                      </span>
+                    </label>
+                    <label className="mt-0.5 flex items-start gap-1.5">
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        name={`cubierto-${String(p.idProveedor)}-${r.tipo}-${String(r.idMaterial)}-${
+                          colorDeRenglon(r) ?? 'sin'
+                        }`}
+                        checked={r.restoCubierto}
+                        onChange={() =>
+                          onAjustar(
+                            claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                            'cubierto',
+                            'si',
+                          )
+                        }
+                        data-testid="exp-previa-queda-cubierto"
+                      />
+                      <span>
+                        <b>Con esto queda cubierto</b> — no me lo vuelvas a pedir
+                      </span>
+                    </label>
+                  </div>
+                ) : null}
+                {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA. Daniel: *"al hacer la OC no
+                    me aparece cantidad por medida… sólo veo un solo renglón"*. La medida NO parte
+                    el renglón (no se recibe por medida): es lo que se le dice al proveedor para que
+                    los corte, y por eso va debajo, junto a la cantidad que sí se pide. */}
+                {r.medidas.length > 0 ? (
+                  <p
+                    className="mt-1 text-xs text-muted-foreground"
+                    data-testid="exp-previa-medidas"
+                  >
+                    Por medida:{' '}
+                    {r.medidas
+                      .map((m) => `${m.etiqueta}: ${formatearCantidad(m.cantidad)}`)
+                      .join(' · ')}
+                  </p>
+                ) : null}
                 {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL MISMO AVISO QUE EN LA EXPLOSIÓN, aquí también.
                     Ésta es la ÚLTIMA pantalla antes de comprometer el dinero, y la cantidad que se
                     va a comprar salió de RESTAR ese número: si parte de él viene de una OC que no
@@ -2186,9 +2462,30 @@ function RevisionPrevia({
                       data-testid="exp-previa-reparto"
                       data-se-escribe={l.seEscribe ? 'si' : 'no'}
                     >
-                      Orden {l.folioOrden}: {formatearCantidad(l.cantidad)}
-                      {r.unidad === null ? '' : ` ${r.unidad}`} × {formatearMoneda(l.precio)} ={' '}
-                      {formatearMoneda(l.importe)}
+                      {/* ⭐⭐ 0.156 (§Post-F9.219) — EL CÁRDIGAN, DENTRO DE LA CUENTA.
+                          🔴 **La igualdad que se imprime tiene que ser VERDADERA**, y ésta es la
+                          pantalla donde se compromete el dinero. El importe de la línea ya incluye
+                          el complemento (la tela se compra con su cárdigan y su importe suma al
+                          subtotal), así que dejar `36 kg × $90.00 = $3,645.00` imprimía una cuenta
+                          FALSA —36 × 90 son 3,240— y una leyenda al lado no la arregla: la explica.
+                          Por eso el cárdigan entra en el PARÉNTESIS del multiplicando, y se nombra
+                          con lo que dice el catálogo («Cardigan»), nunca con la palabra genérica. */}
+                      Orden {l.folioOrden}:{' '}
+                      {typeof l.cantidadComplemento !== 'number' ||
+                      typeof r.nombreComplemento !== 'string' ? (
+                        <>
+                          {formatearCantidad(l.cantidad)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`}
+                        </>
+                      ) : (
+                        <span data-testid="exp-previa-complemento">
+                          ({formatearCantidad(l.cantidad)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`} +{' '}
+                          {formatearCantidad(l.cantidadComplemento)}
+                          {r.unidad === null ? '' : ` ${r.unidad}`} de {r.nombreComplemento})
+                        </span>
+                      )}{' '}
+                      × {formatearMoneda(l.precio)} = {formatearMoneda(l.importe)}
                       {l.seEscribe ? null : ' — no alcanza el mínimo: esta orden no lleva línea'}
                     </li>
                   ))}
@@ -2249,6 +2546,9 @@ function RenglonRequerimiento({
   colorAbierto,
   onAbrirColor,
   onVerTodosLosColores,
+  puedeCubrir,
+  cubriendo,
+  onDarPorCubierto,
 }: {
   renglon: Requerimiento;
   /** ¿Hay varias OP en pantalla? Decide si se enseña el desglose por OP. */
@@ -2270,8 +2570,15 @@ function RenglonRequerimiento({
   onAbrirColor: () => void;
   /** Abre el diálogo con TODOS los colores (y sus precios) de una orden. */
   onVerTodosLosColores: (idOrden: number) => void;
+  /** ⭐⭐ V1-E8e: ¿esta sesión puede decidir qué NO se compra (`compras.administrar`)? */
+  puedeCubrir: boolean;
+  /** ¿Hay una decisión de «dar por cubierto» en vuelo? (apaga el enlace mientras tanto). */
+  cubriendo: boolean;
+  /** ⭐⭐ V1-E8e: cierra (`true`) o reabre (`false`) el faltante de ESTE renglón. */
+  onDarPorCubierto: (cubierto: boolean) => void;
 }): React.JSX.Element {
-  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
+  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar — y desde
+  // ⭐⭐ V1-E8e §Post-F9.99, tampoco lo que alguien dio por cubierto: el pendiente ya lo descontó).
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
   // Se ofrece asignar donde hay HUECO, donde Compras ya puso algo (para corregirlo o quitarlo) y
   // —⭐ segunda vuelta de V1-E3m— donde el proveedor propuesto está DADO DE BAJA. Si el proveedor
@@ -2313,6 +2620,15 @@ function RenglonRequerimiento({
               </ChipEstado>
             )
           ) : null}
+          {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO. Daniel: *"cada color es diferente y cada
+              color tiene cantidades por medida"*. Un avío sin color es lo normal en las OP sin
+              matriz y en todo lo anterior a esta etapa: ahí no se marca nada (a diferencia de la
+              tela, que SÍ se marca en amarillo, porque a ella la recepción le exige el color). */}
+          {renglon.tipo === 'avio' && renglon.colorPrenda !== null ? (
+            <ChipEstado tono="info" sinPunto data-testid="exp-color-avio">
+              {renglon.colorPrenda}
+            </ChipEstado>
+          ) : null}
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
           {/* ⭐ V1-E3q — LO QUE YA ESTÁ COMPRADO SE VE EN SU FILA. */}
@@ -2325,6 +2641,16 @@ function RenglonRequerimiento({
               {renglon.cantidadPendiente > 0
                 ? `Ya en OC: ${formatearCantidad(renglon.cantidadEnOc)}`
                 : 'Ya comprado'}
+            </ChipEstado>
+          ) : null}
+          {/* ⭐⭐ **V1-E8e (§Post-F9.99) — LO QUE ALGUIEN DECIDIÓ NO PERSEGUIR, A LA VISTA.**
+              Daniel: *"no voy a hacer otra OC por 1 kilo"*. Sin este chip, el renglón se vería
+              cerrado sin decir por qué —y «dado por cubierto» no es lo mismo que «ya comprado»: lo
+              primero lo decidió una persona y se puede deshacer. Tono `warn` a propósito: es una
+              renuncia consciente, no un logro. */}
+          {renglon.cantidadCubierta > 0 ? (
+            <ChipEstado tono="warn" sinPunto data-testid="exp-cubierto-badge">
+              Dado por cubierto: {formatearCantidad(renglon.cantidadCubierta)}
             </ChipEstado>
           ) : null}
           {/* ⭐ V1-E3m: de dónde salió el proveedor. */}
@@ -2356,7 +2682,24 @@ function RenglonRequerimiento({
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
+          {/* ⭐⭐ V1-E8e: el tercer sumando del "¿qué falta?", junto a los otros dos. Sin él, la
+              resta no cuadraría a la vista y el número de abajo parecería equivocado. */}
+          {renglon.cantidadCubierta > 0
+            ? ` · dado por cubierto ${formatearCantidad(renglon.cantidadCubierta)}`
+            : ''}
         </p>
+        {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA, en la línea de abajo. Es lo que
+            Daniel echaba en falta: *"no me aparece cantidad por medida… sólo veo un solo renglón"*.
+            Las cantidades son las de lo PENDIENTE de comprar (lo que de verdad va a la OC), no las
+            del requerido: enseñar el requerido aquí contradiría al número de arriba. */}
+        {renglon.medidas.length > 0 ? (
+          <p className="text-xs text-muted-foreground" data-testid="exp-renglon-medidas">
+            Por medida:{' '}
+            {renglon.medidas
+              .map((m) => `${m.etiqueta}: ${formatearCantidad(m.cantidad)}`)
+              .join(' · ')}
+          </p>
+        ) : null}
         {/* ⭐⭐ **§Post-F9.105 — EL AVISO QUE DICE POR QUÉ ESE NÚMERO ESTÁ INFLADO, PEGADO AL
             NÚMERO.** Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor
             de la que necesito"* — el avío se compra por MEDIDA y arrastra encendido "se consume por
@@ -2443,6 +2786,39 @@ function RenglonRequerimiento({
             🔴 **Se ofrece SIEMPRE en las telas, no sólo cuando falta.** Hasta hoy, en cuanto se
             decía el color desaparecía el aviso y con él el único botón: corregir un color ya dicho
             no se veía por dónde. */}
+        {/* ⭐⭐ **V1-E8e (§Post-F9.99) — LA SEGUNDA PUERTA, PARA LOS QUE YA SE ESCAPARON.**
+            La pregunta normal se hace en la revisión previa, en el momento de bajar la cantidad.
+            Pero el caso que originó la decisión **ya estaba generado**: la OC de 480 existía y el
+            kilo llevaba días persiguiendo al comprador. Aquí se cierra desde el propio renglón —y
+            se **deshace**, que es lo que evita que un clic de más tape un faltante de verdad para
+            siempre.
+
+            Misma forma que «asignar proveedor» y «decir el color» de aquí arriba, a propósito: un
+            tercer patrón para la misma clase de acción es cómo una pantalla se vuelve *"muy
+            rebuscada"* (Daniel, 23-ago). */}
+        {puedeCubrir && (renglon.cantidadPendiente > 0 || renglon.cantidadCubierta > 0) ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs underline disabled:opacity-50"
+              disabled={cubriendo}
+              onClick={() => onDarPorCubierto(renglon.cantidadCubierta > 0 ? false : true)}
+              data-testid={
+                renglon.cantidadCubierta > 0 ? 'exp-volver-a-pedir' : 'exp-dar-por-cubierto'
+              }
+              title={
+                renglon.cantidadCubierta > 0
+                  ? 'Vuelve a pedir lo que se había dado por cubierto. Queda registrado quién lo deshizo.'
+                  : 'Lo que falta de este material deja de pedirse. Queda registrado quién lo decidió, cuándo y contra qué cantidad.'
+              }
+            >
+              <ClipboardCheck className="size-3.5" aria-hidden />
+              {renglon.cantidadCubierta > 0
+                ? `Volver a pedirlo (${formatearCantidad(renglon.cantidadCubierta)}${renglon.unidad ? ` ${renglon.unidad}` : ''})`
+                : `Con esto queda cubierto — no volver a pedir ${formatearCantidad(renglon.cantidadPendiente)}${renglon.unidad ? ` ${renglon.unidad}` : ''}`}
+            </button>
+          </div>
+        ) : null}
         {renglon.tipo === 'tela' && puedeDecirColor ? (
           <div className="mt-1">
             <button

@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
+import { generarAbreviaturaCliente } from './abreviatura';
 import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
@@ -17,15 +18,17 @@ import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
  *     el backend del compose; se le da margen).
  *  5. La edición fina F2 sigue viva en /pedidos/administrar (pedido real con réplica de renglones).
  *
- * ⚠️ **Por qué el modelo NACE en Desarrollo y no en `/modelos` (V1-E3n).** El título de la prueba
- * promete "OP con nº de producción", y ese número sólo existe si el modelo se PROMUEVE al generar
- * la OP. Un modelo dado de alta en `/modelos` nace ya en producción (`crearModelo` pone
- * `origen: 'produccion'`), así que no hay nada que promover y el toast sale sin número. Y un
- * modelo de desarrollo no se puede numerar sin sus DOS dígitos —concepto (tipo de prenda) y
- * género (§Post-F9.83)—, que es justo lo que el alta del catálogo no pide. El único camino real
- * es el que usa el negocio: el desarrollo con "Crear un modelo nuevo", que exige tipo de prenda +
- * género y arma el código `ABR-26-71-001` con la abreviatura del cliente. Por eso el cliente se
- * captura CON abreviatura: sin ella el sistema se niega a armar el código (y hace bien).
+ * ⚠️ **Por qué el modelo NACE en Desarrollo y no en `/modelos` (V1-E3n; revisado en V1-E8j).** El
+ * título de la prueba promete "OP con nº de producción", y ese número sólo existe si el modelo se
+ * PROMUEVE al generar la OP. Desde §Post-F9.134 un modelo dado de alta en `/modelos` **también**
+ * nace en desarrollo —el alta directa de modelo de producción se retiró—, así que ya no es "no hay
+ * nada que promover"; lo que sigue igual es lo otro: un modelo de desarrollo no se puede numerar
+ * sin sus DOS dígitos —concepto (tipo de prenda) y género (§Post-F9.83)—, y el alta del catálogo
+ * NO los exige, así que un modelo dado de alta ahí sin ellos haría fallar la promoción. El camino
+ * que usa el negocio es el que se prueba: el desarrollo con "Crear un modelo nuevo", que exige tipo
+ * de prenda + género y arma el código `ABR-26-71-001` con la abreviatura del cliente. Por eso el
+ * cliente se captura CON abreviatura: sin ella el sistema se niega a armar el código (y hace
+ * bien).
  */
 test.describe('Pedidos (rediseño R3, §4.1)', () => {
   test('constructor → tabla agrupada → Generar OP con matriz → OP con nº de producción + OC snapshot + RC sola', async ({
@@ -37,11 +40,14 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     const departamento = `NIÑOS ${sufijo}`;
     const nombreProyecto = `Joggers ${sufijo}`;
     const ocCliente = `OC-E2E-${sufijo}`;
-    // Abreviatura del cliente = el "CYA" de `CYA-26-71-001`: 2–6 letras/dígitos y ÚNICA en el
-    // catálogo (el backend la exige libre). Se saca del reloj en base 36 —no del `sufijo`— porque
-    // los 6 dígitos decimales se repiten cada 1,000 s y aquí un choque no da un nombre feo sino un
-    // 409: en base 36, 5 caracteres tardan ~17 h en repetirse.
-    const abreviatura = `E${Date.now().toString(36).slice(-5).toUpperCase()}`;
+    // Abreviatura del cliente = el "CYA" de `CYA-26-71-001`: EXACTAMENTE 3 letras A–Z
+    // (§Post-F9.112) y ÚNICA en el catálogo (el backend la exige libre). Sigue saliendo del reloj
+    // —no del `sufijo`— porque un choque aquí no da un nombre feo sino un 409, pero el margen
+    // ENCOGIÓ al apretarse la regla: de ~17 h (5 caracteres en base 36) a **~17.6 s** (26³ =
+    // 17,576 valores a resolución de milisegundo). Basta porque la BD de CI nace vacía, este spec
+    // crea UN solo cliente y el seed no siembra abreviaturas. El porqué completo, y cuándo deja de
+    // bastar, en `./abreviatura`.
+    const abreviatura = generarAbreviaturaCliente();
     // Los DOS dígitos de la nomenclatura (§Post-F9.83), tal como los ofrece el diálogo: el 1º sale
     // del tipo de prenda y el 2º del género. De ellos salen tanto el `-71-` del código de
     // desarrollo como los dos primeros dígitos del nº de producción (`71001`).
@@ -169,28 +175,32 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(panelOp.getByTestId('generar-op-capturado')).toContainText('cuadra');
     await page.getByTestId('confirmar-generar-op').click();
 
-    // ⭐ Toast del flujo COMPLETO. Es UNA sola frase, la que arma `PanelGenerarOP.tsx` (~L187), y
-    // aquí salen sus cuatro trozos porque el modelo era de desarrollo Y el renglón trae ficha:
-    // «OP <folio> creada · modelo de producción <nº> (antes <código de desarrollo>, que se
-    // conserva) · ligado a su desarrollo · Ruta Crítica programándose sola». Se exige ENTERA, con
-    // el número y el código concretos de ESTA corrida: si la promoción se cayera, el toast diría
-    // sólo "OP N creada · Ruta Crítica programándose sola" —que es exactamente lo que pasaba
-    // cuando el modelo nacía en `/modelos`— y esta línea se pondría roja.
+    // ⭐⭐ Toast del flujo COMPLETO. Es UNA sola frase, la que arma `PanelGenerarOP.tsx`, y aquí
+    // salen sus cuatro trozos porque el modelo era de desarrollo Y el renglón trae ficha:
+    // «OP <folio> creada · nace el modelo de producción <nº> del desarrollo <código>, que se
+    // conserva · ligado a su desarrollo · Ruta Crítica programándose sola». Se exige ENTERA, con
+    // el número y el código concretos de ESTA corrida: si el modelo de producción no naciera, el
+    // toast diría sólo "OP N creada · Ruta Crítica programándose sola" y esta línea se pondría roja.
+    //
+    // ⚠️ V1-E3 (§Post-F9.172(b)): antes decía «(antes <código>, que se conserva)» porque la salida
+    // TRANSFORMABA el modelo de desarrollo. Ya no: nace uno NUEVO por color y el desarrollo se
+    // queda como está — por eso la frase cambió de "antes" a "del desarrollo".
     await expect(
       page.getByText(
         new RegExp(
-          `OP \\d+ creada · modelo de producción ${numeroProduccion} ` +
-            `\\(antes ${codigoDesarrollo}, que se conserva\\) · ligado a su desarrollo · ` +
+          `OP \\d+ creada · nace el modelo de producción ${numeroProduccion} ` +
+            `del desarrollo ${codigoDesarrollo}, que se conserva · ligado a su desarrollo · ` +
             `Ruta Crítica programándose sola`,
           'u',
         ),
       ),
     ).toBeVisible();
 
-    // Y la promoción no se quedó en el toast: el renglón del pedido ya enseña el modelo con su
-    // código NUEVO (el de producción) y su marca `prod. #<nº>`.
+    // Y el modelo nuevo no se quedó en el toast: el renglón del pedido —que SIGUE enseñando su
+    // código de DESARROLLO, porque el desarrollo ya no se transforma— ya trae la marca
+    // `prod. #<nº>` del modelo de producción que nació de él (V1-E3).
     await expect(
-      grupo.getByTestId('pedidos-renglon').filter({ hasText: numeroProduccion }),
+      grupo.getByTestId('pedidos-renglon').filter({ hasText: codigoDesarrollo }),
     ).toContainText(`prod. #${numeroProduccion}`);
 
     // El renglón ya trae su No. orden (liga al centro de Órdenes).
@@ -267,10 +277,42 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await page.getByTestId('buscar-pedido').fill(cliente);
     await page.getByTestId('fila-pedido').filter({ hasText: cliente }).first().click();
     const detallePedido = page.getByTestId('detalle-pedido');
-    // Mismo motivo que arriba: el renglón enseña el código vigente del modelo, el de producción.
+    // ⭐⭐ V1-E3 (§Post-F9.172(b)) — el renglón enseña el código de DESARROLLO, y es correcto.
+    //
+    // 🔴 Aquí decía *"el código vigente del modelo, el de producción"* y esperaba el nº de 5
+    // dígitos. Eso era verdad mientras generar la OP **transformaba** el modelo de desarrollo; desde
+    // V1-E3 el desarrollo **se queda como está** —por eso de él pueden nacer cuatro modelos, uno por
+    // color— y el renglón del pedido sigue apuntando a él. `PedidosPagina.tsx` pinta
+    // `l.codigoModelo`, que es el del renglón.
+    //
+    // ⚠️ Y el campo `numeroProduccion` de esta forma NO sirve para enseñarlo: es el número del
+    // modelo **DEL RENGLÓN**, y tras V1-E3 el renglón apunta al DESARROLLO —que ya no se promueve
+    // nunca— ⇒ **vale `null` para siempre**. Enseñarlo no devolvería el número: enseñaría un hueco.
+    //
+    // ✅ **0.089 lo cerró.** Los números que Daniel quiere ver son los de los modelos HIJOS, uno por
+    // color, y llegan por la MISMA agregación en servidor que la vista del mes
+    // (`numerosProduccion`). Esta aserción cubre lo mismo que la del MES (`:201-204`) y algo más:
+    // allá se comprueba el `prod. #<nº>`; aquí, además, que el renglón esté VISIBLE.
+    //
+    // 🔴 **Por qué son DOS líneas, y no es por el locator.** El locator es idéntico en las dos
+    // (`filter({ hasText: codigoDesarrollo })`), así que si ese código dejara de pintarse el filtro
+    // resolvería a cero y **las dos** se pondrían rojas: esa regresión no las separa. Lo que las
+    // separa es qué mira cada matcher — medido contra el fuente de Playwright 1.60, no de memoria:
+    //   • `toContainText` compara con `elementText`, que sólo salta `SCRIPT/NOSCRIPT/STYLE/<head>`
+    //     y **no mira CSS**: ni `display:none`, ni `visibility:hidden`, ni tamaño cero.
+    //   • `toBeVisible` sí hace ese chequeo explícito.
+    // ⇒ un renglón **presente en el DOM pero OCULTO** (cajón plegado, panel `hidden`) satisface la
+    // segunda y falla la primera. Ahí es donde la `toBeVisible` se gana el sitio.
+    //
+    // ⚠️ **NO la borres razonando "mismo locator ⇒ sobra".** Lo que se perdería no es la
+    // comprobación del código, es la de que el usuario pueda VERLO. Y sin la segunda, la 0.089
+    // —contrato + dominio + frontend— llegaría a `prueba` sin una sola verificación punta a punta.
     await expect(
-      detallePedido.getByTestId('renglon-pedido').filter({ hasText: numeroProduccion }),
+      detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
     ).toBeVisible();
+    await expect(
+      detallePedido.getByTestId('renglon-pedido').filter({ hasText: codigoDesarrollo }),
+    ).toContainText(`prod. #${numeroProduccion}`);
     await detallePedido.getByTestId('nuevo-pedido-real').click();
     const dialogoReal = page.getByRole('dialog');
     await expect(dialogoReal.getByRole('heading', { name: 'Nuevo pedido real' })).toBeVisible();

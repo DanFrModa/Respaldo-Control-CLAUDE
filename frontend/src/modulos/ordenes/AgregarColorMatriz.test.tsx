@@ -36,6 +36,7 @@ function color(id: number, nombre: string): Color {
     id,
     nombre,
     activo: true,
+    fusionadoEn: null,
     creadoEn: '',
     creadoPorId: null,
     modificadoEn: '',

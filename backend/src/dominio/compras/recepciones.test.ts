@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import { EstatusOrdenCompra } from '../../datos/index.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { calcularEstatusRecepcion, recibirCompra, reversarRecepcion } from './recepciones.js';
+import {
+  calcularEstatusRecepcion,
+  importeDeRecepcion,
+  nombreMaterialDeLinea,
+  precioDelRenglon,
+  recibirCompra,
+  reversarRecepcion,
+} from './recepciones.js';
 
 /**
  * Unit del dominio de RECEPCIÓN de compras (F4-E3) — SIN Postgres. Cubre lo que NO necesita la base:
@@ -13,7 +20,7 @@ import { calcularEstatusRecepcion, recibirCompra, reversarRecepcion } from './re
  *  • la función PURA de recálculo de estatus de la OC (parcial/total/autorizada, R7).
  *
  * La conversión cantidad+costo (caso reina 15 rollos→750 m, importe idéntico) ya se prueba en
- * `comun/conversion.test.ts`. La integridad transaccional real (atomicidad, kardex, outbox,
+ * `recepciones.int.test.ts`. La integridad transaccional real (atomicidad, kardex, outbox,
  * existencia = Σ movimientos, reverso visible en kardex, regla b contra Postgres) va en
  * `recepciones.int.test.ts` (CI).
  */
@@ -120,5 +127,105 @@ describe('Recepción unit — recálculo de estatus de OC (R7, función pura)', 
       [20, 50],
     ]);
     expect(calcularEstatusRecepcion(lineas, recibido)).toBe(EstatusOrdenCompra.recibida_total);
+  });
+});
+
+describe('⭐ V1-E8c — el nombre del renglón al RECIBIR lleva su color', () => {
+  // 🔴 Estas cuatro pruebas nacieron de una MUTACIÓN QUE SOBREVIVIÓ: el reviewer le quitó el color
+  // a esta función y las 2 086 pruebas del backend siguieron en verde. Es el OTRO EXTREMO de la
+  // cadena que V1-E8c abre: partir la compra en cuatro renglones por color no sirve de nada si al
+  // recibir los cuatro vuelven a llamarse igual.
+  const avio = { clave: 'CIE-53', descripcion: 'Cierre Venus' };
+
+  it('⭐ dos colores del MISMO avío se leen DISTINTO (era el defecto que sobrevivía)', () => {
+    const rojo = nombreMaterialDeLinea({
+      avio,
+      tela: null,
+      colorAvio: 'Rojo',
+      descripcionLibre: null,
+    });
+    const azul = nombreMaterialDeLinea({
+      avio,
+      tela: null,
+      colorAvio: 'Azul',
+      descripcionLibre: null,
+    });
+
+    expect(rojo).toBe('CIE-53 — Cierre Venus · Rojo');
+    expect(azul).toBe('CIE-53 — Cierre Venus · Azul');
+    expect(rojo).not.toBe(azul);
+  });
+
+  it('sin color, el nombre es el de siempre (las OC viejas no cambian)', () => {
+    expect(
+      nombreMaterialDeLinea({ avio, tela: null, colorAvio: null, descripcionLibre: null }),
+    ).toBe('CIE-53 — Cierre Venus');
+  });
+
+  it('un color VACÍO se trata como sin color, no deja un separador colgando', () => {
+    expect(nombreMaterialDeLinea({ avio, tela: null, colorAvio: '', descripcionLibre: null })).toBe(
+      'CIE-53 — Cierre Venus',
+    );
+  });
+
+  it('sin avío ni tela cae a la descripción libre, y sin ella lo dice', () => {
+    expect(
+      nombreMaterialDeLinea({ avio: null, tela: null, colorAvio: null, descripcionLibre: 'Flete' }),
+    ).toBe('Flete');
+    expect(
+      nombreMaterialDeLinea({ avio: null, tela: null, colorAvio: null, descripcionLibre: null }),
+    ).toBe('(sin material)');
+  });
+});
+
+/**
+ * ⭐⭐ FILA 0.129 — EL PRECIO CON EL QUE NACE LA DEUDA, y el importe que se le va a deber.
+ *
+ * Daniel (§Post-F9.192): *"el precio debería de ser el de la OC, la cantidad puede variar un poco,
+ * por eso se mete a mano"*. Las dos funciones son PURAS a propósito: la regla del dinero se puede
+ * medir sin base de datos, que es donde antes se escondía.
+ */
+describe('Recepción unit — el precio del renglón (fila 0.129)', () => {
+  it('sin precio capturado manda el de la OC', () => {
+    expect(precioDelRenglon(12.5, undefined)).toBe(12.5);
+  });
+
+  it('con precio capturado manda el capturado (quien recibe ve la mercancía)', () => {
+    expect(precioDelRenglon(12.5, 13.75)).toBe(13.75);
+  });
+
+  it('un precio capturado de CERO se respeta: no se cae al de la OC', () => {
+    // El `?? ` importa: con `||` un 0 legítimo (mercancía sin cargo) se habría convertido en el
+    // precio de la OC y habría nacido una deuda que nadie pidió.
+    expect(precioDelRenglon(12.5, 0)).toBe(0);
+  });
+});
+
+describe('Recepción unit — lo que se le debe al proveedor (fila 0.129)', () => {
+  it('suma cantidad × precio de cada renglón', () => {
+    expect(
+      importeDeRecepcion([
+        { cantidad: 100, precio: 2.5 },
+        { cantidad: 10, precio: 1 },
+      ]),
+    ).toBe(260);
+  });
+
+  it('los renglones LIBRES también cuentan: no se inventarían, pero se pagan', () => {
+    // Un flete de $500 capturado como renglón libre pesa igual que un avío.
+    expect(importeDeRecepcion([{ cantidad: 1, precio: 500 }])).toBe(500);
+  });
+
+  it('un renglón sin precio aporta 0 (no se inventa ninguno)', () => {
+    expect(
+      importeDeRecepcion([
+        { cantidad: 100, precio: null },
+        { cantidad: 2, precio: 3 },
+      ]),
+    ).toBe(6);
+  });
+
+  it('sin renglones el importe es 0 (y arriba nadie registra una deuda de cero)', () => {
+    expect(importeDeRecepcion([])).toBe(0);
   });
 });

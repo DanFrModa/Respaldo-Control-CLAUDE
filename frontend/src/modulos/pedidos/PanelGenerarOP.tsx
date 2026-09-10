@@ -20,13 +20,21 @@ import { useSesion } from '@/sesion/useSesion';
 import { cn } from '@/lib/utils';
 import { AgregarColorMatriz } from '@/modulos/ordenes/AgregarColorMatriz';
 
+import { notaSinExpedienteDesarrollo } from './numeros-produccion';
+
 /**
  * PANEL "GENERAR OP" (rediseño R3, §4.1 — proto `renderOpGen`): la SALIDA A PRODUCCIÓN de un
  * renglón del pedido. Aquí NACE la matriz color×talla de la orden (se eligen colores/tallas del
  * catálogo y se distribuye la cantidad del renglón, con la guía cuadra/faltan/sobran) + las
  * referencias del cliente (D7, opcionales). Al confirmar, el backend en UNA transacción crea la
- * OP, copia el snapshot de la OC, liga al desarrollo, PASA EL MODELO A PRODUCCIÓN si todavía era
- * de desarrollo y encola la RC automática — el toast lo resume.
+ * OP, copia el snapshot de la OC, liga al desarrollo, HACE NACER (o reusa) EL MODELO DE PRODUCCIÓN
+ * DE ESE COLOR y encola la RC automática — el toast lo resume.
+ *
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)): cuatro OC de cuatro colores del mismo modelo dan **cuatro modelos de
+ * producción** —uno por color, cada uno con su nº— y **una sola receta**, la del desarrollo. El
+ * desarrollo NO se transforma: se queda en su catálogo, y por eso este panel sigue proponiendo un
+ * número en cada salida. Si el color ya tiene modelo, el backend REUSA el suyo y el número
+ * propuesto no se usa (lo dice el toast, y sale un aviso).
  *
  * ⚠️ El nº de producción se CONFIRMA aquí (§Post-F9.34 punto 4 + §Post-F9.46). Daniel encontró
  * probando (OP 5558) que la OP se quedaba con el modelo de DESARROLLO: *"habíamos acordado que el
@@ -129,7 +137,10 @@ export function PanelGenerarOP({
             onNavegar: () =>
               void navigate('/desarrollo', { state: { idModelo: renglon.idModelo } }),
           }
-        : { titulo: 'modelo anterior al módulo de Desarrollo' }),
+        : // Fila 0.151: el texto sólo afirma en qué catálogo vive el modelo, nunca su edad — un
+          // renglón sin expediente NO quiere decir "modelo viejo" (los del importador por PDF nacen
+          // así). Ver `notaSinExpedienteDesarrollo`.
+          { titulo: notaSinExpedienteDesarrollo(renglon) ?? '' }),
     },
     {
       clave: 'lista',
@@ -184,14 +195,22 @@ export function PanelGenerarOP({
       { idLinea: renglon.id, cuerpo },
       {
         onSuccess: (resultado) => {
+          // V1-E3: el modelo de la OP puede haber NACIDO aquí (uno por color), haberse REUSADO
+          // (ese color ya lo tenía: el número es del modelo, no de la orden) o venir HEREDADO del
+          // renglón (histórico del Access). El toast dice cuál de los tres, porque son tres cosas
+          // distintas y de la segunda depende que nadie se extrañe de no ver un número nuevo.
+          const queModelo =
+            resultado.modeloDeProduccion === 'nacido'
+              ? ` · nace el modelo de producción ${resultado.codigoModeloProduccion}` +
+                (resultado.codigoModeloDesarrollo === null
+                  ? ''
+                  : ` del desarrollo ${resultado.codigoModeloDesarrollo}, que se conserva`)
+              : resultado.modeloDeProduccion === 'reusado'
+                ? ` · con el modelo ${resultado.codigoModeloProduccion}, que ese color ya tenía`
+                : ` · modelo ${resultado.codigoModeloProduccion}`;
           toast.success(
             `OP ${resultado.orden.folio} creada` +
-              (resultado.numeroProduccion === null
-                ? ''
-                : ` · modelo de producción ${String(resultado.numeroProduccion)}`) +
-              (resultado.codigoModeloAnterior === null
-                ? ''
-                : ` (antes ${resultado.codigoModeloAnterior}, que se conserva)`) +
+              queModelo +
               (resultado.ligaCreada ? ' · ligado a su desarrollo' : '') +
               ' · Ruta Crítica programándose sola',
           );
@@ -258,8 +277,8 @@ export function PanelGenerarOP({
           <p className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs text-muted-foreground">
             <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
             <span>
-              <b>Generar la OP es la salida a producción:</b> el modelo entra al catálogo de
-              producción (base distinta a Desarrollo) con su <b>nº interno de producción</b>
+              <b>Generar la OP es la salida a producción:</b> nace el modelo de producción de este
+              color (base distinta a Desarrollo) con su <b>nº interno de producción</b>
               {renglon.idDesarrollo !== null ? (
                 <>
                   {' '}
@@ -301,9 +320,11 @@ export function PanelGenerarOP({
                 Nº de producción del modelo
               </h3>
               <p className="text-xs text-muted-foreground">
-                <b>{renglon.codigoModelo}</b> todavía es un modelo de <b>desarrollo</b>. Al generar
-                la OP entra al catálogo de producción con este número; su nº de desarrollo se
-                conserva y sigue siendo buscable.
+                <b>{renglon.codigoModelo}</b> es un modelo de <b>desarrollo</b>. Al generar la OP
+                nace el <b>modelo de producción de este color</b> con este número, compartiendo la
+                receta del desarrollo — que se queda como está, con su nº buscable. Si ese color{' '}
+                <b>ya tiene modelo</b> (un resurtido, u otra OC del mismo color), se <b>reusa</b> el
+                suyo y este número no se usa: el número es del modelo, no de la orden.
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Input
@@ -340,6 +361,14 @@ export function PanelGenerarOP({
             </section>
           ) : null}
 
+          {/* ⚠️ AQUÍ NO SE CAPTURAN PACKS, Y ES DELIBERADO (§Post-F9.10): no se pasa `onPackChange`,
+              así que la columna Pack no aparece y una OP nacida de un PEDIDO arranca SIN tendidos
+              (todos sus renglones con pack vacío, que es «sin pack» — el caso normal). Los packs
+              vienen de dos sitios: del PDF de C&A, que los trae del papel, y de la matriz de la OP
+              ya creada, donde sí se editan. Si algún día se quisieran capturar desde aquí, no basta
+              con pasar la prop: hay que traerse también las dos guardas del panel de la matriz (o
+              todos con pack o ninguno, y `(color, pack)` no repetido), porque sin ellas el servidor
+              devuelve un 400 con la matriz ya tecleada. */}
           <MatrizColorTalla
             tallas={columnas}
             lineas={lineas}
@@ -350,16 +379,21 @@ export function PanelGenerarOP({
             tallasDisponibles={tallasDisponibles}
             onLineasChange={setLineas}
             onTallasChange={setColumnas}
-            onPantoneChange={(idColor, pantone) =>
-              setLineas((prev) => prev.map((l) => (l.idColor === idColor ? { ...l, pantone } : l)))
+            /* El primer argumento es la POSICIÓN de la fila, no el `idColor` (§Post-F9.10): con
+               packs el mismo color puede ocupar dos filas y el id dejó de distinguirlas. Los dos
+               son `number`, así que el compilador NO avisa si se confunden — por eso se nombra. */
+            onPantoneChange={(indice, pantone) =>
+              setLineas((prev) => prev.map((l, i) => (i === indice ? { ...l, pantone } : l)))
             }
             testid="matriz-op"
             /* V1-E4 (punto 7): el `<select>` nativo de la matriz se alimentaba de la PRIMERA
-               PÁGINA del catálogo de colores (100). El catálogo los rebasa —el importador de OC
-               por PDF crea colores solo (`Blanco A`, `Blanco B`…)—, así que un color existente
-               podía ser INALCANZABLE aquí y el usuario terminaba duplicándolo. Se reusa el MISMO
-               combobox con búsqueda server-side + alta al vuelo que la matriz de la OP ya usa
-               desde §Post-F9.11 (`AgregarColorMatriz`), no uno nuevo. */
+               PÁGINA del catálogo de colores (100). El catálogo la rebasa —el importador de OC por
+               PDF crea colores al vuelo, y hasta §Post-F9.129 creaba UNO POR PACK (`Blanco A`,
+               `Blanco B`…), que es por lo que el catálogo creció tanto; hoy crea uno por OC, pero
+               los que ya nacieron así siguen ahí y el catálogo sigue rebasando la página—, así que
+               un color existente podía ser INALCANZABLE aquí y el usuario terminaba duplicándolo.
+               Se reusa el MISMO combobox con búsqueda server-side + alta al vuelo que la matriz de
+               la OP ya usa desde §Post-F9.11 (`AgregarColorMatriz`), no uno nuevo. */
             slotAgregarColor={
               <AgregarColorMatriz
                 key={vecesAgregado}

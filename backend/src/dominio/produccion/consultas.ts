@@ -16,7 +16,7 @@
  *
  * Reuso (sin duplicar): la búsqueda combinada (folio si es entero + código de modelo + nombre de
  * cliente + valor de `OrdenReferencia`, D7) y el filtro por año son los MISMOS de `ordenes.ts`
- * (`armarBusqueda`, `rangoAnio`), reexportados desde allí.
+ * (`armarBusquedaConSinonimos`, `rangoAnio`), reexportados desde allí.
  */
 import { z } from 'zod';
 
@@ -37,7 +37,7 @@ import type {
   TableroPedidosMesFila,
 } from '../../contrato/esquemas/orden-consulta.js';
 import { esquemaEstadoOrden } from '../../contrato/esquemas/orden.js';
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoOrden, Prisma } from '../../datos/index.js';
 
 import {
   armarPagina,
@@ -50,7 +50,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { armarBusqueda, rangoAnio } from './ordenes.js';
+import { armarBusquedaConSinonimos, rangoAnio } from './ordenes.js';
 
 // ── Constantes del semáforo de antigüedad (regla `EsUrgente` del viejo) ──────────────
 
@@ -81,7 +81,8 @@ const seleccionLigera = {
 type FilaLigera = {
   id: number;
   folio: bigint;
-  estado: 'capturada' | 'completa' | 'cancelada';
+  /** Estado de la orden: el TIPO del enum, NUNCA una copia literal de sus valores (0.061). */
+  estado: EstadoOrden;
   fecha: Date | null;
   fechaEntrega: Date | null;
   creadoEn: Date;
@@ -122,7 +123,8 @@ function aOrdenLigera(fila: FilaLigera, totalPiezas: number): OrdenLigeraSalida 
 /**
  * Suma de piezas (Σ de `OrdenLineaTalla.cantidad`) POR orden, para un conjunto de ids, en UNA sola
  * consulta agregada (no trae la matriz a memoria). Devuelve un mapa `idOrden -> total`; las órdenes
- * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0. Exportada: el centro
+ * sin matriz capturada no aparecen en el mapa y se proyectan con total 0 (sin matriz ≠ incompleta:
+ * una orden `capturada` puede tener matriz y sumar piezas). Exportada: el centro
  * de comando (R2) la reusa para la columna "Cant. ordenada".
  */
 export async function totalesPorOrden(
@@ -183,7 +185,7 @@ export function semaforoPorDias(dias: number): SemaforoOrden {
  * coaccionado lanzaría (Zod 4.4.x: `stringbool` solo acepta texto) → 400 espurio; por eso el dominio
  * tiene su propio esquema con `z.boolean()` — mismo patrón que `esquemaListarTallas`/`*Dominio`.
  */
-const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
+export const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   idModelo: z.number().int().positive().optional(),
   idCliente: z.number().int().positive().optional(),
@@ -220,7 +222,7 @@ export async function consultarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -243,12 +245,12 @@ export async function consultarOrdenes(
   return armarPagina(datos, total, paginacion);
 }
 
-// ── Incompletas (capturadas sin matriz, con semáforo) ────────────────────────────────
+// ── Incompletas (`estado='capturada'`: les falta algún requisito, con semáforo) ───────
 
 /**
  * Órdenes INCOMPLETAS de la empresa activa: las que están en `estado='capturada'`, es decir, las
- * que NO cumplen todavía los requisitos de la regla (tallas + avíos, y arte si aplica — ver
- * `requisitos-orden.ts`). Proyección ligera + `diasAntiguedad` (desde `creadoEn`, con `fecha` como
+ * que NO cumplen todavía los requisitos de la regla (tallas + receta liberada, y arte si aplica —
+ * ver `requisitos-orden.ts`). Proyección ligera + `diasAntiguedad` (desde `creadoEn`, con `fecha` como
  * respaldo) + el `semaforo` DERIVADO (> 7 días = urgente). El orden por defecto es por antigüedad
  * descendente (las más viejas primero).
  *
@@ -471,7 +473,8 @@ export const LIMITE_BUSCADOR_ORDENES = 20;
 /**
  * BUSCADOR GLOBAL de órdenes para el layout: localiza por folio interno, código de modelo o
  * CUALQUIER valor de `OrdenReferencia` (D7) o nombre de cliente — la MISMA búsqueda combinada del
- * listado (`armarBusqueda`), pero con proyección LIGERA (`{ id, folio, codigoModelo, cliente }`) y
+ * listado (`armarBusquedaConSinonimos`, sinónimos de departamento incluidos), pero con proyección
+ * LIGERA (`{ id, folio, codigoModelo, cliente }`) y
  * tope de {@link LIMITE_BUSCADOR_ORDENES} hits. Filtra por empresa activa (A9). Excluye canceladas
  * (no se navega a algo cancelado desde el buscador rápido; la consulta sí las puede mostrar).
  */
@@ -486,7 +489,7 @@ export async function buscarOrdenesGlobal(
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     estado: { not: 'cancelada' },
-    ...armarBusqueda(q),
+    ...(await armarBusquedaConSinonimos(q, bd)),
   };
 
   const cliente = clienteLectura(bd);

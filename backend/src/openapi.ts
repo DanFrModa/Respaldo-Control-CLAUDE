@@ -145,6 +145,17 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
         description:
           'Inventario de avíos por kardex (multi-almacén, R4): ajuste, traspaso, existencias y kardex.',
       },
+      // La corrida semanal de pagos y su catálogo de conceptos (0.113 / 0.125).
+      {
+        name: 'pagos',
+        description:
+          'La corrida semanal de pagos: la relación con la que se decide a quién se le paga y cuánto (con factura y sin factura).',
+      },
+      {
+        name: 'conceptos-pago',
+        description:
+          'Catálogo de conceptos de pago que NO son proveedores (nómina por fuera, servicios, caja chica) y sus cuentas.',
+      },
     ],
     components: {
       securitySchemes: {

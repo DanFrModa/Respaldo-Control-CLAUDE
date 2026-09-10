@@ -106,6 +106,80 @@ export function claveMaterial(m: { idTela: number | null; idAvio: number | null 
   return 'libre';
 }
 
+/**
+ * ⭐⭐ **EL COLOR DEL RENGLÓN, SEA DE LO QUE SEA** (V1-E8c, §Post-F9.126) — la ÚNICA función que
+ * responde *"¿de qué color es esta línea?"*.
+ *
+ * Desde V1-E3u una línea de TELA lleva su color en `idTelaColor` (catálogo `TelaColor`). Desde
+ * V1-E8c una línea de AVÍO lleva el suyo en `idColorPrenda` (catálogo `Color`, el de la prenda: el
+ * avío **no tiene catálogo de color propio**, §Post-F9.91). Son dos catálogos distintos, pero
+ * responden la MISMA pregunta y nunca coexisten en una línea — así que el neteo, la agrupación y el
+ * diff pueden razonar con un solo número.
+ *
+ * 🔴 **Por qué no hay riesgo de confundir un `TelaColor` 7 con un `Color` 7**: este número SIEMPRE
+ * viaja dentro de una `claveMaterial` (`tela-5` / `avio-9`), que ya separa los dos mundos. Sacarlo
+ * de ahí y compararlo suelto sería el error; por eso vive aquí y no como un campo más.
+ */
+export function colorDelRenglon(m: {
+  idTela: number | null;
+  idTelaColor: number | null;
+  idColorPrenda: number | null;
+}): number | null {
+  return m.idTela !== null ? m.idTelaColor : m.idColorPrenda;
+}
+
+/**
+ * ⭐⭐ **LA IDENTIDAD DE UN RENGLÓN DE EXPLOSIÓN: *(material, color)*** — la clave con la que se
+ * agrupa, se netea, se ajusta y —desde ⭐⭐ V1-E8e (§Post-F9.99)— se **da por cubierto**.
+ *
+ * Vivía como función privada en `mrp.ts`; se mudó AQUÍ, junto a {@link claveMaterial} y
+ * {@link colorDelRenglon}, el día que un tercer módulo necesitó escribirla. Una clave que dos
+ * archivos arman por su cuenta es una clave que en la primera corrección se escribe distinta — y
+ * cuando la clave es la identidad de un renglón, eso significa cubrir el cierre rojo y seguir
+ * pidiendo el azul.
+ *
+ * ⚠️ NO lleva proveedor: el proveedor puede cambiar (y lo cambia Compras desde la propia pantalla,
+ * §Post-F9.82) sin que el renglón deje de ser el mismo. La clave que SÍ lo lleva es
+ * `claveAgrupada` de `mrp.ts`, y es otra cosa: *"¿qué compras caben en la misma OC?"*.
+ */
+export function claveMaterialColor(m: {
+  idTela: number | null;
+  idAvio: number | null;
+  idTelaColor: number | null;
+  idColorPrenda: number | null;
+}): string {
+  const idColor = colorDelRenglon(m);
+  return `${claveMaterial(m)}|${idColor === null ? 'sin' : String(idColor)}`;
+}
+
+/**
+ * ⭐⭐ **¿CUÁNTO FALTA COMPRAR DE VERDAD? — EL CRITERIO, UNO SOLO** (V1-E3q §Post-F9.85 + ⭐⭐ V1-E8e
+ * §Post-F9.99).
+ *
+ * Un requerimiento queda satisfecho cuando **lo comprometido en OC + lo dado por cubierto ≥ lo que
+ * había que comprar**. Los dos sumandos responden la MISMA pregunta —*"¿hace falta volver a comprar
+ * esto?"*— por dos caminos distintos: uno lo contesta un documento (la OC), el otro lo contesta una
+ * persona (*"con esto queda cubierto"*, §Post-F9.99).
+ *
+ * 🔴 **Por qué es UNA función y no la resta escrita en cada sitio.** La fórmula vivía repetida en
+ * dos lugares (la proyección de la explosión y el plan de compra) y la etapa que agregó el tercer
+ * sumando habría tenido que acordarse de los dos: el día que uno se quedara atrás, la explosión y la
+ * revisión previa dirían números distintos sobre lo mismo — el defecto exacto que §Post-F9.85 vino a
+ * cerrar. Ahora hay un solo sitio que puede estar mal, y una sola prueba que lo fija.
+ *
+ * ⚠️ Devuelve el número **a la escala de `OrdenCompraLinea.cantidad`** (2 decimales), que es la
+ * columna donde ese pendiente va a acabar. Sin redondear aquí, un requerido de `3.7020` contra una
+ * línea guardada de `3.70` dejaba `0.002` "pendientes" que ninguna columna puede guardar, y el
+ * renglón volvía a ofrecerse para siempre (la queja literal de Daniel del 20-ago).
+ *
+ * @param aComprar lo que el snapshot dice que hay que comprar (requerido − stock genérico).
+ * @param enOc lo que ya viaja en una OC viva ({@link comprometidoEnOc}).
+ * @param cubierto lo que alguien decidió NO comprar (`dado-por-cubierto.ts`). 0 = nadie decidió nada.
+ */
+export function pendienteDeComprar(aComprar: number, enOc: number, cubierto: number): number {
+  return redondearCantidadCompra(Math.max(0, aComprar - enOc - cubierto));
+}
+
 /** Lo que UNA orden de producción ya tiene comprado de UN material. */
 export interface ComprometidoMaterial {
   /**
@@ -133,7 +207,9 @@ export interface ComprometidoMaterial {
   idTela: number | null;
   idAvio: number | null;
   /**
-   * ⭐⭐ V1-E3u (§Post-F9.89) — el mismo total, DESGLOSADO POR COLOR DE TELA.
+   * ⭐⭐ V1-E3u (§Post-F9.89) — el mismo total, DESGLOSADO POR COLOR DEL RENGLÓN: de tela en las
+   * líneas de tela y, desde ⭐⭐ V1-E8c (§Post-F9.126), **de prenda en las de avío**
+   * ({@link colorDelRenglon} decide cuál).
    *
    * La llave `null` es el **acervo sin color**: las líneas de OC anteriores a esta etapa (y las
    * 7,978 migradas) piden *"esta tela"* sin decir de qué color, porque el sistema no dejaba
@@ -175,6 +251,10 @@ export async function comprometidoEnOc(
       idTela: true,
       idAvio: true,
       idTelaColor: true,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color de la línea de AVÍO. Sin él, cuatro renglones de
+      // cierre (uno por color) netearían contra una sola cubeta y tres se quedarían sin nada que
+      // restar — el defecto de §Post-F9.85 multiplicado por cuatro.
+      idColorPrenda: true,
       descripcionLibre: true,
       cantidad: true,
       tela: { select: { nombre: true } },
@@ -209,10 +289,14 @@ export async function comprometidoEnOc(
     // ⭐ V1-E3u: la MISMA suma, partida por color. Se redondea con la misma regla y en el mismo
     // lugar que el total: si las dos cubetas usaran escalas distintas, el desglose no sumaría el
     // total y habría otra vez dos verdades sobre "cuánto ya compré".
-    const cubeta = acum.porColor.get(l.idTelaColor) ?? { enOc: 0, recibido: 0 };
+    // ⭐⭐ V1-E8c: la cubeta es el COLOR DEL RENGLÓN —de tela o de prenda—, resuelto en un solo
+    // sitio (`colorDelRenglon`). Antes esto leía `idTelaColor` a secas, así que los avíos caían
+    // TODOS en la cubeta `null`.
+    const color = colorDelRenglon(l);
+    const cubeta = acum.porColor.get(color) ?? { enOc: 0, recibido: 0 };
     cubeta.enOc = redondearCantidadCompra(cubeta.enOc + Number(l.cantidad));
     cubeta.recibido += recibidoLinea;
-    acum.porColor.set(l.idTelaColor, cubeta);
+    acum.porColor.set(color, cubeta);
     porMaterial.set(clave, acum);
     resultado.set(l.idOrden, porMaterial);
   }
@@ -242,8 +326,15 @@ export interface RepartoNeteo {
 
 /** Un renglón de requerimiento visto desde el neteo: su color y lo que pide. */
 export interface FilaParaNeteo {
-  /** Color de tela del renglón; `null` = el renglón todavía no dice de qué color (o es de avío). */
-  idTelaColor: number | null;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR del renglón, ya resuelto con {@link colorDelRenglon}: de
+   * tela si es tela, **de prenda si es avío**. `null` = el renglón todavía no dice de qué color.
+   *
+   * 🔴 Se llamaba `idTelaColor` y el nombre se quedó corto el día que los avíos estrenaron color:
+   * un campo que dice "tela" y recibe colores de prenda es la clase de mentira que aquí se paga
+   * cara. El tipo se llama por lo que ES, no por el primero que lo usó.
+   */
+  idColor: number | null;
   /** Lo que ese renglón necesita comprar antes de netear. */
   cantidadAComprar: number;
 }
@@ -258,11 +349,42 @@ export interface FilaParaNeteo {
  * volvería a ofrecer comprar lo ya comprado — **el defecto exacto que §Post-F9.85 cerró**.
  *
  * La regla, en dos frases:
- *  1. **Cada renglón se queda con lo de SU color** (`porColor[idTelaColor]`), que es lo único que
+ *  1. **Cada renglón se queda con lo de SU color** (`porColor[idColor]`), que es lo único que
  *     de verdad le corresponde.
  *  2. **El acervo SIN color** (`porColor[null]`) va al renglón sin color si lo hay —son la misma
  *     pregunta sin responder— y, si no lo hay, se reparte entre los renglones con color **en el
  *     orden en que vienen**, cada uno hasta lo que necesita, y **el último absorbe el remanente**.
+ *  3. ⭐⭐ **fila 0.158 — las cubetas CON color que NINGÚN renglón reclama van al renglón sin color,
+ *     pero SÓLO si ese renglón es el ÚNICO del material** (ningún hermano lleva color). Antes se
+ *     caían al piso y la explosión volvía a ofrecer lo ya comprado.
+ *
+ * 🔴 **Y POR QUÉ ESE "SÓLO SI" NO ES OPCIONAL** (hallazgo del reviewer, 7-sep-2026). La tentación
+ * es decir *"el renglón sin color pide TODO el material de la orden, así que le tocan todas las
+ * líneas"*. **Eso es cierto en un avío colapsado y FALSO en una tela.** En un avío marcado
+ * `seCompraSinColor` hay un solo renglón por orden: **`OrdenAvio` tiene `@@unique([idOrden,
+ * idAvio])`**, así que el avío entra una vez a la **receta congelada de la orden** —que es lo que
+ * la explosión recorre (`Orden.recetaAvios`)— y {@link gruposDeCompraDelAvio} devuelve un único
+ * grupo. (`ModeloAvio.@@id([idModelo, idAvio])` lo refuerza aguas arriba, en el BOM del modelo,
+ * pero la garantía es la de la receta: `OrdenAvio` se escribe aparte al congelarla y sin su propio
+ * cerrojo admitiría duplicados.)
+ * En una tela NO: los colores de prenda **sin amarre de color de tela** caen todos en el grupo
+ * `'sin'` **junto a** los que sí lo tienen, así que una misma tela emite a la vez renglones con
+ * color **y** uno sin color — y ese renglón sin color es **una PARTE de la orden, no toda**. Es el
+ * estado normal mientras el comprador no captura los tonos.
+ *
+ * ⚠️ **Medido:** con una tela mixta y una cubeta huérfana (que se fabrica cambiando un amarre de
+ * color con la OC en `borrador` — permitido, porque `borrador` no está en
+ * {@link ESTATUS_OC_COMPROMETIDA} pero **sí** en {@link ESTATUS_OC_QUE_CUBREN}), absorber sin la
+ * guarda acreditaba al renglón sin color 100 m que la OC había pedido de OTRO tono: su faltante
+ * real se iba a cero y **ese material no se compraba nunca**. Cambiar una sobre-compra visible por
+ * una **sub-compra silenciosa que para la producción** es peor negocio, y además es exactamente lo
+ * que la regla 2 prohíbe tres líneas más abajo: no se le atribuye a un renglón lo que la OC pidió
+ * para otro color.
+ *
+ * 🔑 **La invariante, ACOTADA a donde vale:** cuando el renglón sin color es el **único** del
+ * material, `Σ(enOc) = comprometido.enOc` — nada de lo ya comprometido se queda sin contar, que es
+ * lo que hacía `comprometidoDe` antes de que existieran los colores. Con hermanos de color en la
+ * mesa **no vale, y no debe valer**: lo huérfano se queda sin repartir a propósito.
  *
  * ⚠️ **Por qué el último absorbe (y no se tira):** con UN solo renglón sin color —el caso de toda
  * orden anterior a esta etapa— esa regla devuelve el acervo COMPLETO, que es exactamente lo que
@@ -287,22 +409,63 @@ export function repartirComprometidoPorColor(
   if (comprometido === undefined) return filas.map(() => ({ enOc: 0, desdeAcervoSinColor: 0 }));
 
   const propio: RepartoNeteo[] = filas.map((f) => ({
-    enOc: f.idTelaColor === null ? 0 : (comprometido.porColor.get(f.idTelaColor)?.enOc ?? 0),
+    enOc: f.idColor === null ? 0 : (comprometido.porColor.get(f.idColor)?.enOc ?? 0),
     desdeAcervoSinColor: 0,
   }));
-  let acervo = comprometido.porColor.get(null)?.enOc ?? 0;
-  if (acervo <= 0) return propio;
+  const acervoSinColor = comprometido.porColor.get(null)?.enOc ?? 0;
 
   // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
   // ⚠️ Aquí NO hay ambigüedad que marcar: la fila pregunta lo mismo que el acervo responde.
-  const indiceSinColor = filas.findIndex((f) => f.idTelaColor === null);
+  const indiceSinColor = filas.findIndex((f) => f.idColor === null);
   if (indiceSinColor >= 0) {
+    /**
+     * ⭐⭐ **fila 0.158 — LAS CUBETAS HUÉRFANAS.** Son las que SÍ dicen un color, pero un color que
+     * ningún renglón de esta explosión reclama. Nacen en cuanto alguien marca «se compra sin tomar
+     * en cuenta el color» en un avío cuya OP **ya tenía OC por color**: la explosión pasa a emitir
+     * UN renglón sin color y las tres cubetas (Rojo, Azul, Negro) se quedan sin dueño.
+     *
+     * 🔴 **Sin esto se compra dos veces.** Medido por el camino real: la re-explosión decía
+     * `enOc: 0 / pendiente: 100` con las 100 piezas ya pedidas en una OC viva, y la segunda
+     * generación volvía a ofrecerlas. Es §Post-F9.85 resucitado por otra puerta.
+     *
+     * 🔴 **PERO SÓLO CUANDO NADIE MÁS LLEVA COLOR** (`conRenglon.size === 0`). Con hermanos de
+     * color en la mesa —el caso normal de una tela a la que le faltan tonos por capturar— el
+     * renglón sin color es **una PARTE de la orden, no toda**, y acreditarle una línea que la OC
+     * pidió de otro tono le baja el faltante a cero: **ese material ya no se compra nunca**. Ver el
+     * porqué completo, con la medición, en el doc de esta función.
+     *
+     * ⚠️ **Y NO se marcan como ambiguas** (`desdeAcervoSinColor` sigue en 0): ese campo dice *"la
+     * OC no decía de qué color era, así que atribuírselo a ESTE color lo eligió el sistema"*. Aquí
+     * la OC sí dice su color, y con la guarda de arriba el renglón que las recibe es el ÚNICO del
+     * material: le corresponden enteras, sin elección que confesar. Marcarlas en vez de acotar la
+     * absorción NO sirve —el número seguiría neteando y el material seguiría sin comprarse—; sólo
+     * avisaría del daño.
+     */
+    const conRenglon = new Set<number>();
+    for (const f of filas) {
+      if (f.idColor !== null) conRenglon.add(f.idColor);
+    }
+    let huerfano = 0;
+    if (conRenglon.size === 0) {
+      for (const [idColor, cubeta] of comprometido.porColor) {
+        if (idColor !== null) huerfano += cubeta.enOc;
+      }
+    }
+
     const fila = propio[indiceSinColor] as RepartoNeteo;
-    fila.enOc = redondearCantidadCompra(fila.enOc + acervo);
+    fila.enOc = redondearCantidadCompra(fila.enOc + acervoSinColor + huerfano);
     return propio;
   }
 
   // Sin renglón sin color: se reparte por necesidad y el ÚLTIMO absorbe lo que sobre.
+  //
+  // ⚠️ **Aquí las huérfanas NO se reparten, y es a propósito.** Sin un renglón sin color, darle a
+  // Azul lo que una OC pidió para Rojo sería inventar un hecho —la clase de suposición escrita como
+  // dato que §Post-F9.86 prohíbe—. El acervo sin color sí se reparte porque ahí la OC no dice nada;
+  // una línea que SÍ dice "Rojo" no se le atribuye a otro color.
+  let acervo = acervoSinColor;
+  if (acervo <= 0) return propio;
+
   for (let i = 0; i < filas.length; i += 1) {
     const esUltimo = i === filas.length - 1;
     const fila = propio[i] as RepartoNeteo;

@@ -1,14 +1,21 @@
 /**
- * ¿ESTE PROVEEDOR FACTURA O NO? — la regla general de TODO el sistema (§Post-F9.22).
+ * ¿ESTE PROVEEDOR FACTURA O NO? — la regla general de TODO el sistema (§Post-F9.22), con **UNA
+ * sola fuente de verdad** desde la fila 0.124.
  *
  * Daniel (10-ago-2026): *"tenemos dos tipos de proveedores. Los que nos facturan y los que no
  * facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas,
  * etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no
  * (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
  *
- * La bandera ya existía desde F1-E1B (R15 §4): `Proveedor.factura`, capturada en el alta con la
- * casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que este
- * módulo agrega es que esa casilla **MANDE**: quién puede pasar por el camino del CFDI y quién no.
+ * 🔴 DE DÓNDE SALE LA RESPUESTA (fila 0.124, Daniel 3-sep-2026 — §Post-F9.188(d): *"es un error que
+ * existan"*). Hasta esta fila la misma pregunta se contestaba DOS veces y en dos campos distintos:
+ *  • `Proveedor.factura` (bandera de F1-E1B/R15) — la leía la entrada de tela y el CFDI;
+ *  • `Proveedor.modalidadFacturacion` (`solo_con`/`solo_sin`/`ambos`, F6-E4 decisión (h)) — la leen
+ *    EsMa, CxP y la corrida semanal de pagos, y desde la fila 0.110 es OBLIGATORIA en el alta.
+ * Nada las ataba, así que un proveedor `factura=false` + `solo_con` mandaba su entrada de tela por
+ * el camino SIN factura y su captura de CxP por el camino CON factura: **sus pagos se partían en
+ * dos según la puerta por la que entraran**. Hoy manda `modalidadFacturacion` y punto; `factura`
+ * ya no se captura (sale del contrato de escritura) y donde aún se lea se **deriva** aquí.
  *
  * POR QUÉ VIVE EN `terceros/` Y NO EN `inventarios/`: la distinción es del TERCERO, no del
  * documento. Hoy la usa la entrada de tela (el único flujo que lee CFDI); mañana la usará cualquier
@@ -16,50 +23,116 @@
  * cada módulo.
  *
  * LOS TRES ESTADOS (y por qué son tres y no dos):
- *  • `factura`      — emite CFDI. Camino fiscal: se lee el XML y la cuenta por pagar nace por el
- *                     TOTAL del comprobante (con impuestos).
- *  • `sin-factura`  — no emite. Todo se captura a mano y NUNCA hay XML ni UUID.
- *  • `no-definida`  — la bandera está en NULL. NO es lo mismo que "no factura": son los proveedores
- *                     que venían migrados de Access, donde la pregunta jamás se hizo. Se les deja
- *                     pasar por el camino fiscal (si mandan un CFDI, el CFDI manda), pero el sistema
- *                     NO decide por ellos lo que nadie capturó: se avisa para que se defina en el
+ *  • `factura`      — emite CFDI (`solo_con` o `ambos`). Camino fiscal: se lee el XML y la cuenta
+ *                     por pagar nace por el TOTAL del comprobante (con impuestos).
+ *  • `sin-factura`  — no emite (`solo_sin`). Todo se captura a mano y NUNCA hay XML ni UUID.
+ *  • `no-definida`  — la modalidad está en NULL. NO es lo mismo que "no factura": son los
+ *                     proveedores migrados de Access, donde la pregunta jamás se hizo (REGLA 0-B:
+ *                     el histórico llega con huecos A PROPÓSITO y no se rellena). Se les deja pasar
+ *                     por el camino fiscal (si mandan un CFDI, el CFDI manda), pero el sistema NO
+ *                     decide por ellos lo que nadie capturó: se avisa para que se defina en el
  *                     catálogo. Tratar el NULL como "no factura" habría apagado en silencio la
  *                     lectura de facturas de casi todos los proveedores que ya existen.
+ *
+ * ⚠️ `ambos` cae en `factura` a propósito: un proveedor que factura *unas cosas sí y otras no* SÍ
+ * timbra, así que su CFDI se puede leer y guardar. Qué es con y qué sin factura lo decide
+ * `resolverConFactura` **movimiento por movimiento** (`dominio/esma/facturacion.ts`), no esta
+ * puerta — que solo pregunta si el camino del CFDI está abierto para él.
  */
+import type { ModalidadFacturacion } from '../../datos/index.js';
+
 import { ErrorValidacion } from '../../comun/errores.js';
 
 /** Cómo opera un proveedor respecto al CFDI. */
 export type ModalidadFactura = 'factura' | 'sin-factura' | 'no-definida';
 
-/** Traduce la bandera del catálogo (`Proveedor.factura`) a la modalidad con la que se opera. */
-export function modalidadFactura(factura: boolean | null | undefined): ModalidadFactura {
-  if (factura === true) return 'factura';
-  if (factura === false) return 'sin-factura';
+/**
+ * ⭐ LA ÚNICA DERIVACIÓN (fila 0.124). ¿Emite CFDI este proveedor? `true` si factura (`solo_con` o
+ * `ambos`), `false` si nunca (`solo_sin`), `null` si nadie lo definió todavía (proveedor migrado).
+ *
+ * Todo el sistema pregunta por aquí. Quien lea `Proveedor.factura` directamente estará leyendo la
+ * columna HISTÓRICA que ya nadie escribe.
+ */
+export function emiteFactura(modalidad: ModalidadFacturacion | null | undefined): boolean | null {
+  switch (modalidad) {
+    case 'solo_con':
+    case 'ambos':
+      return true;
+    case 'solo_sin':
+      return false;
+    default:
+      return null;
+  }
+}
+
+/** Traduce la modalidad del catálogo a los tres estados con los que se opera. */
+export function modalidadFactura(
+  modalidad: ModalidadFacturacion | null | undefined,
+): ModalidadFactura {
+  const emite = emiteFactura(modalidad);
+  if (emite === true) return 'factura';
+  if (emite === false) return 'sin-factura';
   return 'no-definida';
 }
 
-/** ¿Se le puede recibir un CFDI? Solo los que NO facturan quedan fuera. */
-export function admiteCfdi(factura: boolean | null | undefined): boolean {
-  return modalidadFactura(factura) !== 'sin-factura';
+/** ¿Se le puede recibir un CFDI? Solo los que NUNCA facturan quedan fuera. */
+export function admiteCfdi(modalidad: ModalidadFacturacion | null | undefined): boolean {
+  return modalidadFactura(modalidad) !== 'sin-factura';
 }
 
 /**
- * Corta el paso si se intenta meter una factura a nombre de un proveedor marcado como que NO
- * factura. Es una validación de SERVIDOR a propósito: la pantalla ya esconde el camino del XML,
- * pero esconder no es impedir (A4, deny-by-default) — y esta contradicción ensuciaría la
+ * Corta el paso si se intenta meter una factura a nombre de un proveedor cuya modalidad dice que
+ * NUNCA factura. Es una validación de SERVIDOR a propósito: la pantalla ya esconde el camino del
+ * XML, pero esconder no es impedir (A4, deny-by-default) — y esta contradicción ensuciaría la
  * contabilidad con un cargo fiscal de alguien que no timbra.
  *
  * `queSeIntento` completa la frase "No se puede …": se le pasa la acción concreta para que el
- * mensaje diga qué se estaba haciendo, no un genérico.
+ * mensaje diga qué se estaba haciendo, no un genérico. Y el mensaje manda a **el campo que hoy
+ * manda** (*«¿Cómo factura?»*), no a la casilla vieja que ya no se captura.
  */
 export function exigirProveedorQueFactura(
-  proveedor: { nombre: string; factura: boolean | null },
+  proveedor: { nombre: string; modalidadFacturacion: ModalidadFacturacion | null },
   queSeIntento: string,
 ): void {
-  if (admiteCfdi(proveedor.factura)) return;
+  if (admiteCfdi(proveedor.modalidadFacturacion)) return;
   throw new ErrorValidacion(
     `No se puede ${queSeIntento}: el proveedor "${proveedor.nombre}" está dado de alta como que ` +
-      `NO emite factura, así que su documentación se captura a mano. Si sí factura, corrígelo en ` +
-      `el catálogo de proveedores (casilla "¿Emite factura (CFDI)?").`,
+      `NUNCA factura (solo sin factura), así que su documentación se captura a mano. Si sí ` +
+      `factura, corrige "¿Cómo factura?" en el catálogo de proveedores.`,
   );
+}
+
+/**
+ * ⭐ VIVE AQUÍ DESDE LA FILA 0.129 (venía de `inventarios/cfdi-entrada-tela.ts`). Se movió sin
+ * cambiarle una coma: es una regla del PROVEEDOR —como su vecina `exigirProveedorQueFactura`—, no
+ * de la entrada de tela, y desde aquí la puede usar también el cargo que nace de una recepción de
+ * compra (`terceros/cargo-de-entrada.ts`) sin que `terceros/` tenga que importar de `inventarios/`.
+ *
+ * Exige que el PROVEEDOR tenga su RFC capturado cuando hay un CFDI de por medio, y lo devuelve ya
+ * comprobado (para que quien llama compare sin volver a preguntar por el null).
+ *
+ * POR QUÉ NO BASTA CON *"si tiene RFC, que coincida"* (hallazgo de la revisión del 11-ago-2026): los
+ * **155 proveedores** que sobreviven a la depuración (§Post-F9.23) llegan del Access con **todo lo
+ * fiscal al 0 %** — el viejo nunca tuvo RFC. Con la comparación condicionada a *"si el proveedor
+ * tiene RFC"*, la regla "el emisor DEBE ser el proveedor" era un **NO-OP el día 1**: se leía el XML
+ * de *Textiles del Norte*, se elegía a mano a *Avíos del Centro* (rfc NULL), se confirmaba… y nacía
+ * un cargo **FISCAL** contra Avíos del Centro con el `rfcTercero` de Textiles del Norte. El contador
+ * veía un tercero cuyo nombre y RFC no coinciden, y el UUID quedaba consumido para siempre.
+ *
+ * Por eso, con CFDI, el RFC del proveedor **es obligatorio**: sin él no hay contra qué comprobar
+ * quién facturó, y una validación que no puede comprobar nada no debe dejar pasar (A4).
+ */
+export function exigirRfcDelProveedor(
+  proveedor: { nombre: string; rfc: string | null },
+  queSeIntento: string,
+): string {
+  const rfc = proveedor.rfc?.trim() ?? '';
+  if (rfc === '') {
+    throw new ErrorValidacion(
+      `No se puede ${queSeIntento}: el proveedor "${proveedor.nombre}" no tiene RFC capturado, así ` +
+        `que no hay contra qué comprobar quién emitió el comprobante. Captúrale el RFC en ` +
+        `Catálogos › Proveedores (es el mismo que trae el XML) y vuelve a intentarlo.`,
+    );
+  }
+  return rfc;
 }

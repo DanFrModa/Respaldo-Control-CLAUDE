@@ -21,8 +21,22 @@ vi.mock('@/api/calidad', () => ({
   useModificarAuditoria: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarAuditoria: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+// V1-E7g: el filtro de proveedor/maquilero es el `SelectorProveedor` (combobox con búsqueda en
+// SERVIDOR), que consulta por `useProveedoresPorRol`. El mock filtra por «contiene», igual que el
+// servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Maquila SA' }] } }),
+  COD_ROL_PROVEEDOR: { corte: 'corte' },
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 5, nombre: 'Maquila SA' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 
 function fila(numAuditoria: number, extra: Partial<AuditoriaResumen> = {}): AuditoriaResumen {

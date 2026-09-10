@@ -56,14 +56,12 @@ function requerido(over: Partial<RequeridoMaterial> & { clave: string }): Requer
 
 /** Una línea de OC ligada a la orden (precio 1 por defecto: 0 dispara el aviso de precio en cero). */
 function ligada(over: Partial<LineaCompraLigada> & { clave: string }): LineaCompraLigada {
-  const cantidad = over.cantidad ?? 0;
   return {
     tipo: 'tela',
     idTela: 1,
     idAvio: null,
     material: 'Tela X',
-    cantidad,
-    cantidadConsumo: over.cantidadConsumo ?? cantidad,
+    cantidad: 0,
     unidad: 'm',
     precio: 1,
     compra: compra(100),
@@ -509,8 +507,11 @@ describe('combinarCostoReal — casos que NO se callan (avisos)', () => {
 });
 
 describe('combinarCostoReal — unidades, redondeo y datos repetidos', () => {
-  it('resta del requerido la cantidad ya CONVERTIDA a unidad de consumo (R1)', () => {
-    // 2 cajas × 144 pzas = 288 pzas de consumo; el importe (2 × $720) NO cambia al convertir.
+  // ⭐ §Post-F9.97 — LA REGLA: la línea de OC ya viene en UNIDAD DE CONSUMO, así que su cantidad se
+  // resta del requerido TAL CUAL. Hasta V1-E8a esta línea llevaba una segunda cantidad
+  // (`cantidadConsumo = cantidad × factor de conversión`) y el caso se escribía "2 cajas de 144";
+  // el factor se retiró. Si alguien reintrodujera una multiplicación, `comprado` dejaría de ser 288.
+  it('resta del requerido la cantidad de la línea de OC, tal cual', () => {
     const r = combinarCostoReal(
       [
         requerido({
@@ -529,10 +530,9 @@ describe('combinarCostoReal — unidades, redondeo y datos repetidos', () => {
           tipo: 'avio',
           idTela: null,
           idAvio: 5,
-          cantidad: 2,
-          cantidadConsumo: 288,
-          unidad: 'caja',
-          precio: 720,
+          cantidad: 288,
+          unidad: 'pza',
+          precio: 5,
         }),
       ],
     );

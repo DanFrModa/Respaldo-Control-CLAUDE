@@ -20,6 +20,7 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { fusionarDepartamentosCliente } from '../catalogos/cliente-departamentos.js';
 import { crearArte } from '../modelos/arte-modelo.js';
 import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
 import { actualizarModelo } from '../modelos/modelos.js';
@@ -153,7 +154,7 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     expect(orden.idCliente).toBe(clienteNegocio.id);
     expect(orden.idEmpresa).toBe(empresa.id);
     expect(orden.idPedidoLinea).toBe(lineaPedido.id);
-    expect(orden.estado).toBe('capturada'); // sin matriz aún
+    expect(orden.estado).toBe('capturada'); // recién creada: aún le faltan requisitos
     expect(orden.folio).toBe(1);
   });
 
@@ -196,6 +197,123 @@ describe('Órdenes (F2-E2) — alta desde pedido + autorrelleno (A2, A9)', () =>
     await expect(crearOrden(s, { idPedidoLinea: renglon.id }, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
+  });
+
+  /**
+   * ⭐⭐ V1-E3 — LA MISMA REGLA, POR LA PUERTA NUEVA. `opciones.idModeloDeLaOrden` sella la orden con
+   * OTRO modelo que el del renglón (el hijo de producción por color de `salidaAProduccion`), y ese
+   * modelo tiene que pasar por la MISMA guarda: producir un modelo dado de baja está prohibido, dé
+   * igual por qué puerta llegue. Hoy `salidaAProduccion` ya lo comprueba antes —el reuso rebota un
+   * hijo descontinuado—, así que esto es la red del SEAM de dominio, no de ese camino: aquí se
+   * ejercita directamente para que sea una red PROBADA y no una rama que nadie pisa.
+   */
+  it('⭐⭐ RECHAZA sellar la orden con un modelo descontinuado pasado por `idModeloDeLaOrden`', async () => {
+    const s = sesion([...PERM_TODOS]);
+    // El renglón apunta a un modelo VIVO: lo que está de baja es el modelo que se le quiere poner
+    // a la orden. Si la guarda se cayera, la OP nacería del modelo descontinuado sin una queja.
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    await expect(
+      crearOrden(s, { idPedidoLinea: renglon.id }, bd(), {
+        idModeloDeLaOrden: modeloInactivo.id,
+      }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+  });
+
+  it('⭐ y un modelo que NO EXISTE por esa misma puerta da 404 (no un 500 crudo de FK)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    await expect(
+      crearOrden(s, { idPedidoLinea: renglon.id }, bd(), { idModeloDeLaOrden: 999_999 }),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  /**
+   * 🔴🔴 **EL ALTA POR CAPTURA SE SALTABA LA ENTRADA A PRODUCCIÓN ENTERA** (§Post-F9.34, cerrada en
+   * la fila 0.090). `POST /api/ordenes` es el único llamador de `crearOrden` que NO pasa
+   * `idModeloDeLaOrden`: por esa puerta nacía una OP de un modelo que sigue en
+   * `origen = 'desarrollo'`, sin `numeroProduccion` y —desde V1-E3— sin ningún modelo por color.
+   *
+   * Las cuatro pruebas van juntas a propósito: sin la del renglón LEGADO y la del hijo por color,
+   * "arreglarlo" cerrando el alta entera pasaría en verde.
+   */
+  describe('🔴🔴 una OP nunca lleva un modelo de DESARROLLO (fila 0.090)', () => {
+    /** Un desarrollo (lo que apunta el renglón desde V1-E3) y su hijo de producción por color. */
+    async function desarrolloYSuHijo(): Promise<{ desarrollo: Modelo; hijo: Modelo }> {
+      const desarrollo = await cliente.modelo.create({
+        data: {
+          codigo: 'CYA-26-71-030',
+          codigoDesarrollo: 'CYA-26-71-030',
+          origen: 'desarrollo',
+          llevaArte: false,
+        },
+      });
+      const hijo = await cliente.modelo.create({
+        data: {
+          codigo: '71030',
+          origen: 'produccion',
+          numeroProduccion: 71_030,
+          idModeloDesarrollo: desarrollo.id,
+          llevaArte: false,
+        },
+      });
+      return { desarrollo, hijo };
+    }
+
+    it('🔴 el alta por CAPTURA de un renglón de desarrollo se RECHAZA, y nada persiste', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const error = await crearOrden(s, { idPedidoLinea: renglon.id }, bd()).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(ErrorConflicto);
+      // ANCLADO a la puerta buena: el mensaje tiene que MANDAR a generar la OP, no solo negarse.
+      expect((error as Error).message).toContain('CYA-26-71-030');
+      expect((error as Error).message).toContain('salida-produccion');
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
+
+    it('🔴 LA GEMELA — el renglón LEGADO (modelo ya de producción) SIGUE creando su orden', async () => {
+      // Control negativo obligado: la fila 0.090 cierra un agujero, NO retira el endpoint. Los
+      // ~4,987 modelos migrados del Access están en `origen = 'produccion'` y su alta por captura
+      // tiene que seguir funcionando igual que antes.
+      const s = sesion([...PERM_TODOS]);
+      const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+
+      expect(orden.idModelo).toBe(modelo.id);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: lineaPedido.id } })).toBe(1);
+    });
+
+    it('⭐⭐ con el HIJO por color (lo que pasa `salidaAProduccion`) SÍ se crea, sellada con él', async () => {
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo, hijo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, desarrollo.id);
+
+      const orden = await crearOrden(s, { idPedidoLinea: renglon.id }, bd(), {
+        idModeloDeLaOrden: hijo.id,
+      });
+
+      // La OP lleva el HIJO; el renglón se queda con su desarrollo (de ahí salen receta y precio).
+      expect(orden.idModelo).toBe(hijo.id);
+      const linea = await cliente.pedidoLinea.findUniqueOrThrow({ where: { id: renglon.id } });
+      expect(linea.idModelo).toBe(desarrollo.id);
+    });
+
+    it('⭐ la guarda mira el modelo que QUEDA en la orden, no la puerta: un desarrollo por `idModeloDeLaOrden` también se rechaza', async () => {
+      // El renglón apunta a un modelo de PRODUCCIÓN vivo; lo que se intenta sellar en la OP es un
+      // desarrollo. Si la guarda se hubiera escrito sobre el modelo del RENGLÓN, esto pasaría.
+      const s = sesion([...PERM_TODOS]);
+      const { desarrollo } = await desarrolloYSuHijo();
+      const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+
+      await expect(
+        crearOrden(s, { idPedidoLinea: renglon.id }, bd(), { idModeloDeLaOrden: desarrollo.id }),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      expect(await cliente.orden.count({ where: { idPedidoLinea: renglon.id } })).toBe(0);
+    });
   });
 
   it('un renglón de pedido de OTRA empresa no existe para esta sesión (A9)', async () => {
@@ -732,6 +850,113 @@ describe('Órdenes (F2-E2) — búsqueda combinada (folio/modelo/cliente/referen
   });
 });
 
+/**
+ * ⭐⭐ LA BÚSQUEDA ENTIENDE LOS DOS NOMBRES (§Post-F9.172(a)) — contra Postgres de verdad.
+ *
+ * Es el cierre del defecto medido: el importador escribe la División DOS veces —al catálogo con FK y
+ * como TEXTO CRUDO en `OrdenReferencia.valor`— y fusionar «2-HOMBRE» en «Caballeros» sólo movía el
+ * catálogo. Aquí se reproduce tal cual: una orden cuya referencia dice «2-HOMBRE», una fusión de
+ * verdad (por el dominio, no sembrada a mano) y la búsqueda por el nombre bueno.
+ *
+ * 🔴 Los DOS sentidos van en pruebas SEPARADAS: cubrir uno y no el otro pasaría en verde y fallaría
+ * justo con quien tiene el papel viejo en la mano.
+ */
+describe('Órdenes — búsqueda por el SINÓNIMO del departamento fusionado (§Post-F9.172(a))', () => {
+  const sesionFusion = () =>
+    sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['ordenes.ver', 'ordenes.administrar', 'clientes.ver', 'clientes.administrar'],
+    });
+
+  /** Deja una orden cuya referencia dice `valorReferencia`, y devuelve su id. */
+  async function ordenConReferencia(valorReferencia: string): Promise<number> {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await guardarReferenciasOrden(
+      s,
+      orden.id,
+      { referencias: [{ idClienteCampo: campoCliente.id, valor: valorReferencia }] },
+      bd(),
+    );
+    return orden.id;
+  }
+
+  /** Fusiona de verdad «2-HOMBRE» dentro de «Caballeros» y devuelve los dos ids. */
+  async function fusionarHombreEnCaballeros(): Promise<{ destino: number; origen: number }> {
+    const destino = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'Caballeros' },
+    });
+    const origen = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: '2-HOMBRE' },
+    });
+    await fusionarDepartamentosCliente(
+      sesionFusion(),
+      clienteNegocio.id,
+      { idDestino: destino.id, origenes: [origen.id] },
+      bd(),
+    );
+    // El fixture NO miente: después de la fusión el absorbido tiene rastro de verdad.
+    const absorbido = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: origen.id },
+    });
+    expect(absorbido.idFusionadoEn).toBe(destino.id);
+    return { destino: destino.id, origen: origen.id };
+  }
+
+  it('DESTINO → ORIGEN: buscar «Caballeros» encuentra la orden que dice «2-hombre»', async () => {
+    // 🔴 LA GRAFÍA ES DISTINTA A PROPÓSITO: la orden dice «2-hombre» y el catálogo «2-HOMBRE».
+    // Es la PREMISA de la etapa —el texto de la OC y el nombre del catálogo se escriben distinto— y
+    // es lo ÚNICO que ejercita de verdad el `mode: 'insensitive'` del `equals` CONTRA POSTGRES:
+    // las unit fijan la FORMA de la cláusula, no su semántica en la base. Con las dos grafías
+    // iguales, un `equals` sensible a mayúsculas pasaría esta prueba en verde.
+    const idOrden = await ordenConReferencia('2-hombre');
+    await fusionarHombreEnCaballeros();
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'Caballeros' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
+  });
+
+  it('ORIGEN → DESTINO: buscar «2-HOMBRE» encuentra la orden que dice «Caballeros»', async () => {
+    const idOrden = await ordenConReferencia('Caballeros');
+    await fusionarHombreEnCaballeros();
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: '2-HOMBRE' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
+  });
+
+  it('⭐ SIN fusionar, la misma búsqueda NO la encuentra (es la fusión la que la trae, no el texto)', async () => {
+    // Misma grafía «2-hombre» que el caso de arriba: si el control usara otra, no controlaría nada.
+    const idOrden = await ordenConReferencia('2-hombre');
+    await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'Caballeros' },
+    });
+    await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: '2-HOMBRE' },
+    });
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'Caballeros' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(false);
+  });
+
+  it('la CADENA de dos saltos también se entiende (A→B→C, buscando por la punta)', async () => {
+    const idOrden = await ordenConReferencia('2-HOMBRE');
+    const { destino, origen } = await fusionarHombreEnCaballeros();
+    // Segundo salto: «Caballeros» se va dentro de «VARONIL».
+    const final = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNegocio.id, nombre: 'VARONIL' },
+    });
+    await fusionarDepartamentosCliente(
+      sesionFusion(),
+      clienteNegocio.id,
+      { idDestino: final.id, origenes: [destino] },
+      bd(),
+    );
+    // La cadena NO se aplana: «2-HOMBRE» sigue apuntando a «Caballeros», que ahora apunta a «VARONIL».
+    const eslabon = await cliente.clienteDepartamento.findUniqueOrThrow({ where: { id: origen } });
+    expect(eslabon.idFusionadoEn).toBe(destino);
+
+    const pagina = await listarOrdenes(sesion([...PERM_TODOS]), { busqueda: 'VARONIL' }, bd());
+    expect(pagina.datos.some((o) => o.id === idOrden)).toBe(true);
+  });
+});
+
 describe('Órdenes (F2-E2) — cancelación suave (motivo obligatorio)', () => {
   it('cancela con motivo, sigue consultable y no se cancela dos veces', async () => {
     const s = sesion([...PERM_TODOS]);
@@ -782,6 +1007,101 @@ describe('Órdenes (F2-E2) — comentarios inmutables (ComentaOrd)', () => {
     expect(conDos.comentarios[0]?.comentario).toBe('El estampado lleva puff');
     expect(conDos.comentarios[0]?.idUsuario).toBe(s.id);
   });
+
+  /**
+   * ⭐ V1 «los nombres, en vez de los ids» — el panel de comentarios pintaba el id crudo porque el
+   * contrato NO mandaba el nombre. `OrdenComentario.idUsuario` no tiene FK física (es un log
+   * inmutable), así que el nombre no llega solo: lo resuelve el servidor. Mismo patrón que ya usaba
+   * `NegociacionEvento` (V1-E8q).
+   */
+  it('🔴 cada comentario sale con el NOMBRE de quien lo escribió (resuelto en el servidor)', async () => {
+    const autor = await cliente.usuario.create({
+      data: {
+        username: 'dmasri-comentarios',
+        nombre: 'Daniel Masri',
+        email: 'dmasri-comentarios@control.local',
+      },
+    });
+    const s = sesion([...PERM_TODOS]);
+    const sesionAutor = { ...s, id: autor.id };
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      sesionAutor,
+      orden.id,
+      { comentario: 'Adelantar la entrega' },
+      bd(),
+    );
+
+    const conNombre = await obtenerOrden(s, orden.id, bd());
+    expect(conNombre.comentarios[0]?.idUsuario).toBe(autor.id);
+    expect(conNombre.comentarios[0]?.nombreUsuario).toBe('Daniel Masri');
+  });
+
+  /**
+   * 🔴 D3 — un autor que ya no resuelve deja el nombre en `null` y el comentario SE SIGUE LEYENDO.
+   * Dar de baja a alguien no borra lo que escribió. (`sesion()` usa el id 'usuario-prueba', que no
+   * existe como fila en la BD: es justo el caso del id sin usuario.)
+   */
+  it('un autor desconocido deja el nombre en null pero NO pierde el comentario', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(s, orden.id, { comentario: 'sin autor resoluble' }, bd());
+
+    const leida = await obtenerOrden(s, orden.id, bd());
+    expect(leida.comentarios[0]?.nombreUsuario).toBeNull();
+    expect(leida.comentarios[0]?.comentario).toBe('sin autor resoluble');
+  });
+
+  /**
+   * El LISTADO también trae el nombre, y lo resuelve para la PÁGINA COMPLETA de una sola consulta:
+   * `aOrdenSalida` es síncrona a propósito para que no se pueda colar un N+1 por renglón.
+   *
+   * 🔴 Por eso hay DOS órdenes con autores DISTINTOS y se asevera sobre la que NO va primera. El
+   * orden por defecto es `folio desc`, así que una sola orden cae SIEMPRE en el renglón 0 y un
+   * `datos.slice(0, 1).flatMap(...)` —resolver sólo el primer renglón— pasaría en verde. Con la
+   * segunda orden abajo, esa mutación muere.
+   */
+  it('el listado resuelve la PÁGINA COMPLETA, no sólo el primer renglón', async () => {
+    const gabriel = await cliente.usuario.create({
+      data: {
+        username: 'gabriel-listado',
+        nombre: 'Gabriel Núñez',
+        email: 'gabriel-listado@control.local',
+      },
+    });
+    const ana = await cliente.usuario.create({
+      data: { username: 'ana-listado', nombre: 'Ana Ruiz', email: 'ana-listado@control.local' },
+    });
+    const s = sesion([...PERM_TODOS]);
+
+    // La PRIMERA que se crea lleva el folio menor ⇒ con `folio desc` queda ABAJO. Es sobre ésa
+    // sobre la que se asevera.
+    const vieja = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      { ...s, id: gabriel.id },
+      vieja.id,
+      { comentario: 'la de abajo' },
+      bd(),
+    );
+    const nueva = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    await agregarComentarioOrden(
+      { ...s, id: ana.id },
+      nueva.id,
+      { comentario: 'la de arriba' },
+      bd(),
+    );
+
+    const pagina = await listarOrdenes(s, {}, bd());
+    const posVieja = pagina.datos.findIndex((o) => o.id === vieja.id);
+    const posNueva = pagina.datos.findIndex((o) => o.id === nueva.id);
+    // Guardia de la propia prueba: si `vieja` cayera primera, el `slice(0, 1)` sobreviviría y esta
+    // prueba no estaría probando lo que su nombre dice.
+    expect(posNueva).toBeLessThan(posVieja);
+    expect(posVieja).toBeGreaterThan(0);
+
+    expect(pagina.datos[posNueva]?.comentarios[0]?.nombreUsuario).toBe('Ana Ruiz');
+    expect(pagina.datos[posVieja]?.comentarios[0]?.nombreUsuario).toBe('Gabriel Núñez');
+  });
 });
 
 describe('Órdenes (F2-E2) — bitácora (A7)', () => {
@@ -802,5 +1122,212 @@ describe('Órdenes (F2-E2) — bitácora (A7)', () => {
     expect(eventos.map((e) => e.accion)).toEqual(['CREAR', 'MODIFICAR']);
     const matriz = eventos[1]?.datos as { matriz?: number } | null;
     expect(matriz?.matriz).toBe(1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ EL PACK / TENDIDO EN LA MATRIZ DE LA OP (§Post-F9.10)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 DANIEL: *«Me gusta que exista **un solo Negro** y no esté fragmentado en miles de colores
+// escritos de diferente manera.»* C&A pide varios TENDIDOS en una misma OP y antes la letra iba
+// dentro del nombre del color («Negro A», «Negro B»). Desde §Post-F9.10 el renglón de la matriz es
+// COLOR × PACK, y la llave `@@unique([idOrden, idColor, pack])` lo sostiene en la BD.
+describe('Matriz de la OP por PACK (§Post-F9.10)', () => {
+  const s = () => sesion([...PERM_TODOS]);
+
+  const guardar = async (id: number, lineas: unknown[]) =>
+    guardarMatrizOrden(s(), id, { lineas } as never, bd());
+
+  it('el MISMO color puede ir dos veces si son tendidos distintos', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const conPacks = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 3 }] },
+    ]);
+    expect(conPacks.lineas).toHaveLength(2);
+    expect(conPacks.lineas.map((l) => l.pack).sort()).toEqual(['A', 'B']);
+    expect(new Set(conPacks.lineas.map((l) => l.idColor)).size).toBe(1);
+    expect(conPacks.totalPiezas).toBe(8);
+  });
+
+  it('…pero el mismo color CON EL MISMO pack sigue siendo un error de captura', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaM.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('🔴 la orden es CON packs o SIN packs, nunca mezclada', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorAzul.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toThrow(/o todos los tendidos llevan su pack, o ninguno/);
+  });
+
+  it('los espacios no fabrican un tendido: "  " sigue siendo «sin pack»', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const sinPack = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: '   ', tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] },
+    ]);
+    expect(sinPack.lineas[0]?.pack).toBe('');
+  });
+
+  it('🔴 una orden SIN packs se guarda exactamente igual que antes (el campo sale vacío)', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const sinPacks = await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+      { idColor: colorAzul.id, tallas: [{ idTalla: tallaM.id, cantidad: 5 }] },
+    ]);
+    expect(sinPacks.lineas.map((l) => l.pack)).toEqual(['', '']);
+    // Y la regla vieja sigue viva: un color no puede repetirse cuando no hay packs.
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] },
+        { idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 1 }] },
+      ]),
+    ).rejects.toThrow(/color no puede aparecer dos veces/);
+  });
+
+  it('el pack de un renglón YA EN PRODUCCIÓN no se puede cambiar', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    const guardada = await guardar(orden.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+    ]);
+    const idRenglon = guardada.lineas[0]?.id;
+
+    // Una etapa VIVA cualquiera basta: el corte se guardó con el pack que tenía la matriz.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 900n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'corte',
+        fecha: new Date('2026-06-18'),
+      },
+    });
+
+    await expect(
+      guardar(orden.id, [
+        {
+          id: idRenglon,
+          idColor: colorRojo.id,
+          pack: 'B',
+          tallas: [{ idTalla: tallaCH.id, cantidad: 5 }],
+        },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Dejarle SU pack sí se puede: lo que se bloquea es cambiarlo, no tocar el renglón.
+    const igual = await guardar(orden.id, [
+      {
+        id: idRenglon,
+        idColor: colorRojo.id,
+        pack: 'A',
+        tallas: [{ idTalla: tallaCH.id, cantidad: 7 }],
+      },
+    ]);
+    expect(igual.lineas[0]?.pack).toBe('A');
+    expect(igual.totalPiezas).toBe(7);
+  });
+
+  // ── Las DOS puertas por las que se colaba una guarda atada al `id` del renglón ────────────────
+  //
+  // La prueba de arriba sólo cubre el camino CON `id` (editar un renglón existente). Una matriz
+  // puede re-empacar un color SIN tocar un solo `id`, y por ahí el daño entraba en silencio: el
+  // corte queda llaveado con el pack viejo y esas piezas ya NO se pueden enviar nunca.
+
+  /** Marca la orden como «ya en producción» con una etapa viva (basta una, `requisitos-orden.ts`). */
+  async function conProduccionViva(idOrden: number, folio: bigint): Promise<void> {
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'corte',
+        fecha: new Date('2026-06-18'),
+      },
+    });
+  }
+
+  it('🔴 PUERTA A — borrar y recrear: re-empacar un color SIN mandar `id` tampoco se puede', async () => {
+    const orden = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(orden.id, 901n);
+
+    // Mismo color, ahora partido en dos tendidos, SIN un solo `id`: el diff borra el renglón viejo
+    // y crea dos nuevos. Atada al `id`, la guarda no veía ningún cambio y esto pasaba.
+    await expect(
+      guardar(orden.id, [
+        { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+        { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      ]),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y la matriz quedó como estaba: sin packs, un renglón. No se guardó nada a medias (A2).
+    const despues = await obtenerOrden(s(), orden.id, bd());
+    expect(despues.lineas).toHaveLength(1);
+    expect(despues.lineas[0]?.pack).toBe('');
+
+    // Recapturar el MISMO color con el MISMO pack (vacío) y otras cantidades sí se puede: lo que se
+    // bloquea es re-empacar, no volver a teclear el renglón.
+    const ok = await guardar(orden.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 12 }] },
+    ]);
+    expect(ok.totalPiezas).toBe(12);
+  });
+
+  it('🔴 PUERTA B — `copiarDetalleOrden`: copiar una matriz CON packs sobre una orden ya cortada', async () => {
+    // El origen se fabrica por tendidos…
+    const origen = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(origen.id, [
+      { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+    ]);
+
+    // …y el destino ya tiene ese color cortado SIN packs.
+    const renglonDestino = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    const destino = await crearOrden(s(), { idPedidoLinea: renglonDestino.id }, bd());
+    await guardar(destino.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(destino.id, 902n);
+
+    // `copiarDetalleOrden` arma su set SIN `id` en ningún renglón: una guarda por `id` NUNCA se
+    // ejecutaba aquí, así que esto re-empacaba el destino en silencio, siempre.
+    await expect(
+      copiarDetalleOrden(s(), destino.id, { idOrdenOrigen: origen.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    const despues = await obtenerOrden(s(), destino.id, bd());
+    expect(despues.lineas).toHaveLength(1);
+    expect(despues.lineas[0]?.pack).toBe('');
+  });
+
+  it('copiar una matriz SIN packs sobre una orden cortada sin packs sigue funcionando', async () => {
+    // La contraprueba: la guarda tiene que morder SÓLO cuando los packs de un color cambian. Sin
+    // ella, esta copia —el flujo de siempre— quedaría rota por una regla demasiado ancha.
+    const origen = await crearOrden(s(), { idPedidoLinea: lineaPedido.id }, bd());
+    await guardar(origen.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] },
+    ]);
+    const renglonDestino = await crearRenglonPedido(empresa.id, clienteNegocio.id, modelo.id);
+    const destino = await crearOrden(s(), { idPedidoLinea: renglonDestino.id }, bd());
+    await guardar(destino.id, [
+      { idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+    ]);
+    await conProduccionViva(destino.id, 903n);
+
+    const copiada = await copiarDetalleOrden(s(), destino.id, { idOrdenOrigen: origen.id }, bd());
+    expect(copiada.totalPiezas).toBe(4);
+    expect(copiada.lineas[0]?.pack).toBe('');
   });
 });

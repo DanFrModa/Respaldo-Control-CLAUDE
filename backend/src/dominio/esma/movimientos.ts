@@ -4,8 +4,9 @@
  * movimiento (sin encabezado). Toda la lógica vive aquí (A1); las rutas delegan.
  *
  * Innegociables: A2 (cada alta en su transacción con bitácora), A4 (`esma.modificar` para capturar;
- * la LECTURA con `esma.ver-pagos`), A7 (bitácora), A9 (empresa activa). El `conFactura` se resuelve de
- * la modalidad del proveedor (decisión (h)). Los IMPORTES se ocultan en la lectura si falta
+ * `esma.revisar` para AUTORIZAR lo capturado —dos permisos, no uno, fila 0.128—; la LECTURA con
+ * `esma.ver-pagos`), A7 (bitácora), A9 (empresa activa). El `conFactura` se resuelve de la
+ * modalidad del proveedor (decisión (h)). Los IMPORTES se ocultan en la lectura si falta
  * `consultas.ver-importes` (server-side: el JSON no trae el monto).
  */
 import {
@@ -31,6 +32,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { resolverConFactura, type ModalidadFacturacion } from './facturacion.js';
+import { WHERE_VIVO_ABONO, WHERE_VIVO_DESCUENTO, WHERE_VIVO_PAGO } from './formula-saldo.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -141,7 +143,9 @@ export async function listarAbonosMaquilero(
   verificarPermiso(sesion, 'esma.ver-pagos');
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const filas = await clienteLectura(bd).abonoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero },
+    // VIVOS: el abono que sustituyó una corrección no se lista (fila 0.145), igual que el descuento
+    // que canceló un deshacer de cierre. El criterio sale de la definición única.
+    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero, ...WHERE_VIVO_ABONO },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     include: incluirMaquilero,
   });
@@ -197,7 +201,8 @@ export async function listarDescuentosMaquilero(
   verificarPermiso(sesion, 'esma.ver-pagos');
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const filas = await clienteLectura(bd).descuentoMaquilero.findMany({
-    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero },
+    // VIVOS: el descuento que canceló un deshacer de cierre no se lista (V1, fila 0.109).
+    where: { idEmpresa: sesion.idEmpresaActiva, idMaquilero, ...WHERE_VIVO_DESCUENTO },
     orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
     include: incluirMaquilero,
   });
@@ -211,8 +216,21 @@ export async function listarDescuentosMaquilero(
  * REVISA (autoriza) una partida `capturado` → `revisado` (F6-E5; ex asteriscos `Rev`/`RevRec` del
  * `EsMa_EdoCta` viejo). Aplica a abonos, descuentos y pagos. En UNA transacción (A2) con bitácora
  * (A7). Idempotencia dura: si ya estaba `revisado`, lanza `ErrorConflicto` (409). Permiso
- * `esma.modificar` (A4); solo la empresa activa (A9). Es el "punto de control del admin" del viejo,
- * operable también desde el celular (E5 vista móvil).
+ * **`esma.revisar`** (A4); solo la empresa activa (A9). Es el "punto de control del admin" del
+ * viejo, operable también desde el celular (E5 vista móvil).
+ *
+ * ⭐⭐ **POR QUÉ SU PROPIO PERMISO, Y NO EL DE CAPTURAR** (fila 0.128, Daniel §Post-F9.192(1),
+ * 4-sep-2026): *«La entrada la da la persona responsable de recibos o de producción. Pero la
+ * validación sólo la doy yo. O sea, es un permiso para meter lo recibido y otro para validarlo.»*
+ *
+ * Hasta la 0.127 esto exigía `esma.modificar`, el MISMO permiso con el que se capturan los abonos
+ * y descuentos ({@link crearAbonoMaquilero}/{@link crearDescuentoMaquilero}). O sea: quien
+ * capturaba se auto-autorizaba, y el "punto de control" no controlaba nada. Y no es un matiz
+ * formal: desde la 0.115 **sólo lo revisado suma al saldo**, así que revisar es exactamente el
+ * acto de convertir un renglón capturado en deuda —o en pago— real. Ese acto es de Daniel.
+ *
+ * `esma.modificar` se quedó con lo que sí es capturar (abonos, descuentos y el override de "orden
+ * pagada"): capturar no es validar.
  */
 export async function revisarMovimiento(
   sesion: SesionUsuario,
@@ -220,7 +238,7 @@ export async function revisarMovimiento(
   id: number,
   bd?: ContextoBd,
 ): Promise<RevisionSalida> {
-  verificarPermiso(sesion, 'esma.modificar');
+  verificarPermiso(sesion, 'esma.revisar');
   const idEmpresa = sesion.idEmpresaActiva;
 
   const entidadBitacora =
@@ -235,16 +253,22 @@ export async function revisarMovimiento(
     const actual =
       concepto === 'abono'
         ? await tx.abonoMaquilero.findFirst({
-            where: { id, idEmpresa },
+            // ⭐ Fila 0.145: un abono CANCELADO (lo sustituyó una corrección) no existe para la
+            // revisión — mismo motivo que el descuento de la 0.109.
+            where: { id, idEmpresa, ...WHERE_VIVO_ABONO },
             select: { estadoRevision: true },
           })
         : concepto === 'descuento'
           ? await tx.descuentoMaquilero.findFirst({
-              where: { id, idEmpresa },
+              // ⭐ V1 (fila 0.109): un descuento CANCELADO por el deshacer de un cierre no existe
+              // para la revisión. Sin este filtro se podía marcar `revisado` por API un movimiento
+              // muerto y quedaba un fantasma «cancelado + revisado» que ninguna suma sabe leer.
+              where: { id, idEmpresa, ...WHERE_VIVO_DESCUENTO },
               select: { estadoRevision: true },
             })
           : await tx.pagoMaquilero.findFirst({
-              where: { id, idEmpresa },
+              // ⭐ Fila 0.145: ídem para el pago.
+              where: { id, idEmpresa, ...WHERE_VIVO_PAGO },
               select: { estadoRevision: true },
             });
 
@@ -255,13 +279,34 @@ export async function revisarMovimiento(
       throw new ErrorConflicto('Esa partida ya está revisada.');
     }
 
+    // ⭐⭐ EL UPDATE ES CONDICIONAL, no un `update` por id (V1, fila 0.109 — precedente F8-E3,
+    // `CLAUDE.md` §7.3). La lectura de arriba da el MENSAJE; la condición del `updateMany` da la
+    // GARANTÍA. Entre las dos cabe una transacción concurrente: revisar y deshacer-el-cierre pelean
+    // por el mismo renglón, y sin la condición el segundo pisaba al primero —o revisaba un
+    // descuento ya cancelado, o cancelaba uno ya revisado (dinero que ya está en el saldo)—.
+    // `count === 0` significa exactamente eso: alguien llegó primero.
     const datos = { estadoRevision: 'revisado' as const, ...datosModificacion(sesion) };
-    if (concepto === 'abono') {
-      await tx.abonoMaquilero.update({ where: { id }, data: datos });
-    } else if (concepto === 'descuento') {
-      await tx.descuentoMaquilero.update({ where: { id }, data: datos });
-    } else {
-      await tx.pagoMaquilero.update({ where: { id }, data: datos });
+    const condicion = { id, idEmpresa, estadoRevision: 'capturado' as const };
+    const cambiadas =
+      concepto === 'abono'
+        ? await tx.abonoMaquilero.updateMany({
+            where: { ...condicion, ...WHERE_VIVO_ABONO },
+            data: datos,
+          })
+        : concepto === 'descuento'
+          ? await tx.descuentoMaquilero.updateMany({
+              where: { ...condicion, ...WHERE_VIVO_DESCUENTO },
+              data: datos,
+            })
+          : await tx.pagoMaquilero.updateMany({
+              where: { ...condicion, ...WHERE_VIVO_PAGO },
+              data: datos,
+            });
+    if (cambiadas.count === 0) {
+      throw new ErrorConflicto(
+        'Esa partida cambió mientras se revisaba (otra persona la revisó o la canceló). ' +
+          'Vuelve a consultarla antes de decidir.',
+      );
     }
 
     await registrarBitacora(tx, sesion, {

@@ -81,8 +81,28 @@ export const esquemaCargoEsMaSalida = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     idOrden: z.number().int().describe('Orden a la que pertenece el cargo.'),
     folioOrden: z.number().int().describe('Folio de la orden.'),
-    idTipoProceso: z.number().int().describe('Proceso de maquila del cargo.'),
-    tipoProceso: z.string().describe('Nombre del proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Proceso de maquila del cargo. NULL cuando el cargo es de un SERVICIO sobre la orden ' +
+          '(corte/empaque, 0.114): ésos no son maquila y llevan `servicio` en su lugar.',
+      ),
+    servicio: z
+      .enum(['corte', 'empaque'])
+      .nullable()
+      .describe(
+        'SERVICIO sobre la orden que originó el cargo (0.114), o null si el cargo es de maquila. ' +
+          'Excluyente con `idTipoProceso`: exactamente uno de los dos viene lleno.',
+      ),
+    tipoProceso: z
+      .string()
+      .describe(
+        'ETIQUETA del cargo, SIEMPRE presente: el nombre del proceso de maquila, o "Corte"/' +
+          '"Empaque" cuando es un servicio sobre la orden (0.114). La redacta el servidor en un ' +
+          'solo lugar (`esma/etiqueta-cargo.ts`) para que todas las pantallas digan lo mismo.',
+      ),
     cantidadPropuesta: z
       .number()
       .int()
@@ -95,6 +115,15 @@ export const esquemaCargoEsMaSalida = z
       .number()
       .nullable()
       .describe('cantidadPropuesta × precioPropuesto, o null si no hay precio.'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). ' +
+          'INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra ' +
+          'aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en ' +
+          '`cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo.',
+      ),
     cantidadReal: z.number().nullable().describe('Cantidad validada por el admin o null.'),
     precioReal: z.number().nullable().describe('Precio validado por el admin (o null / oculto).'),
     importeReal: z.number().nullable().describe('cantidadReal × precioReal (o null / oculto).'),
@@ -301,6 +330,21 @@ export const esquemaPagoSalida = z
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     estadoRevision: z.enum(ESTADOS_REVISION_ESMA).describe('Estado de revisión.'),
     aplicaciones: z.array(esquemaPagoAplicacionSalida).describe('Cargos cubiertos por el pago.'),
+    /**
+     * ⭐⭐ Fila 0.145 — cuándo se ANULÓ este pago, o `null` si está vivo.
+     *
+     * Antes de la 0.145 un pago **no se podía cancelar nunca**, así que este esquema no tenía cómo
+     * decirlo… y el RECIBO en PDF —el papel que se le entrega al maquilero— se seguía armando igual
+     * para un pago ya anulado. El campo existe para que el impreso pueda **estamparlo**, no sólo
+     * para que el API lo sepa: un recibo que no dice que está cancelado es un recibo que se puede
+     * cobrar dos veces.
+     *
+     * 🔑 El pago cancelado **se sigue devolviendo** (no se esconde, D3/A7): lo que cambia es que
+     * ahora viene marcado.
+     */
+    canceladoEn: z.iso.datetime().nullable().describe('Cuándo se anuló el pago, o null si vive.'),
+    /** Por qué se anuló (el motivo de la corrección), o `null`. */
+    motivoCancelacion: z.string().nullable().describe('Motivo de la anulación, o null.'),
     creadoEn: z.iso.datetime().describe('Cuándo se capturó (ISO).'),
   })
   .describe('Pago a un maquilero (con sus aplicaciones a cargos).');
@@ -335,8 +379,67 @@ export const esquemaSaldoQuery = z
 export type SaldoQuery = z.infer<typeof esquemaSaldoQuery>;
 
 /**
+ * PENDIENTE DE REVISIÓN de una cuenta de maquilero: lo que ya se capturó pero todavía no se revisa
+ * y por eso NO entra al saldo. Se publica junto al saldo para que el dinero excluido se vea (y se
+ * entienda que espera una decisión) en vez de desaparecer sin explicación.
+ *
+ * ⭐ Incluye los CUATRO conceptos (V1, fila 0.111). Los CARGOS `propuesto` —lo que espera que
+ * alguien fije cantidad y precio: el recibo de una maquila y, desde la 0.114, también el CORTE y el
+ * EMPAQUE de la orden— faltaban aquí, y por eso un maquilero con diez cargos sin validar y nada más
+ * tenía saldo 0, pendiente 0 y era invisible en el tablero, en la bandeja de CxP y en la corrida
+ * semanal. Su importe no está guardado pero se DERIVA (piezas de la etapa × precio de referencia);
+ * cuando ni eso se puede, la partida cuenta igual y el cargo se anota en `cargosSinPrecio`.
+ */
+export const esquemaPendienteRevisionEsMa = z
+  .object({
+    abonos: z.number().nullable().describe('Σ abonos capturados sin revisar (o null).'),
+    pagos: z.number().nullable().describe('Σ pagos capturados sin revisar (o null).'),
+    descuentos: z.number().nullable().describe('Σ descuentos capturados sin revisar (o null).'),
+    cargos: z
+      .number()
+      .nullable()
+      .describe(
+        'Σ del importe propuesto de los cargos que esperan validación y sí se pueden valuar ' +
+          '(o null si se ocultan importes).',
+      ),
+    neto: z
+      .number()
+      .nullable()
+      .describe(
+        'Neto con el mismo signo del saldo: cargos + abonos − pagos − descuentos (o null).',
+      ),
+    partidas: z
+      .number()
+      .int()
+      .describe(
+        'Cuántas partidas esperan revisión (los tres movimientos planos capturados más los ' +
+          'cargos propuestos). Es un conteo, no un importe: NO se oculta, y es lo que decide si ' +
+          'hay algo pendiente (los importes pueden netear cero y aun así haberlas).',
+      ),
+    cargosPartidas: z
+      .number()
+      .int()
+      .describe('Cuántas de esas partidas son cargos por validar (conteo: NO se oculta).'),
+    cargosSinPrecio: z
+      .number()
+      .int()
+      .describe(
+        'De los cargos por validar, cuántos no se pueden valuar por falta de precio: cuentan ' +
+          'como partida pero no aportan importe (conteo: NO se oculta).',
+      ),
+  })
+  .describe(
+    'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
+  );
+
+/** Forma del bloque de pendiente de revisión. */
+export type PendienteRevisionEsMa = z.infer<typeof esquemaPendienteRevisionEsMa>;
+
+/**
  * SALDO derivado de un maquilero (D3): `Σcargos + Σabonos − Σpagos − Σdescuentos`, con nulos = 0
- * (fórmula exacta de `EsMa_SaldosMaq` con ceronulo). Los importes salen en null si se ocultan.
+ * (fórmula exacta de `EsMa_SaldosMaq` con ceronulo). Los CUATRO conceptos cuentan sólo si ya están
+ * revisados; lo capturado sin revisar viaja aparte en `pendienteRevision`. Los importes salen en
+ * null si se ocultan.
  */
 export const esquemaSaldoSalida = z
   .object({
@@ -347,10 +450,13 @@ export const esquemaSaldoSalida = z
       .nullable()
       .describe('Segmento aplicado o null (todo junto).'),
     totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
-    totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
-    totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
-    totalDescuentos: z.number().nullable().describe('Σ descuentos (o null).'),
+    totalAbonos: z.number().nullable().describe('Σ abonos revisados (o null).'),
+    totalPagos: z.number().nullable().describe('Σ pagos revisados (o null).'),
+    totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
+    pendienteRevision: esquemaPendienteRevisionEsMa.describe(
+      'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
+    ),
   })
   .describe('Saldo derivado de la cuenta de un maquilero.');
 
@@ -388,7 +494,25 @@ export const esquemaConciliacionFila = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     idTipoProceso: z.number().int().nullable().describe('Proceso de maquila.'),
     tipoProceso: z.string().describe('Nombre del proceso.'),
-    recibido: z.number().describe('Σ piezas recibidas (recibos vivos del periodo).'),
+    recibido: z.number().describe('Σ piezas BUENAS recibidas (recibos vivos del periodo).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Σ prendas INCOMPLETAS que el maquilero entregó en los recibos del grupo (V1-E8k, ' +
+          '§Post-F9.136). INFORMATIVO y deliberadamente FUERA de `recibido`: no se producen ni se ' +
+          'pagan, así que no generan cargo y no pueden descuadrar la conciliación.',
+      ),
+    soloIncompletas: z
+      .boolean()
+      .describe(
+        '¿Todos los recibos VIVOS de este grupo trajeron SÓLO prendas incompletas? Es lo que ' +
+          'explica un renglón con `recibido` 0: esas prendas no se pagan, así que esos recibos NO ' +
+          'generaron cargo. NO afirma que el renglón cuadre: `cargado` incluye también los cargos ' +
+          'validados que no cuelgan de un recibo (histórico o manual), y uno de ésos puede dejar ' +
+          '`faltantePorCargar` negativo. Derivado en el servidor (A1) de `recibido === 0 && ' +
+          'incompletas > 0`; la pantalla sólo lo pinta.',
+      ),
     cargado: z.number().describe('Σ piezas cargadas a EsMa (cargos validados).'),
     faltantePorCargar: z.number().describe('recibido − cargado (>0 = falta cargar a EsMa).'),
     // ── F6-E5 add-on: contexto de producción/pago de la orden ────────────────────────────────────
@@ -406,8 +530,14 @@ export const esquemaCargoSinReciboFila = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
     maquilero: z.string().describe('Nombre del maquilero.'),
-    idTipoProceso: z.number().int().describe('Proceso de maquila.'),
-    tipoProceso: z.string().describe('Nombre del proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso de maquila, o null si el cargo es de un servicio de la orden (0.114).'),
+    tipoProceso: z
+      .string()
+      .describe('ETIQUETA del cargo (proceso de maquila, o "Corte"/"Empaque" — 0.114).'),
     cantidad: z.number().nullable().describe('Cantidad del cargo (real o null si aún propuesto).'),
   })
   .describe('Cargo EsMa sin recibo ligado.');
@@ -422,6 +552,8 @@ export const esquemaConciliacionSalida = z
     totales: z
       .object({
         recibido: z.number(),
+        /** Σ de `incompletas` de las filas mostradas (fuera de `recibido`, nunca se le suma). */
+        incompletas: z.number().int(),
         cargado: z.number(),
         faltantePorCargar: z.number(),
         numCargosSinRecibo: z.number().int(),
@@ -481,6 +613,48 @@ export const CONCEPTOS_ESTADO_CUENTA = ['cargo', 'abono', 'descuento', 'pago'] a
 /** Clave de un concepto del estado de cuenta unificado. */
 export type ConceptoEstadoCuentaClave = (typeof CONCEPTOS_ESTADO_CUENTA)[number];
 
+// ── Prendas INCOMPLETAS entregadas (V1-E8k, §Post-F9.136) ────────────────────────────────────────
+
+/**
+ * Una entrega de PRENDAS INCOMPLETAS: prendas a las que les faltó una pieza y nunca se terminaron
+ * de coser. Daniel exige que el maquilero se las lleve de vuelta —*"porque los faltantes se los
+ * cobro"*— y pidió verlas donde se revisa el pago. **NO son dinero**: no cuentan como producidas,
+ * no entran a inventario y no se pagan. Aquí viajan como INFORMACIÓN, sin importe.
+ */
+export const esquemaIncompletaEntregada = z
+  .object({
+    idRecibo: z.number().int().describe('Recibo (EtapaMovimiento) en el que se entregaron.'),
+    folioRecibo: z.number().int().describe('Folio del recibo.'),
+    fecha: z.string().describe('Fecha del recibo (YYYY-MM-DD).'),
+    idOrden: z.number().int().describe('Orden de producción.'),
+    folioOrden: z.number().int().describe('Folio de la orden.'),
+    codigoModelo: z.string().describe('Código del modelo de la orden.'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    tipoProceso: z.string().describe('Nombre del proceso de maquila.'),
+    piezas: z.number().int().describe('Prendas incompletas entregadas en ese recibo.'),
+  })
+  .describe('Entrega de prendas incompletas (informativa, sin importe).');
+
+/** Forma de una entrega de prendas incompletas. */
+export type IncompletaEntregadaSalida = z.infer<typeof esquemaIncompletaEntregada>;
+
+/**
+ * Bloque informativo de PRENDAS INCOMPLETAS del estado de cuenta. Va FUERA de los cargos y **no
+ * suma ni resta al saldo** (§Post-F9.136). Deliberadamente NO se segmenta por facturación: una
+ * incompleta no es dinero, no lleva factura y no pertenece a ninguno de los dos segmentos.
+ */
+export const esquemaIncompletasBloque = z
+  .object({
+    filas: z
+      .array(esquemaIncompletaEntregada)
+      .describe('Entregas de prendas incompletas del periodo, por recibo.'),
+    totalPiezas: z.number().int().describe('Total de prendas incompletas entregadas.'),
+  })
+  .describe('Prendas incompletas entregadas por el maquilero (informativo, fuera del saldo).');
+
+/** Forma del bloque de prendas incompletas. */
+export type IncompletasBloqueSalida = z.infer<typeof esquemaIncompletasBloque>;
+
 // ── Estado de cuenta UNIFICADO (los 4 conceptos por fecha) ────────────────────────────────────────
 
 /** Filtros del estado de cuenta: periodo (por fecha del movimiento) y segmento de facturación. */
@@ -517,6 +691,40 @@ export const esquemaEstadoCuentaMovimiento = z
       .string()
       .describe('Estado del renglón (propuesto/validado o capturado/revisado).'),
     pendienteRevision: z.boolean().describe('true si el renglón está pendiente de revisión.'),
+    /**
+     * ⭐ Fila 0.145 — ¿quien consulta puede CORREGIR este renglón? Lo decide el servidor (bandera de
+     * la persona + sin factura + vivo + es un movimiento plano, no un cargo de recibo). Ver la nota
+     * gemela en `esquemas/terceros.ts`.
+     */
+    corregible: z.boolean().describe('¿Quien consulta puede corregir este renglón?'),
+    /**
+     * ⭐ Fila 0.145 — las observaciones TAL COMO ESTÁN GUARDADAS. `referencia` es texto para LEER
+     * («Abono» cuando no hay nota, «Orden #12 · Costura» en un cargo); esto es el dato. El cajón de
+     * corrección arranca de aquí: si arrancara de `referencia`, guardar metería «Abono» dentro del
+     * movimiento como si alguien lo hubiera escrito.
+     */
+    observacionesGuardadas: z
+      .string()
+      .nullable()
+      .describe('Observaciones tal como están guardadas (null si no tiene).'),
+    /**
+     * ⭐⭐ Fila 0.145 — el IMPORTE guardado **en POSITIVO** (lo normaliza `importeGuardadoDe`) y sin la
+     * aritmética de la lectura: `monto` lleva signo y se vacía cuando el renglón no aporta al saldo,
+     * así que no sirve para arrancar la corrección.
+     *
+     * 🔴 En un renglón **CORREGIBLE**, `null` significa **sólo** que se ocultan importes. El CARGO
+     * viaja en `null` con permiso —su importe se deriva, no se captura— y por eso nunca es
+     * corregible. Ver la nota gemela, más larga, en `esquemas/terceros.ts`.
+     */
+    importeGuardado: z
+      .number()
+      .nullable()
+      .describe(
+        'Importe POSITIVO tal como está guardado; en un renglón corregible, null sólo si se ' +
+          'ocultan importes.',
+      ),
+    /** ⭐ Fila 0.145 — ¿la corrección puede cambiar el importe? `false` en un pago ya aplicado. */
+    importeCorregible: z.boolean().describe('¿La corrección puede cambiar el importe?'),
   })
   .describe('Renglón del estado de cuenta unificado.');
 
@@ -538,6 +746,10 @@ export const esquemaEstadoCuentaSalida = z
     movimientos: z
       .array(esquemaEstadoCuentaMovimiento)
       .describe('Renglones del periodo, ordenados por fecha (fecha+id).'),
+    incompletas: esquemaIncompletasBloque.describe(
+      'Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Van APARTE de los ' +
+        'movimientos porque no son dinero: no suman ni restan al saldo.',
+    ),
   })
   .describe('Estado de cuenta unificado de un maquilero.');
 
@@ -578,6 +790,10 @@ export const esquemaDesglosadoSalida = z
     abonos: z.array(esquemaMovimientoEsMaSalida).describe('Abonos del periodo.'),
     descuentos: z.array(esquemaMovimientoEsMaSalida).describe('Descuentos del periodo.'),
     pagos: z.array(esquemaPagoSalida).describe('Pagos del periodo.'),
+    incompletas: esquemaIncompletasBloque.describe(
+      'Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Informativo: no suma ' +
+        'ni resta al saldo.',
+    ),
     saldo: esquemaSaldoSalida.describe('Saldo derivado (all-time) + su desglose.'),
   })
   .describe('Estado de cuenta desglosado de un maquilero.');
@@ -607,22 +823,42 @@ export const esquemaSaldoTodosFila = z
     maquilero: z.string().describe('Nombre del maquilero.'),
     nombreCorto: z.string().nullable().describe('Campo corto del taller, o null.'),
     totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
-    totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
-    totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
-    totalDescuentos: z.number().nullable().describe('Σ descuentos (o null).'),
+    totalAbonos: z.number().nullable().describe('Σ abonos revisados (o null).'),
+    totalPagos: z.number().nullable().describe('Σ pagos revisados (o null).'),
+    totalDescuentos: z.number().nullable().describe('Σ descuentos revisados (o null).'),
     saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
+    pendienteRevision: esquemaPendienteRevisionEsMa.describe(
+      'Lo que aún espera revisión y no entra al saldo: movimientos capturados + cargos sin validar.',
+    ),
   })
   .describe('Saldo de un maquilero en el tablero.');
 
 /** Forma de una fila del tablero de saldos. */
 export type SaldoTodosFila = z.infer<typeof esquemaSaldoTodosFila>;
 
-/** Tablero de saldos: maquileros activos con saldo ≠ 0. */
+/**
+ * Tablero de saldos: maquileros activos con saldo ≠ 0 **o** con algo pendiente de revisión (si sólo
+ * se cortara por saldo, el maquilero cuyo único movimiento está sin revisar quedaría invisible con
+ * saldo 0 — que es justo el que hay que ver).
+ */
 export const esquemaSaldosTodosSalida = z
   .object({
     conFactura: z.enum(['con', 'sin']).nullable().describe('Segmento aplicado o null.'),
-    filas: z.array(esquemaSaldoTodosFila).describe('Maquileros activos con saldo ≠ 0.'),
+    filas: z
+      .array(esquemaSaldoTodosFila)
+      .describe('Maquileros activos con saldo ≠ 0 o pendiente ≠ 0.'),
     totalSaldo: z.number().nullable().describe('Σ de los saldos (o null si se ocultan importes).'),
+    totalPendienteNeto: z
+      .number()
+      .nullable()
+      .describe('Σ del pendiente neto de todas las filas (o null si se ocultan importes).'),
+    totalCargosPorValidar: z
+      .number()
+      .int()
+      .describe(
+        'Σ de los cargos sin validar de todas las filas (conteo: NO se oculta). Lo agrega el ' +
+          'servidor para que la pantalla no tenga que sumar la columna.',
+      ),
   })
   .describe('Saldos de todos los maquileros.');
 
@@ -728,8 +964,13 @@ export type RecibosSemanalesEsMaSalida = z.infer<typeof esquemaRecibosSemanalesE
 
 // ── Selector de maquileros de EsMa (activos + por tipo) ───────────────────────────────────────────
 
-/** Tipo de maquilero para el selector: costura o estampado (mapea al rol del proveedor). */
-export const TIPOS_MAQUILERO_ESMA = ['costura', 'estampado'] as const;
+/**
+ * Tipo de maquilero para el selector (mapea al rol del proveedor). `corte` y `empaque` entraron en
+ * 0.114, cuando Daniel puso los dos servicios del lado de la maquila: *«corte es parte de maquilas,
+ * no de proveedores … y una maquila de empaque también»*. Sin filtro salen TODOS los roles de
+ * maquila, los cinco de siempre más estos dos.
+ */
+export const TIPOS_MAQUILERO_ESMA = ['costura', 'estampado', 'corte', 'empaque'] as const;
 /** Clave de tipo de maquilero. */
 export type TipoMaquileroEsMaClave = (typeof TIPOS_MAQUILERO_ESMA)[number];
 
@@ -739,7 +980,9 @@ export const esquemaMaquilerosEsMaQuery = z
     tipo: z
       .enum(TIPOS_MAQUILERO_ESMA)
       .optional()
-      .describe('Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila.'),
+      .describe(
+        'Filtra por tipo (costura/estampado/corte/empaque). Omitir = cualquier rol de maquila.',
+      ),
   })
   .describe('Filtros del selector de maquileros.');
 

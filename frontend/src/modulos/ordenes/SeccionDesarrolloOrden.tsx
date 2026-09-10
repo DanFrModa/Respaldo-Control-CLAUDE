@@ -21,7 +21,7 @@ import type { Orden } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatearFechaHora, formatearMoneda } from '@/lib/formato';
+import { autorDeEvento, formatearFechaHora, formatearMoneda } from '@/lib/formato';
 import { CampoDetalle, RejillaCampos } from '@/modulos/detalle';
 import {
   ETIQUETA_ESTADO_DESARROLLO,
@@ -195,7 +195,7 @@ export function SeccionDesarrolloOrden({
                       </span>
                     ) : null}
                     {formatearFechaHora(ev.registradoEn)}
-                    {ev.registradoPorId ? ` · por ${ev.registradoPorId}` : ''}
+                    {` · por ${autorDeEvento(ev)}`}
                   </p>
                 </li>
               ))}

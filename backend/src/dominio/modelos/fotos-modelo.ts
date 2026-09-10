@@ -15,7 +15,8 @@
  *    al primer lugar y reindexa el resto. La principal NO es una bandera: es la PRIMERA (ver
  *    `orden-principal.ts`), la misma que ya encabeza la galería, el listado (`urlFotoPrincipal`)
  *    y el impreso de la orden.
- *  • `quitarFoto` borra el `Archivo` (Cascade arrastra el `ModeloFoto`) en UNA transacción (A2).
+ *  • `quitarFoto` borra el `Archivo` (Cascade arrastra el `ModeloFoto`) en UNA transacción (A2) y,
+ *    TRAS el commit, borra el OBJETO físico de R2 en modo BEST-EFFORT (0.081a).
  * El servicio de archivos se INYECTA (default `servicioArchivos()` lazy) para poder pasar un
  * fake en tests sin R2 real (igual que bordados/proveedores). Permiso `modelos.ver` para leer,
  * `modelos.administrar` para mutar (A4).
@@ -27,7 +28,11 @@ import {
 import type { ModeloFoto } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -60,10 +65,21 @@ const CARPETA_FOTOS = 'modelos';
  * | 20_541 | `desarrollo/cliente-factores.ts` (`NAMESPACE_LOCK_FACTORES`) | idCliente |
  * | 20_542 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_LISTA`, exportado) | idLista |
  * | 20_543 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_CREAR_LISTA`, **no exportado**) | idEmpresa |
- * | 20_544 | `modelos/bom-modelo.ts` (`NAMESPACE_LOCK_ARTE`) | idModelo |
+ * | 20_544 | `modelos/arte-modelo.ts` (`NAMESPACE_LOCK_ARTE`) | idModelo |
  * | 20_545 | **este** | idModelo |
+ * | 20_546 | `modelos/nomenclatura.ts` (`NAMESPACE_LOCK_NUMERO_PRODUCCION`) | hash del prefijo |
+ * | 20_547 | `modelos/versiones.ts` (`NAMESPACE_LOCK_VERSION`, V1-E7b) | hash de la RAÍZ |
+ * | 20_548 | `modelos/nomenclatura.ts` (`NAMESPACE_LOCK_MODELO_POR_COLOR`, V1-E3) | idModeloDesarrollo |
+ * | 20_549 | `catalogos/proveedor-cuentas-pago.ts` (`NAMESPACE_LOCK_CUENTA_DEFAULT`, 0.112) | idProveedor |
+ * | 20_550 | `catalogos/conceptos-pago-cuentas.ts` (`NAMESPACE_LOCK_CUENTA_CONCEPTO`, 0.125) | idConcepto |
+ * | 20_551 | `pagos/corrida.ts` (`NAMESPACE_LOCK_CORRIDA`, 0.113) | idEmpresa |
  *
- * El siguiente libre es el 20_546.
+ * El siguiente libre es el 20_552.
+ *
+ * ⚠️ Las tres filas de arriba se agregaron en la fila 0.113: la 0.112 estrenó el 20_549 y **no
+ * actualizó esta tabla**, así que el puntero seguía anunciando el 20_549 como libre cuando ya
+ * estaba ocupado — dos locks con el mismo número se serializan entre sí sin que nadie entienda por
+ * qué. Si estrenas uno, actualiza AQUÍ.
  */
 const NAMESPACE_LOCK_FOTOS = 20_545;
 
@@ -170,10 +186,46 @@ export async function solicitarSubidaFoto(
 }
 
 /**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **DE QUIÉN SON LAS FOTOS QUE SE VEN: LA PROPIA GANA, Y SI NO HAY,
+ * SE VEN LAS DEL PADRE.**
+ *
+ * Un modelo de producción nacido POR COLOR (V1-E9a) **no trae fotos**: las fotos viven en R2 y no se
+ * clonan por color. Antes de esta regla, los cuatro modelos que nacen de un desarrollo se veían
+ * **todos sin foto** —en la galería, en la ficha y en el papel de la OP— mientras las fotos estaban
+ * en el padre, *que el filtro por default del catálogo (`origen = produccion`) esconde*. Y como
+ * antes de V1-E3 el modelo promovido **conservaba las suyas**, eso era una regresión visible del
+ * flujo principal.
+ *
+ * 🔑 **Por qué «la propia gana» y no «siempre las del padre».** Subirle una foto al hijo es lo
+ * natural (*«ésta es la roja»*) y `solicitarSubidaFoto` lo permite. Si la lectura resolviera SIEMPRE
+ * al padre, esa foto se guardaría, la ficha… no la enseñaría nunca: una escritura que se traga el
+ * sistema en silencio. Con esta regla la asimetría se cierra sin bloquear nada — que es lo que la
+ * receta sí tiene que hacer (`exigirRecetaPropia`), porque allá escribir en el hijo **pisaría** la
+ * del padre y la de sus hermanos; aquí no se pisa nada: la foto propia se SUMA.
+ *
+ * `null` de `idModeloDesarrollo` ⇒ devuelve el mismo id, que es el 100 % de los modelos de hoy.
+ */
+export function idModeloDeLasFotos(
+  modelo: { id: number; idModeloDesarrollo: number | null },
+  tieneFotosPropias: boolean,
+): number {
+  if (tieneFotosPropias) return modelo.id;
+  // ⚠️ Conocimiento POSITIVO, igual que `esVersionDeModelo` (`revision-modelo.ts`): sólo se va al
+  // padre cuando de verdad hay un número. Lo que no se sabe —una clave ausente, un `undefined` de
+  // un objeto armado a mano— cae del lado de «las fotos son mías», que es la conducta de siempre.
+  return typeof modelo.idModeloDesarrollo === 'number' ? modelo.idModeloDesarrollo : modelo.id;
+}
+
+/**
  * Lectura de BAJO NIVEL de las fotos de un modelo (findMany + URLs GET prefirmadas), ordenadas por
  * `orden` (luego por id). NO verifica permiso ni sesión: el llamador es responsable de autorizar.
  * Exige que el modelo exista. La usan `listarFotos` (tras `modelos.ver`) y el IMPRESO de la orden
  * (autorizado por `ordenes.ver`, ver `dominio/produccion/impresos/impreso-orden.ts`).
+ *
+ * ⭐⭐ V1-E3: aplica {@link idModeloDeLasFotos} — un hijo por color SIN fotos propias enseña las de
+ * su modelo de desarrollo. La resolución vive AQUÍ, en la lectura de bajo nivel, para que la
+ * apliquen por igual sus tres consumidores (ficha, impreso de la OP y —por su gemela de lote— la
+ * galería) sin que ninguno tenga que acordarse.
  */
 export async function leerFotosModelo(
   idModelo: number,
@@ -181,20 +233,30 @@ export async function leerFotosModelo(
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<FotoModeloConUrl[]> {
   const cliente = clienteLectura(bd);
-  const modelo = await cliente.modelo.findUnique({ where: { id: idModelo }, select: { id: true } });
+  const modelo = await cliente.modelo.findUnique({
+    where: { id: idModelo },
+    select: { id: true, idModeloDesarrollo: true },
+  });
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
 
-  const fotos = await cliente.modeloFoto.findMany({
-    where: { idModelo },
-    orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+  const consulta = {
+    orderBy: [{ orden: 'asc' as const }, { id: 'asc' as const }],
     include: {
       archivo: {
         select: { id: true, key: true, nombreOriginal: true, tipoMime: true, tamanoBytes: true },
       },
     },
-  });
+  };
+  // La PROPIA gana: se piden primero las suyas. Sólo si no tiene ninguna —y sólo si de verdad hay
+  // padre— se piden las de su modelo de desarrollo. Así el caso normal (todo lo que no es hijo)
+  // sigue costando UNA consulta y no hace falta que nadie traiga un `_count` para preguntar.
+  let fotos = await cliente.modeloFoto.findMany({ where: { idModelo: modelo.id }, ...consulta });
+  const idDueno = idModeloDeLasFotos(modelo, fotos.length > 0);
+  if (idDueno !== modelo.id) {
+    fotos = await cliente.modeloFoto.findMany({ where: { idModelo: idDueno }, ...consulta });
+  }
 
   return Promise.all(
     fotos.map(async (foto) => ({
@@ -337,19 +399,30 @@ export async function marcarFotoPrincipal(
 
 /**
  * Quita UNA foto del modelo (R2) en UNA transacción (A2): borra el `Archivo` (el `onDelete
- * Cascade` arrastra el `ModeloFoto`); hacerlo en un solo paso evita un huérfano. El objeto R2
- * huérfano es inofensivo (lo documenta `comun/archivos.ts`). Requiere `modelos.administrar`. Si
- * la foto no pertenece al modelo → `ErrorNoEncontrado`.
+ * Cascade` arrastra el `ModeloFoto`); hacerlo en un solo paso evita un huérfano. TRAS el commit
+ * borra el OBJETO físico de R2 en modo BEST-EFFORT (0.081a: antes solo se borraba el registro y el
+ * objeto se quedaba en el bucket pagándose para siempre, sin que nadie pudiera verlo). Requiere
+ * `modelos.administrar`. Si la foto no pertenece al modelo → `ErrorNoEncontrado`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico corre
+ * DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function quitarFoto(
   sesion: SesionUsuario,
   idModelo: number,
   idFoto: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // La key del objeto R2 se captura DENTRO de la tx para borrarlo best-effort tras el commit.
+  const keyR2 = await enTransaccion(async (tx) => {
     const foto = await exigirFotoDelModelo(tx, idModelo, idFoto);
+    const archivo = await tx.archivo.findUnique({
+      where: { id: foto.idArchivo },
+      select: { key: true },
+    });
 
     // Borrar el Archivo arrastra el ModeloFoto (onDelete Cascade).
     await tx.archivo.delete({ where: { id: foto.idArchivo } });
@@ -360,5 +433,13 @@ export async function quitarFoto(
       accion: 'MODIFICAR',
       datos: { foto: 'quitar', idFoto },
     });
+
+    return archivo?.key ?? null;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2 === null ? [] : [keyR2],
+    `la foto ${String(idFoto)} del modelo ${String(idModelo)}`,
+  );
 }

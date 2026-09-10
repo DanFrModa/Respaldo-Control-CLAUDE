@@ -102,4 +102,67 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
       }
     }
   });
+
+  /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO», CONTRA EL STACK REAL.**
+   *
+   * Daniel: *"compré **480 en lugar de 481**… y me sigue poniendo que me falta comprar 1 kilo… **no
+   * voy a hacer otra OC por 1 kilo**"*. Lo que este spec comprueba de punta a punta —endpoint real,
+   * tabla real, explosión real— es la **trampa técnica** de la etapa: dar por cubierto y **volver a
+   * explotar** sin que la marca se borre (el snapshot se reescribe entero en cada explosión). El
+   * resto de las conductas vive en integración y en las pruebas de pantalla.
+   *
+   * ⚠️ Corre **sólo si** la orden que le tocó a esta corrida tiene un renglón comprable; si no, no
+   * hay faltante que cerrar y el spec no inventa uno. Lo que NUNCA se acepta es que la pantalla se
+   * quede muda.
+   */
+  test('⭐⭐ dar por cubierto sobrevive a volver a explotar (§Post-F9.99)', async ({ page }) => {
+    await entrarComoAdmin(page);
+    await page.goto('/compras/explosion');
+
+    const opciones = page.getByTestId('exp-orden-opcion');
+    if ((await opciones.count()) === 0) return;
+    const primera = opciones.first();
+    const idOrden = await primera.getAttribute('data-orden');
+
+    // Misma apertura de la puerta que el test de arriba (revisar + liberar por renglón).
+    await page.request.post(`/api/ordenes/${String(idOrden)}/receta/revisar`);
+    const receta = await page.request.get(`/api/ordenes/${String(idOrden)}/receta`);
+    if (!receta.ok()) return;
+    const contenido = (await receta.json()) as {
+      telas: { id: number; excluido: boolean }[];
+      avios: { id: number; excluido: boolean }[];
+      artes: { id: number; excluido: boolean }[];
+    };
+    const renglones = [
+      ...contenido.telas.filter((t) => !t.excluido).map((t) => ({ tipo: 'tela', id: t.id })),
+      ...contenido.avios.filter((a) => !a.excluido).map((a) => ({ tipo: 'avio', id: a.id })),
+      ...contenido.artes.filter((a) => !a.excluido).map((a) => ({ tipo: 'arte', id: a.id })),
+    ];
+    if (renglones.length === 0) return;
+    const abierta = await page.request.post(`/api/ordenes/${String(idOrden)}/receta/liberar`, {
+      data: { renglones },
+    });
+    if (!abierta.ok()) return;
+
+    await primera.click();
+    const cerrar = page.getByTestId('exp-dar-por-cubierto');
+    // Sin nada pendiente (todo ya comprado, o sin proveedor) no hay faltante que cerrar.
+    if ((await cerrar.count()) === 0) return;
+
+    await cerrar.first().click();
+    // El renglón lo DICE, y el enlace pasa a ofrecer deshacerlo.
+    await expect(page.getByTestId('exp-cubierto-badge').first()).toBeVisible();
+    await expect(page.getByTestId('exp-volver-a-pedir').first()).toBeVisible();
+
+    // 🔴 LA PRUEBA DE LA ETAPA: volver a explotar reescribe el snapshot ENTERO. Si la marca viviera
+    // ahí, aquí desaparecería y el faltante volvería sin que nadie entendiera por qué.
+    await page.reload();
+    await opciones.first().click();
+    await expect(page.getByTestId('exp-cubierto-badge').first()).toBeVisible();
+
+    // Y se puede deshacer: el faltante regresa tal cual (el rastro NO se borra, D3).
+    await page.getByTestId('exp-volver-a-pedir').first().click();
+    await expect(page.getByTestId('exp-dar-por-cubierto').first()).toBeVisible();
+  });
 });

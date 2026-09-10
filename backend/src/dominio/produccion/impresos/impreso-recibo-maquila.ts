@@ -3,7 +3,23 @@
  * hoja que documenta la recepción de prenda terminada desde maquila. UN PDF parametrizado por
  * `TipoProceso` (costura/estampado/…, D8): el encabezado y la nota cambian según si el proceso metió
  * a inventario PT (costura) o no (estampado/bordado/lavado). Incluye la matriz color×talla con su
- * CALIDAD (primeras/segundas) y los totales.
+ * CALIDAD (primeras/segundas) y los totales, más —si las hubo— las PRENDAS INCOMPLETAS que el
+ * maquilero entregó (V1-E8k, §Post-F9.136), en un renglón aparte que dice que no se pagan.
+ *
+ * ⭐⭐ 0.107 — **EL RECIBO DE UN PROCESO DE ARTE LLEVA LA FOTO DEL ARTE.** La 0.094 se la puso a la
+ * ficha que sale CON el envío; este papel —la constancia que se firma cuando el trabajo VUELVE— es
+ * el otro que el mismo proveedor tiene en la mano, y seguía sin ella. Sin la imagen, quien recibe
+ * no tiene contra qué cotejar lo que le entregan.
+ *
+ * 🔑 **Cuándo la lleva: cuando el proceso NO mete a inventario PT** (`generaEntradaPt === false`).
+ * No es un criterio nuevo: es el MISMO con el que el resto del producto parte costura de arte
+ * (`AvanceProduccion.tsx`, `esCostura = TipoProceso.generaEntradaPt`), incluido el recibo sin
+ * proceso, que ya se clasificaba como arte. Un recibo de COSTURA no lleva fotos, igual que siempre.
+ * Cubre también el arte que va DESPUÉS de la costura (V1-E4b, `devuelveDeTransito`): también es
+ * arte y también las lleva.
+ *
+ * El bloque de imágenes —tope, resolución best-effort y rejilla— NO se copió de la ficha: vive en
+ * `bloque-fotos-arte.ts` y lo usan los dos papeles. Si cambia, cambia para ambos.
  *
  * Documento generado EN EL SERVIDOR con `@react-pdf/renderer` (`renderToBuffer`), MISMO motor y
  * patrón que `impreso-envio-maquila.ts` (A1: la ruta solo valida permiso+Zod y delega). Reusa
@@ -35,11 +51,29 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerRecibo } from '../recibos.js';
 import type { ReciboSalida } from '../../../contrato/index.js';
+// ⭐ 0.107 — el bloque de arte, COMPARTIDO con la ficha de arte del envío (los dos papeles del
+// mismo proveedor). Debajo, `imagenes-impreso.ts` sigue siendo el único dueño de la regla de QUÉ
+// fotos manda la OP (0.083). Lecturas de BAJO NIVEL, sin permiso propio: esta impresión ya está
+// autorizada por `produccion.wip-ver` y qué arte lleva la orden es parte de su documento.
+import {
+  bloqueFotosArte,
+  resolverFotosArte,
+  AVISO_FOTO_FALTANTE,
+  type DatosFotosArte,
+  type DepsFotosArteImpresas,
+} from './bloque-fotos-arte.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
 
-/** Todo lo que necesita el documento de recibo, ya resuelto (sin BD) → función pura. */
-export interface DatosImpresoRecibo {
+/**
+ * Todo lo que necesita el documento de recibo, ya resuelto (sin BD) → función pura.
+ *
+ * Extiende {@link DatosFotosArte} (0.107): `fotosArte` + `fotosArteOcultas`. A diferencia de la
+ * ficha —que es un tipo aparte del envío para que el remito no cargue nunca con las imágenes—, el
+ * recibo es UN solo documento parametrizado por proceso, así que los campos están siempre; en un
+ * recibo de COSTURA llegan vacíos y no viajan bytes de más al worker de PDF.
+ */
+export interface DatosImpresoRecibo extends DatosFotosArte {
   empresa: string;
   folio: number;
   fecha: string;
@@ -68,6 +102,22 @@ export interface DatosImpresoRecibo {
   totalPiezas: number;
   totalPrimeras: number;
   totalSegundas: number;
+  /**
+   * PRENDAS INCOMPLETAS entregadas (V1-E8k, §Post-F9.136). APARTE de `totalPiezas`: el maquilero
+   * las trajo, pero no se produjeron, no entraron a inventario y no se pagan. Va en la hoja porque
+   * ésta es la constancia que se firma con él.
+   */
+  totalIncompletas: number;
+}
+
+/**
+ * Etiqueta de la fila de la matriz: el color y, cuando la orden se fabrica por packs (§Post-F9.10),
+ * SU TENDIDO. El pack tiene que salir en el papel: es lo que el cortador y el maquilero usan para
+ * saber qué corrida están manejando, y sin él dos filas del mismo color se leerían como un error de
+ * captura. En una orden sin packs es cadena vacía y la fila se imprime exactamente igual que antes.
+ */
+function etiquetaColorPack(color: string, pack: string): string {
+  return pack.trim() === '' ? color : `${color}  ·  PACK ${pack.trim()}`;
 }
 
 /** Proyecta la matriz del recibo a la tabla color×talla del impreso (misma forma que el envío). */
@@ -95,18 +145,51 @@ export function armarTablaRecibo(
       totalesColumna[i] = (totalesColumna[i] ?? 0) + cantidad;
     });
     totalPiezas += totalFila;
-    return { color: linea.color, cantidades, totalFila };
+    return { color: etiquetaColorPack(linea.color, linea.pack), cantidades, totalFila };
   });
 
   return { tallas, renglones, totalesColumna, totalPiezas };
 }
 
-/** Dependencias inyectables (los tests inyectan un `obtenerRecibo` fake para no tocar BD). */
-export interface DepsImpresoRecibo {
+/**
+ * Dependencias inyectables: `obtenerRecibo` (para no tocar BD) y, desde la 0.107, las del bloque de
+ * arte (lectura de fotos, R2 y descarga) — los tests las sustituyen para no tocar ni BD ni red.
+ */
+export interface DepsImpresoRecibo extends DepsFotosArteImpresas {
   obtenerRecibo?: typeof obtenerRecibo;
 }
 
-/** Resuelve los datos del impreso de un recibo (A9). Reusa `obtenerRecibo`. */
+/**
+ * ⭐ 0.107 — ¿ESTE recibo es de un proceso de ARTE (y por tanto lleva la foto)?
+ *
+ * **Sí cuando el proceso NO mete a inventario PT.** Es el mismo criterio con el que el resto del
+ * producto separa costura de arte (`AvanceProduccion.tsx`: `esCostura = generaEntradaPt === true`,
+ * y `claveEtapaDeMovimiento` manda a «Recibo de Arte» todo lo demás, incluido el recibo sin
+ * `TipoProceso`, que llega aquí con `generaEntradaPt` en `false`). No se inventa una regla nueva:
+ * si un día cambia lo que hace «de arte» a un proceso, cambia en el catálogo y este papel la sigue.
+ *
+ * Un recibo que DEVUELVE de tránsito (V1-E4b) también es de arte: el proceso sigue sin ser el que
+ * crea el producto terminado, solo lo regresa al almacén del que había salido.
+ *
+ * Pura y exportada: el criterio se prueba sin renderizar ni tocar BD.
+ */
+export function esReciboDeArte(recibo: Pick<ReciboSalida, 'generaEntradaPt'>): boolean {
+  return !recibo.generaEntradaPt;
+}
+
+/**
+ * Resuelve los datos del impreso de un recibo (A9). Reusa `obtenerRecibo`.
+ *
+ * ⭐ 0.107 — si el recibo es de ARTE ({@link esReciboDeArte}), resuelve además las fotos del arte
+ * de la orden con el MISMO pipeline que la ficha ({@link resolverFotosArte}: tope antes de tocar
+ * R2, presign best-effort por imagen y descarga con tope de bytes). 🔴 **El papel sale siempre**:
+ * si la lectura truena, si R2 rechaza una key o si una imagen no se puede bajar, el recibo se
+ * imprime igual —con su hueco cuando la foto existía y no llegó—.
+ *
+ * 🔑 Un recibo de COSTURA ni siquiera pregunta por las fotos: no toca BD de más, no toca R2 y **no
+ * construye `servicioArchivos()`** (que lanza si falta un `R2_*`). Su hoja es exactamente la de
+ * antes de esta fila.
+ */
 export async function armarDatosImpresoRecibo(
   sesion: SesionUsuario,
   idRecibo: number,
@@ -116,6 +199,15 @@ export async function armarDatosImpresoRecibo(
   const obtener = deps.obtenerRecibo ?? obtenerRecibo;
   const recibo = await obtener(sesion, idRecibo, bd);
   const tabla = armarTablaRecibo(recibo.lineas);
+  const fotos: DatosFotosArte = esReciboDeArte(recibo)
+    ? await resolverFotosArte(
+        bd,
+        recibo.idOrden,
+        sesion.idEmpresaActiva,
+        `el recibo de maquila ${String(idRecibo)}`,
+        deps,
+      )
+    : { fotosArte: [], fotosArteOcultas: 0 };
   return {
     empresa: sesion.nombreEmpresaActiva,
     folio: recibo.folio,
@@ -132,7 +224,9 @@ export async function armarDatosImpresoRecibo(
     cancelado: recibo.cancelado,
     totalPrimeras: recibo.totalPrimeras,
     totalSegundas: recibo.totalSegundas,
+    totalIncompletas: recibo.totalIncompletas,
     ...tabla,
+    ...fotos,
   };
 }
 
@@ -145,6 +239,7 @@ const estilos = StyleSheet.create({
   colTotal: { width: 42, textAlign: 'center', fontFamily: FUENTE.negrita },
   notaCalidad: { marginTop: 8, flexDirection: 'row', gap: 16 },
   notaItem: { fontSize: 9 },
+  notaIncompletas: { marginTop: 4 },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
@@ -228,6 +323,19 @@ function tablaMatriz(datos: DatosImpresoRecibo): ReactElement {
   );
 }
 
+/**
+ * ⭐ 0.107 — El bloque de arte de ESTE papel: el COMPARTIDO con la ficha ({@link bloqueFotosArte}),
+ * con el único texto que los dos papeles no dicen igual — el del HUECO. En el recibo el trabajo ya
+ * volvió, así que la foto se pide *antes de dar por bueno lo recibido*, no *antes de producir*.
+ *
+ * Existe como función exportada, y no como una llamada suelta dentro de la página, para poder
+ * probar sin renderizar que este papel no se quedó con el aviso de la ficha: el PDF comprime sus
+ * flujos de texto, así que sobre el Buffer esa comprobación no discrimina nada.
+ */
+export function bloqueArteRecibo(datos: DatosImpresoRecibo): ReactElement | null {
+  return bloqueFotosArte(datos, AVISO_FOTO_FALTANTE.antesDeCotejar);
+}
+
 /** Pesos en MXN sin redondear (precio pactado). */
 function pesos(valor: number | null): string | null {
   if (valor === null) return null;
@@ -277,6 +385,12 @@ function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
           h(Text, { style: estilosDoc.valorCampoTexto }, datos.observaciones),
         )
       : null,
+    // ⭐ 0.107 — el ARTE va ARRIBA, antes de las cantidades, EN EL MISMO SITIO que en la ficha: es
+    // la identidad del trabajo (de qué arte se habla), y las cantidades solo tienen sentido cuando
+    // ya se sabe. Que los dos papeles del proveedor de arte lo pongan en el mismo lugar es parte de
+    // que sean gemelos. En un recibo de COSTURA `fotosArte` va vacío y el bloque devuelve `null`:
+    // la hoja de siempre, sin sección ni hueco.
+    bloqueArteRecibo(datos),
     tablaMatriz(datos),
     h(
       View,
@@ -285,6 +399,20 @@ function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
       h(Text, { style: estilos.notaItem }, `Segundas: ${datos.totalSegundas}`),
       h(Text, { style: estilos.notaItem }, `Total recibido: ${datos.totalPiezas}`),
     ),
+    // Renglón APARTE del de calidad: una incompleta no es una calidad, y no está sumada en el
+    // total recibido (§Post-F9.136). Solo aparece si la hubo, para no ensuciar el 99 % de las hojas.
+    datos.totalIncompletas > 0
+      ? h(
+          View,
+          { style: estilos.notaIncompletas, key: 'incompletas' },
+          h(
+            Text,
+            { style: estilos.notaItem },
+            `Prendas incompletas entregadas: ${datos.totalIncompletas} — NO cuentan como ` +
+              'producidas, no entran a inventario y no se pagan.',
+          ),
+        )
+      : null,
     PieDocumento({
       contexto: `CONTROL v2 · ${datos.empresa} · Recibo ${datos.folio} · Orden ${datos.folioOrden} · ${datos.totalPiezas} piezas`,
     }),
@@ -316,7 +444,10 @@ export interface ImpresoRecibo {
   folio: number;
 }
 
-/** Resuelve los datos del recibo (A9) y devuelve su PDF + el folio para el nombre del archivo. */
+/**
+ * Resuelve los datos del recibo (A9) —incluidas las fotos del arte si es un recibo de ARTE, 0.107—
+ * y devuelve su PDF + el folio para el nombre del archivo.
+ */
 export async function impresoReciboMaquila(
   sesion: SesionUsuario,
   idRecibo: number,

@@ -14,8 +14,13 @@
  *  • `PATCH  /ordenes/:id/receta/renglones/:tipo/:idRenglon`   — editar (deja el renglón `ajustado`)
  *  • `DELETE /ordenes/:id/receta/renglones/:tipo/:idRenglon`   — quitar (excluye, o borra si era manual)
  *  • `POST   /ordenes/:id/receta/renglones/:tipo/:idRenglon/restaurar` — volver al BOM del modelo
+ *  • `POST   /ordenes/:id/receta/renglones/avio/:idRenglon/corregir` — ⭐ apagar la captura vieja que
+ *    infla el requerido (el botón «Corregir», §Post-F9.130)
  *  • `POST   /ordenes/:id/receta/revisar`                      — marcar TODO revisado (un solo clic)
  *  • `POST   /ordenes/:id/receta/liberar`                      — firmar renglón por renglón (§Post-F9.80)
+ *  • `POST   /ordenes/:id/receta/abrir`                        — ⭐ REABRIR para corregir: CONGELA la
+ *    compra de la orden (V1-E8z, §Post-F9.160(a)). Motivo obligatorio.
+ *  • `POST   /ordenes/:id/receta/cerrar`                       — ⭐ cerrar y DESCONGELAR la compra
  *  • `POST   /ordenes/:id/receta/traer-del-modelo`             — traer lo que le falta (§Post-F9.73)
  *  • `GET    /recetas-por-liberar`                             — la BANDEJA de Desarrollo (§Post-F9.72)
  *
@@ -29,6 +34,7 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
+  esquemaAbrirRecetaCuerpo,
   esquemaErrorApi,
   esquemaLiberarRecetaCuerpo,
   esquemaRecetaAgregarCuerpo,
@@ -44,7 +50,10 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  abrirReceta,
   agregarRenglonReceta,
+  cerrarReceta,
+  corregirCapturaAvio,
   editarRenglonReceta,
   liberarReceta,
   marcarRecetaRevisada,
@@ -72,6 +81,19 @@ const esquemaParamRenglon = esquemaParamOrden.extend({
     .int({ error: 'El id del renglón debe ser entero' })
     .positive({ error: 'El id del renglón debe ser positivo' })
     .describe('Id del renglón de la receta.'),
+});
+
+/**
+ * Parámetros `:id/:idRenglon` de un renglón de AVÍO (V1-E8h). El tipo va FIJO en la URL: corregir la
+ * captura por medida sólo tiene sentido en un avío —las telas y los artes no llevan medidas—, así
+ * que la ruta lo dice en vez de aceptar un `:tipo` que luego habría que rechazar.
+ */
+const esquemaParamRenglonAvio = esquemaParamOrden.extend({
+  idRenglon: z.coerce
+    .number({ error: 'El id del renglón debe ser un número' })
+    .int({ error: 'El id del renglón debe ser entero' })
+    .positive({ error: 'El id del renglón debe ser positivo' })
+    .describe('Id del renglón de avío de la receta.'),
 });
 
 /** Respuestas de error comunes a toda ruta protegida (para documentar el contrato). */
@@ -204,6 +226,33 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
     },
   });
 
+  // ⭐⭐⭐ V1-E8h (§Post-F9.130) — EL BOTÓN «CORREGIR». Es un POST propio y no un efecto de la
+  // lectura a propósito: la contradicción se DETECTA al leer, pero apagarla es un acto EXPLÍCITO de
+  // una persona (D3 — una lectura no cambia datos). Mismo permiso que editar el renglón
+  // (`desarrollo.administrar`, REUSADO): quien puede tocar la receta puede corregirla.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/renglones/avio/:idRenglon/corregir',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Corregir un renglón de avío que pide de más por una captura vieja (§Post-F9.130)',
+      description:
+        'Apaga el «se consume por talla» que un avío POR MEDIDA arrastra de una captura anterior a ' +
+        'V1-E3g — la contradicción que hacía que la orden pidiera hasta 53 veces el material que ' +
+        'necesita. NO borra las cantidades por talla (D3: dejan de mandar, no desaparecen) ni toca ' +
+        'consumo, precio ni amarre. El renglón vuelve a quedar SIN FIRMAR: el requerido cambió y ' +
+        'Desarrollo tiene que verlo. 409 si el renglón no trae la contradicción.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamRenglonAvio,
+      response: { 200: esquemaRecetaOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return corregirCapturaAvio(sesion, request.params.id, request.params.idRenglon);
+    },
+  });
+
   app.route({
     method: 'POST',
     url: '/ordenes/:id/receta/revisar',
@@ -239,6 +288,49 @@ export const rutasRecetaOrden: FastifyPluginCallbackZod = (app, _opciones, done)
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return liberarReceta(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E8z (§Post-F9.160(a)) — EL CANDADO DE COMPRA. Mismo permiso que firmar
+  // (`desarrollo.administrar`): abrir y cerrar son actos del MISMO dueño de la receta, así que no
+  // hay permiso nuevo y **este deploy no requiere `SEED_ON_START`**.
+  //
+  // Dos endpoints y no un `PATCH` con bandera: son dos actos distintos con reglas distintas (abrir
+  // exige motivo y la orden viva; cerrar exige que no quede nada sin firmar y SÍ se permite sobre
+  // una orden cancelada), y un solo endpoint con un booleano los escondería detrás del mismo verbo.
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/abrir',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary:
+        'Reabrir la receta para corregirla — CONGELA la compra de la orden (§Post-F9.160(a))',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      body: esquemaAbrirRecetaCuerpo,
+      response: { 200: esquemaRecetaOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return abrirReceta(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/ordenes/:id/receta/cerrar',
+    preHandler: app.conPermiso('desarrollo.administrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Cerrar la receta reabierta y descongelar la compra de la orden',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrden,
+      response: { 200: esquemaRecetaOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cerrarReceta(sesion, request.params.id);
     },
   });
 

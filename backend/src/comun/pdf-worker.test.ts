@@ -21,20 +21,22 @@ import type { DatosExcelConcentrado } from '../dominio/ruta-critica/impresos/exc
 function datosTelas(nFilas: number): DatosImpresoInventarioTelas {
   const filas = Array.from({ length: nFilas }, (_, i) => ({
     tela: `Tela ${String(i)}`,
-    loteClave: `L-${String(i)}`,
+    contextoTela: 'Punto · Proveedor',
     color: 'Rojo',
-    proveedor: 'Proveedor',
-    factura: `F-${String(i)}`,
+    pantone: '19-3920',
     almacen: 'Bodega',
-    existencia: i,
-    componentes: [] as string[],
+    unidad: 'kg',
+    cuerpo: i,
+    complemento: i % 2 === 0 ? i : null,
   }));
   return {
     empresa: 'FR Moda',
     fecha: '2026-07-10',
     filas,
     totalRenglones: nFilas,
-    totalExistencia: 0,
+    totalColores: nFilas,
+    totalCuerpo: 0,
+    totalComplemento: 0,
   };
 }
 

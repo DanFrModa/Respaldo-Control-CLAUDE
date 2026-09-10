@@ -14,7 +14,10 @@ import { ExplosionMaterialesPagina, ocPlaneadasEnPantalla } from './ExplosionMat
 
 // ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
 // se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
-const { toastExito } = vi.hoisted(() => ({ toastExito: vi.fn() }));
+const { toastExito, toastInfo } = vi.hoisted(() => ({
+  toastExito: vi.fn(),
+  toastInfo: vi.fn(),
+}));
 vi.mock('sonner', () => ({
   toast: {
     success: (mensaje: string): void => {
@@ -22,6 +25,11 @@ vi.mock('sonner', () => ({
     },
     warning: vi.fn(),
     error: vi.fn(),
+    // ⭐⭐ V1-E8e (§Post-F9.99): cuando el servidor no movió nada se DICE, en vez de festejar un
+    // acto que no ocurrió.
+    info: (mensaje: string): void => {
+      toastInfo(mensaje);
+    },
   },
 }));
 
@@ -62,6 +70,12 @@ const useAgregarColorDeTelaMock = vi.fn((): { mutate: unknown; isPending: boolea
   mutate: agregarColorMutateMock,
   isPending: false,
 }));
+// ⭐⭐ V1-E8e (§Post-F9.99): la SEGUNDA puerta — cerrar (o reabrir) un faltante desde la explosión.
+const cubrirMutateMock = vi.fn();
+const useDarPorCubiertoMock = vi.fn((): { mutate: unknown; isPending: boolean } => ({
+  mutate: cubrirMutateMock,
+  isPending: false,
+}));
 vi.mock('@/api/mrp', () => ({
   useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
   useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,
@@ -83,6 +97,8 @@ vi.mock('@/api/mrp', () => ({
   useFijarPrecioColor: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
   // ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela desde el renglón de la compra.
   useAgregarColorDeTela: () => useAgregarColorDeTelaMock() as unknown,
+  // ⭐⭐ V1-E8e (§Post-F9.99): «con esto queda cubierto» / «volver a pedirlo», desde el renglón.
+  useDarPorCubierto: () => useDarPorCubiertoMock() as unknown,
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => useConsultaOrdenesMock() as unknown,
@@ -115,6 +131,22 @@ vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
     </button>
   ),
 }));
+
+/**
+ * 🔴 **V1-E7f (§Post-F9.120) — CAPTURAR LA «Entrega (inicial)», que ahora es EL PASO OBLIGATORIO.**
+ *
+ * Hasta hoy casi ninguna prueba de esta pantalla tocaba la fecha: las OP del fixture la traían y la
+ * OC la HEREDABA, así que el clic de «Revisar y generar OC» salía sin más. Retirado el respaldo —la
+ * fecha de la OP es cuándo se le entrega al CLIENTE, no cuándo debe llegar la tela—, **ninguna
+ * compra avanza sin que una persona teclee la fecha**, y eso es exactamente lo que este paso
+ * reproduce: lo que el comprador hace de verdad antes de darle a generar.
+ *
+ * ⚠️ Por eso NO se usa en el bloque de *"la fecha de entrega, a fuerzas"*: allí lo que se mide es
+ * justamente qué pasa cuando NADIE la capturó.
+ */
+function capturarEntregaInicial(fecha = '2026-10-15'): void {
+  fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: fecha } });
+}
 
 /** Explosión de prueba: un botón comprable (con proveedor) + felpa sin proveedor + genérico cubierto. */
 function explosionDePrueba() {
@@ -157,6 +189,9 @@ function explosionDePrueba() {
             idTela: null,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: 3,
             material: 'BOT-01 — Botón',
             cantidadRequerida: 180,
@@ -174,6 +209,8 @@ function explosionDePrueba() {
             cambiosReceta: [],
             avisos: [],
             cantidadEnOc: 0,
+            // ⭐⭐ V1-E8e (§Post-F9.99): nadie dio nada por cubierto — el DEFAULT.
+            cantidadCubierta: 0,
             cantidadPendiente: 180,
             idsRequerimiento: [1],
             porOrden: [
@@ -184,6 +221,7 @@ function explosionDePrueba() {
                 cantidadRequerida: 180,
                 cantidadAComprar: 180,
                 cantidadEnOc: 0,
+                cantidadCubierta: 0,
                 cantidadPendiente: 180,
                 precioSugerido: 2,
               },
@@ -201,6 +239,9 @@ function explosionDePrueba() {
             idTela: 4,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: null,
             material: 'Felpa',
             cantidadRequerida: 45,
@@ -239,6 +280,9 @@ function explosionDePrueba() {
             idTela: null,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: 5,
             material: 'HIL-01 — Hilo',
             cantidadRequerida: 60,
@@ -428,6 +472,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     // Revisa TODO lo pendiente (sin marcar nada → idsRequerimiento vacío).
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
     // 🔴 Y NADA se generó: el clic que Daniel daba ahora abre la revisión, no la compra.
@@ -438,7 +483,13 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     ];
     // La dirección FAVORITA viaja explícita: el servidor no tiene que adivinarla. Y las OP van en
     // el cuerpo (§Post-F9.86), no en la URL.
-    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
+    expect(cuerpo).toEqual({
+      idsOrden: [50],
+      idsRequerimiento: [],
+      idDireccionEntrega: 7,
+      // 🔴 V1-E7f: la fecha viaja porque una PERSONA la capturó; ya no la pone el servidor solo.
+      fechaEntrega: '2026-10-15',
+    });
     expect(typeof opciones.onSuccess).toBe('function');
   });
 
@@ -574,6 +625,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(aviso).not.toHaveTextContent('No hay ninguna dirección de entrega activa');
     expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
     // ⭐⭐ V1-E4d: y el clic SÍ sale al servidor — por una lectura fallida no se cierra la puerta.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
     await usuario.click(screen.getByTestId('exp-reintentar-direcciones'));
@@ -839,6 +891,9 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
               idTela: 4,
               idTelaColor: null,
               telaColor: null,
+              idColorPrenda: null,
+              colorPrenda: null,
+              medidas: [],
               idAvio: null,
               material: 'Felpa amarrada',
               cantidadRequerida: 45,
@@ -955,6 +1010,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     // …y el otro proveedor sigue con la de arriba (no se movió con el vecino).
     expect(campos[0] as HTMLElement).toHaveValue('2026-11-30');
 
+    // (La «Entrega (inicial)» ya está capturada arriba: sin ella no se avanzaría, V1-E7f.)
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [
       {
@@ -992,6 +1048,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     // Vuelve a mostrar la de arriba (no se queda en blanco significando otra cosa).
     expect(screen.getAllByTestId('exp-fecha-grupo')[1] as HTMLElement).toHaveValue('2026-11-30');
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
     expect(cuerpo).not.toHaveProperty('fechasPorProveedor');
@@ -1348,10 +1405,26 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               tipo: 'avio' as const,
               idMaterial: 3,
               material: 'BOT-01 — Botón',
+              // ⭐⭐ 0.156: el avío no lleva complemento. Se anota ANCHO (como `precioUnitario` aquí
+              // abajo) para que el fixture admita también el caso de la tela con su cárdigan.
+              nombreComplemento: null as string | null,
               unidad: 'pza',
               cantidadTotal: 300,
               cantidadPropuesta: 300,
               cantidadEnOcSinColor: 0,
+              // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío y su desglose por medida. Se anotan
+              // ANCHOS (no con el tipo del literal) para que el fixture admita el caso con color y
+              // con medidas — el mismo truco que ya usaba `precioUnitario` aquí abajo.
+              idColorPrenda: null as number | null,
+              colorPrenda: null as string | null,
+              colorTexto: null as string | null,
+              colorAjustado: false,
+              medidas: [] as {
+                idAvioMedida: number | null;
+                etiqueta: string;
+                cantidad: number;
+                orden: number;
+              }[],
               ajustado: false,
               // ⭐⭐ V1-E3z (§Post-F9.94): el precio del renglón viaja para poder EDITARLO aquí.
               // `as number | null` para que el fixture admita el caso "sus líneas traen precios
@@ -1359,6 +1432,9 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               precioUnitario: 2 as number | null,
               precioPropuesto: 2 as number | null,
               precioAjustado: false,
+              // ⭐⭐ V1-E8e (§Post-F9.99): sin faltante no hay pregunta; y el default no cierra.
+              cantidadFaltante: 0,
+              restoCubierto: false,
               importe: 600,
               porOrden: [
                 {
@@ -1368,7 +1444,14 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidad: 180,
                   cantidadPropuesta: 180,
                   precio: 2,
+                  cantidadComplemento: null as number | null,
                   importe: 360,
+                  medidas: [] as {
+                    idAvioMedida: number | null;
+                    etiqueta: string;
+                    cantidad: number;
+                    orden: number;
+                  }[],
                   seEscribe: true,
                 },
                 {
@@ -1378,7 +1461,14 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidad: 120,
                   cantidadPropuesta: 120,
                   precio: 2,
+                  cantidadComplemento: null as number | null,
                   importe: 240,
+                  medidas: [] as {
+                    idAvioMedida: number | null;
+                    etiqueta: string;
+                    cantidad: number;
+                    orden: number;
+                  }[],
                   seEscribe: true,
                 },
               ],
@@ -1398,6 +1488,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
           unidad: 'm',
           cantidadAComprar: 45,
           cantidadEnOc: 45,
+          cantidadCubierta: 0,
           cantidadEnOcSinColor: 0,
           motivo: 'ya-en-oc' as const,
           detalle: '"Felpa" ya está en una orden de compra viva para la orden 7 (45 m).',
@@ -1473,8 +1564,67 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
+
+  /**
+   * ⭐⭐ **0.156 (§Post-F9.219) — EL CÁRDIGAN, DICHO EN LA LÍNEA QUE LO COBRA.**
+   *
+   * Desde la 0.156 la tela con complemento se compra **junto con su cárdigan**, y el importe de la
+   * línea **ya lo incluye** (`cantidad × precio + complemento × precio`). Sin decirlo, la previa
+   * pintaría `36 kg × $90.00 = $3,645.00` — una cuenta que **no cierra a la vista** justo en la
+   * última pantalla antes de comprometer el dinero.
+   */
+  it('⭐⭐ 0.156: la línea dice cuánto CÁRDIGAN incluye su importe, con el nombre del catálogo', async () => {
+    // El plan de siempre, con su único renglón convertido en una TELA con cárdigan: 36 kg de felpa
+    // a $90 (= $3,240) más 4.5 kg de cárdigan al mismo precio (= $405) ⇒ importe $3,645.
+    const base = planDePrueba();
+    const plan = {
+      ...base,
+      proveedores: base.proveedores.map((prov) => ({
+        ...prov,
+        renglones: prov.renglones.map((r) => ({
+          ...r,
+          material: 'Felpa 50/50',
+          nombreComplemento: 'Cardigan',
+          unidad: 'kg',
+          porOrden: r.porOrden.map((l, i) =>
+            i === 0
+              ? {
+                  ...l,
+                  cantidad: 36,
+                  precio: 90,
+                  cantidadComplemento: 4.5,
+                  importe: 3645,
+                }
+              : l,
+          ),
+        })),
+      })),
+    };
+
+    await llegarALaPrevia(plan);
+
+    // 🔴 LA IGUALDAD IMPRESA TIENE QUE SER VERDADERA: (36 + 4.5) × 90 = 3,645. La versión anterior
+    // ponía `36 kg × $90.00 = $3,645.00` con una leyenda al lado explicando la diferencia — una
+    // cuenta falsa con nota al pie, en la pantalla donde se compromete el dinero.
+    const linea = screen.getAllByTestId('exp-previa-reparto')[0] as HTMLElement;
+    expect(linea).toHaveTextContent('(36 kg + 4.5 kg de Cardigan) × $90.00 = $3,645.00');
+    // Y NO se imprime la igualdad falsa que había antes.
+    expect(linea).not.toHaveTextContent('36 kg × $90.00 = $3,645.00');
+    expect(screen.getByTestId('exp-previa-complemento')).toBeInTheDocument();
+  });
+
+  it('🔑 0.156: sin complemento capturado, la línea NO dice nada de cárdigan', async () => {
+    // El caso de siempre (y el de toda tela sin complemento): la previa se ve exactamente igual que
+    // antes de la fila. Sin esta prueba, pintar la frase siempre pasaría inadvertido.
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-previa-complemento')).not.toBeInTheDocument();
+    // Y la línea conserva su forma de siempre, sin paréntesis ni sumandos.
+    const linea = screen.getAllByTestId('exp-previa-reparto')[0] as HTMLElement;
+    expect(linea).toHaveTextContent('180 pza × $2.00 = $360.00');
+  });
 
   it('⭐ la revisión previa enseña la OC completa, con DE QUÉ OP es cada cantidad', async () => {
     await llegarALaPrevia();
@@ -1556,7 +1706,13 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     await usuario.click(screen.getByTestId('exp-confirmar-generar'));
     expect(mutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = mutateMock.mock.calls[0] as [Record<string, unknown>];
-    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
+    expect(cuerpo).toEqual({
+      idsOrden: [50],
+      idsRequerimiento: [],
+      idDireccionEntrega: 7,
+      // 🔴 V1-E7f: la fecha viaja porque una PERSONA la capturó; ya no la pone el servidor solo.
+      fechaEntrega: '2026-10-15',
+    });
   });
 
   it('volver desde la previa NO genera nada y devuelve la explosión', async () => {
@@ -1596,7 +1752,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 500 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 500 },
     ]);
     // Y NO se generó nada: corregir un número no es comprar.
     expect(mutateMock).not.toHaveBeenCalled();
@@ -1614,7 +1770,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 3.75 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: 3.75 },
     ]);
   });
 
@@ -1630,8 +1786,115 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 0 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: 0 },
     ]);
+  });
+
+  // ── ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA DEL AVÍO EN LA PREVIA ────────────────────
+  //
+  // Daniel: *"Ese modelo nos lo piden en 4 variantes de color… cada color es diferente y cada color
+  // tiene cantidades por medida"*, y su forma preferida: *"poner 4 veces el cierre y **en la
+  // descripción del avío ponerle el color**, y sólo que me dé el desglose de cantidad por medida"*.
+
+  /** Un plan con DOS renglones del MISMO cierre en colores distintos, cada uno con su desglose. */
+  function planConCierres() {
+    const base = planDePrueba();
+    type RenglonPlan = (typeof base.proveedores)[number]['renglones'][number];
+    const botón = base.proveedores[0]?.renglones[0] as RenglonPlan;
+    const cierre = (
+      color: string,
+      idColor: number,
+      medidas: RenglonPlan['medidas'],
+    ): RenglonPlan => ({
+      ...botón,
+      idMaterial: 21,
+      material: 'CIE-53 — Cierre',
+      idColorPrenda: idColor,
+      colorPrenda: color,
+      colorTexto: color,
+      colorAjustado: false,
+      medidas,
+      cantidadTotal: 30,
+      cantidadPropuesta: 30,
+      importe: 180,
+      porOrden: [
+        {
+          idRequerimiento: 90 + idColor,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidad: 30,
+          cantidadPropuesta: 30,
+          precio: 6,
+          cantidadComplemento: null,
+          importe: 180,
+          medidas,
+          seEscribe: true,
+        },
+      ],
+    });
+    const proveedor = base.proveedores[0] as (typeof base.proveedores)[number];
+    return {
+      ...base,
+      proveedores: [
+        {
+          ...proveedor,
+          renglones: [
+            cierre('Rojo', 9, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+              { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+            ]),
+            cierre('Azul', 10, [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 30, orden: 1 }]),
+          ],
+        },
+      ],
+    };
+  }
+
+  it('⭐ los DOS colores del mismo cierre salen como DOS renglones, cada uno con su color', async () => {
+    await llegarALaPrevia(planConCierres());
+    // 🔴 El valor que la pone roja: un solo renglón (los colores fundidos) — *"sólo veo un solo
+    // renglón"*, literal.
+    expect(screen.getAllByTestId('exp-previa-renglon')).toHaveLength(2);
+    const colores = screen.getAllByTestId('exp-previa-color-avio').map((c) => c.textContent);
+    expect(colores).toEqual(['Rojo', 'Azul']);
+  });
+
+  it('⭐ cada renglón enseña su DESGLOSE POR MEDIDA', async () => {
+    await llegarALaPrevia(planConCierres());
+    const desgloses = screen.getAllByTestId('exp-previa-medidas').map((d) => d.textContent);
+    expect(desgloses[0]).toContain('53 cm: 10');
+    expect(desgloses[0]).toContain('60 cm: 20');
+    expect(desgloses[1]).toContain('53 cm: 30');
+  });
+
+  it('⭐ el COLOR del avío es EDITABLE y viaja como `colorTexto` del ajuste de ESE color', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia(planConCierres());
+    previoMutateMock.mockClear();
+
+    const campo = screen.getAllByTestId('exp-previa-color-avio-campo')[0] as HTMLElement;
+    await usuario.clear(campo);
+    await usuario.type(campo, 'Negro contraste');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    // 🔴 El `idColor: 9` es lo que impide que el ajuste del cierre ROJO se le aplique al AZUL.
+    expect(cuerpo.ajustes).toEqual([
+      {
+        tipo: 'avio',
+        idMaterial: 21,
+        idColor: 9,
+        idProveedor: 11,
+        colorTexto: 'Negro contraste',
+      },
+    ]);
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('un avío SIN color no ofrece el campo (no hay color propuesto que corregir)', async () => {
+    // El botón del plan de prueba no se compra por color: la previa no le inventa un campo vacío.
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-previa-color-avio-campo')).toBeNull();
   });
 
   it('🔴 VACIAR el campo BORRA el ajuste (el renglón vuelve a lo que propone el sistema)', async () => {
@@ -1680,7 +1943,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       {
         tipo: 'avio',
         idMaterial: 3,
-        idTelaColor: null,
+        idColor: null,
         idProveedor: 11,
         cantidadTotal: 500,
         precioUnitario: 4,
@@ -2082,6 +2345,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const opciones = screen.getAllByTestId('exp-orden-opcion');
     await usuario.click(opciones[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(pendientes).toHaveLength(1);
 
@@ -2109,6 +2373,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(pendientes).toHaveLength(1);
 
@@ -2200,6 +2465,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       queryClient: cliente,
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     await screen.findByTestId('exp-revision-previa');
 
@@ -2264,6 +2530,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       queryClient: cliente,
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     await waitFor(() => {
       expect(cliente.isMutating()).toBe(0);
@@ -2364,7 +2631,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: -5 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: -5 },
     ]);
   });
 
@@ -2381,7 +2648,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 0 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 0 },
     ]);
   });
 
@@ -2564,10 +2831,11 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(campos).toHaveLength(1);
     fireEvent.change(campos[0] as HTMLElement, { target: { value: '250' } });
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 250 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 250 },
     ]);
   });
 
@@ -2582,6 +2850,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     fireEvent.change(campo, { target: { value: '250' } });
     fireEvent.change(campo, { target: { value: '' } });
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
     expect(cuerpo).not.toHaveProperty('ajustes');
@@ -2731,6 +3000,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: varias OP en una compra (§Post-
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idsOrden: number[] }];
@@ -2974,13 +3244,14 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     const campos = screen.getAllByTestId('exp-ajuste-cantidad');
     expect(campos).toHaveLength(2);
     fireEvent.change(campos[1] as HTMLElement, { target: { value: '250' } });
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
-    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: `idTelaColor: 77` (el grana) o `null` — cualquiera de los dos
+    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: `idColor: 77` (el grana) o `null` — cualquiera de los dos
     // haría que el rollo completo se le cargara al color equivocado.
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'tela', idMaterial: 4, idTelaColor: 78, idProveedor: 11, cantidadTotal: 250 },
+      { tipo: 'tela', idMaterial: 4, idColor: 78, idProveedor: 11, cantidadTotal: 250 },
     ]);
   });
 });
@@ -4536,6 +4807,11 @@ describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISI
               idTelaColor: null,
               telaColor: null,
               cantidadEnOcSinColor: 0,
+              idColorPrenda: null,
+              colorPrenda: null,
+              colorTexto: null,
+              colorAjustado: false,
+              medidas: [],
               material: 'Felpa',
               unidad: 'm',
               cantidadTotal: 45,
@@ -4582,6 +4858,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISI
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
 
@@ -4835,6 +5112,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     expect(claseAmarilla(antes)).toBe(false);
 
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     // 🔴 Bloquear se sigue bloqueando: NO salió la petición del plan.
@@ -4849,6 +5127,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     // Al llenarlo, el aviso se va y la compra sigue su camino.
     await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
     expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
   });
@@ -4876,6 +5155,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     // 🔴 Y no es sólo que se calle: la dirección VIAJA al servidor (que sin ella bloquearía, porque
     // su fallback es la favorita y aquí no hay ninguna marcada).
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
     expect(cuerpo.idDireccionEntrega).toBe(7);
@@ -4904,6 +5184,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('');
     // Y sigue bloqueando (es lo único que bloquea): la petición no sale.
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).not.toHaveBeenCalled();
   });
@@ -4943,6 +5224,9 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
   it('🔴 el botón DICE que falta la dirección, aunque no se apague', async () => {
     useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
     await abrir();
+    // 🔴 V1-E7f: en el título la FECHA va primero (es el primero de la barra), así que para medir
+    // lo que esta prueba mide —que la dirección se dice— hay que capturar la fecha antes.
+    capturarEntregaInicial();
     const boton = screen.getByTestId('exp-generar-oc');
     expect(boton).toBeEnabled();
     expect(boton).toHaveAttribute('title', expect.stringContaining('a dónde se entrega'));
@@ -4970,11 +5254,13 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     const usuario = userEvent.setup();
 
     // 1) Intenta avanzar sin dirección → amarillo.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
 
     // 2) La elige y avanza de verdad (aquí se baja la marca).
     await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
 
@@ -4996,6 +5282,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     await abrir();
     const usuario = userEvent.setup();
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
 
@@ -5085,6 +5372,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
       expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
     });
     // 🔴 Y no es sólo que el aviso se calle: la dirección recién creada VIAJA al servidor.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
     expect(cuerpo.idDireccionEntrega).toBe(9);
@@ -5270,15 +5558,34 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     });
 
     /**
-     * ⭐ **Y EL RESPALDO DE LAS OP SIGUE VALIENDO** (§Post-F9.18): con la entrega capturada en la
-     * orden de producción, la OC ya tiene *cuándo* — reclamarla otra vez sería pedir dos veces lo
-     * mismo, que es la fricción que V1-E4d vino a quitar.
+     * 🔴🔴🔴 **LA PRUEBA DE V1-E7f (§Post-F9.120) — LA OP *CON* FECHA NO EXIME DE CAPTURARLA.**
+     *
+     * Es EXACTAMENTE el caso de Daniel: su orden 7970 **sí** traía fecha de entrega, y por eso la
+     * OC de tela nació con ella («*tomó la fecha de entrega de la OC del cliente*»). Esa fecha es
+     * cuándo se le entrega al CLIENTE; la de la OC es cuándo tiene que llegar la TELA — pedirle al
+     * proveedor la materia prima el día de la entrega final es imposible por definición.
+     *
+     * Hasta hoy esta misma prueba afirmaba lo contrario (*"la OC la hereda"*) y pasaba: la pantalla
+     * se callaba y la petición salía. Ahora reclama, y **la petición NO sale**. Si alguien devuelve
+     * el respaldo —aquí o en `ocSinFechaDeEntrega`—, esto se pone rojo por los dos lados.
      */
-    it('con la fecha en las OP no se reclama nada: la OC la hereda', async () => {
+    it('🔴🔴🔴 con la fecha en las OP se reclama IGUAL: la OC no la hereda (§Post-F9.120)', async () => {
+      // `explosionDePrueba()` trae las OP CON fecha de entrega (el caso de la 7970).
       await abrir(explosionDePrueba());
-      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const aviso = screen.getByTestId('exp-falta-fecha');
+      expect(aviso).toHaveTextContent('«Avíos Baratos»');
+      expect(aviso).toHaveTextContent('No se hereda de la orden de producción');
 
       const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).not.toHaveBeenCalled();
+
+      // Y capturándola —lo único que ahora la resuelve— la compra sigue su camino.
+      fireEvent.change(screen.getByTestId('exp-fecha-entrega'), {
+        target: { value: '2026-10-15' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
       await usuario.click(screen.getByTestId('exp-generar-oc'));
       expect(previoMutateMock).toHaveBeenCalledOnce();
     });
@@ -5420,28 +5727,21 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
  */
 describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por separado', () => {
   /** Un renglón comprable, con lo mínimo que la función mira. */
-  function renglon(
-    idProveedorSugerido: number | null,
-    extra?: {
-      cantidadPendiente?: number;
-      porOrden?: { idOrden: number; cantidadPendiente: number }[];
-    },
-  ) {
+  function renglon(idProveedorSugerido: number | null, extra?: { cantidadPendiente?: number }) {
     return {
       idProveedorSugerido,
       cantidadPendiente: extra?.cantidadPendiente ?? 180,
       idsRequerimiento: [1],
-      porOrden: extra?.porOrden ?? [{ idOrden: 50, cantidadPendiente: 180 }],
     };
   }
 
-  it('el caso sano: un grupo coherente SÍ planea su OC, con las OP de las que vive', () => {
+  it('el caso sano: un grupo coherente SÍ planea su OC', () => {
     expect(
       ocPlaneadasEnPantalla(
         [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(11)] }],
         new Set(),
       ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos' }]);
   });
 
   /**
@@ -5473,65 +5773,511 @@ describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por
   });
 
   /**
-   * 🔴🔴 **LA FECHA DE RESPALDO SALE SÓLO DE LAS OP QUE APORTAN LÍNEA** (hallazgo del reviewer).
-   * Una OP cuyo pendiente ya es 0 —su material está cubierto por otra OC viva— viaja igual en
-   * `porOrden`, pero el servidor la omite antes de calcular el respaldo. Si la pantalla contara su
-   * fecha, **se callaría mientras el servidor bloquea**: la OC nacería sin *cuándo* y el comprador
-   * se lo encontraría tres clics después, en la revisión previa.
-   */
-  it('🔴🔴 una OP sin pendiente NO aporta su fecha de respaldo', () => {
-    expect(
-      ocPlaneadasEnPantalla(
-        [
-          {
-            idProveedor: 11,
-            proveedor: 'Avíos Baratos',
-            renglones: [
-              renglon(11, {
-                cantidadPendiente: 180,
-                porOrden: [
-                  { idOrden: 50, cantidadPendiente: 0 },
-                  { idOrden: 51, cantidadPendiente: 180 },
-                ],
-              }),
-            ],
-          },
-        ],
-        new Set(),
-      ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [51] }]);
-  });
-
-  /**
    * 🔴🔴 **LA FRONTERA DEL FILTRO ES `>=`, Y ESO ES LA INVARIANTE — NO UN DETALLE** (2ª vuelta del
    * reviewer: mutar `>=` a `>` dejaba el archivo entero en verde).
    *
-   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna. Con `>` esa OP se
-   * caería del respaldo y, si era la única con fecha, la pantalla **frenaría una compra que el
-   * servidor sí acepta** — *bloquear de más*, el único error que esta comprobación no se puede
-   * permitir (el margen entero está cargado al otro lado, a propósito).
+   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna, así que ese renglón SÍ
+   * genera línea y su OC SÍ necesita fecha. Con `>` el grupo entero se caería del plan y la pantalla
+   * **se callaría mientras el servidor pide la fecha** — y desde V1-E7f (§Post-F9.120), que nada se
+   * hereda, callarse es exactamente el peor de los dos mundos: el comprador ve todo en orden y se
+   * come el rechazo tres clics después.
    *
    * ⚠️ **Y un resto de un centavo es la forma NORMAL de estos datos**, no un caso de laboratorio:
    * el comentario de `mrp.ts` (busca *"3.7020"*) describe justo esa aritmética — un requerido largo
    * contra una línea ya guardada a 2 decimales deja pendientes de esa talla todo el tiempo.
+   *
+   * ⚠️ Esta prueba fijaba antes el corte por OP (`porOrden`), que existía para el respaldo y murió
+   * con él; se re-apuntó al ÚNICO `>=` que queda —el del renglón—, que hasta hoy el código declaraba
+   * *"no fijado por prueba"*.
    */
-  it('🔴🔴 una OP con pendiente de EXACTAMENTE 0.01 sobrevive y aporta su fecha', () => {
+  it('🔴🔴 un renglón con pendiente de EXACTAMENTE 0.01 SÍ planea su OC (y por tanto pide fecha)', () => {
     expect(
       ocPlaneadasEnPantalla(
         [
           {
             idProveedor: 11,
             proveedor: 'Avíos Baratos',
-            renglones: [
-              renglon(11, {
-                cantidadPendiente: 0.01,
-                porOrden: [{ idOrden: 50, cantidadPendiente: 0.01 }],
-              }),
-            ],
+            renglones: [renglon(11, { cantidadPendiente: 0.01 })],
           },
         ],
         new Set(),
       ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos' }]);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA DEL AVÍO, YA EN LA EXPLOSIÓN.**
+ *
+ * Daniel: *"al hacer la OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*. Con el
+ * renglón partido por color, no enseñar el color aquí dejaría cuatro filas idénticas con cantidades
+ * distintas — peor que antes.
+ */
+describe('ExplosionMaterialesPagina — V1-E8c: el color y el desglose del avío en el renglón', () => {
+  beforeEach(() => {
+    useExplosionMock.mockReset();
+    useGenerarOcMock.mockReset();
+    useConsultaOrdenesMock.mockReset();
+    useDireccionesMock.mockReset();
+    useAsignarProveedorMock.mockReset();
+    useAsignarProveedorEnBloqueMock.mockReset();
+    usePrevioCompraMock.mockReset();
+    useOrdenesDelPedidoMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({
+      mutate: bloqueMutateMock,
+      reset: vi.fn(),
+      data: undefined,
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  /** La explosión con DOS renglones del mismo cierre, uno por color, con su desglose. */
+  function explosionConCierres() {
+    const base = explosionDePrueba();
+    const botón = base.grupos[0]?.renglones[0] as Record<string, unknown>;
+    const cierre = (id: number, color: string, idColor: number, medidas: unknown[]) => ({
+      ...botón,
+      id,
+      idAvio: 21,
+      material: 'CIE-53 — Cierre',
+      idColorPrenda: idColor,
+      colorPrenda: color,
+      medidas,
+      esGenerico: false,
+      estadoGenerico: 'no-aplica',
+      cantidadRequerida: 30,
+      cantidadAComprar: 30,
+      cantidadPendiente: 30,
+      idsRequerimiento: [id],
+    });
+    return {
+      ...base,
+      grupos: [
+        {
+          ...base.grupos[0],
+          renglones: [
+            cierre(30, 'Rojo', 9, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+              { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+            ]),
+            cierre(31, 'Azul', 10, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 30, orden: 1 },
+            ]),
+          ],
+        },
+      ],
+    };
+  }
+
+  async function abrirCon(datos: unknown): Promise<void> {
+    useExplosionMock.mockReturnValue({ data: datos, isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+  }
+
+  it('⭐ cada renglón de avío enseña SU color (dos cierres no se leen idénticos)', async () => {
+    await abrirCon(explosionConCierres());
+    // 🔴 El valor que la pone roja: quitar el chip — dos filas «CIE-53 — Cierre» con 30 cada una y
+    // ninguna manera de saber cuál es cuál.
+    expect(screen.getAllByTestId('exp-color-avio').map((c) => c.textContent)).toEqual([
+      'Rojo',
+      'Azul',
+    ]);
+  });
+
+  it('⭐ cada renglón enseña su DESGLOSE POR MEDIDA bajo el requerido', async () => {
+    await abrirCon(explosionConCierres());
+    const desgloses = screen.getAllByTestId('exp-renglon-medidas').map((d) => d.textContent);
+    expect(desgloses[0]).toContain('53 cm: 10');
+    expect(desgloses[0]).toContain('60 cm: 20');
+    expect(desgloses[1]).toContain('53 cm: 30');
+  });
+
+  it('un avío SIN color ni medidas se pinta como siempre (no se inventa nada)', async () => {
+    await abrirCon(explosionDePrueba());
+    expect(screen.queryByTestId('exp-color-avio')).toBeNull();
+    expect(screen.queryByTestId('exp-renglon-medidas')).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?»**
+ *
+ * Daniel: *"compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que me
+ * falta comprar 1 kilo… **a veces pasa eso en la realidad**. Y **no voy a hacer otra OC por 1
+ * kilo**"*.
+ *
+ * Dos puertas: la **pregunta en la revisión previa** (en el momento de bajar la cantidad) y el
+ * **cierre desde el renglón** de la explosión, para los faltantes que ya se escaparon. Y en las dos,
+ * la mitad que más importa: **el default no cierra nada**.
+ */
+describe('ExplosionMaterialesPagina — V1-E8e: «con esto queda cubierto» (§Post-F9.99)', () => {
+  beforeEach(() => {
+    useExplosionMock.mockReset();
+    useGenerarOcMock.mockReset();
+    useConsultaOrdenesMock.mockReset();
+    useDireccionesMock.mockReset();
+    useAsignarProveedorMock.mockReset();
+    useAsignarProveedorEnBloqueMock.mockReset();
+    usePrevioCompraMock.mockReset();
+    useOrdenesDelPedidoMock.mockReset();
+    previoMutateMock.mockReset();
+    cubrirMutateMock.mockReset();
+    toastExito.mockReset();
+    toastInfo.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({
+      mutate: bloqueMutateMock,
+      reset: vi.fn(),
+      data: undefined,
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  // ── LA EXPLOSIÓN: el faltante que YA se escapó ──────────────────────────────────────────────
+
+  /**
+   * La explosión de siempre, con lo que el renglón del botón trae de cubierto y de pendiente.
+   *
+   * ⚠️ El renglón **agrupa DOS OP** (`idsRequerimiento: [1, 9]`) a propósito: con una sola, `id` y
+   * `idsRequerimiento[0]` coinciden y la prueba no distinguiría *"manda los ids del renglón"* de
+   * *"manda el id de la fila"* — se comprobó mutándolo, y sobrevivía. Un renglón que abarca varias
+   * OP es el caso que Daniel llamó *"muy muy común"* (§Post-F9.86).
+   */
+  function explosionCon(cubierta: number, pendiente = 180) {
+    const base = explosionDePrueba();
+    const renglon = base.grupos[0]?.renglones[0] as Record<string, unknown>;
+    renglon.cantidadCubierta = cubierta;
+    renglon.cantidadPendiente = pendiente;
+    renglon.idsRequerimiento = [1, 9];
+    return base;
+  }
+
+  async function abrirCon(
+    datos: unknown,
+    permisos: Parameters<typeof estadoSesionDePrueba>[0] = ['compras.ver', 'compras.administrar'],
+  ) {
+    useExplosionMock.mockReturnValue({ data: datos, isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(permisos),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    return usuario;
+  }
+
+  it('⭐ el renglón ofrece cerrar el faltante, y lo manda con SUS ids de snapshot', async () => {
+    const usuario = await abrirCon(explosionCon(0));
+    // ⚠️ La explosión de prueba trae varios renglones comprables: se toma el del BOTÓN, que es el
+    // primero y el único cuyos `idsRequerimiento` conocemos.
+    const boton = screen.getAllByTestId('exp-dar-por-cubierto')[0] as HTMLElement;
+    // El botón DICE cuánto deja de pedirse: un «dar por cubierto» a secas no diría qué se renuncia.
+    expect(boton).toHaveTextContent('180');
+    await usuario.click(boton);
+    // 🔴 La CANTIDAD no viaja: la calcula el servidor (A1). Lo que la pantalla dice es *"esto ya no
+    // me lo pidas"*, no un número — mandarlo abriría la puerta a cubrir de más.
+    expect(cubrirMutateMock).toHaveBeenCalledTimes(1);
+    expect(cubrirMutateMock.mock.calls[0]?.[0]).toEqual({
+      // 🔴 TODOS los ids del renglón: uno de pantalla puede abarcar varias OP, y cerrar sólo la
+      // primera dejaría a las otras pidiendo el mismo faltante.
+      idsRequerimiento: [1, 9],
+      cubierto: true,
+    });
+  });
+
+  it('⭐ lo dado por cubierto SE VE, y el botón pasa a ser «volver a pedirlo»', async () => {
+    const usuario = await abrirCon(explosionCon(1, 0));
+    // 🔴 El valor que la pone roja: sin el chip, el renglón se vería cerrado sin decir por qué —y
+    // «dado por cubierto» no es «ya comprado»: lo decidió una persona y se puede deshacer.
+    expect(screen.getByTestId('exp-cubierto-badge')).toHaveTextContent('Dado por cubierto: 1');
+    expect(screen.getAllByTestId('exp-renglon-comprar')[0]).toHaveTextContent('0');
+    // El del BOTÓN deja de ofrecer «dar por cubierto» (ya lo está); el otro renglón comprable de la
+    // explosión de prueba lo sigue ofreciendo.
+    expect(screen.queryAllByTestId('exp-dar-por-cubierto')).toHaveLength(1);
+
+    await usuario.click(screen.getByTestId('exp-volver-a-pedir'));
+    expect(cubrirMutateMock.mock.calls[0]?.[0]).toEqual({
+      idsRequerimiento: [1, 9],
+      cubierto: false,
+    });
+  });
+
+  it('sin `compras.administrar` no se puede decidir qué NO se compra', async () => {
+    await abrirCon(explosionCon(0), ['compras.ver']);
+    expect(screen.queryAllByTestId('exp-dar-por-cubierto')).toHaveLength(0);
+  });
+
+  it('un renglón sin nada pendiente NI cubierto no ofrece nada que cerrar', async () => {
+    await abrirCon(explosionCon(0, 0));
+    // El renglón del botón deja de ofrecerlo (el otro comprable de la explosión de prueba sigue).
+    expect(screen.queryAllByTestId('exp-dar-por-cubierto')).toHaveLength(1);
+    expect(screen.queryByTestId('exp-volver-a-pedir')).toBeNull();
+  });
+
+  it('🔴 si el servidor no movió nada se DICE, en vez de festejar un acto que no ocurrió', async () => {
+    cubrirMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (r: unknown) => void }) => {
+        opciones.onSuccess?.({ cubierto: true, afectados: [] });
+      },
+    );
+    const usuario = await abrirCon(explosionCon(0));
+    await usuario.click(screen.getAllByTestId('exp-dar-por-cubierto')[0] as HTMLElement);
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(toastInfo.mock.calls[0]?.[0]).toContain('no había qué dar por cubierto');
+  });
+
+  it('cuando SÍ movió algo, el aviso dice el material y cuánto deja de pedirse', async () => {
+    cubrirMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (r: unknown) => void }) => {
+        opciones.onSuccess?.({
+          cubierto: true,
+          afectados: [
+            {
+              idRequerimiento: 1,
+              idOrden: 50,
+              folioOrden: 7,
+              material: 'BOT-01 — Botón',
+              unidad: 'pza',
+              cantidad: 180,
+            },
+          ],
+        });
+      },
+    );
+    const usuario = await abrirCon(explosionCon(0));
+    await usuario.click(screen.getAllByTestId('exp-dar-por-cubierto')[0] as HTMLElement);
+    expect(toastExito.mock.calls[0]?.[0]).toContain('BOT-01 — Botón');
+    expect(toastExito.mock.calls[0]?.[0]).toContain('180 pza');
+  });
+
+  // ── LA REVISIÓN PREVIA: la pregunta EN EL MOMENTO de decidir ────────────────────────────────
+
+  /** Un plan de UNA OC con UN renglón, con el faltante y la respuesta que se le indiquen. */
+  function planCon(faltante: number, restoCubierto = false) {
+    return {
+      ordenes: [
+        {
+          idOrden: 50,
+          folio: 7,
+          idModelo: 9,
+          modelo: 'A-100',
+          totalPiezas: 30,
+          idPedido: 300,
+          folioPedido: 1515,
+          fechaEntrega: '2026-09-30',
+        },
+      ],
+      proveedores: [
+        {
+          idProveedor: 11,
+          proveedor: 'Avíos Baratos',
+          fechaEntrega: '2026-09-01',
+          renglones: [
+            {
+              tipo: 'avio' as const,
+              idMaterial: 3,
+              material: 'BOT-01 — Botón',
+              unidad: 'pza',
+              idTelaColor: null,
+              telaColor: null,
+              idColorPrenda: null,
+              colorPrenda: null,
+              colorTexto: null,
+              colorAjustado: false,
+              medidas: [],
+              cantidadEnOcSinColor: 0,
+              cantidadTotal: 180 - faltante,
+              cantidadPropuesta: 180,
+              ajustado: faltante > 0,
+              cantidadFaltante: faltante,
+              restoCubierto,
+              precioUnitario: 2,
+              precioPropuesto: 2,
+              precioAjustado: false,
+              importe: 2 * (180 - faltante),
+              porOrden: [
+                {
+                  idRequerimiento: 1,
+                  idOrden: 50,
+                  folioOrden: 7,
+                  cantidad: 180 - faltante,
+                  cantidadPropuesta: 180,
+                  precio: 2,
+                  importe: 2 * (180 - faltante),
+                  medidas: [],
+                  seEscribe: true,
+                },
+              ],
+            },
+          ],
+          total: 2 * (180 - faltante),
+          ordenes: [7],
+        },
+      ],
+      omitidos: [],
+      bloqueos: [] as string[],
+      avisos: [] as string[],
+      totalGeneral: 2 * (180 - faltante),
+    };
+  }
+
+  /** Llega a la revisión previa con el plan dado. */
+  async function llegarALaPrevia(plan: unknown) {
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(plan);
+      },
+    );
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    capturarEntregaInicial();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    return usuario;
+  }
+
+  it('⭐⭐ bajar la cantidad PREGUNTA qué significa — con los números de Daniel', async () => {
+    await llegarALaPrevia(planCon(1));
+    const caja = screen.getByTestId('exp-previa-cubierto');
+    expect(caja).toHaveTextContent('Pediste 179 pza de los 180 pza que se necesitaban');
+    expect(caja).toHaveTextContent('1 pza');
+    // 🔴 EL DEFAULT: viene marcada «sigue pendiente». Nunca se cierra solo.
+    expect(screen.getByTestId('exp-previa-sigue-pendiente')).toBeChecked();
+    expect(screen.getByTestId('exp-previa-queda-cubierto')).not.toBeChecked();
+  });
+
+  it('comprar COMPLETO no pregunta nada (la pregunta es la excepción, no el saludo)', async () => {
+    await llegarALaPrevia(planCon(0));
+    expect(screen.queryByTestId('exp-previa-cubierto')).toBeNull();
+  });
+
+  it('⭐ contestar «con esto queda cubierto» VIAJA al servidor con el ajuste del renglón', async () => {
+    const usuario = await llegarALaPrevia(planCon(1));
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-previa-queda-cubierto'));
+
+    const cuerpo = previoMutateMock.mock.calls[0]?.[0] as {
+      ajustes?: { restoCubierto?: boolean }[];
+    };
+    // 🔴 El valor que la pone roja: `restoCubierto: undefined` — el clic no diría nada y la compra
+    // saldría dejando el kilo pendiente, que es exactamente lo que el comprador acaba de negar.
+    expect(cuerpo.ajustes?.[0]?.restoCubierto).toBe(true);
+  });
+
+  it('🔴 volver a «sigue pendiente» DESHACE la respuesta (no viaja nada)', async () => {
+    const usuario = await llegarALaPrevia(planCon(1, true));
+    expect(screen.getByTestId('exp-previa-queda-cubierto')).toBeChecked();
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-previa-sigue-pendiente'));
+
+    const cuerpo = previoMutateMock.mock.calls[0]?.[0] as {
+      ajustes?: { restoCubierto?: boolean }[];
+    };
+    // La AUSENCIA de la clave ES «sigue pendiente» (el default del servidor): mandar `false` sería
+    // decir lo mismo dos veces, y dejarlo en `true` sería cerrar algo que ya se retiró.
+    expect(cuerpo.ajustes?.[0]?.restoCubierto).toBeUndefined();
+  });
+
+  it('🔴 BORRAR la cantidad borra la respuesta: no revive sola al volver a bajarla', async () => {
+    const usuario = await llegarALaPrevia(planCon(1));
+    await usuario.click(screen.getByTestId('exp-previa-queda-cubierto'));
+
+    // El comprador se arrepiente del número y vacía «Comprar» (= "no lo toqué").
+    previoMutateMock.mockClear();
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.tab();
+
+    const cuerpo = previoMutateMock.mock.calls[0]?.[0] as { ajustes?: unknown[] };
+    // 🔴 Sin esto, la respuesta se quedaba guardada y volvía a aplicarse en cuanto se bajara otra
+    // vez el número — un «queda cubierto» que él no volvió a decir.
+    expect(cuerpo.ajustes ?? []).toEqual([]);
   });
 });

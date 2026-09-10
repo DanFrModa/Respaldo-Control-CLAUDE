@@ -37,7 +37,6 @@ import type { Avio, AvioProveedor, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { factorParaLectura, precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -100,7 +99,7 @@ const incluirProveedores = {
  * URL), aquí los tipos ya son nativos. La ruta REST le pasa `request.query` ya coaccionado
  * (output del contrato), y los tests pasan valores nativos. Mismo patrón que el maquilero.
  */
-const esquemaListarAviosDominio = esquemaPaginacion.extend({
+export const esquemaListarAviosDominio = esquemaPaginacion.extend({
   /** Texto a buscar en la clave o la descripción (insensible a mayúsculas). */
   busqueda: z.string().trim().max(200).optional(),
   /** Filtra por avíos genéricos (R4). Omitir = todos. */
@@ -331,6 +330,7 @@ function datosOpcionalesCrear(
   if (datos.favorito !== undefined) data.favorito = datos.favorito;
   if (datos.cantFav !== undefined) data.cantFav = datos.cantFav;
   if (datos.esGenerico !== undefined) data.esGenerico = datos.esGenerico;
+  if (datos.seCompraSinColor !== undefined) data.seCompraSinColor = datos.seCompraSinColor;
   if (datos.precioReferencia !== undefined) data.precioReferencia = datos.precioReferencia;
   return data;
 }
@@ -342,7 +342,8 @@ const CAMPOS_TEXTO_EDITABLES = ['unidad', 'presentacion'] as const;
  * Aplica los campos que VENGAN en la edición al `update` y registra qué cambió (para la
  * bitácora). Semántica del PATCH parcial (M1): campo OMITIDO (`undefined`) → no se toca;
  * texto/decimal en `null` (o texto vacío) → se BORRA (a `null`); con valor → se guarda si
- * difiere del actual. `favorito`/`esGenerico` (banderas): omitir = no tocar. Devuelve el
+ * difiere del actual. `favorito`/`esGenerico`/`seCompraSinColor` (banderas): omitir = no
+ * tocar. Devuelve el
  * detalle de cambios para la bitácora.
  */
 function aplicarEditar(
@@ -374,6 +375,12 @@ function aplicarEditar(
   if (datos.esGenerico !== undefined && datos.esGenerico !== actual.esGenerico) {
     cambios.esGenerico = datos.esGenerico;
     detalle.esGenerico = { de: actual.esGenerico, a: datos.esGenerico };
+  }
+  // ⭐⭐ fila 0.158: la bandera que decide si la explosión parte el avío por color. Va a la bitácora
+  // como cualquier otra, porque cambiarla cambia CÓMO se compra el avío de aquí en adelante.
+  if (datos.seCompraSinColor !== undefined && datos.seCompraSinColor !== actual.seCompraSinColor) {
+    cambios.seCompraSinColor = datos.seCompraSinColor;
+    detalle.seCompraSinColor = { de: actual.seCompraSinColor, a: datos.seCompraSinColor };
   }
 
   // Decimales (cantFav/precioReferencia): comparar por valor numérico. Omitir = no tocar;
@@ -693,21 +700,17 @@ export async function listarAvios(
   return armarPagina(datos, total, filtros);
 }
 
-/** Proveedor de un avío con su precio de compra Y ese precio ya en unidad de consumo (R1). */
-export type ProveedorDeAvio = AvioConProveedores['proveedores'][number] & {
-  /**
-   * `precio` ÷ factor de conversión (del proveedor, o el del avío como fallback): el precio POR
-   * UNIDAD DE CONSUMO, que es con el que costean el precosto y el BOM. Lo calcula el DOMINIO
-   * (A1: la aritmética de conversión vive en `comun/conversion.ts`, nunca en la pantalla) para que
-   * el editor de receta muestre el MISMO número que va a costear al amarrar un proveedor.
-   */
-  precioUnidadConsumo: number | null;
-};
+/**
+ * Proveedor de un avío con su precio de compra. ⭐ Ese precio está POR UNIDAD DE CONSUMO — metro,
+ * pieza, kilo—, que es la única unidad del sistema (§Post-F9.97) y con la que costean el precosto y
+ * el BOM. Hasta V1-E8a viajaba junto un `precioUnidadConsumo` = `precio` ÷ factor de conversión;
+ * se retiró con el factor, porque ya no hay dos unidades que traducir.
+ */
+export type ProveedorDeAvio = AvioConProveedores['proveedores'][number];
 
 /**
- * Lista los proveedores de un avío con su precio/condiciones (R1) + el precio ya normalizado a
- * unidad de consumo. El precio por proveedor vive aquí. Requiere `avios.ver`. Exige que el avío
- * exista.
+ * Lista los proveedores de un avío con su precio/condiciones. El precio por proveedor vive aquí.
+ * Requiere `avios.ver`. Exige que el avío exista.
  */
 export async function listarProveedoresDeAvio(
   sesion: SesionUsuario,
@@ -716,38 +719,19 @@ export async function listarProveedoresDeAvio(
 ): Promise<ProveedorDeAvio[]> {
   verificarPermiso(sesion, 'avios.ver');
   const cliente = clienteLectura(bd);
-  const avio = await cliente.avio.findUnique({
-    where: { id: idAvio },
-    select: { id: true, factorConversion: true },
-  });
+  const avio = await cliente.avio.findUnique({ where: { id: idAvio }, select: { id: true } });
   if (avio === null) {
     throw new ErrorNoEncontrado('Avio', idAvio);
   }
-  const filas = await cliente.avioProveedor.findMany({
+  return cliente.avioProveedor.findMany({
     where: { idAvio },
     select: {
       idProveedor: true,
       precio: true,
       condiciones: true,
       habitual: true,
-      factorConversion: true,
       proveedor: { select: { nombre: true } },
     },
     orderBy: { proveedor: { nombre: 'asc' } },
   });
-  return filas.map(({ factorConversion, ...fila }) => ({
-    ...fila,
-    precioUnidadConsumo:
-      fila.precio === null
-        ? null
-        : precioAUnidadConsumo(
-            fila.precio.toNumber(),
-            // Lectura: el factor se SANEA antes de entrar al motor (un valor corrupto se ignora
-            // como si no estuviera), para que el dropdown nunca tumbe la pantalla.
-            resolverFactor(
-              factorParaLectura(factorConversion?.toNumber()),
-              factorParaLectura(avio.factorConversion?.toNumber()),
-            ),
-          ),
-  }));
 }

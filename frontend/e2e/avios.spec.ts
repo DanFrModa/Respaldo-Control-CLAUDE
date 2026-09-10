@@ -26,6 +26,8 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   await dialogo.locator('#proveedor-nombre').fill(nombre);
   // El proveedor exige ≥1 rol/servicio: marca el primero disponible.
   await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+  // La modalidad de facturación es OBLIGATORIA (fila 0.110): sin elegirla el alta no se envía.
+  await dialogo.getByTestId('proveedor-modalidad-facturacion').selectOption('solo_con');
   await page.getByTestId('guardar-proveedor').click();
   await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
 }

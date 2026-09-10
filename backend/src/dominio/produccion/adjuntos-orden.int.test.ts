@@ -164,6 +164,53 @@ describe('Adjuntos de orden (F8-E6) — subir/listar/eliminar (A2, A9)', () => {
     expect(lista[0]?.urlDescarga).toContain('https://');
   });
 
+  /**
+   * ⭐ V1 «los nombres, en vez de los ids» — la lista de adjuntos pintaba `subidoPorId` (un cuid).
+   * `Archivo.subidoPorId` no tiene FK al usuario, así que el nombre lo resuelve el servidor, en
+   * bloque para todos los adjuntos (nunca uno por fila).
+   */
+  it('🔴 cada adjunto sale con el NOMBRE de quien lo subió (resuelto en el servidor)', async () => {
+    const autor = await cliente.usuario.create({
+      data: {
+        username: 'ana-adjuntos-orden',
+        nombre: 'Ana Ruiz',
+        email: 'ana-adjuntos-orden@control.local',
+      },
+    });
+    const idOrden = await crearOrdenDePrueba(empresa.id);
+    const sesionAutor = { ...sesion([...PERM_TODOS]), id: autor.id };
+    await solicitarSubidaAdjunto(
+      sesionAutor,
+      idOrden,
+      { nombreOriginal: 'tech.pdf', tipoMime: 'application/pdf', tamanoBytes: 10 },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const lista = await listarAdjuntos(sesion([...PERM_TODOS]), idOrden, bd(), archivosFalsos());
+    expect(lista[0]?.subidoPorId).toBe(autor.id);
+    expect(lista[0]?.nombreSubidoPor).toBe('Ana Ruiz');
+  });
+
+  /** 🔴 D3 — sin autor resoluble el nombre es null, pero el adjunto SIGUE listándose y descargable. */
+  it('un autor desconocido deja el nombre en null pero NO esconde el adjunto', async () => {
+    const idOrden = await crearOrdenDePrueba(empresa.id);
+    // `sesion()` usa el id 'usuario-prueba', que no existe como fila en la BD.
+    await solicitarSubidaAdjunto(
+      sesion([...PERM_TODOS]),
+      idOrden,
+      { nombreOriginal: 'huerfano.pdf', tipoMime: 'application/pdf', tamanoBytes: 10 },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const lista = await listarAdjuntos(sesion([...PERM_TODOS]), idOrden, bd(), archivosFalsos());
+    expect(lista).toHaveLength(1);
+    expect(lista[0]?.nombreSubidoPor).toBeNull();
+    expect(lista[0]?.nombreOriginal).toBe('huerfano.pdf');
+    expect(lista[0]?.urlDescarga).toContain('https://');
+  });
+
   it('eliminar borra el Archivo (Cascade arrastra el OrdenArchivo) y borra el objeto R2 (best-effort)', async () => {
     const idOrden = await crearOrdenDePrueba(empresa.id);
     const subida = await solicitarSubidaAdjunto(

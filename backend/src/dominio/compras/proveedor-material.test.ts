@@ -27,7 +27,6 @@ function fila(over: Partial<FilaProveedorAvio> & { idProveedor: number }): FilaP
     proveedor: `Proveedor ${String(over.idProveedor)}`,
     activo: true,
     precio: null,
-    factorConversion: null,
     habitual: false,
     ...over,
   };
@@ -38,30 +37,23 @@ function candidato(id: number, nombre: string): CandidatoProveedor {
   return { idProveedor: id, proveedor: nombre, precio: 10, activo: true };
 }
 
-describe('precioProveedorAvio — normalización a unidad de consumo (R1)', () => {
-  it('divide el precio de la PRESENTACIÓN entre el factor del proveedor', () => {
-    // 240 el rollo ÷ 60 m por rollo = 4.00 el metro. Sin dividir daría 240 (rojo).
-    expect(
-      precioProveedorAvio(fila({ idProveedor: 1, precio: 240, factorConversion: 60 }), 1),
-    ).toBe(4);
-  });
-
-  it('cae al factor del AVÍO cuando el proveedor no fija el suyo', () => {
-    // Factor del avío = 4 → 20 ÷ 4 = 5. Si ignorara el factor del avío daría 20 (rojo).
-    expect(
-      precioProveedorAvio(fila({ idProveedor: 1, precio: 20, factorConversion: null }), 4),
-    ).toBe(5);
+describe('precioProveedorAvio — el precio YA está en unidad de consumo (§Post-F9.97)', () => {
+  // ⭐ LA REGLA: `AvioProveedor.precio` va por metro/pieza/kilo, la misma unidad del BOM. Hasta
+  // V1-E8a esta función dividía entre un «factor de conversión» presentación→consumo; el factor se
+  // retiró. Esta prueba es la que impide reintroducirlo: cualquier división vuelve 240 en otra cosa.
+  it('devuelve el precio TAL CUAL, sin dividirlo por nada', () => {
+    expect(precioProveedorAvio(fila({ idProveedor: 1, precio: 240 }))).toBe(240);
   });
 
   it('sin precio capturado devuelve null (no un 0 mudo)', () => {
-    expect(precioProveedorAvio(fila({ idProveedor: 1, precio: null }), 4)).toBeNull();
+    expect(precioProveedorAvio(fila({ idProveedor: 1, precio: null }))).toBeNull();
   });
 });
 
 describe('candidatoHabitualAvio — ⭐ el proveedor al que se le compra siempre (§Post-F9.82)', () => {
   it('sin nadie marcado devuelve null (y el llamador cae al más barato de F4)', () => {
     const filas = [fila({ idProveedor: 1, precio: 5 }), fila({ idProveedor: 2, precio: 3 })];
-    expect(candidatoHabitualAvio(filas, null)).toBeNull();
+    expect(candidatoHabitualAvio(filas)).toBeNull();
   });
 
   it('elige al marcado AUNQUE sea el más caro (esa es la decisión: habitual ≠ más barato)', () => {
@@ -69,16 +61,15 @@ describe('candidatoHabitualAvio — ⭐ el proveedor al que se le compra siempre
       fila({ idProveedor: 1, proveedor: 'Barato', precio: 3 }),
       fila({ idProveedor: 2, proveedor: 'El de siempre', precio: 9, habitual: true }),
     ];
-    const elegido = candidatoHabitualAvio(filas, null);
+    const elegido = candidatoHabitualAvio(filas);
     // Si la función se quedara con el más barato, aquí saldría "Barato"/9 → rojo.
     expect(elegido?.proveedor).toBe('El de siempre');
     expect(elegido?.precio).toBe(9);
   });
 
-  it('normaliza el precio del habitual con su factor (precio ÷ factor)', () => {
-    const filas = [fila({ idProveedor: 7, precio: 500, factorConversion: 100, habitual: true })];
-    // 500 la caja ÷ 100 pzas = 5.00 la pieza. Sin normalizar: 500 (rojo).
-    expect(candidatoHabitualAvio(filas, null)?.precio).toBe(5);
+  it('el precio del habitual viaja TAL CUAL (ya está en unidad de consumo, §Post-F9.97)', () => {
+    const filas = [fila({ idProveedor: 7, precio: 500, habitual: true })];
+    expect(candidatoHabitualAvio(filas)?.precio).toBe(500);
   });
 
   it('un habitual SIN precio sigue siendo el proveedor propuesto (precio null)', () => {
@@ -86,7 +77,7 @@ describe('candidatoHabitualAvio — ⭐ el proveedor al que se le compra siempre
       fila({ idProveedor: 4, proveedor: 'El de siempre', precio: null, habitual: true }),
       fila({ idProveedor: 5, proveedor: 'Otro con precio', precio: 2 }),
     ];
-    const elegido = candidatoHabitualAvio(filas, null);
+    const elegido = candidatoHabitualAvio(filas);
     // El atorón que la etapa vino a quitar era quedarse SIN proveedor; que falte el precio no
     // descalifica al habitual (si eligiera "Otro con precio" esto sería rojo).
     expect(elegido?.idProveedor).toBe(4);
@@ -95,7 +86,7 @@ describe('candidatoHabitualAvio — ⭐ el proveedor al que se le compra siempre
 
   it('un habitual INACTIVO se conserva, marcado como inactivo (el llamador avisa)', () => {
     const filas = [fila({ idProveedor: 9, precio: 1, habitual: true, activo: false })];
-    expect(candidatoHabitualAvio(filas, null)).toMatchObject({ idProveedor: 9, activo: false });
+    expect(candidatoHabitualAvio(filas)).toMatchObject({ idProveedor: 9, activo: false });
   });
 
   it('con dos marcados (no debería pasar: hay índice único) gana el id MENOR, no el primero', () => {
@@ -104,22 +95,19 @@ describe('candidatoHabitualAvio — ⭐ el proveedor al que se le compra siempre
       fila({ idProveedor: 2, proveedor: 'Dos', precio: 7, habitual: true }),
     ];
     // Si devolviera "el primero del arreglo" saldría Ocho → rojo.
-    expect(candidatoHabitualAvio(filas, null)?.proveedor).toBe('Dos');
+    expect(candidatoHabitualAvio(filas)?.proveedor).toBe('Dos');
   });
 });
 
-describe('candidatoMasBaratoAvio — la regla F4/R1, intacta como fallback', () => {
-  it('compara POR UNIDAD DE CONSUMO, no por el precio de la presentación', () => {
+describe('candidatoMasBaratoAvio — la regla F4, intacta como fallback', () => {
+  it('compara los precios directamente: todos están en la MISMA unidad (§Post-F9.97)', () => {
     const filas = [
-      // 300 el rollo ÷ 100 m = 3.00 el metro (el precio BRUTO más alto de los dos).
-      fila({ idProveedor: 1, proveedor: 'Rollo grande', precio: 300, factorConversion: 100 }),
-      // 4 el metro.
-      fila({ idProveedor: 2, proveedor: 'Suelto', precio: 4, factorConversion: 1 }),
+      fila({ idProveedor: 1, proveedor: 'Caro', precio: 300 }),
+      fila({ idProveedor: 2, proveedor: 'Barato', precio: 4 }),
     ];
-    const elegido = candidatoMasBaratoAvio(filas, null);
-    // Comparando precios brutos ganaría "Suelto" (4 < 300) → rojo.
-    expect(elegido?.proveedor).toBe('Rollo grande');
-    expect(elegido?.precio).toBe(3);
+    const elegido = candidatoMasBaratoAvio(filas);
+    expect(elegido?.proveedor).toBe('Barato');
+    expect(elegido?.precio).toBe(4);
   });
 
   it('ignora a los INACTIVOS aunque sean los más baratos', () => {
@@ -127,7 +115,7 @@ describe('candidatoMasBaratoAvio — la regla F4/R1, intacta como fallback', () 
       fila({ idProveedor: 1, proveedor: 'De baja', precio: 1, activo: false }),
       fila({ idProveedor: 2, proveedor: 'Vigente', precio: 6 }),
     ];
-    expect(candidatoMasBaratoAvio(filas, null)?.proveedor).toBe('Vigente');
+    expect(candidatoMasBaratoAvio(filas)?.proveedor).toBe('Vigente');
   });
 
   it('ignora a los que no tienen precio capturado', () => {
@@ -135,7 +123,7 @@ describe('candidatoMasBaratoAvio — la regla F4/R1, intacta como fallback', () 
       fila({ idProveedor: 1, proveedor: 'Sin precio', precio: null }),
       fila({ idProveedor: 2, proveedor: 'Con precio', precio: 6 }),
     ];
-    expect(candidatoMasBaratoAvio(filas, null)?.proveedor).toBe('Con precio');
+    expect(candidatoMasBaratoAvio(filas)?.proveedor).toBe('Con precio');
   });
 
   it('en EMPATE de precio gana el idProveedor menor (determinista, no el orden del arreglo)', () => {
@@ -143,11 +131,11 @@ describe('candidatoMasBaratoAvio — la regla F4/R1, intacta como fallback', () 
       fila({ idProveedor: 9, proveedor: 'Nueve', precio: 5 }),
       fila({ idProveedor: 3, proveedor: 'Tres', precio: 5 }),
     ];
-    expect(candidatoMasBaratoAvio(filas, null)?.proveedor).toBe('Tres');
+    expect(candidatoMasBaratoAvio(filas)?.proveedor).toBe('Tres');
   });
 
   it('sin ningún precio devuelve null (nadie a quien comprarle por precio)', () => {
-    expect(candidatoMasBaratoAvio([fila({ idProveedor: 1 })], null)).toBeNull();
+    expect(candidatoMasBaratoAvio([fila({ idProveedor: 1 })])).toBeNull();
   });
 });
 

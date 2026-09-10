@@ -16,13 +16,18 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { explosionarOrden, previoCompraDesdeExplosion } from '../compras/mrp.js';
+import {
+  explosionarOrden,
+  generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
+} from '../compras/mrp.js';
 import {
   actualizarOC,
   autorizarOC,
   cancelarOC,
   crearOC,
   desautorizarOC,
+  duplicarOC,
 } from '../compras/ordenes-compra.js';
 import { obtenerCostoOrden } from '../costos/costo-orden.js';
 import { enTransaccion } from '../../comun/transaccion.js';
@@ -30,8 +35,11 @@ import { enTransaccion } from '../../comun/transaccion.js';
 import { habilitacionOrden } from './habilitacion-orden.js';
 import { consultarRecetasPorLiberar } from './recetas-por-liberar.js';
 import {
+  abrirReceta,
   agregarRenglonReceta,
+  cerrarReceta,
   copiarRecetaDelModelo,
+  corregirCapturaAvio,
   editarRenglonReceta,
   leerRecetaParaImpreso,
   liberarReceta,
@@ -1110,7 +1118,7 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
     // con la sesión de Compras, no con la de Desarrollo que libera.
     const plan = await previoCompraDesdeExplosion(
       sesionOc(),
-      { idsOrden: [ordenA], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
       bd(),
     );
 
@@ -1147,7 +1155,7 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
     // con la sesión de Compras, no con la de Desarrollo que libera.
     const plan = await previoCompraDesdeExplosion(
       sesionOc(),
-      { idsOrden: [ordenA], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
@@ -2340,6 +2348,293 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
   });
 
+  /**
+   * ⭐⭐⭐ **V1-E8h (§Post-F9.130) — EL BOTÓN «CORREGIR»: el remedio que faltaba.**
+   *
+   * Daniel, 27-ago-2026: *"Sigue estando mal lo de los cierres… me sigue multiplicando por las
+   * medidas… Y me sigue poniendo 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo
+   * modelo desde el principio para que funcione bien? o sigue siendo algún tema de programación?
+   * **Siento que estamos atorados en lo mismo desde hace varias versiones.**"*
+   *
+   * Y no estaba atorado el CÁLCULO: el motor lleva sano desde el 18-ago-2026
+   * (`copiarRecetaDelModelo` normaliza al nacer la orden, así que **una OP nueva sale bien**). Lo
+   * que nunca se tocó es el **dato ya congelado** de las órdenes viejas — se arregló el cálculo tres
+   * veces y el dato equivocado se quedó guardado. Y el aviso, que ya sabía la magnitud, cerraba con
+   * *"Guarda el renglón para normalizarlo"*: **un conjuro que un no-programador no puede adivinar**.
+   *
+   * ⚠️ **EL FIXTURE ES LA PARTE FINA.** El estado que estas pruebas necesitan —un `OrdenAvio` con
+   * `consumoPorTalla = true` sobre un avío que TIENE medidas— **no se puede montar por el MODELO**:
+   * `copiarRecetaDelModelo` lo normalizaría al copiar y la prueba no probaría nada (la receta ya
+   * está congelada en la ORDEN). Se escribe DIRECTO sobre el renglón de la orden, que es exactamente
+   * como llegó a producción.
+   */
+  describe('⭐⭐⭐ V1-E8h — el botón «Corregir» (§Post-F9.130)', () => {
+    /** Sesión de compras con la llave de autorizar (para montar el caso de la OC viva). */
+    function sesionComprasAutoriza(): SesionUsuario {
+      return sesionDePrueba({
+        idEmpresaActiva: empresa.id,
+        permisos: ['compras.ver', 'compras.administrar', 'compras.autorizar'],
+      });
+    }
+
+    /**
+     * Deja el renglón del BOTÓN con la contradicción congelada y devuelve su id de renglón.
+     * La orden lleva 10 piezas de CH: hoy pide 53×10 = 530 pza, y de verdad lleva 2×10 = 20.
+     */
+    async function conLaContradiccion(): Promise<number> {
+      const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioBoton.id,
+      )!;
+      await cliente.ordenAvio.update({ where: { id: previo.id }, data: { consumoPorTalla: true } });
+      await cliente.ordenAvioTalla.create({
+        data: { idOrdenAvio: previo.id, idTalla: tallaCH.id, consumo: 53 },
+      });
+      await botonPorMedida();
+      return previo.id;
+    }
+
+    it('⭐⭐ el aviso NOMBRA el botón y el renglón se marca REPARABLE (no hay que adivinar)', async () => {
+      await conLaContradiccion();
+      const boton = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioBoton.id,
+      )!;
+      // La magnitud, PRIMERO y en lenguaje de negocio: 53×10 = 530 contra 2×10 = 20.
+      expect(boton.avisoCaptura).toContain('Esta orden pide 530 pza y deberían ser 20 pza');
+      expect(boton.avisoCaptura).toContain('«Corregir»');
+      // 🔴 Y ya NO manda a adivinar el conjuro que estuvo tres versiones en pantalla.
+      expect(boton.avisoCaptura).not.toContain('normalizarlo');
+      expect(boton.capturaReparable).toBe(true);
+    });
+
+    it('⭐⭐⭐ CORREGIR baja el requerido de 530 a 20 — y la EXPLOSIÓN lo refleja', async () => {
+      const idRenglon = await conLaContradiccion();
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      // 🔴 Antes: la explosión —donde Daniel lo sufre— compra 53 veces lo que hace falta.
+      const antes = (await explosionarOrden(sesion(), ordenA, bd())).grupos.flatMap(
+        (g) => g.renglones,
+      );
+      expect(antes.find((r) => r.idAvio === avioBoton.id)?.cantidadRequerida).toBe(530);
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+      expect(boton.consumoPorTalla).toBe(false);
+      expect(boton.avisoCaptura).toBeNull();
+      expect(boton.capturaReparable).toBe(false);
+      // D3: la cantidad vieja NO se borra, sólo deja de mandar.
+      expect(boton.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(53);
+      // Y lo que NO se toca: el consumo por prenda congelado sigue igual.
+      expect(boton.consumoPorPrenda).toBe(2);
+      // 🔴 NO queda «ajustado»: corregir un defecto NUESTRO no es desviar el renglón del modelo, y
+      // marcarlo apagaría para siempre los avisos de "el modelo cambió" de ese renglón.
+      expect(boton.estado).not.toBe('ajustado');
+
+      // Se vuelve a firmar (la corrección cambió el requerido, así que la firma se cayó) y la
+      // explosión ya pide lo bueno.
+      await liberarReceta(sesion(), ordenA, { renglones: [{ tipo: 'avio', id: idRenglon }] }, bd());
+      const despues = (await explosionarOrden(sesion(), ordenA, bd())).grupos.flatMap(
+        (g) => g.renglones,
+      );
+      expect(despues.find((x) => x.idAvio === avioBoton.id)?.cantidadRequerida).toBe(20);
+    });
+
+    it('⭐ queda AUDITADO con la magnitud: qué se pedía y qué se pide (A7/D3)', async () => {
+      const idRenglon = await conLaContradiccion();
+      await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      const bitacora = await cliente.bitacora.findFirst({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+        orderBy: { id: 'desc' },
+      });
+      const datos = JSON.stringify(bitacora?.datos);
+      expect(datos).toContain('captura-por-medida-corregida');
+      expect(datos).toContain('"consumoPorTalla":false');
+      // La foto ÍNTEGRA de lo que había, con la cantidad por talla que dejó de mandar (D3).
+      expect(datos).toContain('"consumo":53');
+      // 🔴 La MAGNITUD escrita: sin esto, dentro de un mes nadie puede reconstruir qué se corrigió.
+      expect(datos).toContain('"requeridoAntes":530');
+      expect(datos).toContain('"requeridoDespues":20');
+
+      // 🔴 H5 del review — A7 NO es sólo la bitácora: la FILA guarda quién la tocó por última vez
+      // (`datosModificacion`). Sin este assert, quitar esa línea del `update` pasaba el CI entero.
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).modificadoPorId,
+      ).toBe(sesion().id);
+    });
+
+    it('🔴 sobre un renglón SANO devuelve 409: no es una puerta lateral para apagar la bandera', async () => {
+      // La jareta SÍ se consume por talla de verdad (no tiene medidas en su catálogo): apagarle la
+      // bandera "corrigiendo" sería cambiar el negocio, no reparar un defecto.
+      const jareta = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioJareta.id,
+      )!;
+      await cliente.ordenAvio.update({ where: { id: jareta.id }, data: { consumoPorTalla: true } });
+
+      // 🔴 **H2 del review — y es la mitad que faltaba.** Sin este assert, mapear
+      // `capturaReparable: f.consumoPorTalla` (olvidando el "¿es por medida?") SOBREVIVÍA el CI
+      // entero: las dos únicas afirmaciones que había eran `true` sobre el renglón contradictorio y
+      // `false` DESPUÉS de corregirlo —cuando `consumoPorTalla` ya vale `false` de todos modos—, o
+      // sea que ninguna distinguía los dos mundos. Con la mutación viva, el botón «Corregir»
+      // aparecería en la jareta, el elástico y todo avío que SÍ se consume por talla de verdad, y
+      // Daniel se llevaría un 409 que no puede accionar.
+      expect(jareta.consumoPorTalla).toBe(false); // (lo de arriba se escribió por fuera del dominio)
+      const jaretaConBandera = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioJareta.id,
+      )!;
+      expect(jaretaConBandera.consumoPorTalla).toBe(true);
+      expect(jaretaConBandera.capturaReparable).toBe(false);
+      expect(jaretaConBandera.avisoCaptura).toBeNull();
+
+      await expect(corregirCapturaAvio(sesion(), ordenA, jareta.id, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: jareta.id } })).consumoPorTalla,
+      ).toBe(true);
+    });
+
+    it('🔴 RE-CIERRA la firma de ESE renglón (y sólo de ése): el requerido cambió', async () => {
+      const idRenglon = await conLaContradiccion();
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      expect(r.avios.find((a) => a.id === idRenglon)?.liberadoEn).toBeNull();
+      // 🔴 SÓLO ése: corregir un avío no puede tumbar la firma de la tela que ya se compra.
+      expect(r.telas[0]?.liberadoEn).not.toBeNull();
+    });
+
+    /**
+     * 🔴 **H1 + H3 del review — EL RENGLÓN EXCLUIDO (la lápida).**
+     *
+     * H3: la rama `cayoSobreLapida` de `corregirCapturaAvio` estaba documentada tres veces y
+     * **probada cero**. H1: y encima estaba MAL — el aviso decía *"Esta orden pide 530 pza"* de un
+     * renglón que la orden **no pide en absoluto**, y con el botón al lado. Un enunciado factual
+     * falso es peor que no avisar: es el mecanismo por el que se deja de creerle al sistema.
+     */
+    it('🔴 sobre una LÁPIDA el aviso NO inventa magnitud, y corregir no revoca ninguna firma', async () => {
+      const idRenglon = await conLaContradiccion();
+      // 🔴 **SE LIBERA ANTES DE QUITAR, Y ES DELIBERADO.** Excluir un renglón NO revoca su firma, así
+      // que la lápida llega aquí con `liberadoEn` **no nulo** — y eso es lo único que hace que el
+      // assert de abajo mate la mutación de invertir la rama (`ctx.tocoRenglon` en vez de
+      // `ctx.cayoSobreLapida`): con la firma ya limpia, `revocarFirmaDeRenglones` no tendría nada que
+      // limpiar y la prueba pasaría en verde con el defecto vivo. ⚠️ Invertir estas dos líneas deja
+      // la prueba **sin poder fallar, sin ponerse roja al hacerlo**.
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+      await quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd());
+
+      // (H1) La orden pide CERO de este material: el aviso sigue existiendo —hay que arreglarlo
+      // igual, puede revivir— pero SIN cifras, la misma variante que usa el BOM del modelo.
+      const lapida = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.id === idRenglon,
+      )!;
+      expect(lapida.excluido).toBe(true);
+      expect(lapida.capturaReparable).toBe(true);
+      expect(lapida.avisoCaptura).toContain('POR MEDIDA');
+      expect(lapida.avisoCaptura).not.toContain('Esta orden pide');
+      expect(lapida.avisoCaptura).toContain('«Corregir»');
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      // (a) La bandera se apaga igual: si revive, revive ya sano.
+      const corregida = r.avios.find((a) => a.id === idRenglon)!;
+      expect(corregida.consumoPorTalla).toBe(false);
+      expect(corregida.capturaReparable).toBe(false);
+      // (b) Y NO se revoca ninguna firma —ni la suya—: tocar una lápida no cambia qué se compra.
+      expect(corregida.liberadoEn).not.toBeNull();
+      expect(r.telas[0]?.liberadoEn).not.toBeNull();
+      expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.liberadoEn).not.toBeNull();
+      // (c) La bitácora no puede decir un número distinto del que el usuario leyó: sin magnitud
+      // en el aviso, aquí los dos requeridos son 0 y coinciden con él.
+      const bitacora = await cliente.bitacora.findFirst({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+        orderBy: { id: 'desc' },
+      });
+      const datos = JSON.stringify(bitacora?.datos);
+      expect(datos).toContain('captura-por-medida-corregida');
+      expect(datos).toContain('"requeridoAntes":0');
+      expect(datos).toContain('"requeridoDespues":0');
+    });
+
+    /**
+     * 🔴 **H1 del review, la otra mitad**: el renglón que sigue VIVO pero está apagado para
+     * producción tampoco pide nada — y `requeridoContradictorioPorMedida` no sabe de esa bandera
+     * (su tipo de entrada ni siquiera la tiene). El criterio se le pregunta a `requeridoDelRenglon`,
+     * que es quien ya lo decide para la guarda de compra y para la bitácora.
+     */
+    it('🔴 con `paraProduccion: false` el aviso tampoco afirma que la orden pide de más', async () => {
+      const idRenglon = await conLaContradiccion();
+      await editarRenglonReceta(
+        sesion(),
+        ordenA,
+        'avio',
+        idRenglon,
+        { paraProduccion: false },
+        bd(),
+      );
+
+      // ⚠️ Editar el renglón YA normaliza (§Post-F9.105), así que se vuelve a poner la
+      // contradicción por fuera del dominio: lo que se mide aquí es el AVISO, no la edición.
+      await cliente.ordenAvio.update({ where: { id: idRenglon }, data: { consumoPorTalla: true } });
+
+      const apagado = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.id === idRenglon,
+      )!;
+      expect(apagado.paraProduccion).toBe(false);
+      expect(apagado.capturaReparable).toBe(true);
+      expect(apagado.avisoCaptura).toContain('POR MEDIDA');
+      expect(apagado.avisoCaptura).not.toContain('Esta orden pide');
+    });
+
+    it('🔴 exige `desarrollo.administrar`: verla no alcanza para repararla (A4)', async () => {
+      const idRenglon = await conLaContradiccion();
+      await expect(
+        corregirCapturaAvio(sesion(['ordenes.ver', 'desarrollo.ver']), ordenA, idRenglon, bd()),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).consumoPorTalla,
+      ).toBe(true);
+    });
+
+    it('🔴 con el consumo por prenda en 0 y OC viva NO vacía la compra: dice qué capturar', async () => {
+      // La tercera puerta de atrás (§Post-F9.79): si TODO lo que el renglón pide sale de las
+      // cantidades por talla, corregirlo lo dejaría en CERO — y ese avío ya está comprado. El
+      // mensaje NO manda a des-autorizar una OC que está bien: la causa es nuestra.
+      const idRenglon = await conLaContradiccion();
+      await cliente.ordenAvio.update({ where: { id: idRenglon }, data: { consumoPorPrenda: 0 } });
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Avíos SA' } });
+      const direccion = await cliente.direccionEntrega.create({
+        data: { nombre: 'Naucalpan V1E8h', direccion: 'Calle 2' },
+      });
+      const oc = await crearOC(
+        sesionComprasAutoriza(),
+        {
+          idProveedor: proveedor.id,
+          idDireccionEntrega: direccion.id,
+          fechaEntrega: '2026-09-30',
+          lineas: [{ idAvio: avioBoton.id, cantidad: 530, precio: 2, idOrden: ordenA }],
+        },
+        bd(),
+      );
+      await autorizarOC(sesionComprasAutoriza(), oc.id, bd());
+
+      await expect(corregirCapturaAvio(sesion(), ordenA, idRenglon, bd())).rejects.toThrow(
+        /consumo por prenda/i,
+      );
+      // La bandera sigue encendida: la transacción se deshizo entera (A2).
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).consumoPorTalla,
+      ).toBe(true);
+    });
+  });
+
   it('⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío', async () => {
     const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
       (a) => a.idAvio === avioBoton.id,
@@ -2353,8 +2648,9 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     const leido = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const aviso = leido.avios.find((a) => a.idAvio === avioBoton.id)?.avisoCaptura ?? '';
     // La orden lleva 10 piezas de CH: 53×10 = 530 pza contra las 2×10 = 20 que de verdad lleva.
-    expect(aviso).toContain('530 pza');
-    expect(aviso).toContain('en vez de 20 pza');
+    // ⭐⭐ V1-E8h: las dos cifras EN UNA SOLA FRASE y de primeras — el aviso ya no abre con dos
+    // renglones de explicación técnica con el número sepultado en medio.
+    expect(aviso.startsWith('Esta orden pide 530 pza y deberían ser 20 pza')).toBe(true);
   });
 });
 
@@ -3060,5 +3356,796 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
       bd(),
     );
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+
+  // ── ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — SI YA SE COMPRÓ, AVISA ───────────────────────────────────
+  //
+  // DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede cancelar
+  // la OC interna, o que **el comprador sepa que cambió**… **No se puede cancelar la OC en
+  // automático… eso hay que negociarlo con el proveedor.**"*
+  //
+  // 🔴 EL HUECO, y por qué no lo tapaba nada de lo de arriba: la guarda de §Post-F9.79 frena cuando
+  // el cambio SACA el material. **Cambiarle el precio, el consumo o el amarre a un material ya
+  // comprado no lo frena nada —ni debe—, y hasta la 0.084 tampoco lo avisaba nadie.** Se le caía la
+  // firma y ahí terminaba todo. Estas pruebas fijan las dos mitades: que AVISA, y que **NO bloquea**.
+
+  /** El folio (`numCompra`) de una OC, que es como se la nombra en el aviso. */
+  async function folioDe(idOc: number): Promise<number> {
+    return Number((await cliente.ordenCompra.findUniqueOrThrow({ where: { id: idOc } })).numCompra);
+  }
+
+  it('⭐⭐⭐ cambiar el PRECIO de un material ya comprado AVISA — y NO bloquea', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    // 1) NO bloqueó: el cambio se guardó (Daniel pidió que AVISE, no que impida).
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.precio).toBe(11);
+    // 2) Y avisó, nombrando el material, el folio y el camino que sí existe.
+    const aviso = r.avisoCambioSobreLoComprado;
+    expect(aviso).not.toBeNull();
+    expect(aviso).toContain('JAR-01');
+    expect(aviso).toContain(`#${String(folio)} (autorizada)`);
+    expect(aviso).toContain('negociarlo con el proveedor');
+    // 3) §Post-F9.145(f): no manda a nadie a un botón que le va a dar 403 sin decírselo.
+    expect(aviso).toContain('pídeselo a quien lo tenga');
+  });
+
+  it('⭐ EL GEMELO: con la OC en BORRADOR no avisa nada (no hay con quién negociar)', async () => {
+    // 🔴 La trampa de fixture que esta pareja existe para no caer: si la OC de la prueba de arriba
+    // naciera en `borrador`, el caso "comprometida" NUNCA se ejercitaría y las dos pasarían verdes
+    // sin que el criterio estuviera bien. Aquí se siembra el estado REAL de cada rama.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    await ocDe(ordenA, { idAvio: avioJareta.id }); // se queda en BORRADOR: NO se autoriza
+    const idRenglon = await renglonJareta(ordenA);
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.ocsComprometidas).toEqual([]);
+    expect(r.ocsComprometidas).toEqual([]);
+    expect(r.avisoCompraComprometida).toBeNull();
+  });
+
+  it('⭐ EL OTRO GEMELO: si la OC ya se RECIBIÓ, el aviso cambia de camino', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await cliente.ordenCompra.update({
+      where: { id: idOc },
+      data: { estatus: 'recibida_parcial' },
+    });
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    expect(r.avisoCambioSobreLoComprado).toContain('ya se RECIBIÓ');
+    expect(r.avisoCambioSobreLoComprado).toContain('devolución o un ajuste');
+    // Sobre una OC recibida des-autorizar NO existe para nadie: mandar ahí sería mandar a rebotar.
+    expect(r.avisoCambioSobreLoComprado).not.toContain('perfil de Dirección');
+  });
+
+  it('el renglón lleva SUS OC comprometidas, con folio y estado (la fila lo dice sola)', async () => {
+    const { idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.ocsComprometidas).toEqual([
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
+    ]);
+    // Y va POR MATERIAL: el botón, que nadie compró, no hereda la OC de la jareta.
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.ocsComprometidas).toEqual([]);
+    expect(r.telas[0]?.ocsComprometidas).toEqual([]);
+  });
+
+  it('⭐ tocar OTRO renglón (el que NO está comprado) no levanta el aviso', async () => {
+    await jaretaComprada(ordenA);
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const idBoton = r0.avios.find((a) => a.idAvio === avioBoton.id)?.id ?? 0;
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idBoton, { precio: 2 }, bd());
+    // Rojo si el aviso se calculara sobre la orden entera en vez de sobre lo TOCADO: entonces
+    // cambiarle el precio al botón gritaría sobre la jareta, que nadie movió.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+  });
+
+  it('el cambio sobre lo comprado queda en la BITÁCORA (A7/D3: el toast se lo lleva el viento)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const rastro = await cliente.bitacora.findFirst({
+      where: {
+        entidad: 'RecetaOrden',
+        idEntidad: String(ordenA),
+        datos: { path: ['accion'], equals: 'cambio-sobre-material-ya-comprado' },
+      },
+      orderBy: { id: 'desc' },
+    });
+    expect(rastro).not.toBeNull();
+    expect(rastro?.datos).toMatchObject({
+      renglones: [{ material: 'JAR-01 — Jareta', ocs: [{ folio, estatus: 'autorizada' }] }],
+    });
+  });
+
+  it('una LECTURA nunca resucita el aviso del cambio, pero sí trae el de la orden', async () => {
+    const { idRenglon } = await jaretaComprada(ordenA);
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    // El eco es de LA MUTACIÓN: recargar la pantalla no puede repetir un aviso de algo ya pasado.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    // Pero el estado de la orden sí sigue ahí: es lo que se pinta ANTES de reabrir (hueco 2).
+    expect(r.ocsComprometidas).toHaveLength(1);
+    expect(r.avisoCompraComprometida).toContain('NO las cancela');
+  });
+
+  it('⭐ des-autorizada la OC, el aviso se CALLA solo (en vivo, nunca un snapshot)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await desautorizarOC(
+      sesionCompras(['compras.desautorizar']),
+      idOc,
+      { motivo: 'se renegoció' },
+      bd(),
+    );
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+    // Rojo si el aviso se hubiera guardado el día del cambio: seguiría gritando sobre una OC muerta.
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+    expect(r.ocsComprometidas).toEqual([]);
+  });
+
+  it('⭐⭐⭐ LA BANDEJA lleva las OC comprometidas al COMPRADOR (folio + estado)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = await folioDe(idOc);
+    // El cambio que desfirma el renglón: así es como esta orden vuelve a la bandeja.
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 11 }, bd());
+
+    const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+    const fila = pagina.datos.find((f) => f.idOrden === ordenA)!;
+    expect(fila.ocsComprometidas).toEqual([
+      { idOrdenCompra: idOc, folio, estatus: 'autorizada', recibida: false },
+    ]);
+    // La orden que no tiene compra comprometida sale con la lista vacía, no ausente.
+    expect(pagina.datos.find((f) => f.idOrden === ordenB)?.ocsComprometidas).toEqual([]);
+  });
+
+  /**
+   * ⭐⭐⭐ **REVIVIR UNA LÁPIDA NO ES CREAR: ES CAMBIARLE EL CONTENIDO A UN RENGLÓN QUE YA EXISTE**
+   * (hallazgo del reviewer de la 0.085).
+   *
+   * 🔴 El camino, entero y real: se EXCLUYE un material (legal: todavía no hay OC) → **Compras
+   * captura a mano una línea de OC** contra ese (orden, material) y la autoriza —nada lo impide,
+   * porque la puerta de compra sólo frena lo que está PENDIENTE de firma, y una lápida no lo
+   * está— → alguien REVIVE el renglón, lo que le **reescribe consumo, precio y amarre**. Hasta la
+   * primera versión de esta etapa eso pasaba **en silencio**: `agregarRenglonReceta` no declaraba
+   * `tocoRenglon`, así que ni revocaba firma ni avisaba.
+   */
+  async function jaretaExcluidaYComprada(idOrden: number): Promise<number> {
+    await marcarRecetaRevisada(sesion(), idOrden, bd());
+    await liberarTodo(idOrden);
+    // Se saca de la receta ANTES de que exista la OC: en ese momento es perfectamente legal.
+    await quitarRenglonReceta(
+      sesion(),
+      idOrden,
+      'avio',
+      await renglonJareta(idOrden),
+      { motivo: 'el cliente la negoció fuera' },
+      bd(),
+    );
+    // Y AHORA Compras la compra igual, a mano. La lápida no está pendiente de firma, así que la
+    // puerta de compra no la frena.
+    const idOc = await ocDe(idOrden, { idAvio: avioJareta.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    return idOc;
+  }
+
+  it('⭐⭐⭐ REVIVIR una lápida cuyo material YA ESTÁ COMPRADO avisa (no pasa en silencio)', async () => {
+    const idOc = await jaretaExcluidaYComprada(ordenA);
+    const folio = await folioDe(idOc);
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: avioJareta.id, consumoPorPrenda: 4 },
+      bd(),
+    );
+
+    // Revivió (no bloquea: el material VUELVE a la compra, no sale de ella)…
+    const revivida = r.avios.find((a) => a.idAvio === avioJareta.id)!;
+    expect(revivida.excluido).toBe(false);
+    expect(revivida.consumoPorPrenda).toBe(4);
+    // …y AVISA, nombrando la OC que acaba de quedar descuadrada.
+    expect(r.avisoCambioSobreLoComprado).toContain('JAR-01');
+    expect(r.avisoCambioSobreLoComprado).toContain(`#${String(folio)} (autorizada)`);
+    // Y su firma se cayó, que es lo que lo devuelve a la bandeja del comprador.
+    expect(revivida.liberadoEn).toBeNull();
+  });
+
+  it('⭐⭐ …y lo MISMO por la rama de la TELA, que es la OTRA mitad del arreglo', async () => {
+    /*
+     * 🔴 EXISTE PORQUE LA COBERTURA ESTABA A MEDIAS, y lo midió el reviewer: quitar sólo el
+     * `tocoRenglon` de la rama de la TELA sobrevivía a las 2 425 unit **y a las de integración**,
+     * porque ninguna de las ~20 pruebas de `agregarRenglonReceta` del archivo combinaba revivir una
+     * TELA con una OC comprometida. Son dos ramas distintas del mismo `if`, con su propio `update`
+     * cada una: probar sólo el avío deja la otra libre de caer.
+     *
+     * Es la regla que esta misma etapa escribió al reforzar M8: un fixture que sólo alcanza
+     * mientras nadie ejercite el caso de al lado es una prueba que caduca sin avisar.
+     */
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const tela = r0.telas.find((t) => t.idTela === telaJersey.id)!;
+    await quitarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { motivo: 'se cambió' }, bd());
+    // Compras la compra igual, a mano: la lápida no está pendiente de firma y nada la frena.
+    const idOc = await ocDe(ordenA, { idTela: telaJersey.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    const folio = await folioDe(idOc);
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'tela', idTela: telaJersey.id, consumoPorPrenda: 9 },
+      bd(),
+    );
+
+    const revivida = r.telas.find((t) => t.idTela === telaJersey.id)!;
+    expect(revivida.excluido).toBe(false);
+    expect(revivida.consumoPorPrenda).toBe(9);
+    // 🔴 LA aserción que mata la mutación: sin `ctx.tocoRenglon('tela', …)` esto es `null`.
+    expect(r.avisoCambioSobreLoComprado).toContain('Jersey');
+    expect(r.avisoCambioSobreLoComprado).toContain(`#${String(folio)} (autorizada)`);
+  });
+
+  it('⭐ EL GEMELO: revivir una lápida con la OC en BORRADOR no avisa nada', async () => {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      await renglonJareta(ordenA),
+      { motivo: 'fuera' },
+      bd(),
+    );
+    await ocDe(ordenA, { idAvio: avioJareta.id }); // se queda en BORRADOR: NO se autoriza
+
+    const r = await agregarRenglonReceta(
+      sesion(),
+      ordenA,
+      { tipo: 'avio', idAvio: avioJareta.id, consumoPorPrenda: 4 },
+      bd(),
+    );
+
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(false);
+    expect(r.avisoCambioSobreLoComprado).toBeNull();
+  });
+
+  it('⭐ y la LÁPIDA comprada se ve como tal ANTES de revivirla (el chip sale de este dato)', async () => {
+    await jaretaExcluidaYComprada(ordenA);
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const lapida = r.avios.find((a) => a.idAvio === avioJareta.id)!;
+
+    // 🔴 Excluida Y comprada a la vez: es la contradicción que la pantalla tiene que enseñar antes
+    // de que alguien la reviva. Si `armarReceta` se saltara las lápidas, el chip no existiría.
+    expect(lapida.excluido).toBe(true);
+    expect(lapida.ocsComprometidas).toHaveLength(1);
+    expect(lapida.ocsComprometidas[0]).toMatchObject({ estatus: 'autorizada', recibida: false });
+  });
+
+  it('⭐ LA BANDEJA distingue: un BORRADOR marca «ya frena compras» pero NO es compra comprometida', async () => {
+    // 🔴 La pareja que separa las dos preguntas, y la razón de no copiar el `<> cancelada`:
+    //  • `conOrdenCompra` = *"¿hay alguien esperando esta firma?"* → un borrador SÍ cuenta.
+    //  • `ocsComprometidas` = *"¿hay que negociar con un proveedor?"* → un borrador NO cuenta.
+    // Si las dos leyeran el mismo criterio, esta prueba no podría existir.
+    //
+    // ⚠️ Se firma SÓLO la tela y la OC se le hace a ELLA: así la orden sigue teniendo los dos avíos
+    // pendientes (y por eso sigue saliendo en la bandeja) con una OC viva encima. Firmarlo todo la
+    // sacaría de la bandeja y la prueba no podría mirar ninguna fila.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA, 'telas');
+    await ocDe(ordenA, { idTela: telaJersey.id }); // se queda en BORRADOR: NO se autoriza
+
+    const fila = (await consultarRecetasPorLiberar(sesion(), {}, bd())).datos.find(
+      (f) => f.idOrden === ordenA,
+    )!;
+    expect(fila.conOrdenCompra).toBe(true);
+    expect(fila.ocsComprometidas).toEqual([]);
+  });
+});
+
+// ── ⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a) + §Post-F9.165) ────────────────────────
+
+/**
+ * DANIEL: *"pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**"*.
+ *
+ * 🔴 **EL DEFECTO QUE ESTE BLOQUE EXISTE PARA IMPEDIR, y que el plan de la etapa casi entrega.** El
+ * campo que PARECE el candado (`Orden.recetaLiberadaEn`) **no lo es**: desde V1-E3h es un derivado y
+ * la puerta de compra dejó de consultarlo — pregunta renglón por renglón. Quien "reabra" apagando
+ * ese derivado entrega esto: la pantalla dice *«receta no liberada»* y **la orden de compra sale
+ * igual**. Por eso la prueba central de aquí abajo no mira banderas: **intenta comprar por las
+ * cinco bocas** y exige que las cinco contesten 409.
+ *
+ * Las otras dos reglas que se fijan, y que son decisiones de negocio, no detalles:
+ *  • **Reabrir NO desfirma** (§Post-F9.165 punto 1): las firmas se conservan para que cerrar sea un
+ *    clic y no cuarenta — lo único compatible con §Post-F9.80.
+ *  • **Cerrar exige que no quede nada sin firmar**: lo que se tocó durante la corrección perdió su
+ *    firma solo, y sin esta condición se descongelaría la compra de material que nadie re-miró.
+ */
+describe('⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a))', () => {
+  /** Sesión de compras (capturar/generar OC). `extra` agrega la llave de autorizar. */
+  function sesionCompra(extra: ClavePermiso[] = []): SesionUsuario {
+    return sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['compras.ver', 'compras.administrar', 'compras.cancelar', ...extra],
+    });
+  }
+
+  /**
+   * Proveedor para tela y avíos: sin él el plan de compra no arma ninguna OC.
+   *
+   * ⚠️ Deja a `telaJersey` con DUEÑO, y eso manda en las pruebas de OC: `validarLineas` rechaza
+   * comprarle una tela a un proveedor que no es su dueño (§Post-F9.15). Por eso devuelve su id y las
+   * OC de aquí abajo se le capturan a ÉL — si no, el error que saldría sería el del dueño y estas
+   * pruebas «pasarían» sin haber tocado nunca el candado.
+   */
+  async function conProveedor(): Promise<number> {
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Insumos del Norte' } });
+    await cliente.tela.update({ where: { id: telaJersey.id }, data: { idProveedor: prov.id } });
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: avioBoton.id, idProveedor: prov.id, precio: 2, habitual: true },
+        { idAvio: avioJareta.id, idProveedor: prov.id, precio: 8, habitual: true },
+      ],
+    });
+    return prov.id;
+  }
+
+  /** Cuerpo de una OC de la tela AL PROVEEDOR QUE LA POSEE, con o sin liga a la orden. */
+  async function cuerpoOcPropio(
+    idProveedor: number,
+    idOrden?: number,
+  ): Promise<Parameters<typeof crearOC>[1]> {
+    const direccion =
+      (await cliente.direccionEntrega.findFirst({ where: { nombre: 'Naucalpan' } })) ??
+      (await cliente.direccionEntrega.create({
+        data: { nombre: 'Naucalpan', direccion: 'Calle 1' },
+      }));
+    return {
+      idProveedor,
+      idDireccionEntrega: direccion.id,
+      fechaEntrega: '2026-09-30',
+      lineas: [
+        {
+          idTela: telaJersey.id,
+          cantidad: 10,
+          precio: 50,
+          unidad: 'kg',
+          ...(idOrden === undefined ? {} : { idOrden }),
+        },
+      ],
+    };
+  }
+
+  /** Deja la receta de `ordenA` LIBERADA COMPLETA: el único estado desde el que se puede reabrir. */
+  async function liberadaCompleta(): Promise<void> {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    const r = await liberarTodo(ordenA);
+    expect(r.todoLiberado).toBe(true);
+  }
+
+  /** El texto del 409 del candado (para poder afirmar que es EL suyo y no el de la firma). */
+  async function mensajeDe(promesa: Promise<unknown>): Promise<string> {
+    const error = await promesa.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    return (error as ErrorConflicto).message;
+  }
+
+  describe('ABRIR', () => {
+    it('⭐ abre, CONGELA la compra y CONSERVA todas las firmas (no desfirma nada)', async () => {
+      await liberadaCompleta();
+
+      const r = await abrirReceta(
+        sesion(),
+        ordenA,
+        { motivo: 'el cliente cambió el cierre' },
+        bd(),
+      );
+
+      expect(r.abiertaEn).not.toBeNull();
+      expect(r.abiertaPor).not.toBeNull();
+      expect(r.abiertaMotivo).toBe('el cliente cambió el cierre');
+      // 🔴 LA DECISIÓN DE LA ETAPA: las firmas siguen ahí. Si reabrir desfirmara, cerrar una receta
+      // de 40 renglones costaría 40 clics (§Post-F9.80 prohíbe la firma en bloque).
+      expect(r.resumen).toMatchObject({ liberados: 3, porLiberar: 0 });
+      expect(r.telas.every((t) => t.liberadoEn !== null)).toBe(true);
+      expect(r.avios.every((a) => a.liberadoEn !== null)).toBe(true);
+      expect(r.todoLiberado).toBe(true);
+      // …y aun así NO se puede comprar: el campo es una promesa de lo que el servidor contestará.
+      expect(r.puedeComprar).toBe(false);
+    });
+
+    it('el MOTIVO es obligatorio (un candado anónimo es un misterio a las dos horas)', async () => {
+      await liberadaCompleta();
+      await expect(abrirReceta(sesion(), ordenA, { motivo: '   ' }, bd())).rejects.toBeInstanceOf(
+        ErrorValidacion,
+      );
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaEn).toBeNull();
+    });
+
+    it('no se puede abrir DOS veces: se dice desde cuándo y por qué, sin pisar el motivo', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'primera razón' }, bd());
+
+      const mensaje = await mensajeDe(
+        abrirReceta(sesion(), ordenA, { motivo: 'segunda razón' }, bd()),
+      );
+      expect(mensaje).toContain('YA está abierta');
+      expect(mensaje).toContain('primera razón');
+
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaMotivo).toBe('primera razón');
+    });
+
+    it('⚠️ no se puede abrir una receta que NO está liberada completa (nada que reabrir)', async () => {
+      // Sin firmar nada: lo que no está firmado ya no se compra, así que no necesita candado — y
+      // permitirlo dejaría órdenes imposibles de cerrar (un renglón que el cliente no autoriza).
+      const mensaje = await mensajeDe(abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd()));
+      expect(mensaje).toContain('no está liberada completa');
+    });
+
+    it('exige `desarrollo.administrar` (es el mismo dueño que firma)', async () => {
+      await liberadaCompleta();
+      await expect(
+        abrirReceta(
+          sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['ordenes.ver'] }),
+          ordenA,
+          { motivo: 'x' },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+    });
+
+    it('una orden de OTRA empresa es 404, no 409 (A9: ni se confirma que existe)', async () => {
+      await liberadaCompleta();
+      const otra = await crearEmpresaPrueba(cliente, 'Empresa ajena al candado');
+      await expect(
+        abrirReceta(sesion(PERM, otra.id), ordenA, { motivo: 'x' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+
+    it('A7/D3: abrir y cerrar quedan los DOS en la bitácora', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'el cliente cambió el cierre' }, bd());
+      await cerrarReceta(sesion(), ordenA, bd());
+
+      const rastro = await cliente.bitacora.findMany({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA) },
+        orderBy: { id: 'asc' },
+      });
+      const acciones = rastro.map((b) => (b.datos as { accion?: string }).accion);
+      expect(acciones).toContain('abrir-receta');
+      expect(acciones).toContain('cerrar-receta');
+      // El motivo NO se pierde al cerrar (las tres columnas se vacían: si no quedara aquí, se iría).
+      const cierre = rastro.find(
+        (b) => (b.datos as { accion?: string }).accion === 'cerrar-receta',
+      );
+      expect((cierre?.datos as { motivoDeApertura?: string }).motivoDeApertura).toBe(
+        'el cliente cambió el cierre',
+      );
+    });
+  });
+
+  /**
+   * 🔴🔴 **LA PRUEBA CENTRAL DE LA ETAPA.** No mira banderas: intenta **gastar dinero** por cada una
+   * de las bocas y exige el 409 del candado. Es lo único que distingue un candado de un letrero.
+   *
+   * Y cada caso comprueba las dos mitades: **cerrado se puede** / **abierto no**. Sin la primera
+   * mitad, una guarda que rechazara SIEMPRE pasaría igual de verde.
+   */
+  describe('🔴 LAS BOCAS DE GASTO: con la receta abierta, NINGUNA compra', () => {
+    /** El proveedor DUEÑO de la tela: es el único al que se le puede comprar (§Post-F9.15). */
+    let idProveedor: number;
+
+    beforeEach(async () => {
+      idProveedor = await conProveedor();
+      await liberadaCompleta();
+    });
+
+    it('boca 1 · EXPLOTAR el MRP', async () => {
+      await expect(explosionarOrden(sesion(), ordenA, bd())).resolves.toBeDefined();
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const mensaje = await mensajeDe(explosionarOrden(sesion(), ordenA, bd()));
+
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(mensaje).toContain('CONGELADA');
+      expect(mensaje).toContain('corrigiendo la tela');
+      // ⚠️ Y NO el mensaje de la firma, que aquí sería FALSO: sí la liberaron (§Post-F9.165 punto 8).
+      expect(mensaje).not.toContain('todavía no la libera Desarrollo');
+      // Lo que el candado NO frena: cortar y producir.
+      expect(mensaje).toContain('cortar y producir');
+    });
+
+    it('boca 2 · la REVISIÓN PREVIA de la compra', async () => {
+      await explosionarOrden(sesion(), ordenA, bd());
+      const cuerpo = { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] };
+      await expect(previoCompraDesdeExplosion(sesionCompra(), cuerpo, bd())).resolves.toBeDefined();
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+      const mensaje = await mensajeDe(previoCompraDesdeExplosion(sesionCompra(), cuerpo, bd()));
+      expect(mensaje).toContain('ABIERTA para corregirse');
+    });
+
+    it('boca 3 · GENERAR las órdenes de compra desde la explosión', async () => {
+      // El snapshot se hace ANTES de abrir: es exactamente el caso que obliga a re-verificar aquí y
+      // no sólo al explotar — el dinero sale en este clic, no en el anterior.
+      await explosionarOrden(sesion(), ordenA, bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        generarOCDesdeExplosion(
+          sesionCompra(),
+          { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(0);
+    });
+
+    it('boca 4 · CAPTURAR a mano una OC ligada a la orden', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd()),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(0);
+    });
+
+    it('boca 5 · EDITAR una OC para meterle una línea de esta orden', async () => {
+      // La OC nace SIN liga (no toca la orden congelada); el intento es agregarle la línea después.
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        actualizarOC(
+          sesionCompra(),
+          oc.id,
+          {
+            lineas: [
+              { idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg', idOrden: ordenA },
+            ],
+          },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+    });
+
+    /**
+     * 🔴🔴 **EL HALLAZGO DEL REVIEWER (H1) — el que el candado dejaba pasar.**
+     *
+     * `validarLineas` exime de la puerta de la FIRMA a la edición que *"conserva la identidad"*
+     * (`agregaLineas`): corregir cantidad o precio de una línea que ya existía no es gastar de
+     * nuevo… **para la firma**, cuya razón es *"un material que la receta firmada sí incluía"*. Esa
+     * razón **NO transfiere al candado**, cuya premisa es que esa receta firmada está BAJO
+     * CORRECCIÓN. Con el candado dentro de `exigirRecetaLiberada`, heredaba la exención y esto
+     * pasaba: 100 kg → 5,000 kg **con la compra "congelada"**, 50 veces el dinero.
+     */
+    it('🔴 boca 5-bis (H1) · SUBIR la cantidad de una línea YA existente de la orden congelada', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        actualizarOC(
+          sesionCompra(),
+          oc.id,
+          {
+            // MISMO material, MISMA orden, MISMA cantidad de líneas: `agregaLineas` dice `false`.
+            // Lo único que cambia es la cantidad (100 → 5000) y el precio.
+            lineas: [
+              {
+                idTela: telaJersey.id,
+                cantidad: 5000,
+                precio: 90,
+                unidad: 'kg',
+                idOrden: ordenA,
+              },
+            ],
+          },
+          bd(),
+        ),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+
+      // Y NO se escribió: la cantidad sigue siendo la original.
+      const linea = await cliente.ordenCompraLinea.findFirstOrThrow({
+        where: { idOrdenCompra: oc.id },
+      });
+      expect(linea.cantidad.toNumber()).toBe(10);
+    });
+
+    /**
+     * ⭐ LA MITAD POSITIVA DE H1, y no es cosmética: es **la vía de escape**. `idsOrdenLigada` se
+     * arma de las líneas ENTRANTES, así que QUITARLE a la OC todas las líneas de la orden congelada
+     * sí se puede — que es lo que le queda a un comprador cuya OC agrupa varias OP y una se congeló.
+     * Sin esta mitad, el fix de H1 sería un bloqueo total disfrazado.
+     */
+    it('⭐ …pero QUITARLE a la OC las líneas de la orden congelada SÍ se puede (la vía de escape)', async () => {
+      // Una OC que agrupa la orden congelada Y otra línea suelta (el caso normal, §Post-F9.86).
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      // Se reemplaza el juego de líneas por una SIN liga: la orden congelada deja de estar en el
+      // conjunto entrante, así que el candado ya no tiene nada que proteger aquí.
+      const editada = await actualizarOC(
+        sesionCompra(),
+        oc.id,
+        { lineas: [{ idTela: telaJersey.id, cantidad: 10, precio: 50, unidad: 'kg' }] },
+        bd(),
+      );
+      expect(editada.lineas).toHaveLength(1);
+      expect(editada.lineas[0]?.idOrden ?? null).toBeNull();
+    });
+
+    it('⭐ boca 6 (hallazgo) · DUPLICAR una OC ligada a la orden', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(duplicarOC(sesionCompra(), oc.id, bd()));
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      expect(await cliente.ordenCompra.count()).toBe(1);
+    });
+
+    it('⭐ boca 7 (hallazgo) · AUTORIZAR una OC ligada — el momento en que sale el dinero', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const mensaje = await mensajeDe(
+        autorizarOC(sesionCompra(['compras.autorizar']), oc.id, bd()),
+      );
+      expect(mensaje).toContain('ABIERTA para corregirse');
+      const guardada = await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } });
+      expect(guardada.estatus).toBe('borrador');
+    });
+
+    it('⭐ una OC YA AUTORIZADA no se toca: se bloquean las NUEVAS (§Post-F9.165 punto 5)', async () => {
+      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
+      await autorizarOC(sesionCompra(['compras.autorizar']), oc.id, bd());
+
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      const guardada = await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } });
+      expect(guardada.estatus).toBe('autorizada');
+    });
+
+    it('⚠️ BLOQUEA EL GASTO, NO LA LECTURA: la receta y la habilitación se consultan igual', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      await expect(obtenerRecetaOrden(sesion(), ordenA, bd())).resolves.toBeDefined();
+      // Cortar y producir NO se bloquean: la habilitación es lo que el piso mira para surtir.
+      const h = await habilitacionOrden(sesion(), ordenA, bd());
+      expect(h.avios).toHaveLength(2);
+    });
+
+    it('⭐ y la orden VECINA del mismo modelo no se entera: el candado es POR ORDEN', async () => {
+      await marcarRecetaRevisada(sesion(), ordenB, bd());
+      await liberarTodo(ordenB);
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+
+      await expect(explosionarOrden(sesion(), ordenB, bd())).resolves.toBeDefined();
+    });
+  });
+
+  describe('CERRAR', () => {
+    beforeEach(async () => {
+      await conProveedor();
+      await liberadaCompleta();
+    });
+
+    it('cerrar lo que no está abierto se dice, no se traga', async () => {
+      const mensaje = await mensajeDe(cerrarReceta(sesion(), ordenA, bd()));
+      expect(mensaje).toContain('no está abierta');
+    });
+
+    it('🔴 NO cierra mientras quede algo sin firmar, y NOMBRA lo que falta', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      const tela = r0.telas[0]!;
+      // Editar el renglón le quita su firma (y SÓLO la suya): eso es lo que hay que re-firmar.
+      await editarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { consumoPorPrenda: 2 }, bd());
+
+      const mensaje = await mensajeDe(cerrarReceta(sesion(), ordenA, bd()));
+      expect(mensaje).toContain('Jersey');
+      expect(mensaje).toContain('volver a firmar');
+
+      // Y sigue congelada: no se "cerró a medias".
+      const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      expect(r.abiertaEn).not.toBeNull();
+      await expect(explosionarOrden(sesion(), ordenA, bd())).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('⭐⭐ re-firmar SÓLO lo tocado y cerrar DESCONGELA la compra (el ciclo completo)', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo la tela' }, bd());
+      const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+      const tela = r0.telas[0]!;
+      await editarRenglonReceta(sesion(), ordenA, 'tela', tela.id, { consumoPorPrenda: 2 }, bd());
+
+      // UN solo renglón que re-firmar: los otros dos conservaron su firma (ésa es la decisión).
+      const pendientes = (await obtenerRecetaOrden(sesion(), ordenA, bd())).resumen.porLiberar;
+      expect(pendientes).toBe(1);
+      await liberarReceta(sesion(), ordenA, { renglones: [{ tipo: 'tela', id: tela.id }] }, bd());
+
+      const cerrada = await cerrarReceta(sesion(), ordenA, bd());
+      expect(cerrada.abiertaEn).toBeNull();
+      expect(cerrada.abiertaPor).toBeNull();
+      expect(cerrada.abiertaMotivo).toBeNull();
+      expect(cerrada.puedeComprar).toBe(true);
+
+      // 🔴 Y LA COMPRA VUELVE DE VERDAD (no basta con que la bandera cambie).
+      const explosion = await explosionarOrden(sesion(), ordenA, bd());
+      expect(explosion.grupos.flatMap((g) => g.renglones)).toHaveLength(3);
+    });
+
+    it('🔴 la orden CANCELADA con la receta abierta SÍ se puede cerrar (si no, sería una trampa)', async () => {
+      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
+      await cliente.orden.update({ where: { id: ordenA }, data: { estado: 'cancelada' } });
+
+      const cerrada = await cerrarReceta(sesion(), ordenA, bd());
+      expect(cerrada.abiertaEn).toBeNull();
+    });
+
+    it('…pero ABRIR una orden cancelada no: no hay nada que corregir de lo que no se va a producir', async () => {
+      await cliente.orden.update({ where: { id: ordenA }, data: { estado: 'cancelada' } });
+      await expect(abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+    });
+  });
+
+  /**
+   * 🔴 SIN ESTO, EL CANDADO SE VUELVE UNA TRAMPA SILENCIOSA (§Post-F9.165 punto 7). Como reabrir no
+   * desfirma, la orden en corrección **no tiene renglones pendientes** y la bandeja —que lista por
+   * renglones sin firmar— no la vería nunca: compra congelada, invisible e indefinidamente.
+   */
+  describe('LA BANDEJA la tiene que ver', () => {
+    it('⭐ la orden REABIERTA sale en la bandeja aunque no le falte firmar nada, y va PRIMERO', async () => {
+      // `ordenB` entra por lo de siempre (renglones sin firmar) y con la entrega MÁS CERCANA, así
+      // que sin la regla "las abiertas primero" iría arriba. `ordenA` no tiene fecha: sin esa regla
+      // caería al final (NULLS LAST), que es justo donde una compra congelada se vuelve invisible.
+      await cliente.orden.update({
+        where: { id: ordenB },
+        data: { fechaEntrega: new Date('2026-01-01T00:00:00.000Z') },
+      });
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'el cliente cambió el cierre' }, bd());
+
+      const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+
+      expect(pagina.datos.map((d) => d.idOrden)).toEqual([ordenA, ordenB]);
+      const reabierta = pagina.datos[0]!;
+      expect(reabierta.abiertaEn).not.toBeNull();
+      expect(reabierta.abiertaMotivo).toBe('el cliente cambió el cierre');
+      // No le falta firmar NADA: entró por el candado, no por los renglones.
+      expect(reabierta.porLiberar).toBe(0);
+      // Y la que entró por lo de siempre no queda marcada.
+      expect(pagina.datos[1]?.abiertaEn).toBeNull();
+      expect(pagina.datos[1]?.porLiberar).toBe(3);
+    });
+
+    it('al CERRARLA desaparece de la bandeja (ya no falta firmar ni cerrar nada)', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'x' }, bd());
+      await cerrarReceta(sesion(), ordenA, bd());
+
+      const pagina = await consultarRecetasPorLiberar(sesion(), {}, bd());
+      expect(pagina.datos.map((d) => d.idOrden)).not.toContain(ordenA);
+    });
   });
 });

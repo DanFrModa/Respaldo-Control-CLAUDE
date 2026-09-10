@@ -44,6 +44,21 @@ const esquemaConsumo = z
   .positive({ error: 'El consumo debe ser mayor a 0' });
 
 /**
+ * Consumo OPCIONAL por prenda (0.156): mismo número positivo, pero `null` = no capturado. Se usa
+ * para el COMPLEMENTO de la tela, que no todas las telas tienen y que nadie está obligado a
+ * capturar. Omitirlo equivale a `null` — el PUT del BOM es SET-COMPLETO: lo que no viene, no está.
+ *
+ * ⚠️ Cero NO es un valor válido (igual que en el cuerpo): una tela cuyo cárdigan consume 0 no lleva
+ * cárdigan, y guardarlo como 0 haría que la orden de compra pidiera una cantidad que la propia
+ * `esquemaCompraLineaEntrada.cantidadComplemento` rechaza por no ser positiva.
+ */
+const esquemaConsumoOpcional = z
+  .number({ error: 'El consumo debe ser un número' })
+  .positive({ error: 'El consumo debe ser mayor a 0' })
+  .nullable()
+  .default(null);
+
+/**
  * Id de un AMARRE de precio del renglón del BOM (R17/D13): entero positivo, `null` = sin amarre.
  * Es opcional en la captura y su default es `null` — el PUT del BOM es SET-COMPLETO: lo que no
  * viene, no está (un renglón que se manda sin amarre queda sin amarre, no conserva el anterior).
@@ -77,6 +92,17 @@ export const esquemaModeloTelaEntrada = z.object({
    * esté activo. Omitirlo equivale a `null` (el set-completo no conserva amarres implícitos).
    */
   idTelaProveedor: esquemaAmarre,
+  /**
+   * ⭐⭐ 0.156 (§Post-F9.214/.219) — CONSUMO DEL COMPLEMENTO por prenda (el cárdigan de esa felpa).
+   * **Número propio**, no una proporción del cuerpo (§Post-F9.210·6): se teclea.
+   *
+   * `null`/omitido = nadie lo capturó ⇒ todo sigue como antes (la OC que genera la explosión nace
+   * con el complemento PENDIENTE y `autorizarOC` lo exige). El dominio RECHAZA capturarlo en una
+   * tela que no declara complemento: **quién lleva complemento lo dice el catálogo
+   * (`Tela.nombreComplemento`), cuánto lleva lo dice la receta** — el mismo reparto que ya usa la
+   * línea de orden de compra (`validarLineas`, §Post-F9.18).
+   */
+  consumoComplementoPorPrenda: esquemaConsumoOpcional,
 });
 
 /** Datos validados de un renglón de tela del BOM. */
@@ -236,6 +262,68 @@ const camposOpcionalesModelo = {
  * son OPCIONALES (el ETL E7 las poblará). El BOM no va aquí: se captura con los endpoints de
  * BOM tras crear el modelo (igual que la foto del arte). Nace activo y sin BOM/fotos.
  */
+// ⭐ V1-E7d — declarado AQUÍ y no junto a sus endpoints porque `esquemaModeloSalida` lo usa: un
+// `const` no se iza, y declararlo después reventaría el módulo al evaluarse (TDZ).
+/**
+ * Estado de la REVISIÓN de la receta de una versión. `null` en el modelo (no un cuarto valor
+ * aquí) significa **no aplica**: el modelo no nació de una negociación.
+ */
+export const esquemaEstadoRevisionModelo = z
+  .enum(['pendiente', 'aprobada', 'rechazada'])
+  .describe('Estado de la revisión de la receta de una versión de modelo.');
+
+/** Clave del estado de revisión. */
+export type EstadoRevisionModeloClave = z.infer<typeof esquemaEstadoRevisionModelo>;
+
+/**
+ * ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EN QUÉ TERMINÓ LA PROMESA de la mesa.** Daniel: *«todo eso se
+ * intentará hacer así, pero **no es seguro que se consiga**»*. Un estimado de negociación no es un
+ * dato pendiente de captura: es una **promesa pendiente de cumplimiento**, con DOS finales.
+ *
+ * ⚠️ **Es un EJE APARTE de {@link esquemaEstadoRevisionModelo}**, no un cuarto valor suyo: aquél
+ * contesta *«¿alguien miró la receta?»* (trámite), éste *«¿se logró el costo que se vendió?»*
+ * (dinero). Una versión puede estar `aprobada` **y** `no_lograda`. `null` = nadie lo declaró.
+ */
+export const esquemaResultadoMetaNegociada = z
+  .enum(['lograda', 'no_lograda'])
+  .describe('Desenlace de la promesa de la mesa: se consiguió lo prometido, o no se consiguió.');
+
+/** Clave del desenlace de la promesa. */
+export type ResultadoMetaNegociadaClave = z.infer<typeof esquemaResultadoMetaNegociada>;
+
+/**
+ * ⭐ Las CUATRO columnas del desenlace tal como SALEN, en un solo sitio para que la ficha del modelo
+ * y la salida de la firma no puedan describir el mismo hecho con dos formas distintas.
+ *
+ * ⚠️ **`metaResultado` en `null` NO es «se cumplió»: es «nadie lo declaró»** — el estado del 100 %
+ * de lo firmado antes de esta etapa y de quien firma sin contestar la pregunta (REGLA 0-B). Quien
+ * pinte esto tiene que distinguir las tres cosas; enseñar el `null` como «sí» convertiría otra vez
+ * un incumplimiento en un silencio, que es justo lo que la etapa vino a matar.
+ */
+const CAMPOS_DESENLACE_META = {
+  metaResultado: esquemaResultadoMetaNegociada
+    .nullable()
+    .describe(
+      'Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido).',
+    ),
+  metaCostoPrometido: z
+    .number()
+    .nullable()
+    .describe(
+      'La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada.',
+    ),
+  metaCostoConseguido: z
+    .number()
+    .nullable()
+    .describe('Lo que SÍ se consiguió (costo por prenda), o null.'),
+  metaNota: z
+    .string()
+    .nullable()
+    .describe(
+      'Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió.',
+    ),
+} as const;
+
 /**
  * ORIGEN del modelo (§Post-F9.34, V1-E3n): en qué catálogo vive y de qué serie salió su número.
  * Ver `Modelo.origen` en el esquema Prisma.
@@ -248,13 +336,16 @@ export const esquemaOrigenModelo = z
 export type OrigenModeloClave = z.infer<typeof esquemaOrigenModelo>;
 
 /**
- * Filtro de ORIGEN del catálogo y de la galería. `produccion` es el DEFAULT a propósito: Daniel
- * pidió *"no llenar de basura el catálogo"* con los modelos de desarrollo que nunca salen
- * (§Post-F9.34 punto 2); los de desarrollo quedan detrás del filtro, no escondidos.
+ * Filtro de ORIGEN del catálogo y de la galería. ⭐ **El DEFAULT es `todos` desde V1-E8j**
+ * (§Post-F9.134). Nació como `produccion` —Daniel pidió *"no llenar de basura el catálogo"* con los
+ * modelos de desarrollo que nunca salen (§Post-F9.34 punto 2)—, pero junto con que **todo modelo
+ * nace en desarrollo** ese default escondía por omisión justo lo recién creado: *"generé dos
+ * modelos en precosteo… y no los veo en modelos"*. El motivo viejo se sirve con la **etapa visible
+ * en cada renglón**; los filtros `produccion` y `desarrollo` siguen a un clic.
  */
 export const esquemaFiltroOrigenModelo = z
   .enum(['produccion', 'desarrollo', 'todos'])
-  .describe('Filtro de origen: solo producción (default), solo desarrollo, o todos.');
+  .describe('Filtro de origen: solo producción, solo desarrollo, o todos (default).');
 
 /** Clave del filtro de origen. */
 export type FiltroOrigenModeloClave = z.infer<typeof esquemaFiltroOrigenModelo>;
@@ -282,18 +373,26 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id de la curva de tallas debe ser entero' })
     .positive({ error: 'El id de la curva de tallas debe ser positivo' })
     .optional(),
-  /** Género (opcional). Si viene, el dominio exige que exista y esté activo. */
+  /**
+   * Género — ⭐ **OBLIGATORIO desde V1-E8j** (§Post-F9.134). Antes era opcional. Junto con el tipo de
+   * prenda da los DOS DÍGITOS con los que el sistema arma el nº de producción del modelo
+   * (§Post-F9.83), y desde que **todo modelo nace en desarrollo** un modelo sin ellos **no se puede
+   * promover**: su OP no se puede generar. El alta de Desarrollo ya los exigía; esto alinea la
+   * segunda puerta con la primera en vez de inventar una regla.
+   * ⚠️ El **modo migración** entra por `esquemaModeloCrearMigracion`, donde siguen siendo opcionales.
+   */
   idGenero: z
-    .number({ error: 'El id del género debe ser un número' })
+    .number({ error: 'El género es obligatorio' })
     .int({ error: 'El id del género debe ser entero' })
-    .positive({ error: 'El id del género debe ser positivo' })
-    .optional(),
-  /** Tipo de producto para Calidad (opcional, F6-E1, decisión (d)). Si viene, debe existir/estar activo. */
+    .positive({ error: 'El id del género debe ser positivo' }),
+  /**
+   * Tipo de producto (ex «tipo de prenda» para Calidad, F6-E1) — ⭐ **OBLIGATORIO desde V1-E8j**, por
+   * la misma razón que el género: es el dígito de CONCEPTO del nº de producción.
+   */
   idTipoProducto: z
-    .number({ error: 'El id del tipo de producto debe ser un número' })
+    .number({ error: 'El tipo de prenda es obligatorio' })
     .int({ error: 'El id del tipo de producto debe ser entero' })
-    .positive({ error: 'El id del tipo de producto debe ser positivo' })
-    .optional(),
+    .positive({ error: 'El id del tipo de producto debe ser positivo' }),
   /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. Opcional. */
   numOperaciones: esquemaNumOperaciones.optional(),
   /** Costo de corte por prenda (R5/B8), separado de la maquila, sin proveedor. Opcional. */
@@ -309,6 +408,27 @@ export const esquemaModeloCrear = z.object({
 
 /** Datos validados de alta de modelo. */
 export type DatosModeloCrear = z.infer<typeof esquemaModeloCrear>;
+
+/**
+ * Alta de modelo en **MODO MIGRACIÓN** (V1-E8j) — el ETL del histórico de Access y NADA MÁS.
+ *
+ * Es el mismo esquema del alta con los DOS DÍGITOS de vuelta en opcionales. No es un descuido: los
+ * ~4,987 modelos del Access **no traen género** (`Modelos.csv` ni siquiera tiene la columna) y ya son
+ * de producción con su número puesto, así que no hay nada que numerar. La obligatoriedad existe para
+ * que un modelo NUEVO no nazca sin poder promoverse; el histórico no tiene ese problema.
+ *
+ * ⚠️ **La regla vive en UNA sola capa.** Este esquema lo usa exclusivamente `crearModeloMigrado`
+ * (`dominio/modelos/migracion.ts`), que **no pasa por `crearModelo`**: los dos comparten el núcleo
+ * `crearModeloNucleo`, y la exigencia de los dígitos está en `crearModelo`, por ENCIMA del núcleo.
+ * Así la migración entra por debajo sin que nadie tenga que acordarse de una bandera.
+ */
+export const esquemaModeloCrearMigracion = esquemaModeloCrear.extend({
+  idGenero: esquemaModeloCrear.shape.idGenero.optional(),
+  idTipoProducto: esquemaModeloCrear.shape.idTipoProducto.optional(),
+});
+
+/** Datos validados de alta de modelo en modo migración (los dos dígitos, opcionales). */
+export type DatosModeloCrearMigracion = z.infer<typeof esquemaModeloCrearMigracion>;
 
 /**
  * Edición de modelo: `id` + todos los campos del alta opcionales (edición parcial) +
@@ -344,14 +464,21 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id de la curva de tallas debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el género; un id lo fija; omitir = no tocar. */
+    /**
+     * `null` quita el género; un id lo fija; omitir = no tocar. ⚠️ **Sólo en modelos de PRODUCCIÓN:**
+     * a uno de DESARROLLO el dominio le rechaza tanto el `null` como un género sin dígito capturado
+     * (`exigirNoDesnumerar`), porque lo dejaría sin poder recibir su nº de producción (V1-E8j·H9).
+     */
     idGenero: z
       .number({ error: 'El id del género debe ser un número' })
       .int({ error: 'El id del género debe ser entero' })
       .positive({ error: 'El id del género debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). */
+    /**
+     * `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). ⚠️ Mismo corte que
+     * el género: en un modelo de DESARROLLO el dominio rechaza vaciarlo o poner uno sin dígito.
+     */
     idTipoProducto: z
       .number({ error: 'El id del tipo de producto debe ser un número' })
       .int({ error: 'El id del tipo de producto debe ser entero' })
@@ -402,7 +529,7 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
  *  • `amarre`           — el proveedor amarrado por Desarrollo (su precio negociado de catálogo):
  *                         aplica cuando a ese proveedor todavía no se le ha comprado el material.
  *  • `mas-barato`       — sin amarre (o con un amarre SIN precio) y sin compras: el proveedor más
- *                         barato del avío, ya normalizado ÷ factor (R1). NO está negociado.
+ *                         barato del avío, en unidad de consumo (§Post-F9.97). NO está negociado.
  *  • `promedio-medidas` — avío "por medida" (R5/B11): promedio de los precios de sus medidas. Este
  *                         escalón GANA sobre todos (una compra es de UNA medida: no representa al
  *                         resto).
@@ -437,7 +564,25 @@ export const esquemaModeloTelaSalida = z
   .object({
     idTela: z.number().int().describe('Id de la tela.'),
     nombre: z.string().describe('Nombre de la tela (para la UI).'),
-    consumoPorPrenda: z.number().describe('Consumo de tela por prenda.'),
+    consumoPorPrenda: z
+      .number()
+      .describe('Consumo de tela por prenda. En una tela con complemento, del CUERPO.'),
+    /**
+     * ⭐⭐ 0.156 — cómo se llama el complemento de ESTA tela (`Tela.nombreComplemento`: "Cardigan"),
+     * o null si no lleva. Viaja para que la pantalla pueda ROTULAR el campo con su nombre real en
+     * vez de decir "complemento": lo dice el catálogo, no lo adivina la UI.
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento de la tela ("Cardigan"); null = no lleva.'),
+    /** ⭐⭐ 0.156 — consumo del complemento por prenda; null = no capturado. */
+    consumoComplementoPorPrenda: z
+      .number()
+      .nullable()
+      .describe(
+        'Consumo del COMPLEMENTO por prenda (número propio), o null si no se ha capturado.',
+      ),
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
@@ -474,8 +619,10 @@ export const esquemaModeloTelaSalida = z
 
 /**
  * Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas) + el AMARRE
- * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` viene NORMALIZADO
- * a unidad de consumo (÷ factor de conversión, R1) y sale de la MISMA función que usa el precosto
+ * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` va en UNIDAD DE
+ * CONSUMO —metro, pieza, kilo— porque desde V1-E8a (§Post-F9.97) el sistema tiene una sola unidad y
+ * no hay nada que normalizar: el precio del catálogo YA está en ella. Sale de la MISMA función que
+ * usa el precosto
  * (`resolverPrecioAvioCatalogo`), así que el número de la pantalla y el del costeo son el mismo:
  * promedio de medidas (si el avío es "por medida") → amarre → más barato → referencia.
  */
@@ -556,6 +703,73 @@ export const esquemaModeloSalida = z
       .describe(
         'Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico).',
       ),
+    idModeloPadre: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz.',
+      ),
+    codigoPadre: z
+      .string()
+      .nullable()
+      .describe('Código del modelo padre (para enseñar el linaje con liga), o null.'),
+    versionDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión.',
+      ),
+    // ⭐⭐ V1-E9a (§Post-F9.135) — LINAJE 1:N. Molde idéntico al de `idModeloPadre`/`codigoPadre`:
+    // el id para preguntar, el código para enseñarlo con liga. Son EJES DISTINTOS y no se mezclan —
+    // una VERSIÓN copia la receta del padre y lleva revisión propia; un HIJO de producción la
+    // COMPARTE y no lleva ninguna. La ficha los necesita separados para no enseñarle a un hijo el
+    // chip de revisión de una versión (§Post-F9.167 punto 2).
+    idModeloDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Id del modelo de DESARROLLO del que nació este modelo de PRODUCCIÓN (linaje 1:N, V1-E9a) y de quien es su receta, o null = la receta es la suya.',
+      ),
+    codigoModeloDesarrollo: z
+      .string()
+      .nullable()
+      .describe('Código del modelo de desarrollo del que nació (para enseñar el linaje), o null.'),
+    // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN antes de mandar a producir. Sólo la llevan las
+    // VERSIONES; en cualquier otro modelo los cuatro campos vienen en null (= no aplica) y su
+    // conducta no cambió.
+    //
+    // ⚠️ V1-E7e (§Post-F9.116): estos campos NO los mueven sólo las dos firmas. Cualquier cambio a
+    // la receta de una versión APROBADA la devuelve a `pendiente` sola, suelta a `revisadoPor` /
+    // `revisadoEn` (nadie ha revisado la receta que hay AHORA) y deja el porqué en `revisionNota`.
+    // Quien pinte esto tiene que enseñar la nota TAMBIÉN en `pendiente`: es lo único que le dice al
+    // que vuelve a revisar por qué se cayó la firma anterior.
+    revisionEstado: esquemaEstadoRevisionModelo
+      .nullable()
+      .describe(
+        'Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión).',
+      ),
+    idRevisadoPor: z.string().nullable().describe('Id de quien firmó la revisión, o null.'),
+    revisadoPor: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien firmó la revisión (para la pantalla), o null.'),
+    revisadoEn: z
+      .string()
+      .nullable()
+      .describe('Fecha/hora ISO-8601 en que se firmó la revisión, o null.'),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada.',
+      ),
+    // ⭐⭐ V1-E9p (§Post-F9.144(b)) — EL DESENLACE DE LA PROMESA, el otro eje. Va pegado a la
+    // revisión porque se escribe con ella (y se BORRA con el rechazo y con la invalidación: un
+    // desenlace medido sobre una receta que ya cambió sería una tupla mentirosa).
+    ...CAMPOS_DESENLACE_META,
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -625,8 +839,12 @@ export const esquemaModeloSalida = z
     /**
      * Costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa activa =
      * `costoTotal / cantidadDeBase(baseProrrateo)` — EXACTAMENTE el criterio de la Lista de
-     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, si la
-     * sesión no tiene `consultas.ver-importes` (mismo candado que Costos) o fuera del listado.
+     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, o fuera
+     * del listado.
+     *
+     * ⭐ §Post-F9.137 — es un costo REAL («cómo terminamos»), no del plan: exige `costos.ver` **y**
+     * `consultas.ver-importes` (`puedeVerCostoRealDeModelo`). Sin ellos el servidor NO lo manda —no
+     * es que el front lo esconda— y la columna del listado desaparece.
      */
     costoActual: z
       .number()
@@ -697,7 +915,7 @@ export const esquemaModelosQuery = z
       .describe(
         'Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas).',
       ),
-    origen: esquemaFiltroOrigenModelo.default('produccion'),
+    origen: esquemaFiltroOrigenModelo.default('todos'),
     idTemporada: z.coerce
       .number()
       .int()
@@ -785,6 +1003,133 @@ export const esquemaPasarAProduccionCuerpo = z
       .describe('Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema.'),
   })
   .describe('Cuerpo de la acción «pasar a producción» de un modelo.');
+
+/**
+ * ⭐ V1-E7b (§Post-F9.110) — Cuerpo de «crear versión»: casi todo se HEREDA del padre, así que lo
+ * único que se puede ajustar al nacer es la descripción (para poder decir qué cambió). Si se
+ * omite, la versión hereda también la del padre.
+ */
+export const esquemaModeloVersionCuerpo = z
+  .object({
+    descripcion: z
+      .string()
+      .trim()
+      .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Descripción de la versión; si se omite, hereda la del modelo padre.'),
+  })
+  .describe('Cuerpo de la acción «crear versión» de un modelo.');
+
+/** Datos validados de «crear versión». */
+export type DatosModeloVersion = z.infer<typeof esquemaModeloVersionCuerpo>;
+
+// ── ⭐ V1-E7d (§Post-F9.110): la REVISIÓN antes de mandar a producir ─────────────
+
+/**
+ * ⭐⭐ V1-E9p (§Post-F9.144(b)) — **EL DESENLACE DE LA PROMESA**, que se declara al firmar.
+ *
+ * La pregunta que la bandeja tenía que empezar a hacer: **«¿se logró lo prometido — sí o no?»**, en
+ * vez de *«¿ya capturaste?»*. Si se responde `lograda: false`, hacen falta las dos cosas que
+ * convierten el «no» en información: **cuánto se consiguió** (sin número no hay brecha) y **por
+ * qué** (sin explicación, un costo peor no le dice nada a quien ya vendió con el anterior). El
+ * dominio las vuelve a exigir (A1).
+ *
+ * ⚠️ **TODO el bloque es OPCIONAL**: firmar sin contestar la pregunta funciona exactamente como
+ * antes de esta etapa. *Avisar no es bloquear* (§Post-F9.64).
+ *
+ * ⚠️ **La META no se manda**: el costo con el que se cerró la mesa ya está guardado
+ * (`NegociacionEvento.costoEstimado`) y lo resuelve el servidor. Aceptarlo del cliente permitiría
+ * declarar una brecha contra un número inventado.
+ */
+export const esquemaDesenlaceMetaNegociada = z
+  .object({
+    lograda: z
+      .boolean()
+      .describe('true = se consiguió lo prometido (o mejor); false = NO se consiguió.'),
+    costoConseguido: z
+      .number({ error: 'El costo conseguido debe ser un número' })
+      .min(0, { error: 'El costo conseguido no puede ser negativo' })
+      .max(9_999_999_999, { error: 'El costo conseguido es demasiado grande' })
+      .optional()
+      .describe(
+        'Costo por prenda que SÍ se consiguió. OBLIGATORIO cuando no se logró: sin él no hay brecha que enseñar.',
+      ),
+    nota: z
+      .string()
+      .trim()
+      .max(500, { error: 'La nota no puede tener más de 500 caracteres' })
+      .optional()
+      .describe(
+        'Por qué no se consiguió (OBLIGATORIO cuando no se logró) u observación de lo que sí se logró.',
+      ),
+  })
+  .describe('Desenlace de la promesa de la mesa, declarado al firmar la revisión.');
+
+/** Desenlace declarado de la promesa. */
+export type DatosDesenlaceMetaNegociada = z.infer<typeof esquemaDesenlaceMetaNegociada>;
+
+/** Cuerpo de «aprobar revisión»: la nota es opcional (la firma es lo que importa). */
+export const esquemaRevisionAprobarCuerpo = z
+  .object({
+    nota: z
+      .string()
+      .trim()
+      .max(500, { error: 'La nota no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Nota opcional del aprobador; queda como observación del acto.'),
+    // ⭐⭐ V1-E9p — el SEGUNDO FINAL. Ver `esquemaDesenlaceMetaNegociada`. Omitirlo deja la firma
+    // exactamente como era antes de esta etapa (y BORRA cualquier desenlace anterior: el acto nuevo
+    // sustituye al anterior COMPLETO, la misma regla de las cuatro columnas de la revisión).
+    meta: esquemaDesenlaceMetaNegociada
+      .optional()
+      .describe(
+        'Desenlace de la promesa de la mesa. Omitir = no se declara (conducta de siempre).',
+      ),
+  })
+  .describe('Cuerpo de la acción «aprobar la revisión» de una versión de modelo.');
+
+/** Datos validados de «aprobar revisión». */
+export type DatosRevisionAprobar = z.infer<typeof esquemaRevisionAprobarCuerpo>;
+
+/**
+ * Cuerpo de «rechazar revisión»: el motivo es OBLIGATORIO. Un rechazo sin motivo no le dice nada
+ * a quien tiene que corregir la receta, y el dominio lo vuelve a exigir (A1).
+ */
+export const esquemaRevisionRechazarCuerpo = z
+  .object({
+    motivo: z
+      .string()
+      .trim()
+      .min(1, { error: 'Escribe el motivo del rechazo' })
+      .max(500, { error: 'El motivo no puede tener más de 500 caracteres' })
+      .describe('Qué se observó en la receta y hay que corregir.'),
+  })
+  .describe('Cuerpo de la acción «rechazar la revisión» de una versión de modelo.');
+
+/** Datos validados de «rechazar revisión». */
+export type DatosRevisionRechazar = z.infer<typeof esquemaRevisionRechazarCuerpo>;
+
+/** Cómo quedó la revisión tras firmarla. */
+export const esquemaRevisionModeloSalida = z
+  .object({
+    idModelo: z.number().int().describe('Id del modelo revisado.'),
+    codigo: z.string().describe('Código VIGENTE del modelo revisado.'),
+    revisionEstado: esquemaEstadoRevisionModelo.nullable().describe('En qué quedó la revisión.'),
+    idRevisadoPor: z.string().nullable().describe('Id de quien firmó.'),
+    revisadoPor: z.string().nullable().describe('Nombre de quien firmó.'),
+    revisadoEn: z.string().nullable().describe('Fecha/hora ISO-8601 de la firma.'),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática.',
+      ),
+    ...CAMPOS_DESENLACE_META,
+  })
+  .describe('Estado de la revisión de la receta de una versión de modelo.');
+
+/** Salida de las dos firmas de revisión. */
+export type RevisionModeloSalidaContrato = z.infer<typeof esquemaRevisionModeloSalida>;
 
 /** Datos de «pasar a producción». */
 export type DatosPasarAProduccion = z.infer<typeof esquemaPasarAProduccionCuerpo>;
@@ -1019,3 +1364,257 @@ export const esquemaModeloFotoEditarCuerpo = z
 
 /** Datos validados de edición de metadatos de una foto. */
 export type DatosModeloFotoEditar = z.infer<typeof esquemaModeloFotoEditarCuerpo>;
+
+// ══ ⭐⭐ V1-E8r — BANDEJA «Recetas por revisar» (§Post-F9.140, DANIEL) ════════════════════════════
+//
+// La COLA de la revisión de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
+// validadcion de la receta original… de alguna manera deberia de pasar un filtro para ver lo que se
+// negocio con el cliente. y como se cerro"*. Es de SOLO LECTURA: la bandeja NO firma, LLEVA a la
+// ficha del modelo, donde se revisa viéndola (§Post-F9.80).
+
+/** Una versión cuya revisión todavía no está firmada (§Post-F9.140). */
+export const esquemaRecetaPorRevisar = z
+  .object({
+    idModelo: z.number().int().describe('Id de la VERSIÓN que espera revisión.'),
+    codigo: z.string().describe('Código vigente de la versión (ej. `CYA-26-71-001-01`).'),
+    descripcion: z.string().nullable().describe('Descripción de la versión, o null.'),
+    codigoPadre: z
+      .string()
+      .nullable()
+      .describe(
+        'Código del modelo del que nació — «la receta original» que Daniel quiere cotejar.',
+      ),
+    versionDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre.'),
+    estado: esquemaEstadoRevisionModelo.describe(
+      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (la misma lectura que la ficha del modelo). Nunca llega `aprobada`: eso ya no espera nada.',
+    ),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del rechazo o porqué de la invalidación automática — lo que le dice al que va a revisar por qué esto sigue aquí.',
+      ),
+    creadoEn: z
+      .string()
+      .describe('Fecha/hora ISO-8601 en que nació la versión (lo que lleva esperando).'),
+    cliente: z
+      .string()
+      .nullable()
+      .describe(
+        'Cliente con el que se negoció (por el expediente de Desarrollo), o null si la versión no tiene expediente.',
+      ),
+    proyecto: z.string().nullable().describe('Proyecto de la negociación, o null.'),
+    fechaCompromiso: z
+      .string()
+      .nullable()
+      .describe(
+        'Fecha comprometida más próxima (AAAA-MM-DD) de los pedidos vivos que esperan esta receta, o null si nadie la ha pedido todavía. Es el criterio de orden: lo que estorba primero, arriba.',
+      ),
+    piezasPedidas: z
+      .number()
+      .int()
+      .describe(
+        'Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR.',
+      ),
+    conPedido: z
+      .boolean()
+      .describe(
+        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión, así que hay piezas comprometidas esperando detrás de esta receta sin revisar — por eso esta fila va primero en la cola. No es lo mismo que una versión recién negociada a la que nadie le pide nada. ⚠️ Decía «su OP no puede nacer hasta que la receta se revise»: fue verdad hasta V1-E9c (§Post-F9.169), que disolvió la compuerta. La OP nace igual, y esta revisión no condiciona ni producir ni comprar: lo que gobierna la compra es OTRA firma, la liberación POR RENGLÓN de la receta de la ORDEN.',
+      ),
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E9p (§Post-F9.144(b)) — LO QUE SE PROMETIÓ EN LA MESA: la suma de los costos estimados con los que se cerró la negociación (`NegociacionEvento.costoEstimado`). Es la META que quien cuadre esta receta tiene que salir a conseguir, y sin verla no puede contestar «¿se logró?» al firmar. ⚠️ Es DINERO y va tras la reja de `consultas.ver-importes`: al que no lo tiene le llega en null (ocultación en el SERVIDOR, igual que el `costoEstimado` del historial de negociación) — ve la fila, no el importe. Null también cuando esta versión no viene de una negociación registrada; entonces se comporta como siempre.',
+      ),
+  })
+  .describe('Una versión que espera revisión de receta (§Post-F9.140).');
+
+/** Fila de la bandeja «Recetas por revisar». */
+export type RecetaPorRevisar = z.infer<typeof esquemaRecetaPorRevisar>;
+
+/** Filtros de la bandeja «Recetas por revisar» (querystring): paginación + búsqueda + el filtro del dinero. */
+export const esquemaRecetasPorRevisarQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (tope 100).'),
+    soloConPedido: z
+      .stringbool()
+      .default(false)
+      .describe('Sólo las versiones que ya tienen pedido vivo esperando.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Código de la versión, código del padre o cliente (contiene).'),
+  })
+  .describe('Filtros de la bandeja «Recetas por revisar».');
+
+/**
+ * Filtros de la bandeja **en su forma NATIVA** (números y booleanos ya resueltos) — lo que recibe el
+ * dominio. En la URL todo es texto, así que el esquema de la ruta coacciona y el dominio re-valida
+ * con éste. Mismo reparto que la bandeja hermana «Recetas por liberar»: sin él, re-validar la salida
+ * de la ruta con el esquema de la URL tira un 400 espurio (cicatriz del hotfix F2, PR #56).
+ */
+export const esquemaRecetasPorRevisarDominio = z.object({
+  pagina: z.number().int().min(1).default(1),
+  porPagina: z.number().int().min(1).max(100).default(20),
+  soloConPedido: z.boolean().default(false),
+  busqueda: z.string().trim().max(200).optional(),
+});
+
+/** Filtros de la bandeja (forma nativa, no la de la URL). */
+export type FiltrosRecetasPorRevisar = z.input<typeof esquemaRecetasPorRevisarDominio>;
+
+/** Respuesta paginada de la bandeja «Recetas por revisar» (forma estándar `Pagina<T>`). */
+export const esquemaRecetasPorRevisarPagina = z
+  .object({
+    datos: z.array(esquemaRecetaPorRevisar),
+    total: z.number().int(),
+    pagina: z.number().int(),
+    porPagina: z.number().int(),
+    totalPaginas: z.number().int(),
+  })
+  .describe('Página de la bandeja «Recetas por revisar».');
+
+/** Página de la bandeja «Recetas por revisar». */
+export type RecetasPorRevisarPagina = z.infer<typeof esquemaRecetasPorRevisarPagina>;
+
+// ══ ⭐⭐ V1-E9p — «PROMESAS INCUMPLIDAS» (§Post-F9.144(b), DANIEL) ═══════════════════════════════
+//
+// La lista del DUEÑO. La decisión lo dice con esas palabras: la brecha *«le importa AL DUEÑO, que ya
+// le dio ese precio al cliente»*, no a quien despacha la cola. La bandeja «Recetas por revisar»
+// contesta *«¿ya lo cuadraste?»* y por diseño se VACÍA al firmar; esto contesta lo otro —*«¿se
+// logró?»*— y por diseño **se queda**, porque un margen que se perdió no deja de haberse perdido
+// porque alguien firme.
+
+/** Una promesa de mesa que NO se cumplió, con su brecha y lo que cuesta. */
+export const esquemaPromesaIncumplida = z
+  .object({
+    idModelo: z.number().int().describe('Id de la VERSIÓN cuya promesa no se cumplió.'),
+    codigo: z.string().describe('Código de la versión (ej. `CYA-26-71-001-01`).'),
+    descripcion: z.string().nullable().describe('Descripción de la versión, o null.'),
+    codigoPadre: z.string().nullable().describe('Código del modelo del que nació, o null.'),
+    versionDesarrollo: z.number().int().nullable().describe('Nº del sufijo de versión, o null.'),
+    cliente: z.string().nullable().describe('Cliente al que se le vendió con ese costo, o null.'),
+    proyecto: z.string().nullable().describe('Proyecto de la negociación, o null.'),
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        'La META congelada al firmar: el costo con el que se cerró la mesa. Null si no se encontró.',
+      ),
+    costoConseguido: z.number().nullable().describe('Lo que SÍ se consiguió (costo por prenda).'),
+    brecha: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐ `conseguido − prometido`. POSITIVO = se consiguió PEOR de lo prometido (la prenda cuesta más que el costo con el que se vendió). Null cuando falta alguno de los dos números: sin los dos no hay brecha, y un 0 diría «se cumplió exacto» justo cuando no se sabe.',
+      ),
+    piezasPedidas: z
+      .number()
+      .int()
+      .describe(
+        'Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR.',
+      ),
+    impacto: z
+      .number()
+      .nullable()
+      .describe(
+        '⭐⭐ `brecha × piezasPedidas`: lo que la promesa incumplida cuesta EN DINERO. Es lo que traduce «$2 de más por prenda» a «$24,000 de margen que ya no está». Null si no hay brecha; 0 si hay brecha pero todavía nadie ha pedido la prenda.',
+      ),
+    nota: z.string().nullable().describe('Por qué no se consiguió, en palabras de quien lo buscó.'),
+    revisadoPor: z
+      .string()
+      .nullable()
+      .describe('Quién firmó la revisión donde se declaró, o null.'),
+    revisadoEn: z.string().nullable().describe('Fecha/hora ISO-8601 de esa firma, o null.'),
+  })
+  .describe('Una promesa de negociación que no se cumplió (§Post-F9.144(b)).');
+
+/** Fila de «Promesas incumplidas». */
+export type PromesaIncumplida = z.infer<typeof esquemaPromesaIncumplida>;
+
+/** Filtros de «Promesas incumplidas» (querystring): paginación + búsqueda. */
+export const esquemaPromesasIncumplidasQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (tope 100).'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Código de la versión, código del padre o cliente (contiene).'),
+  })
+  .describe('Filtros de «Promesas incumplidas».');
+
+/**
+ * Filtros **en su forma NATIVA** (números ya resueltos) — lo que recibe el dominio. Mismo reparto
+ * que la bandeja «Recetas por revisar»: sin él, re-validar la salida de la ruta con el esquema de la
+ * URL tira un 400 espurio (cicatriz del hotfix F2, PR #56).
+ */
+export const esquemaPromesasIncumplidasDominio = z.object({
+  pagina: z.number().int().min(1).default(1),
+  porPagina: z.number().int().min(1).max(100).default(20),
+  busqueda: z.string().trim().max(200).optional(),
+});
+
+/** Filtros de «Promesas incumplidas» (forma nativa, no la de la URL). */
+export type FiltrosPromesasIncumplidas = z.input<typeof esquemaPromesasIncumplidasDominio>;
+
+/** Respuesta paginada de «Promesas incumplidas», con el total de la CARTERA (no el de la página). */
+export const esquemaPromesasIncumplidasPagina = z
+  .object({
+    datos: z.array(esquemaPromesaIncumplida),
+    total: z.number().int(),
+    impactoTotal: z
+      .number()
+      .describe(
+        '⭐ La suma del impacto de TODAS las promesas incumplidas que cumplen el filtro — no las de esta página. Se agrega en el SERVIDOR: sumarlo en el cliente daría un número distinto en cada página, y éste es justo el número que el dueño mira primero.',
+      ),
+    pagina: z.number().int(),
+    porPagina: z.number().int(),
+    totalPaginas: z.number().int(),
+  })
+  .describe('Página de «Promesas incumplidas».');
+
+/** Página de «Promesas incumplidas». */
+export type PromesasIncumplidasPagina = z.infer<typeof esquemaPromesasIncumplidasPagina>;
+
+/**
+ * ⭐ V1-E9p — LA META de una versión, para que quien va a firmar pueda contestar *«¿se logró lo
+ * prometido?»* **viendo contra qué**. Se resuelve EN VIVO (`GET /api/modelos/:id/meta-prometida`):
+ * la columna congelada del modelo sólo existe después de declarar un desenlace, o sea nunca en la
+ * primera firma, que es justo cuando se hace la pregunta.
+ */
+export const esquemaMetaPrometida = z
+  .object({
+    costoPrometido: z
+      .number()
+      .nullable()
+      .describe(
+        'Suma de los costos estimados con los que se cerró la mesa (`NegociacionEvento.costoEstimado`), o null si esta versión no viene de una negociación registrada.',
+      ),
+  })
+  .describe('La meta con la que se vendió una versión negociada.');
+
+/** La meta de una versión (respuesta de `GET /api/modelos/:id/meta-prometida`). */
+export type MetaPrometidaSalida = z.infer<typeof esquemaMetaPrometida>;

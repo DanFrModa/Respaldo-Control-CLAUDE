@@ -20,8 +20,10 @@ import { esquemaErrorApi } from '../../contrato/index.js';
 import {
   esquemaClienteDepartamentoCrear,
   esquemaClienteDepartamentoEditar,
+  esquemaClienteDepartamentoFusionar,
   esquemaClienteDepartamentoSalida,
   esquemaClienteDepartamentosLista,
+  esquemaFusionDepartamentosPrevia,
   type ClienteDepartamentoSalida,
 } from '../../contrato/esquemas/cliente-departamento.js';
 import type { ClienteDepartamento } from '../../datos/index.js';
@@ -31,7 +33,9 @@ import {
   actualizarDepartamentoCliente,
   agregarDepartamentoCliente,
   desactivarDepartamentoCliente,
+  fusionarDepartamentosCliente,
   listarDepartamentosCliente,
+  previsualizarFusionDepartamentos,
 } from '../../dominio/catalogos/cliente-departamentos.js';
 
 /** Proyecta un `ClienteDepartamento` de Prisma a la forma JSON del contrato (fechas ISO). */
@@ -146,6 +150,53 @@ export const rutasClienteDepartamentos: FastifyPluginCallbackZod = (app, _opcion
         request.body,
       );
       return reply.code(201).send(aDepartamentoSalida(departamento));
+    },
+  });
+
+  // ── Vista previa de la FUSIÓN: qué va a pasar ANTES de hacerlo (§Post-F9.122a) ──
+  // Va ANTES del PATCH/DELETE por claridad de lectura; el ruteo no depende del orden
+  // (métodos y rutas distintos), pero la previa y su fusión se leen juntas.
+  app.route({
+    method: 'POST',
+    url: '/clientes/:idCliente/departamentos/fusionar/previa',
+    preHandler: app.conPermiso('clientes.administrar'),
+    schema: {
+      tags: ['clientes'],
+      summary: 'Vista previa de una fusión de departamentos duplicados (§Post-F9.122a)',
+      description:
+        'Sólo lectura: dice cuántos proyectos, listas de precios, cotizaciones y factores se moverían al departamento que se conserva, y si los factores del absorbido se descartarían. Usa las MISMAS funciones que la fusión, no un contador paralelo.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamCliente,
+      body: esquemaClienteDepartamentoFusionar,
+      response: { 200: esquemaFusionDepartamentosPrevia, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return previsualizarFusionDepartamentos(sesion, request.params.idCliente, request.body);
+    },
+  });
+
+  // ── Fusionar departamentos duplicados (absorbidos → canónico) ───────────────
+  app.route({
+    method: 'POST',
+    url: '/clientes/:idCliente/departamentos/fusionar',
+    preHandler: app.conPermiso('clientes.administrar'),
+    schema: {
+      tags: ['clientes'],
+      summary: 'Fusionar departamentos duplicados en uno canónico (§Post-F9.122a)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamCliente,
+      body: esquemaClienteDepartamentoFusionar,
+      response: { 200: esquemaClienteDepartamentoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const departamento = await fusionarDepartamentosCliente(
+        sesion,
+        request.params.idCliente,
+        request.body,
+      );
+      return aDepartamentoSalida(departamento);
     },
   });
 

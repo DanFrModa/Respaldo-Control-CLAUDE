@@ -1,4 +1,4 @@
-import { GitCompareIcon, HandshakeIcon, Loader2Icon, PlusIcon } from 'lucide-react';
+import { GitCompareIcon, HandshakeIcon, Loader2Icon, LockIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -32,11 +32,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatearFechaHora, formatearMoneda } from '@/lib/formato';
+import { autorDeEvento, formatearFechaHora, formatearMoneda } from '@/lib/formato';
 import { DialogoPrecosto } from '@/modulos/desarrollo/DialogoPrecosto';
 
 import { CalculadoraNegociacion } from './CalculadoraNegociacion';
 import { ComparadorVersiones } from './ComparadorVersiones';
+import { esEstadoTerminal } from './estados-renglon';
+import { MesaNegociacion } from './MesaNegociacion';
 
 /** Clases del textarea (mismo estilo que el resto de formularios). */
 const CLASES_TEXTAREA =
@@ -64,6 +66,11 @@ export function DialogoNegociacionRenglon({
   const eventos = useEventosLinea(abierto ? linea.id : null);
   const [nuevaRondaAbierta, setNuevaRondaAbierta] = useState(false);
   const [acuerdoAbierto, setAcuerdoAbierto] = useState(false);
+  // ⭐⭐ V1-E8x (§Post-F9.151): un modelo CERRADO o DROPEADO no admite movimiento — ni rondas, ni
+  // acuerdos, ni mesa— hasta que se reviva. El servidor los rechaza con 409; aquí se apagan los
+  // controles y se DICE por qué, en vez de dejar botones que fallan al pulsarlos. El historial y
+  // el comparador siguen abiertos: lo negociado no se esconde, sólo se congela.
+  const movible = puedeNegociar && !esEstadoTerminal(linea.estado);
 
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
@@ -81,6 +88,40 @@ export function DialogoNegociacionRenglon({
           className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           data-testid="panel-negociacion"
         >
+          {/* ⭐ V1-E8x: el estado del modelo, arriba de todo — es lo que explica que los botones de
+              abajo estén apagados. */}
+          {esEstadoTerminal(linea.estado) ? (
+            <p
+              className="flex items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] text-muted-foreground"
+              data-testid="renglon-congelado"
+            >
+              <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                Este modelo está <b>{linea.nombreEstado}</b> y ya no admite rondas, acuerdos ni
+                mesa.
+                {linea.estado === 'dropeado'
+                  ? ' Tampoco sale en el PDF, el Excel ni la cotización.'
+                  : ''}{' '}
+                Para volver a moverlo, <b>revívelo</b> desde la lista (déjalo en Abierto o En
+                negociación): su historial se conserva completo.
+              </span>
+            </p>
+          ) : null}
+
+          {/*
+            ⭐⭐ LA MESA (§Post-F9.138): lo PRIMERO que se ve, porque es lo que se usa con el cliente
+            enfrente. El historial de abajo cuenta lo que ya pasó; esto es lo que está pasando. Pide
+            los dos permisos del endpoint (`listas.negociar` + `consultas.ver-importes`): sin ellos no
+            hay nada que jugar aquí.
+          */}
+          {movible && verImportes ? (
+            <MesaNegociacion
+              idLinea={linea.id}
+              precioInicial={linea.precioAprobado ?? linea.precioCalculado}
+              codigoModelo={linea.codigoModelo}
+            />
+          ) : null}
+
           {eventos.isPending ? (
             <p className="text-sm text-muted-foreground">Cargando historial…</p>
           ) : eventos.isError ? (
@@ -95,7 +136,7 @@ export function DialogoNegociacionRenglon({
             <HistorialEventos eventos={eventos.data ?? []} verImportes={verImportes} />
           )}
 
-          {puedeNegociar ? (
+          {movible ? (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               <Button
                 type="button"
@@ -157,6 +198,7 @@ function HistorialEventos({
           <TableHeader>
             <TableRow>
               <TableHead>Cuándo</TableHead>
+              <TableHead>Quién</TableHead>
               <TableHead>Versión</TableHead>
               <TableHead className="text-right">Precio anterior</TableHead>
               <TableHead className="text-right">Precio nuevo</TableHead>
@@ -167,10 +209,26 @@ function HistorialEventos({
           <TableBody>
             {eventos.map((e) => {
               const esRonda = e.idPrecostoAnterior !== null && e.idPrecostoNuevo !== null;
+              // ⭐ V1-E8w (§Post-F9.149): un evento que trae desglose vino de la MESA — es *"la
+              // información que vendí"*, no una ronda ni un acuerdo a secas.
+              const esMesa = e.costos.length > 0;
               return (
                 <TableRow key={e.id} data-testid="fila-evento-negociacion">
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                     {formatearFechaHora(e.registradoEn)}
+                  </TableCell>
+                  {/*
+                    ⭐ V1-E8q: QUIÉN lo escribió. El hilo ya guardaba el autor desde F8-E5, pero no
+                    se pintaba: se leía "qué se acordó y cuándo" sin saber de quién venía. El nombre
+                    lo resuelve el servidor (no hay FK física al usuario). El criterio de cómo
+                    nombrarlo vive en `autorDeEvento` (`lib/formato`) y lo comparten ESTA pantalla y
+                    el expediente de la orden — son el mismo hilo, tienen que decir lo mismo.
+                  */}
+                  <TableCell
+                    className="whitespace-nowrap text-xs font-medium"
+                    data-testid="autor-evento"
+                  >
+                    {autorDeEvento(e)}
                   </TableCell>
                   <TableCell>
                     {esRonda ? (
@@ -178,6 +236,8 @@ function HistorialEventos({
                         v{e.versionAnterior} →{' '}
                         <span className="font-medium">v{e.versionNueva}</span>
                       </span>
+                    ) : esMesa ? (
+                      <Badge data-testid="badge-mesa">mesa</Badge>
                     ) : (
                       <Badge variant="secondary">acuerdo</Badge>
                     )}
@@ -188,7 +248,41 @@ function HistorialEventos({
                   <TableCell className="text-right">
                     {verImportes ? formatearMoneda(e.precioNuevo) : '—'}
                   </TableCell>
-                  <TableCell className="max-w-[16rem] text-sm">{e.acuerdo}</TableCell>
+                  <TableCell className="max-w-[16rem] text-sm">
+                    {e.acuerdo}
+                    {/* ⭐⭐ §Post-F9.149 — EL DESGLOSE CON EL QUE SE VENDIÓ, a la vista. Guardarlo y
+                        no enseñarlo sería no haberlo guardado: es la materia prima con la que
+                        Desarrollo arma la receta revisada (*"es como se va a armar la nueva
+                        receta"*). Los importes salen "—" sin `consultas.ver-importes`. */}
+                    {esMesa ? (
+                      <ul className="mt-1 space-y-0.5" data-testid="costos-de-la-mesa">
+                        {e.costos.map((c, i) => (
+                          <li
+                            key={`${String(e.id)}-${String(i)}`}
+                            className="flex justify-between gap-3 text-[11.5px] text-muted-foreground"
+                            data-testid="costo-de-la-mesa"
+                          >
+                            <span
+                              className="truncate"
+                              title={`${c.conceptoNombre} · ${c.etiqueta}`}
+                            >
+                              {c.etiqueta}
+                              {c.consumo === null ? '' : ` (${String(c.consumo)})`}
+                            </span>
+                            <span className="shrink-0 tabular-nums">
+                              {verImportes ? formatearMoneda(c.importe) : '—'}
+                            </span>
+                          </li>
+                        ))}
+                        <li className="flex justify-between gap-3 border-t pt-0.5 text-[11.5px] font-medium">
+                          <span>Costo de la mesa</span>
+                          <span className="tabular-nums" data-testid="costo-total-de-la-mesa">
+                            {verImportes ? formatearMoneda(e.costoEstimado) : '—'}
+                          </span>
+                        </li>
+                      </ul>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-right">
                     {esRonda ? (
                       <Button

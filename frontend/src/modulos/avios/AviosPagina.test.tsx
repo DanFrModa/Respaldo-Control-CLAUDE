@@ -71,6 +71,7 @@ function avio(id: number, clave: string, activo = true): Avio {
     favorito: false,
     cantFav: null,
     esGenerico: false,
+    seCompraSinColor: false,
     precioReferencia: null,
     proveedores: [],
     activo,
@@ -227,6 +228,25 @@ describe('<AviosPagina>', () => {
     expect(screen.getAllByText('Genérico · stock').length).toBeGreaterThan(0);
   });
 
+  it('⭐⭐ 0.158 — el chip «Sin color» sale SÓLO en el avío marcado', () => {
+    // Daniel: *«hay ciertos avíos que no se compran por color… como la etiqueta de lavado»*. El
+    // chip es la única señal en el catálogo de que ese avío se va a comprar junto, así que tiene
+    // que verse — y, por lo mismo, NO puede verse en los demás (sería ruido en 629 avíos).
+    const etiqueta = avio(7, 'ETI-LAV');
+    etiqueta.seCompraSinColor = true;
+    useAvios.mockReturnValue(consultaConDatos([etiqueta, avio(8, 'BTN-08')]));
+    renderConProveedores(<AviosPagina />, {
+      sesion: estadoSesionDePrueba(['avios.ver']),
+    });
+
+    // Un solo avío marcado ⇒ el chip aparece las veces que la pantalla pinta ESE renglón (móvil +
+    // escritorio), nunca las del otro. 🔴 Si el chip se pintara siempre, este conteo se duplica.
+    const chips = screen.getAllByText('Sin color');
+    expect(chips.length).toBeGreaterThan(0);
+    const marcados = screen.getAllByText('ETI-LAV descripción');
+    expect(chips.length).toBe(marcados.length);
+  });
+
   it('muestra los proveedores y precios del avío al expandir el renglón (R1)', () => {
     const conProveedores = avio(5, 'BTN-05');
     conProveedores.proveedores = [
@@ -235,7 +255,6 @@ describe('<AviosPagina>', () => {
         nombreProveedor: 'Botones SA',
         precio: 0.5,
         condiciones: 'contado',
-        precioUnidadConsumo: null,
         habitual: false,
       },
       {
@@ -243,7 +262,6 @@ describe('<AviosPagina>', () => {
         nombreProveedor: 'Hilos del Norte',
         precio: null,
         condiciones: null,
-        precioUnidadConsumo: null,
         // ⭐ V1-E3m: el HABITUAL es el que la explosión propone — y NO es el más barato.
         habitual: true,
       },

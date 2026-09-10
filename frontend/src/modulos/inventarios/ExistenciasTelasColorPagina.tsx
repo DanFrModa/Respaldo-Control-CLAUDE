@@ -1,9 +1,10 @@
-import { Ban, BookOpenText, ChevronRight, Printer, Search } from 'lucide-react';
+import { Ban, BookOpenText, ChevronRight, FileDown, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import {
+  urlImpresoInventarioTelas,
   urlImpresoTraspasoTela,
   useCancelarTelaColor,
   useExistenciasTelaColor,
@@ -64,6 +65,10 @@ interface ColorKardex {
  * móvil) en un renglón de color → CAJÓN con el KARDEX de ese color (saldo corrido de ambos
  * componentes). La vista vieja por lote sigue viva en "Existencias por lote (legado)".
  * `inventario-telas.ver` gobierna el acceso. Existencia = Σ de movimientos (D3), nunca editable.
+ *
+ * IMPRESO PDF (R9): el botón «Imprimir PDF» del inventario de telas vive AQUÍ desde v0.098 —antes
+ * colgaba de la vista legada por lote y el impreso leía ESA consulta —la del inventario legado, no
+ * la de esta pantalla—, así que salía en blanco— y manda los MISMOS filtros de esta pantalla.
  */
 export function ExistenciasTelasColorPagina(): React.JSX.Element {
   const [texto, setTexto] = useState('');
@@ -143,6 +148,15 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
             clic en un color para su kardex
           </p>
         </div>
+        {/* IMPRESO PDF (R9). El botón vivía en la vista LEGADA por lote y su impreso leía ESA
+            consulta: la hoja salía prácticamente en blanco (fila 0.098). Ahora cuelga de aquí y
+            viaja con LOS MISMOS filtros que se están viendo, así que el papel dice lo que dice la
+            pantalla. */}
+        <Button asChild variant="outline" size="sm" data-testid="telas-color-imprimir">
+          <a href={urlImpresoInventarioTelas(filtros)} target="_blank" rel="noopener noreferrer">
+            <FileDown aria-hidden /> Imprimir PDF
+          </a>
+        </Button>
       </header>
 
       {/* ── KPIs ────────────────────────────────────────────────────────────── */}

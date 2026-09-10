@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderConProveedores } from '@/pruebas/utilidades';
+import { limpiarCombobox, renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoAlmacen } from './DialogoAlmacen';
 
@@ -22,9 +22,19 @@ vi.mock('@/api/almacenes', () => ({
 const espiaRol = vi.fn();
 vi.mock('@/api/proveedores', () => ({
   COD_ROL_PROVEEDOR: { corte: 'corte', vendeTelas: 'vende-telas' },
-  useProveedoresPorRol: (codigo: string | undefined) => {
+  // V1-E7g: el cortador se elige en un combobox con búsqueda en SERVIDOR; el mock filtra por
+  // «contiene», igual que el servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
+  useProveedoresPorRol: (codigo: string | undefined, filtros?: { busqueda?: string }) => {
     espiaRol(codigo);
-    return { data: { datos: [{ id: 99, nombre: 'Taller Montaño' }] }, isPending: false };
+    const todos = [{ id: 99, nombre: 'Taller Montaño' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
   },
 }));
 
@@ -48,7 +58,7 @@ function almacenDePrueba(sobrescribir: Record<string, unknown> = {}) {
 }
 
 describe('DialogoAlmacen · cortador (§Post-F9.13)', () => {
-  it('el campo solo existe en almacenes de TELA y ofrece únicamente cortadores', () => {
+  it('el campo solo existe en almacenes de TELA y ofrece únicamente cortadores', async () => {
     renderConProveedores(<DialogoAlmacen abierto alCambiarAbierto={vi.fn()} almacen={undefined} />);
 
     // El alta arranca en PT: sin campo de cortador.
@@ -58,7 +68,11 @@ describe('DialogoAlmacen · cortador (§Post-F9.13)', () => {
     expect(screen.getByTestId('almacen-cortador')).toBeInTheDocument();
     // La lista se pide acotada al rol "corte" (el filtro lo aplica el servidor).
     expect(espiaRol).toHaveBeenCalledWith('corte');
-    expect(screen.getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
+    // V1-E7g: la lista vive en el popover del combobox, que se abre al enfocar el campo.
+    fireEvent.focus(screen.getByTestId('almacen-cortador-busqueda'));
+    expect(await screen.findByTestId('almacen-cortador-opcion')).toHaveTextContent(
+      'Taller Montaño',
+    );
   });
 
   it('en el ALTA sin cortador elegido, el campo NO viaja en el cuerpo', async () => {
@@ -82,10 +96,10 @@ describe('DialogoAlmacen · cortador (§Post-F9.13)', () => {
 
     // Llega con su cortador ya elegido…
     await waitFor(() => {
-      expect(screen.getByTestId('almacen-cortador')).toHaveValue('99');
+      expect(screen.getByTestId('almacen-cortador-busqueda')).toHaveValue('Taller Montaño');
     });
     // …y al vaciarlo, el PATCH manda null explícito (omitirlo dejaría la liga intacta).
-    fireEvent.change(screen.getByTestId('almacen-cortador'), { target: { value: '' } });
+    limpiarCombobox('almacen-cortador');
     fireEvent.click(screen.getByTestId('guardar-almacen'));
 
     await waitFor(() => {
@@ -101,7 +115,7 @@ describe('DialogoAlmacen · cortador (§Post-F9.13)', () => {
       <DialogoAlmacen abierto alCambiarAbierto={vi.fn()} almacen={almacenDePrueba()} />,
     );
     await waitFor(() => {
-      expect(screen.getByTestId('almacen-cortador')).toHaveValue('99');
+      expect(screen.getByTestId('almacen-cortador-busqueda')).toHaveValue('Taller Montaño');
     });
 
     fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: 'PT' } });

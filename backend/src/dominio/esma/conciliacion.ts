@@ -5,6 +5,10 @@
  * contra lo CARGADO a EsMa (Σ cantidadReal de los cargos validados):
  *  • `faltantePorCargar = recibido − cargado` (>0 = se recibió pero aún no se cargó/validó a EsMa);
  *  • `cargosSinRecibo`   = cargos sin `idEtapaRecibo` (histórico/manual) — candidatos a revisión.
+ *  • `incompletas` + `soloIncompletas` (V1-E8k, §Post-F9.136) = las prendas que el maquilero
+ *    entregó SIN terminar. Van FUERA de `recibido` (no se producen ni se pagan), así que un grupo
+ *    de puras incompletas no genera cargo y aun así conserva su renglón: es la única huella que esa
+ *    entrega deja aquí, y `soloIncompletas` dice —desde el servidor, A1— por qué existe.
  *
  * Es una consulta de solo lectura (agregación en servidor, A1/§1 permite SQL de reporte; aquí basta
  * agrupar en memoria). Devuelve CANTIDADES (piezas), no importes → no se ocultan por `ver-importes`.
@@ -21,6 +25,8 @@ import type { z } from 'zod';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -76,7 +82,11 @@ export async function conciliarEsMa(
       orden: { select: { folio: true } },
       tercero: { select: { nombre: true } },
       tipoProceso: { select: { nombre: true } },
-      detalles: { select: { cantidad: true } },
+      // `cantidad` = piezas BUENAS (lo que se paga y lo que se cuadra contra EsMa).
+      // `cantidadIncompletas` viaja aparte y NUNCA se le suma (V1-E8k, §Post-F9.136: *"tampoco se
+      // pagan"*), pero sin leerla un grupo de puras incompletas sale con tres ceros y nadie puede
+      // saber por qué existe ese renglón. Misma pareja que ya lee `esma/cargos.ts`.
+      detalles: { select: { cantidad: true, cantidadIncompletas: true } },
     },
   });
 
@@ -88,6 +98,8 @@ export async function conciliarEsMa(
     idTipoProceso: number | null;
     tipoProceso: string;
     recibido: number;
+    /** Σ prendas INCOMPLETAS entregadas en los recibos del grupo (deliberadamente fuera de `recibido`). */
+    incompletas: number;
     cargado: number;
   }
   const grupos = new Map<string, Grupo>();
@@ -96,6 +108,7 @@ export async function conciliarEsMa(
     idsOrden.add(r.idOrden);
     const clave = claveGrupo(r.idOrden, r.idTercero, r.idTipoProceso);
     const recibido = r.detalles.reduce((s, d) => s + d.cantidad, 0);
+    const incompletas = r.detalles.reduce((s, d) => s + (d.cantidadIncompletas ?? 0), 0);
     const g = grupos.get(clave) ?? {
       idOrden: r.idOrden,
       folioOrden: Number(r.orden.folio),
@@ -104,9 +117,11 @@ export async function conciliarEsMa(
       idTipoProceso: r.idTipoProceso,
       tipoProceso: r.tipoProceso?.nombre ?? '',
       recibido: 0,
+      incompletas: 0,
       cargado: 0,
     };
     g.recibido += recibido;
+    g.incompletas += incompletas;
     grupos.set(clave, g);
   }
 
@@ -170,6 +185,26 @@ export async function conciliarEsMa(
       idTipoProceso: g.idTipoProceso,
       tipoProceso: g.tipoProceso,
       recibido: g.recibido,
+      incompletas: g.incompletas,
+      // ⭐ V1-E8k — POR QUÉ ESTE RENGLÓN PUEDE VENIR EN CEROS. `registrarReciboMaquila` sólo guarda
+      // una celda si trae `cantidad > 0` **o** `cantidadIncompletas > 0`, y rechaza el recibo si no
+      // queda ninguna (`produccion/recibos.ts`, `aplanarYValidar`). Por eso, en un grupo armado a
+      // partir de recibos, `recibido === 0` NO puede significar "no trajo nada": significa que
+      // TODOS los recibos VIVOS de ese grupo trajeron sólo prendas incompletas — que no se pagan y
+      // por eso NO generaron cargo (§Post-F9.136). Ese renglón es la ÚNICA huella que esa entrega
+      // deja en la conciliación, y se marca AQUÍ, en el servidor, para que la pantalla no tenga que
+      // deducir la regla (A1).
+      //
+      // ⚠️ LA MARCA DICE DE DÓNDE **NO** SALIÓ UN CARGO; NO PROMETE QUE EL RENGLÓN CUADRE. El paso
+      // (2) suma a `cargado` TODOS los cargos validados del grupo, incluidos los que no cuelgan de
+      // un recibo (`idEtapaRecibo` NULL: histórico o manual) — no filtra por esa columna. Así que un
+      // cargo migrado sobre el mismo (orden, maquilero, proceso) puede dejar `faltantePorCargar`
+      // NEGATIVO con `soloIncompletas` encendido. El número sigue siendo correcto; lo que no se
+      // puede afirmar es que no haya descuadre.
+      //
+      // Se exige además `incompletas > 0` para no llamar "sólo incompletas" a un grupo que llegara
+      // en ceros por otra vía (un histórico migrado que no pasó por ese guard).
+      soloIncompletas: g.recibido === 0 && g.incompletas > 0,
       cargado: g.cargado,
       faltantePorCargar: g.recibido - g.cargado,
       cortado: cortadoPorOrden.get(g.idOrden) ?? 0,
@@ -214,6 +249,10 @@ export async function conciliarEsMa(
       cantidadReal: true,
       orden: { select: { folio: true } },
       maquilero: { select: { nombre: true } },
+      // 0.114: un cargo puede colgar de un proceso de maquila O de un servicio de la orden.
+      // (Los de corte/empaque SÍ traen `idEtapaRecibo`, así que en la práctica no caen en esta
+      // lista de "cargos sin recibo" — pero el tipo lo admite y la etiqueta no se re-escribe aquí.)
+      servicio: true,
       tipoProceso: { select: { nombre: true } },
     },
     orderBy: { id: 'asc' },
@@ -225,18 +264,25 @@ export async function conciliarEsMa(
     idMaquilero: c.idMaquilero,
     maquilero: c.maquilero.nombre,
     idTipoProceso: c.idTipoProceso,
-    tipoProceso: c.tipoProceso.nombre,
+    tipoProceso: etiquetaProcesoDelCargo(c),
     cantidad: c.cantidadReal?.toNumber() ?? null,
   }));
 
   const totales = filas.reduce(
     (acc, f) => ({
       recibido: acc.recibido + f.recibido,
+      incompletas: acc.incompletas + f.incompletas,
       cargado: acc.cargado + f.cargado,
       faltantePorCargar: acc.faltantePorCargar + f.faltantePorCargar,
       numCargosSinRecibo: acc.numCargosSinRecibo,
     }),
-    { recibido: 0, cargado: 0, faltantePorCargar: 0, numCargosSinRecibo: cargosSinRecibo.length },
+    {
+      recibido: 0,
+      incompletas: 0,
+      cargado: 0,
+      faltantePorCargar: 0,
+      numCargosSinRecibo: cargosSinRecibo.length,
+    },
   );
 
   return {

@@ -24,6 +24,9 @@ let empresa: Empresa;
 let empresa2: Empresa;
 let idMaquilero: number;
 let idOrdenWip: number;
+/** Color y talla del envío de `o1`, para el recibo que arma la prueba de incompletas (V1-E8v). */
+let idColorRojo: number;
+let idTallaM: number;
 // Catálogos globales sembrados en beforeEach, reutilizables por los tests que arman datos extra.
 let idModelo: number;
 let idCliente: number;
@@ -103,6 +106,8 @@ beforeEach(async () => {
   const rojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   const tCH = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
   const tM = await cliente.talla.create({ data: { etiqueta: 'M', orden: 2 } });
+  idColorRojo = rojo.id;
+  idTallaM = tM.id;
   const modelo = await cliente.modelo.create({ data: { codigo: 'MOD-1', descripcion: 'Playera' } });
   idModelo = modelo.id;
   const clienteNeg = await cliente.cliente.create({ data: { nombre: 'Tienda X' } });
@@ -325,5 +330,122 @@ describe('kpisWip', () => {
     const todas = await kpisWip(sesion(empresa.id), { soloPendientes: false }, bd());
     const soloPend = await kpisWip(sesion(empresa.id), { soloPendientes: true }, bd());
     expect(todas.total).toBeGreaterThanOrEqual(soloPend.total);
+  });
+
+  it('⭐ las PRENDAS INCOMPLETAS cierran el «por recibir» de la vista kpi_wip (V1-E8v)', async () => {
+    // Éste es el ÚNICO sitio del repo donde la fórmula del pendiente vivía CONGELADA en SQL (la
+    // vista materializada `kpi_wip`, F7-E3). Sin la columna `incompletas` de la migración
+    // `20260830120000_la_incompleta_sale_del_transito`, el tablero de Indicadores seguiría diciendo
+    // que faltan por recibir prendas que ya volvieron — y contradiría al tablero WIP de Producción
+    // sobre la MISMA orden. De las 20 enviadas de `o1`, ahora vuelven 12 buenas + 8 incompletas.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 102n,
+        idEmpresa: empresa.id,
+        idOrden: idOrdenWip,
+        tipo: 'recibo_maquila',
+        idTercero: idMaquilero,
+        fecha: new Date('2026-06-04T00:00:00.000Z'),
+        detalles: {
+          create: [
+            { idColor: idColorRojo, idTalla: idTallaM, cantidad: 12, cantidadIncompletas: 8 },
+          ],
+        },
+      },
+    });
+    await refrescarKpis(bd());
+
+    const k = await kpisWip(sesion(empresa.id), { soloPendientes: false }, bd());
+    const fila = k.datos.find((o) => o.idOrden === idOrdenWip);
+    expect(fila?.enviado).toBe(20);
+    expect(fila?.recibido).toBe(12);
+    expect(fila?.incompletas).toBe(8);
+    // 20 − 12 − 8 = 0. Antes de V1-E8v esto valía 8 y la orden nunca cerraba esa etapa.
+    expect(fila?.porRecibir).toBe(0);
+    expect(k.totales.incompletas).toBe(8);
+    expect(k.totales.porRecibir).toBe(0);
+  });
+
+  it('⭐ los FALTANTES SALDADOS sacan la orden de `soloPendientes` (V1, fila 0.109)', async () => {
+    // GEMELA de la prueba de arriba, y de la de `resumen.int.test.ts`. Vale por el `WHERE` de
+    // `condicionesWip`, que es la TERCERA copia de la fórmula del pendiente en este archivo (las
+    // otras dos son las expresiones `porRecibir` de los dos SELECT). En la fila 0.109 se
+    // actualizaron las dos del SELECT y se olvidó el WHERE 60 líneas más arriba: la orden seguía
+    // saliendo en el listado con `soloPendientes` y enseñando «Por recibir» = 0 en su propia fila —
+    // una fila contradiciéndose a sí misma.
+    //
+    // La orden se arma A PROPÓSITO con las otras tres etapas cuadradas (pedido = cortado = enviado,
+    // nada entregado): así el ÚNICO motivo por el que puede aparecer es el «por recibir».
+    const proceso = await cliente.tipoProceso.create({
+      data: { codigo: 'costura-kpi', nombre: 'Costura', generaEntradaPt: true },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 9001n,
+        idEmpresa: empresa.id,
+        idModelo,
+        idCliente,
+        estado: 'capturada',
+        fecha: new Date('2026-06-01T00:00:00.000Z'),
+        lineas: {
+          create: [
+            { idColor: idColorRojo, tallas: { create: [{ idTalla: idTallaM, cantidad: 10 }] } },
+          ],
+        },
+      },
+    });
+    for (const [folio, tipo] of [
+      [9100n, 'corte'],
+      [9101n, 'envio_maquila'],
+    ] as const) {
+      await cliente.etapaMovimiento.create({
+        data: {
+          folio,
+          idEmpresa: empresa.id,
+          idOrden: orden.id,
+          tipo,
+          ...(tipo === 'envio_maquila'
+            ? { idTercero: idMaquilero, idTipoProceso: proceso.id }
+            : {}),
+          fecha: new Date('2026-06-02T00:00:00.000Z'),
+          detalles: { create: [{ idColor: idColorRojo, idTalla: idTallaM, cantidad: 10 }] },
+        },
+      });
+    }
+    await refrescarKpis(bd());
+
+    // ANTES del cierre: le debe 10 y por eso SÍ sale con `soloPendientes`.
+    const antes = await kpisWip(sesion(empresa.id), { soloPendientes: true }, bd());
+    expect(antes.datos.some((o) => o.idOrden === orden.id)).toBe(true);
+    expect(antes.datos.find((o) => o.idOrden === orden.id)?.porRecibir).toBe(10);
+    const totalAntes = antes.total;
+
+    // Se cierra la orden con ese maquilero: las 10 quedan saldadas.
+    await cliente.cierreMaquilaOrden.create({
+      data: {
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        idMaquilero,
+        idTipoProceso: proceso.id,
+        fecha: new Date('2026-06-05T00:00:00.000Z'),
+        desenlace: 'cobrado',
+        detalles: {
+          create: [{ idColor: idColorRojo, idTalla: idTallaM, cantidadFaltantes: 10 }],
+        },
+      },
+    });
+    await refrescarKpis(bd());
+
+    const despues = await kpisWip(sesion(empresa.id), { soloPendientes: true }, bd());
+    // 🔴 Lo que el WHERE roto dejaba pasar: la orden seguía en la lista Y en el conteo.
+    expect(despues.datos.some((o) => o.idOrden === orden.id)).toBe(false);
+    expect(despues.total).toBe(totalAntes - 1);
+
+    // Y sin el filtro sigue existiendo, con sus cuatro cubetas cuadradas.
+    const todas = await kpisWip(sesion(empresa.id), { soloPendientes: false }, bd());
+    const fila = todas.datos.find((o) => o.idOrden === orden.id);
+    expect(fila?.enviado).toBe(10);
+    expect(fila?.faltantesSaldados).toBe(10);
+    expect(fila?.porRecibir).toBe(0);
   });
 });

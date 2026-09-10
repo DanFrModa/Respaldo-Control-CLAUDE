@@ -64,6 +64,36 @@ export const esquemaOrigenProveedor = z
 export type OrigenProveedor = z.infer<typeof esquemaOrigenProveedor>;
 
 /**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — UNA MEDIDA DEL DESGLOSE de un renglón de avío.** Daniel: *"el cierre
+ * lo tengo que comprar por medidas… no me aparece cantidad por medida"*.
+ *
+ * 🔴 **La medida NO parte el renglón: va en una tablita debajo.** Lo que parte el renglón es lo que
+ * se recibe por separado (el COLOR); la medida no se recibe —llegan "3,200 cierres"— así que es
+ * información PARA EL PROVEEDOR. Y **no multiplica**: la cantidad sale de cuántas prendas la llevan,
+ * jamás del número de la medida (§Post-F9.105, los 133,095 cierres).
+ *
+ * ⚠️ Se desglosan CANTIDADES, no precios (§Post-F9.113): **un solo precio** para todo el renglón.
+ */
+const esquemaMedidaDesglose = z
+  .object({
+    idAvioMedida: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Medida del catálogo del avío, o null = la cubeta "Sin medida".'),
+    etiqueta: z.string().describe('Etiqueta congelada de la medida ("53 cm") o "Sin medida".'),
+    cantidad: z.number().describe('Cuánto de esa medida. Σ del desglose = cantidad del renglón.'),
+    orden: z
+      .number()
+      .int()
+      .describe('Orden de despliegue (el del catálogo; "Sin medida" al final).'),
+  })
+  .describe('Un renglón del desglose por medida de un avío.');
+
+/** Forma de una medida del desglose en la API. */
+export type MedidaDesglose = z.infer<typeof esquemaMedidaDesglose>;
+
+/**
  * ⭐ V1-E3q (§Post-F9.86) — LO QUE LE TOCA A CADA OP de un material agrupado. Daniel: *"el reparto
  * es SIEMPRE por OP"*. La OC guarda **una línea por (material, OP)** con este mismo desglose.
  */
@@ -75,6 +105,12 @@ export const esquemaRepartoOrden = z
     cantidadRequerida: z.number().describe('Requerido por ESA orden (R3).'),
     cantidadAComprar: z.number().describe('Requerido − stock genérico, en ESA orden.'),
     cantidadEnOc: z.number().describe('Ya en OC viva ligada a ESA orden (V1-E3q).'),
+    cantidadCubierta: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E8e (§Post-F9.99): cuánto de ESA orden se dio por cubierto (*"con esto queda ' +
+          'cubierto — no me lo vuelvas a pedir"*). 0 = nadie decidió nada, que es el default.',
+      ),
     cantidadPendiente: z.number().describe('Lo que falta comprar para ESA orden.'),
     precioSugerido: z.number().nullable().describe('Precio unitario con el que nacería su línea.'),
   })
@@ -95,12 +131,30 @@ export const esquemaRequerimientoSalida = z
       .int()
       .nullable()
       .describe(
-        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color ' +
-          'todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son ' +
-          'DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga ' +
-          'que inventar la correspondencia.',
+        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío —cuyo color es OTRO, ' +
+          'el de la PRENDA, en `idColorPrenda` (⭐⭐ V1-E8c §Post-F9.126)— o tela cuyo color todavía ' +
+          'nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS ' +
+          'renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que ' +
+          'inventar la correspondencia.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    idColorPrenda: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *"cada color ' +
+          'es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el ' +
+          'pedido"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica ' +
+          'es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada.',
+      ),
+    colorPrenda: z.string().nullable().describe('Nombre de ese color de prenda, o null.'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo ' +
+          'PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela).',
+      ),
     material: z.string().describe('Nombre/clave del material (para la UI).'),
     cantidadRequerida: z.number().describe('Cantidad requerida en unidad de consumo (R3).'),
     unidad: z.string().nullable().describe('Unidad de consumo, o null.'),
@@ -157,12 +211,24 @@ export const esquemaRequerimientoSalida = z
           'tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de ' +
           'pintar "ya en OC" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color.',
       ),
+    cantidadCubierta: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO: *"compré 480 ' +
+          'en lugar de 481… no voy a hacer otra OC por 1 kilo"* (Daniel). Es lo que impide que ese ' +
+          'kilo se persiga para siempre. **No se cierra solo NUNCA**: sale de una decisión explícita ' +
+          'y se puede deshacer («volver a pedirlo»). No vive en el snapshot —que se reescribe entero ' +
+          'en cada explosión— sino en su propia tabla, así que SOBREVIVE a volver a explotar. ' +
+          '0 = nadie decidió nada.',
+      ),
     cantidadPendiente: z
       .number()
       .describe(
-        '⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es ' +
-          'lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, ' +
-          'y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago).',
+        '⭐ V1-E3q + ⭐⭐ V1-E8e: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − ' +
+          'cantidadEnOc − cantidadCubierta). Es lo único que se compra al generar la OC. **UN ' +
+          'criterio, no dos**: el requerimiento queda satisfecho cuando lo comprometido más lo dado ' +
+          'por cubierto alcanzan lo requerido (§Post-F9.99). Antes se compraba `cantidadAComprar` a ' +
+          'secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago).',
       ),
     idsRequerimiento: z
       .array(z.number().int())
@@ -277,7 +343,11 @@ export const esquemaOrdenExplosionada = z
     fechaEntrega: z.iso
       .date()
       .nullable()
-      .describe('Fecha de entrega de la orden (respaldo de la fecha de sus OC).'),
+      .describe(
+        'Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la ' +
+          'alimenta: la de la OC es cuándo debe llegar el material y se captura a mano ' +
+          '(§Post-F9.120).',
+      ),
   })
   .describe('Orden de producción incluida en la explosión.');
 
@@ -420,13 +490,18 @@ export const esquemaGenerarOcCuerpo = z
       .array(z.number().int().positive())
       .default([])
       .describe('Ids de renglones de snapshot a comprar (vacío = todo lo pendiente).'),
-    // §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo. Aquí son OPCIONALES
-    // porque el dominio tiene de dónde sacarlas sin inventar nada: la fecha de entrega de la ORDEN
-    // de producción y la dirección FAVORITA del catálogo. Si se manda, gana lo que se manda.
+    // §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo. La DIRECCIÓN es
+    // opcional porque el dominio la saca del catálogo sin inventar nada (la FAVORITA).
+    // 🔴 La FECHA es opcional aquí sólo porque puede venir por proveedor (`fechasPorProveedor`,
+    // §Post-F9.71): **el dominio ya no la hereda de la orden de producción** (§Post-F9.120). Si no
+    // llega ninguna de las dos, la generación se RECHAZA nombrando a los proveedores sin fecha.
     fechaEntrega: z.iso
       .date({ error: 'La fecha de entrega no es válida' })
       .optional()
-      .describe('Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.'),
+      .describe(
+        'Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada ' +
+          'proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).',
+      ),
     idDireccionEntrega: z
       .number()
       .int()
@@ -437,7 +512,8 @@ export const esquemaGenerarOcCuerpo = z
     // POR PROVEEDOR de un clic, y la tela se necesita semanas antes que los avíos: una sola fecha
     // para todas convierte el dato en decorativo — y un dato que nadie cree no sirve para reclamar.
     // La fecha de arriba (`fechaEntrega`) es el VALOR INICIAL; lo que venga aquí GANA para ese
-    // proveedor. Un proveedor sin entrada propia usa la de arriba (y si tampoco hay, la de la orden).
+    // proveedor. Un proveedor sin entrada propia usa la de arriba — y si tampoco hay, NO se compra:
+    // la fecha no se hereda de ningún lado (§Post-F9.120).
     fechasPorProveedor: z
       .array(
         z.object({
@@ -450,7 +526,8 @@ export const esquemaGenerarOcCuerpo = z
       .optional()
       .describe(
         'Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese ' +
-          'proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).',
+          'proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la ' +
+          'generación se rechaza (§Post-F9.120).',
       ),
     // ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. Daniel: *"el sobrante de compra se reparte
     // entre las OP de la compra… comprar el rollo completo es una decisión del comprador EN EL
@@ -463,7 +540,7 @@ export const esquemaGenerarOcCuerpo = z
         z.object({
           tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
           idMaterial: z.number().int().positive().describe('Tela o avío del catálogo.'),
-          idTelaColor: z
+          idColor: z
             .number()
             .int()
             .positive()
@@ -473,7 +550,10 @@ export const esquemaGenerarOcCuerpo = z
               '⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de ' +
                 'Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras ' +
                 'capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. ' +
-                'Omitir/`null` = el renglón sin color (lo que ya se compraba así).',
+                'Omitir/`null` = el renglón sin color (lo que ya se compraba así). ' +
+                '⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las ' +
+                'telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se ' +
+                'confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos.',
             ),
           idProveedor: z.number().int().positive().describe('Proveedor al que se le compra.'),
           cantidadTotal: z
@@ -512,15 +592,67 @@ export const esquemaGenerarOcCuerpo = z
                 'significa que la línea nace SIN precio (se captura después en la OC), que es lo ' +
                 'mismo que ya pasaba cuando la cascada no encontraba ninguno.',
             ),
+          // ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, EDITABLE ANTES DE GENERAR. Daniel:
+          // *"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. El sistema
+          // PROPONE el nombre del color de la prenda; la persona lo corrige aquí cuando el avío va
+          // en CONTRASTE — igual que ya pasa con la cantidad y el precio (§Post-F9.94).
+          colorTexto: z
+            .string()
+            .trim()
+            .max(120, { error: 'El color del avío no puede tener más de 120 caracteres' })
+            .optional()
+            .describe(
+              '⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese ' +
+                'renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). ' +
+                'Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: ' +
+                'borrarlo del todo no es una instrucción, es un descuido.',
+            ),
+          // ⭐⭐ V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?». Daniel: *"compré 480 en lugar
+          // de 481… y me sigue poniendo que me falta comprar 1 kilo… no voy a hacer otra OC por 1
+          // kilo"*. Cuando el comprador BAJA la cantidad por debajo de lo que se necesitaba, la
+          // previa le pregunta qué significa — y esto es su respuesta.
+          //
+          // 🔴 **El default es «sigue pendiente»: omitirlo (o `false`) deja el faltante VIVO.**
+          // Nada se cierra solo. Y NO basta por sí solo para que un ajuste exista (ver el `refine`
+          // de abajo): marcar «queda cubierto» sin bajar la cantidad no deja faltante ninguno, así
+          // que aceptarlo a solas guardaría un acto que no hace nada.
+          restoCubierto: z
+            .boolean()
+            .optional()
+            .describe(
+              '⭐⭐ V1-E8e (§Post-F9.99): `true` = *"con esto queda cubierto, no me lo vuelvas a ' +
+                'pedir"* — al generar la OC, lo que se deje de comprar de ese renglón se registra ' +
+                'como DADO POR CUBIERTO y deja de aparecer como faltante. Omitir o `false` = *"el ' +
+                'resto sigue pendiente"*, que es el **default** y lo que pasa si nadie contesta. ' +
+                'Sólo actúa cuando de verdad se compra de menos: con la cantidad completa no hay ' +
+                'nada que cubrir y se ignora.',
+            ),
         }),
       )
       // Un ajuste que no trae ni cantidad ni precio no dice nada: aceptarlo callado dejaría al
       // comprador creyendo que cambió algo. Se rechaza con todas las letras.
       .refine(
         (items) =>
-          items.every((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined),
+          items.every(
+            (a) =>
+              a.cantidadTotal !== undefined ||
+              a.precioUnitario !== undefined ||
+              // ⭐⭐ V1-E8c: el color también cuenta como ajuste — se puede corregir SOLO el color.
+              (a.colorTexto !== undefined && a.colorTexto !== '') ||
+              // ⭐⭐ V1-E8e (§Post-F9.99): y «con esto queda cubierto» es un ajuste POR SÍ SOLO.
+              //
+              // 🔴 Casi se deja fuera «porque siempre acompaña a una cantidad bajada», y **era
+              // falso**: el faltante también aparece sin ajuste ninguno cuando una OP del renglón
+              // se queda por debajo del mínimo guardable y su línea no se escribe (`seEscribe:
+              // false`, V1-E3z). Rechazarlo ahí habría **tragado la respuesta en silencio** — el
+              // defecto exacto de §Post-F9.126, en el campo que más caro cuesta perder: uno que
+              // deja vivo un faltante que la persona creyó cerrar.
+              a.restoCubierto === true,
+          ),
         {
-          error: 'Cada ajuste tiene que traer la cantidad, el precio, o los dos',
+          error:
+            'Cada ajuste tiene que traer la cantidad, el precio, el color, «con esto queda ' +
+            'cubierto», o varios',
         },
       )
       .optional()
@@ -568,6 +700,10 @@ export const esquemaMotivoOmision = z
   .enum([
     'sin-proveedor',
     'ya-en-oc',
+    // ⭐⭐ V1-E8e (§Post-F9.99): alguien dijo «con esto queda cubierto». Es un motivo PROPIO y no
+    // una variante de `ya-en-oc` porque no lo decidió un documento sino una PERSONA — y porque se
+    // puede deshacer («volver a pedirlo»), que es lo que la frase tiene que ofrecer.
+    'dado-por-cubierto',
     'menor-al-minimo',
     'cubierto-por-stock',
     'no-seleccionado',
@@ -575,9 +711,11 @@ export const esquemaMotivoOmision = z
   ])
   .describe(
     'sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva ' +
-      '(V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir ' +
-      '(0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; ' +
-      'no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.',
+      '(V1-E3q); dado-por-cubierto: alguien decidió que con lo comprado queda cubierto y que el ' +
+      'resto no se persiga (⭐⭐ V1-E8e, §Post-F9.99); menor-al-minimo: falta algo, pero menos de lo ' +
+      'que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: ' +
+      'genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el ' +
+      'requerido es cero.',
   );
 
 /** Forma del motivo de omisión en la API. */
@@ -594,6 +732,12 @@ export const esquemaOmitidoPlan = z
     unidad: z.string().nullable(),
     cantidadAComprar: z.number().describe('Lo que pedía el snapshot (requerido − stock).'),
     cantidadEnOc: z.number().describe('Lo que ya está en OC viva (V1-E3q).'),
+    cantidadCubierta: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E8e (§Post-F9.99): lo que alguien dio por cubierto de este renglón. Cuando el ' +
+          'motivo es `dado-por-cubierto`, es POR ESTE número que el renglón se queda fuera.',
+      ),
     cantidadEnOcSinColor: z
       .number()
       .describe(
@@ -625,7 +769,26 @@ export const esquemaPlanLineaOrden = z
           'que la bandeja de autorización mide el desvío. El desvío AVISA, no bloquea.',
       ),
     precio: z.number().describe('Precio unitario con el que nace esa línea.'),
-    importe: z.number().describe('cantidad × precio.'),
+    /**
+     * ⭐⭐ 0.156 (§Post-F9.219) — cuánto COMPLEMENTO (el cárdigan de la felpa) va a pedir esta
+     * línea. Lo calcula el PLAN —no la generación— para que la previa y la orden de compra usen el
+     * mismo número y el importe prometido no se separe del guardado. `null` = nace pendiente (la
+     * tela no lleva complemento, o la receta no capturó su consumo) y `autorizarOC` lo exigirá.
+     */
+    cantidadComplemento: z
+      .number()
+      .nullable()
+      .describe('Cantidad del COMPLEMENTO de esta línea, o null si nace pendiente.'),
+    importe: z
+      .number()
+      .describe('cantidad × precio (+ el complemento, valuado al precio del cuerpo).'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida que se va a GUARDAR en esta línea de OC. ' +
+          '**Σ de sus cantidades = `cantidad` de la línea, exactamente** (se reparte con la misma ' +
+          'función que reparte la compra entre las OP). Vacío = el avío no se pide por medida.',
+      ),
     seEscribe: z
       .boolean()
       .describe(
@@ -654,6 +817,30 @@ export const esquemaPlanRenglon = z
         '⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color, o null.'),
+    idColorPrenda: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA del renglón de AVÍO, o null.'),
+    colorPrenda: z
+      .string()
+      .nullable()
+      .describe('Nombre de ese color de prenda — lo que el sistema PROPONE como texto, o null.'),
+    colorTexto: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el color que se va a ESCRIBIR en las líneas de este renglón — ' +
+          'lo que el proveedor lee. Nace del color de la prenda y el comprador lo puede corregir ' +
+          'aquí (el avío puede ir en contraste). `null` = no hay color que decir.',
+      ),
+    colorAjustado: z.boolean().describe('¿El comprador cambió el color propuesto (§Post-F9.126)?'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón = Σ de los de las líneas que ' +
+          'SÍ se escriben (mismo criterio que `importe`). Vacío = no se pide por medida.',
+      ),
     cantidadEnOcSinColor: z
       .number()
       .describe(
@@ -664,12 +851,41 @@ export const esquemaPlanRenglon = z
           'de la orden. 0 = nada que advertir.',
       ),
     material: z.string(),
+    /**
+     * ⭐⭐ 0.156 (§Post-F9.219) — cómo se llama el COMPLEMENTO de esta tela («Cardigan»), o null si
+     * no lleva. Viaja para que la previa pueda decir **de qué** es la cantidad extra que suma al
+     * importe: sin el nombre, la línea enseñaría `36 kg × $90 = $3,645` y la cuenta no cerraría a
+     * la vista. Lo dice el catálogo (`Tela.nombreComplemento`), no lo adivina la pantalla.
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento de la tela de este renglón («Cardigan»), o null.'),
     unidad: z.string().nullable(),
     cantidadTotal: z.number().describe('Lo que se va a pedir de este material (Σ del reparto).'),
     cantidadPropuesta: z
       .number()
       .describe('Lo que el sistema propuso antes de cualquier ajuste del comprador.'),
     ajustado: z.boolean().describe('¿El comprador cambió el total (sobrante de compra)?'),
+    // ── ⭐⭐ V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?» ──
+    cantidadFaltante: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E8e (§Post-F9.99): cuánto de este renglón se va a quedar SIN comprar si se genera ' +
+          'así = lo propuesto − lo que de verdad se va a pedir (contando en cero las líneas que no ' +
+          'llegan al mínimo guardable). **Es el disparador de la pregunta**: en cuanto pasa de 0, la ' +
+          'previa tiene que preguntar qué significa —*"¿sigue pendiente o con esto queda ' +
+          'cubierto?"*—, sin umbral ninguno. 0 = se compra todo lo que faltaba, no hay nada que ' +
+          'preguntar.',
+      ),
+    restoCubierto: z
+      .boolean()
+      .describe(
+        '⭐⭐ V1-E8e (§Post-F9.99): qué contestó el comprador a esa pregunta, tal como llegó en el ' +
+          'cuerpo. `false` = *"el resto sigue pendiente"* — el **default**, y lo que vale mientras ' +
+          'nadie conteste. `true` = *"con esto queda cubierto"*: al generar, el faltante se ' +
+          'registra como dado por cubierto y deja de perseguirse.',
+      ),
     // ── ⭐⭐ V1-E3z (§Post-F9.94) — EL PRECIO DEL RENGLÓN, para poder editarlo aquí ──
     precioUnitario: z
       .number()
@@ -959,3 +1175,75 @@ export const esquemaEstatusMaterialesSalida = z
 
 /** Forma del tablero de estatus en la API. */
 export type EstatusMaterialesSalida = z.infer<typeof esquemaEstatusMaterialesSalida>;
+
+// ── ⭐⭐ V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO», DESDE LA EXPLOSIÓN ──────────────────────
+
+/**
+ * ⭐⭐ **DAR POR CUBIERTO —o VOLVER A PEDIR— UN FALTANTE, DESDE EL RENGLÓN DE LA EXPLOSIÓN.**
+ *
+ * Es la SEGUNDA puerta de §Post-F9.99. La primera vive en la revisión previa (el campo
+ * `restoCubierto` del ajuste), que es donde se pregunta **en el momento de decidir**. Ésta existe
+ * para *"los casos que ya se escaparon —como el que originó esto, que ya estaba generado"*: la OC de
+ * 480 ya está hecha y el kilo lleva días persiguiendo al comprador.
+ *
+ * ⚠️ **La CANTIDAD no viaja, y es a propósito.** Lo que el comprador dice aquí es *"esto ya no me lo
+ * pidas"*, no un número: cuánto falta lo sabe el servidor, con el mismo criterio con el que lo pinta
+ * (A1 — la pantalla nunca calcula). Mandarlo desde el cliente abriría la puerta a cubrir de más.
+ */
+export const esquemaDarPorCubiertoCuerpo = z
+  .object({
+    idsRequerimiento: z
+      .array(z.number().int().positive())
+      .min(1, { error: 'Elige al menos un material' })
+      .max(200, { error: 'Son demasiados materiales para un solo acto (máximo 200)' })
+      .describe(
+        'Renglones de snapshot a los que aplica. ⚠️ El id es una DIRECCIÓN, no la identidad: el ' +
+          'dominio lo traduce a *(orden, material, color)* dentro de la misma transacción, y es eso ' +
+          'lo que se guarda — así la marca sobrevive a volver a explotar (que reescribe el snapshot ' +
+          'entero y cambia los ids). Un renglón de pantalla agrupa varias OP, así que manda todos ' +
+          'sus `idsRequerimiento`.',
+      ),
+    cubierto: z
+      .boolean()
+      .describe(
+        '`true` = *"con esto queda cubierto"*: lo que hoy falta de esos renglones deja de pedirse. ' +
+          '`false` = **volver a pedirlo**: se deshacen (suavemente, D3) los actos vivos y el ' +
+          'faltante reaparece. No tiene default: aquí SIEMPRE hay una decisión explícita detrás ' +
+          '(el default de *"sigue pendiente"* es no llamar a esto).',
+      ),
+  })
+  .describe('Dar por cubierto —o volver a pedir— el faltante de unos renglones (§Post-F9.99).');
+
+/** Datos validados del cuerpo de dar por cubierto. */
+export type DatosDarPorCubierto = z.infer<typeof esquemaDarPorCubiertoCuerpo>;
+
+/** Resultado de dar por cubierto (o de deshacerlo): qué renglones se movieron y por cuánto. */
+export const esquemaDarPorCubiertoSalida = z
+  .object({
+    cubierto: z
+      .boolean()
+      .describe('Qué se pidió: dar por cubierto (true) o volver a pedir (false).'),
+    afectados: z
+      .array(
+        z.object({
+          idRequerimiento: z.number().int().describe('Renglón de snapshot que se nombró.'),
+          idOrden: z.number().int().describe('Orden de producción a la que le pertenece.'),
+          folioOrden: z.number().int().describe('Folio de esa orden (para el mensaje).'),
+          material: z.string().describe('Material CON su color, tal como la pantalla lo enseña.'),
+          unidad: z.string().nullable().describe('Unidad de consumo, o null.'),
+          cantidad: z
+            .number()
+            .describe(
+              'Cuánto se dio por cubierto (o cuánto se devolvió a pendiente al deshacerlo). ' +
+                'Siempre > 0: los renglones donde no había nada que hacer NO aparecen — la ' +
+                'operación es idempotente y decirlo con una lista vacía es más honesto que ' +
+                'inventar un acto de cero.',
+            ),
+        }),
+      )
+      .describe('Renglones que de verdad se movieron (vacío = no había nada que cubrir/deshacer).'),
+  })
+  .describe('Resultado de «con esto queda cubierto» / «volver a pedirlo» (§Post-F9.99).');
+
+/** Forma del resultado de dar por cubierto en la API. */
+export type DarPorCubiertoSalida = z.infer<typeof esquemaDarPorCubiertoSalida>;

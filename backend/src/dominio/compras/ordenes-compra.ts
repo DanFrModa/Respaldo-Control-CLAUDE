@@ -39,6 +39,8 @@ import {
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
+import { motivoDesgloseInvalido } from './desglose-por-medida.js';
+import { modalidadFactura } from '../terceros/facturacion-proveedor.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -46,8 +48,10 @@ import type {
   ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
+  ModalidadFacturacion,
   OrdenCompra,
   OrdenCompraLinea,
+  OrdenCompraLineaMedida,
   OrdenCompraLineaTalla,
   Prisma,
 } from '../../datos/index.js';
@@ -78,7 +82,11 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { exigirMaterialesLiberados, exigirRecetaLiberada } from '../produccion/receta-orden.js';
+import {
+  exigirComprasNoCongeladas,
+  exigirMaterialesLiberados,
+  exigirRecetaLiberada,
+} from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -125,24 +133,32 @@ const ESTATUS_EDITABLES_NORMAL: readonly string[] = ['borrador', 'pendiente_auto
  * nombre, orden ligada con folio, matriz con etiquetas) y órdenes ligadas (folio).
  */
 type OCConDetalle = OrdenCompra & {
-  proveedor: { nombre: string };
+  /** `modalidadFacturacion` (fila 0.129): lo que decide qué deuda nace al RECIBIR (fila 0.124). */
+  proveedor: { nombre: string; modalidadFacturacion: ModalidadFacturacion | null };
   direccionEntrega: { nombre: string; direccion: string } | null;
   lineas: (OrdenCompraLinea & {
     tela: { nombre: string; nombreComplemento: string | null } | null;
     telaColor: { nombre: string; pantone: string | null } | null;
     avio: { clave: string; descripcion: string } | null;
+    /** ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA con el que se pidió el avío. */
+    colorPrenda: { nombre: string } | null;
     orden: { folio: bigint } | null;
     tallas: (OrdenCompraLineaTalla & {
       color: { nombre: string };
       talla: { etiqueta: string };
     })[];
+    /** ⭐⭐ V1-E8c: el desglose por medida del renglón (vacío si no se pide por medida). */
+    medidas: OrdenCompraLineaMedida[];
   })[];
   ordenesLigadas: { idOrden: number; orden: { folio: bigint } }[];
 };
 
 /** `include` estándar para traer la OC con todo su detalle (ordenado de forma estable). */
 const incluirDetalle = {
-  proveedor: { select: { nombre: true } },
+  // ⭐ Fila 0.129: la MODALIDAD viaja con el nombre porque la pantalla de recepción tiene que
+  // decir, ANTES de confirmar, si va a nacer un cargo o si la factura queda pendiente. Es
+  // `modalidadFacturacion` y no la casilla vieja: desde la fila 0.124 es la única que contesta.
+  proveedor: { select: { nombre: true, modalidadFacturacion: true } },
   direccionEntrega: { select: { nombre: true, direccion: true } },
   lineas: {
     orderBy: { id: 'asc' },
@@ -152,6 +168,11 @@ const incluirDetalle = {
       // recibe compara contra lo que llegó, y lo que el impreso tiene que decirle al proveedor.
       telaColor: { select: { nombre: true, pantone: true } },
       avio: { select: { clave: true, descripcion: true } },
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color de prenda del avío — lo que el impreso le dice al
+      // proveedor y lo que el editor de OC tiene que devolver intacto.
+      colorPrenda: { select: { nombre: true } },
+      // ⭐⭐ V1-E8c: y su desglose por medida, en el orden del catálogo del avío.
+      medidas: { orderBy: [{ orden: 'asc' }, { etiqueta: 'asc' }] },
       orden: { select: { folio: true } },
       tallas: {
         orderBy: [{ talla: { orden: 'asc' } }, { id: 'asc' }],
@@ -366,6 +387,8 @@ async function validarLineas(
   const idsTela = new Set<number>();
   const idsTelaColor = new Set<number>();
   const idsAvio = new Set<number>();
+  /** ⭐⭐ V1-E8c: medidas del catálogo citadas por el desglose (se verifica que existan). */
+  const idsAvioMedida = new Set<number>();
   const idsColor = new Set<number>();
   const idsTalla = new Set<number>();
 
@@ -387,15 +410,44 @@ async function validarLineas(
         `El renglón ${num} no es de avío; no puede llevar proveedor de avío (idAvioProveedor).`,
       );
     }
-    // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. En un avío o en una línea libre no
-    // significa nada — y un avío NO tiene colores en ninguna parte del modelo de datos, así que
-    // aceptarlo aquí sería fingir una capacidad que el sistema no tiene.
+    // ⭐⭐ V1-E3u (§Post-F9.89): `idTelaColor` es el color **de la TELA** (catálogo `TelaColor`). En
+    // un avío o en una línea libre no significa nada. ⭐⭐ V1-E8c: el avío SÍ tiene color desde
+    // §Post-F9.126, pero es OTRO —el de la PRENDA, `idColorPrenda`, validado unas líneas abajo—;
+    // aceptar aquí un color de tela en un avío seguiría siendo fingir una capacidad que no existe.
     if (linea.idTelaColor != null && !tieneTela) {
       throw new ErrorValidacion(
         `El renglón ${num} no es de tela; no puede llevar color de tela (el color es de la tela).`,
       );
     }
     if (tieneTela && linea.idTelaColor != null) idsTelaColor.add(linea.idTelaColor);
+    // ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA SON DEL AVÍO. En una tela el color es
+    // `idTelaColor` (otro catálogo) y en una línea libre no hay material del que hablar: aceptar
+    // aquí un color de prenda o un desglose fingiría una capacidad que el renglón no tiene.
+    if (!tieneAvio && (linea.idColorPrenda != null || linea.colorAvio != null)) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de avío; no puede llevar color de prenda (el color de una tela es ` +
+          `el suyo, y una línea libre no tiene material del que decir el color).`,
+      );
+    }
+    if (!tieneAvio && linea.medidas !== undefined && linea.medidas.length > 0) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de avío; no puede llevar desglose por medida.`,
+      );
+    }
+    if (tieneAvio && linea.idColorPrenda != null) idsColor.add(linea.idColorPrenda);
+    // ⭐⭐ V1-E8c — 🔴 EL CERROJO DEL DESGLOSE: la Σ de las medidas es la cantidad del renglón, y sus
+    // etiquetas no se repiten. Sin esto el papel del proveedor podría decir "3,200" arriba y un
+    // desglose de 1,800 abajo — un documento que se contradice a sí mismo es peor que uno sin
+    // desglose. Se compara a la escala de la columna (`Decimal(14,2)`), que es la del destino.
+    if (linea.medidas !== undefined && linea.medidas.length > 0) {
+      const motivoDesglose = motivoDesgloseInvalido(linea.medidas, linea.cantidad);
+      if (motivoDesglose !== null) {
+        throw new ErrorValidacion(`El renglón ${num} ${motivoDesglose}`);
+      }
+      for (const m of linea.medidas) {
+        if (m.idAvioMedida != null) idsAvioMedida.add(m.idAvioMedida);
+      }
+    }
     // El COMPLEMENTO (Cardigan) es parte de una TELA: en avíos y líneas libres no existe
     // (§Post-F9.18). Que la tela SÍ lo exija se valida abajo, cuando ya se leyó el catálogo.
     if (!tieneTela && (linea.cantidadComplemento != null || linea.precioComplemento != null)) {
@@ -537,6 +589,11 @@ async function validarLineas(
   await exigirTodosExisten(tx, 'Color', idsColor, (ids) =>
     tx.color.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
+  // ⭐⭐ V1-E8c: las medidas citadas existen. La etiqueta se guarda CONGELADA (D3), pero el id tiene
+  // que ser real: una FK a una medida inventada reventaría en Postgres con un 500 sin explicación.
+  await exigirTodosExisten(tx, 'AvioMedida', idsAvioMedida, (ids) =>
+    tx.avioMedida.findMany({ where: { id: { in: ids } }, select: { id: true } }),
+  );
   await exigirTodosExisten(tx, 'Talla', idsTalla, (ids) =>
     tx.talla.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
@@ -553,6 +610,29 @@ async function validarLineas(
         throw new ErrorNoEncontrado('Orden', idOrden);
       }
     }
+    // ⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA VA **FUERA** DEL BUCLE, Y ÉSA ES LA CORRECCIÓN
+    // (hallazgo del reviewer de esta etapa).
+    //
+    // 🔴 EL DEFECTO QUE TENÍA: meter el candado DENTRO de `exigirRecetaLiberada` lo hacía heredar la
+    // exención de `agregaLineas` de abajo (*"corregir cantidad o precio conserva la identidad ⇒ no
+    // es gastar de nuevo"*). Esa exención se justificó para **la firma**, y su razón es *"un material
+    // que la receta firmada sí incluía"* — una razón que **NO transfiere al candado**, cuya premisa
+    // es exactamente que esa receta firmada **está bajo corrección**. Resultado medido: con la
+    // receta congelada, un `PATCH` que subía la cantidad de una línea YA existente de 100 a 5,000 kg
+    // no llegaba nunca a la guarda (`agregaLineas` contestaba `false` → `continue`) y **la OC
+    // comprometía 50 veces el dinero mientras la compra estaba "congelada"**.
+    //
+    // ⭐ POR QUÉ AQUÍ ES CORRECTO, y no sólo "más temprano": `idsOrdenLigada` se arma de las líneas
+    // **ENTRANTES**, así que esto bloquea **cualquier orden que la OC siga referenciando** —da igual
+    // si le cambia el material, la cantidad o el precio—, y **deja pasar quitarle TODAS sus líneas**
+    // a una orden congelada (su id ya no está en el conjunto). Esa asimetría no es un descuido: es
+    // la única vía de escape honesta para una OC que agrupa varias OP y una de ellas se congeló.
+    // Vale para `crearOC` y `actualizarOC` de una sola vez, y cuesta una consulta sólo si hay ligas.
+    //
+    // Va DESPUÉS del filtro por empresa, como todo lo de aquí: una orden ajena no se comprueba ni se
+    // nombra (A9).
+    await exigirComprasNoCongeladas(tx, idsOrdenLigada, idEmpresa);
+
     // ⭐ LA PUERTA, también por la puerta de atrás (V1-E3d, §Post-F9.43(c) — hallazgo del reviewer).
     // La decisión dice *"no se puede explotar el MRP **ni generar OC**"*, y una OC capturada A MANO
     // en *Compras › Nueva OC* y ligada a la orden gasta el mismo dinero contra la misma receta que
@@ -624,6 +704,10 @@ async function crearLineas(
         idAvioProveedor: linea.idAvioProveedor ?? null,
         // ⭐⭐ V1-E3u (§Post-F9.89): el color con el que se PIDE la tela.
         idTelaColor: linea.idTelaColor ?? null,
+        // ⭐⭐ V1-E8c (§Post-F9.126): el color del AVÍO en sus dos piezas — la IDENTIDAD (por la que
+        // netea la explosión) y el TEXTO que lee el proveedor.
+        idColorPrenda: linea.idColorPrenda ?? null,
+        colorAvio: aTexto(linea.colorAvio) ?? null,
         cantidad: linea.cantidad,
         // ⭐ V1-E3u (§Post-F9.89(a)): lo que el sistema propuso (null si la capturó una persona).
         cantidadSugerida: linea.cantidadSugerida ?? null,
@@ -644,6 +728,20 @@ async function crearLineas(
           idColor: t.idColor,
           idTalla: t.idTalla,
           cantidad: t.cantidad,
+          creadoPorId: sesion.id,
+          modificadoPorId: sesion.id,
+        })),
+      });
+    }
+    // ⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón (Σ = cantidad, ya validado).
+    if (linea.medidas !== undefined && linea.medidas.length > 0) {
+      await tx.ordenCompraLineaMedida.createMany({
+        data: linea.medidas.map((m) => ({
+          idOrdenCompraLinea: creada.id,
+          idAvioMedida: m.idAvioMedida ?? null,
+          etiqueta: m.etiqueta,
+          cantidad: m.cantidad,
+          orden: m.orden ?? 0,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
         })),
@@ -726,6 +824,16 @@ function aCompraSalida(
       idAvioProveedor: l.idAvioProveedor,
       idTelaColor: l.idTelaColor,
       telaColor: l.telaColor?.nombre ?? null,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío, en sus dos piezas.
+      idColorPrenda: l.idColorPrenda,
+      colorPrenda: l.colorPrenda?.nombre ?? null,
+      colorAvio: l.colorAvio,
+      medidas: l.medidas.map((m) => ({
+        idAvioMedida: m.idAvioMedida,
+        etiqueta: m.etiqueta,
+        cantidad: m.cantidad.toNumber(),
+        orden: m.orden,
+      })),
       pantoneTelaColor: l.telaColor?.pantone ?? null,
       descripcionLibre: l.descripcionLibre,
       cantidad,
@@ -762,6 +870,7 @@ function aCompraSalida(
     estatus: oc.estatus,
     idProveedor: oc.idProveedor,
     proveedor: oc.proveedor.nombre,
+    modalidadFacturaProveedor: modalidadFactura(oc.proveedor.modalidadFacturacion),
     fecha: aFechaIso(oc.fecha),
     fechaEntrega: aFechaIso(oc.fechaEntrega),
     idDireccionEntrega: oc.idDireccionEntrega,
@@ -1065,6 +1174,24 @@ export async function autorizarOC(
       );
     }
     await exigirComplementosCapturados(tx, id);
+    // ⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a)): con la receta de una orden ligada ABIERTA
+    // para corregirse, su compra está congelada. Autorizar es EL momento en que el dinero se
+    // compromete —el borrador todavía no compra nada—, así que la guarda va aquí y no sólo al
+    // capturar las líneas.
+    //
+    // ⚠️ No contradice el punto 5 de §Post-F9.165 ("las OC ya autorizadas no se tocan"): eso protege
+    // a las que YA tienen firma, y esto frena una firma NUEVA. La OC no se pierde: se queda en
+    // borrador y se autoriza en cuanto Desarrollo cierre la receta.
+    const ligadas = await tx.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: id, idOrden: { not: null } },
+      select: { idOrden: true },
+      distinct: ['idOrden'],
+    });
+    await exigirComprasNoCongeladas(
+      tx,
+      ligadas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),
+      sesion.idEmpresaActiva,
+    );
     await tx.ordenCompra.update({
       where: { id },
       data: {
@@ -1353,7 +1480,8 @@ export async function duplicarOC(
   const idNueva = await enTransaccion(async (tx) => {
     const origen = await tx.ordenCompra.findFirst({
       where: { id, idEmpresa: sesion.idEmpresaActiva },
-      include: { lineas: { include: { tallas: true }, orderBy: { id: 'asc' } } },
+      // ⭐⭐ V1-E8c: la copia arrastra también el desglose por medida (y el color, ver abajo).
+      include: { lineas: { include: { tallas: true, medidas: true }, orderBy: { id: 'asc' } } },
     });
     if (origen === null) {
       throw new ErrorNoEncontrado('OrdenCompra', id);
@@ -1362,6 +1490,20 @@ export async function duplicarOC(
     if (motivo !== null) {
       throw new ErrorValidacion(motivo);
     }
+    // ⭐⭐ V1-E8z — EL CANDADO, también por aquí. Duplicar es capturar una OC nueva contra la misma
+    // orden de producción, sólo que copiando: si la receta de esa orden está abierta para
+    // corregirse, su compra está congelada y esta copia no puede nacer.
+    //
+    // 🔴 Y de paso queda dicho lo que se encontró al pasar (deuda PREVIA, no de esta etapa): esta
+    // función NO llama a `validarLineas`, así que se salta las DOS puertas de la firma
+    // (`exigirRecetaLiberada` / `exigirMaterialesLiberados`) que sí cobra la captura a mano. Aquí
+    // sólo se cierra el candado de V1-E8z; cerrar el hueco de la firma es una decisión aparte,
+    // anotada para el lead.
+    await exigirComprasNoCongeladas(
+      tx,
+      origen.lineas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),
+      sesion.idEmpresaActiva,
+    );
 
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
 
@@ -1389,6 +1531,19 @@ export async function duplicarOC(
       idTela: l.idTela,
       idAvio: l.idAvio,
       idAvioProveedor: l.idAvioProveedor,
+      // 🔴 **V1-E8c — Y AQUÍ FALTABA EL COLOR DE LA TELA.** No es de esta etapa: V1-E3u le dio color
+      // a la línea de OC y esta copia se quedó sin arrastrarlo, así que duplicar una OC devolvía una
+      // compra "de la misma tela" pero SIN TONO — el dato que la recepción cruza. Se arregla al
+      // pasar (un defecto conocido no es "menor"), junto con los tres campos nuevos.
+      idTelaColor: l.idTelaColor,
+      idColorPrenda: l.idColorPrenda,
+      colorAvio: l.colorAvio,
+      medidas: l.medidas.map((m) => ({
+        idAvioMedida: m.idAvioMedida,
+        etiqueta: m.etiqueta,
+        cantidad: m.cantidad.toNumber(),
+        orden: m.orden,
+      })),
       cantidad: l.cantidad.toNumber(),
       unidad: l.unidad,
       precio: l.precio.toNumber(),

@@ -141,6 +141,14 @@ vi.mock('@/api/inventario-materiales', () => ({
   }),
   useCancelarTelaColor: () => ({ mutate: cancelarMutate, isPending: false }),
   urlImpresoTraspasoTela: (id: number) => `/api/inventarios/telas/traspasos/${String(id)}/impreso`,
+  // El doble del constructor de la URL ECHA los filtros en el querystring (igual que el real): así
+  // la prueba del botón puede distinguir "manda los filtros" de "manda una URL pelona".
+  urlImpresoInventarioTelas: (query: Record<string, unknown> = {}) => {
+    const qs = Object.entries(query)
+      .map(([k, v]) => `${k}=${String(v)}`)
+      .join('&');
+    return `/api/inventarios/telas/impreso${qs.length > 0 ? `?${qs}` : ''}`;
+  },
 }));
 // `etiquetaUnidadTela` salió de la pantalla a `@/api/telas` para que todas escriban igual la
 // unidad (kg/m) — el mock la incluye porque la tabla la usa en cada renglón.
@@ -351,5 +359,25 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
     expect(screen.getByText('Kardex · Felpa Suiza · Marino Alsa 3040')).toBeInTheDocument();
+  });
+
+  // 🔴 fila 0.098 — el botón «Imprimir PDF» del inventario de telas colgaba de la vista LEGADA por
+  // lote (y el impreso leía ESA consulta, la del inventario legado: hoja en blanco). Vive aquí,
+  // con LOS filtros.
+  it('ofrece imprimir el PDF con los MISMOS filtros que se están viendo', () => {
+    useKardexTelaColor.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    const enlace = screen.getByTestId('telas-color-imprimir').closest('a');
+    // Sin filtros: URL pelona.
+    expect(enlace).toHaveAttribute('href', '/api/inventarios/telas/impreso');
+    // Al mover un filtro de la pantalla, el enlace lo lleva (si el botón mandara una URL fija —el
+    // defecto que se está arreglando— esta aserción moriría).
+    fireEvent.click(screen.getByTestId('telas-color-ceros'));
+    expect(screen.getByTestId('telas-color-imprimir').closest('a')).toHaveAttribute(
+      'href',
+      '/api/inventarios/telas/impreso?incluirCeros=true',
+    );
   });
 });

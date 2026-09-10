@@ -33,6 +33,22 @@ export const esquemaColorEditar = esquemaColorCrear.partial().extend({
 export type DatosColorEditar = z.infer<typeof esquemaColorEditar>;
 
 /**
+ * A dónde se fue un color que una FUSIÓN se llevó: el canónico que lo absorbió, con su nombre.
+ * Sólo el NOMBRE contesta la pregunta que se hace quien mira el catálogo ("¿y «Blanco» a dónde se
+ * fue?"), y el id no viene solo/aparte a propósito: dos campos que dicen lo mismo pueden acabar
+ * diciéndolo distinto.
+ */
+export const esquemaColorFusionadoEn = z
+  .object({
+    id: z.number().int().describe('Id del color canónico que lo absorbió.'),
+    nombre: z.string().describe('Nombre del color canónico que lo absorbió.'),
+  })
+  .describe('El color canónico que absorbió a éste en una fusión.');
+
+/** Forma del destino de una fusión. */
+export type ColorFusionadoEn = z.infer<typeof esquemaColorFusionadoEn>;
+
+/**
  * Salida de un color en la API. Proyección del modelo `Color` a JSON, con la auditoría
  * (quién/cuándo). Parte del contrato OpenAPI.
  */
@@ -41,6 +57,17 @@ export const esquemaColorSalida = z
     id: z.number().int().describe('Id del color.'),
     nombre: z.string().describe('Nombre del color (normalizado).'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
+    /**
+     * ⭐ El RASTRO de la fusión, expuesto (`Color.idFusionadoEn` + el nombre del destino). Sin él la
+     * pantalla pintaba un color ABSORBIDO como un inactivo cualquiera: la fusión existía en la base
+     * y en la bitácora, pero no se veía en ningún lado. Null = a este color no se lo llevó nadie
+     * (que es el caso de casi todos, incluidos los que su dueño apagó a mano).
+     */
+    fusionadoEn: esquemaColorFusionadoEn
+      .nullable()
+      .describe(
+        'El color canónico que absorbió a éste en una fusión, o null si nunca lo absorbieron (un color apagado A MANO también da null).',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
@@ -63,9 +90,13 @@ export const esquemaColoresQuery = z
       .number()
       .int()
       .min(1)
-      .max(500)
+      // ⚠️ 100 es el tope REAL, el del dominio (`comun/paginacion.ts`: "nadie lee más y protege la
+      // base"). El contrato decía 500 y era MENTIRA: `listarColores` re-valida con el esquema del
+      // dominio, así que quien leía el OpenAPI y pedía 500 recibía un 400. No es un cambio de
+      // conducta —hoy ya fallaba—: es dejar de prometer lo que nunca se cumplió.
+      .max(100)
       .default(20)
-      .describe('Renglones por página (máx 500).'),
+      .describe('Renglones por página (máx 100).'),
     busqueda: z
       .string()
       .trim()

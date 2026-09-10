@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useDesautorizarOc } from '@/api/ordenes-compra';
-import type { OrdenCompra } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,6 +15,21 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 
 /**
+ * Lo ÚNICO que este diálogo necesita saber de la OC: su id (para mandar la mutación) y su folio
+ * (para nombrarla). Se pide así, y no como `OrdenCompra` entera, porque desde la fila 0.068 lo abren DOS
+ * pantallas con dos formas distintas del mismo hecho: la de Órdenes de compra, que tiene la OC
+ * completa, y el aviso de «ya está comprado» de la receta, que sólo tiene la `OcComprometida` que
+ * le manda el servidor (`idOrdenCompra` + `folio`). Pedir el objeto entero habría obligado a
+ * fabricar una OC de mentira para poder abrirlo —y una OC de mentira en un diálogo que quita firmas
+ * es justo lo que no puede existir—. `OrdenCompra` sigue encajando aquí tal cual.
+ */
+export interface OcADesautorizar {
+  id: number;
+  /** El folio con el que la nombra todo el mundo. */
+  numCompra: number;
+}
+
+/**
  * ⭐ Diálogo de DES-AUTORIZACIÓN de una orden de compra (V1-E3y, §Post-F9.79).
  *
  * Es la MARCHA ATRÁS de la firma de compra, y existe para que el bloqueo *"no se quita de la receta
@@ -25,15 +39,30 @@ import { Field, FieldLabel } from '@/components/ui/field';
  * Requiere `compras.desautorizar` —la llave del perfil de dirección—; el botón que lo abre se oculta
  * sin ese permiso. ⚠️ **Ocultar el botón NO es la defensa**: la decisión real (permiso, estatus,
  * "una OC recibida no se des-autoriza") la toma el servidor (A1/A4).
+ *
+ * 🔴 **Y NO CANCELA NADA CON EL PROVEEDOR.** Quita el sello en el sistema y devuelve la OC a
+ * borrador; lo de afuera —Daniel, §Post-F9.173(a): *"eso hay que negociarlo con el proveedor"*— no
+ * lo hace ningún botón. Por eso este diálogo es el ÚNICO camino: exige que una persona escriba el
+ * motivo y confirme.
  */
 export function DialogoDesautorizarOc({
   abierto,
   alCambiarAbierto,
   oc,
+  alDesautorizada,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
-  oc: OrdenCompra | undefined;
+  oc: OcADesautorizar | undefined;
+  /**
+   * ⭐ fila 0.068 — se avisa cuando la des-autorización SÍ ocurrió, para que el llamador refresque lo
+   * suyo. Existe porque `useDesautorizarOc` sólo invalida el árbol de Órdenes de compra, y la receta
+   * de la OP —que es quién pinta «Comprado · OC 12»— vive en otro (`['ordenes','receta',id]`). Sin
+   * esto, quien des-autoriza desde el aviso se queda mirando un chip que ya no es verdad y un botón
+   * que lo mandaría a un 409. `alCambiarAbierto(false)` NO sirve para lo mismo: también se dispara
+   * al cancelar.
+   */
+  alDesautorizada?: (() => void) | undefined;
 }): React.JSX.Element {
   const desautorizar = useDesautorizarOc();
   const [motivo, setMotivo] = useState('');
@@ -59,6 +88,7 @@ export function DialogoDesautorizarOc({
           toast.success(
             `Orden de compra ${oc.numCompra} des-autorizada: vuelve a borrador y se puede corregir.`,
           );
+          alDesautorizada?.();
           alCambiarAbierto(false);
         },
         onError: (error) => toast.error(error.message),

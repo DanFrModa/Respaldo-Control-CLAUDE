@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirEnSelectPorPrefijo, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del INVENTARIO CÍCLICO (F7-E5) contra el stack real. Cubre el flujo de la ficha:
@@ -23,6 +23,13 @@ test.describe('Inventario cíclico (F7-E5)', () => {
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
     await page.getByTestId('nuevo-modelo').click();
     await page.getByRole('dialog').getByLabel('Código').fill(codigoModelo);
+    // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+    // dos dígitos con los que el sistema arma el nº de producción del modelo.
+    await page
+      .getByRole('dialog')
+      .getByLabel('Tipo de producto')
+      .selectOption({ label: 'Pantalón' });
+    await page.getByRole('dialog').getByLabel('Género').selectOption({ label: 'Caballero' });
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
@@ -39,6 +46,8 @@ test.describe('Inventario cíclico (F7-E5)', () => {
       await agregarTalla.selectOption({ index: 1 });
     }
     await page.getByTestId('mov-matriz-celda').first().fill('20');
+    // Fila 0.100 — el MOTIVO es obligatorio: sin él el botón de guardar sigue deshabilitado.
+    await page.getByTestId('mov-motivo').fill('Inventario inicial de la prueba');
     await page.getByTestId('mov-guardar').click();
     await expect(page.getByText(/Movimiento #\d+ guardado/)).toBeVisible();
 
@@ -46,7 +55,10 @@ test.describe('Inventario cíclico (F7-E5)', () => {
     await page.goto('/indicadores/ciclicos');
     await expect(page.getByRole('heading', { name: 'Inventarios cíclicos' })).toBeVisible();
     await page.getByTestId('ic-nuevo').click();
-    await page.getByTestId('ic-almacen').selectOption({ label: 'Primeras' });
+    // Por PREFIJO, no por `label` exacto: aquí la opción lleva pegada la dimensión que se va a
+    // contar («Primeras · Producto terminado»), y atar el spec a esa etiqueta literal lo rompe en
+    // cuanto alguien la retoque — que es justo el rojo de CI que este ayudante vino a cerrar.
+    await elegirEnSelectPorPrefijo(page.getByTestId('ic-almacen'), 'Primeras');
     await page.getByTestId('ic-selector-modelo-busqueda').fill(codigoModelo);
     await page.getByTestId('ic-selector-modelo-opcion').first().click();
     await page.getByTestId('ic-guardar').click();

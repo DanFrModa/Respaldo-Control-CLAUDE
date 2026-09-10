@@ -10,9 +10,11 @@
  *      lo que cuelga del modelo se mueve (D3);
  *  (d) el consecutivo de DESARROLLO por secuencia atómica (A3), que corre por **cliente+año** y
  *      reinicia cada año (§Post-F9.108 «✅ RESUELTO», V1-E7a: sustituye al criterio por par de
- *      §Post-F9.34/.46), incluyendo lo que sólo la base demuestra — que dos altas SIMULTÁNEAS de
- *      pares distintos no repiten número, y que un código heredado del criterio viejo se salta
- *      solo, sin renumerar nada;
+ *      §Post-F9.34/.46) y **arranca sobre el piso del catálogo** (V1-E7h: el defecto que reportó
+ *      Daniel — 001/002/008 donde iban 008/009/010), incluyendo lo que sólo la base demuestra —
+ *      que dos altas SIMULTÁNEAS de pares distintos no repiten número, que el `GREATEST` de la
+ *      secuencia adelanta pero nunca retrocede, y que un código heredado del criterio viejo se
+ *      salta solo, sin renumerar nada;
  *  (e) el filtro de origen y la búsqueda por los DOS números.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -35,9 +37,11 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearDesarrolloConModeloNuevo } from '../desarrollo/desarrollos.js';
+import { crearModeloMigrado } from './migracion.js';
 import { actualizarModelo, crearModelo, listarModelos, pasarModeloAProduccion } from './modelos.js';
 import {
   consultarPropuestaProduccion,
+  derivarModeloDeProduccion,
   digitosDelModelo,
   leerSerie,
   mintearCodigoDesarrollo,
@@ -118,6 +122,22 @@ async function crearModeloDesarrollo(
     select: { id: true },
   });
   return modelo.id;
+}
+
+/**
+ * Alta por el CATÁLOGO (el camino de `crearModelo`), con sus DOS DÍGITOS.
+ *
+ * ⭐ V1-E8j: desde §Post-F9.134 el alta EXIGE tipo de prenda y género — son los dígitos con los que
+ * se le arma el nº de producción, y sin ellos el modelo no se podría promover. Se pasan de verdad
+ * (Pantalón 7 + Caballero 1 → serie 71), no un valor cualquiera para callar al validador: varias de
+ * estas pruebas promueven después el modelo y esperan `71xxx`.
+ */
+async function altaDeCatalogo(codigo: string) {
+  return crearModelo(
+    sesion(),
+    { codigo, idTipoProducto: pantalon.id, idGenero: caballero.id },
+    bd(),
+  );
 }
 
 /** Corre algo del motor de nomenclatura dentro de una transacción (necesita `Tx`). */
@@ -320,6 +340,104 @@ describe('digitosDelModelo', () => {
 });
 
 // ── (c) Pasar a producción ─────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐⭐ V1-E3 (§Post-F9.172(b)) — **EL BOTÓN «PASAR A PRODUCCIÓN» YA NO PUEDE DESHACER LA ETAPA.**
+ *
+ * Promover **transforma** el modelo: al terminar su `origen` es `produccion` **para siempre**, y
+ * `derivarModeloDeProduccion` exige un padre de DESARROLLO ⇒ un clic dejaba al modelo **incapaz de
+ * tener modelos por color, definitivamente**. Los dos daños se midieron y los dos eran
+ * **silenciosos** — ni error ni aviso.
+ *
+ * 🔴 Y el segundo es el que la base **no puede** vigilar: el CHECK
+ * `modelos_linaje_desarrollo_solo_produccion_check` no mira otra fila, así que no ve que el padre
+ * **deje de ser de desarrollo DESPUÉS** de que ya nacieron sus hijos.
+ */
+describe('⭐⭐ pasarModeloAProduccion — las guardas que protegen el linaje (V1-E3)', () => {
+  it('🔴 GUARDA A · un padre que YA tiene modelos por color NO se promueve (dos números, misma prenda)', async () => {
+    const idPadre = await crearModeloDesarrollo('CYA-26-71-020');
+    const color = await cliente.color.create({ data: { nombre: 'Rojo guarda A' } });
+    await cliente.modelo.create({
+      data: {
+        codigo: '71001',
+        origen: 'produccion',
+        numeroProduccion: 71_001,
+        idModeloDesarrollo: idPadre,
+        idColor: color.id,
+      },
+    });
+
+    // Sin la guarda, medido: el padre se llevaba el 71002 de la MISMA serie mientras su hijo Rojo
+    // tenía el 71001 ⇒ la misma prenda con DOS números de catálogo, que es justo lo que la decisión
+    // (B) de §Post-F9.172 existe para impedir.
+    const error = await pasarModeloAProduccion(sesion(), idPadre, {}, bd()).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect(error?.message).toContain('71001');
+    // Y NADA se movió: el padre sigue en desarrollo, con su código y sin número.
+    const padre = await cliente.modelo.findUniqueOrThrow({ where: { id: idPadre } });
+    expect(padre.origen).toBe('desarrollo');
+    expect(padre.codigo).toBe('CYA-26-71-020');
+    expect(padre.numeroProduccion).toBeNull();
+  });
+
+  /**
+   * ⚠️⚠️ **EL LÍMITE DE LA GUARDA, PROBADO EN VEZ DE CALLADO.** Promover ANTES de que llegue
+   * ninguna OC **sigue siendo posible**, y deja al modelo con UN número para todos sus colores,
+   * sin vuelta atrás. Es el bug que Daniel reportó, reproducible por un clic informado.
+   *
+   * 🔴 No se tapó con una guarda porque la que haría falta («con ficha de Desarrollo no se
+   * promueve») **rompe un camino existente y probado** —`crearDesarrolloConModeloNuevo` → promover,
+   * en este mismo archivo—: no sería una valla contra un descuido, sería RETIRAR una capacidad, y
+   * eso lo decide Daniel. Lo que V1-E3 sí hizo es que el clic deje de ser silencioso (el diálogo lo
+   * avisa antes, `DialogoPasarAProduccion.tsx`).
+   *
+   * Esta prueba existe para que el residuo esté **medido y a la vista**: el día que se decida
+   * retirar el botón, es la que hay que dar vuelta.
+   */
+  it('⚠️ RESIDUO MEDIDO · promover ANTES de las OC deja UN modelo para todos los colores', async () => {
+    // ⚠️ CON ficha de Desarrollo A PROPÓSITO: es el caso REAL (el flujo de C&A) y el que reproduce
+    // el bug de Daniel. La ficha **no protege** — eso es justo lo que esta prueba fija, porque el
+    // docstring de `pasarModeloAProduccion` lo afirma y una afirmación sin prueba es la que se
+    // pudre.
+    const idModelo = await crearModeloDesarrollo('CYA-26-71-021');
+    const departamento = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteCyA.id, nombre: 'NIÑOS' },
+    });
+    const proyecto = await cliente.proyecto.create({
+      data: {
+        folio: 7001n,
+        idEmpresa: empresa.id,
+        idCliente: clienteCyA.id,
+        idClienteDepartamento: departamento.id,
+        nombre: 'Joggers PV26',
+      },
+    });
+    await cliente.desarrollo.create({ data: { idProyecto: proyecto.id, idModelo } });
+
+    await pasarModeloAProduccion(sesion(), idModelo, {}, bd());
+
+    const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: idModelo } });
+    // Quedó TRANSFORMADO: ya es de producción, y por eso `derivarModeloDeProduccion` —que exige un
+    // padre de DESARROLLO— nunca podrá hacerle nacer un modelo por color. Sus OP saldrán todas por
+    // la rama `heredado`, con ESTE único modelo.
+    expect(modelo.origen).toBe('produccion');
+    expect(modelo.numeroProduccion).toBe(71_001);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idModelo } })).toBe(0);
+  });
+
+  it('⚠️ un desarrollo SIN HIJOS TODAVÍA se sigue promoviendo (lo determinante es "sin hijos")', async () => {
+    // El control negativo, y el límite declarado de LA guarda —una, no dos—: es el uso para el que
+    // el botón se construyó (§Post-F9.34/§Post-F9.46). Si esta prueba cayera, la guarda se habría
+    // comido el endpoint entero sin que nadie lo decidiera.
+    const id = await crearModeloDesarrollo('CYA-26-71-022');
+    const promovido = await pasarModeloAProduccion(sesion(), id, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
+  });
+});
 
 describe('pasarModeloAProduccion', () => {
   it('asigna el número propuesto, cambia el código y CONSERVA el de desarrollo', async () => {
@@ -644,10 +762,150 @@ describe('mintearCodigoDesarrollo', () => {
   });
 
   /**
-   * ⭐ Lo que hace SEGURO el cambio de criterio sin migración ni renumeración: la serie nueva de un
-   * cliente+año que YA tiene modelos arranca otra vez en 1 y vuelve a pasar por códigos que el
-   * criterio viejo (por par) entregó. El centinela del bucle los salta pidiendo otro número, y aquí
-   * se ve contra la base de verdad, con el `@unique` de por medio.
+   * ⭐⭐ **EL DEFECTO QUE REPORTÓ DANIEL** (25-ago-2026), contra la base de verdad: un cliente+año
+   * cuyos modelos ya llegaban al `007`; mete dos sudaderas y un jogger. Antes de V1-E7h salían
+   * **001, 002 y 008** —el contador nacía en 1 y el centinela sólo choca dentro del MISMO par, así
+   * que las sudaderas se llevaban números viejos sin enterarse—; ahora la serie arranca sobre el
+   * piso del catálogo y salen **008, 009 y 010**, de corrido y sin importar la prenda.
+   *
+   * Aquí se ejercita lo que la prueba unitaria NO puede: el `startsWith … mode: 'insensitive'` de
+   * verdad contra Postgres, y el `GREATEST(valor, piso) + 1` de verdad de la secuencia global.
+   */
+  it('⭐ el caso de Daniel: con el catálogo en 007, dos sudaderas y un jogger dan 008, 009 y 010', async () => {
+    for (let i = 1; i <= 7; i += 1) {
+      await crearModeloDesarrollo(`CYA-26-72-${String(i).padStart(3, '0')}`);
+    }
+
+    const codigos: string[] = [];
+    for (const genero of [1, 1, 2]) {
+      const minteado = await enTx((tx) =>
+        mintearCodigoDesarrollo(tx, {
+          idCliente: clienteCyA.id,
+          anioEntrega: 2026,
+          concepto: 7,
+          genero,
+        }),
+      );
+      codigos.push(minteado.codigo);
+    }
+
+    expect(codigos).toEqual(['CYA-26-71-008', 'CYA-26-71-009', 'CYA-26-72-010']);
+  });
+
+  /**
+   * ⭐ El estado REAL en que quedó `prueba` al reportarse el defecto: el contador de ese cliente+año
+   * ya había avanzado (3 altas) mientras el catálogo iba en 007. La regla es **la secuencia nunca
+   * retrocede, pero sí adelanta**: el piso se recalcula en cada alta, así que ese cliente se corrige
+   * SOLO en su siguiente modelo — sin script de reparación ni SQL a mano.
+   */
+  it('un cliente+año cuyo contador ya avanzó con el criterio viejo se corrige solo en el siguiente alta', async () => {
+    for (let i = 1; i <= 7; i += 1) {
+      await crearModeloDesarrollo(`CYA-26-72-${String(i).padStart(3, '0')}`);
+    }
+    // Los tres códigos que ya se entregaron mal (001, 002 del par 71 y el 008 del par 72): el
+    // contador quedó en 3 y los modelos existen. No se renumeran — el arreglo es PROSPECTIVO.
+    await crearModeloDesarrollo('CYA-26-71-001');
+    await crearModeloDesarrollo('CYA-26-71-002');
+    await crearModeloDesarrollo('CYA-26-72-008');
+    await cliente.secuenciaGlobal.create({
+      data: { clave: `modelo-desarrollo-${String(clienteCyA.id)}-2026`, valor: 3n },
+    });
+
+    const siguiente = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    // Ni el 004 (seguir el contador a media asta) ni el 001: el 009, que es donde va el catálogo.
+    expect(siguiente.codigo).toBe('CYA-26-71-009');
+    expect(await cliente.modelo.count({ where: { codigo: 'CYA-26-71-001' } })).toBe(1);
+  });
+
+  /**
+   * La otra mitad de la regla, y la que protege A3 contra la base: si el contador va POR DELANTE del
+   * catálogo (números entregados a altas que no comitearon, modelos descontinuados) el piso NO lo
+   * baja. Un `GREATEST` cambiado por un `SET valor = piso + 1` re-repartiría números ya dados.
+   */
+  it('la secuencia NUNCA retrocede: si el contador va por delante del catálogo, manda el contador', async () => {
+    await crearModeloDesarrollo('CYA-26-71-002');
+    await cliente.secuenciaGlobal.create({
+      data: { clave: `modelo-desarrollo-${String(clienteCyA.id)}-2026`, valor: 20n },
+    });
+
+    const siguiente = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(siguiente.codigo).toBe('CYA-26-71-021');
+  });
+
+  /**
+   * El sufijo de VERSIÓN (V1-E7b) no quema consecutivo: cuenta el de su raíz. Leer "los últimos
+   * dígitos" del texto daría `2` y hundiría el piso de toda la serie.
+   */
+  it('una VERSIÓN no infla ni hunde el piso: cuenta el consecutivo de su raíz', async () => {
+    await crearModeloDesarrollo('CYA-26-71-045');
+    await crearModeloDesarrollo('CYA-26-71-045-02');
+
+    const siguiente = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(siguiente.codigo).toBe('CYA-26-71-046');
+  });
+
+  /**
+   * El catálogo tiene códigos capturados a mano y migrados del Access que NO siguen el patrón.
+   * Ninguno puede tumbar un alta ni disparar el piso: se ignoran. El `…-99999999999` es el caso
+   * feo — si contara, este cliente+año se quedaría sin poder dar de alta nada.
+   */
+  it('los códigos fuera del patrón no mueven el piso ni revientan el alta', async () => {
+    await crearModeloDesarrollo('CYA-26-71-003');
+    await crearModeloDesarrollo('CYA-26-M18');
+    await crearModeloDesarrollo('CYA-26-71-99999999999');
+
+    const siguiente = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(siguiente.codigo).toBe('CYA-26-71-004');
+  });
+
+  /** El piso cuenta los códigos guardados con OTRA caja (en la base conviven `CYA-` y `cya-`). */
+  it('el piso cuenta un código guardado en minúsculas', async () => {
+    await crearModeloDesarrollo('cya-26-72-007');
+
+    const siguiente = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(siguiente.codigo).toBe('CYA-26-71-008');
+  });
+
+  /**
+   * ⭐ Lo que hace SEGURO el cambio de criterio sin migración ni renumeración: un cliente+año que YA
+   * tiene modelos del criterio viejo. Con el piso, la serie arranca DESPUÉS del mayor consecutivo
+   * que ya existe; el centinela del bucle queda de última red, y aquí se ve contra la base de
+   * verdad, con el `@unique` de por medio.
    */
   it('se salta los códigos que dejó el criterio VIEJO en ese cliente+año', async () => {
     // Como quedó el catálogo con el criterio por par: 71-001/002 de caballero y 72-001 de dama.
@@ -655,7 +913,7 @@ describe('mintearCodigoDesarrollo', () => {
     await crearModeloDesarrollo('CYA-26-71-002');
     await crearModeloDesarrollo('CYA-26-72-001');
 
-    // La serie nueva pide 1 y 2 (ocupados por los joggers de caballero) y se queda con el 3.
+    // El mayor consecutivo del cliente+año es el 2, así que la serie arranca en el 3.
     const primero = await enTx((tx) =>
       mintearCodigoDesarrollo(tx, {
         idCliente: clienteCyA.id,
@@ -917,12 +1175,21 @@ describe('listarModelos con la separación de catálogos', () => {
     await crearModeloDesarrollo('CYA-26-71-003');
   });
 
-  it('por default enseña SOLO los de producción', async () => {
+  /**
+   * ⭐ V1-E8j (§Post-F9.134) — el default del filtro pasó de `produccion` a `todos`. Junto con que
+   * todo modelo nace en desarrollo, el default viejo escondía por omisión justo lo recién creado
+   * (*"generé dos modelos en precosteo… y no los veo en modelos"*). Ésta es la puerta del DOMINIO:
+   * la que se aplica cuando se llama a `listarModelos` sin filtro (el ETL, otro servicio, un test).
+   */
+  it('por default los enseña TODOS, con el de desarrollo incluido', async () => {
     const pagina = await listarModelos(sesion(), {}, bd());
-    expect(pagina.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002']);
+    expect(pagina.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002', 'CYA-26-71-003']);
   });
 
-  it('el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra', async () => {
+  it('los filtros `produccion` y `desarrollo` siguen acotando a una sola cara', async () => {
+    const soloProduccion = await listarModelos(sesion(), { origen: 'produccion' }, bd());
+    expect(soloProduccion.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002']);
+
     const soloDesarrollo = await listarModelos(sesion(), { origen: 'desarrollo' }, bd());
     expect(soloDesarrollo.datos.map((m) => m.codigo)).toEqual(['CYA-26-71-003']);
 
@@ -1030,11 +1297,9 @@ describe('unicidad de los códigos con un modelo promovido', () => {
     const id = await crearModeloDesarrollo('CYA-26-71-003');
     await pasarModeloAProduccion(sesion(), id, { numeroProduccion: 71_050 }, bd());
 
-    await expect(crearModelo(sesion(), { codigo: 'CYA-26-71-003' }, bd())).rejects.toThrow(
-      ErrorConflicto,
-    );
+    await expect(altaDeCatalogo('CYA-26-71-003')).rejects.toThrow(ErrorConflicto);
     // El mensaje tiene que decir DÓNDE está ocupado; si sólo dijera "ya existe" nadie lo hallaría.
-    await expect(crearModelo(sesion(), { codigo: 'CYA-26-71-003' }, bd())).rejects.toThrow(
+    await expect(altaDeCatalogo('CYA-26-71-003')).rejects.toThrow(
       /nº de desarrollo del modelo "71050"/,
     );
     expect(await cliente.modelo.count()).toBe(1);
@@ -1050,12 +1315,18 @@ describe('unicidad de los códigos con un modelo promovido', () => {
   });
 
   it('renombrar un modelo a un código de 5 dígitos lo hace OCUPAR ese consecutivo', async () => {
-    const modelo = await crearModelo(sesion(), { codigo: 'TEMP-1' }, bd());
+    const modelo = await altaDeCatalogo('TEMP-1');
     expect(modelo.numeroProduccion).toBeNull();
 
     await actualizarModelo(sesion(), { id: modelo.id, codigo: '71001' }, bd());
     const tras = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
-    expect(tras.numeroProduccion).toBe(71_001);
+    // ⚠️ V1-E8j: el modelo nació en DESARROLLO, y ahí `numero_produccion` DEBE quedarse en null (lo
+    // exige el CHECK de la base; su número lo estrena la promoción). El consecutivo lo ocupa igual,
+    // por el CÓDIGO — que es lo que este caso mide, y lo prueba la propuesta de abajo.
+    expect(tras.numeroProduccion).toBeNull();
+    // Y el nº de desarrollo VIAJA con el código mientras el modelo vive en desarrollo: si se
+    // quedara en 'TEMP-1', el modelo tendría dos códigos buscables y sólo uno visible.
+    expect(tras.codigoDesarrollo).toBe('71001');
 
     const propuesta = await enTx((tx) =>
       proponerNumeroProduccion(tx, {
@@ -1069,14 +1340,34 @@ describe('unicidad de los códigos con un modelo promovido', () => {
   });
 });
 
-// ── El alta normal del catálogo deriva su número (para que OCUPE su consecutivo) ───
+// ── ⭐ V1-E8j — EL ALTA DEL CATÁLOGO YA NO FABRICA MODELOS DE PRODUCCIÓN (§Post-F9.134) ───────
+//
+// Daniel: *"nunca va a pasar que dé de alta un modelo de producción si no tiene ya una orden
+// asignada. No tendría sentido poner ahí una puerta. Mejor siempre desde producción."* El catálogo
+// de producción se llena por «pasar a producción», y esta puerta se cerró: antes `crearModelo`
+// dejaba el modelo EN PRODUCCIÓN con su nº derivado del código.
 
-describe('crearModelo con código de producción', () => {
-  it('deriva el nº de producción del código de 5 dígitos, y así lo saca de la propuesta', async () => {
-    await crearModelo(sesion(), { codigo: '71001' }, bd());
-    const modelo = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71001' } });
-    expect(modelo.numeroProduccion).toBe(71_001);
+describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
+  it('nace marcado desarrollo, sin nº de producción y conservando su código como nº de desarrollo', async () => {
+    const modelo = await altaDeCatalogo('CYA-26-71-009');
 
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('desarrollo');
+    expect(enBd.numeroProduccion).toBeNull();
+    // El código vigente y el de desarrollo valen lo mismo mientras vive ahí (§Post-F9.34 punto 5):
+    // así, cuando la promoción lo sustituya por el número, el tecleado NO se pierde (D3).
+    expect(enBd.codigoDesarrollo).toBe('CYA-26-71-009');
+  });
+
+  it('ni siquiera tecleando un código de 5 dígitos entra a producción — pero SÍ ocupa el número', async () => {
+    const modelo = await altaDeCatalogo('71001');
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('desarrollo');
+    expect(enBd.numeroProduccion).toBeNull();
+
+    // Y el consecutivo queda OCUPADO igual: la ocupación se lee también del CÓDIGO, no sólo de la
+    // columna numérica. Sin esto, la promoción siguiente propondría 71001 y chocaría con el unique.
     const propuesta = await enTx((tx) =>
       proponerNumeroProduccion(tx, {
         concepto: 7,
@@ -1088,9 +1379,459 @@ describe('crearModelo con código de producción', () => {
     expect(propuesta.numero).toBe(71_002);
   });
 
-  it('un código que no es de 5 dígitos se queda sin número', async () => {
-    await crearModelo(sesion(), { codigo: '71001a' }, bd());
-    const modelo = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71001a' } });
-    expect(modelo.numeroProduccion).toBeNull();
+  it('y el modelo que nace aquí SÍ se puede pasar a producción (es el camino que queda)', async () => {
+    const modelo = await altaDeCatalogo('MUESTRA-1');
+
+    const resultado = await pasarModeloAProduccion(sesion(), modelo.id, {}, bd());
+
+    expect(resultado.numeroProduccion).toBe(71_001);
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.codigo).toBe('71001');
+    // El código con el que se dio de alta se CONSERVA y sigue buscable (D3).
+    expect(enBd.codigoDesarrollo).toBe('MUESTRA-1');
+    const porElViejo = await listarModelos(sesion(), { busqueda: 'MUESTRA-1' }, bd());
+    expect(porElViejo.datos.map((m) => m.id)).toEqual([modelo.id]);
+  });
+});
+
+// ── El MODO MIGRACIÓN: el histórico del Access sí nace en producción ───────────────
+
+describe('crearModeloMigrado (modo migración del ETL)', () => {
+  it('deja el modelo EN PRODUCCIÓN, con su nº derivado del código y sin nº de desarrollo', async () => {
+    // ⚠️ SIN tipo de prenda ni género, a propósito: el histórico del Access no los trae (el CSV ni
+    // siquiera tiene la columna de género) y el modo migración entra POR DEBAJO de esa exigencia.
+    const modelo = await crearModeloMigrado(sesion(), { codigo: '71001' }, bd());
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.numeroProduccion).toBe(71_001);
+    // Nunca fue de desarrollo: inventarle un nº de desarrollo haría que su código apareciera DOS
+    // veces en la búsqueda por texto.
+    expect(enBd.codigoDesarrollo).toBeNull();
+
+    // Y OCUPA su consecutivo, que es lo que el ETL necesita para que el generador no lo reproponga.
+    const propuesta = await enTx((tx) =>
+      proponerNumeroProduccion(tx, {
+        concepto: 7,
+        genero: 1,
+        generoAlterno: null,
+        fuente: 'catalogo',
+      }),
+    );
+    expect(propuesta.numero).toBe(71_002);
+  });
+
+  it('un código histórico NO numérico (`M-18`, `51783a`) se queda sin número', async () => {
+    const modelo = await crearModeloMigrado(sesion(), { codigo: '71001a' }, bd());
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.numeroProduccion).toBeNull();
+    expect(enBd.codigoDesarrollo).toBeNull();
+  });
+});
+
+// ── ⭐⭐ V1-E9a · EL LINAJE 1:N: derivar N modelos de producción de un desarrollo ───────────────
+
+/**
+ * §Post-F9.135 (DANIEL): cuatro órdenes de compra del cliente para cuatro COLORES del mismo modelo
+ * tienen que dar **cuatro modelos de producción** —uno por color, con su número de 5 dígitos— y
+ * **una sola receta**, la del desarrollo. Aquí se prueba el vínculo (E1); el resolver que lee la
+ * receta por él es la etapa siguiente.
+ *
+ * Lo que sólo la BASE puede demostrar y por eso vive en integración:
+ *  (a) que los N hijos salen del MISMO padre con números DISTINTOS de la misma serie;
+ *  (b) que el padre no se mueve de su catálogo ni pierde su código de desarrollo (D3);
+ *  (c) que **la receta NO se copia** — la diferencia entera con `mintearVersionDeModelo`;
+ *  (d) que las CADENAS son imposibles, por dominio Y por CHECK de la base;
+ *  (e) que el advisory lock del par también serializa esta puerta (A3, ADR-0018).
+ */
+describe('derivarModeloDeProduccion — el linaje 1:N', () => {
+  /** Crea el desarrollo del que van a nacer los hijos, con su ficha completa. */
+  async function crearDesarrolloConFicha(codigo: string): Promise<number> {
+    const temporada = await cliente.temporada.create({ data: { nombre: `Temp ${codigo}` } });
+    const curva = await cliente.curvaTalla.create({ data: { nombre: `Curva ${codigo}` } });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo,
+        codigoDesarrollo: codigo,
+        origen: 'desarrollo',
+        descripcion: 'Sudadera con cierre',
+        composicion: '80% algodón / 20% poliéster',
+        maquilaBase: 42.5,
+        corteBase: 3.25,
+        numOperaciones: 17,
+        secuenciaEstampado: 'despues',
+        llevaArte: false,
+        idTemporada: temporada.id,
+        idCurvaTalla: curva.id,
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+      },
+      select: { id: true },
+    });
+    return modelo.id;
+  }
+
+  it('⭐ el caso de Daniel: 4 colores → 4 modelos de producción, UN solo desarrollo', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-001');
+
+    const hijos = [];
+    for (const color of ['Negro', 'Blanco', 'Marino', 'Gris']) {
+      hijos.push(
+        await enTx((tx) =>
+          derivarModeloDeProduccion(tx, sesion(), idDesarrollo, {
+            descripcion: `Sudadera con cierre — ${color}`,
+          }),
+        ),
+      );
+    }
+
+    // 1) Cuatro números DISTINTOS y consecutivos de la serie 71 (Pantalón 7 + Caballero 1).
+    expect(hijos.map((h) => h.numeroProduccion)).toEqual([71_001, 71_002, 71_003, 71_004]);
+    expect(hijos.map((h) => h.codigo)).toEqual(['71001', '71002', '71003', '71004']);
+    // 2) Los cuatro apuntan al MISMO desarrollo: es la promesa entera de la etapa.
+    expect(new Set(hijos.map((h) => h.idModeloDesarrollo))).toEqual(new Set([idDesarrollo]));
+    expect(new Set(hijos.map((h) => h.idModelo)).size).toBe(4);
+
+    const enBd = await cliente.modelo.findMany({
+      where: { idModeloDesarrollo: idDesarrollo },
+      select: {
+        codigo: true,
+        origen: true,
+        codigoDesarrollo: true,
+        numeroProduccion: true,
+        idModeloPadre: true,
+        versionDesarrollo: true,
+        revisionEstado: true,
+        descripcion: true,
+      },
+      orderBy: { numeroProduccion: 'asc' },
+    });
+    expect(enBd).toHaveLength(4);
+    for (const hijo of enBd) {
+      expect(hijo.origen).toBe('produccion');
+      // `codigoDesarrollo` es @unique: si los cuatro se lo llevaran, el segundo reventaría. El
+      // número de desarrollo NO se pierde (D3) — sigue en el padre, y se llega por el vínculo.
+      expect(hijo.codigoDesarrollo).toBeNull();
+      // Un hijo NO es una versión: ni padre de versión, ni sufijo, ni revisión propia.
+      expect(hijo.idModeloPadre).toBeNull();
+      expect(hijo.versionDesarrollo).toBeNull();
+      expect(hijo.revisionEstado).toBeNull();
+    }
+    expect(enBd.map((h) => h.descripcion)).toEqual([
+      'Sudadera con cierre — Negro',
+      'Sudadera con cierre — Blanco',
+      'Sudadera con cierre — Marino',
+      'Sudadera con cierre — Gris',
+    ]);
+
+    // 3) El PADRE no se movió: sigue en desarrollo, con su código y sin número (D3).
+    const padre = await cliente.modelo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { codigo: true, origen: true, codigoDesarrollo: true, numeroProduccion: true },
+    });
+    expect(padre).toEqual({
+      codigo: 'CYA-26-71-001',
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+      numeroProduccion: null,
+    });
+  });
+
+  it('el hijo HEREDA la ficha del padre (y sólo la descripción se puede cambiar)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-002');
+    const padre = await cliente.modelo.findUniqueOrThrow({ where: { id: idDesarrollo } });
+
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: hijo.idModelo } });
+
+    // Se comparan los CAMPOS DE FICHA uno por uno: si `CAMPOS_FICHA_HEREDADOS` pierde uno, este
+    // `toEqual` lo enseña por nombre en vez de con un conteo.
+    expect({
+      descripcion: fila.descripcion,
+      composicion: fila.composicion,
+      maquilaBase: fila.maquilaBase?.toString(),
+      corteBase: fila.corteBase?.toString(),
+      idTemporada: fila.idTemporada,
+      idCurvaTalla: fila.idCurvaTalla,
+      idGenero: fila.idGenero,
+      idTipoProducto: fila.idTipoProducto,
+      idMaquileroCotizado: fila.idMaquileroCotizado,
+      numOperaciones: fila.numOperaciones,
+      secuenciaEstampado: fila.secuenciaEstampado,
+      llevaArte: fila.llevaArte,
+    }).toEqual({
+      descripcion: padre.descripcion,
+      composicion: padre.composicion,
+      maquilaBase: padre.maquilaBase?.toString(),
+      corteBase: padre.corteBase?.toString(),
+      idTemporada: padre.idTemporada,
+      idCurvaTalla: padre.idCurvaTalla,
+      idGenero: padre.idGenero,
+      idTipoProducto: padre.idTipoProducto,
+      idMaquileroCotizado: padre.idMaquileroCotizado,
+      numOperaciones: padre.numOperaciones,
+      secuenciaEstampado: padre.secuenciaEstampado,
+      llevaArte: padre.llevaArte,
+    });
+    // Los valores NO son los defaults de la base: si lo fueran, la herencia podría estar rota y la
+    // comparación de arriba seguiría en verde por casualidad.
+    expect(fila.llevaArte).toBe(false);
+    expect(fila.secuenciaEstampado).toBe('despues');
+    expect(fila.numOperaciones).toBe(17);
+  });
+
+  /**
+   * 🔑 **LA PRUEBA QUE DEFINE LA ETAPA.** `mintearVersionDeModelo` COPIA la receta; ésta la
+   * COMPARTE. Si alguien "mejorara" esta función copiándola —que es lo que el vecino hace— las
+   * cuatro recetas se desincronizarían a la semana siguiente, que es exactamente lo que la decisión
+   * de Daniel vino a impedir. Esta prueba muere si eso pasa.
+   */
+  it('⭐ NO copia la receta: el hijo nace VACÍO y el padre conserva la suya entera', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-003');
+    const tela = await cliente.tela.create({ data: { nombre: 'Felpa Suiza' } });
+    await cliente.modeloTela.create({
+      data: { idModelo: idDesarrollo, idTela: tela.id, consumoPorPrenda: 1.25 },
+    });
+
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    expect(await cliente.modeloTela.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    expect(await cliente.modeloAvio.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    expect(await cliente.modeloArte.count({ where: { idModelo: hijo.idModelo } })).toBe(0);
+    // Y la del padre sigue completa: derivar no toca la receta de nadie.
+    expect(await cliente.modeloTela.count({ where: { idModelo: idDesarrollo } })).toBe(1);
+    // Tampoco marca la receta como "tocada" (V1-E8d): no la movió.
+    const padre = await cliente.modelo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { recetaTocadaEn: true, recetaTocadaCambio: true },
+    });
+    expect(padre).toEqual({ recetaTocadaEn: null, recetaTocadaCambio: null });
+  });
+
+  it('deja en la bitácora de qué desarrollo salió el hijo (A7)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-004');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    const renglones = await cliente.bitacora.findMany({
+      where: { entidad: 'Modelo', idEntidad: String(hijo.idModelo) },
+      select: { datos: true },
+    });
+    const derivacion = renglones
+      .map((r) => r.datos as Record<string, unknown>)
+      .find((d) => d.operacion === 'derivar-modelo-de-produccion');
+    expect(derivacion).toMatchObject({
+      codigo: '71001',
+      numeroProduccion: 71_001,
+      numeroCapturado: false,
+      idModeloDesarrollo: idDesarrollo,
+      // ⚠️ Estos DOS tienen que ser el código con el que ESTA prueba creó el desarrollo (…-004), no el
+      // de la primera del archivo: son lo que el renglón de bitácora dice sobre el PADRE. El CI cazó
+      // aquí un copia-pega que las unitarias no podían ver — el doble no conoce el código real.
+      codigoModeloDesarrollo: 'CYA-26-71-004',
+      numeroDeDesarrollo: 'CYA-26-71-004',
+    });
+  });
+
+  // ── Las guardas ─────────────────────────────────────────────────────────────────
+
+  it('el desarrollo tiene que existir', async () => {
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), 999_999)),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  /**
+   * ⭐ Y ESTA ES LA PRUEBA DE QUE NO HAY CADENAS: derivar de un hijo (que es de producción) rebota.
+   * Como todo hijo nace en producción y sólo se puede derivar de un desarrollo, la profundidad
+   * máxima del linaje es 1 — sin necesidad de una comprobación aparte de "el padre no es hijo".
+   */
+  it('⭐ no se puede derivar de un modelo que YA es de producción (así no hay cadenas)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-005');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    // (a) de un hijo del linaje 1:N
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), hijo.idModelo)),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // (b) y de un modelo de producción cualquiera (los ~4,987 migrados del Access)
+    await sembrarProduccion(['71900']);
+    const migrado = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71900' } });
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), migrado.id)),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // Y nadie nació de esos intentos.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: hijo.idModelo } })).toBe(0);
+  });
+
+  it('un desarrollo DESCONTINUADO no produce hijos (se reactiva a mano, §Post-F9.119)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-006');
+    await cliente.modelo.update({ where: { id: idDesarrollo }, data: { activo: false } });
+
+    await expect(
+      enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo)),
+    ).rejects.toThrow(/descontinuado/i);
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(0);
+  });
+
+  /**
+   * ⭐⭐ V1-E9c (§Post-F9.169) — **DERIVAR TAMPOCO PREGUNTA POR LA REVISIÓN.** Esta prueba afirmaba
+   * lo contrario: V1-E9a había puesto aquí la compuerta de V1-E7d evaluada contra el PADRE. Daniel
+   * la disolvió (*"no detiene ni la producción ni los demás renglones ya firmados"*), y derivar es
+   * precisamente el acto de producir: es lo que V1-E3 va a llamar para hacer nacer un modelo de
+   * producción por cada color de la OC del cliente.
+   *
+   * 🔴 Se prueba contra Postgres y no sólo con un doble porque lo que importa es que el hijo NAZCA
+   * de verdad —fila, número y vínculo— cuando la receta del padre está sin revisar: un `not.toThrow`
+   * pasaría igual con la derivación rota.
+   */
+  it('⭐⭐ una VERSIÓN sin revisar SÍ deriva hijos (la compuerta se retiró, V1-E9c)', async () => {
+    const idRaiz = await crearDesarrolloConFicha('CYA-26-71-007');
+    const version = await cliente.modelo.create({
+      data: {
+        codigo: 'CYA-26-71-007-01',
+        codigoDesarrollo: 'CYA-26-71-007-01',
+        origen: 'desarrollo',
+        idModeloPadre: idRaiz,
+        versionDesarrollo: 1,
+        revisionEstado: 'pendiente',
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
+      },
+      select: { id: true },
+    });
+
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), version.id));
+    expect(hijo.numeroProduccion).toBe(71_001);
+
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: hijo.idModelo } });
+    expect(fila.origen).toBe('produccion');
+    expect(fila.idModeloDesarrollo).toBe(version.id);
+
+    // Y la revisión del PADRE no se tocó al derivar: sigue pendiente, y sigue siendo verdad.
+    expect(
+      (await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } })).revisionEstado,
+    ).toBe('pendiente');
+  });
+
+  // ── El número: mismas reglas que la promoción ───────────────────────────────────
+
+  it('respeta los huecos de la serie y acepta un número capturado a mano, con su aviso', async () => {
+    await sembrarProduccion(['71001', '71003']);
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-008');
+
+    // Sin capturar: el hueco libre MÁS BAJO (002), no el que sigue al máximo.
+    const auto = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+    expect(auto.numeroProduccion).toBe(71_002);
+    expect(auto.numeroCapturado).toBe(false);
+
+    // Capturado de OTRO par: se guarda igual y AVISA (§Post-F9.34 punto 7: la excepción es suya).
+    const aMano = await enTx((tx) =>
+      derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 39_500 }),
+    );
+    expect(aMano.numeroProduccion).toBe(39_500);
+    expect(aMano.numeroCapturado).toBe(true);
+    expect(aMano.avisos.join(' ')).toContain('39');
+
+    // Repetido: eso SÍ bloquea.
+    await expect(
+      enTx((tx) =>
+        derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 71_003 }),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  /**
+   * 🔴 EL CASO QUE EL CENTINELA DEL CÓDIGO LIBRE **NO** ALCANZA: un modelo cuyo `numeroProduccion`
+   * está ocupado pero cuyo `codigo` es OTRO. El número es editable a mano (§Post-F9.46), así que las
+   * dos columnas se pueden desalinear, y ahí `exigirCodigoLibre` mira el sitio equivocado. Sin el
+   * centinela del NÚMERO, esto llegaría al `@unique` de la base y **abortaría la transacción
+   * entera** — que en la salida a producción se lleva por delante las otras órdenes del lote.
+   */
+  it('⭐ rebota el número ocupado aunque el que lo ocupa tenga OTRO código', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-014');
+    await cliente.modelo.create({
+      data: { codigo: 'MODELO-VIEJO', origen: 'produccion', numeroProduccion: 71_003 },
+    });
+
+    await expect(
+      enTx((tx) =>
+        derivarModeloDeProduccion(tx, sesion(), idDesarrollo, { numeroCapturado: 71_003 }),
+      ),
+    ).rejects.toThrow(
+      'El número de producción 71003 ya está ocupado por el modelo "MODELO-VIEJO".',
+    );
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(0);
+  });
+
+  /**
+   * El mismo candado que la promoción, por la misma razón (ADR-0018): el consecutivo de producción
+   * no sale de una secuencia, sale del hueco libre más bajo, y "elegirlo" y "escribirlo" tienen que
+   * ser un solo hecho. Aquí es MÁS necesario que en la promoción, porque el caso de negocio es
+   * justamente hacer nacer varios hijos a la vez del mismo padre.
+   */
+  it('⭐ N derivaciones SIMULTÁNEAS del mismo desarrollo sacan N números distintos', async () => {
+    const CONCURRENTES = 8;
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-009');
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: CONCURRENTES }, () =>
+        enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo)),
+      ),
+    );
+    expect(resultados.filter((r) => r.status === 'rejected').map((r) => String(r.reason))).toEqual(
+      [],
+    );
+
+    const numeros = resultados
+      .filter(
+        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof derivarModeloDeProduccion>>> =>
+          r.status === 'fulfilled',
+      )
+      .map((r) => r.value.numeroProduccion)
+      .sort((a, b) => a - b);
+    expect(numeros).toEqual(Array.from({ length: CONCURRENTES }, (_, i) => 71_000 + i + 1));
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(
+      CONCURRENTES,
+    );
+  });
+
+  // ── Lo que vigila la BASE, no el dominio ────────────────────────────────────────
+
+  /**
+   * Las dos invariantes de la migración `20260831190000_el_linaje_de_los_modelos`. Se prueban con
+   * SQL crudo a propósito: son la red que queda cuando alguien escriba la columna por un camino que
+   * hoy no existe — que es exactamente para lo que sirve un CHECK.
+   */
+  it('⭐ la BASE impide que un modelo sea su propio padre de receta', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-010');
+    const hijo = await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    await expect(
+      cliente.$executeRawUnsafe(
+        `UPDATE "modelos" SET "id_modelo_desarrollo" = "id" WHERE "id" = ${String(hijo.idModelo)}`,
+      ),
+    ).rejects.toThrow(/modelos_linaje_desarrollo_no_es_si_mismo_check/);
+  });
+
+  it('⭐ la BASE impide que un modelo de DESARROLLO lleve el vínculo (es lo que mata las cadenas)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-011');
+    const otro = await crearDesarrolloConFicha('CYA-26-71-012');
+
+    await expect(
+      cliente.$executeRawUnsafe(
+        `UPDATE "modelos" SET "id_modelo_desarrollo" = ${String(idDesarrollo)} WHERE "id" = ${String(otro)}`,
+      ),
+    ).rejects.toThrow(/modelos_linaje_desarrollo_solo_produccion_check/);
+  });
+
+  it('⭐ la BASE impide borrar el desarrollo mientras tenga hijos (Restrict, D3)', async () => {
+    const idDesarrollo = await crearDesarrolloConFicha('CYA-26-71-013');
+    await enTx((tx) => derivarModeloDeProduccion(tx, sesion(), idDesarrollo));
+
+    await expect(cliente.modelo.delete({ where: { id: idDesarrollo } })).rejects.toThrow();
+    expect(await cliente.modelo.count({ where: { id: idDesarrollo } })).toBe(1);
   });
 });

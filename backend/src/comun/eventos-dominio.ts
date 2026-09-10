@@ -70,6 +70,18 @@ export const EVENTOS_OUTBOX = {
    * proceso re-evaluar; el resto lo relee de la BD (idempotente).
    */
   hitoOrdenResuelto: 'hito-orden-resuelto',
+  /**
+   * ⭐ Una orden se CERRÓ con un maquilero, o ese cierre se DESHIZO (V1, fila 0.109). El faltante
+   * —lo que el maquilero nunca devolvió— quedó saldado (o volvió al pendiente), y con él quedó
+   * fijado *«qué pasó con cada prenda»* de ese saldo.
+   *
+   * 🔑 HOY NADIE LO CONSUME, y está puesto a propósito: es el MISMO acto del que colgará el
+   * **congelado del costo** (fila 0.061 — cerrar es el momento en que la orden deja de moverse por
+   * ese lado). El despachador del auto-avance ignora en silencio los tipos que no conoce
+   * (`ruta-critica/autoAvance.ts`), así que el evento se registra, se publica y espera a su
+   * consumidor sin que haya que rediseñar el acto para colgárselo.
+   */
+  cierreMaquilaResuelto: 'cierre-maquila-resuelto',
 } as const;
 
 /** Nombre válido de evento de outbox. */
@@ -89,6 +101,30 @@ export const VERSION_EVENTO_RC_ORDEN = 1;
 
 /** Versión actual del evento `hito-orden-resuelto` (post-F9). */
 export const VERSION_HITO_ORDEN = 1;
+
+/** Versión actual del evento `cierre-maquila-resuelto` (V1, fila 0.109). */
+export const VERSION_CIERRE_MAQUILA = 1;
+
+/**
+ * Carga del evento `cierre-maquila-resuelto` (V1, fila 0.109). Lleva lo MÍNIMO para que un
+ * consumidor reaccione —a qué orden, con qué maquilero y en qué proceso— más el `idCierre` para
+ * trazarlo y `deshecho` para saber en qué dirección fue. Como todos los de esta casa, el consumidor
+ * RELEE el estado físico de la BD: el evento no es un delta.
+ */
+export type EventoCierreMaquila = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden que se cerró (o cuyo cierre se deshizo). */
+  idOrden: number;
+  /** Maquilero con el que se cerró el saldo. */
+  idMaquilero: number;
+  /** Proceso de maquila del saldo cerrado. */
+  idTipoProceso: number;
+  /** Id del `CierreMaquilaOrden`. */
+  idCierre: number;
+  /** `false` al cerrar, `true` al deshacer. */
+  deshecho: boolean;
+};
 
 /**
  * Carga del evento `orden-creada` (R3, B5). Lo MÍNIMO para que el consumidor programe la RC

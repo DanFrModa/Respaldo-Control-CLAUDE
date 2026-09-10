@@ -2,8 +2,15 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RecetaOrden } from '@/api/tipos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import type { QueryClient } from '@tanstack/react-query';
+
+import type { OrdenArteConFotos } from '@/api/fotos-arte-orden';
+import type { ClavePermiso, RecetaOrden, RecetaOrdenArte } from '@/api/tipos';
+import {
+  crearQueryClientDePrueba,
+  estadoSesionDePrueba,
+  renderConProveedores,
+} from '@/pruebas/utilidades';
 
 import { PanelRecetaOrden } from './PanelRecetaOrden';
 
@@ -14,6 +21,10 @@ const quitarMutateMock = vi.fn();
 const restaurarMutateMock = vi.fn();
 const editarMutateMock = vi.fn();
 const traerMutateMock = vi.fn();
+const corregirMutateMock = vi.fn();
+/** ⭐⭐ V1-E8z — el candado de compra: abrir (con motivo) y cerrar. */
+const abrirMutateMock = vi.fn();
+const cerrarMutateMock = vi.fn();
 
 /**
  * El catálogo de medidas del avío (para el amarre por talla). Por defecto VACÍO: sólo las pruebas
@@ -37,7 +48,46 @@ vi.mock('@/api/medidas-avio', () => ({
   useMedidasAvio: () => catalogoMedidas(),
 }));
 
+/*
+ * ⭐ §Post-F9.177 — LAS FOTOS DEL ARTE SON DE LA OP: el CABLEADO de la tira a la sección de Arte.
+ *
+ * 🔴 Este doble NO fabrica los datos: los devuelve **sólo para el `idOrden` que el cableado le
+ * pasa**. Si la pantalla consultara con otro id —o no consultara— el mapa no casa y todas las
+ * aserciones de abajo se caen. Es la lección de la 0.082: un doble que responde lo mismo pase lo que
+ * pase deja la prueba en verde CON el defecto dentro, y entonces no es una prueba.
+ */
+const fotosArtePorOrden = new Map<number, OrdenArteConFotos[]>();
+const useFotosArteOrdenMock = vi.fn((idOrden: number | undefined) => ({
+  data: idOrden === undefined ? undefined : fotosArtePorOrden.get(idOrden),
+}));
+const ocultarFotoArteMock = vi.fn();
+const mostrarFotoArteMock = vi.fn();
+const subirFotoArteMock = vi.fn();
+const quitarFotoArteMock = vi.fn();
+
+vi.mock('@/api/fotos-arte-orden', () => ({
+  useFotosArteOrden: (id: unknown) => useFotosArteOrdenMock(id as number | undefined),
+  useOcultarFotoArteOrden: () => ({ mutate: ocultarFotoArteMock, isPending: false }),
+  useMostrarFotoArteOrden: () => ({ mutate: mostrarFotoArteMock, isPending: false }),
+  useSubirFotoArteOrden: () => ({ mutate: subirFotoArteMock, isPending: false }),
+  useQuitarFotoArteOrden: () => ({ mutate: quitarFotoArteMock, isPending: false }),
+}));
+
+/**
+ * ⭐ fila 0.068 — el aviso de «ya está comprado» LLEVA al diálogo de des-autorizar, que es EL MISMO de la
+ * pantalla de Compras. Se le pone doble a su mutación para poder demostrar lo que más importa aquí:
+ * que **abrir el diálogo no des-autoriza nada**, y que sólo se manda tras motivo + confirmación.
+ */
+const desautorizarMutateMock = vi.fn();
+
+vi.mock('@/api/ordenes-compra', () => ({
+  useDesautorizarOc: () => ({ mutate: desautorizarMutateMock, isPending: false }),
+}));
+
 vi.mock('@/api/receta-orden', () => ({
+  // ⭐ fila 0.068: la clave de la query, que el panel necesita para RE-LEER la receta cuando una OC se
+  // des-autoriza (el chip «Comprado · OC 12» vive ahí, no en el árbol de Órdenes de compra).
+  CLAVE_RECETA_ORDEN: ['ordenes', 'receta'],
   useRecetaOrden: (id: unknown) => useRecetaOrdenMock(id) as unknown,
   useMarcarRecetaRevisada: () => ({ mutate: marcarMutateMock, isPending: false }),
   useLiberarReceta: () => ({ mutate: liberarMutateMock, isPending: false }),
@@ -46,6 +96,9 @@ vi.mock('@/api/receta-orden', () => ({
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarRenglonReceta: () => ({ mutate: editarMutateMock, isPending: false }),
   useTraerDelModelo: () => ({ mutate: traerMutateMock, isPending: false }),
+  useCorregirCapturaAvio: () => ({ mutate: corregirMutateMock, isPending: false }),
+  useAbrirReceta: () => ({ mutate: abrirMutateMock, isPending: false }),
+  useCerrarReceta: () => ({ mutate: cerrarMutateMock, isPending: false }),
 }));
 
 /** Receta base: una tela y dos avíos (uno de ellos, la jareta), sin revisar y sin liberar. */
@@ -63,6 +116,14 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     liberadaPor: null,
     puedeComprar: false,
     todoLiberado: false,
+    // ⭐⭐ V1-E8z: la receta NO está reabierta (el candado de compra, §Post-F9.160(a)).
+    abiertaEn: null,
+    abiertaPor: null,
+    abiertaMotivo: null,
+    // ⭐⭐⭐ 0.085 (§Post-F9.173(a)): por default esta orden NO tiene compra comprometida.
+    ocsComprometidas: [],
+    avisoCompraComprometida: null,
+    avisoCambioSobreLoComprado: null,
     resumen: {
       sinRevisar: 3,
       revisados: 0,
@@ -97,6 +158,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1.5,
         precioModelo: 50,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     avios: [
@@ -125,6 +187,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         modoCaptura: 'consumo',
         unidadMedida: null,
         avisoCaptura: null,
+        capturaReparable: false,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -132,6 +195,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 2,
         precioModelo: 2,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
       {
         id: 3,
@@ -158,6 +222,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         modoCaptura: 'consumo',
         unidadMedida: null,
         avisoCaptura: null,
+        capturaReparable: false,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -165,19 +230,38 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         consumoModelo: 1,
         precioModelo: 8,
         precioModeloDeCompra: false,
+        ocsComprometidas: [],
       },
     ],
     artes: [],
     avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    frenteAlGrupo: {
+      hermanas: 0,
+      foliosHermanas: [],
+      fueraDeLaComparacion: 0,
+      diferencias: [],
+      aviso: null,
+      notaFueraDeLaComparacion: null,
+    },
     ...over,
   };
 }
 
-function render(receta: RecetaOrden, puedeAdministrar = true): void {
+function render(
+  receta: RecetaOrden,
+  puedeAdministrar = true,
+  // ⭐ 0.085: `compras.ver` decide si los chips de «ya comprado» llevan a la OC o solo informan.
+  // ⚠️ Tipado como `ClavePermiso[]`: un `as never` apagaba la comprobación de que el permiso
+  // EXISTE, que es justo lo que hace útil a esta lista (un typo pasaría verde sin permisos).
+  permisos: ClavePermiso[] = ['ordenes.ver', 'desarrollo.administrar'],
+  // ⭐ fila 0.068: se puede inyectar el cliente para ESPIAR la invalidación de la receta.
+  queryClient?: QueryClient,
+): void {
   useRecetaOrdenMock.mockReturnValue({ data: receta, isPending: false, isError: false });
   renderConProveedores(<PanelRecetaOrden idOrden={50} puedeAdministrar={puedeAdministrar} />, {
-    sesion: estadoSesionDePrueba(['ordenes.ver', 'desarrollo.administrar']),
+    sesion: estadoSesionDePrueba(permisos),
+    ...(queryClient === undefined ? {} : { queryClient }),
   });
 }
 
@@ -718,6 +802,86 @@ describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
     expect(screen.getAllByTestId('aviso-captura-receta-avio-2')).toHaveLength(1);
   });
 
+  /**
+   * ⭐⭐⭐ **V1-E8h (§Post-F9.130) — EL AVISO TRAE SU REMEDIO.** Daniel, 27-ago-2026: *"Siento que
+   * estamos atorados en lo mismo desde hace varias versiones. No podemos desatorarlo."* No estaba
+   * atorado el cálculo —el motor lleva sano desde el 18-ago—, sino el **remedio**: el aviso cerraba
+   * con *"guarda el renglón para normalizarlo"*, un conjuro que un no-programador no puede adivinar.
+   * Lo que esta prueba fija es que el botón viva **pegado al aviso**, no en un menú aparte.
+   */
+  it('⭐⭐ el aviso trae el botón «Corregir» AL LADO, y repara ese renglón', async () => {
+    const base = enModoMedida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              consumoPorTalla: true,
+              capturaReparable: true,
+              avisoCaptura: 'Esta orden pide 53,095 pza y deberían ser 3,200 pza…',
+            }
+          : a,
+      ),
+    });
+
+    // El botón está DENTRO de la caja del aviso: es la parte que no se puede perder.
+    const aviso = screen.getByTestId('aviso-captura-receta-avio-2');
+    const boton = within(aviso).getByTestId('corregir-captura-receta-avio-2');
+    expect(boton).toHaveTextContent('Corregir');
+
+    await userEvent.click(boton);
+
+    expect(corregirMutateMock).toHaveBeenCalledTimes(1);
+    expect(corregirMutateMock.mock.calls[0]?.[0]).toEqual({ idOrden: 50, idRenglon: 2 });
+  });
+
+  /**
+   * 🔴 **NO todo aviso es reparable, y quién lo decide es el SERVIDOR.** `avisoCaptura` también
+   * cubre un número absurdo para la unidad, que se arregla capturando bien — no con un botón. La
+   * pantalla NO lee el texto para adivinarlo (A1): mira `capturaReparable`.
+   */
+  it('🔴 con aviso pero SIN `capturaReparable` no hay botón (ese aviso no se repara solo)', () => {
+    const base = enModoMedida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              capturaReparable: false,
+              avisoCaptura: 'El consumo de la talla CH (500 cm) queda fuera de lo normal…',
+            }
+          : a,
+      ),
+    });
+    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('corregir-captura-receta-avio-2')).not.toBeInTheDocument();
+  });
+
+  /** Sin `desarrollo.administrar` el aviso se LEE (hay que saberlo) pero no se puede reparar. */
+  it('🔴 sin permiso de administrar la receta el aviso se ve, pero sin botón', () => {
+    const base = enModoMedida();
+    render(
+      {
+        ...base,
+        avios: base.avios.map((a) =>
+          a.id === 2
+            ? {
+                ...a,
+                consumoPorTalla: true,
+                capturaReparable: true,
+                avisoCaptura: 'Esta orden pide 53,095 pza y deberían ser 3,200 pza…',
+              }
+            : a,
+        ),
+      },
+      false,
+    );
+    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('corregir-captura-receta-avio-2')).not.toBeInTheDocument();
+  });
+
   it('en modo `consumo` la unidad del avío se ve pegada al campo', async () => {
     const base = recetaDePrueba();
     render({
@@ -1180,5 +1344,915 @@ describe('<PanelRecetaOrden> · liberar por partes y traer del modelo (V1-E3h)',
     // una"*. El nombre accesible es lo que hace visible la acción.
     expect(screen.getByTestId('liberar-receta-avio-2')).toHaveAccessibleName(/liberar/i);
     expect(screen.getByTestId('liberar-receta-avio-2')).toHaveTextContent('Liberar');
+  });
+});
+
+/**
+ * ⭐⭐⭐ EL CANDADO DE COMPRA EN PANTALLA (V1-E8z, §Post-F9.160(a)) — DANIEL: *"pongamos un candado
+ * que no se pueda comprar nada hasta que esté cerrado otra vez"*.
+ *
+ * 🔴 LO QUE ESTAS PRUEBAS EXISTEN PARA IMPEDIR, y es el defecto natural de esta etapa: como reabrir
+ * **sólo marca y no desfirma**, `todoLiberado` sigue en `true` mientras la receta está abierta. Una
+ * pantalla que lea sólo esa bandera enseña **«Receta liberada · ya se puede comprar»** mientras el
+ * servidor rechaza toda compra con un 409. El letrero mintiendo justo sobre lo único que importa.
+ */
+describe('<PanelRecetaOrden> · el candado de compra (V1-E8z)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Receta liberada COMPLETA — el único estado desde el que el servidor deja reabrir. */
+  function liberadaCompleta(over: Partial<RecetaOrden> = {}): RecetaOrden {
+    return recetaDePrueba({
+      liberadaEn: '2026-08-30T10:00:00.000Z',
+      liberadaPor: 'usuario-1',
+      puedeComprar: true,
+      todoLiberado: true,
+      resumen: {
+        sinRevisar: 0,
+        revisados: 3,
+        ajustados: 0,
+        excluidos: 0,
+        total: 3,
+        liberados: 3,
+        porLiberar: 0,
+      },
+      ...over,
+    });
+  }
+
+  it('🔴 con la receta ABIERTA no dice «liberada»: dice que la compra está CONGELADA', () => {
+    render(
+      liberadaCompleta({
+        // Reabrir NO desfirma: `todoLiberado` sigue en true y ésa es toda la trampa.
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        abiertaPor: 'usuario-1',
+        abiertaMotivo: 'el cliente cambió el cierre',
+        puedeComprar: false,
+      }),
+    );
+
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-liberada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('receta-aviso-en-correccion')).toHaveTextContent(/congelada/);
+    // El motivo se ENSEÑA: es lo que el comprador va a leer en su 409, y quien mira la orden tiene
+    // que poder saber qué está esperando sin ir a preguntar.
+    expect(screen.getByText(/el cliente cambió el cierre/)).toBeInTheDocument();
+    // Y NO se repite el letrero viejo, que aquí sería falso de facto.
+    expect(screen.queryByText(/ya se puede explotar el MRP/)).not.toBeInTheDocument();
+  });
+
+  it('abierta: se ofrece CERRAR y desaparece «Abrir» (son los dos lados del mismo interruptor)', () => {
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+  });
+
+  it('cerrada y liberada completa: se ofrece ABRIR y no CERRAR', () => {
+    render(liberadaCompleta());
+
+    expect(screen.getByTestId('receta-abrir')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-en-correccion')).not.toBeInTheDocument();
+  });
+
+  it('⚠️ sin liberar NO se ofrece abrir: el servidor lo rechazaría (no hay nada que reabrir)', () => {
+    render(recetaDePrueba());
+
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` la receta es de solo lectura: ni abrir ni cerrar', () => {
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z' }), false);
+
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+    // Pero el estado SÍ se ve: la compra congelada le importa a quien sólo mira.
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+  });
+
+  it('⭐ abrir EXIGE motivo: el botón no se habilita vacío, y el motivo viaja tal cual', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta());
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    const confirmar = screen.getByTestId('confirmar-abrir-receta');
+    expect(confirmar).toBeDisabled();
+    expect(abrirMutateMock).not.toHaveBeenCalled();
+
+    await usuario.type(
+      screen.getByTestId('motivo-abrir-receta'),
+      '  el cliente cambió el cierre  ',
+    );
+    expect(confirmar).toBeEnabled();
+    await usuario.click(confirmar);
+
+    expect(abrirMutateMock).toHaveBeenCalledTimes(1);
+    expect(abrirMutateMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      cuerpo: { motivo: 'el cliente cambió el cierre' },
+    });
+  });
+
+  /**
+   * 🔴🔴 **H2 — LA SALIDA DEL CANDADO EN UNA ORDEN CANCELADA** (hallazgo del reviewer).
+   *
+   * El dominio permite cerrar una receta abierta aunque la OP esté cancelada
+   * (`permitirOrdenCancelada`) **exactamente para que el candado no sea una trampa**… y la pantalla
+   * escondía el botón, porque colgaba de `editable = puedeAdministrar && estado !== 'cancelada'`.
+   *
+   * Escenario del reviewer: una OC borrador agrupa la OP 500 y la 501 (§Post-F9.86). Desarrollo abre
+   * la receta de la 500 y el cliente cancela esa OP. `autorizarOC` contesta 409 nombrando la 500
+   * **para siempre**: no hay botón aquí, no hay fila en la bandeja (excluye canceladas) y ningún
+   * mensaje sugiere la única salida real. Sin esta prueba, `permitirOrdenCancelada` era código
+   * muerto.
+   */
+  it('🔴 H2: la orden CANCELADA con la receta abierta SIGUE ofreciendo «Cerrar»', () => {
+    render(
+      liberadaCompleta({
+        estado: 'cancelada',
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        abiertaMotivo: 'el cliente cambió el cierre',
+        puedeComprar: false,
+      }),
+    );
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    // …y el estado se sigue viendo: la compra de esa OP está congelada y hay que decirlo.
+    expect(screen.getByTestId('receta-en-correccion')).toBeInTheDocument();
+  });
+
+  it('…pero en esa MISMA cancelada abierta no se cuela «Abrir» ni «marcar revisado»', () => {
+    // ⚠️ El escenario tiene que ser el de ARRIBA (cancelada **y abierta**), no una cancelada a
+    // secas: en ésa no se pinta ningún botón y la prueba pasaría sin comprobar nada. Aquí el bloque
+    // SÍ se pinta —por el candado— y lo que se afirma es que sólo trae la salida, no el resto de
+    // la edición, que sobre una orden cancelada sigue prohibida.
+    render(
+      liberadaCompleta({
+        estado: 'cancelada',
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        puedeComprar: false,
+        resumen: {
+          sinRevisar: 1,
+          revisados: 2,
+          ajustados: 0,
+          excluidos: 0,
+          total: 3,
+          liberados: 3,
+          porLiberar: 0,
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+    // `sinRevisar: 1` a propósito: sin el filtro por `editable`, este botón se habilitaría.
+    expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
+  });
+
+  it('⚠️ y sin `desarrollo.administrar` la cancelada tampoco ofrece cerrar (el permiso manda)', () => {
+    render(liberadaCompleta({ estado: 'cancelada', abiertaEn: '2026-08-31T09:00:00.000Z' }), false);
+
+    expect(screen.queryByTestId('receta-cerrar')).not.toBeInTheDocument();
+  });
+
+  it('cerrar no pide nada: la razón ya se dio al abrir', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));
+
+    await usuario.click(screen.getByTestId('receta-cerrar'));
+
+    expect(cerrarMutateMock).toHaveBeenCalledTimes(1);
+    expect(cerrarMutateMock.mock.calls[0]?.[0]).toBe(50);
+  });
+});
+
+/**
+ * ⭐⭐⭐ **0.085 (§Post-F9.173(a)) — SI YA SE COMPRÓ, AVISA.**
+ *
+ * DANIEL, textual: *"Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede
+ * cancelar la OC interna, o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer.
+ * **No se puede cancelar la OC en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * Lo que estas pruebas fijan son los TRES sitios donde el aviso tiene que aparecer, y —tan
+ * importante— los tres donde NO puede aparecer cuando no hay nada comprometido.
+ */
+describe('⭐⭐⭐ 0.085 — «ya está comprado» en la receta (§Post-F9.173(a))', () => {
+  const OC_AUTORIZADA = {
+    idOrdenCompra: 900,
+    folio: 12,
+    estatus: 'autorizada' as const,
+    // ⭐ `recibida` lo calcula el DOMINIO (`algunaRecibida`) y VIAJA: la pantalla no lo deduce.
+    recibida: false,
+  };
+  const AVISO_DEL_SERVIDOR =
+    'Acabas de cambiar un material que YA ESTÁ COMPRADO para esta orden: "Jersey" (la orden de ' +
+    'compra #12 (autorizada)). La orden de compra NO se corrige sola.';
+
+  /**
+   * ⭐⭐ **DISPARA UNA EDICIÓN DE VERDAD** y deja que el mock de la mutación conteste con el aviso.
+   *
+   * 🔴 Nace de un hallazgo del reviewer: las dos primeras versiones de estas pruebas renderizaban
+   * una receta **con el campo ya puesto**, así que su nombre prometía el flujo y el cuerpo sólo
+   * comprobaba el pintado. Hoy el aviso NO viene de la receta —vive en el estado del panel, porque
+   * la invalidación borraba el de la caché—, de modo que la única manera de verlo es **provocarlo**.
+   */
+  async function editarElPrecioDeLaTela(
+    usuario: ReturnType<typeof userEvent.setup>,
+    respuesta: RecetaOrden,
+  ): Promise<void> {
+    editarMutateMock.mockImplementation(
+      (_vars: unknown, opciones?: { onSuccess?: (r: RecetaOrden) => void }) => {
+        opciones?.onSuccess?.(respuesta);
+      },
+    );
+    const campo = screen.getByTestId('precio-receta-tela-1');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+  }
+
+  /** La receta con su(s) TELA(S) ya compradas en la OC #12 (y la orden, en consecuencia). */
+  function conTelaComprada(
+    extra: Partial<RecetaOrden['telas'][number]> = {},
+    over: Partial<RecetaOrden> = {},
+  ): RecetaOrden {
+    const r = recetaDePrueba();
+    return {
+      ...r,
+      telas: r.telas.map((t) => ({ ...t, ocsComprometidas: [OC_AUTORIZADA], ...extra })),
+      ocsComprometidas: [OC_AUTORIZADA],
+      ...over,
+    };
+  }
+
+  /** Receta LIBERADA COMPLETA: la única que el servidor deja reabrir (§Post-F9.165 punto 4). */
+  function liberadaCompleta(over: Partial<RecetaOrden> = {}): RecetaOrden {
+    return recetaDePrueba({
+      liberadaEn: '2026-08-30T10:00:00.000Z',
+      liberadaPor: 'usuario-1',
+      puedeComprar: true,
+      todoLiberado: true,
+      resumen: {
+        sinRevisar: 0,
+        revisados: 3,
+        ajustados: 0,
+        excluidos: 0,
+        total: 3,
+        liberados: 3,
+        porLiberar: 0,
+      },
+      ...over,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('el RENGLÓN comprado lo dice en su fila, con folio y estado', () => {
+    render(conTelaComprada());
+
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('OC 12');
+    expect(screen.getByTestId('oc-comprometida-12')).toHaveTextContent('Autorizada');
+  });
+
+  it('🔴 EL GEMELO: sin OC comprometidas la fila no lleva chip (nada de gritar en falso)', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('oc-comprometida-12')).not.toBeInTheDocument();
+  });
+
+  it('⭐ en una LÁPIDA SÍ se pinta: ahí el dato es una CONTRADICCIÓN, no un adorno', () => {
+    // 🔴 Al revés que la firma, que en una lápida se calla. Aquí el hecho es: existe una OC viva
+    // contra un material que esta orden dice que NO lleva — y quien vaya a REVIVIRLO (lo que le
+    // reescribe consumo, precio y amarre) tiene que verlo ANTES. Callarlo en el único renglón donde
+    // el dato es una contradicción sería callarlo justo donde más grita (hallazgo del reviewer).
+    render(conTelaComprada({ excluido: true }));
+    expect(screen.getByTestId('oc-comprometida-12')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ EDITAR algo comprado pinta el aviso del SERVIDOR entero (y no como toast)', async () => {
+    // 🔴 Un toast se va en cuatro segundos; esto no es un «guardado ✓», es «acabas de descuadrar
+    // una OC que ya está con el proveedor». Va como bloque, y el texto viaja REDACTADO (A1).
+    const usuario = userEvent.setup();
+    render(conTelaComprada());
+    // Antes de tocar nada NO hay bloque: es el eco de una acción, no un estado de la receta.
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+
+    await editarElPrecioDeLaTela(
+      usuario,
+      conTelaComprada({}, { avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR }),
+    );
+
+    const bloque = screen.getByTestId('receta-aviso-ya-comprado');
+    expect(bloque).toHaveTextContent('"Jersey"');
+    expect(bloque).toHaveTextContent('#12 (autorizada)');
+    // La pantalla NO arma la frase: si la armara, este texto exacto no podría salir de aquí.
+    expect(within(bloque).getByTestId('oc-comprometida-12')).toBeInTheDocument();
+  });
+
+  it('🔴 EL GEMELO: si la respuesta NO trae aviso, no se pinta el bloque aunque haya OC', async () => {
+    // Rojo si el bloque se colgara de `ocsComprometidas` en vez del aviso: entonces toda orden con
+    // una compra viva llevaría permanentemente un cartel rojo que nadie provocó.
+    const usuario = userEvent.setup();
+    render(conTelaComprada());
+
+    await editarElPrecioDeLaTela(usuario, conTelaComprada());
+
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+  });
+
+  it('⭐⭐ el diálogo de REABRIR nombra las OC ANTES de confirmar (§Post-F9.145(a))', async () => {
+    const usuario = userEvent.setup();
+    render(
+      liberadaCompleta({
+        ocsComprometidas: [OC_AUTORIZADA],
+        avisoCompraComprometida:
+          'Esta orden ya tiene compra comprometida con el proveedor: la orden de compra #12 ' +
+          '(autorizada). Reabrir la receta NO las cancela ni las toca: siguen su curso.',
+      }),
+    );
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    const bloque = screen.getByTestId('abrir-receta-compra-comprometida');
+    expect(bloque).toHaveTextContent('#12 (autorizada)');
+    expect(bloque).toHaveTextContent('NO las cancela');
+    // Y sigue siendo posible reabrir: AVISA, no bloquea.
+    expect(screen.getByTestId('motivo-abrir-receta')).toBeInTheDocument();
+  });
+
+  it('🔴 EL GEMELO: sin compra comprometida el diálogo no inventa un aviso', async () => {
+    const usuario = userEvent.setup();
+    render(liberadaCompleta());
+
+    await usuario.click(screen.getByTestId('receta-abrir'));
+    expect(screen.queryByTestId('abrir-receta-compra-comprometida')).not.toBeInTheDocument();
+    expect(screen.getByTestId('motivo-abrir-receta')).toBeInTheDocument();
+  });
+
+  it('🔴 SIN `compras.ver` el chip informa pero NO es enlace (no se pinta un 403)', () => {
+    render(conTelaComprada());
+    expect(screen.getByTestId('oc-comprometida-12').closest('button')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐⭐ **LA DÉCIMA MUTACIÓN: «traer del modelo» TAMBIÉN tiene que apagar el eco** (remate del
+   * reviewer).
+   *
+   * 🔴 `useTraerDelModelo` es la ÚNICA que `recordandoElAviso` no puede envolver —devuelve
+   * `TraerDelModeloResultado`, no `RecetaOrden`—, así que reporta a mano. Sin esa línea el bloque
+   * rojo sobrevivía a la siguiente acción y seguía diciendo *«acabas de cambiar…»* de algo que ya
+   * no era lo último: el *gritar en falso* que este mismo módulo dice que enseña a ignorar avisos.
+   */
+  it('⭐⭐ «Traer del modelo» APAGA el aviso: es otra acción, y el eco es de la ÚLTIMA', async () => {
+    const usuario = userEvent.setup();
+    const conFaltante = conTelaComprada(
+      {},
+      {
+        desalineacion: {
+          hayCambios: true,
+          conOrdenCompra: false,
+          critico: false,
+          cambios: [
+            {
+              tipo: 'avio',
+              idRenglon: null,
+              material: 'E01 — Etiqueta de lavado',
+              idMaterialModelo: 77,
+              que: 'agregado',
+              detalle:
+                'El modelo ahora lleva "E01 — Etiqueta de lavado", y esta orden no lo tiene.',
+            },
+          ],
+        },
+      },
+    );
+    render(conFaltante);
+
+    // 1) Una edición sobre lo comprado enciende el bloque…
+    await editarElPrecioDeLaTela(usuario, {
+      ...conFaltante,
+      avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+    });
+    expect(screen.getByTestId('receta-aviso-ya-comprado')).toBeInTheDocument();
+
+    // 2) …y la SIGUIENTE acción, que no toca nada comprado, lo apaga.
+    traerMutateMock.mockImplementation(
+      (
+        _vars: unknown,
+        opciones?: {
+          onSuccess?: (r: {
+            receta: RecetaOrden;
+            traidos: unknown[];
+            respetados: unknown[];
+          }) => void;
+        },
+      ) => {
+        opciones?.onSuccess?.({
+          receta: conFaltante, // sin aviso: traer del modelo sólo CREA renglones
+          traidos: [{ tipo: 'avio', material: 'E01 — Etiqueta de lavado' }],
+          respetados: [],
+        });
+      },
+    );
+    await usuario.click(screen.getByTestId('traer-del-modelo-todo'));
+
+    expect(screen.queryByTestId('receta-aviso-ya-comprado')).not.toBeInTheDocument();
+  });
+
+  it('⭐ con `compras.ver` el chip del AVISO sí es la puerta a las compras de la orden', async () => {
+    const usuario = userEvent.setup();
+    render(conTelaComprada(), true, ['ordenes.ver', 'desarrollo.administrar', 'compras.ver']);
+
+    await editarElPrecioDeLaTela(
+      usuario,
+      conTelaComprada({}, { avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR }),
+    );
+
+    const bloque = screen.getByTestId('receta-aviso-ya-comprado');
+    // ⛔ Y lo que a ÉL no se le ofrece: des-autorizar la OC (fila 0.068: es de Dirección, y esta
+    // sesión no tiene `compras.desautorizar`; pintárselo sería pintarle un 403).
+    expect(bloque).not.toHaveTextContent(/Des-?autorizar la/i);
+    expect(within(bloque).getByTestId('oc-comprometida-12').closest('button')).not.toBeNull();
+  });
+
+  /**
+   * ⭐⭐⭐ **fila 0.068 — EL AVISO QUE PIDE UN ACTO, LLEVA A HACERLO** (§Post-F9.145 sobre el aviso de
+   * §Post-F9.173(a)).
+   *
+   * Hasta la 0.085 el bloque decía *"des-autorizarla es del perfil de Dirección"* **también a la
+   * Dirección**, que se quedaba leyendo la instrucción de un acto que sí podía hacer, sin puerta.
+   * §Post-F9.68 tiene las dos mitades: esconder lo que no se puede usar **y enseñar lo que sí**.
+   *
+   * 🔴 Lo que estas pruebas clavan, en este orden de importancia:
+   *  1. **LLEVAR NO ES HACER**: el clic ABRE un diálogo y no manda nada. DANIEL: *«no se puede
+   *     cancelar la OC en automático: eso hay que negociarlo con el proveedor»*.
+   *  2. **la pareja**: con la llave se pinta, **sin la llave NO** — y el chip sigue informando.
+   *  3. **la OC RECIBIDA no se le ofrece a NADIE**, Dirección incluida: el servidor la rechaza, así
+   *     que ofrecerla sería mandar a alguien a rebotar.
+   *  4. **el cableado es real**: el diálogo se abre con el `idOrdenCompra` (900) y se NOMBRA con el
+   *     `folio` (12). Son dos números distintos a propósito: confundirlos pone esto rojo.
+   */
+  describe('⭐⭐⭐ fila 0.068 — y el aviso LLEVA a des-autorizar la OC (sólo a quien puede)', () => {
+    /** Una sesión de Dirección: la única que tiene la llave de des-firmar una compra. */
+    const DIRECCION: ClavePermiso[] = [
+      'ordenes.ver',
+      'desarrollo.administrar',
+      'compras.ver',
+      'compras.desautorizar',
+    ];
+    /** El comprador: ve las compras, pero NO puede des-autorizar. */
+    const COMPRADOR: ClavePermiso[] = ['ordenes.ver', 'desarrollo.administrar', 'compras.ver'];
+    /** Otra OC de la misma orden, ya RECIBIDA: ahí no hay des-autorizar para nadie. */
+    const OC_RECIBIDA = {
+      idOrdenCompra: 901,
+      folio: 15,
+      estatus: 'recibida_total' as const,
+      recibida: true,
+    };
+
+    /** Igual que en las pruebas de arriba: el aviso NO se pinta hasta que algo lo provoca. */
+    async function conElAvisoEncendido(
+      usuario: ReturnType<typeof userEvent.setup>,
+      receta: RecetaOrden,
+      permisos: ClavePermiso[],
+    ): Promise<HTMLElement> {
+      render(receta, true, permisos);
+      await editarElPrecioDeLaTela(usuario, {
+        ...receta,
+        avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+      });
+      return screen.getByTestId('receta-aviso-ya-comprado');
+    }
+
+    /** La receta con las OC que se le indiquen, tanto en la orden como en su tela. */
+    function conEstasOcs(ocs: RecetaOrden['ocsComprometidas']): RecetaOrden {
+      return conTelaComprada({ ocsComprometidas: ocs }, { ocsComprometidas: ocs });
+    }
+
+    it('⭐⭐ CON la llave el aviso ofrece la puerta — y ABRIRLA no des-autoriza NADA', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), DIRECCION);
+
+      await usuario.click(within(bloque).getByTestId('desautorizar-oc-12'));
+
+      // 🔴 EL CORAZÓN DE LA ETAPA: el clic abrió una decisión, no la tomó.
+      expect(desautorizarMutateMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId('confirmar-desautorizar-oc')).toBeDisabled();
+      // Y el diálogo habla de la OC elegida por su FOLIO (12), no por su id (900).
+      expect(screen.getByRole('dialog')).toHaveTextContent('Des-autorizar orden de compra 12');
+    });
+
+    it('⭐⭐ sólo se des-autoriza cuando una PERSONA escribe el motivo y confirma', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), DIRECCION);
+      await usuario.click(within(bloque).getByTestId('desautorizar-oc-12'));
+
+      await usuario.type(
+        screen.getByTestId('oc-motivo-desautorizar'),
+        '  el cliente cambió la tela  ',
+      );
+      await usuario.click(screen.getByTestId('confirmar-desautorizar-oc'));
+
+      // 🔴 `id` es el de la OC y NO su folio: los dos son números, y confundirlos es el error fácil.
+      expect(desautorizarMutateMock).toHaveBeenCalledWith(
+        { id: OC_AUTORIZADA.idOrdenCompra, cuerpo: { motivo: 'el cliente cambió la tela' } },
+        expect.anything(),
+      );
+      expect(OC_AUTORIZADA.idOrdenCompra).not.toBe(OC_AUTORIZADA.folio);
+    });
+
+    it('🔴 EL GEMELO: SIN la llave la puerta NO se pinta, y el chip sigue informando', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conTelaComprada(), COMPRADOR);
+
+      expect(within(bloque).queryByTestId('desautorizar-oc-12')).toBeNull();
+      expect(screen.queryByTestId('receta-aviso-desautorizar')).toBeNull();
+      // Se esconde el ACTO, no el HECHO: el comprador tiene que seguir enterándose.
+      expect(within(bloque).getByTestId('oc-comprometida-12')).toBeInTheDocument();
+    });
+
+    it('🔴🔴 sobre una OC ya RECIBIDA no se ofrece NI A DIRECCIÓN (el servidor la rechaza)', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(usuario, conEstasOcs([OC_RECIBIDA]), DIRECCION);
+
+      expect(within(bloque).getByTestId('oc-comprometida-15')).toBeInTheDocument();
+      expect(within(bloque).queryByTestId('desautorizar-oc-15')).toBeNull();
+      expect(screen.queryByTestId('receta-aviso-desautorizar')).toBeNull();
+    });
+
+    it('⭐⭐ y al des-autorizar RE-LEE la receta: el chip no se puede quedar mintiendo', async () => {
+      /*
+       * 🔴 `useDesautorizarOc` invalida `['ordenes-compra']`, y «Comprado · OC 12 · Autorizada» NO
+       * vive ahí: sale de `ocsComprometidas`, dentro de la receta. Sin la re-lectura el chip —y su
+       * botón— sobrevivirían a la des-autorización, y el segundo clic se estrellaría contra el 409
+       * del servidor («no está autorizada»). Es decir: la pantalla mandaría a rebotar a la única
+       * persona que sí puede hacer esto, que es justo lo que §Post-F9.145(f) prohíbe.
+       */
+      const usuario = userEvent.setup();
+      const cliente = crearQueryClientDePrueba();
+      const espia = vi.spyOn(cliente, 'invalidateQueries');
+      // El doble contesta que la mutación SALIÓ BIEN: sin eso no hay nada que refrescar.
+      desautorizarMutateMock.mockImplementation(
+        (_vars: unknown, opciones?: { onSuccess?: () => void }) => {
+          opciones?.onSuccess?.();
+        },
+      );
+
+      render(conTelaComprada(), true, DIRECCION, cliente);
+      await editarElPrecioDeLaTela(usuario, {
+        ...conTelaComprada(),
+        avisoCambioSobreLoComprado: AVISO_DEL_SERVIDOR,
+      });
+      await usuario.click(
+        within(screen.getByTestId('receta-aviso-ya-comprado')).getByTestId('desautorizar-oc-12'),
+      );
+      await usuario.type(screen.getByTestId('oc-motivo-desautorizar'), 'me equivoqué de tela');
+      await usuario.click(screen.getByTestId('confirmar-desautorizar-oc'));
+
+      // La receta DE ESTA ORDEN (id 50), no `['ordenes']` entero ni la de la orden de al lado.
+      expect(espia).toHaveBeenCalledWith({ queryKey: ['ordenes', 'receta', 50] });
+    });
+
+    it('⭐ con las dos a la vez, la puerta es SÓLO la de la autorizada', async () => {
+      const usuario = userEvent.setup();
+      const bloque = await conElAvisoEncendido(
+        usuario,
+        conEstasOcs([OC_AUTORIZADA, OC_RECIBIDA]),
+        DIRECCION,
+      );
+
+      expect(within(bloque).getByTestId('desautorizar-oc-12')).toBeInTheDocument();
+      expect(within(bloque).queryByTestId('desautorizar-oc-15')).toBeNull();
+    });
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.177 — **EL CABLEADO de las fotos del arte a su ÚNICA pantalla.**
+ *
+ * 🔴 Existe por un hallazgo de revisión: la tira estaba construida y probada por dentro
+ * (`FotosArteOrden.test.tsx`), pero **el elemento que la monta en la sección de Arte no lo tocaba ni
+ * una prueba**. Borrándolo entero, la suite del frontend seguía **verde de punta a punta** — y con
+ * ella el argumento de que un renglón EXCLUIDO no necesita guarda en el servidor *porque la pantalla
+ * no ofrece el botón*. ⭐ **Un control compensatorio sin prueba no es un control.**
+ *
+ * Lo que se fija aquí es exactamente lo que se caía en silencio:
+ *  • que la tira **se monta**, una por renglón de arte;
+ *  • que cada una recibe **el arte de SU renglón**, no el del vecino ni `undefined`;
+ *  • que el renglón **EXCLUIDO no ofrece los botones** (la mitad de pantalla del residuo del
+ *    servidor), y el vivo sí;
+ *  • y que la consulta sale con **el `idOrden` de la pantalla** — lo que hace honesto al doble.
+ */
+describe('PanelRecetaOrden · el cableado de las fotos del arte (§Post-F9.177)', () => {
+  /** Un renglón de arte de la receta de la OP, con lo mínimo que la sección pinta. */
+  function arteReceta(over: Partial<RecetaOrdenArte> & { id: number }): RecetaOrdenArte {
+    return {
+      tipo: 'arte',
+      estado: 'sin_revisar',
+      agregadoAMano: false,
+      excluido: false,
+      notas: null,
+      liberadoEn: null,
+      liberadoPor: null,
+      enElModelo: true,
+      cambios: [],
+      idModeloArte: 500,
+      descripcion: 'Arte',
+      posicion: null,
+      puntadas: null,
+      idTipoArte: 1,
+      tipoArte: 'Bordado',
+      codigoTipoArte: 'bordado',
+      usaPuntadas: true,
+      precio: 12,
+      idProveedor: null,
+      proveedor: null,
+      precioModelo: 12,
+      precioModeloDeCompra: false,
+      ...over,
+    };
+  }
+
+  /** Una foto HEREDADA del arte del modelo, tal como la devuelve el servidor. */
+  function fotoHeredada(
+    idModeloArteFoto: number,
+    nombre: string,
+  ): OrdenArteConFotos['fotos'][number] {
+    return {
+      origen: 'modelo',
+      idModeloArteFoto,
+      idFoto: null,
+      urlDescarga: `https://ej.test/${nombre}`,
+      nombreOriginal: nombre,
+      oculta: false,
+      principal: idModeloArteFoto % 10 === 0,
+    };
+  }
+
+  /** La fila `<tr>` de la tabla de Arte cuya descripción es la dada. */
+  function filaDe(descripcion: string): HTMLElement {
+    const celda = screen.getByText(descripcion);
+    const fila = celda.closest('tr');
+    expect(fila, `no se encontró la fila del arte "${descripcion}"`).not.toBeNull();
+    return fila as HTMLElement;
+  }
+
+  /** Receta con DOS artes: uno vivo («Logo pecho») y uno EXCLUIDO («Etiqueta vieja»). */
+  const VIVO = 30;
+  const EXCLUIDO = 31;
+  function recetaConDosArtes(): RecetaOrden {
+    return recetaDePrueba({
+      artes: [
+        arteReceta({ id: VIVO, descripcion: 'Logo pecho', idModeloArte: 500 }),
+        arteReceta({
+          id: EXCLUIDO,
+          descripcion: 'Etiqueta vieja',
+          idModeloArte: 501,
+          excluido: true,
+        }),
+      ],
+    });
+  }
+
+  beforeEach(() => {
+    useFotosArteOrdenMock.mockClear();
+    ocultarFotoArteMock.mockReset();
+    fotosArtePorOrden.clear();
+    // ⚠️ La clave es 50 porque es el `idOrden` con el que `render()` monta el panel. Si el cableado
+    // consultara con otro, el doble devuelve `undefined` y todo lo de abajo se cae.
+    fotosArtePorOrden.set(50, [
+      {
+        idOrdenArte: VIVO,
+        descripcion: 'Logo pecho',
+        agregadoAMano: false,
+        // DOS fotos: el conteo es lo que delata un arte cruzado con el del vecino.
+        fotos: [fotoHeredada(100, 'pecho-a.jpg'), fotoHeredada(101, 'pecho-b.jpg')],
+      },
+      {
+        idOrdenArte: EXCLUIDO,
+        descripcion: 'Etiqueta vieja',
+        agregadoAMano: false,
+        fotos: [fotoHeredada(200, 'etiqueta.jpg')],
+      },
+    ]);
+  });
+
+  it('🔴 monta la tira en CADA renglón de arte, con las fotos de SU renglón', () => {
+    render(recetaConDosArtes());
+
+    // La tira existe en las dos filas (si el elemento se borrara, esto es lo primero que revienta).
+    expect(screen.getAllByTestId('fotos-arte-orden')).toHaveLength(2);
+
+    // Y cada una trae LO SUYO: dos fotos el vivo, una el excluido. Un `arte={undefined}` daría cero
+    // en las dos; un arte cruzado daría los conteos al revés.
+    expect(within(filaDe('Logo pecho')).getAllByTestId('foto-arte-orden')).toHaveLength(2);
+    expect(within(filaDe('Etiqueta vieja')).getAllByTestId('foto-arte-orden')).toHaveLength(1);
+    // El `alt` amarra la foto a SU arte por nombre, no sólo por conteo.
+    expect(within(filaDe('Etiqueta vieja')).getByAltText(/Etiqueta vieja/)).toBeInTheDocument();
+  });
+
+  it('🔴 el renglón EXCLUIDO no ofrece NINGÚN botón; el vivo los ofrece todos', () => {
+    render(recetaConDosArtes());
+
+    const vivo = within(filaDe('Logo pecho'));
+    expect(vivo.getAllByTestId('ocultar-foto-arte-orden')).toHaveLength(2);
+    expect(vivo.getByTestId('subir-foto-arte-orden')).toBeInTheDocument();
+
+    // ⭐ Ésta es la mitad de pantalla del residuo declarado en el servidor («un renglón excluido se
+    // deja tocar por la API porque la pantalla no ofrece el botón»). Sin esta aserción, aquella
+    // permisividad se apoyaría en algo que nadie vigila.
+    const excluido = within(filaDe('Etiqueta vieja'));
+    expect(excluido.getByTestId('foto-arte-orden')).toBeInTheDocument();
+    expect(excluido.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('mostrar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('quitar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('sin `desarrollo.administrar` ninguna fila ofrece botones (la tira se sigue viendo)', () => {
+    render(recetaConDosArtes(), false, ['ordenes.ver']);
+
+    expect(screen.getAllByTestId('fotos-arte-orden')).toHaveLength(2);
+    expect(screen.getAllByTestId('foto-arte-orden')).toHaveLength(3);
+    expect(screen.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('el botón de la fila viva quita la foto de ESE renglón (llega hasta la mutación)', async () => {
+    const usuario = userEvent.setup();
+    render(recetaConDosArtes());
+
+    const botones = within(filaDe('Logo pecho')).getAllByTestId('ocultar-foto-arte-orden');
+    await usuario.click(botones[0] as HTMLElement);
+
+    expect(ocultarFotoArteMock).toHaveBeenCalledTimes(1);
+    expect(ocultarFotoArteMock.mock.calls[0]?.[0]).toEqual({
+      idOrden: 50,
+      idOrdenArte: VIVO,
+      idModeloArteFoto: 100,
+    });
+  });
+
+  it('⭐ la consulta sale con el `idOrden` de la pantalla (lo que hace honesto al doble)', () => {
+    render(recetaConDosArtes());
+    expect(useFotosArteOrdenMock).toHaveBeenCalledWith(50);
+    // Y una sola consulta para TODOS los renglones, no una por fila.
+    expect(new Set(useFotosArteOrdenMock.mock.calls.map((c) => c[0]))).toEqual(new Set([50]));
+  });
+
+  it('mientras la consulta no responde, la sección de Arte se pinta igual (sin miniaturas)', () => {
+    fotosArtePorOrden.clear();
+    render(recetaConDosArtes());
+
+    expect(screen.getByTestId('receta-seccion-artes')).toBeInTheDocument();
+    expect(screen.getByText('Logo pecho')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('foto-arte-orden')).toHaveLength(0);
+    // Sin renglón resuelto tampoco se ofrece subir: no se sabría a qué arte colgarla.
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐⭐ fila 0.068 (a) — **EL AVISO DE LA OP QUE SE DESVÍA DEL GRUPO, EN LA ORDEN.**
+ *
+ * DANIEL: *«Puede pasar que una OP del grupo se le cambie algún avío… se debe de poder hacer, **pero
+ * advirtiendo de la diferencia**»*. Aquí se fija que el aviso APAREZCA con su detalle, que NO se
+ * confunda con la desalineación contra el modelo, y que **no bloquee nada**.
+ */
+describe('<PanelRecetaOrden> — esta OP no va igual que sus hermanas', () => {
+  /** El caso de Daniel: sólo la café lleva ese cierre. */
+  function desviada(): RecetaOrden {
+    return recetaDePrueba({
+      frenteAlGrupo: {
+        hermanas: 2,
+        foliosHermanas: [5001, 5002],
+        fueraDeLaComparacion: 0,
+        notaFueraDeLaComparacion: null,
+        diferencias: [
+          {
+            tipo: 'avio',
+            material: 'CIE-02 — Cierre café',
+            que: 'solo-esta',
+            detalle: '«CIE-02 — Cierre café»: esta OP lleva 1 · OP 5001, 5002 no lo llevan.',
+          },
+        ],
+        aviso: 'Esta OP no va igual que sus 2 hermanas: «CIE-02 — Cierre café».',
+      },
+    });
+  }
+
+  it('enseña el aviso con el DETALLE del servidor (qué lleva esta OP y qué las otras)', () => {
+    render(desviada());
+    const aviso = screen.getByTestId('receta-aviso-hermanas');
+    expect(aviso).toHaveTextContent('«CIE-02 — Cierre café»: esta OP lleva 1');
+    expect(aviso).toHaveTextContent('OP 5001, 5002 no lo llevan');
+    // Y dice con todas las letras que NO es un error (Daniel: la diferencia es legítima).
+    expect(aviso).toHaveTextContent(/no bloquea nada/i);
+  });
+
+  it('🔴 CONTROL NEGATIVO: sin diferencias con las hermanas NO se pinta nada', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+  });
+
+  it('🔴 es OTRO aviso que la desalineación contra el modelo: pueden salir los dos, o uno solo', () => {
+    // Sólo horizontal: la receta está alineada con el modelo y aun así difiere de sus hermanas.
+    render(desviada());
+    expect(screen.getByTestId('receta-aviso-hermanas')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-desalineacion')).toBeNull();
+  });
+
+  it('🔴 una respuesta VIEJA (sin el campo) no tumba la pantalla — sólo no pinta el aviso', () => {
+    /*
+     * Este caso NO es teórico: lo cazó la corrida completa de la suite. Entre el despliegue y el
+     * refresco, el caché de TanStack Query puede servir una receta guardada ANTES de esta etapa, sin
+     * `frenteAlGrupo`. La primera versión del componente lo desreferenciaba a pelo y se caía con
+     * `TypeError: Cannot read properties of undefined (reading 'aviso')`, tumbando la pantalla de la
+     * receta ENTERA. El `as` es a propósito: el contrato promete el campo y el tipo no deja
+     * expresar la respuesta vieja, que es justo la que llega en el navegador.
+     */
+    const { frenteAlGrupo: _omitido, ...vieja } = recetaDePrueba();
+    render(vieja as RecetaOrden);
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    // Y la pantalla SIGUE EN PIE (si se cayera, esto no existiría).
+    expect(screen.getByTestId('receta-sin-liberar')).toBeInTheDocument();
+  });
+
+  it('🔴🔴 SIN diferencias pero CON hermanas apartadas, lo DICE igual (el caso silencioso)', () => {
+    /*
+     * El defecto que esto cierra: el componente devolvía `null` en cuanto `aviso` era null, así que
+     * la nota de las apartadas era **inalcanzable justo cuando hacía falta**. Y con el histórico
+     * real —el ETL SÍ escribe recetas congeladas, y ésas no votan— éste es el caso COMÚN: sin la
+     * nota, «va igual que sus hermanas» se leería como el visto bueno de una familia que ni entró.
+     */
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 3,
+          diferencias: [],
+          aviso: null,
+          notaFueraDeLaComparacion:
+            '3 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+        },
+      }),
+    );
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    expect(screen.getByTestId('receta-hermanas-fuera')).toHaveTextContent(
+      '3 OP del modelo quedaron fuera de la comparación',
+    );
+  });
+
+  it('🔴 CONTROL NEGATIVO: sin diferencias y sin apartadas no se pinta NADA', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('receta-aviso-hermanas')).toBeNull();
+    expect(screen.queryByTestId('receta-hermanas-fuera')).toBeNull();
+  });
+
+  it('la nota la redacta el SERVIDOR: la pantalla no conjuga (aquí llega en singular)', () => {
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 1,
+          diferencias: [],
+          aviso: null,
+          notaFueraDeLaComparacion:
+            '1 OP del modelo quedó fuera de la comparación (es histórico migrado, o no tiene receta capturada).',
+        },
+      }),
+    );
+    expect(screen.getByTestId('receta-hermanas-fuera')).toHaveTextContent('1 OP del modelo quedó');
+  });
+
+  it('cuando quedan hermanas fuera por no tener receta capturada, lo DICE (no las esconde)', () => {
+    render(
+      recetaDePrueba({
+        frenteAlGrupo: {
+          hermanas: 1,
+          foliosHermanas: [5001],
+          fueraDeLaComparacion: 2,
+          notaFueraDeLaComparacion:
+            '2 OP del modelo quedaron fuera de la comparación (son histórico migrado, o no tienen receta capturada).',
+          diferencias: [
+            {
+              tipo: 'tela',
+              material: 'Jersey',
+              que: 'cantidad',
+              detalle: '«Jersey»: esta OP lleva 2 · OP 5001 lleva 1.5.',
+            },
+          ],
+          aviso: 'Esta OP no va igual que su hermana: «Jersey».',
+        },
+      }),
+    );
+    expect(screen.getByTestId('receta-aviso-hermanas')).toHaveTextContent(
+      '2 OP del modelo quedaron fuera de la comparación',
+    );
   });
 });

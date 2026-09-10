@@ -32,10 +32,22 @@ import {
 import {
   esquemaClienteCamposLista,
   esquemaClienteCampoSalida,
+  esquemaClienteContactoCrear,
+  esquemaClienteContactoEditarCuerpo,
+  esquemaClienteContactoSalida,
+  esquemaClienteContactosLista,
+  esquemaClienteContactosQuery,
+  type ClienteContactoSalida,
 } from '../../contrato/esquemas/cliente.js';
 import type { ClienteCampo } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
+import {
+  actualizarContactoCliente,
+  crearContactoCliente,
+  listarContactosCliente,
+  type ContactoCliente,
+} from '../../dominio/catalogos/cliente-contactos.js';
 import {
   actualizarCampoCliente,
   actualizarCliente,
@@ -87,6 +99,26 @@ function aClienteSalida(cliente: ClienteConCampos): z.infer<typeof esquemaClient
   };
 }
 
+/**
+ * Proyecta un contacto del cliente (V1-E8y, §Post-F9.152) a la forma JSON del contrato. El NOMBRE
+ * del departamento viaja resuelto: la pantalla enseña «Laura · compradora · NIÑOS» sin cruzar
+ * catálogos, y `null` significa que atiende al cliente completo.
+ */
+function aContactoClienteSalida(contacto: ContactoCliente): ClienteContactoSalida {
+  return {
+    id: contacto.id,
+    idCliente: contacto.idCliente,
+    idClienteDepartamento: contacto.idClienteDepartamento,
+    nombreDepartamento: contacto.clienteDepartamento?.nombre ?? null,
+    nombre: contacto.nombre,
+    puesto: contacto.puesto,
+    telefono: contacto.telefono,
+    email: contacto.email,
+    notas: contacto.notas,
+    activo: contacto.activo,
+  };
+}
+
 /** Parámetro de ruta `:id` (entero positivo). Reutilizado por GET/PATCH/DELETE. */
 const esquemaParamId = z.object({
   id: z.coerce
@@ -108,6 +140,20 @@ const esquemaParamCampo = z.object({
     .int()
     .positive()
     .describe('Id del campo de referencia.'),
+});
+
+/** Parámetros `:id` (cliente) + `:idContacto` para editar/archivar un contacto (V1-E8y). */
+const esquemaParamContactoCliente = z.object({
+  id: z.coerce
+    .number({ error: 'El id del cliente debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del cliente.'),
+  idContacto: z.coerce
+    .number({ error: 'El id del contacto debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del contacto del cliente.'),
 });
 
 /** Querystring del listado de campos (permite traer los desactivados). */
@@ -322,6 +368,78 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const campo = await desactivarCampoCliente(sesion, request.params.id, request.params.idCampo);
       return aCampoSalida(campo);
+    },
+  });
+
+  // ── ⭐ Contactos del cliente (V1-E8y, §Post-F9.152) ─────────────────────────
+  // SIN permisos nuevos: se gobiernan con `clientes.ver`/`.administrar`. Mismo sub-recurso que los
+  // contactos del proveedor, con el DEPARTAMENTO opcional (decisión de Daniel). No hay DELETE: un
+  // contacto que se fue se ARCHIVA con `activo: false` (D3).
+
+  app.route({
+    method: 'GET',
+    url: '/clientes/:id/contactos',
+    preHandler: app.conPermiso('clientes.ver'),
+    schema: {
+      tags: ['clientes'],
+      summary: 'Listar los contactos del cliente (la compradora; puesto en texto libre)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      querystring: esquemaClienteContactosQuery,
+      response: { 200: esquemaClienteContactosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contactos = await listarContactosCliente(
+        sesion,
+        request.params.id,
+        request.query.incluirInactivos,
+      );
+      return { datos: contactos.map(aContactoClienteSalida) };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/clientes/:id/contactos',
+    preHandler: app.conPermiso('clientes.administrar'),
+    schema: {
+      tags: ['clientes'],
+      summary: 'Agregar un contacto al cliente (departamento OPCIONAL)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaClienteContactoCrear,
+      response: { 201: esquemaClienteContactoSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contacto = await crearContactoCliente(sesion, request.params.id, request.body);
+      return reply.code(201).send(aContactoClienteSalida(contacto));
+    },
+  });
+
+  // PATCH parcial; con `activo: false` ARCHIVA el contacto (borrado suave, D3 — no hay DELETE).
+  app.route({
+    method: 'PATCH',
+    url: '/clientes/:id/contactos/:idContacto',
+    preHandler: app.conPermiso('clientes.administrar'),
+    schema: {
+      tags: ['clientes'],
+      summary: 'Editar (o archivar con activo=false) un contacto del cliente',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamContactoCliente,
+      body: esquemaClienteContactoEditarCuerpo,
+      response: { 200: esquemaClienteContactoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contacto = await actualizarContactoCliente(
+        sesion,
+        request.params.id,
+        request.params.idContacto,
+        request.body,
+      );
+      return aContactoClienteSalida(contacto);
     },
   });
 

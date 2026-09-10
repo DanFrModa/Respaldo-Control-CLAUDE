@@ -11,6 +11,12 @@ import { z } from 'zod';
  *    traspaso); las salidas NO pueden dejar existencia negativa (lo valida el dominio bajo lock).
  *  • Traspaso: dos almacenes DISTINTOS; el origen debe tener existencia suficiente (dominio).
  *  • Cancelación: motivo obligatorio (A7); genera el inverso (entrada↔salida) — sin no-negativo.
+ *  • Fila 0.100 — MOTIVO OBLIGATORIO también al METER o SACAR PT a mano y al TRASPASARLO (Daniel,
+ *    §Post-F9.193 decisión 3): *"hoy se mueven mil piezas sin una palabra"*. Es el MISMO trato que
+ *    ya tenían telas y avíos (`inventario-material.ts` → `esquemaAjusteTelaCrear.motivo`), con el
+ *    mismo texto y los mismos límites, y se guarda en la MISMA columna que allá: `observaciones`
+ *    del `Movimiento` (por eso el campo de entrada se llama `motivo` y el de salida
+ *    `observaciones` — igual que en materiales; no hay columna nueva ni migración).
  */
 
 // ── Renglón color×talla (compartido por movimiento y traspaso) ───────────────────────────────────
@@ -80,6 +86,33 @@ const esquemaMovPtMatriz = z
 /** Un renglón de la matriz tal como lo recibe el dominio. */
 export type DatosMovPtLineaEntrada = z.infer<typeof esquemaMovPtLinea>;
 
+// ── Motivo obligatorio de un movimiento capturado A MANO (fila 0.100) ───────────────────────────
+
+/**
+ * MOTIVO de un movimiento manual de PT (entrada, salida o traspaso) — fila 0.100, §Post-F9.193
+ * decisión 3. Obligatorio: *"hoy se mueven mil piezas sin una palabra"* (Daniel). Calcado de los
+ * ajustes de tela y avío (`esquemaAjusteTelaCrear.motivo`): **mismos límites** (3–500) y los dos
+ * primeros mensajes **verbatim** (`'El motivo es obligatorio'` y
+ * `'Explica el motivo (mínimo 3 caracteres)'`), para que las dos capturas se sientan iguales.
+ *
+ * ⚠️ Con UNA diferencia deliberada: allá el `.max(500)` va **sin mensaje**, así que al pasarse del
+ * límite el usuario recibe el texto genérico de Zod (en inglés). Aquí sí lleva mensaje en español.
+ * Es una mejora, no una copia imperfecta — pero conviene saber que las dos pantallas **no** dicen lo
+ * mismo al rebasar el tope, hasta que materiales adopte también el suyo.
+ *
+ * ⚠️ Se guarda en `Movimiento.observaciones` (columna que YA existe, `@db.Text`) — igual que en
+ * materiales. Por eso la SALIDA sigue llamándose `observaciones`: es la misma columna leída.
+ *
+ * REGLA 0-B — aplica de aquí en adelante. Los movimientos ya guardados sin motivo se quedan con
+ * `observaciones` NULL y se leen e imprimen tal cual; no se rellenan ni se reparan.
+ */
+const esquemaMotivoMovimientoPt = z
+  .string({ error: 'El motivo es obligatorio' })
+  .trim()
+  .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+  .max(500, { error: 'El motivo no puede tener más de 500 caracteres' })
+  .describe('Por qué se mueve el producto terminado (obligatorio; se guarda en observaciones).');
+
 // ── Movimiento manual (entrada/salida/ajuste) ────────────────────────────────────────────────────
 
 /**
@@ -108,10 +141,12 @@ export const esquemaMovimientoPtCrear = z
     fecha: z.iso
       .date({ error: 'La fecha del movimiento es obligatoria (YYYY-MM-DD)' })
       .describe('Fecha del movimiento (YYYY-MM-DD).'),
-    observaciones: z.string().trim().max(1000).optional(),
+    motivo: esquemaMotivoMovimientoPt,
     lineas: esquemaMovPtMatriz,
   })
-  .describe('Datos de un movimiento manual de inventario PT (color×talla, D4).');
+  .describe(
+    'Datos de un movimiento manual de inventario PT (color×talla, D4). Motivo obligatorio.',
+  );
 
 /** Datos validados de alta de movimiento manual. */
 export type DatosMovimientoPtCrear = z.infer<typeof esquemaMovimientoPtCrear>;
@@ -144,10 +179,10 @@ export const esquemaTraspasoPtCrear = z
     fecha: z.iso
       .date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' })
       .describe('Fecha del traspaso (YYYY-MM-DD).'),
-    observaciones: z.string().trim().max(1000).optional(),
+    motivo: esquemaMotivoMovimientoPt,
     lineas: esquemaMovPtMatriz,
   })
-  .describe('Datos de un traspaso de PT entre almacenes (color×talla, D4).');
+  .describe('Datos de un traspaso de PT entre almacenes (color×talla, D4). Motivo obligatorio.');
 
 /** Datos validados de alta de traspaso. */
 export type DatosTraspasoPtCrear = z.infer<typeof esquemaTraspasoPtCrear>;
@@ -209,7 +244,12 @@ export const esquemaMovimientoPtSalida = z
     idModelo: z.number().int().describe('Modelo del movimiento.'),
     modelo: z.string().describe('Código del modelo.'),
     fecha: z.string().describe('Fecha del movimiento (YYYY-MM-DD).'),
-    observaciones: z.string().nullable().describe('Observaciones o null.'),
+    observaciones: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual).',
+      ),
     origenTipo: z.string().nullable().describe('Discriminador del hecho de origen o null.'),
     cancelado: z.boolean().describe('Si el movimiento ya fue anulado por un inverso.'),
     idMovimientoInverso: z
@@ -357,8 +397,30 @@ export const esquemaKardexPtQuery = z
       .positive()
       .optional()
       .describe('Filtra por una orden de producción (F6-E2).'),
+    desde: z.iso
+      .date({ error: 'La fecha «desde» no es válida (YYYY-MM-DD)' })
+      .optional()
+      .describe('Primer día del periodo (YYYY-MM-DD), INCLUSIVE.'),
+    hasta: z.iso
+      .date({ error: 'La fecha «hasta» no es válida (YYYY-MM-DD)' })
+      .optional()
+      .describe('Último día del periodo (YYYY-MM-DD), INCLUSIVE.'),
+    limite: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(5000)
+      .optional()
+      .describe(
+        'Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta ' +
+          'siempre dice cuál se aplicó (`limite`) y si hubo corte (`truncado`).',
+      ),
   })
-  .describe('Filtros del kardex de un modelo.');
+  .describe(
+    'Filtros del kardex de un modelo. El PERIODO manda: si no se pide `desde`, el dominio pone ' +
+      'una ventana por omisión (ver `desde`/`ventanaPorOmision` de la respuesta) — pedir el ' +
+      'kardex NUNCA trae diez años.',
+  );
 
 /** Parámetros del kardex por modelo ya coaccionados. */
 export type KardexPtQuery = z.infer<typeof esquemaKardexPtQuery>;
@@ -391,20 +453,82 @@ const esquemaKardexPtRenglon = z.object({
   salida: z.number().int().describe('Piezas que salen en este renglón (0 si es entrada).'),
   saldo: z.number().int().describe('Saldo corrido del artículo tras este movimiento.'),
   cancelado: z.boolean().describe('Si el movimiento fue anulado por un inverso.'),
-  observaciones: z.string().nullable().describe('Observaciones del movimiento o null.'),
+  observaciones: z
+    .string()
+    .nullable()
+    .describe(
+      'Motivo del movimiento (fila 0.100) o las observaciones de uno automático; null en los movimientos viejos que se capturaron sin motivo (REGLA 0-B: se leen tal cual).',
+    ),
 });
 
 /** Un renglón del kardex tal como lo devuelve la API. */
 export type KardexPtRenglon = z.infer<typeof esquemaKardexPtRenglon>;
+
+/**
+ * SALDO ANTERIOR de un artículo (color×talla×almacén×orden): lo que YA traía justo antes del PRIMER
+ * RENGLÓN que se devuelve. Es lo que vuelve verdadera la columna «Saldo» cuando el kardex viene
+ * recortado — sin él, el primer renglón arrancaría en cero y el saldo corrido diría una mentira.
+ *
+ * Cuando `truncado` es `false` ese punto es el inicio del periodo, así que es el saldo de apertura
+ * de toda la vida. Cuando es `true` la lista trae el FINAL del periodo, y entonces este número ya
+ * incluye también los movimientos del periodo que el tope dejó fuera por arriba: sigue siendo el
+ * saldo exacto desde el que arranca lo que se ve.
+ *
+ * Sólo vienen los artículos que APARECEN en los renglones devueltos (los que no se movieron no son
+ * parte de este kardex; su existencia se consulta en Existencias) y sólo si el saldo no es cero.
+ */
+const esquemaKardexPtSaldoInicial = z.object({
+  idColor: z.number().int().describe('Color del artículo.'),
+  color: z.string().describe('Nombre del color.'),
+  idTalla: z.number().int().describe('Talla del artículo.'),
+  etiquetaTalla: z.string().describe('Etiqueta de la talla.'),
+  idAlmacen: z.number().int().describe('Almacén del artículo.'),
+  almacen: z.string().describe('Nombre del almacén.'),
+  idOrden: z.number().int().nullable().describe('Orden del artículo, o null (bucket sin orden).'),
+  folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
+  saldo: z
+    .number()
+    .int()
+    .describe(
+      'Saldo del artículo justo ANTES del primer renglón devuelto (que es el inicio del periodo ' +
+        'sólo cuando `truncado` es false).',
+    ),
+});
+
+/** Un saldo anterior tal como lo devuelve la API. */
+export type KardexPtSaldoInicial = z.infer<typeof esquemaKardexPtSaldoInicial>;
 
 /** Respuesta del kardex por modelo (movimientos cronológicos con saldo corrido). */
 export const esquemaKardexPtLista = z
   .object({
     idModelo: z.number().int().describe('Modelo del kardex.'),
     modelo: z.string().describe('Código del modelo.'),
+    desde: z
+      .string()
+      .describe('Primer día del periodo que SÍ se consultó (YYYY-MM-DD, inclusive).'),
+    hasta: z
+      .string()
+      .nullable()
+      .describe('Último día del periodo (YYYY-MM-DD, inclusive), o null si no se puso tope.'),
+    ventanaPorOmision: z
+      .boolean()
+      .describe('true cuando `desde` lo puso el dominio porque nadie pidió periodo.'),
+    limite: z.number().int().describe('Tope de renglones que se aplicó.'),
+    truncado: z
+      .boolean()
+      .describe(
+        'true si el periodo tiene MÁS movimientos de los que caben en `limite`. Cuando corta, lo ' +
+          'que se devuelve son los MÁS RECIENTES del periodo (el principio es lo que se pierde).',
+      ),
+    saldosIniciales: z
+      .array(esquemaKardexPtSaldoInicial)
+      .describe('Saldo de los artículos del periodo justo ANTES del primer renglón devuelto.'),
     renglones: z.array(esquemaKardexPtRenglon).describe('Movimientos en orden cronológico.'),
   })
-  .describe('Kardex de un modelo (movimientos con saldo corrido).');
+  .describe(
+    'Kardex de un modelo en un PERIODO: saldo anterior + movimientos con saldo corrido. Nunca es ' +
+      'todo el histórico — `desde`/`hasta`/`limite` dicen exactamente qué pedazo se está viendo.',
+  );
 
 /** Forma de la respuesta del kardex por modelo. */
 export type KardexPtLista = z.infer<typeof esquemaKardexPtLista>;

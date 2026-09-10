@@ -23,13 +23,21 @@ type ArgsMutacion = { id: number; cuerpo: Record<string, unknown> };
 // Mutaciones del guardado único: `mutateAsync` resuelve para que el flujo complete.
 const actualizarOrden = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
 const guardarReferencias = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
+const guardarMatriz = vi.fn<(args: ArgsMutacion) => Promise<void>>(() => Promise.resolve());
+// ⭐ 0.061 — cerrar / reabrir la orden. Se capturan los argumentos para poder AFIRMAR qué se manda
+// (el motivo opcional al cerrar, el obligatorio al reabrir), no sólo que el botón exista.
+type ArgsCierre = { id: number; cuerpo: { motivo?: string } };
+const cerrarOrden = vi.fn<(args: ArgsCierre) => void>();
+const reabrirOrden = vi.fn<(args: ArgsCierre) => void>();
 
 vi.mock('@/api/ordenes', () => ({
   useOrden: () => useOrden(),
   useActualizarOrden: () => ({ mutateAsync: actualizarOrden, isPending: false }),
-  useGuardarMatriz: () => ({ mutateAsync: vi.fn(() => Promise.resolve()), isPending: false }),
+  useGuardarMatriz: () => ({ mutateAsync: guardarMatriz, isPending: false }),
   useCopiarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useCerrarOrden: () => ({ mutate: cerrarOrden, isPending: false }),
+  useReabrirOrden: () => ({ mutate: reabrirOrden, isPending: false }),
   useGuardarReferencias: () => ({ mutateAsync: guardarReferencias, isPending: false }),
   useAgregarComentario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -38,12 +46,47 @@ vi.mock('@/api/ordenes', () => ({
 const CAMPO_REF = { id: 1, etiqueta: 'Orden de compra', tipo: 'TEXTO', activo: true, orden: 0 };
 
 // Catálogos/selectores de los paneles del detalle: inertes.
+/** Fotos del MODELO que ve la tira del detalle (controlable por prueba). */
+const useFotosModelo = vi.fn<() => { data: { idFoto: number; urlDescarga: string }[] }>(() => ({
+  data: [],
+}));
 vi.mock('@/api/modelos', () => ({
   useFichaModelo: () => ({ data: { idCurvaTalla: null }, isPending: false, isError: false }),
-  useFotosModelo: () => ({ data: [], isPending: false, isError: false }),
+  useFotosModelo: () => ({ ...useFotosModelo(), isPending: false, isError: false }),
 }));
+/**
+ * ⭐ §Post-F9.169(b) — fotos del modelo QUITADAS de esta OP.
+ *
+ * ⚠️ El doble RESPETA el `enabled` del hook real: sin `idOrden` no hay orden por la que preguntar,
+ * así que devuelve la lista VACÍA. Es lo que impide que la prueba de abajo pase por construcción: si
+ * alguien le quitara el `idOrden={orden.id}` a la tira —el defecto que esta ronda vino a cerrar— el
+ * doble devolvería vacío igual que el hook real y la prueba se pondría ROJA.
+ */
+const fotosOcultasDeLaOrden = vi.fn<() => { idModeloFoto: number; ocultadaEn: string }[]>(() => []);
+vi.mock('@/api/fotos-ocultas-orden', () => ({
+  useFotosOcultasOrden: (idOrden: number | undefined) => ({
+    data: idOrden === undefined ? [] : fotosOcultasDeLaOrden(),
+  }),
+  useOcultarFotoModeloOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useMostrarFotoModeloOrden: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// Los dos dobles de la TIRA DE FOTOS vuelven a su valor neutro antes de CADA prueba del archivo. Va
+// a nivel de ARCHIVO —no dentro de un `describe`— para que ningún escenario se filtre al siguiente.
+beforeEach(() => {
+  useFotosModelo.mockReturnValue({ data: [] });
+  fotosOcultasDeLaOrden.mockReturnValue([]);
+});
+/** Catálogo de colores que ve el combobox de «agregar color» de la matriz (controlable por prueba). */
+const coloresDelCatalogo = vi.fn<() => { id: number; nombre: string }[]>(() => []);
 vi.mock('@/api/colores', () => ({
-  useColores: () => ({ data: { datos: [] }, isPending: false }),
+  useColores: () => ({
+    data: { datos: coloresDelCatalogo() },
+    isPending: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+  }),
   // El alta de color al vuelo de la matriz (§Post-F9.11) usa este hook; aquí no se ejercita.
   useCrearColor: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -88,6 +131,8 @@ function orden(
     estado?: Orden['estado'];
     idCliente?: number;
     requisitos?: Orden['requisitos'];
+    /** 0.061: cuándo se cerró la orden (null = abierta). */
+    cerradaEn?: string | null;
   } = {},
 ): Orden {
   return {
@@ -95,10 +140,15 @@ function orden(
     folio,
     idEmpresa: 1,
     estado: opciones.estado ?? 'capturada',
+    cerradaEn: opciones.cerradaEn ?? null,
+    motivoCierre: null,
     idPedidoLinea: 500 + id,
     idModelo: 10,
     codigoModelo: 'A-100',
     descripcionModelo: 'Playera',
+    // Fila 0.151 — linaje V1-E3: esta orden de ejemplo NO nació de un desarrollo.
+    idModeloDesarrollo: null,
+    codigoModeloDesarrollo: null,
     idCliente: opciones.idCliente ?? 3,
     cliente: 'Liverpool',
     idMaquilero: null,
@@ -166,6 +216,7 @@ describe('<DialogoOrden>', () => {
     useOrden.mockReset();
     actualizarOrden.mockClear();
     guardarReferencias.mockClear();
+    guardarMatriz.mockClear();
     useCamposCliente.mockReturnValue({
       data: [],
       isPending: false,
@@ -180,6 +231,64 @@ describe('<DialogoOrden>', () => {
     expect(screen.getByTestId('dialogo-orden')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Orden 101/ })).toBeInTheDocument();
     expect(screen.getByTestId('detalle-orden')).toBeInTheDocument();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 §Post-F9.169(b) — LA FOTO QUITADA DE LA OP NO PUEDE REAPARECER AQUÍ.
+  // Este diálogo es el «Modificar» de la MISMA orden del Centro de Órdenes. Sin `idOrden` en la
+  // tira, `useFotosOcultasOrden` iba deshabilitado, la lista de quitadas llegaba vacía y la foto
+  // volvía a verse un clic después — sin que el usuario pudiera saber por qué.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  it('🔴 NO enseña la foto del modelo que ESTA orden quitó', () => {
+    useFotosModelo.mockReturnValue({
+      data: [
+        { idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' },
+        { idFoto: 2, urlDescarga: 'https://ej.test/m2.jpg' },
+      ],
+    });
+    fotosOcultasDeLaOrden.mockReturnValue([
+      { idModeloFoto: 1, ocultadaEn: '2026-09-01T00:00:00Z' },
+    ]);
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    const miniaturas = screen.getAllByTestId('foto-modelo-orden');
+    expect(miniaturas).toHaveLength(1);
+    expect(within(miniaturas[0] as HTMLElement).getByRole('img')).toHaveAttribute(
+      'src',
+      'https://ej.test/m2.jpg',
+    );
+  });
+
+  it('y sigue enseñando las que la orden NO quitó (las dos, si no quitó ninguna)', () => {
+    // La rama gemela: sin esta, un filtro que se comiera TODAS las fotos también pasaría la de
+    // arriba. Aquí la lista de quitadas está vacía y tienen que salir las dos.
+    useFotosModelo.mockReturnValue({
+      data: [
+        { idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' },
+        { idFoto: 2, urlDescarga: 'https://ej.test/m2.jpg' },
+      ],
+    });
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(2);
+  });
+
+  it('las fotos aquí SÓLO SE MIRAN: ni se quitan, ni se suben, ni se borran', () => {
+    // No se pasa `puedeAdministrar` a propósito (se administran en el Centro de Órdenes), así que
+    // ningún botón de la tira se enciende ni con los permisos completos.
+    useFotosModelo.mockReturnValue({
+      data: [{ idFoto: 1, urlDescarga: 'https://ej.test/m1.jpg' }],
+    });
+
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+
+    expect(screen.getAllByTestId('foto-modelo-orden')).toHaveLength(1);
+    expect(screen.queryByTestId('ocultar-foto-modelo-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mostrar-foto-modelo-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('quitar-foto-orden')).not.toBeInTheDocument();
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {
@@ -286,11 +395,97 @@ describe('<DialogoOrden>', () => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ 0.061 — CERRAR / REABRIR LA ORDEN (§Post-F9.154(c), DANIEL).
+// Cerrar no es «archivar»: cierra la captura y CONGELA el costo por prenda. Por eso tiene permiso
+// propio (`ordenes.cerrar`) y una confirmación que dice qué implica — si el usuario se entera
+// después, se entera cuando el piso ya no pueda capturar un recibo.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
+  /** Los de siempre MÁS el permiso propio del cierre. */
+  const PERM_CON_CIERRE = [...PERM_TODOS, 'ordenes.cerrar'] as const;
+
+  beforeEach(() => {
+    useOrden.mockReset();
+    cerrarOrden.mockClear();
+    reabrirOrden.mockClear();
+    useCamposCliente.mockReturnValue({ data: [], isPending: false, isError: false, error: null });
+  });
+
+  it('con `ordenes.cerrar`, la orden ABIERTA ofrece «Cerrar» (y no «Reabrir»)', () => {
+    renderDialogo(orden(1, 101), [...PERM_CON_CIERRE]);
+
+    expect(screen.getByTestId('cerrar-orden')).toBeInTheDocument();
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+  });
+
+  it('SIN `ordenes.cerrar` no ofrece ni cerrar ni reabrir (es permiso PROPIO)', () => {
+    // La rama que importa: `ordenes.administrar` + `ordenes.cancelar` NO alcanzan. Sin esto, el
+    // botón podría colgar de «administrar» y nadie lo notaría hasta que el backend rebotara.
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+
+    renderDialogo(orden(2, 102, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_TODOS]);
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+  });
+
+  it('la orden CERRADA ofrece «Reabrir», y ya no deja cancelar ni guardar', () => {
+    renderDialogo(orden(3, 103, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+
+    expect(screen.getByTestId('reabrir-orden')).toBeInTheDocument();
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+    // Cerrada = solo lectura: ni el pie de guardado ni la cancelación (el backend los rechaza
+    // igual; esto evita ofrecer botones que van a rebotar).
+    expect(screen.queryByTestId('pie-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cancelar-orden')).not.toBeInTheDocument();
+  });
+
+  it('la confirmación de CERRAR dice que el costo queda congelado, y el motivo es OPCIONAL', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(orden(4, 104), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    // Lo que el usuario tiene que leer ANTES de apretar.
+    expect(screen.getByText(/costo por prenda queda congelado/i)).toBeInTheDocument();
+    // Sin motivo, el botón sigue vivo: cerrar es el final NORMAL de una orden.
+    const confirmar = screen.getByTestId('confirmar-cerrar-orden');
+    expect(confirmar).toBeEnabled();
+
+    await usuario.click(confirmar);
+    expect(cerrarOrden).toHaveBeenCalledTimes(1);
+    // Cuerpo VACÍO (no un motivo en blanco): el contrato lo declara opcional.
+    expect(cerrarOrden.mock.calls[0]?.[0]).toMatchObject({ id: 4, cuerpo: {} });
+  });
+
+  it('REABRIR exige motivo: el botón arranca deshabilitado y manda lo escrito', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(orden(5, 105, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('reabrir-orden'));
+
+    const confirmar = screen.getByTestId('confirmar-reabrir-orden');
+    expect(confirmar).toBeDisabled();
+
+    await usuario.type(screen.getByTestId('orden-motivo-cierre'), '  Faltó capturar un recibo  ');
+    expect(confirmar).toBeEnabled();
+
+    await usuario.click(confirmar);
+    expect(reabrirOrden).toHaveBeenCalledTimes(1);
+    // Se manda RECORTADO: el backend valida `min(1)` sobre el texto ya limpio.
+    expect(reabrirOrden.mock.calls[0]?.[0]).toMatchObject({
+      id: 5,
+      cuerpo: { motivo: 'Faltó capturar un recibo' },
+    });
+  });
+});
+
 describe('<DialogoOrden> — guardado ÚNICO (Daniel 24-jul-2026)', () => {
   beforeEach(() => {
     useOrden.mockReset();
     actualizarOrden.mockClear();
     guardarReferencias.mockClear();
+    guardarMatriz.mockClear();
     useCamposCliente.mockReturnValue({ data: [], isPending: false, isError: false, error: null });
   });
 
@@ -322,6 +517,8 @@ describe('<DialogoOrden> — guardado ÚNICO (Daniel 24-jul-2026)', () => {
             idColor: 2,
             color: 'Rojo',
             pantone: null,
+            // Renglón SIN pack: la orden no se fabrica por tendidos (§Post-F9.10).
+            pack: '',
             totalPiezas: 10,
             tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 10 }],
           },
@@ -583,5 +780,265 @@ describe('<DialogoOrden> — el refetch re-sincroniza las referencias', () => {
     );
     expect(screen.getByLabelText('Orden de compra')).toHaveValue('OC-7');
     expect(screen.getByTestId('guardar-orden')).toBeEnabled();
+  });
+});
+
+describe('<DialogoOrden> — el PACK / TENDIDO de la matriz (§Post-F9.10)', () => {
+  beforeEach(() => {
+    useOrden.mockReset();
+    actualizarOrden.mockClear();
+    guardarReferencias.mockClear();
+    guardarMatriz.mockClear();
+    coloresDelCatalogo.mockReturnValue([]);
+    useCamposCliente.mockReturnValue({ data: [], isPending: false, isError: false, error: null });
+  });
+
+  // ── ⭐ EL PACK / TENDIDO EN LA MATRIZ DE LA OP (§Post-F9.10) ─────────────────────────────────
+
+  /** Orden con DOS tendidos (packs A y B) del MISMO color: dos renglones con `id` distinto. */
+  function ordenConTendidos(): Orden {
+    const base = orden(1, 101);
+    return {
+      ...base,
+      lineas: [
+        {
+          id: 11,
+          idColor: 2,
+          color: 'Rojo',
+          pantone: null,
+          pack: 'A',
+          totalPiezas: 6,
+          tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 6 }],
+        },
+        {
+          id: 12,
+          idColor: 2,
+          color: 'Rojo',
+          pantone: null,
+          pack: 'B',
+          totalPiezas: 4,
+          tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 4 }],
+        },
+      ],
+      totalPiezas: 10,
+    };
+  }
+
+  it('🔴 cada tendido conserva SU id de renglón (dos filas del mismo color no comparten uno)', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(ordenConTendidos(), [...PERM_TODOS]);
+
+    // Se toca una celda para ensuciar la sección y disparar el guardado de la matriz.
+    const celdas = screen.getAllByTestId('matriz-orden-celda');
+    await usuario.clear(celdas[0] as HTMLElement);
+    await usuario.type(celdas[0] as HTMLElement, '7');
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+    await usuario.click(screen.getByTestId('guardar-orden'));
+
+    await waitFor(() => expect(guardarMatriz).toHaveBeenCalledTimes(1));
+    const cuerpo = guardarMatriz.mock.calls[0]?.[0].cuerpo as {
+      lineas: { id?: number; idColor: number; pack: string }[];
+    };
+    // Indexado sólo por color, los DOS renglones habrían recibido el id 11: el backend actualizaría
+    // el mismo `OrdenLinea` dos veces y el tendido B desaparecería de la matriz sin decir nada.
+    expect(cuerpo.lineas.map((l) => [l.id, l.pack])).toEqual([
+      [11, 'A'],
+      [12, 'B'],
+    ]);
+  });
+
+  it('cambiar SÓLO el pack de un renglón ya cuenta como cambio sin guardar', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(ordenConTendidos(), [...PERM_TODOS]);
+
+    expect(screen.getByTestId('guardar-orden')).toBeDisabled();
+    const packs = screen.getAllByTestId('matriz-orden-pack');
+    await usuario.clear(packs[1] as HTMLElement);
+    await usuario.type(packs[1] as HTMLElement, 'C');
+
+    // Si la FIRMA del contenido no llevara el pack, la sección no se ensuciaría y el cambio se
+    // perdería al cerrar, sin aviso.
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+    await usuario.click(screen.getByTestId('guardar-orden'));
+    await waitFor(() => expect(guardarMatriz).toHaveBeenCalledTimes(1));
+    const cuerpo = guardarMatriz.mock.calls[0]?.[0].cuerpo as { lineas: { pack: string }[] };
+    expect(cuerpo.lineas.map((l) => l.pack)).toEqual(['A', 'C']);
+  });
+
+  it('una orden SIN tendidos no muestra ninguna etiqueta de pack capturada', () => {
+    renderDialogo(
+      {
+        ...orden(1, 101),
+        lineas: [
+          {
+            id: 11,
+            idColor: 2,
+            color: 'Rojo',
+            pantone: null,
+            pack: '',
+            totalPiezas: 10,
+            tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 10 }],
+          },
+        ],
+        totalPiezas: 10,
+      },
+      [...PERM_TODOS],
+    );
+    // La columna existe (es la única manera de estrenar tendidos), pero llega VACÍA: la orden no
+    // los maneja y nada en pantalla dice lo contrario.
+    expect(screen.getByTestId('matriz-orden-pack')).toHaveValue('');
+  });
+
+  it('🔴 con tendidos, elegir un color YA USADO agrega el SEGUNDO renglón (no es un no-op mudo)', async () => {
+    const usuario = userEvent.setup();
+    coloresDelCatalogo.mockReturnValue([{ id: 2, nombre: 'Rojo' }]);
+    renderDialogo(
+      {
+        ...orden(1, 101),
+        lineas: [
+          {
+            id: 11,
+            idColor: 2,
+            color: 'Rojo',
+            pantone: null,
+            pack: 'A',
+            totalPiezas: 6,
+            tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 6 }],
+          },
+        ],
+        totalPiezas: 6,
+      },
+      [...PERM_TODOS],
+    );
+
+    // El combobox SÍ ofrece el Rojo (la matriz maneja tendidos, así que `idsUsados` va vacío)…
+    await usuario.type(screen.getByTestId('matriz-color-al-vuelo-input'), 'Rojo');
+    await usuario.click(await screen.findByTestId('matriz-color-al-vuelo-opcion'));
+
+    // …y elegirlo agrega la fila. Sin esto el combobox lo ofrecía y al elegirlo NO PASABA NADA.
+    await waitFor(() => expect(screen.getAllByTestId('matriz-orden-fila')).toHaveLength(2));
+
+    // ⚠️ EL ESTADO QUE QUEDA AQUÍ ES INVÁLIDO A PROPÓSITO, y no es el resultado deseable: la fila
+    // nace SIN pack, así que la matriz queda MEZCLADA (una con pack y otra sin) — el 400 de
+    // `sincronizarMatriz`. Es un paso intermedio inevitable: para estrenar el segundo tendido
+    // primero se agrega la fila y luego se le escribe su letra. Lo que el sistema promete es que
+    // ese paso NO se pueda guardar, no que no exista.
+    expect(
+      screen.getAllByTestId('matriz-orden-pack').map((p) => (p as HTMLInputElement).value),
+    ).toEqual(['A', '']);
+    expect(screen.getByTestId('matriz-orden-aviso-invalida')).toHaveTextContent(
+      'o todos llevan pack, o ninguno',
+    );
+    // Sigue habiendo CAMBIOS (la fila capturada no se tira), pero el botón está apagado.
+    expect(screen.getByTestId('guardar-orden')).toBeDisabled();
+
+    // Y en cuanto se le escribe su letra, la matriz vuelve a ser mandable: la guarda no se pasa de
+    // estricta ni deja el diálogo bloqueado.
+    const packs = screen.getAllByTestId('matriz-orden-pack');
+    await usuario.type(packs[1] as HTMLElement, 'B');
+    await waitFor(() =>
+      expect(screen.queryByTestId('matriz-orden-aviso-invalida')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('guardar-orden')).toBeEnabled();
+  });
+
+  it('🔴 el color repetido DOS VECES con el mismo pack tampoco se puede guardar', async () => {
+    const usuario = userEvent.setup();
+    const alCerrar = vi.fn();
+    renderDialogo(ordenConTendidos(), [...PERM_TODOS], alCerrar);
+
+    // El tendido B se re-teclea como "A " (el error de dedo real, con el espacio de propina): dos
+    // renglones `(Rojo, A)`, el duplicado que prohíbe el `@@unique([idOrden, idColor, pack])`. El
+    // espacio NO los salva: el dominio recorta el pack (`normalizarPack`) y aquí se hace lo mismo.
+    const packs = screen.getAllByTestId('matriz-orden-pack');
+    await usuario.clear(packs[1] as HTMLElement);
+    await usuario.type(packs[1] as HTMLElement, 'A ');
+
+    expect(screen.getByTestId('matriz-orden-aviso-invalida')).toHaveTextContent(
+      'mismo color y pack',
+    );
+    expect(screen.getByTestId('guardar-orden')).toBeDisabled();
+    // El pie dice POR QUÉ está apagado (el aviso de la matriz puede quedar fuera de pantalla).
+    expect(screen.getByTestId('aviso-cambios-orden')).toHaveTextContent('mismo color y pack');
+    await usuario.click(screen.getByTestId('guardar-orden'));
+    expect(guardarMatriz).not.toHaveBeenCalled();
+
+    // ⚠️ Y LA SECCIÓN SIGUE SUCIA — esto es lo que distingue el arreglo bueno del atajo malo. Apagar
+    // el botón declarando la matriz LIMPIA también lo apagaría, pero entonces cerrar el diálogo NO
+    // preguntaría nada y lo tecleado se perdería en silencio: peor que el 400 que se quería evitar.
+    await usuario.click(screen.getByTestId('dialogo-orden-cerrar'));
+    const titulo = await screen.findByRole('heading', { name: /Cambios sin guardar/ });
+    expect(alCerrar).not.toHaveBeenCalled();
+
+    // 🔴 Y "Guardar y salir" —el OTRO camino al guardado, que el pie no gobierna— tampoco manda la
+    // matriz inválida: el diálogo se queda abierto, con la captura intacta, y dice el motivo AQUÍ
+    // DENTRO (el aviso en línea de la matriz queda tapado por este diálogo).
+    const confirmacion = titulo.closest('[role="dialog"]') as HTMLElement;
+    expect(within(confirmacion).getByText(/mismo color y pack/)).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('confirmar-accion'));
+    expect(guardarMatriz).not.toHaveBeenCalled();
+    expect(alCerrar).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: /Cambios sin guardar/ })).toBeInTheDocument();
+  });
+
+  it('un espacio de más en el pack NO es un cambio (el pack se recorta, como en el dominio)', async () => {
+    const usuario = userEvent.setup();
+    renderDialogo(ordenConTendidos(), [...PERM_TODOS]);
+
+    // "B" → "B ": para el servidor es el MISMO tendido. Si el panel no recortara, la sección se
+    // ensuciaría por nada y —peor— la llave del renglón dejaría de casar con la que devolvió el
+    // servidor, así que el renglón viajaría SIN su `id` (borrar y recrear en vez de actualizar).
+    await usuario.type(screen.getAllByTestId('matriz-orden-pack')[1] as HTMLElement, ' ');
+    expect(screen.getAllByTestId('matriz-orden-pack')[1]).toHaveValue('B ');
+    expect(screen.getByTestId('guardar-orden')).toBeDisabled();
+    expect(screen.getByTestId('aviso-cambios-orden')).toHaveTextContent('Sin cambios pendientes');
+
+    // 🔴 Y EL DAÑO, no sólo el síntoma: con el espacio todavía tecleado se ensucia la matriz por
+    // otro lado y se guarda. El renglón "B " tiene que viajar CON su `id` 12 — si la llave de
+    // `construirCuerpo` no recortara (aunque la firma sí lo hiciera, y entonces el "Sin cambios"
+    // de arriba seguiría verde), iría sin `id` y el backend lo BORRARÍA Y RECREARÍA en vez de
+    // actualizarlo, tirando la auditoría del renglón.
+    const celdas = screen.getAllByTestId('matriz-orden-celda');
+    await usuario.clear(celdas[0] as HTMLElement);
+    await usuario.type(celdas[0] as HTMLElement, '7');
+    await waitFor(() => expect(screen.getByTestId('guardar-orden')).toBeEnabled());
+    await usuario.click(screen.getByTestId('guardar-orden'));
+    await waitFor(() => expect(guardarMatriz).toHaveBeenCalledTimes(1));
+    const cuerpo = guardarMatriz.mock.calls[0]?.[0].cuerpo as {
+      lineas: { id?: number; pack: string }[];
+    };
+    expect(cuerpo.lineas.map((l) => [l.id, l.pack])).toEqual([
+      [11, 'A'],
+      [12, 'B'],
+    ]);
+  });
+
+  it('sin tendidos, elegir un color YA USADO sigue sin duplicar la fila', async () => {
+    const usuario = userEvent.setup();
+    coloresDelCatalogo.mockReturnValue([{ id: 2, nombre: 'Rojo' }]);
+    renderDialogo(
+      {
+        ...orden(1, 101),
+        lineas: [
+          {
+            id: 11,
+            idColor: 2,
+            color: 'Rojo',
+            pantone: null,
+            pack: '',
+            totalPiezas: 6,
+            tallas: [{ idTalla: 1, etiquetaTalla: 'CH', cantidad: 6 }],
+          },
+        ],
+        totalPiezas: 6,
+      },
+      [...PERM_TODOS],
+    );
+
+    // Aquí el combobox NO lo ofrece (el padre manda `idsUsados` con el Rojo dentro): la protección
+    // de siempre contra el color duplicado sigue en pie mientras la orden no use tendidos.
+    await usuario.type(screen.getByTestId('matriz-color-al-vuelo-input'), 'Rojo');
+    expect(screen.queryByTestId('matriz-color-al-vuelo-opcion')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('matriz-orden-fila')).toHaveLength(1);
   });
 });

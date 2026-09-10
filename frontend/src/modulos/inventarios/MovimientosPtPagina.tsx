@@ -56,6 +56,10 @@ function hoy(): string {
  *    "no hay existencia" con la mercancía físicamente en el almacén.
  * En ambos casos el bucket «sin orden» (default) siempre está.
  *
+ * Fila 0.100 (§Post-F9.193 decisión 3) — el MOTIVO es OBLIGATORIO: *"hoy se mueven mil piezas sin
+ * una palabra"* (Daniel). Mismo trato que ya tenían telas y avíos; se guarda en las observaciones
+ * del movimiento y se ve en el kardex.
+ *
  * `inventario-pt.mover` gobierna la captura.
  */
 export function MovimientosPtPagina(): React.JSX.Element {
@@ -66,7 +70,9 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
   const [fecha, setFecha] = useState(hoy());
-  const [observaciones, setObservaciones] = useState('');
+  // Fila 0.100 — MOTIVO obligatorio al meter o sacar PT a mano (§Post-F9.193 decisión 3), igual
+  // que en los ajustes de tela y avío. Se guarda en las observaciones del movimiento.
+  const [motivo, setMotivo] = useState('');
   // §Post-F9.25 — nº de la orden del sistema VIEJO que fabricó estas prendas. Es lo que permite ir a
   // consultar la orden en Control viejo: esas órdenes no se migraron (la migración lleva 2025-2026).
   const [numOrdenV1, setNumOrdenV1] = useState('');
@@ -76,15 +82,24 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
 
-  // Solo entrada/salida (los `traspaso` van por la otra pantalla).
+  // Solo entrada/salida (los `traspaso` van por la otra pantalla), y NUNCA los dos rótulos que la
+  // fila 0.104 reservó a la dirección: «Devolución a Proveedor» y «Venta de Material» nacieron para
+  // telas y avíos, pero el catálogo de tipos es GLOBAL y se colaban aquí — ofreciéndole a cualquiera
+  // con `inventario-pt.mover` el rótulo que Daniel se reservó. El backend los rechaza igual (A1);
+  // esto es para no enseñar una puerta que no abre. La venta de producto terminado tiene su propia
+  // fila (0.130), con cliente y precio.
   const tiposMov = useTiposMovimiento();
-  const tiposCaptura = (tiposMov.data?.datos ?? []).filter((t) => t.direccion !== 'traspaso');
+  const tiposCaptura = (tiposMov.data?.datos ?? []).filter(
+    (t) => t.direccion !== 'traspaso' && t.capturaManual,
+  );
 
+  // Solo almacenes de PT: el dominio rechaza un movimiento de producto terminado contra una bodega de telas o de avíos (fila 0.137), así que el desplegable ni los ofrece.
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
+    tipo: 'PT',
   });
   const colores = useColores({
     pagina: 1,
@@ -153,11 +168,15 @@ export function MovimientosPtPagina(): React.JSX.Element {
   }
 
   const total = totalMatriz(lineas);
+  // El mínimo es el MISMO que exige el contrato (3 caracteres, ya recortado): así el botón no
+  // promete un guardado que el servidor va a rechazar.
+  const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
     puedeMover &&
     idTipoMov !== '' &&
     idAlmacen !== '' &&
     modelo !== undefined &&
+    motivoOk &&
     total > 0 &&
     !crear.isPending;
 
@@ -176,7 +195,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
         idAlmacen: Number(idAlmacen),
         idModelo: modelo.id,
         fecha,
-        ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
+        motivo: motivo.trim(),
         lineas: aLineasApi(lineas, numOrdenV1, aIdOrden(ordenElegida)),
       },
       {
@@ -184,6 +203,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
           toast.success(`Movimiento #${mov.folio} guardado (${mov.totalPiezas} pzas).`);
           limpiarMatriz();
           setNumOrdenV1('');
+          setMotivo('');
           void existencias.refetch();
         },
         onError: (error) => toast.error(error.message),
@@ -319,15 +339,19 @@ export function MovimientosPtPagina(): React.JSX.Element {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">
-                <Field>
-                  <FieldLabel htmlFor="obs">Observaciones</FieldLabel>
+                <Field data-invalid={!motivoOk}>
+                  <FieldLabel htmlFor="mov-motivo">Motivo (obligatorio)</FieldLabel>
                   <Input
-                    id="obs"
-                    value={observaciones}
-                    onChange={(e) => setObservaciones(e.target.value)}
-                    placeholder="Opcional"
+                    id="mov-motivo"
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Por qué entra o sale (conteo físico, merma, muestra…)"
                     disabled={!puedeMover}
+                    data-testid="mov-motivo"
                   />
+                  <FieldDescription>
+                    Queda en el kardex del movimiento. Mínimo 3 caracteres.
+                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="mov-orden-v1">Orden de Control viejo</FieldLabel>

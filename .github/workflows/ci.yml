@@ -50,9 +50,48 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # 30: la suite de integración creció (2,700+ tests con testcontainers); la corrida sana ya
-    # tarda ~19 min y con runners degradados el tope de 20 la cancelaba a media suite (6-ago-2026).
-    timeout-minutes: 30
+    # 45 (25-ago-2026). ⚠️ ES LA SEGUNDA VEZ QUE PASA ESTO — la nota de abajo se conserva porque
+    # cuenta la primera, idéntica: la suite crece, el techo se queda, y el fallo NO se ve como lo
+    # que es.
+    #
+    # 🔴 CÓMO SE VE, Y POR QUÉ ENGAÑA: al agotarse `timeout-minutes`, GitHub marca el job como
+    # **`cancelled`**, exactamente igual que si alguien hubiera matado la corrida a mano o la
+    # hubiera pisado un push nuevo. El 25-ago costó TRES ciclos y dos diagnósticos equivocados
+    # (se culpó a un push propio y a un merge a `main`) antes de que alguien midiera la duración
+    # y viera que las tres «cancelaciones» duraron **exactamente 30 minutos**.
+    #
+    # ⇒ **Ante un `cancelled` en este job, lo PRIMERO es mirar cuánto duró.** Si roza el tope,
+    # es el reloj, no interferencia.
+    #
+    # LA MEDICIÓN (25-ago): las corridas verdes recientes tardaron **25-26 min** contra un techo de
+    # 30 ⇒ apenas ~15 % de margen, y cualquier runner degradado lo rebasa. No hubo regresión de
+    # rendimiento: entre la corrida de 25.6 min que pasó y las que se pasaron de 30, lo único que
+    # cambió fueron archivos del FRONTEND, que este job ni toca. Es varianza del runner comiéndose
+    # un margen que ya era demasiado estrecho.
+    #
+    # LA REGLA, para no repetirlo una tercera vez: **el tope se mantiene en ~1.7× la duración sana**
+    # (25 min → 45). Subirlo NO hace la suite más rápida — eso es deuda aparte, anotada en
+    # `HOJA-DE-RUTA.md` §4: 25 min de backend es mucho, y la culpa está en el arranque repetido de
+    # testcontainers.
+    #
+    # 🔴 Y LO QUE SE APRENDIÓ AL SUBIRLO (mismo 25-ago, horas después): **un tope de tiempo puede
+    # estar TAPANDO un fallo de verdad.** Al pasar de 30 a 45 la corrida por fin llegó al final…
+    # y murió de MEMORIA en el paso de build. El OOM llevaba ahí abajo todo el tiempo, escondido
+    # detrás del reloj: mientras el job moría a los 30 min, nadie podía ver el paso que reventaba.
+    # ⇒ Subir un tope NUNCA es "arreglar": es **destapar**. Después de subirlo, hay que volver a
+    # mirar la corrida completa, no darla por buena.
+    #
+    # 🔎 CÓMO SE RECONOCE UN OOM (para no volver a confundirlo): el job sale con **exit code 134**
+    # (128+6, SIGABRT) y el log trae `FATAL ERROR: ... JavaScript heap out of memory`,
+    # `Ineffective mark-compacts near heap limit` y `Aborted (core dumped)`. Nada de eso se parece
+    # a un fallo de prueba.
+    #
+    # 🔎 Y ANTES DE CULPAR A LAS PRUEBAS, MIRAR **QUÉ PASO** FALLÓ. Que el job se llame `backend`
+    # no quiere decir que fallara la suite: en la corrida del OOM las pruebas salieron **VERDES,
+    # 305 archivos y 4,241 pruebas**, y la muerte fue DOS PASOS después, en `npm run build`. Se
+    # perdió tiempo buscando fugas de memoria en las pruebas de integración —que no tenían
+    # ninguna— porque se leyó el fallo del job sin mirar en qué paso ocurrió.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: backend
@@ -79,10 +118,34 @@ jobs:
 
       # El lint con tipos crece con el proyecto: con el heap por defecto de Node
       # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
+      #
+      # ⚠️⚠️ TERCERA VEZ, y la PRIMERA que el techo deja de ser uno solo (5-sep-2026).
+      # El lint volvió a morir con exit 134 contra los 6 GB — reproducido dos veces,
+      # pico medido de 6011 MiB. Antes de mover el número se midieron las dos salidas
+      # baratas, y las dos están MUERTAS:
+      #   • partirlo por carpetas NO ayuda: `eslint src/dominio` A SOLAS revienta con
+      #     4096 Y con 5120 — el costo no está en el número de archivos, está en el
+      #     grafo de tipos que cada archivo obliga a cargar entero;
+      #   • `eslint.config.js` YA usa `parserOptions.projectService` y YA ignora el
+      #     cliente generado de Prisma (`src/datos/generated/`, 22 MB / 181 .ts).
+      # Medido a 8192: pasa, con un pico de 7034 MiB (~14 % de margen).
+      #
+      # 🔴 POR QUÉ SÓLO AQUÍ, y no en los otros tres sitios (decisión de Gabriel,
+      # 5-sep-2026): `backend/Dockerfile` NO corre eslint —construye la imagen con
+      # `tsc`—, así que no queda ningún hermano atrás, que es lo que el guardián de la
+      # fila 0.092 (`comun/techo-de-memoria.test.ts`) existe para impedir. Y el número
+      # se puede subir aquí porque la memoria del runner de GitHub SÍ es medible
+      # (16 GB); la del contenedor que construye en Railway, NO — y un techo por encima
+      # de lo que el contenedor puede dar no protege, EMPEORA (cambia el OOM limpio de
+      # V8, exit 134, por el OOM-killer del kernel, exit 137).
+      #
+      # 🔴 Y ESTA VENDA YA NO TIENE OTRA VUELTA: con el margen en ~14 % y sin salidas
+      # baratas, la siguiente vez toca la CURA (adelgazar el programa de tipos), no el
+      # número. Deuda en `HOJA-DE-RUTA.md` §4.
       - name: Lint (eslint)
         run: npm run lint
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=8192
 
       # MISMA causa que el lint, diez días después (16-ago-2026): `tsc --noEmit`
       # murió con OOM (exit 134) en el runner. En su momento se le subió el heap
@@ -106,26 +169,31 @@ jobs:
       - name: Formato (prettier --check)
         run: npm run format:check
 
-      # Cliente PostgreSQL 17 para las pruebas del SEGUNDO RESPALDO a R2 (V1-E6a): el Postgres efimero de
-      # testcontainers es 17 y `pg_dump` se NIEGA a volcar un servidor mas nuevo que el (el runner
-      # de GitHub trae el 16). Sin este paso, el ENSAYO DE RESTAURACION se salta con aviso y nadie
-      # verifica que el respaldo se pueda restaurar — que es la mitad del valor de esa etapa. Es el
-      # mismo paquete que instala la imagen de produccion (backend/Dockerfile).
+      # Cliente PostgreSQL 18 para las pruebas del SEGUNDO RESPALDO a R2 (V1-E6a): `pg_dump` se NIEGA
+      # a volcar un servidor mas nuevo que el (el runner de GitHub trae el 16). Sin este paso, el
+      # ENSAYO DE RESTAURACION se salta con aviso y nadie verifica que el respaldo se pueda
+      # restaurar — que es la mitad del valor de esa etapa. Es el mismo paquete que instala la
+      # imagen de produccion (backend/Dockerfile), y por eso las dos majors se mueven JUNTAS.
+      #
+      # ⚠️ ASIMETRIA A PROPOSITO: el Postgres de testcontainers sigue siendo **17** y el cliente es
+      # **18**. No es un descuido — la restriccion de `pg_dump` es de UN SOLO sentido: un cliente
+      # mas NUEVO vuelca servidores mas viejos sin problema; uno mas viejo se niega. El cliente se
+      # ata a la major del servidor de RAILWAY (hoy 18.6), que es el que se respalda de verdad.
       #
       # Con REINTENTOS (3 intentos, espera creciente): este repo ya carga cicatrices de CI rojo
       # cronico, y un hipo de apt.postgresql.org no puede bloquear PRs ajenos. Si tras los tres
       # intentos sigue sin instalarse, el job SI falla: las pruebas del respaldo estan configuradas
       # para caer (no para saltarse) cuando corren en CI sin cliente compatible.
       #
-      # ⚠️ INSTALAR LA 17 NO BASTA — LA TRAMPA DEL WRAPPER DE DEBIAN (PR #184, CI en rojo):
+      # ⚠️ INSTALAR LA 18 NO BASTA — LA TRAMPA DEL WRAPPER DE DEBIAN (PR #184, CI en rojo):
       # `/usr/bin/pg_dump` NO es el binario, es un WRAPPER de `postgresql-client-common` que elige
       # la version segun el cluster/version por defecto. Con la 16 (preinstalada en el runner) y la
       # 17 (recien puesta) conviviendo, el wrapper se quedaba con la 16 aunque los binarios de la 17
       # estuvieran en /usr/lib/postgresql/17/bin: las pruebas caian con "pg_dump 16.14 es mas viejo
-      # que el servidor 17.11". Por eso se antepone el directorio de la 17 al PATH del job. Y por eso
+      # que el servidor 17.11". Por eso se antepone el directorio del cliente al PATH del job. Y por eso
       # el `pg_dump --version` que cerraba este paso NO delataba nada: el wrapper contestaba 16 y el
       # paso salia con exito — la misma clase de "verificacion que no verifica" que esta etapa vino
-      # a eliminar. Ahora se COMPRUEBA la major y, si no es 17, el paso falla diciendo por que.
+      # a eliminar. Ahora se COMPRUEBA la major y, si no es 18, el paso falla diciendo por que.
       #
       # ⏱️ Y LOS REINTENTOS NO SALVAN DE UN CUELGUE (V1-E3i — se colgo DOS VECES la noche del
       # 19-ago: 32 min y 23 min contra los ~11 s que tarda cuando funciona, y hubo que cancelar y
@@ -139,7 +207,7 @@ jobs:
       # a `set -e` (la condicion de un `if` esta exenta): cuenta como intento fallido, que es
       # justo lo que se quiere. Y `timeout-minutes` en el paso es el cinturon: aunque se cuelgue
       # algo que no previmos, no vuelve a comerse media hora del runner.
-      - name: Cliente PostgreSQL 17 (pruebas de respaldo/restauracion)
+      - name: Cliente PostgreSQL 18 (pruebas de respaldo/restauracion)
         timeout-minutes: 10
         run: |
           set -e
@@ -158,7 +226,7 @@ jobs:
           instalado=0
           for intento in 1 2 3; do
             # `timeout` va DENTRO de sudo para que corra como root y pueda matar a su hijo.
-            if sudo timeout 180 apt-get update && sudo timeout 180 apt-get install -y --no-install-recommends postgresql-client-17; then
+            if sudo timeout 180 apt-get update && sudo timeout 180 apt-get install -y --no-install-recommends postgresql-client-18; then
               instalado=1
               break
             else
@@ -174,43 +242,43 @@ jobs:
             sleep $((intento * 15))
           done
           if [ "$instalado" -ne 1 ]; then
-            echo "No se pudo instalar postgresql-client-17 tras 3 intentos."
+            echo "No se pudo instalar postgresql-client-18 tras 3 intentos."
             exit 1
           fi
 
-          # Los binarios REALES de la 17, sin pasar por el wrapper.
-          BIN17=/usr/lib/postgresql/17/bin
-          if [ ! -x "$BIN17/pg_dump" ]; then
-            echo "postgresql-client-17 se instalo pero no existe $BIN17/pg_dump."
+          # Los binarios REALES de la 18, sin pasar por el wrapper.
+          BIN18=/usr/lib/postgresql/18/bin
+          if [ ! -x "$BIN18/pg_dump" ]; then
+            echo "postgresql-client-18 se instalo pero no existe $BIN18/pg_dump."
             exit 1
           fi
           # Comprobacion REAL de la major (antes solo se imprimia y siempre pasaba).
-          mayor="$("$BIN17/pg_dump" --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
-          if [ "$mayor" != "17" ]; then
-            echo "Se esperaba pg_dump 17 en $BIN17 y se encontro la $mayor:"
-            "$BIN17/pg_dump" --version
+          mayor="$("$BIN18/pg_dump" --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+          if [ "$mayor" != "18" ]; then
+            echo "Se esperaba pg_dump 18 en $BIN18 y se encontro la $mayor:"
+            "$BIN18/pg_dump" --version
             exit 1
           fi
 
           # Se antepone al PATH del JOB (afecta a los pasos SIGUIENTES, no a este) para que
-          # `pg_dump`, `pg_restore` y `psql` resuelvan a la 17 y no al wrapper que elige la 16.
-          echo "$BIN17" >> "$GITHUB_PATH"
-          echo "Instalado y verificado: $("$BIN17/pg_dump" --version)"
+          # `pg_dump`, `pg_restore` y `psql` resuelvan a la 18 y no al wrapper que elige la 16.
+          echo "$BIN18" >> "$GITHUB_PATH"
+          echo "Instalado y verificado: $("$BIN18/pg_dump" --version)"
 
       # El estado que de verdad importa: que `pg_dump` A SECAS —tal como lo invoca el codigo del
-      # respaldo— sea la 17 en los pasos siguientes. Va en su propio paso porque `GITHUB_PATH` no
+      # respaldo— sea la 18 en los pasos siguientes. Va en su propio paso porque `GITHUB_PATH` no
       # aplica al paso que lo escribe. Si el wrapper volviera a ganar, esto falla AQUI, con el
       # diagnostico servido, en vez de reventar mas tarde dentro de la suite.
-      - name: Verificar que `pg_dump` del PATH es la 17
+      - name: Verificar que `pg_dump` del PATH es la 18
         run: |
           set -e
           echo "which pg_dump  -> $(which pg_dump)"
           pg_dump --version
           mayor="$(pg_dump --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
-          if [ "$mayor" != "17" ]; then
-            echo "⛔ El pg_dump del PATH es la $mayor, no la 17: el wrapper de Debian"
+          if [ "$mayor" != "18" ]; then
+            echo "⛔ El pg_dump del PATH es la $mayor, no la 18: el wrapper de Debian"
             echo "   (/usr/bin/pg_dump) esta ganando y el ENSAYO DE RESTAURACION fallaria."
-            echo "   Revisa que el paso anterior haya escrito /usr/lib/postgresql/17/bin en GITHUB_PATH."
+            echo "   Revisa que el paso anterior haya escrito /usr/lib/postgresql/18/bin en GITHUB_PATH."
             exit 1
           fi
           # pg_restore y psql los usa el script de restauracion: se comprueba su VERSION, no su
@@ -218,8 +286,8 @@ jobs:
           # ademas no es lo que importa — lo que rompe el ensayo es la major, no el directorio.
           for herramienta in pg_restore psql; do
             suya="$($herramienta --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
-            if [ "$suya" != "17" ]; then
-              echo "⛔ $herramienta del PATH es la $suya, no la 17 ($(which $herramienta))."
+            if [ "$suya" != "18" ]; then
+              echo "⛔ $herramienta del PATH es la $suya, no la 18 ($(which $herramienta))."
               exit 1
             fi
             echo "$herramienta -> $(which $herramienta) (major $suya)"
@@ -231,8 +299,73 @@ jobs:
         run: npm test
 
       # `build` compila TypeScript a dist/ (no toca openapi.json).
+      #
+      # 🔴 TERCERA VEZ DE LA MISMA CICATRIZ (25-ago-2026) — lint (6-ago), typecheck (16-ago) y
+      # ahora el build. El patrón que se repite NO es "a tsc le falta memoria": es que **se le
+      # sube el heap al paso que reventó y se dejan sus HERMANOS en el default**, así que la
+      # cicatriz reaparece un paso más abajo. `npm run build` era el último tsc sin techo.
+      #
+      # LA MEDICIÓN (`tsc -p tsconfig.build.json --extendedDiagnostics`, misma metodología que la
+      # nota del typecheck): 2,106 archivos, 3.52 M de tipos, 19.9 M de instanciaciones,
+      # **5,144,812K ≈ 5.03 GB**. O sea el build pesa PRÁCTICAMENTE LO MISMO que el typecheck
+      # (5.22-5.28 GB), que lleva 6144 desde el 16-ago. No hay razón para que uno tenga techo y el
+      # otro no: es el mismo compilador sobre el mismo árbol, y el build encima emite.
+      #
+      # DÓNDE ESTÁ EL FILO, medido a mano bisecando el heap con el MISMO comando del CI
+      # (`node --max-old-space-size=N node_modules/typescript/bin/tsc -p tsconfig.build.json`):
+      # **2048 → muere (exit 134, reproduce el fallo del CI clavado) · 3072 → muere · 4096 → pasa ·
+      # 6144 → pasa**. Léase con cuidado: el default de Node en un runner GRANDE ronda los 4 GB, o
+      # sea que el build venía pasando **por un pelo** y en el chico (~2 GB) no tenía ninguna
+      # posibilidad. Por eso 6144 y no 4096: 4 GB es justo el borde donde V8 ya entra en
+      # mark-compacts inútiles, y el número se elige con ~50 % de aire sobre el borde medido —
+      # además de quedar igual que el del typecheck, que es lo que evita la próxima asimetría.
+      #
+      # NO LO DISPARÓ NINGÚN CAMBIO NUESTRO, y esto importa: entre la corrida que compiló en VERDE
+      # (`ed99245`, build en 73 s) y la que murió (`92325fd`) **no se tocó un solo archivo del
+      # backend** — `git diff --stat ed99245 92325fd -- backend/src` sale vacío; lo único que
+      # cambió fue ci.yml, docs y frontend, que este job ni compila. Lo que cambió fue el RUNNER:
+      # en la corrida que murió el heap tope era ~2 GB (murió en 2040 de 2082 MB) y las pruebas
+      # tardaron 28 min contra 20 min de la verde — las dos señales de un runner más chico/lento.
+      # Con el default de Node atado al tamaño de la máquina, el mismo commit compila o revienta
+      # según qué runner toque. Fijar el techo aquí quita esa lotería.
+      #
+      # ⚠️ ESTO ES LA VENDA, NO LA CURA — igual que en lint y typecheck: el número no arregla que
+      # el proyecto genere 3.5 M de tipos, sólo deja de depender del azar. La cura (proyectos de
+      # TS separados / `--build` incremental / adelgazar los tipos de Prisma+Zod) sigue siendo la
+      # deuda ya anotada en `HOJA-DE-RUTA.md` §4. Cuando 6 GB no alcancen, se ataca ESO; no se
+      # vuelve a subir el número.
+      #
+      # LA REGLA — Y SE ESCRIBIÓ CORTA, ASÍ QUE HUBO CUARTA VEZ EL MISMO DÍA. La primera versión de
+      # esta nota decía «todo PASO que corra tsc o eslint». Se barrió `ci.yml`, se dio por cerrado…
+      # y a las pocas horas murió el job `imagenes-docker`: `backend/Dockerfile` compila con el
+      # MISMO `tsc` y su `RUN npm run build` seguía sin techo. Un `env:` de un paso del workflow NO
+      # cruza a `docker build` — son procesos distintos. Y ése era el peor de los cuatro: es la
+      # imagen que va a PRODUCCIÓN, y de paso tumbaba al `e2e`, que la levanta con `docker compose`.
+      #
+      # ⇒ LA REGLA BUENA: **el techo se pone en TODOS LOS SITIOS DONDE CORRE EL MISMO COMPILADOR,
+      # no en el que reventó.** Un `tsc` no sabe si lo invocó un workflow, un Dockerfile o Railway:
+      # pesa lo mismo en los tres. Al tocar este número, se buscan TODOS los invocadores
+      # (`grep -rn 'npm run build\|tsc\|eslint' .github/ */Dockerfile docker-compose.yml`) antes de
+      # dar nada por cerrado.
+      #
+      # EL BARRIDO COMPLETO (25-ago-2026), para no repetirlo a ciegas:
+      #   · ci.yml → Lint / Typecheck / Build del backend ......... 6144 (los tres)
+      #   · backend/Dockerfile:23 `RUN npm run build` ............. 6144 (inline en el RUN)
+      #   · frontend/Dockerfile `RUN npm run build` ............... SIN techo, MEDIDO: ~1.05 GB y
+      #     pasa con 1024 MB — cinco veces más liviano que el backend (la nota vive en ese archivo)
+      #   · job `frontend` de este workflow (tsc -b, eslint, vite) . SIN techo, mismo motivo
+      #   · docker-compose.yml .................................... no compila: usa esos Dockerfiles
+      #   · `npm run openapi` y docker-entrypoint.sh .............. corren con tsx/node, NO
+      #     typechequean: transpilan y ya, no cargan el grafo de tipos
+      #
+      # Va paso por paso y NO a nivel de job a propósito:
+      # el paso de pruebas lanza procesos hijos (vitest forkea un worker por archivo) y cada hijo
+      # heredaría el mismo techo — dos procesos autorizados a 6 GB en un runner de 8 GB cambian un
+      # OOM limpio de V8 por una muerte del OOM-killer del kernel, que es mucho peor de diagnosticar.
       - name: Build (tsc)
         run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       # Regenera el contrato desde los MISMOS esquemas Zod de las rutas
       # (`npm run openapi` ejecuta scripts/generar-openapi.ts). El paso siguiente

@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2Icon, Trash2Icon } from 'lucide-react';
+import { ChevronRight, InfoIcon, Loader2Icon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -39,6 +39,25 @@ import { SugerenciaAviosFavoritos } from './SugerenciaAviosFavoritos';
 /** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
 type SeccionBom = 'telas' | 'avios' | 'artes';
 
+/**
+ * ⭐⭐ V1-E9b pieza B — ¿la receta que enseña esta ficha es de OTRO modelo?
+ *
+ * Un modelo de PRODUCCIÓN nacido de un desarrollo (linaje 1:N, V1-E9a) **comparte** la receta de su
+ * padre: la ve completa, pero no la edita. La edita quien es responsable de las recetas, en el
+ * modelo de desarrollo, y el cambio les llega a todos los colores a la vez (§Post-F9.135 p.5). Si
+ * un color necesita algo distinto, eso vive en su ORDEN (p.4), no en el modelo.
+ *
+ * 🔑 **Por qué `typeof === 'number'` y no `!== null`, y por qué la razón NO es la del dominio.** En
+ * `esVersionDeModelo` (dominio y `ModelosPagina`) ese operador está porque su rama es la que ABRE la
+ * compuerta de producción. Aquí es al revés —ésta es la rama que CIERRA el editor— y el operador
+ * coincide por otro motivo: si el campo faltara, cerrar el editor de TODOS los modelos sería
+ * catastrófico, mientras que dejarlo abierto sólo consigue que el backend rechace el guardado con
+ * su mensaje (él es la autoridad, A1). El modo de fallo barato es el de dejar abierto.
+ */
+function recetaEsDelDesarrollo(ficha: Pick<ModeloFicha, 'idModeloDesarrollo'>): boolean {
+  return typeof ficha.idModeloDesarrollo === 'number';
+}
+
 /** De qué escalón de la cascada salió el precio que costea (lo resuelve el backend). */
 type OrigenPrecio = ModeloTela['origenPrecio'];
 
@@ -54,6 +73,17 @@ interface RenglonComponente {
   detalle: string | null;
   /** Consumo por prenda como texto (`<input type=number>` entrega string). */
   consumo: string;
+  /**
+   * ⭐⭐ 0.156 — cómo se llama el COMPLEMENTO de esta tela ("Cardigan"), o `null` si no lleva. Lo
+   * dice el servidor desde el catálogo (`Tela.nombreComplemento`); la pantalla NO lo adivina, y es
+   * lo único que decide si el segundo campo de consumo existe.
+   */
+  nombreComplemento: string | null;
+  /**
+   * ⭐⭐ 0.156 — consumo del complemento por prenda, como texto. Vacío = sin capturar (viaja como
+   * `null`), y entonces la orden de compra que genere la explosión seguirá pidiéndolo a mano.
+   */
+  consumoComplemento: string;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
@@ -102,6 +132,9 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
     etiqueta: t.nombre,
     detalle: null,
     consumo: String(t.consumoPorPrenda),
+    nombreComplemento: t.nombreComplemento,
+    consumoComplemento:
+      t.consumoComplementoPorPrenda === null ? '' : String(t.consumoComplementoPorPrenda),
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
@@ -124,6 +157,9 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     etiqueta: a.clave,
     detalle: a.descripcion,
     consumo: String(a.consumoPorPrenda),
+    // El complemento es de la TELA (una felpa con su cárdigan): un avío nunca lo tiene.
+    nombreComplemento: null,
+    consumoComplemento: '',
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
@@ -199,6 +235,14 @@ export function EditorBom({
   const [seccion, setSeccion] = useState<SeccionBom>('telas');
   const [copiarAbierto, setCopiarAbierto] = useState(false);
 
+  // ⭐⭐ V1-E9b pieza B — ¿la receta que se está viendo es de OTRO modelo? Un modelo de PRODUCCIÓN
+  // nacido de un desarrollo (linaje 1:N) **comparte** la receta de su padre: la ve entera, y la
+  // edita allá. Ver {@link recetaEsDelDesarrollo} para el porqué del `typeof`.
+  const heredada = recetaEsDelDesarrollo(ficha);
+  // 🔑 El gate de la RECETA. `puedeAdministrar` sigue mandando en lo que es del modelo (su CURVA,
+  // que NO es receta y sí es suya): por eso hay dos variables y no una.
+  const puedeEditarReceta = puedeAdministrar && !heredada;
+
   const [telas, setTelas] = useState<RenglonComponente[]>([]);
   const [avios, setAvios] = useState<RenglonComponente[]>([]);
 
@@ -230,6 +274,10 @@ export function EditorBom({
         etiqueta: tela.nombre,
         detalle: null,
         consumo: '',
+        // ⭐⭐ 0.156 — el catálogo ya dijo si esta tela lleva complemento: el campo aparece desde
+        // que se agrega, sin esperar a guardar.
+        nombreComplemento: tela.nombreComplemento,
+        consumoComplemento: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
@@ -261,6 +309,8 @@ export function EditorBom({
         etiqueta: avio.clave,
         detalle: avio.descripcion,
         consumo: '',
+        nombreComplemento: null,
+        consumoComplemento: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
@@ -286,6 +336,14 @@ export function EditorBom({
         telas: telas.map((r) => ({
           idTela: r.id,
           consumoPorPrenda: Number(r.consumo),
+          // ⭐⭐ 0.156 — vacío = NO capturado, y eso es `null`, no 0: un cárdigan que consume 0 no
+          // existe, y el servidor rechaza el cero por la misma razón. Sólo se manda cuando la tela
+          // declara complemento; si el catálogo se lo quitó, lo tecleado no viaja (el servidor
+          // también lo rechazaría, pero el rechazo hablaría de un campo que ya no se ve).
+          consumoComplementoPorPrenda:
+            r.nombreComplemento === null || r.consumoComplemento.trim() === ''
+              ? null
+              : Number(r.consumoComplemento),
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
@@ -331,6 +389,29 @@ export function EditorBom({
           tallas realmente?"). Avisa si difiere de la de sus OP; propone si el modelo no tiene. */}
       <CurvaDelModelo ficha={ficha} puedeAdministrar={puedeAdministrar} />
 
+      {/* ⭐⭐ V1-E9b — EL LETRERO. Sin él, la pantalla ofrecía guardar telas, avíos, medidas, arte y
+          copiar receta sobre un modelo cuya receta es de otro: el backend lo rechaza (bien), pero
+          el usuario sólo veía un error después de teclear. Aquí se dice ANTES y se dice DÓNDE. */}
+      {heredada ? (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-primary/40 bg-primary-soft p-3"
+          data-testid="receta-del-desarrollo"
+        >
+          <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          <div className="space-y-0.5 text-sm">
+            <p className="font-medium">
+              La receta es del modelo de desarrollo
+              {ficha.codigoModeloDesarrollo === null ? '' : ` ${ficha.codigoModeloDesarrollo}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Este modelo la COMPARTE, no la copia: se ve completa aquí y se edita allá, y el cambio
+              les llega a todos los colores de ese desarrollo a la vez. Si hay que cambiar algo sólo
+              para este color, se hace en su ORDEN de producción.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Pestañas + copiar receta */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1" role="tablist" aria-label="Secciones de la receta">
@@ -355,7 +436,7 @@ export function EditorBom({
             </Button>
           ))}
         </div>
-        {puedeAdministrar ? (
+        {puedeEditarReceta ? (
           <Button
             type="button"
             variant="outline"
@@ -374,11 +455,11 @@ export function EditorBom({
           titulo="telas"
           renglones={telas}
           alCambiar={setTelas}
-          puedeAdministrar={puedeAdministrar}
+          puedeAdministrar={puedeEditarReceta}
           guardando={guardarTelas.isPending}
           deshabilitadoGlobal={guardando}
           alGuardar={guardarSeccionTelas}
-          unidadAyuda="Consumo de tela por prenda."
+          unidadAyuda="Consumo de tela por prenda. La tela que lleva complemento (el cárdigan de la felpa) pide el suyo aparte: es un número propio —cuánto cárdigan por prenda—, no un porcentaje de la tela, y es el que la compra usa para pedir los dos juntos."
           selectorAgregar={
             <SelectorTela
               idSeleccionado={undefined}
@@ -389,7 +470,7 @@ export function EditorBom({
           renderAmarre={(r, alAmarrar) => (
             <AmarreTela
               renglon={r}
-              deshabilitado={!puedeAdministrar || guardando}
+              deshabilitado={!puedeEditarReceta || guardando}
               alAmarrar={alAmarrar}
             />
           )}
@@ -400,7 +481,7 @@ export function EditorBom({
               acto. Quién es favorito y con cuánta cantidad lo dice el servidor (A1). */}
           <SugerenciaAviosFavoritos
             idModelo={ficha.id}
-            puedeAdministrar={puedeAdministrar}
+            puedeAdministrar={puedeEditarReceta}
             hayCambiosSinGuardar={aviosSinGuardar}
             deshabilitado={guardando}
           />
@@ -408,7 +489,7 @@ export function EditorBom({
             titulo="avíos"
             renglones={avios}
             alCambiar={setAvios}
-            puedeAdministrar={puedeAdministrar}
+            puedeAdministrar={puedeEditarReceta}
             guardando={guardarAvios.isPending}
             deshabilitadoGlobal={guardando}
             alGuardar={guardarSeccionAvios}
@@ -423,7 +504,7 @@ export function EditorBom({
             renderAmarre={(r, alAmarrar) => (
               <AmarreAvio
                 renglon={r}
-                deshabilitado={!puedeAdministrar || guardando}
+                deshabilitado={!puedeEditarReceta || guardando}
                 alAmarrar={alAmarrar}
               />
             )}
@@ -432,7 +513,7 @@ export function EditorBom({
                 <EditorMedidasAvio
                   idModelo={ficha.id}
                   idAvio={r.id}
-                  puedeAdministrar={puedeAdministrar}
+                  puedeAdministrar={puedeEditarReceta}
                   tieneCurvaModelo={ficha.tallasCurva.length > 0}
                 />
               ) : (
@@ -444,7 +525,7 @@ export function EditorBom({
           />
         </div>
       ) : (
-        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeAdministrar} />
+        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeEditarReceta} />
       )}
 
       <CopiarBomDialogo
@@ -671,6 +752,34 @@ function RenglonBom({
             onChange={(e) => alActualizar({ consumo: e.target.value })}
             data-testid={`consumo-bom-${r.id}`}
           />
+          {/* ⭐⭐ 0.156 (§Post-F9.214) — EL SEGUNDO CAMPO, el que Daniel echó de menos: «no se ve el
+              campo de la segunda tela para meter la info. Sólo se ve el campo de la tela
+              principal». Va AQUÍ, en el renglón, y NO en el panel que hay que desplegar: si hubiera
+              que abrirlo para verlo, seguiría sin verse. Se rotula con el nombre REAL del
+              complemento que dice el catálogo ("Cardigan"), nunca con la palabra «complemento». */}
+          {r.nombreComplemento === null ? null : (
+            <div className="mt-1 flex items-center justify-end gap-1.5">
+              <span
+                className="truncate text-[11px] text-muted-foreground"
+                title={`Consumo de ${r.nombreComplemento} por prenda (el complemento de ${r.etiqueta})`}
+              >
+                {r.nombreComplemento}
+              </span>
+              <Input
+                type="number"
+                min={0}
+                step="0.0001"
+                inputMode="decimal"
+                className="h-7 w-24 text-right"
+                placeholder="—"
+                aria-label={`Consumo de ${r.nombreComplemento} (complemento de ${r.etiqueta})`}
+                value={r.consumoComplemento}
+                disabled={!puedeAdministrar || deshabilitadoGlobal}
+                onChange={(e) => alActualizar({ consumoComplemento: e.target.value })}
+                data-testid={`consumo-complemento-bom-${r.id}`}
+              />
+            </div>
+          )}
         </TablaDensaCelda>
         <TablaDensaCelda className="p-0 pr-2">
           {puedeAdministrar ? (
@@ -974,10 +1083,10 @@ function AmarreAvio({
 }): React.JSX.Element {
   const consulta = useProveedoresDeAvio(renglon.id);
   const proveedores = consulta.data ?? [];
-  // El precio que se compara y se muestra es el de UNIDAD DE CONSUMO (precio ÷ factor R1): lo
-  // calcula el backend (A1), para que el número no cambie entre "recién amarrado" y "ya guardado".
-  const precioDe = (p: (typeof proveedores)[number]): number | null =>
-    p.precioUnidadConsumo ?? p.precio;
+  // El precio del proveedor YA viene por unidad de consumo — es la única unidad del sistema
+  // (§Post-F9.97). Hasta V1-E8a el backend mandaba además `precioUnidadConsumo` (precio ÷ factor de
+  // conversión) y aquí se prefería ése; el factor se retiró y con él la segunda cifra.
+  const precioDe = (p: (typeof proveedores)[number]): number | null => p.precio;
 
   return (
     <SelectorAmarre

@@ -201,4 +201,47 @@ describe('<RolesPagina>', () => {
     expect(screen.queryByTestId('guardar-permisos')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nuevo-rol')).not.toBeInTheDocument();
   });
+
+  // ── ⚠️ Los 9 perfiles de SISTEMA se restablecen solos (3-sep-2026) ──────────────
+  //
+  // El seed los re-sincroniza con `definirRoles()` en cada arranque con `SEED_ON_START=true`
+  // (`deleteMany` de lo que sobre + `createMany` de lo que falte), así que un permiso palomeado
+  // aquí a mano se borra CALLADO en el siguiente deploy. La pantalla no lo bloquea —guardar sirve
+  // para probar algo en el momento—, pero tiene que decirlo. Los roles PROPIOS no se tocan nunca:
+  // si el aviso les saliera a ellos también, sería mentira y la gente dejaría de leerlo.
+
+  it('⭐ un perfil de SISTEMA avisa que sus permisos se restablecen en el siguiente deploy', () => {
+    useRoles.mockReturnValue(estadoRoles([rol(1, 'Secretarial', true, 3, ['almacenes.ver'])]));
+    renderConProveedores(<RolesPagina />, {
+      sesion: estadoSesionDePrueba(['roles.administrar']),
+    });
+
+    abrirPrimero();
+    const aviso = screen.getByTestId('aviso-rol-sistema');
+    expect(aviso).toHaveAttribute('role', 'alert');
+    expect(aviso).toHaveTextContent('«Secretarial» es un perfil de sistema.');
+    // Lo que la persona tiene que llevarse: qué pasa, y qué hacer en su lugar.
+    expect(aviso).toHaveTextContent(/vuelven a su definición de fábrica/);
+    expect(aviso).toHaveTextContent(/crea un perfil propio/);
+    // 🔴 Y LA EXCEPCIÓN, que es la mitad que de verdad quema: `sembrarRoles` NUNCA revoca
+    // `usuarios.administrar` ni `roles.administrar` (guard anti-lockout del seed). El escenario
+    // que el propio seed documenta —darle «administrar roles» a Gerencial desde ESTA pantalla— se
+    // queda para siempre; un aviso que dijera «todo se borra» mentiría justo ahí, y sobre el
+    // permiso que además hace de marcador de «es admin» en la Ruta Crítica.
+    expect(aviso).toHaveTextContent(/salvo administrar usuarios y administrar roles/);
+    expect(aviso).toHaveTextContent(/nunca retira/);
+    // Y NO se bloquea la edición: guardar sigue disponible (el backend lo permite, A1).
+    expect(screen.getByRole('checkbox', { name: /almacenes\.ver/ })).toBeEnabled();
+    expect(screen.getByTestId('guardar-permisos')).toBeInTheDocument();
+  });
+
+  it('⭐ un perfil PROPIO no lleva ese aviso (a ése no se lo pisa nadie)', () => {
+    useRoles.mockReturnValue(estadoRoles([rol(2, 'Almacenista', false, 0, ['almacenes.ver'])]));
+    renderConProveedores(<RolesPagina />, {
+      sesion: estadoSesionDePrueba(['roles.administrar']),
+    });
+
+    abrirPrimero();
+    expect(screen.queryByTestId('aviso-rol-sistema')).not.toBeInTheDocument();
+  });
 });

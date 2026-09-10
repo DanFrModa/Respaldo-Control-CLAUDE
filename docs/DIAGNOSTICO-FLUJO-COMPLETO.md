@@ -149,11 +149,16 @@ Si **sí** se usa en v1, tres prerrequisitos duros: correr el ETL de F5 (plantil
 | B27 | **El renglón de TELA de una nota de salida es incapturable** en el modelo vigente: el dominio exige lote (`notas-salida.ts:246`) y el selector lee un kardex que **excluye** el modelo por color (`telas.ts:751`). → **la nota de salida solo documenta avíos**; la tela que sale a la orden no queda documentada en ninguna nota. | |
 | B28 | **"Ajuste de materiales" abre por defecto en la pestaña TELAS** = motor legado por lote (`AjusteMaterialesPagina.tsx:57`), y vive en el riel junto a "Ajuste de telas por color". **Lo capturado ahí no aparece en Existencias de telas.** | |
 
-**La salida de emergencia que conviene conocer:** la **entrada de tela sin OC**
+~~**La salida de emergencia que conviene conocer:** la **entrada de tela sin OC**
 (`/inventarios/telas/entradas/nueva`, tela suelta) **no exige orden de compra** —
 `idOrdenCompraLinea` es opcional (`entradas-tela.ts:992`). Se puede cargar tela y operar el
 inventario **saltándose la OC**. Funciona, pero deja la OC en borrador para siempre y el tablero
-"qué tengo / qué falta" mostrando todo pendiente. **Es un parche, no un flujo.**
+"qué tengo / qué falta" mostrando todo pendiente. **Es un parche, no un flujo.**~~
+
+🔴 **CERRADA (versión 0.078, §Post-F9.159(a) — Daniel, 30-ago-2026).** Ese atajo **ya no existe**:
+*«es imposible. Porque sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC?»*. Un renglón
+sin orden de compra se **rechaza** al capturar, al editar y al confirmar. El diagnóstico de arriba
+tenía razón —era un parche, no un flujo— y por eso se quitó en vez de documentarse.
 
 **Lo que duele en este tramo:** el Centro de Órdenes **no lleva** ni a la explosión ni al semáforo de
 materiales, y Explosión, Estatus y Recepción son pantallas **terminales** (ninguna enlaza a la

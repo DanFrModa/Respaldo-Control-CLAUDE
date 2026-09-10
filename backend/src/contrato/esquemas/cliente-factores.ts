@@ -7,9 +7,11 @@ import { z } from 'zod';
  * regalías, costo de ventas) van EN PORCENTAJE, estilo "sobre la venta" (la fórmula la aplica el
  * dominio, `dominio/costos/precio-lista.ts`, A1: aquí solo las FORMAS).
  *
- * Los porcentajes son IMPORTES sensibles: se OCULTAN (null) en la salida sin `consultas.ver-importes`
- * (mismo criterio que precosto/EsMa). La unicidad `[idCliente, idClienteDepartamento]` la enforcea el
- * dominio (upsert) — Postgres trata los NULL como distintos, así que el default único lo cuida E4.
+ * ⭐ **V1-E8b (§Post-F9.125): los cuatro factores son SÓLO DEL DUEÑO.** Se OCULTAN (null) en la salida
+ * sin `listas.aprobar`, y guardarlos exige ese mismo permiso — no `consultas.ver-importes` ni
+ * `listas.administrar`, que Desarrollo tiene. La unicidad `[idCliente, idClienteDepartamento]` la
+ * enforcea el dominio (upsert) — Postgres trata los NULL como distintos, así que el default único lo
+ * cuida E4.
  */
 
 /**
@@ -54,10 +56,15 @@ export const esquemaClienteFactoresSalida = z
       .int()
       .nullable()
       .describe('Departamento del override, o null (default del cliente).'),
-    margenPct: z.number().nullable().describe('% de margen (o null sin importes).'),
-    descuentosPct: z.number().nullable().describe('% de descuentos (o null sin importes).'),
-    regaliasPct: z.number().nullable().describe('% de regalías (o null sin importes).'),
-    costoVentasPct: z.number().nullable().describe('% de costo de ventas (o null sin importes).'),
+    // §Post-F9.125(b): los cuatro factores son del dueño → la reja es `listas.aprobar`, NO
+    // `consultas.ver-importes` (que Desarrollo tiene y necesita para su trabajo).
+    margenPct: z.number().nullable().describe('% de margen (o null sin `listas.aprobar`).'),
+    descuentosPct: z.number().nullable().describe('% de descuentos (o null sin `listas.aprobar`).'),
+    regaliasPct: z.number().nullable().describe('% de regalías (o null sin `listas.aprobar`).'),
+    costoVentasPct: z
+      .number()
+      .nullable()
+      .describe('% de costo de ventas (o null sin `listas.aprobar`).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que los creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),

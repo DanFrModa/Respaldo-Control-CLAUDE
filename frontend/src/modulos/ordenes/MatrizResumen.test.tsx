@@ -15,6 +15,9 @@ function linea(parcial: Partial<LineaOrden>): LineaOrden {
     id: 1,
     color: 'BLANCO',
     pantone: null,
+    // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). La salida del API SIEMPRE lo
+    // trae (cadena vacía = sin pack), así que el fixture tampoco puede omitirlo.
+    pack: '',
     tallas: [{ idTalla: 1, etiquetaTalla: '5-6', cantidad: 305 }],
     totalPiezas: 305,
     ...parcial,
@@ -51,5 +54,30 @@ describe('MatrizResumen · pantone de solo lectura', () => {
     render(<MatrizResumen orden={ordenCon([linea({ id: 1, color: 'BLANCO', pantone: '' })])} />);
 
     expect(screen.queryByTestId('centro-matriz-pantone')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatrizResumen · el PACK / TENDIDO (§Post-F9.10)', () => {
+  it('etiqueta el tendido cuando la línea lo trae: dos renglones del mismo color se distinguen', () => {
+    render(
+      <MatrizResumen
+        orden={ordenCon([
+          linea({ id: 1, color: 'NEGRO', pack: 'A' }),
+          linea({ id: 2, color: 'NEGRO', pack: 'B' }),
+        ])}
+      />,
+    );
+
+    // Sin la etiqueta, el cajón enseñaría dos renglones «NEGRO» idénticos con números distintos y
+    // nada que explicara por qué el color aparece dos veces.
+    expect(screen.getAllByTestId('centro-matriz-pack').map((p) => p.textContent)).toEqual([
+      'Pack A',
+      'Pack B',
+    ]);
+  });
+
+  it('no pinta nada de pack en una orden que no los maneja', () => {
+    render(<MatrizResumen orden={ordenCon([linea({ id: 1, color: 'BLANCO' })])} />);
+    expect(screen.queryByTestId('centro-matriz-pack')).not.toBeInTheDocument();
   });
 });

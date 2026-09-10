@@ -1,0 +1,47 @@
+-- V1-E8k · PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían
+-- (§Post-F9.136, DANIEL: *"a veces alguna pieza de la prenda no salió bien y no la cosen. Pero sí
+-- les pido que me traigan todo, porque los faltantes se los cobro… eso no se va a ningún
+-- inventario… sólo al registro de la entrada como incompleta; tampoco se pagan"*).
+--
+-- Migración 100 % ADITIVA: UNA columna nullable en el detalle del recibo. No toca ni una fila
+-- existente, no borra nada, no cambia ningún default y no restringe nada de lo que hoy se puede
+-- hacer. NO requiere `SEED_ON_START` (no hay permisos, roles ni catálogos nuevos: la captura reusa
+-- `produccion.recibo` y la consulta `esma.ver-pagos`).
+--
+-- 🔴 POR QUÉ UNA COLUMNA PROPIA Y NO UN TERCER SUMANDO DE `cantidad`, que es donde uno la pondría.
+-- `etapa_movimiento_det.cantidad` es el TOTAL RECIBIDO del recibo, y de ahí cuelgan las dos cosas
+-- que Daniel pidió explícitamente evitar:
+--   • el CARGO al maquilero — `esma/cargos.ts::aCargoSalida` calcula `cantidadPropuesta` como la
+--     suma exacta de `etapaRecibo.detalles.cantidad`, y `importePropuesto` es esa cantidad × el
+--     precio de la orden ⇒ toda pieza que entre a `cantidad` acaba multiplicada por un precio;
+--   • el KARDEX DE PT — el recibo de costura mete `cantidad_primeras` a su almacén y
+--     `cantidad_segundas` al suyo ⇒ toda pieza que entre ahí queda en inventario.
+-- Y la invariante `cantidad_primeras + cantidad_segundas = cantidad` (que valida el dominio en
+-- `aplanarYValidar`) se rompería, o las incompletas tendrían que disfrazarse de segundas — que es
+-- justo lo que NO son (una segunda se vende más barata; una incompleta no existe como prenda).
+--
+-- ⚠️ NULLABLE, SIN DEFAULT y SIN BACKFILL, a propósito. El Access nunca tuvo el concepto: no hay
+-- dato del que deducir cuántas incompletas entregó nadie antes de hoy.
+--
+-- 🔑 QUÉ SIGNIFICA NULL, con precisión: **"este renglón se escribió antes de que el concepto
+-- existiera, o lo cargó el ETL"**. NO significa "el capturista no reportó incompletas": de V1-E8k
+-- en adelante el dominio persiste **0** en todo recibo nuevo (`aplanarYValidar` normaliza la
+-- ausencia a 0 y `registrarReciboMaquila` la escribe siempre), y en corte/envío/entrega la columna
+-- ni se toca. Todos los derivados leen `?? 0`, así que la distinción no cambia ninguna cuenta; lo
+-- que evita es fingir un dato histórico que nunca se capturó.
+--
+-- ⚠️ NO se le pone CHECK de no-negatividad en la BD por coherencia con sus hermanas
+-- (`cantidad_primeras`/`cantidad_segundas`, que tampoco lo tienen): el piso ≥ 0 lo ponen el
+-- contrato Zod y el dominio, que es donde vive la regla (A1).
+--
+-- ⚠️ SIN índice nuevo, y la razón NO es que ya exista uno que cubra la consulta —no existe—. La
+-- única consulta que filtra por esta columna (las incompletas de UN maquilero en un periodo, para
+-- su estado de cuenta) entra por `etapa_movimiento.id_tercero`, que **sí** tiene su índice desde
+-- F3-E1 (`etapa_movimiento_id_tercero_idx`, sólo sobre esa columna); la `fecha` y el
+-- `cantidad_incompletas > 0` se resuelven **filtrando encima del subconjunto de ese tercero**, que
+-- es chico —los recibos de UN maquilero, no los de la empresa—. Un índice compuesto por
+-- `(id_tercero, fecha)` o parcial por `cantidad_incompletas > 0` se puede agregar el día que el
+-- volumen lo pida; hoy sería optimizar sin medir.
+
+-- AlterTable
+ALTER TABLE "etapa_movimiento_det" ADD COLUMN     "cantidad_incompletas" INTEGER;

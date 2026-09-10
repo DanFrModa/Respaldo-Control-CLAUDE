@@ -23,6 +23,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { WHERE_CUENTA_CARGO } from './formula-saldo.js';
+
 /** Resultado de la derivación: cuántos cargos pagables tiene la orden y cuántos ya están pagados. */
 interface DerivacionPagada {
   derivada: boolean;
@@ -32,12 +34,20 @@ interface DerivacionPagada {
 
 /**
  * Calcula la derivación de "pagada" de una orden a partir de sus cargos VIVOS (no cancelados): los
- * PAGABLES son los `validado` no `sinCosto`; de esos, "pagado" = `cantidadPagada ≥ cantidadReal`.
- * `derivada` = hay ≥1 pagable Y todos pagados. Lee directo de los cargos (sin acumuladores, D3).
+ * PAGABLES son exactamente los que le CUENTAN al saldo del maquilero (validados y con costo); de
+ * esos, "pagado" = `cantidadPagada ≥ cantidadReal`. `derivada` = hay ≥1 pagable Y todos pagados. Lee
+ * directo de los cargos (sin acumuladores, D3).
+ *
+ * ⭐ El criterio NO se escribe aquí: es {@link WHERE_CUENTA_CARGO}, el MISMO de la fórmula del saldo
+ * (`formula-saldo.ts`). "Lo que se le debe al maquilero" y "lo que hay que pagarle para dar la orden
+ * por pagada" tienen que ser el mismo conjunto de cargos: si mañana el criterio cambia —otra causa
+ * de exclusión, otro estado— y esta copia se quedara atrás, una orden se declararía pagada con
+ * cargos que el saldo sigue cobrando (o al revés). La guardia de `formula-saldo.test.ts` lo vigila:
+ * este archivo está en su lista de CONSUMIDORES_DEL_SALDO.
  */
 async function calcularDerivada(tx: Tx, idOrden: number): Promise<DerivacionPagada> {
   const cargos = await tx.esMaCargo.findMany({
-    where: { idOrden, estado: 'validado', sinCosto: false },
+    where: { idOrden, ...WHERE_CUENTA_CARGO },
     select: { cantidadReal: true, cantidadPagada: true },
   });
   let pagados = 0;

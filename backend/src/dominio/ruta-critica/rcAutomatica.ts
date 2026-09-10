@@ -66,6 +66,8 @@ function sesionSistema(idEmpresa: number): SesionUsuario {
     idEmpresaActiva: idEmpresa,
     nombreEmpresaActiva: '',
     permisos: new Set<ClavePermiso>(['rc.programar']),
+    // Fila 0.145: la RC automática no corrige movimientos de dinero. Nunca.
+    puedeCorregirSinFactura: false,
   };
 }
 

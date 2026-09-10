@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
+import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
+
 /**
  * Esquemas Zod del RECIBO de maquila (F3-E4; doc 03-Produccion Paso 5 "Recibo" + flujo paralelo de
  * estampado). UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). El recibo es
  * la etapa ⭐ central de F3: de UNA captura se derivan varios efectos según el `TipoProceso`
  * (costura: WIP + entrada a PT + cargo EsMa; estampado/bordado/lavado: WIP + cargo EsMa, sin tocar
- * inventario). El detalle es SIEMPRE color×talla (D4), con su CALIDAD (primeras/segundas).
+ * inventario). El detalle es SIEMPRE color×talla (D4), con su CALIDAD (primeras/segundas) y —desde
+ * V1-E8k (§Post-F9.136)— sus PRENDAS INCOMPLETAS, que van en campo aparte porque NO se producen, NO
+ * se inventarían y NO se pagan.
  *
  * Reglas de negocio (la AUTORIDAD es el dominio; estos esquemas solo cuidan la forma):
  *  • `recibido ≤ enviado` ESTRICTO por orden+proceso (decisión (g)): el dominio lo valida por suma
@@ -19,9 +23,13 @@ import { z } from 'zod';
 // ── Renglón color×talla con calidad (primeras/segundas) ──────────────────────────────────────────
 
 /**
- * Una talla recibida dentro de un color (D4). `cantidad` = total recibido (entera ≥ 0). Opcional el
- * desglose de calidad: `cantidadPrimeras` (buenas) + `cantidadSegundas` (defectuosas). Si se manda
- * el desglose, ambas son enteras ≥ 0 y suman `cantidad` (lo cierra el dominio).
+ * Una talla recibida dentro de un color (D4). `cantidad` = total recibido BUENO (entera ≥ 0).
+ * Opcional el desglose de calidad: `cantidadPrimeras` (buenas) + `cantidadSegundas` (defectuosas).
+ * Si se manda el desglose, ambas son enteras ≥ 0 y suman `cantidad` (lo cierra el dominio).
+ *
+ * ⭐ `cantidadIncompletas` (V1-E8k) va **fuera** de esa suma y fuera de `cantidad`: no es una tercera
+ * calidad, son piezas que nunca llegaron a ser prenda. Una celda entra si trae `cantidad` **o**
+ * incompletas — un recibo puede ser SOLO de incompletas.
  */
 const esquemaReciboTalla = z.object({
   idTalla: z
@@ -44,14 +52,42 @@ const esquemaReciboTalla = z.object({
     .min(0, { error: 'Las segundas no pueden ser negativas' })
     .optional()
     .describe('Piezas de SEGUNDA (defectuosas) de esta talla. Opcional; default 0.'),
+  cantidadIncompletas: z
+    .number()
+    .int({ error: 'Las incompletas deben ser un entero' })
+    .min(0, { error: 'Las incompletas no pueden ser negativas' })
+    .optional()
+    .describe(
+      'Piezas INCOMPLETAS entregadas de esta talla (V1-E8k, §Post-F9.136): prendas a las que les ' +
+        'faltó una pieza y nunca se terminaron de coser. Van FUERA de `cantidad`: no cuentan como ' +
+        'producidas, no entran a inventario y no se pagan. Opcional; default 0.',
+    ),
 });
 
-/** Un renglón de la matriz del recibo: un color con sus cantidades por talla (D4). */
+/**
+ * Un renglón de la matriz del recibo: un color × su PACK, con sus cantidades por talla (D4).
+ *
+ * ⭐ AQUÍ EL PACK ES **OPCIONAL**, y es una decisión de negocio de Daniel, no una holgura técnica:
+ * *«que sea **opcional al recibir**»* — el maquilero puede devolver los packs separados (y entonces
+ * se captura cada uno con su letra) o revueltos (y entonces se captura sin pack, en un solo
+ * renglón). Las dos formas conviven en la misma orden, y hasta en la misma captura.
+ *
+ * 🔴 LO QUE ESO OBLIGA (y es la parte difícil de §Post-F9.10): el saldo «recibido ≤ enviado» NO
+ * puede llevarse sólo por pack. Un renglón SIN pack consume del saldo AGREGADO de todos los packs
+ * de esa orden+proceso+maquilero; uno CON pack consume además del suyo. El dominio topa las DOS
+ * cosas a la vez para que las dos formas no dejen recibir de más EN TOTAL — ver
+ * `dominio/produccion/recibos.ts`.
+ */
 const esquemaReciboLinea = z.object({
   idColor: z
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  pack: esquemaPackEntrada.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). OPCIONAL SIEMPRE: vacío = «el maquilero los ' +
+      'devolvió revueltos», y ese renglón consume del saldo agregado de todos los packs. Con pack, ' +
+      'consume además del saldo de ese pack. En una orden sin packs va vacío.',
+  ),
   tallas: z
     .array(esquemaReciboTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
@@ -151,14 +187,26 @@ const esquemaReciboTallaSalida = z.object({
   cantidad: z.number().int().describe('Total recibido de la talla.'),
   cantidadPrimeras: z.number().int().nullable().describe('Primeras (buenas) o null.'),
   cantidadSegundas: z.number().int().nullable().describe('Segundas (defectuosas) o null.'),
+  cantidadIncompletas: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Prendas INCOMPLETAS entregadas (fuera de `cantidad`) o null.'),
 });
 
 /** Un renglón color×talla en la salida de un recibo, con totales derivados. */
 const esquemaReciboLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK / TENDIDO de este renglón (§Post-F9.10). CADENA VACÍA = se recibió sin distinguir pack.',
+  ),
   tallas: z.array(esquemaReciboTallaSalida).describe('Cantidades por talla (con calidad).'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
+  totalIncompletas: z
+    .number()
+    .int()
+    .describe('Prendas incompletas del renglón (derivado; NO suma a `totalPiezas`).'),
 });
 
 /** Salida de un recibo de maquila: encabezado + matriz + totales. Parte del contrato OpenAPI. */
@@ -206,6 +254,13 @@ export const esquemaReciboSalida = z
     totalPiezas: z.number().int().describe('Total recibido (derivado).'),
     totalPrimeras: z.number().int().describe('Total de primeras (derivado).'),
     totalSegundas: z.number().int().describe('Total de segundas (derivado).'),
+    totalIncompletas: z
+      .number()
+      .int()
+      .describe(
+        'Total de prendas INCOMPLETAS entregadas (V1-E8k). Derivado, y APARTE de `totalPiezas`: ' +
+          'no se produjeron, no entraron a inventario y no se pagan.',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de captura (ISO).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo capturó.'),
   })
@@ -214,20 +269,47 @@ export const esquemaReciboSalida = z
 /** Forma de un recibo tal como lo devuelve la API. */
 export type ReciboSalida = z.infer<typeof esquemaReciboSalida>;
 
-// ── Pendientes por recibir (derivados: enviado − recibido por orden+proceso) ─────────────────────
+// ── Pendientes por recibir (derivados: enviado − recibido − incompletas − faltantes saldados, por orden+proceso) ──────
 
-/** Pendiente de UNA celda color×talla. */
+/**
+ * Pendiente de UNA celda color×talla×PACK.
+ *
+ * ⚠️ Con packs, la celda de `pack` VACÍO puede salir NEGATIVA, y no es un defecto: es lo que el
+ * maquilero ya devolvió SIN decir de qué pack era (§Post-F9.10). Se muestra tal cual para que
+ * `Σ celdas = totalPendiente` siga siendo cierto — esconderla haría que el desglose contradijera al
+ * total, que es justo lo que el drill-down no puede hacer.
+ */
 const esquemaPendienteRecibirCelda = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  pack: esquemaPackSalida.describe(
+    'PACK de la celda. CADENA VACÍA = sin pack (en una orden con packs, lo devuelto revuelto).',
+  ),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
-  cantidad: z.number().int().describe('Pendiente por recibir (enviado − recibido).'),
+  cantidad: z
+    .number()
+    .int()
+    .describe(
+      'Pendiente por recibir = enviado − buenas − incompletas − faltantes saldados (V1-E8v, §Post-F9.147). Es a la vez ' +
+        'lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, ' +
+        'calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` ' +
+        '(`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v ' +
+        'al volverse idéntico.',
+    ),
+  incompletas: z
+    .number()
+    .int()
+    .describe(
+      'Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). ' +
+        'RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una ' +
+        'celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas.',
+    ),
 });
 
 /**
- * Lo que UN maquilero tiene pendiente de devolver de un proceso (enviado − recibido de ESE tercero).
- * Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
+ * Lo que UN maquilero tiene pendiente de devolver de un proceso (`enviado − buenas − incompletas − faltantes saldados`
+ * de ESE tercero). Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
  * pantallas de recibo —el panel de avance y `/produccion/recibos`— tienen que ofrecer y topar
  * exactamente lo mismo: no se recibe de quien no recibió el corte (regla de Daniel, 28-jul-2026).
  */
@@ -240,14 +322,56 @@ const esquemaPendienteRecibirMaquilero = z.object({
   maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
-    .describe('enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0).'),
+    .describe(
+      'enviado − buenas − incompletas − faltantes saldados de ESE maquilero, por color×talla (celdas con pendiente o ' +
+        'con incompletas entregadas).',
+    ),
   totalPendiente: z
     .number()
     .int()
     .describe('Total pendiente de ese maquilero (NEGATIVO si recibió sin envío).'),
+  totalIncompletas: z
+    .number()
+    .int()
+    .describe(
+      'Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v).',
+    ),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES de ese maquilero ya SALDADAS al CERRAR la orden con él (V1, fila 0.109): ' +
+        'nunca volvieron y ya se decidió que no vuelven. Restan de `totalPendiente`.',
+    ),
+  faltantesSaldables: z
+    .number()
+    .int()
+    .describe(
+      'Las piezas que de VERDAD se pueden saldar hoy con ese maquilero: Σ del pendiente POSITIVO ' +
+        'por color×talla (V1, fila 0.109). Es el número exacto que el servidor escribirá al cerrar ' +
+        '—y por el que multiplicará el descuento—, y por eso es el que la pantalla debe enseñar y ' +
+        'usar para decidir si ofrece el botón. ⚠️ NO es `totalPendiente`: esa suma es plana y una ' +
+        'celda NEGATIVA (histórico migrado, o lo devuelto sin decir de qué pack era) la compensa. ' +
+        'Con +5 y −5 la suma plana da 0 —el botón no aparecería y esa orden nunca se podría ' +
+        'cerrar— habiendo 5 piezas que saldar; con +5 y −3 da 2 mientras el cobro saldría por 5.',
+    ),
+  precioFaltante: z
+    .number()
+    .nullable()
+    .describe(
+      'Precio pactado del envío vivo a ese maquilero, base del cobro que se propondría al cerrar. ' +
+        '`null` si el envío no lo trae o si falta `ordenes.ver-precio-real-maquila` (redactado).',
+    ),
+  importeFaltantePropuesto: z
+    .number()
+    .nullable()
+    .describe(
+      'Lo que se propondría cobrarle si se cerrara AHORA: `faltantesSaldables × precioFaltante`, ' +
+        'calculado en el servidor. `null` sin precio o sin permiso de verlo.',
+    ),
 });
 
-/** Pendiente por recibir de un proceso de maquila: enviado − recibido a ESE proceso. */
+/** Pendiente por recibir de un proceso de maquila: enviado − recibido − incompletas − faltantes saldados a ESE proceso. */
 const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
   tipoProceso: z.string().describe('Nombre del proceso.'),
@@ -263,8 +387,22 @@ const esquemaPendienteRecibirProceso = z.object({
     .describe('Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
-    .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),
+    .describe(
+      'enviado − recibido − incompletas − faltantes saldados a este proceso, por color×talla. Se incluyen las celdas con ' +
+        'pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 ' +
+        'buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia.',
+    ),
   totalPendiente: z.number().int().describe('Total pendiente por recibir de este proceso.'),
+  totalIncompletas: z
+    .number()
+    .int()
+    .describe(
+      'Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v).',
+    ),
+  totalFaltantesSaldados: z
+    .number()
+    .int()
+    .describe('Piezas faltantes ya saldadas en este proceso al cerrar la orden (V1, fila 0.109).'),
   porMaquilero: z
     .array(esquemaPendienteRecibirMaquilero)
     .describe(
@@ -274,8 +412,8 @@ const esquemaPendienteRecibirProceso = z.object({
 
 /**
  * Pendientes por recibir DERIVADOS de una orden (form `Proceso` del viejo, sin acumuladores): por
- * cada proceso ya enviado a la orden, enviado − recibido a ESE proceso, por color×talla. Las etapas
- * canceladas NO cuentan.
+ * cada proceso ya enviado a la orden, `enviado − buenas − incompletas − faltantes saldados` a ESE proceso, por
+ * color×talla. Las etapas canceladas NO cuentan.
  */
 export const esquemaPendientesRecibir = z
   .object({
@@ -283,7 +421,9 @@ export const esquemaPendientesRecibir = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     porRecibir: z
       .array(esquemaPendienteRecibirProceso)
-      .describe('enviado − recibido, por proceso ya usado en la orden.'),
+      .describe(
+        'enviado − buenas − incompletas − faltantes saldados, por proceso ya usado en la orden.',
+      ),
   })
   .describe('Pendientes por recibir derivados de una orden (por proceso).');
 
@@ -318,6 +458,10 @@ const esquemaRecibosSemanalesFila = z.object({
   totalRecibido: z.number().int().describe('Piezas recibidas (suma de los recibos vivos).'),
   totalPrimeras: z.number().int().describe('Piezas de primera recibidas.'),
   totalSegundas: z.number().int().describe('Piezas de segunda recibidas.'),
+  totalIncompletas: z
+    .number()
+    .int()
+    .describe('Prendas incompletas entregadas esa semana (aparte de `totalRecibido`).'),
   numRecibos: z.number().int().describe('Número de recibos capturados esa semana.'),
 });
 

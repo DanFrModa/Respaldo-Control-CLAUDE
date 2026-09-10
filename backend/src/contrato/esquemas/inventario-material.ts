@@ -454,6 +454,63 @@ export const esquemaSalidaTelaColorCrear = z
 /** Datos validados de una salida de tela por color a orden. */
 export type DatosSalidaTelaColorCrear = z.infer<typeof esquemaSalidaTelaColorCrear>;
 
+// ── ⭐ LA SALIDA QUE NO ES POR OP (fila 0.104) ───────────────────────────────────────────────────
+//
+// DANIEL (§Post-F9.193 resp. 12, 4-sep-2026): *«debería de haber manera de sacar por ejemplo una
+// devolución, o una venta de avíos que ya no se usen… que no sea mediante la descarga o aplicación
+// a una OP. Esto autorizado siempre por mí. Lo mismo en telas»*. Y antes (3-sep): *«sí debe existir
+// una salida por otro medio que sólo ajuste de inventario»*.
+//
+// 🔑 EL CONCEPTO NO ES TEXTO LIBRE. Una salida sin orden tiene que decir POR QUÉ existe, y decirlo
+// de una forma que el kardex pueda leer: por eso el concepto es un ENUM cerrado que el dominio
+// traduce a un TIPO DE MOVIMIENTO dedicado. El motivo en prosa (obligatorio, como en el ajuste)
+// va aparte: sirve para el detalle («devolución de la factura 8842»), no para clasificar.
+
+/**
+ * Por qué sale el material cuando no va a ninguna orden. Los dos primeros son los que Daniel
+ * nombró; `otro` es el «o cualquier otra cosa» del 2-sep-2026 y NO estrena tipo de movimiento
+ * (reusa el «Otras Salidas» que ya existe desde el sistema viejo).
+ */
+export const esquemaConceptoSalidaSinOrden = z
+  .enum(['devolucion-proveedor', 'venta', 'otro'])
+  .describe(
+    'Por qué sale el material sin orden: devolución al proveedor, venta de material que ya no ' +
+      'se usa, u otra causa.',
+  );
+
+/** Por qué sale el material cuando no va a ninguna orden. */
+export type ConceptoSalidaSinOrden = z.infer<typeof esquemaConceptoSalidaSinOrden>;
+
+/** Campos comunes del encabezado de una salida sin orden (misma forma para tela y avío). */
+const camposSalidaSinOrden = {
+  concepto: esquemaConceptoSalidaSinOrden,
+  idAlmacen: idPositivo('el almacén'),
+  fecha: z.iso.date({ error: 'La fecha de la salida es obligatoria (YYYY-MM-DD)' }),
+  motivo: z
+    .string({ error: 'El motivo es obligatorio' })
+    .trim()
+    .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+    .max(500)
+    .describe('Detalle de la salida (a qué proveedor se devolvió, a quién se le vendió…).'),
+} as const;
+
+/**
+ * Alta de una SALIDA de TELA por color que NO va a ninguna orden (fila 0.104). Sólo ajusta
+ * inventario: no toca compras, ni CxP, ni notas de crédito. No lleva partida (el consumo empareja
+ * por tela+color) y no deja negativo ninguno de los dos componentes (dominio, bajo lock).
+ */
+export const esquemaSalidaTelaColorSinOrdenCrear = z
+  .object({
+    ...camposSalidaSinOrden,
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe('Salida de tela por color SIN orden (devolución / venta / otra). Sólo inventario.');
+
+/** Datos validados de una salida de tela por color sin orden. */
+export type DatosSalidaTelaColorSinOrdenCrear = z.infer<typeof esquemaSalidaTelaColorSinOrdenCrear>;
+
 /** Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). */
 export const esquemaTraspasoTelaColorCrear = z
   .object({
@@ -477,7 +534,15 @@ const esquemaMovTelaColorRenglonSalida = z.object({
   idTelaColor: z.number().int(),
   telaColor: z.string().describe('Nombre del color de la tela.'),
   pantone: z.string().nullable(),
-  idPartida: z.number().int().nullable().describe('Partida de la entrada o null (salidas).'),
+  idPartida: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      'Partida de la que sale/entra la tela. La llevan las ENTRADAS y, desde la fila 0.142, LAS ' +
+        'DOS PATAS DEL TRASPASO (repartidas FIFO por folio). Va null en las salidas a orden y en ' +
+        'la tela traspasada antes de esa fila.',
+    ),
   partidaFolio: z.number().int().nullable().describe('Folio de la partida o null.'),
   loteProveedor: z.string().nullable().describe('Lote del proveedor de la partida o null.'),
   cantidad: z.number().describe('Cantidad de CUERPO (≥ 0; el signo lo da la dirección).'),
@@ -538,6 +603,180 @@ export const esquemaTraspasoTelaColorSalida = z
 
 /** Forma del resultado de un traspaso de tela por color. */
 export type TraspasoTelaColorSalida = z.infer<typeof esquemaTraspasoTelaColorSalida>;
+
+// ── CONTEO por COLOR (capturar LO CONTADO, no la resta — fila 0.098) ─────────────────────────────
+//
+// Daniel: «capturar lo contado, con el saldo del sistema a la vista, y que el sistema calcule y
+// aplique la diferencia». Hasta v0.097 «Ajuste de telas por color» —la pantalla con la que se va a
+// INICIALIZAR todo el inventario de telas el día del arranque— pedía una ENTRADA o una SALIDA con su
+// cantidad, o sea LA RESTA: para ajustar había que ir a otra pantalla, ver la existencia, restar de
+// cabeza y volver a capturar la diferencia con el signo correcto.
+//
+// El patrón se copia del CONTEO CÍCLICO de producto terminado (`indicadores/inventario-ciclico.ts`),
+// que ya hace exactamente esto: lee el teórico bajo lock, captura lo contado y aplica la diferencia
+// como MOVIMIENTO de kardex (D3) — jamás una escritura de la existencia. Lo que NO se reusa es su
+// MOTOR: es de producto terminado (modelo×color×talla×orden, sus tablas y sus estados). Extender el
+// cíclico entero a telas y avíos es otra fila (0.099).
+
+/**
+ * Filtros de los SALDOS del sistema para el conteo (querystring). Los colores viajan en UNA lista
+ * separada por comas —`idTelaColor=11,21,33`— para que la pantalla pida TODOS sus renglones en una
+ * sola llamada: pedirlos de uno en uno eran cientos de GET al cargar el inventario del arranque.
+ */
+export const esquemaSaldosTelaColorQuery = z
+  .object({
+    idAlmacen: z.coerce
+      .number({ error: 'El almacén es obligatorio' })
+      .int()
+      .positive()
+      .describe('Almacén del que se quieren los saldos (obligatorio).'),
+    // Se queda como STRING en el contrato (y por tanto en el OpenAPI): un querystring viaja como
+    // texto y el cliente generado lo manda tal cual. El troceo por comas y la validación de cada id
+    // los hace el DOMINIO (`idsDeColorPedidos`), no el esquema — con un `transform` aquí, la
+    // entrada (string) y la salida (number[]) dejaban de encajar cuando la ruta le pasaba al
+    // dominio lo que Fastify ya había parseado, y con `preprocess` el OpenAPI acababa declarando un
+    // arreglo que el cliente serializaba como parámetro repetido.
+    idTelaColor: z
+      .string({ error: 'Indica al menos un color de tela' })
+      .min(1, { error: 'Indica al menos un color de tela' })
+      .max(4000)
+      .describe('Ids de color de tela separados por comas (p. ej. "11,21,33").'),
+  })
+  .describe('Almacén + colores de los que se quiere el saldo del sistema.');
+
+/** Parámetros de los saldos por color ya coaccionados. */
+export type SaldosTelaColorQuery = z.infer<typeof esquemaSaldosTelaColorQuery>;
+
+/**
+ * SALDO del sistema de un color en un almacén, calculado por Σ de movimientos DIRECTA sobre
+ * `MovimientoDetTela` (nunca la vista `existencia_tela_color`): es LA MISMA aritmética que el
+ * conteo usa al aplicar la diferencia — el fragmento SQL vive una sola vez en `comun/kardex.ts`.
+ */
+const esquemaSaldoTelaColorSalida = z.object({
+  idTelaColor: z.number().int(),
+  idTela: z.number().int(),
+  tela: z.string(),
+  telaColor: z.string(),
+  cuerpo: z.number().describe('Existencia del CUERPO (Σ de movimientos).'),
+  complemento: z.number().describe('Existencia del COMPLEMENTO (0 si la tela no lo lleva).'),
+  nombreComplemento: z
+    .string()
+    .nullable()
+    .describe('Cómo se llama el complemento ("Cardigan"), o null si la tela no lleva.'),
+});
+
+/** Respuesta de los saldos pedidos: uno por color, en el orden de los ids resueltos. */
+export const esquemaSaldosTelaColorSalida = z
+  .object({
+    idAlmacen: z.number().int(),
+    saldos: z.array(esquemaSaldoTelaColorSalida),
+  })
+  .describe('Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, D3).');
+
+/** Forma de los saldos por color. */
+export type SaldosTelaColorSalida = z.infer<typeof esquemaSaldosTelaColorSalida>;
+
+/**
+ * Un renglón CONTADO: lo que la persona vio en el anaquel. NO es una diferencia — la calcula el
+ * servidor contra el saldo que lee bajo lock en el momento de aplicar.
+ */
+export const esquemaConteoTelaColorLinea = z
+  .object({
+    idTelaColor: idPositivo('el color de tela'),
+    contadoCuerpo: z
+      .number({ error: 'La cantidad contada de cuerpo es obligatoria (puede ser 0)' })
+      .nonnegative({ error: 'La cantidad contada no puede ser negativa' }),
+    contadoComplemento: z
+      .number()
+      .nonnegative({ error: 'La cantidad contada de complemento no puede ser negativa' })
+      .optional()
+      .describe('Sólo en telas que llevan complemento; sin capturar se toma como 0.'),
+    loteProveedor: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Lote del proveedor de la PARTIDA que se cree si el conteo da de ALTA (faltante).'),
+  })
+  .describe('Un renglón contado (lo que hay), no una diferencia.');
+
+/** Datos de un renglón contado. */
+export type DatosConteoTelaColorLinea = z.infer<typeof esquemaConteoTelaColorLinea>;
+
+/**
+ * CONTEO físico del inventario de telas por COLOR: se captura LO CONTADO y el servidor calcula y
+ * aplica la diferencia contra el saldo que lee bajo lock (D3). Motivo OBLIGATORIO (A7). Un color no
+ * se puede repetir: se cuenta UNA vez por almacén (dos renglones del mismo color restarían dos veces
+ * contra el MISMO saldo).
+ */
+export const esquemaConteoTelaColorCrear = z
+  .object({
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha del conteo es obligatoria (YYYY-MM-DD)' }),
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+      .max(500),
+    factura: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Factura/remisión de las partidas que cree el alta por faltante (opcional).'),
+    lineas: z
+      .array(esquemaConteoTelaColorLinea)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe(
+    'Conteo físico de tela por COLOR: se captura lo contado; el sistema aplica la diferencia.',
+  );
+
+/** Datos validados de un conteo de tela por color. */
+export type DatosConteoTelaColorCrear = z.infer<typeof esquemaConteoTelaColorCrear>;
+
+/** Qué pasó con un renglón del conteo: teórico, contado y diferencia aplicada. */
+const esquemaConteoTelaColorRenglonSalida = z.object({
+  idTelaColor: z.number().int(),
+  idTela: z.number().int(),
+  tela: z.string(),
+  telaColor: z.string(),
+  nombreComplemento: z.string().nullable().describe('Null = la tela no lleva complemento.'),
+  teoricoCuerpo: z.number().describe('Saldo del sistema al aplicar (Σ de movimientos bajo lock).'),
+  contadoCuerpo: z.number(),
+  diferenciaCuerpo: z.number().describe('contado − teórico (positiva = entra, negativa = sale).'),
+  teoricoComplemento: z.number(),
+  contadoComplemento: z.number(),
+  diferenciaComplemento: z.number(),
+});
+
+/** Un renglón del resultado del conteo. */
+export type ConteoTelaColorRenglonSalida = z.infer<typeof esquemaConteoTelaColorRenglonSalida>;
+
+/**
+ * Resultado de un conteo: el detalle renglón por renglón (teórico vs contado vs diferencia) y los
+ * DOS movimientos que lo materializan — uno de ENTRADA con todos los faltantes y otro de SALIDA con
+ * todos los sobrantes (cualquiera puede ir `null` si no hubo diferencias de ese signo). Un conteo
+ * que cuadra en todo no escribe NINGÚN movimiento: `sinDiferencias`.
+ */
+export const esquemaConteoTelaColorSalida = z
+  .object({
+    idAlmacen: z.number().int(),
+    almacen: z.string(),
+    fecha: z.string().describe('Fecha (YYYY-MM-DD).'),
+    sinDiferencias: z.boolean().describe('true = el conteo cuadró y no se escribió movimiento.'),
+    renglones: z.array(esquemaConteoTelaColorRenglonSalida),
+    entrada: esquemaMovimientoTelaColorSalida
+      .nullable()
+      .describe('Movimiento de ENTRADA con los faltantes, o null si no hubo.'),
+    salida: esquemaMovimientoTelaColorSalida
+      .nullable()
+      .describe('Movimiento de SALIDA con los sobrantes, o null si no hubo.'),
+  })
+  .describe('Resultado de un conteo físico de tela por color.');
+
+/** Forma del resultado de un conteo por color. */
+export type ConteoTelaColorSalida = z.infer<typeof esquemaConteoTelaColorSalida>;
 
 // ── Existencias por COLOR (agrupadas TELA PADRE → colores hijos) ─────────────────────────────────
 
@@ -740,6 +979,166 @@ export const esquemaPartidasTelaLista = z
 /** Forma de la respuesta de la búsqueda de partidas. */
 export type PartidasTelaLista = z.infer<typeof esquemaPartidasTelaLista>;
 
+// ── ⭐⭐ LOS DOS AVISOS DE LA SALIDA DE TELA (fila 0.101 — Daniel §Post-F9.193, dec. 8 y 9) ───────
+//
+// La previa de la salida: se manda LA CAPTURA EN CURSO y el servidor devuelve **los dos veredictos
+// ya tomados** —¿se pasa de lo que la orden pide? ¿hay más de una partida de este color?— con los
+// números y las partidas que los sostienen. La pantalla NO compara nada (A1): pinta lo que el
+// dominio (`inventarios/previa-salida-tela-orden.ts`) le dice. Los dos avisos AVISAN y ninguno
+// BLOQUEA: esta previa no registra nada y su respuesta jamás apaga el botón de guardar.
+
+/**
+ * Un renglón capturado en la pantalla LEGADA por lote (`Salida a orden por lote`): tela SIN color.
+ * Sólo alimenta el aviso (a) —la comparación es por TELA de todos modos—; del riesgo de tono no
+ * tiene nada que decir, porque en ese flujo no hay ni color ni partida.
+ */
+const esquemaPreviaSalidaLineaTela = z.object({
+  idTela: idPositivo('la tela'),
+  cantidad: z.number().nonnegative({ error: 'La cantidad no puede ser negativa' }),
+});
+
+/** Cuerpo de la previa: la orden, el almacén del que se saca y los renglones ya capturados. */
+export const esquemaPreviaSalidaTelaColorCrear = z
+  .object({
+    idOrden: idPositivo('la orden').describe('Orden de producción a la que se ligaría la salida.'),
+    idAlmacen: idPositivo('el almacén').describe(
+      'Almacén del que se sacaría: acota las partidas del riesgo de tono.',
+    ),
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .default([])
+      .describe('Renglones por TELA+COLOR (flujo vigente).'),
+    lineasTela: z
+      .array(esquemaPreviaSalidaLineaTela)
+      .default([])
+      .describe('Renglones por TELA sin color (pantalla LEGADA por lote).'),
+  })
+  .refine((c) => c.lineas.length + c.lineasTela.length > 0, {
+    error: 'Captura al menos un renglón',
+  })
+  .describe(
+    'Captura en curso de una salida de tela (por color o por lote), para pedir sus avisos.',
+  );
+
+/** Datos validados de la previa de la salida por color. */
+export type DatosPreviaSalidaTelaColor = z.infer<typeof esquemaPreviaSalidaTelaColorCrear>;
+
+/**
+ * ⭐ AVISO (a) — SOBRE-SALIDA, por TELA. `requerido` es la Σ del snapshot de la explosión
+ * (`RequerimientoOrden`), **la misma cifra que ve el comprador**; `null` = la orden no tiene esa
+ * tela en su explosión y por eso NO se avisa nada (no hay contra qué comparar).
+ */
+const esquemaPreviaSalidaTelaRenglon = z.object({
+  idTela: z.number().int(),
+  tela: z.string(),
+  unidad: z.string().nullable().describe('Unidad de consumo del BOM (KG/M) o null.'),
+  requerido: z
+    .number()
+    .nullable()
+    .describe('Lo que la orden PIDE de esta tela (snapshot de la explosión); null = no lo dice.'),
+  yaSalido: z.number().describe('Σ de las salidas VIVAS ya ligadas a la orden (sin canceladas).'),
+  aSacar: z.number().describe('Cuerpo que se está a punto de sacar de esta tela en esta captura.'),
+  excedente: z
+    .number()
+    .describe('Cuánto se pasa: max(0, yaSalido + aSacar − requerido). 0 = no se pasa.'),
+  sobreSalida: z
+    .boolean()
+    .describe('VEREDICTO del dominio: la salida pasa de lo que la orden pide.'),
+  colores: z.array(z.string()).describe('Colores capturados de esta tela (para nombrarla).'),
+});
+
+/** Un renglón del aviso de sobre-salida (por tela). */
+export type PreviaSalidaTelaRenglon = z.infer<typeof esquemaPreviaSalidaTelaRenglon>;
+
+/** Una PARTIDA viva del color en el almacén del que se saca (la lista del aviso de tono). */
+const esquemaPreviaSalidaPartida = z.object({
+  id: z.number().int(),
+  folio: z.number().int().describe('Folio de la partida (A3).'),
+  loteProveedor: z.string().nullable().describe('Lote del proveedor o null.'),
+  factura: z.string().nullable().describe('Factura/remisión que la amparó o null.'),
+  fecha: z.string().nullable().describe('Fecha de la entrada (YYYY-MM-DD) o null.'),
+  saldo: z
+    .number()
+    .describe(
+      'Lo que QUEDA de esta partida en este almacén (cuerpo + complemento): Σ entradas − Σ ' +
+        'salidas que la nombran. Es un NETO de hoy, no un acumulado de entradas (fila 0.142). ' +
+        'Sólo se listan las partidas con saldo > 0.',
+    ),
+});
+
+/** Una partida de la lista del aviso de tono. */
+export type PreviaSalidaPartida = z.infer<typeof esquemaPreviaSalidaPartida>;
+
+/**
+ * ⭐ AVISO (b) — RIESGO DE TONO, por TELA+COLOR. El veredicto tiene **TRES** valores, no dos: el
+ * tercero existe porque queda tela que el sistema no puede nombrar. Desde la 0.142 el traspaso SÍ
+ * nombra el lote, así que el almacén del cortador —donde alguien está escogiendo el rollo— ya tiene
+ * lista que enseñar; pero **no toda la tela llega con nombre**, y las puertas por las que entra sin
+ * él son CUATRO, no tres: los traspasos ANTERIORES a la 0.142, el ajuste de ENTRADA del conteo
+ * cíclico, la cancelación de una salida que tampoco llevaba lote, y **un traspaso de hoy cuyo origen
+ * tampoco pueda nombrarla** —incluido el remanente que deja el tope del reparto—. El mapa completo,
+ * con el porqué de cada una, vive en `dominio/inventarios/previa-salida-tela-orden.ts`; aquí se
+ * enumeran para que quien lea el contrato no crea que el tercer estado es sólo cosa del pasado.
+ * La ignorancia no se presenta como tranquilidad.
+ */
+const esquemaPreviaSalidaColorRenglon = z.object({
+  idTelaColor: z.number().int(),
+  telaColor: z.string(),
+  idTela: z.number().int(),
+  tela: z.string(),
+  estadoTono: z
+    .enum(['sin-riesgo', 'varias-partidas', 'origen-desconocido'])
+    .describe(
+      'VEREDICTO del dominio: `varias-partidas` = más de un lote VIVO (avisa y los lista); ' +
+        '`origen-desconocido` = hay más existencia que la que los lotes vivos explican, o sea tela ' +
+        'que el sistema no puede nombrar (avisa diciendo que NO se sabe); `sin-riesgo` = calla.',
+    ),
+  existencia: z
+    .number()
+    .describe('Existencia del color EN ESE ALMACÉN (cuerpo + complemento, Σ de movimientos).'),
+  saldoConocido: z
+    .number()
+    .describe(
+      'Σ del saldo VIVO de los lotes de ese color en ese almacén. Es un neto de hoy, comparable ' +
+        'con la existencia (fila 0.142). Puede quedar POR ENCIMA de lo real en un almacén que ' +
+        'consume: las salidas a orden no nombran lote, así que no lo descuentan.',
+    ),
+  sinNombrar: z
+    .number()
+    .describe(
+      'Cuánta de la existencia de hoy NO explica ningún lote vivo = max(0, existencia − ' +
+        'saldoConocido). > 0 es lo que enciende `origen-desconocido`, y es el número que la ' +
+        'pantalla enseña cuando hay lotes listados pero la lista no lo cubre todo.',
+    ),
+  partidas: z
+    .array(esquemaPreviaSalidaPartida)
+    .describe('Los lotes vivos del color en ese almacén (para escoger a conciencia).'),
+});
+
+/** Un renglón del aviso de riesgo de tono (por color). */
+export type PreviaSalidaColorRenglon = z.infer<typeof esquemaPreviaSalidaColorRenglon>;
+
+/** Respuesta de la previa: los dos avisos, ya decididos por el dominio. */
+export const esquemaPreviaSalidaTelaColorSalida = z
+  .object({
+    idOrden: z.number().int(),
+    folioOrden: z.number().int(),
+    idAlmacen: z.number().int(),
+    tieneExplosion: z
+      .boolean()
+      .describe('¿La orden tiene snapshot de explosión? Sin él, el aviso (a) no tiene con qué.'),
+    telas: z.array(esquemaPreviaSalidaTelaRenglon),
+    colores: z.array(esquemaPreviaSalidaColorRenglon),
+    haySobreSalida: z.boolean().describe('¿Alguna tela se pasa de lo que la orden pide?'),
+    hayRiesgoTono: z
+      .boolean()
+      .describe('¿Algún color trae riesgo de tono (varias partidas, u origen desconocido)?'),
+  })
+  .describe('Avisos de una salida de tela por color: sobre-salida y riesgo de tono.');
+
+/** Forma de la respuesta de la previa de la salida. */
+export type PreviaSalidaTelaColorSalida = z.infer<typeof esquemaPreviaSalidaTelaColorSalida>;
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // AVÍOS
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -793,6 +1192,23 @@ export const esquemaTraspasoAvioCrear = z
 
 /** Datos validados de un traspaso de avío. */
 export type DatosTraspasoAvioCrear = z.infer<typeof esquemaTraspasoAvioCrear>;
+
+/**
+ * Alta de una SALIDA de AVÍO que NO va a ninguna orden (fila 0.104 — el caso que Daniel nombró
+ * con nombre y apellido: *«una venta de avíos que ya no se usen»*). Sólo ajusta inventario; no
+ * deja existencia negativa (dominio, bajo lock).
+ */
+export const esquemaSalidaAvioSinOrdenCrear = z
+  .object({
+    ...camposSalidaSinOrden,
+    lineas: z
+      .array(esquemaAjusteAvioLinea)
+      .min(1, { error: 'Captura al menos un renglón de avío' }),
+  })
+  .describe('Salida de avío SIN orden (devolución / venta / otra). Sólo inventario.');
+
+/** Datos validados de una salida de avío sin orden. */
+export type DatosSalidaAvioSinOrdenCrear = z.infer<typeof esquemaSalidaAvioSinOrdenCrear>;
 
 /** Un renglón de la salida de un movimiento de avío. */
 const esquemaMovAvioRenglonSalida = z.object({

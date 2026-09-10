@@ -16,7 +16,15 @@
  * INVENTARIO NUEVO POR COLOR (etapa A2 — partidas + tela×color; el flujo por Lote de arriba queda
  * como legado consultable; dominio `dominio/inventarios/partidas-telas`):
  *  • `POST /inventarios/telas/color/ajustes`         (`inventario-telas.mover`) → ajuste (entrada crea partidas).
+ *  • `POST /inventarios/telas/color/conteos`         (`inventario-telas.mover`) → conteo físico (lo contado → diferencia).
+ *  • `GET  /inventarios/telas/color/saldos`          (`inventario-telas.ver`)   → saldos (Σ directa) para el conteo.
  *  • `POST /inventarios/telas/color/salidas-orden`   (`inventario-telas.mover`) → salida a orden (sin partida).
+ *  • `POST /inventarios/telas/color/salidas-orden/previa` (`inventario-telas.mover`) → SOLO LECTURA:
+ *    los dos avisos de la captura en curso (sobre-salida contra lo que la orden pide + riesgo de
+ *    tono con la lista de partidas). No registra nada y NUNCA bloquea (fila 0.101).
+ *  • `POST /inventarios/telas/color/salidas-sin-orden` (`salida-material.registrar`) → ⭐ salida que
+ *    NO va a ninguna orden (devolución al proveedor / venta de material / otra causa — fila 0.104).
+ *    Permiso PROPIO y sólo del administrador: NO basta `inventario-telas.mover`.
  *  • `POST /inventarios/telas/color/traspasos`       (`inventario-telas.mover`) → traspaso (2 patas, ambas cantidades).
  *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
@@ -41,7 +49,12 @@ import {
   esquemaKardexTelaQuery,
   esquemaKardexTelaLista,
   esquemaAjusteTelaColorCrear,
+  esquemaSaldosTelaColorQuery,
+  esquemaSaldosTelaColorSalida,
+  esquemaConteoTelaColorCrear,
+  esquemaConteoTelaColorSalida,
   esquemaSalidaTelaColorCrear,
+  esquemaSalidaTelaColorSinOrdenCrear,
   esquemaTraspasoTelaColorCrear,
   esquemaMovimientoTelaColorSalida,
   esquemaTraspasoTelaColorSalida,
@@ -51,6 +64,8 @@ import {
   esquemaKardexTelaColorLista,
   esquemaPartidasTelaQuery,
   esquemaPartidasTelaLista,
+  esquemaPreviaSalidaTelaColorCrear,
+  esquemaPreviaSalidaTelaColorSalida,
   esquemaParamIdMaterial,
   esquemaErrorApi,
 } from '../../contrato/index.js';
@@ -72,9 +87,13 @@ import {
   consultarExistenciasTelaColor,
   kardexTelaColor,
   listarPartidasTela,
+  registrarConteoTelaColor,
   registrarSalidaTelaColorAOrden,
+  registrarSalidaTelaColorSinOrden,
+  saldosTelaColorParaConteo,
   traspasarTelaColor,
 } from '../../dominio/inventarios/partidas-telas.js';
+import { previaSalidaTelaColorAOrden } from '../../dominio/inventarios/previa-salida-tela-orden.js';
 
 const respuestasError = {
   400: esquemaErrorApi,
@@ -232,6 +251,52 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     },
   });
 
+  // ── Saldos para el CONTEO (Σ de movimientos DIRECTA, NUNCA la vista) ────────
+  // Es la columna «Sistema» de la pantalla de conteo, y la MISMA aritmética que el conteo usa al
+  // aplicar la diferencia (el fragmento SQL vive una sola vez en `comun/kardex.ts`), para que no
+  // puedan divergir. Recibe TODOS los colores de la pantalla en UNA llamada (`idTelaColor=11,21`):
+  // pedirlos de uno en uno eran cientos de GET al cargar el inventario del arranque. SIN lock — es
+  // una lectura; la garantía contra el saldo viejo vive en el recálculo bajo lock AL APLICAR.
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/color/saldos',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Saldos del sistema de varios tela+color en un almacén (Σ de movimientos, D3)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaSaldosTelaColorQuery,
+      response: { 200: esquemaSaldosTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return saldosTelaColorParaConteo(sesion, request.query);
+    },
+  });
+
+  // ── CONTEO físico por color: se captura LO CONTADO y el servidor aplica la diferencia ──
+  // Fila 0.098 (Daniel): «capturar lo contado, con el saldo del sistema a la vista, y que el
+  // sistema calcule y aplique la diferencia». La diferencia se materializa SIEMPRE como movimiento
+  // de kardex (D3), nunca como escritura de la existencia.
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/conteos',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Registrar un conteo físico de tela por color (se captura lo contado; el sistema aplica la diferencia)',
+      security: SEGURIDAD_SESION,
+      body: esquemaConteoTelaColorCrear,
+      response: { 201: esquemaConteoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const conteo = await registrarConteoTelaColor(sesion, request.body);
+      return reply.code(201).send(conteo);
+    },
+  });
+
   // ── Salida por color a una orden de producción (sin partida — empareja por color) ──
   app.route({
     method: 'POST',
@@ -248,6 +313,55 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const movimiento = await registrarSalidaTelaColorAOrden(sesion, request.body);
+      return reply.code(201).send(movimiento);
+    },
+  });
+
+  // ── ⭐⭐ PREVIA de la salida por color: los DOS avisos, decididos por el dominio (fila 0.101) ──
+  // Daniel §Post-F9.193 (dec. 8 y 9): avisar la sobre-salida contra lo que la orden pide, y sacar
+  // el aviso de tono SÓLO cuando hay más de una partida del color —con la lista a la vista—. Va
+  // por POST porque el cuerpo es la CAPTURA EN CURSO (N renglones), no un filtro de URL; es SOLO
+  // LECTURA (no registra ningún movimiento) y su respuesta AVISA, nunca bloquea. Sirve a las DOS
+  // pantallas que sacan tela a una orden: la vigente por color (`lineas`) y la LEGADA por lote
+  // (`lineasTela`, tela sin color — sólo el aviso de sobre-salida).
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/salidas-orden/previa',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Avisos de una salida de tela por color: sobre-salida contra lo que la orden pide y riesgo de tono',
+      security: SEGURIDAD_SESION,
+      body: esquemaPreviaSalidaTelaColorCrear,
+      response: { 200: esquemaPreviaSalidaTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return previaSalidaTelaColorAOrden(sesion, request.body);
+    },
+  });
+
+  // ── ⭐ Salida por color que NO va a ninguna orden (fila 0.104) ───────────────
+  // DANIEL (§Post-F9.193 resp. 12): *«sacar por ejemplo una devolución, o una venta… que no sea
+  // mediante la descarga o aplicación a una OP. Esto autorizado siempre por mí»*. El gate es el
+  // permiso PROPIO `salida-material.registrar` —no el `.mover` que lleva medio organigrama—, y la
+  // guarda de verdad la vuelve a hacer el dominio (A1): esto sólo evita el viaje.
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/salidas-sin-orden',
+    preHandler: app.conPermiso('salida-material.registrar'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Registrar una salida de tela por color SIN orden (devolución al proveedor, venta u otra causa)',
+      security: SEGURIDAD_SESION,
+      body: esquemaSalidaTelaColorSinOrdenCrear,
+      response: { 201: esquemaMovimientoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const movimiento = await registrarSalidaTelaColorSinOrden(sesion, request.body);
       return reply.code(201).send(movimiento);
     },
   });
@@ -375,16 +489,21 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
 
   // ── Impreso PDF 'Inventario de telas' (R9) ───────────────────────────────────
   // Respuesta BINARIA (application/pdf): no se declara `response` 200 (Fastify manda el Buffer).
-  // Reusa el mismo querystring de existencias (mismos filtros). Permiso `inventario-telas.ver`.
+  // Reusa el querystring de las existencias POR COLOR (mismos filtros que la pantalla de la que
+  // cuelga su botón). Permiso `inventario-telas.ver`.
+  //
+  // ⚠️ Hasta v0.097 este endpoint recibía `esquemaExistenciasTelaQuery` (los filtros del inventario
+  // LEGADO por lote) y su impreso leía esa consulta: la hoja salía prácticamente en blanco. Ver el
+  // encabezado de `impreso-inventario-telas.ts`.
   app.route({
     method: 'GET',
     url: '/inventarios/telas/impreso',
     preHandler: app.conPermiso('inventario-telas.ver'),
     schema: {
       tags: ['inventario-telas'],
-      summary: 'Imprimir el inventario de telas (PDF de existencias por tela × lote × almacén)',
+      summary: 'Imprimir el inventario de telas (PDF de existencias por tela × color × almacén)',
       security: SEGURIDAD_SESION,
-      querystring: esquemaExistenciasTelaQuery,
+      querystring: esquemaExistenciasTelaColorQuery,
       response: { ...respuestasError },
     },
     handler: async (request, reply) => {

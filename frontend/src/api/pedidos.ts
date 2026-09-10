@@ -16,6 +16,7 @@ import type {
   PedidoEditar,
   PedidoReal,
   PedidoCancelarCuerpo,
+  PedidoCancelarResultado,
   PedidoRealCancelarCuerpo,
   PedidoRealCrear,
   PedidoRealEditar,
@@ -87,6 +88,10 @@ async function copiarPedido(id: number, cuerpo: PedidoCopiar): Promise<Pedido> {
  *
  * V1-E4 (punto 5): el cuerpo lleva `cancelarOrdenes` + `motivo`. Sin él, el backend RECHAZA el
  * pedido que tiene OPs vivas en vez de fingir que las detiene.
+ *
+ * ⭐⭐ 0.150: la respuesta ya no es el pedido a secas, sino el DESENLACE de cada OP (cuáles se
+ * cancelaron, cuáles siguen vivas y por qué). La cascada dejó de arrastrar las que ya tienen
+ * movimientos — DANIEL: *«no quiero que se borren las OP en ese caso»*.
  */
 async function cancelarPedido({
   id,
@@ -94,7 +99,7 @@ async function cancelarPedido({
 }: {
   id: number;
   cuerpo: PedidoCancelarCuerpo;
-}): Promise<Pedido> {
+}): Promise<PedidoCancelarResultado> {
   const { data, error } = await api.POST('/api/pedidos/{id}/cancelar', {
     params: { path: { id } },
     body: cuerpo,
@@ -153,7 +158,7 @@ export function useCopiarPedido(): UseMutationResult<Pedido, ErrorDeApi, ArgsCop
 
 /** Cancela un pedido (suave) e invalida la lista. */
 export function useCancelarPedido(): UseMutationResult<
-  Pedido,
+  PedidoCancelarResultado,
   ErrorDeApi,
   { id: number; cuerpo: PedidoCancelarCuerpo }
 > {

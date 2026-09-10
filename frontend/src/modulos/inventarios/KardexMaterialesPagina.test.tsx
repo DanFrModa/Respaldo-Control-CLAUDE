@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { KardexTela } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -34,9 +34,20 @@ const kardexTela: KardexTela = {
   ],
 };
 
+/** Kardex de tela SIN movimientos legados: el caso que producía la pantalla vacía y muda. */
+const kardexTelaVacio: KardexTela = { idTela: 1, tela: 'Felpa', renglones: [] };
+
+/** Lo que devuelve `useKardexTela` en cada prueba (por defecto, el kardex con un movimiento). */
+const datosKardexTela = vi.fn<() => KardexTela>(() => kardexTela);
+
 // La tela seleccionada se fija al elegir en el SelectorTela (mockeado abajo).
 vi.mock('@/api/inventario-materiales', () => ({
-  useKardexTela: () => ({ data: kardexTela, isPending: false, isError: false, error: null }),
+  useKardexTela: () => ({
+    data: datosKardexTela(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
   useKardexAvio: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useCancelarTela: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarAvio: () => ({ mutate: vi.fn(), isPending: false }),
@@ -60,6 +71,12 @@ vi.mock('./SelectorTela', () => ({
 vi.mock('./SelectorAvio', () => ({
   SelectorAvio: () => <div data-testid="sel-avio" />,
 }));
+
+// El doble se restaura ANTES de cada prueba, no a mano al final de la que lo cambió: así una
+// prueba nueva insertada en medio no hereda el kardex vacío de la anterior.
+beforeEach(() => {
+  datosKardexTela.mockReturnValue(kardexTela);
+});
 
 describe('KardexMaterialesPagina (F4-E1)', () => {
   it('muestra el kardex de la tela elegida con tabla (escritorio) y tarjetas (móvil)', () => {
@@ -89,5 +106,45 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
     });
     fireEvent.click(screen.getByTestId('sel-tela'));
     expect(screen.queryByTestId('kardex-tela-cancelar-10')).not.toBeInTheDocument();
+  });
+
+  // ── fila 0.098: la pestaña de telas es la del flujo LEGADO y tiene que decirlo ──────────────
+  //
+  // 🔴 `kardexTela` filtra `idTelaColor: null` en el servidor: aquí SOLO salen los movimientos por
+  // lote. Quien entraba buscando los de una tela del inventario vigente se llevaba una pantalla
+  // vacía y MUDA. La pestaña no se retiró (sigue siendo la única ventana al histórico por lote):
+  // se le quitó la mentira.
+  it('la pestaña de telas se presenta como LEGADA por lote', () => {
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-avios.ver']),
+    });
+    expect(screen.getByTestId('kardex-mat-dim-tela')).toHaveTextContent(/lote.*legado/i);
+  });
+
+  it('avisa SIEMPRE (aunque haya movimientos) que el kardex vigente va por color', () => {
+    datosKardexTela.mockReturnValue(kardexTela);
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.click(screen.getByTestId('sel-tela'));
+    // Hay renglones…
+    expect(screen.getByTestId('kardex-tela-tabla')).toBeInTheDocument();
+    // …y aun así el aviso está, con su puerta a la pantalla vigente.
+    const nota = screen.getByTestId('kardex-tela-nota-legado');
+    expect(nota.querySelector('a')).toHaveAttribute('href', '/inventarios/telas/existencias');
+  });
+
+  it('el vacío ya no es mudo: dice de qué flujo habla y a dónde ir', () => {
+    datosKardexTela.mockReturnValue(kardexTelaVacio);
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    fireEvent.click(screen.getByTestId('sel-tela'));
+    expect(screen.queryByTestId('kardex-tela-tabla')).not.toBeInTheDocument();
+    const vacio = screen.getByTestId('kardex-tela-vacio');
+    expect(vacio).toHaveTextContent(/LEGADO por lote/);
+    expect(vacio.querySelector('a')).toHaveAttribute('href', '/inventarios/telas/existencias');
+    // El texto mudo de antes ("Esta tela no tiene movimientos." a secas) no vuelve.
+    expect(screen.queryByText('Esta tela no tiene movimientos.')).not.toBeInTheDocument();
   });
 });

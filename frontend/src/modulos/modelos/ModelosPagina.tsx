@@ -1,6 +1,8 @@
 import {
   ArrowRightLeftIcon,
+  CheckIcon,
   ChevronLeft,
+  GitBranchIcon,
   ChevronRight,
   FileText,
   Grid3x3,
@@ -17,6 +19,7 @@ import {
   Tag,
   Trash2,
   Users,
+  XIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -24,6 +27,7 @@ import { toast } from 'sonner';
 
 import { useExistenciasPt } from '@/api/inventarios';
 import {
+  useCrearVersionModelo,
   useDescontinuarModelo,
   useFichaModelo,
   useModelos,
@@ -32,7 +36,7 @@ import {
   type ModelosQuery,
 } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
-import type { ExistenciaPtCelda } from '@/api/tipos';
+import type { ClavePermiso, ExistenciaPtCelda } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
@@ -57,11 +61,76 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoModelo } from './DialogoModelo';
 import { DialogoPasarAProduccion } from './DialogoPasarAProduccion';
+import { DialogoRevisionModelo } from './DialogoRevisionModelo';
 import { EditorBom } from './EditorBom';
 import { FotosModelo } from './FotosModelo';
 
 /** Renglones por página (volumen ~4,987: SIEMPRE modo servidor). */
 const POR_PAGINA = 15;
+
+/**
+ * ⭐ V1-E7d — Cómo se lee la REVISIÓN de una versión (§Post-F9.110). Los tonos son los semánticos
+ * de siempre: aprobada = ok (puede producirse), rechazada = crit (no puede y hay que corregir),
+ * pendiente = warn (no puede todavía, y depende de que alguien la firme).
+ */
+const ETIQUETA_REVISION = {
+  pendiente: 'Revisión pendiente',
+  aprobada: 'Revisión aprobada',
+  rechazada: 'Revisión rechazada',
+} as const;
+
+const TONO_REVISION = {
+  pendiente: 'warn',
+  aprobada: 'ok',
+  rechazada: 'crit',
+} as const;
+
+/**
+ * ⭐ V1-E7d — ¿Este modelo nació de una NEGOCIACIÓN, o sea, es una VERSIÓN? Es el MISMO predicado
+ * que usa el dominio para decidir a quién alcanza la revisión (`esVersionDeModelo`, en
+ * `backend/src/dominio/modelos/revision-modelo.ts`): el LINAJE, no el estado de la firma.
+ *
+ * ⭐ **V1-E9a — y los HIJOS del linaje 1:N quedan fuera:** ver el comentario de dentro. Las tres
+ * copias del predicado (aquí, `esVersionDeModelo` y su gemela SQL `SQL_REVISION_SIN_APROBAR`)
+ * excluyen a los hijos, y las tres se movieron JUNTAS: mover una sola las desincroniza.
+ *
+ * ⚠️ **Por qué no se pregunta por `revisionEstado !== null`,** que es lo que esta pantalla hacía:
+ * era un PROXY que sólo acierta porque «crear versión» siempre escribe `'pendiente'`. Las
+ * versiones que nacieron ANTES de que esta etapa se desplegara —las que estrenó V1-E7b en
+ * `prueba`— tienen la columna en NULL, y el backend lee ese null como PENDIENTE y les niega
+ * producción. Con el proxy, la ficha no les enseñaba ni el chip ni los botones: una versión que no
+ * se puede producir y que nadie puede firmar, un callejón sin salida. Eran dos puertas con reglas
+ * distintas para el mismo hecho (§Post-F9.119); ahora las dos preguntan el linaje. Las dos
+ * columnas ya viajan en `ModeloSalida`, así que no hizo falta tocar el contrato.
+ */
+function esVersionDeModelo(
+  modelo: Pick<Modelo, 'idModeloPadre' | 'versionDesarrollo' | 'idModeloDesarrollo'>,
+): boolean {
+  // ⭐⭐ V1-E9a (§Post-F9.167 punto 2) — LOS HIJOS DEL LINAJE 1:N QUEDAN FUERA, SIEMPRE. Un modelo
+  // con `idModeloDesarrollo` nació YA EN PRODUCCIÓN (uno por color de la OC), comparte la receta de
+  // su desarrollo y NO lleva revisión propia: la firma que lo habilitó es la del padre.
+  //
+  // 🔴 Sin esta línea, el chip de abajo se pinta SÓLO por el linaje —sin mirar `origen`— y cada
+  // hijo se enseñaría a sí mismo como «Revisión pendiente» y pediría una firma que no le toca: su
+  // receta es la del padre, y firmarla en el hijo sería firmar dos veces lo mismo. Aquí se cierra
+  // ANTES de que exista.
+  //
+  // ⚠️ `typeof === 'number'` y no `!== null`, EXACTAMENTE como el dominio: esta exclusión es lo
+  // único que puede apagar el chip, y su modo de fallo tiene que caer del lado seguro — lo que no
+  // se sabe, no excluye. Las tres copias del predicado se mueven juntas o se desincronizan.
+  if (typeof modelo.idModeloDesarrollo === 'number') {
+    return false;
+  }
+  return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
+}
+
+/**
+ * Con qué estado se PINTA la revisión de una versión. El null se lee como `pendiente`, igual que
+ * en el backend (`estadoRevisionEfectivo`): nadie la firmó.
+ */
+function estadoRevision(modelo: Modelo): keyof typeof ETIQUETA_REVISION {
+  return modelo.revisionEstado ?? 'pendiente';
+}
 
 /** Valor del filtro de temporada que significa "todas". */
 const TEMPORADA_TODAS = 'TODAS';
@@ -75,6 +144,36 @@ function formatearPrecio(precio: number): string {
 function nombreModelo(modelo: Modelo): string {
   const descripcion = modelo.descripcion?.trim() ?? '';
   return descripcion !== '' ? descripcion : modelo.codigo;
+}
+
+/**
+ * ⭐ V1-E8j (§Post-F9.134) — LA ETAPA DEL MODELO, dicha en cada renglón.
+ *
+ * Es la mitad que hace tolerable la otra: el filtro de origen arranca en «Todos», así que la lista
+ * trae las dos caras del catálogo y **cada renglón tiene que decir cuál es**. Sin esto, ver de más
+ * se leería como dos catálogos revueltos — que es justo lo que §Post-F9.34 punto 2 quería evitar.
+ *
+ * `Desarrollo` va en tono INFO (algo en proceso, y lo que Daniel acaba de crear salta a la vista) y
+ * `Producción` en NEUTRO (es lo normal, no una alarma). El texto va siempre: el estado nunca
+ * depende sólo del color.
+ */
+function ChipEtapa({
+  origen,
+  testid,
+}: {
+  origen: Modelo['origen'];
+  /** Distinto en móvil y en escritorio: los DOS bloques se montan y se ocultan con CSS. */
+  testid: string;
+}): React.JSX.Element {
+  return origen === 'desarrollo' ? (
+    <ChipEstado tono="info" data-testid={testid}>
+      Desarrollo
+    </ChipEstado>
+  ) : (
+    <ChipEstado tono="neutro" data-testid={testid}>
+      Producción
+    </ChipEstado>
+  );
 }
 
 /**
@@ -111,12 +210,34 @@ function conDeepLinkInyectado(
 }
 
 /**
+ * ⭐ §Post-F9.137 — GUARDA GEMELA de `puedeVerCostoRealDeModelo`
+ * (`backend/src/dominio/modelos/modelos.ts`): ¿se pinta la columna «Costo» del listado?
+ *
+ * Esa columna NO es el precosteo: es el costo unitario del ÚLTIMO COSTEO REAL (F7) de una orden ya
+ * producida — «cómo terminamos». Daniel, preguntado si esconderla: *«Escóndesela»*.
+ *
+ * Exige los MISMOS dos permisos que el backend, y por la misma razón: es un costo real
+ * (`costos.ver`) **y** es dinero (`consultas.ver-importes`). ⚠️ Esto es lo que se PINTA; lo que se
+ * MANDA lo decide el servidor, que sin esos permisos ni siquiera consulta el costo (§Post-F9.68:
+ * esconder sin bloquear es maquillaje). Las dos guardas se mueven juntas o no se mueven.
+ *
+ * NO se exporta a propósito: exportar algo que no es un componente desde este archivo dispara
+ * `react-refresh/only-export-components`, y no hace falta — su prueba la ejercita a través de la
+ * PANTALLA, que es quien de verdad la consume.
+ */
+function puedeVerCostoRealDeModelo(tienePermiso: (clave: ClavePermiso) => boolean): boolean {
+  return tienePermiso('costos.ver') && tienePermiso('consultas.ver-importes');
+}
+
+/**
  * Pantalla de Modelos (Módulo 2, F1-E4) — TABLA-FIRST fiel al proto `vModelos`:
  * page-head con conteo vivo («… · N modelos · M mostrados») + «Nuevo modelo»; toolbar con
  * buscador (código/nombre), chips de estado (Activos | Todos), filtro por temporada, el conteo
  * plano «M de N» y el SEGMENTADO Tabla | Galería (proto `.seg`); TABLA DENSA con las columnas
- * del proto (Modelo con MINIATURA de foto real + nombre/código · Temporada como badge neutral
- * con punto · Tela principal · Tallas · Stock PT · Costo · Estado — los agregados los sirve el
+ * del proto (Modelo con MINIATURA de foto real + nombre/código · **Etapa** (Desarrollo |
+ * Producción, V1-E8j) · Temporada como badge neutral
+ * con punto · Tela principal · Tallas · Stock PT · Costo (sólo con permiso, ver
+ * `puedeVerCostoRealDeModelo`) · Estado — los agregados los sirve el
  * LISTADO del backend por fila, sin N+1) y paginación de SERVIDOR al pie. Al hacer clic en un
  * renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto hero 46px + nombre +
  * estado + línea `código · Temporada`; secciones Ficha (tela principal, rango de tallas,
@@ -128,11 +249,30 @@ function conDeepLinkInyectado(
  * (swatches) NO va (decisión D14 de Daniel: los colores no son atributo del modelo); botón
  * «Exportar» (sin endpoint); filtro por tela; «Ficha PDF» del cajón.
  *
- * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1).
+ * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1);
+ * `costos.ver` + `consultas.ver-importes` deciden si la columna «Costo» existe (§Post-F9.137).
  */
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('modelos.administrar');
+  // ⭐ V1-E7b (§Post-F9.110) — aprobar la RECETA creando la versión es un permiso APARTE de
+  // `modelos.administrar`, y por eso NO se cuelga de `puedeAdministrar`.
+  //
+  // ⚠️ La razón ESCRITA aquí llevaba meses caducada: decía que `modelos.aprobar-receta` llegaba
+  // hasta Gerencial (Daniel: *"Aurora podría hacerlo aparte de mí"*) «mientras `modelos.administrar`
+  // se corta en Directivo». Desde §Post-F9.123 los DOS los llevan exactamente los mismos cuatro
+  // perfiles —Administrador, AdministracionDireccion, Directivo y Gerencial, medido en
+  // `definirRoles()`—, así que ese contraste ya no separa nada.
+  //
+  // La decisión NO cambia, y ahora se sostiene sola: son dos permisos distintos a propósito
+  // —firmar la receta no es administrar el catálogo (§Post-F9.110 (b))— y **los roles son DATOS
+  // editables**; un rol a la medida puede llevar uno sin el otro, y cuando Daniel arme los perfiles
+  // por puesto real este botón tiene que seguir la facultad de FIRMAR, no la de administrar.
+  const puedeVersionar = tienePermiso('modelos.aprobar-receta');
+  // ⭐ §Post-F9.137 — la columna «Costo» enseña el costo REAL del último costeo (F7): «cómo
+  // terminamos», no el plan. Daniel: *«Escóndesela»*. Se calcula UNA vez y gobierna sus DOS
+  // pintados (la tarjeta de móvil y la columna de escritorio) para que no puedan divergir.
+  const puedeVerCostoReal = puedeVerCostoRealDeModelo(tienePermiso);
 
   // Deep-link desde la galería (u otra vista): `state.idModelo` abre la ficha de ESE modelo.
   const navigate = useNavigate();
@@ -157,9 +297,14 @@ export function ModelosPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [temporadaFiltro, setTemporadaFiltro] = useState<string>(TEMPORADA_TODAS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
-  // Filtro de ORIGEN (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por default, para no
-  // llenarse de los modelos de desarrollo que nunca salen. Los de desarrollo quedan a un clic.
-  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('produccion');
+  // ⭐ Filtro de ORIGEN — default `todos` desde V1-E8j (§Post-F9.134). Arrancaba en `produccion`
+  // (§Post-F9.34 punto 2, "no llenar de basura el catálogo") y, como TODO modelo nace en
+  // desarrollo, la pantalla escondía por omisión justo lo recién creado: *"generé dos modelos en
+  // precosteo… y no los veo en modelos"*. La etapa de cada renglón se ve en su columna, así que
+  // ver de más ya no confunde — y no encontrar lo propio sí.
+  // ⚠️ Va explícito en la query a propósito: aunque el servidor también cambió su default, este
+  // valor es el que manda aquí. Es la puerta que hay que mover para que el cambio se note.
+  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('todos');
   const [pagina, setPagina] = useState(1);
 
   const query: ModelosQuery = {
@@ -187,11 +332,18 @@ export function ModelosPagina(): React.JSX.Element {
   });
   const descontinuar = useDescontinuarModelo();
   const reactivar = useReactivarModelo();
+  const crearVersion = useCrearVersionModelo();
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [modeloEnEdicion, setModeloEnEdicion] = useState<Modelo | undefined>(undefined);
   const [aDescontinuar, setADescontinuar] = useState<Modelo | null>(null);
   const [aPromover, setAPromover] = useState<Modelo | null>(null);
+  const [aVersionar, setAVersionar] = useState<Modelo | null>(null);
+  // ⭐ V1-E7d — qué versión se está revisando y en qué sentido (§Post-F9.110).
+  const [aRevisar, setARevisar] = useState<{
+    modelo: Modelo;
+    accion: 'aprobar' | 'rechazar';
+  } | null>(null);
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);
@@ -200,6 +352,30 @@ export function ModelosPagina(): React.JSX.Element {
   function abrirEdicion(modelo: Modelo): void {
     setModeloEnEdicion(modelo);
     setDialogoAbierto(true);
+  }
+
+  /**
+   * ⭐ V1-E7b — Crea la VERSIÓN del modelo y ABRE LA NUEVA. El código, el sufijo y la copia de la
+   * receta los decide el servidor (A1): aquí sólo se pide y se navega al resultado, reusando el
+   * mismo camino del deep-link (`idAbrir` trae la ficha del modelo aunque no esté en la página).
+   */
+  function confirmarVersion(): void {
+    if (aVersionar === null) {
+      return;
+    }
+    const padre = aVersionar;
+    crearVersion.mutate(
+      { id: padre.id },
+      {
+        onSuccess: (nuevo) => {
+          toast.success(`Nació el modelo "${nuevo.codigo}" con la receta de "${padre.codigo}".`);
+          setAVersionar(null);
+          setIdAbrir(nuevo.id);
+          setSeleccionId(nuevo.id);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   }
 
   function confirmarDescontinuar(): void {
@@ -370,7 +546,7 @@ export function ModelosPagina(): React.JSX.Element {
             </p>
           ) : (
             <>
-              {/* Móvil (<lg): tarjetas apiladas — la tabla de 7 columnas se apachurra en teléfono.
+              {/* Móvil (<lg): tarjetas apiladas — la tabla de 8 columnas se apachurra en teléfono.
                   Mismo clic (selecciona → cajón) que la fila. */}
               <div className="space-y-2 p-3 lg:hidden" data-testid="modelo-tarjetas">
                 {registros.map((m) => (
@@ -395,12 +571,25 @@ export function ModelosPagina(): React.JSX.Element {
                                 {m.codigo}
                               </div>
                             ) : null}
+                            {/* ⭐ V1 — el nº de DESARROLLO también en la tarjeta de móvil. La tabla
+                                de escritorio ya lo pintaba y el teléfono no: la misma divergencia
+                                PC/móvil que la etapa (V1-E8j) ya había corregido dos líneas abajo.
+                                Los dos códigos son suyos y los dos son buscables (D3). */}
+                            {m.codigoDesarrollo !== null && m.codigoDesarrollo !== m.codigo ? (
+                              <div className="mono truncate text-xs text-faint">
+                                desarrollo {m.codigoDesarrollo}
+                              </div>
+                            ) : null}
                           </div>
                           <EstadoBadge activo={m.activo} />
                         </div>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      {/* ⭐ V1-E8j — la ETAPA también en la tarjeta de móvil: el filtro ya no
+                          esconde una de las dos caras, así que cada renglón tiene que decir cuál
+                          es (§Post-F9.134). */}
+                      <ChipEtapa origen={m.origen} testid="etapa-modelo-movil" />
                       {m.temporada !== null ? (
                         <ChipEstado tono="neutro">{m.temporada}</ChipEstado>
                       ) : null}
@@ -421,12 +610,15 @@ export function ModelosPagina(): React.JSX.Element {
                           {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
                         </span>
                       </span>
-                      <span>
-                        Costo{' '}
-                        <span className="mono font-medium">
-                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                      {/* §Post-F9.137 — el costo REAL sólo para quien puede verlo. */}
+                      {puedeVerCostoReal ? (
+                        <span data-testid="costo-modelo-movil">
+                          Costo{' '}
+                          <span className="mono font-medium">
+                            {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                          </span>
                         </span>
-                      </span>
+                      ) : null}
                     </div>
                   </button>
                 ))}
@@ -437,11 +629,17 @@ export function ModelosPagina(): React.JSX.Element {
                   <TablaDensaEncabezado>
                     <TablaDensaFila>
                       <TablaDensaHead>Modelo</TablaDensaHead>
+                      {/* ⭐ V1-E8j (§Post-F9.134): la ETAPA es columna propia. Con el filtro en
+                          «Todos» por default, es lo que evita que la lista se lea como dos
+                          catálogos revueltos. */}
+                      <TablaDensaHead>Etapa</TablaDensaHead>
                       <TablaDensaHead>Temporada</TablaDensaHead>
                       <TablaDensaHead>Tela principal</TablaDensaHead>
                       <TablaDensaHead>Tallas</TablaDensaHead>
                       <TablaDensaHead numerica>Stock PT</TablaDensaHead>
-                      <TablaDensaHead numerica>Costo</TablaDensaHead>
+                      {/* §Post-F9.137 — «Costo» es el costo REAL del último costeo (F7): se
+                          esconde entera (encabezado Y celda) sin `costos.ver`. */}
+                      {puedeVerCostoReal ? <TablaDensaHead numerica>Costo</TablaDensaHead> : null}
                       <TablaDensaHead>Estado</TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -458,13 +656,11 @@ export function ModelosPagina(): React.JSX.Element {
                           <div className="flex items-center gap-2">
                             <MiniaturaModelo modelo={m} />
                             <div className="min-w-0">
-                              {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate font-semibold">{nombreModelo(m)}</span>
-                                {m.origen === 'desarrollo' ? (
-                                  <ChipEstado tono="neutro">Desarrollo</ChipEstado>
-                                ) : null}
-                              </div>
+                              {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo.
+                                  El chip de «Desarrollo» que vivía pegado al nombre se mudó a la
+                                  columna Etapa (V1-E8j): decirlo dos veces en el mismo renglón
+                                  ocupa el ancho del nombre sin agregar nada. */}
+                              <div className="truncate font-semibold">{nombreModelo(m)}</div>
                               {/* El código VIGENTE y, si el modelo fue promovido, también su nº de
                                   DESARROLLO: los dos son suyos y los dos son buscables (D3). */}
                               {m.descripcion !== null && m.descripcion.trim() !== '' ? (
@@ -479,6 +675,9 @@ export function ModelosPagina(): React.JSX.Element {
                               ) : null}
                             </div>
                           </div>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <ChipEtapa origen={m.origen} testid="etapa-modelo" />
                         </TablaDensaCelda>
                         <TablaDensaCelda>
                           {m.temporada !== null ? (
@@ -497,10 +696,17 @@ export function ModelosPagina(): React.JSX.Element {
                         >
                           {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
                         </TablaDensaCelda>
-                        {/* Costo del último costeo (F7); null (sin costeo o sin permiso) → "—". */}
-                        <TablaDensaCelda numerica className="mono">
-                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
-                        </TablaDensaCelda>
+                        {/* Costo del último costeo (F7); "—" si el modelo nunca se costeó. La
+                            celda desaparece con su encabezado cuando no hay permiso. */}
+                        {puedeVerCostoReal ? (
+                          <TablaDensaCelda
+                            numerica
+                            className="mono"
+                            data-testid="costo-modelo-tabla"
+                          >
+                            {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                          </TablaDensaCelda>
+                        ) : null}
                         <TablaDensaCelda>
                           <EstadoBadge activo={m.activo} />
                         </TablaDensaCelda>
@@ -570,6 +776,58 @@ export function ModelosPagina(): React.JSX.Element {
                     : ''}
                   {seleccion.temporada !== null ? ` · Temporada ${seleccion.temporada}` : ''}
                 </span>
+                {/* ⭐ V1-E7b — El LINAJE: de qué modelo nació esta versión, con liga para ir a
+                    verlo. El sufijo del código ya lo insinúa; esto lo dice con todas sus letras y
+                    lo hace navegable. */}
+                {seleccion.versionDesarrollo !== null && seleccion.codigoPadre !== null ? (
+                  <span
+                    className="text-xs font-normal text-muted-foreground"
+                    data-testid="linaje-modelo"
+                  >
+                    Versión {seleccion.versionDesarrollo} de{' '}
+                    <button
+                      type="button"
+                      className="mono underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        if (seleccion.idModeloPadre !== null) {
+                          setIdAbrir(seleccion.idModeloPadre);
+                          setSeleccionId(seleccion.idModeloPadre);
+                        }
+                      }}
+                    >
+                      {seleccion.codigoPadre}
+                    </button>
+                  </span>
+                ) : null}
+                {/* ⭐ V1-E7d — LA REVISIÓN de la receta negociada (§Post-F9.110). Sólo aparece en
+                    las VERSIONES —se pregunta por el linaje, ver `esVersionDeModelo`—, porque son
+                    las únicas que la llevan. Dice en qué quedó, quién firmó y cuándo; el rechazo
+                    enseña además el motivo, porque es lo único que le sirve a quien corrige.
+                    ⚠️ V1-E9c (§Post-F9.169): la revisión ya NO impide producir, así que el chip
+                    tampoco lo dice — es un REGISTRO de que alguien miró lo que se negoció. */}
+                {esVersionDeModelo(seleccion) ? (
+                  <span
+                    className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted-foreground"
+                    data-testid="revision-modelo"
+                  >
+                    <ChipEstado tono={TONO_REVISION[estadoRevision(seleccion)]}>
+                      {ETIQUETA_REVISION[estadoRevision(seleccion)]}
+                    </ChipEstado>
+                    {seleccion.revisadoPor !== null ? (
+                      <span>
+                        por {seleccion.revisadoPor}
+                        {seleccion.revisadoEn !== null
+                          ? ` · ${new Date(seleccion.revisadoEn).toLocaleDateString('es-MX')}`
+                          : ''}
+                      </span>
+                    ) : seleccion.revisionNota === null ? (
+                      <span>Nadie la ha revisado todavía.</span>
+                    ) : null}
+                    {estadoRevision(seleccion) !== 'aprobada' && seleccion.revisionNota !== null ? (
+                      <span className="text-crit">«{seleccion.revisionNota}»</span>
+                    ) : null}
+                  </span>
+                ) : null}
               </span>
             </span>
           ) : errorFichaDeepLink !== null ? (
@@ -581,49 +839,104 @@ export function ModelosPagina(): React.JSX.Element {
           )
         }
         acciones={
-          seleccion !== null && puedeAdministrar ? (
+          seleccion !== null && (puedeAdministrar || puedeVersionar) ? (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => abrirEdicion(seleccion)}
-                data-testid="editar-modelo"
-              >
-                <Pencil aria-hidden />
-                Editar
-              </Button>
-              {seleccion.origen === 'desarrollo' ? (
+              {/* ⭐ V1-E7b — «Crear versión» va bajo SU permiso, no bajo el de administrar: si se
+                  colgara de `puedeAdministrar`, Gerencial (Aurora) no lo vería nunca. Y sólo se
+                  pinta si el modelo TIENE número de desarrollo: el sufijo cuelga de él, así que
+                  sin código de desarrollo el botón sería una puerta cerrada. */}
+              {puedeVersionar && seleccion.codigoDesarrollo !== null ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setAPromover(seleccion)}
-                  data-testid="pasar-a-produccion"
+                  onClick={() => setAVersionar(seleccion)}
+                  data-testid="crear-version-modelo"
                 >
-                  <ArrowRightLeftIcon aria-hidden />
-                  Pasar a producción
+                  <GitBranchIcon aria-hidden />
+                  Crear versión
                 </Button>
               ) : null}
-              {seleccion.activo ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setADescontinuar(seleccion)}
-                  data-testid="desactivar-modelo"
-                >
-                  <Trash2 aria-hidden />
-                  Descontinuar
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => reactivarModelo(seleccion)}
-                  data-testid="activar-modelo"
-                >
-                  <RotateCcw aria-hidden />
-                  Reactivar
-                </Button>
-              )}
+              {/* ⭐ V1-E7d — Firmar la REVISIÓN. Va bajo el MISMO permiso que crear la versión
+                  (`modelos.aprobar-receta`, hasta Gerencial) y sólo se pinta en las versiones —por
+                  el LINAJE, nunca por el estado de la firma: una versión SIN firmar es justo la que
+                  más necesita el botón—.
+
+                  ⭐⭐ V1-E9c (§Post-F9.169) — **y TAMBIÉN con el modelo ya en producción.** Aquí
+                  había un `seleccion.origen === 'desarrollo'` que tenía sentido mientras la firma
+                  abriera una compuerta: promovido el modelo, ya no había nada que abrir. Sin
+                  compuerta, generar la OP promueve la versión con la revisión en `pendiente`, así
+                  que ese filtro dejaba un chip *«Revisión pendiente»* SIN ningún botón para
+                  resolverlo, para siempre — exactamente la cicatriz de §Post-F9.119. El backend
+                  también levantó su guard (`exigirVersionRevisable`); las dos se movieron juntas. */}
+              {puedeVersionar && esVersionDeModelo(seleccion) ? (
+                <>
+                  {estadoRevision(seleccion) === 'aprobada' ? null : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setARevisar({ modelo: seleccion, accion: 'aprobar' })}
+                      data-testid="aprobar-revision-modelo"
+                    >
+                      <CheckIcon aria-hidden />
+                      Aprobar revisión
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setARevisar({ modelo: seleccion, accion: 'rechazar' })}
+                    data-testid="rechazar-revision-modelo"
+                  >
+                    <XIcon aria-hidden />
+                    Rechazar revisión
+                  </Button>
+                </>
+              ) : null}
+              {puedeAdministrar ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => abrirEdicion(seleccion)}
+                    data-testid="editar-modelo"
+                  >
+                    <Pencil aria-hidden />
+                    Editar
+                  </Button>
+                  {seleccion.origen === 'desarrollo' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAPromover(seleccion)}
+                      data-testid="pasar-a-produccion"
+                    >
+                      <ArrowRightLeftIcon aria-hidden />
+                      Pasar a producción
+                    </Button>
+                  ) : null}
+                  {seleccion.activo ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setADescontinuar(seleccion)}
+                      data-testid="desactivar-modelo"
+                    >
+                      <Trash2 aria-hidden />
+                      Descontinuar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reactivarModelo(seleccion)}
+                      data-testid="activar-modelo"
+                    >
+                      <RotateCcw aria-hidden />
+                      Reactivar
+                    </Button>
+                  )}
+                </>
+              ) : null}
             </>
           ) : undefined
         }
@@ -641,6 +954,55 @@ export function ModelosPagina(): React.JSX.Element {
           </div>
         ) : null}
       </CajonDetalle>
+
+      {/* ⭐ V1-E7b — La confirmación dice qué va a pasar, y por eso mismo NO enseña un código de
+          ejemplo. Lo enseñaba, armado como «código del padre + -01», y al versionar un modelo que
+          YA era una versión escribía `CYA-26-71-001-01-01`: justo la forma ANIDADA que Daniel
+          descartó —*"en tres temporadas hay -01-02-01 y nadie lo lee"*— exhibida como promesa a
+          quien está a punto de aprobar. El servidor creaba bien el `-02`; mentía el texto.
+
+          Y no se arregla calculándolo mejor en el cliente, por dos razones independientes:
+           1. El sufijo es `max(la familia) + 1` leído BAJO LOCK (ver `dominio/modelos/versiones.ts`).
+              El cliente no tiene la familia: aunque partiera de la RAÍZ, un modelo cuya familia ya
+              tiene `-01` y `-02` recibe `-03`, no `-01`. Seguiría prometiendo un número que el
+              servidor puede desmentir — y peor, fallando sólo a veces, que es cuando se le cree.
+           2. Derivar la raíz aquí obligaría a COPIAR `raizDeCodigoDesarrollo` al frontend: lógica
+              de negocio fuera de `backend/src/dominio` (A1), y una copia que puede divergir del
+              original. Backend y frontend sólo comparten el OpenAPI (ADR-0002): «la misma función»
+              no está disponible, sólo una copia — que es exactamente lo que no se debe hacer.
+
+          Así que se dice la FORMA y quién decide el número, y el número real se ve al abrirse el
+          modelo nuevo. Prometer menos y cumplirlo. */}
+      <DialogoConfirmacion
+        abierto={aVersionar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setAVersionar(null);
+        }}
+        titulo="Crear versión del modelo"
+        descripcion={
+          <>
+            Va a nacer un modelo NUEVO a partir de{' '}
+            <span className="font-medium text-foreground">{aVersionar?.codigo}</span>, con{' '}
+            <span className="font-medium text-foreground">la misma receta</span> (telas, avíos y
+            arte) y un número de versión al final del código. El número lo asigna el sistema —el
+            siguiente libre de la familia— y lo verás al terminar, porque se abre el modelo nuevo.
+            El modelo actual <span className="font-medium text-foreground">queda igual</span>: lo
+            que ya se produjo con él no se toca.
+          </>
+        }
+        textoConfirmar="Crear versión"
+        procesando={crearVersion.isPending}
+        alConfirmar={confirmarVersion}
+      />
+
+      <DialogoRevisionModelo
+        abierto={aRevisar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setARevisar(null);
+        }}
+        modelo={aRevisar?.modelo ?? null}
+        accion={aRevisar?.accion ?? 'aprobar'}
+      />
 
       <DialogoPasarAProduccion
         abierto={aPromover !== null}

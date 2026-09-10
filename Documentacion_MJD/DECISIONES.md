@@ -625,12 +625,20 @@ Daniel entró a la sesión simulando la operación real y dictó el flujo del im
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-pdf-cya`); las plantillas de otros clientes se definirán igual, cliente por cliente.
 - **Fecha:** 2026-07-12.
 
-#### (Post-F9.3) — Importador PDF: UN RENGLÓN POR PACK + formato del nombre de color (DANIEL, 12-jul-2026)
+#### (Post-F9.3) — Importador PDF: UN RENGLÓN POR PACK + formato del nombre de color (DANIEL, 12-jul-2026) — 🔁 **REVERTIDA EN PARTE** por §Post-F9.129
+
+> ⚠️ **Leer antes que lo de abajo (27-ago-2026).** El **"un renglón por pack"** de esta decisión
+> **YA NO RIGE**: el mismo Daniel la revirtió en **§Post-F9.129** al ver que partía las compras de una
+> misma orden (*"Negro A y Negro B es lo mismo"*). Hoy los packs se **suman en un solo renglón de
+> color**, y su desglose vive en `Orden.packsCliente`. **Lo que SÍ sigue vigente** de esta decisión es
+> el **formato del nombre del color** (Título: `AZUL INDIGO` → `Azul Indigo`, con acentos y guiones
+> preservados) — sólo que ya no se le pega la letra del pack.
+
 Revisando el importador en operación, Daniel precisó cómo deben nacer los renglones de la OP y cómo se escribe el color. **Definido por el dueño sobre datos reales.**
 
 - **Un renglón por pack (A, B, C…):** cada pack va en **su propio renglón** de la matriz color×talla, **NO** todo junto — porque **se corta por separado** (cada pack lleva **distintas proporciones** de tallas). Referencia que dio Daniel: la orden vieja **4868**, que trae `Azul Indigo A` y `Azul Indigo B` como dos renglones con corridas distintas (A = corrida completa; B = solo tallas de en medio). El sobre-pedido (Post-F9.2) NO cambia la ESTRUCTURA de renglones, solo las cantidades → una OC con 3 packs siempre produce 3 renglones, aun a 0%.
 - **Formato del nombre de color = `{Base} {LETRA}`:** el nombre del color en **Título** (primera letra de **cada palabra** en Mayúscula, el resto en minúscula: `AZUL INDIGO` → `Azul Indigo`) y la **letra del pack SIEMPRE en MAYÚSCULA** (A, B, C…). Preserva acentos (`MARRÓN` → `Marrón`) y guiones (`AZUL-MARINO` → `Azul-Marino`). Motivo de Daniel: "me gusta más cómo se ve".
-- **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor` en `componerColor`/`componerColorUI`, backend y frontend en espejo). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
+- **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor`, backend y frontend en espejo — desde §Post-F9.129 lo usan `colorDeLaOrden` en el backend y el rótulo del total de la vista previa en el frontend; las funciones viejas `componerColor`/`componerColorUI`, que pegaban la letra del pack, ya no existen: hoy son `colorDeLaOrden` y `etiquetaPack`). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-renglon-por-pack`).
 - **Fecha:** 2026-07-12.
 
@@ -726,6 +734,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 5. *"Normalmente se descargan las telas al mismo tiempo cuando están relacionadas"* (la felpa y su cardigan al tono).
 6. Sobrantes: *"solo damos salida de lo que se corta, no lo que viene en la partida. Bajo esa manera de trabajar no veo la necesidad de volver a meterlo al almacén."* → **NO hay devoluciones de tela al almacén**; nunca sale más de lo que se consumió.
 7. Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión sin OC), con **una cabecera por documento y N partidas** (cada una con su color y sus telas al tono).
+   🔴 **SUPERADO (§Post-F9.159, 30-ago-2026):** la vía «sin OC» **queda cerrada**. Daniel: *«es imposible. Sin OC no podemos recibir tela. ¿De quién recibiríamos sin OC? No puede suceder»*. Esta línea es anterior a que se construyera la cadena de compras; **prevalece §Post-F9.159**.
 
 **Lo que YA estaba y no había que construir:** el **lote** es una partida de UN color con **N telas dentro** (`Lote` + `LoteComponente`, decisión **D5**) — dos partidas de negro son dos lotes, cada uno con su cardigan al tono, y el inventario se lleva por **tela × lote × almacén**. También el **precio por color** (`TelaColor`) y el **precio por proveedor y por color** (`TelaProveedor`/`TelaProveedorColor`, F8-E1).
 
@@ -743,7 +752,25 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
 
-#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ REGISTRADA, NO CONSTRUIDA
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — 🔶 **DOS TERCIOS CONSTRUIDOS** ⇒ el importador fue la **0.058/V1-E8g**, el campo propio la **0.087**, y las pantallas + el cableado del importador son la **0.095**
+
+> 📌 **No espera nada de Daniel: es TRABAJO, y ya tiene número (0.084, asignado el 1-sep).** Estuvo
+> **cuatro semanas sin número** —lo encontró el repaso que él mismo pidió— y por eso este encabezado
+> lleva ⏳: marca **pendiente de construir**, no pendiente de respuesta.
+
+> ⚖️ **AJUSTE (28-ago-2026) — el bullet de «Migración» de abajo (*partir los colores ya creados en
+> color + pack*) queda SIN EFECTO para lo capturado en `prueba`:** *«Lo viejo ahorita es irrelevante»*
+> ⇒ **§Post-F9.132**. Ese trabajo **no desaparece: cambia de sitio** y se vuelve requisito del **ETL de
+> Access del arranque** ⇒ **§Post-F9.133**. Lo demás de esta entrada —el pack como **campo propio** que
+> viaja al corte y al envío, y que el ETL y la **captura manual de OP** cumplan la misma regla que el
+> importador de PDF— **sigue abierto y sigue siendo lo que hay que construir**.
+
+
+> **Estado al 27-ago-2026.** La **primera mitad ✅ se construyó** en `V1-E8g` (**§Post-F9.129**): el
+> importador de PDF dejó de componer el color con la letra del pack, y los packs se suman en un solo
+> renglón de color. La **segunda mitad ⏳ sigue abierta**: el pack como **campo propio** que viaja al
+> corte y al envío a maquila (y es opcional al recibir), más la **migración** de las órdenes que ya
+> nacieron con `Negro A`/`Negro B`. Todo lo que sigue abajo describe esa parte pendiente.
 
 **El problema.** C&A pide varios **tendidos** en una misma OP: el pack A con corrida 1-2-2-1 (CH-M-G-EG), el pack B con 1-1-1-2, etc. Daniel lo resuelve hoy metiendo el pack **dentro del nombre del color**: "Negro A", "Negro B". Y **v2 lo copió**: el importador de OC por PDF crea un renglón por pack con el color `{Base} {LETRA}` (`BLANCO A`/`B`/`C`) — a petición suya cuando se construyó (§Post-F9.2).
 
@@ -760,7 +787,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 | Arte, entrega a cliente, inventario PT | **no aplica** — ahí ya es solo color |
 
 - **Consecuencia de diseño a resolver al construir:** con el recibo opcional, el saldo "recibido ≤ enviado" no puede llevarse solo por pack. Un recibo SIN pack consume del saldo **agregado de todos los packs** de esa orden y proceso; uno CON pack, del suyo. Hay que definir (y probar) que las dos formas convivan sin permitir recibir de más en total.
-- **Migración:** los colores ya creados con la convención vieja ("NEGRO A") hay que partirlos en color *NEGRO* + pack *A*, en la OP y en las etapas de corte/envío que ya existan. El importador de PDF deja de componer el color con la letra.
+- **Migración:** los colores ya creados con la convención vieja ("NEGRO A") hay que partirlos en color *NEGRO* + pack *A*, en la OP y en las etapas de corte/envío que ya existan. ~~El importador de PDF deja de componer el color con la letra.~~ ✅ **Esa última frase YA SE HIZO** en `V1-E8g` (§Post-F9.129); lo que sigue pendiente de este bullet es la **migración de lo ya capturado** — y mientras no exista, fusionar esos colores está **bloqueado** por el sistema, a propósito.
 - **Alcance:** OP + `EtapaMovimientoDet` (corte/envío/recibo) + importador de PDF + matrices de captura. **NO** toca el kardex de PT.
 - **Secuencia (Daniel):** *"Me parece bien terminar con las telas y luego retomas esto."* Va **después** de la reestructura de telas, como etapa propia.
 - **Fecha:** 2026-08-06.
@@ -879,7 +906,9 @@ Cierra la deuda (ii) que B1 dejó declarada: la entrada por factura no tocaba la
 
 **1. UNA sola puerta para recibir tela (decisión de Daniel).** Había dos caminos —recepción desde la OC (F4) y entrada por factura (B1)— y hacerlos convivir permitía recibir la misma tela **dos veces**, una por cada uno, inflando el inventario sin que nada lo impidiera. Se eligió que la **factura sea la puerta**: `recibirCompra` **rechaza** los renglones de tela con un mensaje que dice a dónde ir; los **avíos y las líneas libres siguen recibiéndose desde la OC**, sin cambio.
 
-**2. La liga es POR RENGLÓN, no por documento (decisión de Daniel).** `EntradaTelaLinea.idOrdenCompraLinea` (nullable). Así una misma factura puede amparar tela de **dos OCs distintas** y, en el mismo documento, tela **suelta** sin orden de compra — que es como facturan los proveedores. `NULL` sigue siendo un caso válido y frecuente.
+**2. La liga es POR RENGLÓN, no por documento (decisión de Daniel).** `EntradaTelaLinea.idOrdenCompraLinea` (nullable). Así una misma factura puede amparar tela de **dos OCs distintas** en el mismo documento — que es como facturan los proveedores.
+
+   🔴 **SUPERADO EN PARTE por §Post-F9.159(a) (30-ago-2026):** esta línea decía además *"y, en el mismo documento, tela **suelta** sin orden de compra… `NULL` sigue siendo un caso válido y frecuente"*. **Ya no lo es**: Daniel cerró esa vía (*«sin OC no podemos recibir tela»*) y el dominio la rechaza. Lo que SIGUE vigente de este punto es la liga **por renglón** (una factura, dos OCs). La columna se queda `nullable` sólo por los documentos anteriores a esa decisión, que se siguen leyendo (D3 + REGLA 0-B).
 
 **3. Confirmar la factura ES la recepción.** Al confirmar, los renglones con OC generan una `RecepcionCompra` **por cada OC surtida** (`recepciones_compra.id_entrada_tela` guarda de qué documento nació) con la MISMA contabilidad de F4: renglones contra `OrdenCompraLinea`, recálculo del estatus (R7 → `recibida_parcial`/`recibida_total`) y evento `material-recibido` al outbox, que es lo que hace avanzar la Ruta Crítica. **No mueve inventario otra vez**: reusa la partida y el movimiento de kardex que la entrada ya creó. Por eso la tela entra una vez al kardex y suma una vez a lo recibido.
 
@@ -906,7 +935,9 @@ Daniel, después de probar §Post-F9.14: *"El punto 3 no me gustó cómo quedó.
 - Lo único que queda por capturar es **el color que llegó** (y el lote), que es justo lo que la OC no define. Cantidades y precio son editables: lo que llegó puede no ser lo pedido.
   > ⭐⭐ **SUPERADO por §Post-F9.89 (V1-E3u, 22-ago-2026):** la OC **ya define el color**. La captura lo **preselecciona** desde el renglón de OC (y lo enseña en el panel de pendientes, con su pantone); sigue **editable** porque manda lo que de verdad llegó, y el confirmar **cuadra** los dos y lo dice si no coinciden. Lo que se conserva de esta decisión es el punto de partida y la contabilidad, no la frase *"la OC no lo define"*.
 
-**Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden. La captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel.
+**Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden.
+
+> 🔴 **SUPERADO por §Post-F9.159(a) (30-ago-2026):** aquí decía *"la captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel"*. Al cerrarse la vía sin OC eso habría dejado el menú **sin ninguna salida**, así que la captura desde el menú **ahora SÍ pinta el panel**: se elige el proveedor y se ofrece todo lo que tiene pendiente de recibir en sus órdenes abiertas (llegando desde una OC concreta, el panel sigue acotado a ESA orden, como dice el punto de abajo). Lo demás de esta decisión se conserva tal cual.
 
 - **El proveedor viaja en el enlace** (`state: { idOrdenCompra, idProveedor }`) en vez de releer la OC: la pantalla que manda ya lo tiene, y así el panel de pendientes se puede pedir de inmediato (necesita el proveedor).
 - **Pendiente ACOTADO a esa OC:** `GET /api/compras/lineas-tela-pendientes` acepta `idOrdenCompra`. Llegando desde una orden solo se ofrece lo de ESA orden, no todo lo abierto del proveedor.
@@ -1068,7 +1099,7 @@ Cierra la petición que quedó abierta en §Post-F9.15 (*"desde que demos entrad
 
 > *"Recuerda que en algún momento hablamos que tenemos dos tipos de proveedores. Los que nos facturan y los que no facturan. Esto aplica para todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Entonces todo esto aplica para los proveedores que manejan facturas. Pero para los que no (eso se define desde que se da de alta el proveedor) todo se tiene que meter manual."*
 
-La bandera ya existía desde **F1-E1B** (R15 §4): `Proveedor.factura`, capturada en el alta con la casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que faltaba es que esa casilla **MANDARA** en el flujo. Esta decisión la vuelve la que decide el camino, y lo hace en **un solo lugar** del dominio (`terceros/facturacion-proveedor.ts`) para que no se conteste distinto en cada módulo — la distinción es del **tercero**, no del documento.
+La bandera ya existía desde **F1-E1B** (R15 §4): `Proveedor.factura`, capturada en el alta con la casilla *"¿Emite factura (CFDI)?"* y con la regla `factura ⇒ RFC + régimen fiscal`. Lo que faltaba es que esa casilla **MANDARA** en el flujo. **⚠️ Superado por la fila 0.124 (§Post-F9.188(d)):** esa casilla **ya no se captura ni existe la regla `factura ⇒ RFC + régimen`** — contestaba lo mismo que `modalidadFacturacion` y podían contradecirse. Hoy la única pregunta es la **modalidad de facturación** y `factura` se **DERIVA** de ella (`solo_sin ⇒ false` · `solo_con`/`ambos` ⇒ `true` · sin modalidad ⇒ `null`); todo lo demás de esta decisión sigue vigente tal cual, solo cambia **de qué campo sale la respuesta**. Esta decisión la vuelve la que decide el camino, y lo hace en **un solo lugar** del dominio (`terceros/facturacion-proveedor.ts`) para que no se conteste distinto en cada módulo — la distinción es del **tercero**, no del documento.
 
 **Los tres estados (y por qué son tres, no dos):**
 
@@ -1089,7 +1120,7 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 5. **El que SÍ factura, pero todavía sin CFDI** (llegó con remisión y la factura viene después) sigue como en §Post-F9.21: **no se inventa cargo**, se registrará con la factura, que es la que trae el importe bueno.
 
 - **Aplica en:** SIN migración, SIN permisos nuevos, SIN seed → **no requiere `SEED_ON_START`**.
-- **Pendiente de captura (Daniel):** revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados — mientras esté en NULL se comportan como formales.
+- **Pendiente de captura (Daniel):** ~~revisar la casilla *"¿Emite factura (CFDI)?"* de los proveedores migrados~~ → **absorbido por la modalidad de facturación** (filas 0.110 y 0.124): la casilla se retiró y lo que hay que capturarles es *"¿Cómo factura?"*, que además es **obligatoria** desde la 0.110. Mientras la modalidad esté en NULL siguen comportándose como formales. **No hay casilla que revisar.**
 - **Fecha:** 2026-08-10.
 
 #### (Post-F9.23) — Depurar el catálogo de proveedores: solo los de 2025-2026 (DANIEL, 10-ago-2026)
@@ -1114,7 +1145,7 @@ El **NULL no es "no factura"**: son los proveedores que venían **migrados de Ac
 - **Un movimiento sin fecha legible NO declara vivo a nadie**, y el `0` del viejo (su nulo) nunca revive: preferimos dejar fuera a un dudoso —se da de alta en un minuto— que arrastrar de vuelta la basura que se está depurando.
 - **El análisis y la carga comparten el módulo**, para que no puedan discrepar.
 
-**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Emite factura (CFDI)?` (§Post-F9.22), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
+**"Corregirlos porque les falta mucha información" — qué falta exactamente.** De los 155 que se quedan: nombre 100 %, teléfono 72 %, razón social 55 %, contacto 52 %, condiciones 51 %, tipo (T/H/S) 37 %, dirección 25 %. Y **todo lo fiscal y comercial está al 0 %**, porque **el Access nunca lo tuvo**: `¿Cómo factura?` (§Post-F9.22, y fila 0.124: la columna del CSV cambió con la casilla), RFC, régimen fiscal, uso de CFDI, CP de expedición, retenciones, email, días de crédito, moneda, forma/método de pago, banco/CLABE y lead time. Esa captura es **manual e inevitable**. Para hacerla llevadera, `migracion/analisis/proveedores-depuracion.ts` escribe un **CSV con los 155 y las columnas vacías** por llenar (no toca la BD; se corre con `ETL_PROVEEDORES_DESDE=2025 npx tsx migracion/analisis/proveedores-depuracion.ts`).
 
 **⚠️ CONSECUENCIA QUE HAY QUE CONFIRMAR CON GABRIEL (no la decide este cambio):** el catálogo depurado **solo alcanza para migrar historia de 2025-2026**. Los ETL de F3-E6 (producción), F4-E6 (compras/notas) y F5-E7 (RC) hoy cargan el histórico **completo**, y esas filas apuntan a los ~897 terceros depurados. **O la migración entera se acota a 2025-2026** —que es lo que Daniel entiende que decidió Gabriel, y lo que ya vale para los consumos de tela (§Post-F9.11 punto 5, *"2025-2026, ~400 órdenes"*)— **o esos ETL se quedan sin proveedor** y omitirían masivamente. Mientras no se confirme, la depuración **está apagada por default**.
 
@@ -1359,6 +1390,17 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 - **Fecha:** 2026-08-12.
 
 #### (Post-F9.34) — Nomenclatura: el catálogo de modelos separa DESARROLLO de PRODUCCIÓN, y el modelo conserva sus dos números (DANIEL, 12-ago-2026)
+
+> ⚖️ **AJUSTE (28-ago-2026) — dos de los puntos de «Qué se decidió construir» cambian:**
+> • **El punto 2** (*el catálogo muestra **producción por defecto***) queda **SUSTITUIDO**: el default
+> pasa a **`todos`**, con la etapa visible en cada renglón, porque tal como estaba **escondía los
+> modelos que Desarrollo acababa de crear** ⇒ **§Post-F9.134** (que además **retira el alta directa de
+> modelo de producción**). El motivo original —*«no quiero llenar de basura el catálogo»*— sigue
+> vigente y ahora lo sirven la columna y el filtro, no el ocultamiento.
+> • **El punto 4** (*«pasar a producción»*) deja de ser **1:1**: de un modelo de desarrollo pueden nacer
+> **VARIOS** de producción, compartiendo **una sola receta** ⇒ **§Post-F9.135**.
+> **Todo lo demás sigue vigente** (el significado de los dígitos, las dos series, que nada se borra).
+
 
 > 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
 > SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
@@ -2852,7 +2894,14 @@ registrado: **no hay movimiento donde registrarlo**.
 | Envío de prendas **ya terminadas** | **SALIDA** de PT → saldo «en proceso» con ese tercero (por orden y proceso) |
 | Recibo de primeras | **ENTRADA** al almacén de primeras |
 | Recibo de segundas | **ENTRADA** al almacén de segundas |
-| Diferencia (enviado − recibido) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+| Diferencia (lo que no volvió) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+
+> 🔁 **PRECISIÓN de V1-E8v (§Post-F9.147, 29-ago-2026):** esta tabla decía *«Diferencia (enviado −
+> recibido)»*, y desde que la prenda **incompleta** cierra el pendiente eso dejó de describir el saldo
+> del WIP. Aquí sigue siendo correcto para **el kardex de Tránsito** —esas piezas de verdad salieron y
+> no volvieron—, pero **las dos capas ya no llevan el mismo número**: el WIP dice que el maquilero no
+> tiene nada y Tránsito guarda las incompletas, que no se inventarían. **No se pueden cuadrar entre
+> sí.** Detalle en `dominio/produccion/transito.ts` y deuda en `HOJA-DE-RUTA.md` §4.
 
 ⭐ **El faltante NO se absorbe en silencio** (D3): queda como saldo pendiente del maquilero — que es
 justo lo que se necesita para reclamárselo. Y resuelve de paso un caso que hoy tampoco tiene salida:
@@ -4214,8 +4263,12 @@ La conclusión no cambia: catálogo nuevo + dimensión nueva de existencias + re
 del histórico = **otra etapa, del tamaño de ésta o más**. Por eso NO entró aquí (habría duplicado el
 alcance de la etapa que Daniel puso como prioridad).
 
-⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
-justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+✅ **CONTESTADO — ya no preguntar.** Daniel lo cerró el **22-ago-2026** en **§Post-F9.91**: *«Va.
+Entonces lo dejamos así y ponemos los avíos con color en la misma descripción del avío»*. ⇒ **basta la
+descripción; NO se hace catálogo por color.** Se conserva la pregunta original abajo sólo como historia:
+
+> ⬜ ~~Pendiente de Daniel:~~ ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
+> justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
 ⚠️ **Al preguntárselo, hay que poner sobre la mesa que en D13 (4-jul-2026) él ya había dicho** *"consumo
 por talla solo ciertos avíos (telas no; **tampoco por color**)"* — puede seguir vigente o la práctica
 puede haberlo rebasado, pero la pregunta se hace con esa decisión a la vista, no como terreno virgen.
@@ -4392,9 +4445,20 @@ etapa del tamaño de V1-E3u o más**.
 > Y al confirmarlo: *"**Va. Entonces lo dejamos así y ponemos los avíos con color en la misma descripción
 > del avío.**"*
 
-**Qué significa en la práctica:** un cierre azul y un cierre rojo son **dos avíos** del catálogo, cada uno
-con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción ya los tratan como
-avíos distintos, que es exactamente lo que se necesita para pedir cuatro órdenes de cuatro colores.
+**Qué significaba en la práctica (22-ago):** un cierre azul y un cierre rojo son **dos avíos** del
+catálogo, cada uno con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción
+ya los tratan como avíos distintos.
+
+> 🔴 **CORREGIDO POR §Post-F9.126 (27-ago-2026) — la conclusión de arriba, NO la decisión.** Lo que se
+> mantiene intacto es lo que Daniel decidió: **no hay catálogo de color de avío, el color va en la
+> descripción**. Lo que se cayó es el *"nada que construir"*: cuando Daniel usó el sistema volvió con el
+> caso completo y pidió otra cosa —**un solo avío repetido**, no cuatro del catálogo—:
+> *"poner **4 veces el cierre** y en la descripción del avío ponerle el color"*. Duplicar el avío en el
+> catálogo habría multiplicado por cuatro su BOM, su precosto, sus proveedores y sus medidas, y habría
+> partido su inventario en cuatro. **V1-E8c lo construyó por el camino barato:** el renglón se parte por
+> el color de la **PRENDA** (el que ya vive en la matriz de la OP) y el texto del color viaja **editable**
+> en la línea de OC — sin catálogo nuevo, que es exactamente lo que él dijo aquí. *La decisión de alcance
+> aguantó; la manera de aplicarla no.*
 
 **Por qué se escribe si no se construye nada.** Porque **una decisión que no se anota se vuelve a
 preguntar**, y ésta se le hizo a Daniel con un análisis largo detrás. Queda cerrada: *no es un olvido del
@@ -4405,7 +4469,8 @@ nuevo.
 ⚠️ **Coherente con D13** (4-jul-2026), donde Daniel ya había dicho *"consumo por talla sólo ciertos avíos
 (telas no; **tampoco por color**)"*. No hubo cambio de opinión: hubo confirmación.
 
-- **Aplica en:** nada que construir. Es una decisión de **alcance**, registrada el 22-ago-2026.
+- **Aplica en:** era *"nada que construir"*; lo construyó **V1-E8c** (§Post-F9.126) sin desviarse de la
+  decisión de alcance de aquí — ver el recuadro de arriba. Registrada el 22-ago-2026.
 - **Fecha:** 2026-08-22.
 
 ---
@@ -4791,7 +4856,14 @@ leerla junto con `comprometido-en-oc.ts`, que ya es **la única verdad sobre cu�
 requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**. **Un criterio,
 no dos.**
 
-- **Aplica en:** etapa propia, después de V1-E5.
+- **Aplica en:** ✅ **V1-E8e** (27-ago-2026, versión **0.042**). Construido tal cual: la pregunta en la
+  **revisión previa** cuando se baja la cantidad (default *«sigue pendiente»*, sin umbral), un
+  **«dar por cubierto» / «volver a pedirlo»** desde el renglón de la explosión para los que ya se
+  escaparon, y el rastro de A7 completo. La marca vive en **tabla propia**
+  (`RequerimientoCubierto`, por *(orden, material, color)*) — **no** en el snapshot, que se reescribe
+  entero en cada explosión— y el neteo la lee **en el mismo criterio** que lo comprometido
+  (`pendienteDeComprar`: *comprometido + dado-por-cubierto ≥ requerido*). Ficha:
+  `docs/hoja-de-ruta/V1-etapas.md` §V1-E8e; módulo: `docs/modulos/compras-mrp.md`.
 - **Fecha:** 2026-08-23.
 
 ---
@@ -5145,10 +5217,64 @@ mismo orden. Sigue siendo escritura de catálogo: queda auditada contra la tela 
 
 ⚠️ **Daniel puede pedir marcha atrás.** Si prefiere que el alta de colores sea privilegio de quien
 administra catálogos, se vuelve a `telas.administrar` cambiando **una línea** en el dominio, una en la
-ruta y una en la pantalla — con el efecto conocido de que ningún perfil de compras salvo el dueño podrá
-dar de alta un color desde la explosión.
+ruta y una **en cada una de las DOS pantallas** que hoy abren la puerta (el renglón de la explosión y
+el cuadro de «colores y precios de la orden», V1-E8o del 29-ago-2026) — con el efecto conocido de que
+ningún perfil de compras salvo el dueño podrá dar de alta un color desde la compra.
 
 - **Fecha del ajuste:** 2026-08-25.
+
+### ✅ EXTENSIÓN (29-ago-2026, `V1-E8o`) — la MISMA puerta en el cuadro de «colores y precios de la orden»
+
+La etapa que implementó esta decisión abrió el alta **en el renglón** de la explosión y **dejó anotado
+en su propio código** que el diálogo «Ver todos los colores y precios de la orden N» —al que se llega
+**desde ese mismo bloque, a un clic**— seguía sin ella: sólo *apuntaba* al desplegable de al lado. La
+frase con la que se le contó a Daniel (*"antes te mandaba a Catálogos › Telas… ahora es la última
+opción del desplegable"*) era cierta **en una de las dos puertas**.
+
+**Ya está en las dos, con el mismo patrón y el mismo permiso** (`compras.administrar`, sin cambio a lo
+decidido el 25-ago): opción última y separada, precargada con el color y el pantone de la OP, y el
+color recién creado **queda elegido**. No hay decisión nueva de negocio aquí — es la misma, aplicada
+donde faltaba.
+
+⭐ **Lo que sí se aprendió y vale para lo que sigue:** *cerrar una puerta no cierra su gemela.* Este
+mismo texto ya se había corregido una vez (de *"ve a Catálogos › Telas"* a *"cierra este cuadro"*) y
+seguía produciendo el estado prohibido, más cerca. El barrido por **estado** —no por función—
+encontró además una **tercera** boca en el **almacén** (captura de entrada/traspaso/ajuste/salida de
+tela por color) — y está en el **camino obligatorio** de recibir tela, porque desde §Post-F9.14 la tela
+ya no se recibe desde la OC.
+
+🔴 **Ahí se partió la deuda en dos, y la ronda de corrección enseñó por qué hay que partirla:** el
+permiso que falta bloquea **construir el alta**, no **decir a dónde ir**. El letrero ya entró (esa
+pantalla nombra ahora *Catálogos › Telas*); lo que espera es el alta.
+
+~~⭐ **PREGUNTA ABIERTA PARA DANIEL:** **¿quién puede dar de alta un color de tela desde el ALMACÉN?**
+Hoy el servidor exige `compras.administrar` para `agregarColorATela` y esas pantallas viven bajo
+`inventario-telas.mover` → un almacenista se comería un **403**. Las opciones son un permiso propio
+(`inventario-telas.administrar`) o reusar `compras.administrar` si quien recibe también compra. **No
+se propone default**: es exactamente el tipo de decisión que §Post-F9.106 dejó en manos del dueño.
+Anotada en `HOJA-DE-RUTA.md` §4.~~
+
+### ✅ CERRADA EN CONTRA (29-ago-2026, DANIEL — §Post-F9.144(d)): el alta desde el almacén NO se construye
+
+> *"no se puede dar de alta un color al recibir. El color se da de alta en la OC. Por que no puede recibir
+> nada que no se haya comprado con una OC. Y ahi es donde se define el color. Por que recibiria algo que no
+> este dado de alta? quiere decir que no hubo una OC previa?"*
+
+🔴 **Daniel no eligió entre las dos opciones: rechazó la premisa.** La pregunta daba por bueno que el
+almacén *debe* poder dar de alta colores y que sólo faltaba **con qué permiso**. La regla de negocio es
+otra: **el color se define en la OC**, y **no se recibe nada sin OC previa** ⇒ si hay algo que recibir, su
+color **ya existe**. ⇒ **No hay permiso que elegir, porque la función no debe existir.**
+
+⭐ **El reencuadre, que es lo que vale:** el equipo lo trataba como **una función que falta**; es un
+**SÍNTOMA**. Si el almacén se topa con un color inexistente, lo que falla está **antes**: se está
+recibiendo algo **sin orden de compra**. Montar el alta ahí no habría resuelto nada — habría **borrado la
+única señal** de que faltó la OC.
+
+⬜ **Lo que sí queda pendiente es AFINAR EL LETRERO** que esta extensión puso en
+`CapturaRenglonesTelaColor` (`data-testid="captura-color-sin-colores"`): hoy dice **a dónde ir**, y debería
+además decir **qué significa** (*«este color no viene de ninguna OC; verifica que la compra exista»*) —
+convertir un callejón sin salida en un **diagnóstico**. **No se construyó nada**: sólo quedó escrito.
+Detalle en **§Post-F9.144 (d)**.
 
 ---
 
@@ -5395,6 +5521,27 @@ documento propio.
 > mandar a producir**. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
 > imprudencia o un error."*
 
+### 🔁 NOTA DE AFINACIÓN (29-ago-2026, §Post-F9.144) — «EDITA LA RECETA EN VIVO» hay que leerlo con cuidado
+
+⚠️ **Lo esencial de esta decisión SIGUE EN PIE:** la negociación **no toca el modelo**, escribe en la
+versión del precosto, y la revisión bisagra es indispensable. **Nada de eso se retira.** Lo que el título
+y la cita de arriba sugieren —que **Daniel** edita la receta **en la mesa**— es lo que él precisó cuatro
+días después, y conviene tenerlo delante antes de construir:
+
+> *"todo eso se registra pero **no se puede cambiar la receta por que no estoy viendo los catalogos**"*
+
+> *"**No puedo yo modificar la receta estando en la negociacion**... eso se hara mas adelante por la gente
+> de desarrollo en base a la informacion que meti en lanegociacion."*
+
+⇒ Lo que se mueve en la mesa son **ESTIMADOS** (§Post-F9.139) — números libres que **no tocan catálogo**—,
+y la **receta de verdad** nace **después, en la oficina, y la hace DESARROLLO**, en una **versión nueva**
+armada a partir de los comentarios y la cotización negociada. La frase *"yo en la negociación le quiero
+poder eliminar el cierre"* describe **el efecto que quiere ver en el precio**, no una escritura sobre la
+receta.
+
+**El proceso completo, en tres momentos, está en §Post-F9.144 (a).** *Se deja el título de esta entrada
+como está: es historia del proyecto y renombrarla rompería las ~decenas de referencias que la citan.*
+
 ### ⭐ Lo que YA está construido (medido, 25-ago) — es más de lo que parecía
 
 | Pieza | Estado |
@@ -5614,3 +5761,8900 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 - **Aplica en:** V1-E6c (ya construido). ⚠️ **Si Daniel la rechaza**, hay que revertir el guard de `login.ts` **y aceptar el escenario del auto-bloqueo** — o construir otra salida (p. ej. que Gerencial pueda desbloquear).
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
+
+**Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
+colgando de la lista, el correo después). Al construirlo (V1-E7c) hicieron falta **cinco reglas más**
+que él no dictó. El reviewer independiente marcó —con razón— que vivían sólo en la ficha del track de
+desarrollo: *"hoy Daniel sólo puede objetarla si lee un archivo del track"*. **Una decisión que el dueño
+no puede encontrar no está tomada, está escondida.** Por eso se registran aquí.
+
+**(a) La cotización es INMUTABLE.** Nace ya emitida —es la foto de un momento— y **no se edita jamás**:
+no hay `PUT` ni `PATCH`, a propósito. Otra vuelta = **otra cotización**. Se **cancela con motivo**,
+auditado, y la cancelada **se sigue imprimiendo** con su banda. *Un papel que ya salió no se corrige
+borrándolo: se corrige con otro papel.* (D3.)
+
+**(b) Cada renglón CONGELA VALORES, no punteros:** código del modelo, descripción, el número del
+cliente, la versión del precosto y el precio, **copiados**. La lista sigue moviéndose después de emitir;
+con sólo referencias, **reimprimir la de marzo enseñaría los precios de mayo**. Es lo que permite
+contestar *"esto fue exactamente lo que le mandé"*.
+
+**(c) Folio por secuencia atómica** (A3), nunca `Max()+1`. Y el guard va **antes** del folio: un rechazo
+**no quema un folio**.
+
+**(d) 🔴 NO se emite con un precio SIN APROBAR** — se rechaza **nombrando cuáles** faltan.
+⚖️ *Mandarle al cliente un precio que el dueño no aprobó es el compromiso que nadie firmó*, y Daniel fue
+explícito en F8-E4: *"el precio lo apruebo solo yo"*.
+⚠️ **Ésta es la que más probable que él quiera ajustar**: si alguna vez quiere mandar una **preliminar**,
+es un freno. Se quita retirando `exigirRenglonesAprobados` y caen 4 pruebas que lo dicen por su nombre.
+
+**(e) Sin permiso nuevo.** Emitir usa **`listas.negociar`** (quien está en la mesa); ver usa
+`listas.ver`. ⇒ el deploy **no requiere `SEED_ON_START`**.
+
+- **Aplica en:** V1-E7c (construida). **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.115) — EL DOCUMENTO TIENE QUE SER AUTOSUFICIENTE (LEAD + reviewer, 25-ago-2026)
+
+**Cómo salió, y por qué vale registrarlo.** La primera versión de V1-E7c dejó dos pegas declaradas como
+**cosas distintas**: (1) las FK con `RESTRICT` dejaban **amarrado** lo ya cotizado —un renglón cotizado no
+se podía quitar de la lista **ni con la cotización cancelada**—, y (2) el **encabezado no se congelaba**
+(el nombre del cliente se leía por FK, así que un renombre reescribía el papel viejo).
+
+🔴 **El reviewer midió que eran EL MISMO defecto**, y ahí está la lección:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+**Y era el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era "queda atrapado" sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` — **que sigue vivo**.
+
+**Lo que se decide, y sirve para TODO documento futuro:**
+
+- **Un documento que sale a un tercero se congela ENTERO** —encabezado incluido—, no sólo sus renglones.
+  El precedente ya estaba en el propio módulo: `ListaPrecios` **ya guardaba** los factores del cliente
+  como snapshot en vez de apuntarlos.
+- **Las FK de PROCEDENCIA van a `SetNull`, no a `RESTRICT`.** `RESTRICT` **no protege el papel** —su
+  contenido está en sus propias columnas y nadie lo toca—: protege **el puntero**, y para eso **prohíbe
+  una operación de otro agregado que el sistema construyó a propósito**. La procedencia ya está a salvo
+  en la bitácora.
+- ⇒ **D3 queda igual de satisfecho** (no se edita ni se borra nada del documento) **y V1-E4 deja de
+  estar revertido**.
+
+⭐ **Y el argumento del coder que cierra el caso**, sobre dejar una FK en `RESTRICT` "porque hoy no
+existe ningún camino que borre eso": *sostener una decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida.* Los caminos se construyen después, y entonces
+nadie recuerda por qué el candado estaba ahí.
+
+**Momento:** se hizo **con las tablas vacías**, sin backfill. *Es el momento más barato que iba a
+existir* — un mes después habría sido una migración de datos.
+
+- **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.116) — ⭐ LA APROBACIÓN SE CAE SI LA RECETA CAMBIA: una firma que no está amarrada a lo que se firmó no es una firma (DANIEL, 25-ago-2026)
+
+**Cómo salió.** No lo reportó Daniel: lo **declaró el coder de V1-E7d** al cerrar su etapa, como hueco
+conocido de lo que acababa de construir. Aurora revisa la versión y la **aprueba**. Después alguien le
+cambia el consumo de una tela, o le mueve el arte. Y la orden de producción sale **con la aprobación
+vieja**, sobre una receta que ya no es la que ella miró.
+
+⚖️ **Es exactamente el problema que la revisión viene a evitar, entrando por otra puerta** — y peor,
+porque el sistema la presenta como revisada. *Una firma que no está amarrada a lo que se firmó no es una
+firma: es un adorno.*
+
+**Respuesta de Daniel:** *"Sí, ciérralo."*
+
+Y con una condición que fijó el alcance de toda la etapa:
+
+> *"Cubrir sólo una parte sería **PEOR** que no cubrir nada: parecería resuelto sin estarlo."*
+
+**Lo que se decide:**
+
+- **(a)** **Cualquier cambio a la receta de una versión APROBADA la devuelve a `pendiente`**, con una
+  nota que dice **qué la invalidó y cuándo**, más de cuándo era la firma que tumbó (A7).
+- **(b)** **La firma vieja NO se borra** (D3): vive en la bitácora con quién la aprobó y cuándo, así que
+  el sistema puede contestar *"Aurora la aprobó el 12, se le cambió la tela el 14, y volvió a firmarse
+  el 15"*.
+- **(c)** **Se vuelve a firmar normalmente**, con el mismo permiso. **No hay estado muerto**: nada queda
+  atrapado sin salida.
+- **(d)** **TODAS las puertas o ninguna** — la condición de Daniel. Cubrir cuatro de seis habría dejado
+  un sistema que **dice** que la firma está viva.
+
+🔴 **Y el barrido encontró SEIS puertas, no las cuatro que el lead había listado.** Las dos que se le
+escaparon: **los avíos favoritos** (un botón que mete avíos **directo al BOM**, saltándose la pantalla
+normal) y **las fotos del arte** — y ésta importa, porque *la imagen ES lo que el bordador va a hacer*:
+cambiarla cambia el producto.
+
+⭐ **Cómo se cerró, y esto vale más que la etapa:** había **tres copias** de la función que "toca" el
+modelo, y cada mutación llamaba a la suya. **El embudo ya existía: sólo estaba triplicado.** Se
+unificaron en una sola con el **tipo de cambio como parámetro OBLIGATORIO**, de modo que **una puerta
+nueva no compila hasta que declara qué toca**. Deja de depender de que alguien se acuerde.
+
+⚠️ **La red tiene dos límites, y quedan dichos** (los encontró el reviewer, no se descubrieron después):
+el guardián trabaja **por archivo, no por función**, y mira las dos formas de escribir —directa y
+anidada por relación— en **`src/` y `migracion/`**. Los cargadores del ETL quedan como **excepción
+declarada** (cargan modelos migrados, que nunca tuvieron firma). *Es una red, no un teorema.*
+
+- **Aplica en:** V1-E7e. **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.117) — ⚠️ NÚMERO NO USADO
+
+Se pronunció en el chat al numerar la tanda del 25-ago y **nunca llegó a ser una entrada**. Se deja
+asentado para que quien siga una referencia no crea que se perdió algo: **no hay decisión 117**. Lo
+mismo con la **121**. *(Es la tercera cicatriz de numeración de este track — ver el aviso de la 108
+duplicada y el de la 123.)*
+
+---
+
+#### (Post-F9.118) — LO QUE ENTRA Y LO QUE NO ENTRA A LA PRIMERA VERSIÓN DE PRODUCCIÓN (DANIEL, 25-ago-2026)
+
+> ✅ **RATIFICADA (28-ago-2026): el punto (b) se le volvió a preguntar y contestó lo mismo —
+> «Arrancamos sin ella».** La **Ruta Crítica NO entra el día uno**: está construida completa (F5, siete
+> etapas) pero **nunca se ha usado en vivo**, y se enciende después del arranque, con calma. No hay
+> decisión nueva que registrar: **se anota aquí para que quede claro que no es un olvido, sino la
+> misma decisión sostenida**. Su consecuencia —que todo lo que dependía de la RC para tener fechas se
+> pueda capturar a mano— sigue igual de vigente.
+
+
+**Cómo salió.** Daniel, de corrido, contestando qué hacía falta decidir para arrancar:
+
+> *"Las órdenes de compra quedamos que en producción **empezamos en 10000**. / **La ruta crítica
+> después. Arrancamos sin ella**. / **Cargamos los saldos con las facturas que están vivas.** No es
+> mucho tema. Son 3 o 4 clientes."*
+
+**(a) El folio de las órdenes de compra arranca en 10000.** Y cuando el lead le preguntó si no
+chocaría con la numeración del sistema viejo:
+
+> *"Vamos a empezar con el 10000. **No choca. Yo sé en qué va el otro.** No te preocupes. **Déjalo como
+> una regla.** Ya te había dicho. **Ya deja de preocuparte por cosas que ya están resueltas.**"*
+
+⇒ Es una **regla del arranque**, no una configuración: el consecutivo de OC se siembra en 10000 al
+poner producción. 🔴 **Es IRREVERSIBLE** (los folios no se re-numeran) y **hoy no existe herramienta
+para sembrarlo**: hay que construirla antes del go-live, o quedará en 1.
+
+**(b) La Ruta Crítica NO entra a la primera versión.** *"Arrancamos sin ella."* El módulo está
+construido (F5, siete etapas) pero **no se enciende**: se prende después, con calma. ⇒ Lo que hoy
+depende de la RC para tener fechas **tiene que poder capturarse a mano**, y eso no es un parche: **es
+lo correcto mientras la RC esté apagada**.
+
+**(c) Los saldos de apertura se cargan con las facturas VIVAS**, no con el histórico completo. *"Son 3
+o 4 clientes."* ⇒ El ETL de apertura de F9 **no necesita el corte completo de SINUBE para arrancar**:
+necesita las facturas abiertas. Sigue esperando que Daniel las entregue.
+
+- **Aplica en:** (a) el go-live · (b) todo el track V1 · (c) el ETL de apertura de F9.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.121) — ⚠️ NÚMERO NO USADO
+
+Ver el aviso de la **117**: se pronunció al numerar y nunca llegó a ser entrada. **No hay decisión 121.**
+
+#### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
+
+> *"Acuérdate que el número de modelo de desarrollo se genera en automático. Hay que ponerle **3 letras
+> identificadoras del cliente** dentro del catálogo de clientes para usar **siempre el mismo
+> identificador**, ¿no?"*
+
+**Ya existía, y él tenía razón en pedirlo:** `Cliente.abreviatura` (`schema.prisma`) es el `CYA` de
+`CYA-26-71-001`, es **única entre clientes** (así que dos clientes no se pelean el mismo identificador)
+y sin ella el minteo **no adivina**: lanza un error que dice qué capturar y dónde
+(`nomenclatura.ts:406-410`). Eso último importa más de lo que parece — derivar las letras del nombre
+automáticamente acabaría con dos clientes distintos compitiendo por las mismas tres sin que nadie lo
+hubiera decidido.
+
+**Lo que NO coincidía con lo que él pidió:** el Zod aceptaba **2 a 6 caracteres y admitía DÍGITOS**
+(`contrato/esquemas/cliente.ts:113-119` y un segundo bloque en `:248`). O sea `CY`, `MARILY` y `CY2`
+eran todos legales.
+
+⚖️ **Por qué la longitud fija no es capricho:** con longitud variable el código deja de alinearse
+(`CYA-26-71-001` contra `MARILY-26-71-001`) y se pierde justo lo que hace útil una nomenclatura —
+poder leerla en columna y ordenarla. Daniel especificó **3 letras** las dos veces que tocó el tema.
+
+**Lo que se decide:**
+
+- **(a)** La abreviatura son **EXACTAMENTE 3 letras A–Z**. Sin dígitos, sin 2, sin 6.
+- **(b)** 🔴 **PROSPECTIVO.** La regla aplica **al capturar o corregir**. **NO puede romper la LECTURA**
+  de clientes ya capturados con otra longitud: si el apretón tocara el esquema de RESPUESTA, un cliente
+  viejo de 2 letras **reventaría al listarse** y se caería el catálogo entero. Se aprieta la entrada; la
+  salida se deja tolerante.
+- **(c)** No se pudo medir cuántos clientes hay hoy fuera de norma (no hay BD local y Docker está
+  prohibido). Se descubre en uso: al guardar un cliente viejo, el sistema lo rechaza y se corrige en
+  ese momento.
+- **(d)** Se conserva lo que ya estaba decidido y sigue vigente: **cambiar la abreviatura NO renumera
+  los códigos ya emitidos** — quedaron congelados, porque ese código ya vive en órdenes, en papeles y
+  en la cabeza de la gente.
+
+- **Aplica en:** V1-E7b (mismo commit que el sufijo de versión, es el mismo territorio).
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.113) — UN SOLO PRECIO PARA TODAS LAS MEDIDAS DEL AVÍO (DANIEL, 25-ago-2026)
+
+**La pregunta.** Al medir §Post-F9.100 (que la medida del avío viaje a la orden de compra) apareció un
+cabo que la decisión original no contemplaba: cada `AvioMedida` tiene **precio propio** en el catálogo
+(`schema.prisma:2028`) — el cierre de 53 cm puede costar distinto que el de 56 —, pero el renglón de la
+orden de compra lleva **un solo `precio`**. Al desglosar el papel («120 piezas de 53 cm, 80 de 56 cm»),
+¿el precio también se desglosa?
+
+Se le planteó a Daniel como decisión de negocio, no de ingeniería, porque **desglosar cantidades sin
+desglosar precios deja el detalle a medias** y ése es justo el documento que genera discusión con el
+proveedor.
+
+**Su respuesta:**
+
+> *"Un solo precio para todas las medidas."*
+
+⇒ **El renglón de la OC conserva UN precio.** El desglose por medida es **de cantidades**, para que el
+proveedor sepa qué mandar. El importe sigue siendo `cantidad × precio` y **cuadra sin excepciones**.
+
+**Lo que esto simplifica, y no es poco:**
+
+- La **consolidación** de §Post-F9.102 sigue metiendo `precio` en su clave de agrupación sin conflicto:
+  dos órdenes del mismo avío al mismo precio se funden aunque lleven medidas distintas.
+- No hay que tocar `OrdenCompraLinea.precio` ni el cálculo de importes.
+- El `precio` del catálogo por medida **no se contradice**: sigue sirviendo para el **precosteo**, que
+  es donde se usa. Lo que se decide aquí es sólo qué se le imprime al proveedor.
+
+⚠️ **Lo que queda dicho para que nadie lo descubra después:** si algún día un proveedor cobra de verdad
+distinto por medida, esta decisión hay que revisitarla — el renglón tendría que partirse en uno por
+medida, no llevar precios múltiples. **Partir el renglón es la salida natural**, y no requiere cambiar
+el modelo de datos. Se anota aquí para no re-descubrirlo.
+
+- **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.119) — NO SE VERSIONA UN MODELO DESCONTINUADO: HAY QUE REACTIVARLO PRIMERO (DANIEL, 25-ago-2026)
+
+**Cómo salió.** El reviewer de V1-E7b lo levantó como **observación, no como defecto**: versionar un
+modelo descontinuado estaba **permitido**, mientras que el vecino más cercano —`crearDesarrollo`— sí lo
+bloquea (*"está descontinuado; no se puede desarrollar"*). **Dos puertas con reglas distintas para el
+mismo hecho.** No rompía ninguna invariante y podía ser deliberado (revivir con receta nueva es un caso
+de negocio real), pero **nadie lo había decidido**.
+
+**Qué significa «descontinuado», medido antes de preguntar** (para que la decisión se tomara sobre
+hechos y no sobre una idea):
+
+- Es una **decisión manual y explícita**: una casilla en la ficha del modelo. **Nada lo hace solo** — ni
+  por antigüedad, ni por falta de ventas, ni porque el cliente se fue.
+- Es **reversible**: se reactiva con la operación inversa. **No se borra nada** (D3): el modelo conserva
+  su historia, sus órdenes y su receta.
+- Hoy ya implica tres cosas: desaparece de las listas por omisión (se ve marcando *"incluir
+  descontinuados"*), **no se le puede abrir un desarrollo nuevo**, y si alguien intenta dar de alta otro
+  modelo con ese código, el sistema **ofrece reactivarlo** en vez de dejar crear un duplicado.
+
+**Respuesta de Daniel:** *"Sí. Está bien. **Hay que activarlo para poder usarlo nuevamente**."*
+
+**Lo que se decide:**
+
+- **(a)** **Versionar un modelo descontinuado se RECHAZA**, con un mensaje que diga qué hacer:
+  reactivarlo primero.
+- **(b)** El criterio queda **consistente en las dos puertas**: si descontinuar es un acto deliberado,
+  ni se desarrolla ni se versiona sin deshacerlo antes. **Reactivar sigue siendo trivial**, así que no
+  se pierde el caso de negocio de revivir un modelo — sólo se vuelve **explícito**.
+
+⚖️ *El valor no está en impedir el versionado: está en que revivir un modelo sea un acto que alguien
+decide, y no un efecto lateral de otra operación.*
+
+- **Aplica en:** V1-E7e (añadido acotado; es el mismo territorio de `modelos/versiones.ts`).
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.123) — ⭐ AURORA ADMINISTRA MODELOS: un modelo NO es un catálogo como los demás (DANIEL, 26-ago-2026)
+
+> ✅ **CERRADA LA NOTA QUE ESTA ENTRADA DEJÓ LEVANTADA (28-ago-2026).** Abajo queda anotado —y
+> explícitamente NO resuelto por iniciativa propia— que la columna **«costo actual»** del listado de
+> modelos enseña un **costo REAL de producción** y que Gerencial la ve por `consultas.ver-importes`,
+> rozando el *«tampoco costos finales reales»* de Daniel. Se le preguntó y contestó **«Escóndesela»**
+> ⇒ **§Post-F9.137** — **decisión cerrada y ✅ CONSTRUIDA** (V1-E8l, 28-ago-2026, versión 0.049):
+> **ya no se ve.** El candado pasó a `costos.ver` + `consultas.ver-importes`, así que **a Gerencial no
+> se le quitó ningún permiso** y su precosteo quedó intacto (el porqué, medido, está en §Post-F9.137).
+> Lo demás de esta entrada (que `modelos.administrar` se corte en Ventas) **no cambia**.
+
+
+**Cómo salió.** Daniel: *"Me comenta Aurora que no puede meter un nuevo modelo. Ella lleva toda la parte
+de desarrollo, así es que debería de poder ver todo eso."*
+
+**La causa, medida:** `modelos.administrar` se corta en **Directivo** hacia abajo, junto con telas, avíos,
+colores, tallas y clientes, bajo la regla *"administrar catálogos es de Administración/Dirección"*.
+Aurora es **Gerencial** ⇒ no lo tenía.
+
+🔴 **El error de fondo: un modelo NO es un catálogo como los demás.** Una tela o un color son **datos
+maestros** que se dan de alta una vez y casi no cambian. **Un modelo es el TRABAJO DIARIO de Desarrollo**
+—se crea, se le mueve la receta, se le cambia el arte, se versiona—. Meterlo en el mismo saco que *"el
+catálogo de colores"* dejó **a quien lleva Desarrollo sin poder desarrollar**.
+
+⚠️ Y el sistema ya lo contradecía: Gerencial **sí** tenía todo `desarrollo.*` y todo `listas.*` —proyectos,
+precosteo, negociar—. Le faltaba **la pieza sin la cual nada de eso arranca**.
+
+### Cómo se trabaja HOY, en palabras de Daniel
+
+> *"Ella hace todo el desarrollo con el equipo de desarrollo… arma un excel con todos los costos. Me los
+> pasa, yo reviso y le doy el precio de venta que ella arma en una cotización y manda al cliente."*
+>
+> *"Solo yo defino los precios de los clientes… ella no los define, pero sí los ve."*
+>
+> *"Solamente no quiero que vea al final los estados de resultados… **Tampoco costos finales reales**. O
+> sea tiene que ver todo en la parte de desarrollo **pero no cómo terminamos**."*
+
+### ⭐ La línea que trazó, y que resultó estar YA construida
+
+**Ve EL PLAN (lo que va a costar), no EL RESULTADO (cómo terminamos).** Se midió permiso por permiso y el
+corte ya caía exactamente ahí:
+
+| Permiso | Qué gobierna | ¿Gerencial? |
+|---|---|---|
+| `precostos.consultar` | **El PLAN**: el precosteo | ✅ ya lo tenía |
+| `consultas.ver-importes` | Los importes de **Costos/Márgenes** (costeo de orden, márgenes, lista de costos) **y los del PRE-COSTEO** (`calcularPreCosto`/`listaPrecios` — por eso NO se le puede quitar sin apagarle el precosteo, §Post-F9.137). En el módulo de Modelos su único efecto era la columna **«costo actual»** del listado, que **desde §Post-F9.137 pide ADEMÁS `costos.ver`** | ✅ ya lo tenía |
+| `costos.ver` / `.capturar` | **El RESULTADO**: costo real de la orden, costo real desde compras, márgenes | ❌ correcto |
+| `ordenes.ver-costos` | El botón de costos de la orden ya producida | ❌ correcto |
+| `edr.ver` / `.capturar` | Estado de resultados | ❌ correcto |
+| `listas.aprobar` | **El precio de venta** | ❌ correcto — *"solo yo defino los precios"* |
+| `listas.negociar` | Armar y **mandar** la cotización | ✅ ya lo tenía |
+
+⇒ **Faltaba UN permiso, no un rediseño.** Se verificó además lo que más preocupaba —que Aurora no quede
+**desarrollando a ciegas**— y el resultado, medido, fue todavía más simple de lo que se creía:
+
+🔵 **La receta NO tiene candado de importes en absoluto.** `obtenerFichaModelo`, `listarTelasBom` y
+`listarAviosBom` (`backend/src/dominio/modelos/bom-modelo.ts`) exigen **sólo `modelos.ver`**, y los
+precios de telas y avíos viajan en su salida **sin permiso adicional**. O sea que la receta ya se veía
+completa antes de este cambio, y `consultas.ver-importes` **no es lo que la destapa** (ese permiso
+gobierna los importes de Costos/Márgenes). Su único uso dentro del módulo de Modelos era
+`adjuntarAgregadosListado` (`backend/src/dominio/modelos/modelos.ts`).
+
+⚠️ **Nota levantada con Daniel (preexistente — este cambio NO la introduce).** Ese único uso,
+`adjuntarAgregadosListado`, alimenta `costoActual`: el **costo UNITARIO del ÚLTIMO costeo (F7) de una
+orden del modelo**, pintado como **columna del listado de modelos**
+(`frontend/src/modulos/modelos/ModelosPagina.tsx`, en sus dos pintados: tabla de escritorio y tarjeta de
+móvil). Eso es un
+**costo REAL de producción**, no del plan, y Gerencial **lo veía cuando se escribió esto** —ya desde
+antes de §Post-F9.123, porque `consultas.ver-importes` siempre estuvo en su conjunto—. **Ya NO** (véase
+§Post-F9.137, construida el 28-ago-2026). Roza el *"tampoco costos finales reales"*
+de Daniel, así que **queda anotado y levantado con él**. **NO se cambia por iniciativa propia:** mover ese
+permiso es decisión suya, y afecta también a Costos y Márgenes.
+
+> ✅ **RESUELTA LA DECISIÓN (28-ago-2026): «Escóndesela»** — y ✅ **CONSTRUIDA en V1-E8l** (28-ago-2026,
+> versión **0.049**): **Gerencial ya NO la ve.** Daniel decidió esconder esa columna y **bloquear el dato
+> en el servidor**, y así quedó: sin permiso la columna no se pinta **y** el servidor ni siquiera
+> consulta el costo.
+>
+> ⚠️ **El mecanismo salió DISTINTO del que esta nota daba por hecho.** Aquí se asumía que bastaba con
+> mover a Aurora fuera de `consultas.ver-importes` *«que afecta también a Costos y Márgenes»*. Medido,
+> ese permiso gobierna **además el PRE-COSTEO** (`calcularPreCosto`/`listaPrecios`), justo lo que Daniel
+> dijo que ella SÍ debe ver ⇒ **no se le quitó ningún permiso**: el candado se colgó de `costos.ver` +
+> `consultas.ver-importes` (`puedeVerCostoRealDeModelo`), y **el seed no se tocó**. El detalle, y el
+> riesgo que Daniel aceptó, en **§Post-F9.137**.
+
+**Lo que se decide:** **`modelos.administrar` cambia de escalón: se corta en VENTAS, no en Directivo.**
+Sale de la resta de `directivo` y entra en la de `ventas` (`seed.ts`). ⇒ Lo tienen **Administrador,
+AdministracionDireccion, Directivo y Gerencial**; **Ventas, Logística, Asistente y Secretarial NO**. Es el
+mismo escalón donde ya se cortaba `modelos.aprobar-receta` (§Post-F9.110), y por la misma razón:
+administrar y aprobar la receta son trabajo de **Desarrollo**.
+
+🔴 **Por qué se mueve el CORTE y no se le "añade" el permiso a Gerencial.** La cascada del seed es
+*"menor nivel ⊃ mayor nivel"* (`sin()`): cada rol es el anterior **menos** lo que pierde. Devolvérselo a
+Gerencial con un `.concat` sobre `sin(directivo, …)` —como se intentó primero— **lo colaba ADEMÁS a
+Ventas, Logística, Asistente y Secretarial**, que derivan de Gerencial, y encima **invertía la cascada**:
+Directivo (nivel 30) se quedaba sin él y Secretarial (nivel 60) con él. Es la **misma fuga** que ya se
+había corregido en `rc.catalogo-administrar` (*"antes se colaba a roles clericales"*). Lo cazó el reviewer
+**ejecutando `definirRoles()`**, no leyéndolo, y ahora queda fijado por una prueba de **ALCANCE** en
+`roles-reparto.test.ts` que nombra rol por rol dónde termina el permiso.
+
+### La prueba que lo afirmaba al revés, INVERTIDA y no borrada
+
+`roles-reparto.test.ts` tenía *"⭐ aprobar la receta NO arrastra administrar el catálogo (Aurora no
+administra modelos)"*. **Era cierta bajo la regla de entonces.** Se invierte con su rastro escrito dentro
+—por qué el sistema llegó a ese estado— y se **añade una gemela** que fija la línea nueva: administrar
+modelos **no le abre** costos reales ni EDR, y el precio sigue siendo del dueño.
+
+Y se añaden **dos pruebas de ALCANCE** —las que faltaban, y las que habrían matado la fuga del `.concat`
+en el sitio—: que `modelos.administrar` **no baja de Gerencial** (nombrando a Ventas, Logística, Asistente
+y Secretarial uno por uno) y que **la cascada no se invierte** (Directivo sí, Secretarial no). Las
+aserciones de conteo de `seed.int.test.ts` **no ven** una fuga así: infla los dos escalones a la vez y la
+cascada "sigue bajando".
+
+*El flujo del Excel, dentro del sistema: ella desarrolla y cotiza, él aprueba el precio.*
+
+- **Aplica en:** V1-E7d (mismo commit; es el territorio de permisos de modelos) — versión **0.034**.
+  🔴 **Requiere `SEED_ON_START=true`** en el deploy, o el reparto nuevo no llega.
+- **Fecha:** 2026-08-26.
+
+> ⚠️ **Nota de archivo, para quien busque esto por el historial de git:** el commit que trae este cambio
+> (`9b4e9a2`) lleva en su título **`§Post-F9.122`**, que es **otra decisión** (el catálogo de
+> departamentos que se llena de sinónimos, aquí abajo). La numeración correcta de ESTA decisión es
+> **§Post-F9.123**, que es la que llevan los archivos. No se reescribe la historia por un título; queda
+> anotado aquí para que un `git log` no mande a la sección equivocada.
+#### (Post-F9.122) — ⭐⭐ EL CATÁLOGO DE DEPARTAMENTOS DEL CLIENTE SE ESTÁ LLENANDO SOLO DE SINÓNIMOS (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, después de cargar tres modelos de C&A:
+
+> *"Hay un problema de fondo que vale la pena resolver de una vez. Se ha vuelto algo confuso el género,
+> el departamento, y conforme vayamos subiendo nuevas órdenes va metiendo a su catálogo nuevos
+> nombres… Hice 3 modelos de C&A que los puse en el departamento **«2-HOMBRE»** (ese seguramente lo sacó
+> de alguna OC), y luego hay **«Caballeros»**… y esta lista va a ir creciendo conforme vayamos subiendo
+> nuevas OC."*
+
+**Medido — el importador crea departamentos SOLO.** `importacion-pdf.ts:300-318`: si la OC del cliente
+trae un departamento que no existe, lo **da de alta**. Comprueba que no exista **con ese mismo nombre**
+(`mode: 'insensitive'`), pero `"2-HOMBRE"` y `"Caballeros"` **son textos distintos**, así que crea los
+dos. Y como cada cliente escribe su departamento a su manera —y cambia el formato entre archivos—, **la
+lista crece con sinónimos de lo mismo**.
+
+⚖️ **Por qué importa más de lo que parece:** el departamento no es una etiqueta suelta. **La lista de
+precios cuelga de cliente + departamento** (§Post-F9.109), y los candidatos a lista se filtran por él
+(`candidatosParaLista`). ⇒ Dos nombres para el mismo departamento **parten el trabajo en dos mundos que
+no se ven entre sí**: un desarrollo capturado en «2-HOMBRE» no aparece al armar la lista de «Caballeros».
+
+⭐ **Y este problema YA SE RESOLVIÓ UNA VEZ en este sistema: los COLORES tienen fusión**
+(`DialogoFusionColores`, `dominio/catalogos/colores.ts`). **La misma medicina aplica.** No hay que
+inventar el patrón, hay que llevarlo a este catálogo.
+
+**Respuesta de Daniel:** *"Sí, que me pregunte y yo le confirmo… pero creo que hay que empezar a
+unificar."*
+
+**Lo que se decide, y son DOS piezas:**
+
+- **(a) FUSIÓN de departamentos**, igual que la de colores: se elige cuál se queda, cuáles se absorben, y
+  **todo lo que apuntaba a los absorbidos pasa a apuntar al bueno**. **Nada se borra ni se pierde** (D3).
+  Es lo que limpia lo que ya está.
+- **(b) EL IMPORTADOR DEJA DE CREAR A CIEGAS.** Cuando llegue un departamento que no reconoce,
+  **pregunta y Daniel confirma** a cuál de los suyos corresponde.
+  ⭐ **Y APRENDE:** la primera vez pregunta; a partir de ahí **recuerda** que `"2-HOMBRE"` de C&A es su
+  departamento `"Caballeros"`. **El patrón ya existe y está probado aquí**: `ClienteModeloLiga` hace
+  exactamente eso con los modelos del cliente en el importador de OC. Se replica, no se inventa.
+
+⚠️ **PENDIENTE DE MEDIR, no de suponer:** Daniel menciona en la misma frase que *"se ha vuelto confuso el
+GÉNERO, el departamento"*. Son cosas distintas —`Genero` es catálogo global de FR Moda («Caballero» es un
+dígito de la nomenclatura, §Post-F9.34) y `ClienteDepartamento` es del cliente— **pero se parecen tanto
+en el nombre que pueden estar mezclándose en la captura**. **Hay que medirlo antes de opinar**: si el
+sistema los está cruzando de verdad, es otro defecto; si sólo se parecen los nombres, es un problema de
+rótulos y se arregla nombrando mejor.
+
+### ✅ LA PIEZA (a) YA ESTÁ CONSTRUIDA — V1-E8p, 29-ago-2026
+
+**Daniel ya puede juntar departamentos duplicados** desde la ficha del cliente («Juntar duplicados»):
+elige el que se queda, marca los que son el mismo escrito de otra forma, **lee cuántos proyectos,
+listas de precios y cotizaciones se van a mover**, y confirma. Todo lo que colgaba de los absorbidos
+pasa al bueno; los absorbidos quedan **desactivados, nunca borrados** (D3).
+
+⚠️ **REPUNTA, no bloquea — al revés que la fusión de COLORES.** `fusionarColores` se NIEGA cuando el
+origen ya se usa (§Post-F9.129), porque `Color` tiene doce llaves entrantes y varias son movimientos ya
+asentados (corte, kardex de PT) que no se pueden mover sin volverlos incoherentes entre sí. El
+departamento no se parece: sus **cuatro** llaves entrantes —`Proyecto`, `ListaPrecios`, `Cotizacion` y
+`ClienteFactores`— son documentos **vivos y editables**, y arreglar a dónde apuntan **es** el trabajo.
+Bloquear aquí habría dejado a Daniel exactamente igual de atorado, porque los departamentos revueltos
+son justamente los que ya tienen trabajo encima.
+
+#### ⚖️ La decisión que había que tomar: **QUÉ FACTORES GANAN cuando los dos tienen**
+
+`ClienteFactores` lleva `@@unique([idCliente, idClienteDepartamento])`: un cliente tiene **como mucho
+un** juego de factores por departamento. Si el que se queda **y** el absorbido tienen los suyos, no se
+pueden mover los dos. Y **la receta de los colores no traduce**: allá la colisión se resuelve
+*rellenando huecos* (el destino conserva lo suyo y toma del origen sólo lo que tenía vacío), pero aquí
+los cuatro porcentajes son obligatorios — **siempre están completos los dos juegos y hay que elegir**.
+
+**Se decide: GANAN LOS DEL DEPARTAMENTO QUE SE QUEDA.** La razón es de negocio, no técnica: el canónico
+es la identidad que sobrevive —conserva su id, su nombre y su historia— y **sus factores son parte de
+esa identidad**. Que los del absorbido lo pisaran significaría que el departamento sale de la fusión con
+el mismo nombre y **otro precio** — el cambio más caro del sistema (el factor **es** el precio dicho de
+otra forma, §Post-F9.125) ocurriendo como efecto colateral invisible de una limpieza de catálogo.
+
+- **No se pierden en silencio:** los cuatro valores del absorbido se **escriben en la bitácora** antes
+  de retirar la fila. La decisión queda auditable y **rehacible a mano** si Daniel dice que los buenos
+  eran los otros.
+- **Tampoco se BLOQUEA la fusión por esto** (bloquear devuelve a Daniel al problema): se **avisa antes**,
+  en la misma pantalla, y se ejecuta.
+- El **default del cliente** (los factores sin departamento) no lo toca la fusión: no apunta a ninguno.
+- ⚠️ **Si se absorben VARIOS y más de uno trae factores propios, se queda el del PRIMERO** (los
+  absorbidos se procesan en el orden en que se marcaron): el primero se los lleva al canónico y los
+  demás ya chocan contra ésos. La pantalla lo dice **por departamento**, uno por uno, antes de
+  confirmar. *(Este caso llegó a mentir en la vista previa y se arregló al construirlo: ver la ficha
+  de V1-E8p.)*
+
+#### 🔴 Lo que la fusión NO alcanza — dos COPIAS DE TEXTO, y sólo una es problema
+
+1. **`Cotizacion.nombreDepartamento`** — snapshot congelado **a propósito** (*"tal como se imprimió"*).
+   **No se toca, y está bien:** un papel de marzo no se reescribe porque en agosto se unifiquen dos
+   catálogos. Se dice para que nadie lo lea como un olvido.
+2. **`OrdenReferencia.valor`** del campo «División» — el importador guarda el texto **crudo** de la OC
+   (`"2-HOMBRE"`) como referencia de la orden (D7), y está **indexado para búsqueda**. ⇒ Después de una
+   fusión los proyectos y las listas quedan unificados **pero la búsqueda por referencia sigue partida**.
+   **Es la QUINTA PIEZA, y queda pendiente de la palabra de Daniel** (`HOJA-DE-RUTA.md` §4): tocar un
+   valor capturado de un documento del cliente es una decisión de negocio, no un efecto colateral de
+   limpiar un catálogo.
+
+#### 🔴 Y una guarda que la fusión NECESITABA: el importador ya no RESUCITA lo absorbido
+
+Medido al construir: `resolverOCrearDepartamento` (`pedidos/importacion-pdf.ts`) **reactivaba** un
+departamento desactivado que volviera a aparecer en una OC. Con eso, Daniel junta «2-HOMBRE» en
+«Caballeros» y **la siguiente OC de C&A le deshace la limpieza en silencio**. *Una limpieza no puede
+durar menos que la siguiente importación.* Ahora lo **reusa sin reactivarlo** — y no se pierde nada,
+porque ese resolver no amarra el departamento a la orden (la orden no tiene FK a departamento; la
+División viaja como referencia de texto). **Esto NO es la pieza (b)**: es la guarda mínima para que (a)
+no se deshaga sola.
+
+#### La red contra la podredumbre
+
+`cliente-departamentos-fusion-referencias.test.ts` **lee `prisma/schema.prisma`** y exige que la lista
+de tablas a repuntar cubra **todas** las llaves entrantes del departamento, con igualdad exacta. Si
+mañana alguien le cuelga una quinta tabla y no la agrega, **la prueba se pone roja** en vez de dejar la
+fusión repuntando cuatro de cinco y la quinta apuntando a un departamento apagado, en silencio. Es la
+misma red que se puso en los colores después de que aquella lista se enumerara mal **tres veces**.
+
+**La pieza (b) —que el importador PREGUNTE y APRENDA— sigue pendiente**, con su etapa propia.
+
+- **Aplica en:** **(a) V1-E8p ✅ (29-ago-2026, versión 0.053)** · **(b) ⬜ etapa propia, sin construir**.
+  **SIN migración, SIN permiso nuevo** (reusa `clientes.administrar`) → el deploy **no** necesita
+  `SEED_ON_START`.
+- **Fecha:** 2026-08-25 (decisión) · 2026-08-29 (construcción de (a)).
+#### (Post-F9.120) — 🔴 LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, usando la explosión en `prueba`:
+
+> *"No puse fecha de entrega en una OC de tela, y tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**Medido: el sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion`
+(`dominio/compras/mrp.ts`) armaba un `respaldoPorProveedor` con la **fecha de entrega de la orden de
+producción** y lo pasaba como último recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo
+obligatoria la fecha (§Post-F9.103): en vez de bloquear siempre, se decidió reusar la de la orden si la
+traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor que entregue la materia
+prima **el mismo día en que hay que entregar la prenda terminada** — imposible por definición.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+Un campo vacío que frena es honesto; un campo lleno con la fecha incorrecta **nadie lo revisa**, y el dato
+sirve para reclamarle al proveedor.
+
+**Y hay antecedente del propio Daniel** en §Post-F9.71: *"cada OC interna va a tener una fecha de entrega
+diferente"* — porque **la tela se necesita semanas antes que los avíos**. Ahí quedaron dos caminos: (A)
+capturar la fecha por proveedor —lo construido— y (B) que el sistema la **calcule hacia atrás** desde la
+entrega de la orden con el tiempo de entrega de cada proveedor. El respaldo que había **no era ni A ni B**:
+copiaba la fecha del cliente, la única de las tres que no puede ser correcta.
+
+**Se le ofrecieron tres salidas. Daniel escogió la primera, sin matices:**
+
+> *"Que marque error y pida poner una fecha de entrega. **No toma nada en automático de ningún lado**."*
+
+**Lo que se decide:**
+
+- **(a)** **Se ELIMINA el respaldo.** Sin fecha capturada, la explosión **no genera la OC** y lo dice.
+  **Nada se hereda de la orden de producción, ni de ningún otro lado.**
+- **(b)** 🔴 **El mensaje de error hay que reescribirlo.** El de hoy dice *"Captúrala en la orden, o
+  indica la fecha de…"* — y bajo la regla nueva **«captúrala en la orden» es un consejo FALSO**: capturarla
+  ahí ya no sirve de nada. Un mensaje que manda al usuario a hacer algo que no funciona es peor que
+  ninguno.
+- **(c)** Sigue vigente §Post-F9.71(A): **la fecha se captura por proveedor** en la misma pantalla, porque
+  la tela y los avíos no llegan el mismo día.
+- **(d)** El camino (B) —calcularla hacia atrás con el tiempo de entrega por proveedor— **sigue abierto y
+  es el correcto de fondo**. Cuando exista, será una **PROPUESTA editable**, nunca un valor silencioso.
+
+🔴 **Y Daniel precisó de qué depende, que es más de lo que el lead había supuesto:**
+
+> *"Ya llegaremos en algún momento a que sea en automático… pero para eso tenemos que tener muy avanzado
+> todo… **desde la Ruta Crítica**, pero aún no vamos a implementarlo."*
+
+⇒ El lead había escrito que (B) *"exige capturar el tiempo de entrega por proveedor"*. **Es más que eso.**
+Calcular hacia atrás una fecha de compra es, literalmente, **programación hacia atrás desde la entrega** —
+que es lo que hace la **Ruta Crítica** (el CPM del sistema, F5: procesos con antecesores, duraciones y
+*backward pass*). Poner una calculadora de fechas aparte en Compras sería **una segunda planeación que
+compite con la buena** y que se desincroniza en cuanto la RC empiece a usarse de verdad.
+
+**Y la Ruta Crítica está POSPUESTA a propósito** (§Post-F9.118(b), del mismo día: *"arrancamos sin ella"*).
+
+⇒ **(B) NO se construye hasta que la Ruta Crítica esté operando.** Mientras tanto la fecha se captura a
+mano, por proveedor, y **eso es lo correcto** — no un parche esperando algo mejor. *Un cálculo automático
+apoyado en una planeación que nadie usa produciría exactamente el mismo tipo de dato falso que esta
+decisión viene a quitar.*
+
+- **Aplica en:** V1-E7f. **Fecha:** 2026-08-25.
+
+#### (Post-F9.124) — 🔴 EL CLIENTE `pg_dump` DE LA IMAGEN VA ATADO A LA MAJOR DEL SERVIDOR DE RAILWAY (26-ago-2026)
+
+> ⚠️ **Nació con el número 123, que ya estaba ocupado** por «Aurora administra modelos» (arriba). Dos
+> ramas escribieron el mismo número el mismo día sin verse. Se renumera **ésta** —la de pg_dump— porque
+> es la que **nadie referencia**: la de Aurora la citan seis archivos, y mover la más citada sería
+> cambiar seis lugares para arreglar uno. **Es la tercera cicatriz de numeración del track** (ver la 108
+> duplicada y el aviso de la 117/121). *El número se asigna al escribir; que dos plumas escriban a la
+> vez es el costo de trabajar en paralelo, y se paga con un aviso, no borrando.*
+
+> El comentario que ya estaba escrito en `backend/Dockerfile`, y que se cumplió al pie de la letra:
+> *"Si algún día se sube la major del servidor en Railway, hay que subir este número también — el job
+> lo detecta y lo dice con todas sus letras en el rastro de la corrida, **pero para entonces ya se
+> habrán perdido corridas**."*
+
+**Qué pasó.** Railway ya provisiona **PostgreSQL 18.6**. La imagen del backend instalaba
+`postgresql-client-17`. Como **`pg_dump` se niega a volcar un servidor más nuevo que él**, el segundo
+respaldo cifrado a R2 (V1-E6a) **no podía correr en ningún ambiente**: la corrida mensual habría
+fallado en el paso `VOLCADO` sin escribir un byte, en `prueba` y en el environment de producción que
+se está montando.
+
+**Cómo se descubrió, y por qué importa el cómo.** Daniel notó que en R2 no existía la carpeta
+`respaldos/`. Rastreando eso aparecieron **dos fallos encadenados, los dos invisibles**:
+
+1. Una fila `FALLO`/`CONFIGURACION` del **17-ago** —faltaba `RESPALDO_LLAVE`— que llevaba **una
+   semana** en `respaldo_corrida` sin que nadie la viera. Ya estaba resuelta (la llave se puso el
+   19-ago; `pgboss.schedule` tenía el job agendado).
+2. Al correr el respaldo **a mano por primera vez**, este otro: el desajuste de majors.
+
+**La regla que queda escrita.** La major de `postgresql-client-NN` del `Dockerfile` **no es una
+elección libre: va atada a la del servidor de Railway**. La restricción de `pg_dump` es de un solo
+sentido — un cliente **más nuevo** vuelca servidores más viejos sin problema; uno más viejo **se
+niega**. Ante la duda, se sube.
+
+**Dónde se mueve, y siempre JUNTO:**
+- `backend/Dockerfile`: el paquete `postgresql-client-NN` **y** el `ENV RESPALDO_PG_DUMP=/usr/lib/postgresql/NN/bin/pg_dump`.
+  ⚠️ Las dos, no una: `/usr/bin/pg_dump` es un **wrapper** de `postgresql-client-common` que elige la
+  versión según el clúster por defecto. Ya causó un CI rojo en el PR #184.
+- `.github/workflows/ci.yml`: la instalación, el `GITHUB_PATH` y el paso *"Verificar que `pg_dump`
+  del PATH es la NN"*.
+
+**Lo que NO se movió, a propósito:** el `docker-compose.yml` local y el Postgres de **testcontainers**
+siguen en **17**. No es descuido — un cliente 18 vuelca un servidor 17 sin problema, y subir la major
+de la base local/CI toca el job `e2e` (que levanta el compose) sin comprar nada para este arreglo.
+**Queda como divergencia consciente**; si algún día se quiere alinear, es una etapa aparte.
+
+**Y el hueco que este arreglo NO cierra.** El aviso del respaldo es **PASIVO**: no hay correo ni
+notificación. Los dos fallos de arriba vivieron días sin que nadie los notara, y con corridas
+**mensuales** eso pesa más, no menos — *un fallo en enero se descubre en junio*. Mientras no exista
+notificación activa, **revisar la bitácora `RespaldoBd` tiene que ser parte de la rutina mensual**.
+Queda anotado como deuda, no como resuelto.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es imagen + CI + documentación.
+  Se verifica corriendo `scripts/respaldar-ahora.ts --revisar` (imprime la versión de `pg_dump`).
+- **Fecha:** 2026-08-26.
+
+---
+
+#### (Post-F9.125) — ⭐⭐ EL PRECIO DE VENTA ES SÓLO DEL DUEÑO: los cuatro factores, quién los ve, y la firma que se cae (DANIEL, 26-ago-2026)
+
+**El principio, con sus palabras, y es lo que resuelve los casos que no se previeron:**
+
+> *"Puede hacer sus cálculos, pero **el sistema no le muestra información digerida**."*
+
+**Cómo salió.** Revisando cómo trabaja Desarrollo (§Post-F9.123: *"ella arma un excel con todos los
+costos, me los pasa, **yo reviso y le doy el precio de venta**"*), quedó a la vista que el sistema no
+reproducía ese reparto. Aurora —rol `Gerencial`— podía mover los porcentajes con los que se calcula el
+precio, verlos, y bajarle al cliente un papel con precios que nadie había aprobado.
+
+---
+
+**(a) LOS CUATRO FACTORES SÓLO LOS MUEVE ÉL.** Margen · descuentos · regalías · costo de ventas.
+
+> *"los factores sólo yo los puedo mover"*
+
+Movían con **`listas.administrar`**, que Aurora tiene (y Ventas también). Hoy exigen **`listas.aprobar`**,
+el permiso del dueño (Administrador · AdministracionDireccion · Directivo; a Gerencial se le resta en el
+seed desde F8-E4). **Mover un factor ES mover el precio de venta**, y el precio ya era suyo.
+
+🔴 **Y son DOS puertas, no una.** El snapshot editable de la lista **y** el catálogo de factores del
+CLIENTE (`ClienteFactores`), del que la lista copia su snapshot al nacer. Blindar sólo la primera habría
+dejado la segunda abierta: se mueve el factor del cliente y el precio de la próxima lista sale distinto,
+sin pasar por él. *Un candado que se rodea por el catálogo de al lado no es un candado.* (Es la lección
+de §Post-F9.116(d) —«todas las puertas o ninguna»— aplicada al precio.)
+
+---
+
+**(b) NADIE MÁS LOS VE.**
+
+> *"y no son visibles para nadie más"*
+
+Se ocultan (`null`) en la **proyección del servidor**, con el mismo mecanismo que ya existía para los
+importes. Lo que cambia es **cuál es la reja**: era `consultas.ver-importes`, que **Aurora tiene y
+necesita** —ve costos, arma precostos, manda cotizaciones—, así que nunca fue reja. Hoy es
+`listas.aprobar`, y el criterio vive en **UNA sola función** (`puedeVerFactoresDePrecio`) que usan las
+tres proyecciones. *Dos criterios que validan "casi" igual se desincronizan en la primera corrección.*
+
+🔴 **La tercera puerta, que era la más ancha: la CALCULADORA de la mesa.** `simularNegociacion` no
+"dejaba deducir" el margen — lo **servía**:
+
+| Campo | Qué entregaba |
+|---|---|
+| `margenObjetivoPct` | **ES** el factor `margenPct` del snapshot, tal cual. No es derivable de nada. |
+| `precioNeto` | `objetivo × (1 − suma/100)` ⇒ dividido entre el objetivo, da la **suma de los otros tres**. |
+| `margenBrutoPct` | sale del neto ⇒ arrastra la misma fuga. |
+| `cumpleObjetivo` | un **oráculo**: moviendo el objetivo hasta que cambia se reconstruye el margen a voluntad. |
+
+La pantalla lo pintaba literalmente: `Cumple · obj. 44.4%`. Eso es *información digerida*, que es
+exactamente lo que Daniel dijo que no debía pasar. Los cuatro salen hoy en `null` sin `listas.aprobar`,
+y la pantalla **no los pide ni pinta guiones**: dice a quién le toca. El **input del precio se queda**
+—es el «precio acordado» de la ronda, que sí es trabajo de quien negocia—: se retira el veredicto del
+sistema, no la captura.
+
+⚠️ **EL LÍMITE, DECLARADO Y ACEPTADO.** Aurora ve el **costo** (`desgloseCostoLinea`, el precosto) y ve
+el **precio** ⇒ **el margen sale con una división**. Se le planteó a Daniel y **eligió a sabiendas**: se
+oculta el NÚMERO, no la ARITMÉTICA. Cerrarlo de verdad exigiría quitarle el costo o el precio a
+Desarrollo, y eso **rompería su trabajo** —ella hace el desarrollo y manda las cotizaciones—. Queda
+**dicho en el código**, no callado, para que nadie lo "descubra" dentro de seis meses y crea que es un
+defecto.
+
+---
+
+**(c) SIN APROBACIÓN NO SALE DOCUMENTO, NI BORRADOR.**
+
+> *"si no está aprobado no debería de poder bajar ni un borrador porque puede confundir al cliente"*
+
+La **cotización** (V1-E7c) ya lo hacía bien: rechaza nombrando los modelos que faltan. Pero el **impreso
+PDF** y el **Excel** de la lista bajaban `precioAprobado ?? precioCalculado` — una hoja con precios que
+nadie autorizó y **con la misma pinta que la buena**. *Era la ventana abierta al lado de la puerta
+cerrada.* Hoy las tres salidas comparten **el mismo guard**, `exigirRenglonesAprobados`: rechazan (409)
+**nombrando los renglones** que faltan, y también la lista vacía (una hoja en blanco no es una oferta).
+En la pantalla los dos botones quedan deshabilitados **diciendo por qué** — negar en el servidor y
+explicar en la pantalla, no esconder.
+
+⚠️ **Lo que NO alcanza, y con su razón:** el `precioAprobado ?? precioCalculado` sobrevive donde el
+número es un **default interno editable**, no un papel para el cliente — el precio sugerido al ligar la
+orden (`sugerenciaLigaOrden`) y los candidatos del pedido. Ahí nadie le enseña nada a nadie de fuera.
+
+---
+
+**(d) MOVER UN FACTOR TUMBA LA FIRMA.** ⚠️ **Los factores. La RECETA todavía no** — ver el eslabón
+abierto al final de esta decisión.
+
+> 🔴 **Este encabezado decía «se mueva la receta o se muevan los factores», y era FALSO.** Lo escribió
+> el lead, se lo dijo así a Daniel en el chat y llegó hasta aquí; lo cazó el reviewer de V1-E8b. El
+> cuerpo de abajo siempre fue honesto —declara el eslabón suelto— pero **el encabezado es lo que se
+> lee**, y prometía un candado que no existe. Queda corregido y **anotado en vez de borrado**, porque
+> el modo de fallo importa más que el error: *una promesa de más en un documento de garantías es peor
+> que no tener el documento; el lector deja de verificar justo donde más falta hace.*
+
+`editarFactoresLista` recalculaba el precio **sin tocar `precioAprobado`**, y estaba escrito como una
+cortesía: *no pisarle la firma al dueño*. **El efecto era el contrario del propósito** — quedaba un
+precio APROBADO que ya no correspondía a los porcentajes con que se calculó, y el sistema lo seguía
+presentando como firmado.
+
+🔴 **Y había DOS criterios para el mismo hecho:** la **ronda de negociación** SÍ resetea la aprobación
+cuando cambia el costo. Que mover el costo tumbara la firma y mover el margen no, **no era una
+distinción de negocio**: era que nadie las había mirado juntas.
+
+Se unifican con la regla que este proyecto ya adoptó en **V1-E7e (§Post-F9.116)**: *cambiar aquello
+sobre lo que se firmó tumba la firma*.
+
+- Mover **cualquiera** de los cuatro factores devuelve a `pendiente` **todos** los renglones aprobados
+  de esa lista.
+- **La firma vieja NO se borra** (D3): va al `NegociacionEvento` **inmutable** del renglón —el mismo
+  libro que la pantalla ya enseña como historial— con el precio anterior y una **nota de qué la
+  invalidó y de cuándo era**; y a la **bitácora**, con quién la aprobó y cuándo.
+- **Se vuelve a aprobar normalmente**, con el mismo permiso. **No hay estado muerto.**
+- **Guardar los MISMOS valores no tumba nada**: sin hecho detrás no hay firma que caer.
+
+---
+
+🔴 **EL ESLABÓN QUE ESTA DECISIÓN NO CIERRA (medido, no supuesto).** Cambiar la **receta del modelo** no
+mueve el precosto congelado —son inmutables por diseño (D3)— ni el renglón de lista. Hay que **congelar
+una versión nueva Y registrar una ronda**, las dos **a mano**; si se olvida cualquiera, **el precio
+aprobado sigue en pie sobre un costo que ya no existe, y el sistema no avisa**. Es el hermano de
+§Post-F9.116 del lado del precio. No se construyó aquí porque es **alcance nuevo** y hay que decidirlo:
+el detalle de lo que se midió y las dos opciones están en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8b.
+
+> ✅ **RESUELTO en V1-E8d (27-ago-2026) — pero léelo con cuidado: se cerró como AVISO, no como firma
+> que se cae.** Daniel: *"Si. Ok. **Que me avise.**"* Se construyó la opción **(B)** (columna
+> `Modelo.recetaTocadaEn` escrita sólo por el embudo de la receta) y el sistema **lo dice** en la
+> pantalla donde se aprueba y al emitir la cotización. **La firma NO se cae y el papel sigue saliendo**
+> — el porqué, y el hueco que eso deja, están en **§Post-F9.127**.
+
+- **Aplica en:** V1-E8b. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto no se toca)
+  ⇒ **no requiere `SEED_ON_START`**. **SIN migración de BD.** **Fecha:** 2026-08-26.
+
+---
+
+#### (Post-F9.126) — ⭐⭐ LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA: lo que parte el renglón es lo que se recibe por separado (DANIEL, 26-ago-2026)
+
+**Cómo salió.** Daniel lo reportó **dos veces** usando el sistema. La primera, corta:
+
+> *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la OC **no me
+> aparece cantidad por medida… sólo veo un solo renglón**."*
+
+Y después el caso completo, que es el que fijó el diseño:
+
+> *"Se cotiza un cierre de un modelo. Ese modelo nos lo piden en **4 variantes de color**. Se generan
+> 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en **una sola OC**. Los
+> cierres se compran todos al mismo proveedor, pero **cada color es diferente y cada color tiene
+> cantidades por medida** de acuerdo a lo que nos pide por talla el cliente en cada OP. **En la
+> receta no viene definido el color. Eso viene hasta que nos hacen el pedido.** … Esto mismo pasa en
+> **jaretas, cintas palmita**, etc."*
+
+Su forma preferida, textual: *"poner 4 veces el cierre y **en la descripción del avío ponerle el
+color**, y sólo que me dé el desglose de cantidad por medida sería suficiente"*, con un
+**"hazlo de la mejor manera que puedas"**. Y confirmó que **una sola OP con varios colores también
+debe salir renglón por color**.
+
+---
+
+**🔴 LA REGLA DE DISEÑO, que es lo que hay que recordar de esta decisión:**
+
+> **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al
+> proveedor va en la TABLITA.**
+
+De ahí salen las dos mitades, y ninguna es arbitraria:
+
+**(a) EL COLOR PARTE EL RENGLÓN.** El renglón es la unidad de todo lo que viene después: se **recibe
+contra la LÍNEA, que lleva el color**, y `comprometido-en-oc.ts` netea por renglón para no volver a
+comprar lo ya comprado. Si un renglón cargara cuatro colores, **recibir tendría que aprender a leer
+una tabla** — y eso sí sería caro.
+
+> 🔴 **Aquí decía «y el kardex entra por color», y era FALSO.** Lo cazó el reviewer de V1-E8c: el
+> kardex de avíos **no lleva color** —`MovimientoDetAvio` no tiene esa columna y la vista
+> `existencia_avio` agrupa sin ella—, y el propio código lo dice a catorce líneas de distancia
+> (`mrp.ts:~1326`), que es justo el motivo por el que el stock de un avío genérico se lee **una vez**
+> y se consume color por color. La frase estaba en **siete sitios del mismo commit**, uno de ellos el
+> comentario permanente de la migración. Se corrige y **se anota, no se borra**: el argumento que
+> sostiene el diseño —*si un renglón cargara cuatro colores, recibir tendría que aprender a leer una
+> tabla*— nunca necesitó del kardex. *Una razón falsa que sostiene una decisión correcta es peor que
+> ninguna razón: el que venga después la usará para decidir otra cosa.*
+
+Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas; esta etapa le abre la misma puerta a
+los avíos. **No hay un segundo mecanismo de agrupación**: es
+`claveAgrupada` (`material | color | proveedor`) con un concepto de color más ancho — de tela en las
+telas, **de prenda en los avíos**.
+
+**(b) LA MEDIDA VA EN UNA TABLITA BAJO EL RENGLÓN.** **No se recibe por medida**: llegan *"3,200
+cierres"* y el proveedor los mandó cortados según el desglose. Es información **para él**, así que su
+destino útil es el papel (y la pantalla que lo revisa), no una dimensión del inventario.
+
+**⚠️ LA MEDIDA NO MULTIPLICA NUNCA.** De ahí salieron los **133,095** cierres que Daniel cazó en
+§Post-F9.105: el sistema leyó el `50` de *"50 cm"* como si fuera consumo. Lo que multiplica es el
+**CONSUMO** (el elástico gasta distinto por talla, y de ahí sale cuánto comprar). La cantidad de una
+medida sale de **cuántas prendas la llevan** — curva × consumo por prenda. Por eso el desglose se
+calcula abriendo la MISMA regla R18 (`requeridoAvioReceta`, `porTalla`) y no con una cuenta paralela:
+una segunda cuenta sobre medidas es exactamente como nació el defecto de los 133,095.
+
+**(c) UN SOLO PRECIO PARA TODO EL RENGLÓN** (§Post-F9.113). Se desglosan **cantidades**, no precios;
+el importe sigue siendo `cantidad × precio` y cuadra sin excepciones. **Σ del desglose = cantidad del
+renglón, exactamente**, y no por casualidad: se reparte con la misma función que reparte una compra
+entre las OP (`repartirEntreOrdenes`, la última absorbe el residuo). Hace falta porque el total del
+renglón **no siempre es el requerido**: se le resta lo que ya está en otra OC (§Post-F9.85) y el
+comprador lo puede editar antes de generar (§Post-F9.94).
+
+**(d) EL SISTEMA PROPONE, LA PERSONA EDITA** — igual que la cantidad y el precio hoy (§Post-F9.94). El
+color viaja en **dos piezas que hacen cosas distintas**: `idColorPrenda` es la **identidad** del
+renglón (por ella netea la explosión y se reparte por OP) y `colorAvio` es **el texto que el proveedor
+lee**, precargado con el nombre del color de la prenda y **editable en la revisión previa** — porque a
+veces **el avío va en contraste** (cierre negro en prenda roja) y el nombre del color de la prenda
+sería una instrucción equivocada.
+
+---
+
+**⛔ NO SE CREA CATÁLOGO DE COLOR DE AVÍO**, y es decisión de Daniel (§Post-F9.91):
+
+> *"los avíos no llevan catálogo de color: **el color va en su descripción**"*
+
+Por eso el texto es texto y no una FK. El id que sí existe (`idColorPrenda`) no es un catálogo nuevo:
+es el color de la **prenda** que ya vive en la matriz color×talla de la OP (D4) — el mismo del que
+sale la cantidad de cada renglón.
+
+---
+
+**⚠️ EL LÍMITE, DECLARADO Y ACEPTADO POR DANIEL — no es un defecto escondido.**
+
+Una **entrega parcial sabrá el COLOR pero no la MEDIDA**. Sale directo de (b): la recepción cruza
+contra la LÍNEA, y la línea lleva su color; la medida es informativa y no tiene dimensión ni en la
+recepción ni en el kardex de avíos. Si algún día importa —si de verdad hay que recibir "1,200 de 53
+cm" por separado—, **se parte también por medida con este mismo mecanismo**: la medida sube de la
+tablita al renglón, igual que el color acaba de subir. **No es un callejón sin salida**, y decirlo así
+importa tanto como decir el límite.
+
+---
+
+**Lo que NO cambia** (para que nadie lo lea al revés): el reparto sigue siendo **por OP** (§Post-F9.86,
+una línea por material × OP), el **impreso sigue consolidando para el proveedor** (§Post-F9.102: él ve
+una cantidad por color+medida, **no el reparto interno por OP**) y las telas siguen exactamente como
+las dejó V1-E3u. Las OC anteriores a esta etapa quedan con el color en NULL y sin desglose, que es
+justo lo que dicen hoy: el sistema no dejaba decirlo, y **inventárselo escribiría una suposición como
+hecho** (D3).
+
+🔴 **Un ajuste que se descubrió MUTANDO, y que aquí queda escrito:** en el **impreso** el papel agrupa
+por el **TEXTO** del color, **no** por `idColorPrenda`. Dos líneas que el comprador corrigió al mismo
+color ("Negro contraste" para el rojo y para el azul) salen en **un solo renglón**: al proveedor no le
+sirven nuestros ids, y dos filas idénticas en un papel son ruido. El reparto por OP y por color de
+prenda sigue **guardado intacto** — lo que se agrupa es sólo el documento.
+
+---
+
+**🔴 LO QUE EL CI DESTAPÓ, Y VALE MÁS QUE LA ETAPA: UN AJUSTE QUE NO CASA NO SE PUEDE TRAGAR EN SILENCIO.**
+
+Al partir el renglón de avío por color, la **identidad** del renglón cambió: la clave del ajuste del
+comprador (§Post-F9.94) pasó a llevar el color. Un ajuste que **no lo nombra dejó de casar** — y el
+sistema **no hacía nada**. Medido con un doble de transacción, sin base de datos:
+
+| Escenario | Cantidad que sale | ¿Se aplicó? | ¿Avisó? |
+|---|---|---|---|
+| Ajuste **sin** color, renglón **con** color | **100** (la propuesta del sistema) | ❌ | **nada** |
+| Ajuste **con** color, renglón con color | 40 (lo tecleado) | ✅ | — |
+
+⚖️ **Por qué esto no es "una prueba que se quedó vieja":** el comprador teclea *"compra 0.1"* y se
+compran **180**. Es **dinero saliendo con una cantidad que nadie aprobó, sin traza**. La prueba que
+falla es el síntoma; el defecto es el silencio.
+
+**Lo que se decide:** un ajuste que no encuentra su renglón se convierte en **BLOQUEO** —nombrando el
+material y los renglones que sí había—, y la orden de compra **no se genera**.
+
+- **Es bloqueo y no aviso** porque no es un juicio de negocio (§Post-F9.64, *guía no jaula*): es el
+  sistema diciendo **"no pude honrar tu instrucción"**. Avisar y comprar igual sería el mismo defecto
+  con más letras.
+- **Sólo se reclama cuando hay dinero en juego**: si ese material se le va a comprar a ese proveedor
+  de todas formas. Si quedó fuera del plan —lo desmarcó, ya estaba cubierto, se quedó sin proveedor—
+  el ajuste es irrelevante y bloquear sería ruido que atora al comprador por algo que no cambia nada.
+  **Se reclama el dinero, no la contabilidad de claves.**
+
+⭐ **El hallazgo que hay que recordar:** de las **18** pruebas que capturaban un ajuste, **unas diez
+estaban en verde con su ajuste convertido en no-op**. Pasaban por lo que afirmaban *después*, no por
+lo que creían estar ejerciendo. *Una prueba puede estar en verde y haber dejado de tocar el sistema.*
+
+📌 **Y la regla de proceso que lo explica, para no repetirlo:** el cambio no rompió a quien **lee** el
+color, sino a quien **construye la identidad** del renglón. El barrido buscó lecturas. ⇒ **Cuando una
+etapa cambia la IDENTIDAD de una entidad, hay que barrer los sitios que la CONSTRUYEN, no sólo los que
+la leen** — y los cuerpos de las pruebas son uno de esos sitios.
+
+⚠️ **Nota de método, del lead:** la lista de fallos que se le pasó al coder salió de un registro de CI
+**cortado por la cola**, y se le presentó como si fuera completa. El coder midió por su cuenta y
+respondió que **al menos cuatro pruebas más** deberían haber estado ahí — y tenía razón en desconfiar.
+El arreglo las cubre igual porque atacó la causa y no los síntomas, pero *una lista incompleta
+presentada como completa es una forma de mentir con datos ciertos*.
+
+---
+
+#### (Post-F9.127) — ⭐ SI LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO, EL SISTEMA **AVISA** (no tumba la firma, y el papel sigue saliendo) (DANIEL, 26-ago-2026)
+
+**Cómo salió.** Es el **eslabón que §Post-F9.125 dejó abierto y declarado**. Se le explicó a Daniel así:
+*"tu precio aprobado se queda parado sobre un costo que ya no existe. El sistema no avisa"*. Contestó,
+textual:
+
+> *"Si. Ok. **Que me avise.**"*
+
+---
+
+**EL HUECO, tal como estaba medido.** Un renglón de lista de precios guarda dos cosas: el id de un
+**precosto CONGELADO** y una **copia** de su costo. Las versiones congeladas son **INMUTABLES por
+diseño** (D3) — y eso está bien: es lo que hace que un precio firmado se pueda auditar años después.
+La consecuencia es que **cambiar la receta del modelo no mueve nada del renglón**: hay que **congelar
+una versión nueva Y registrar una ronda**, las dos **a mano**. Si se olvida cualquiera de las dos, el
+precio aprobado sigue en pie sobre un costo que ya no corresponde a la receta de hoy, y hasta esta
+etapa **nada lo decía**.
+
+---
+
+**(a) LA SEÑAL: una columna nueva escrita SÓLO por el embudo de la receta.**
+
+`Modelo.recetaTocadaEn` + `Modelo.recetaTocadaCambio` (cuándo se tocó la receta, y qué parte). Las
+escribe **una sola función**, `tocarModeloPorCambioDeReceta` — el embudo de V1-E7e por el que ya pasan
+obligatoriamente las **6 puertas** que pueden mover la receta (telas, avíos, avíos favoritos, medidas
+por talla, arte, copiado). Una puerta nueva las hereda sin hacer nada: no compila sin pasar por ahí.
+
+🔴 **Se descartó la alternativa barata, y el porqué es lo que hay que recordar.** La señal parecía ya
+existir: `Modelo.modificadoEn > Precosto.congeladoEn`, sin migración. Pero **`modificadoEn` es
+`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **11** en el código que no son receta
+—renombrarlo, pasarlo a producción, la propia firma de revisión, subirle una foto—. *Un aviso que nace
+gritando en falso se aprende a ignorar, y el día que sea de verdad nadie lo mira.* La columna cuesta
+una migración **aditiva de dos campos nullable** y compra que el aviso diga exactamente lo que promete.
+
+⚠️ **NULL = "no se sabe", NO "nunca se tocó".** **Sin backfill**, a propósito: no hay dato del que
+deducir cuándo se movió una receta antes del despliegue, y rellenarlo con `modificadoEn` sería la
+mentira que la decisión acaba de descartar. **Consecuencia declarada:** un desfase que YA existía el
+día del despliegue **no se detecta**; se detecta el primer cambio de receta posterior.
+
+---
+
+**(b) EL AVISO DICE QUÉ Y CUÁNDO, y lo arma el SERVIDOR.**
+
+Un criterio único, `avisoDeCostoViejo` (`dominio/desarrollo/costo-viejo.ts`), devuelve **la frase
+completa** o `null`. No un booleano ni un semáforo: la cicatriz de este proyecto es *"la frase del
+servidor nunca llega a la pantalla"*. Dice qué parte de la receta cambió, en qué fecha, contra qué
+versión del precosto, y qué hacer. Se ve en **tres sitios**: pegado a su renglón en la lista de precios
+(donde Daniel aprueba), en el resumen del encabezado de esa tabla, y en el diálogo de **emitir
+cotización** —que es la puerta por la que un precio sobre un costo viejo sale hacia el cliente—.
+
+**Avisa aunque el renglón NO esté aprobado** (con otra frase: *"…antes de aprobar el precio"*). Avisar
+sólo sobre lo aprobado dejaría firmar un precio nuevo sobre el costo viejo, que es el mismo agujero un
+minuto antes.
+
+⛔ **Y NO se imprime en el PDF, el Excel ni la cotización.** Esos papeles los lee el **cliente**, y
+*"el costo de este modelo quedó viejo"* es una nota interna. El aviso va donde se **decide**, no donde
+se **comunica**.
+
+**Y el aviso se apaga solo** en cuanto se congela una versión nueva y se registra la ronda: la ronda
+re-apunta el renglón a un precosto congelado DESPUÉS del cambio. **No hay estado muerto** y no hizo
+falta un mecanismo nuevo para limpiarlo.
+
+---
+
+**🔴 (c) POR QUÉ AVISA Y NO TUMBA LA FIRMA — y por qué eso NO es un tercer criterio.**
+
+Los dos hermanos **sí** tumban: §Post-F9.116 (cambiar la receta tumba la revisión del modelo) y
+§Post-F9.125(d) (mover un factor tumba la aprobación del precio). La regla que este proyecto unificó es
+*«cambiar aquello sobre lo que se firmó tumba la firma»* — y la palabra que hace el trabajo es
+**aquello**:
+
+| Caso | Sobre qué se firmó | Qué cambió | ¿Es lo mismo? |
+|---|---|---|---|
+| §Post-F9.116 | la **receta del modelo** | la receta del modelo | **Sí** — misma fila, mismo acto |
+| §Post-F9.125(d) | un **precio calculado con esos factores** | esos factores | **Sí** — misma lista, misma transacción |
+| **Aquí** | un precio calculado **sobre el precosto congelado v3** | el **modelo** del que salió el v3 | **No** — el v3 no cambió, ni puede |
+
+El precosto congelado es **inmutable por diseño**, así que el precio firmado sigue siendo exactamente
+coherente con lo que se firmó. Lo que ya no se sabe es si **lo que se firmó sigue describiendo lo que se
+va a fabricar**. *No es la misma clase de hecho, y por eso no pide la misma clase de respuesta.*
+
+Y hay una razón práctica encima: un cambio de receta **puede no mover el costo ni un peso** (se corrigió
+el archivo del arte, se ajustó una medida por talla) y **el sistema no tiene forma de saberlo** sin
+volver a costear — sólo el humano que congela la versión nueva puede decirlo. Tumbar aquí cancelaría
+precios ya firmados, y ya comunicados al cliente en una cotización, por hechos que a lo mejor no los
+tocan.
+
+---
+
+**🔴 EL HUECO QUE ESTE AVISO DEJA, dicho y no callado.** **Un aviso se puede ignorar.** Con el desfase a
+la vista, la **cotización, el PDF y el Excel siguen saliendo** con ese precio aprobado, y el renglón se
+puede aprobar igual. Cerrarlo del todo sería **bloquear el papel mientras el costo esté viejo** —el
+mismo candado de §Post-F9.125(c), pero disparado por un hecho distinto—. **Eso es MÁS de lo que Daniel
+pidió**, y es él quien lo tiene que decidir, no el código. Queda **sobre la mesa**, no construido.
+
+- **Aplica en:** V1-E8d. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **CON migración de
+  BD**, 100 % aditiva (`20260827160000_aviso_costo_viejo`: dos columnas nullable en `modelos`, sin
+  backfill). **Fecha:** 2026-08-27.
+
+---
+
+#### (Post-F9.128) — 🔴 «NO HAY DESARROLLOS DISPONIBLES»: EL AVISO QUE NO DECÍA POR QUÉ NI QUÉ HACER (DANIEL, 27-ago-2026)
+
+**Cómo salió.** El motor de cotización está construido desde F8 y V1-E7c le puso el documento. Nada de
+eso falló. Lo que falló fue **llegar a él**: Daniel, que sabe el negocio mejor que nadie, se topó con
+**cuatro muros seguidos**, en este orden y con estas palabras:
+
+> 1. *"En cotizaciones **no puedo hacer nada**… no veo ninguna actualización."* — y al rato:
+>    *"**Aaaaaa, yo estaba viendo los precosteos** (en lugar de lista de precios)."*
+> 2. *"**no está la opción de listas de precios** en desarrollo."*
+> 3. *"si, ya estoy en cotizaciones, pero **supuse que de ahí jalo un proyecto de precosteo**… no puedo
+>    hacer nada ahí. **No me deja hacer una lista de precios nueva**."*
+> 4. *"si tengo el permiso. Sí veo el botón. Justo me sale la leyenda de que **no hay desarrollos
+>    disponibles**."*
+
+**No faltaba capacidad: faltaba el camino, y faltaba que el sistema dijera por qué no podía.**
+
+---
+
+**LO QUE SE MIDIÓ (antes de tocar nada).**
+
+**(a) Por qué no había candidatos.** La regla de candidatura vivía **disuelta en un `where` de Prisma**
+(`candidatosParaLista`), y son **cinco condiciones**, todas obligatorias: el desarrollo **no está
+apagado** · su proyecto es de la **empresa activa** (A9) · del **cliente** y del **departamento**
+pedidos · tiene **al menos un precosto en estado `congelado`** · y **no tiene renglón en ninguna lista**
+(`listaLineas: none`). La que falla en el caso de Daniel es la del **precosto congelado**: el precosto
+existe, pero se quedó en **borrador**, y congelarlo es un acto aparte («Precosto» → «Congelar versión»)
+que nada le pedía ni le nombraba. Escrito como `where`, ese filtro **sólo sabe contestar "hay / no
+hay"**: preguntarle *"¿y por qué no?"* era imposible.
+
+**(b) Dónde vivía cada cosa en el menú.** Las tres que Daniel confundió, medidas en el riel:
+
+| Lo que buscó | Cómo se llamaba | Dónde | Ruta | Permiso |
+|---|---|---|---|---|
+| Listas de precios | **«Pre-costeos»** | Operación › Desarrollo | `/desarrollo` | `desarrollo.ver` |
+| Listas de precios | **«Cotizaciones»** | Operación › Desarrollo | `/listas-precios` | `listas.ver` |
+| Listas de precios | **«Listas de precios»** | Comercial › Clientes | `/listas-precios` | `listas.ver` |
+
+O sea: **la MISMA pantalla se llamaba distinto en dos lugares**, y el nombre que él buscaba sólo existía
+en el grupo donde no la fue a buscar. Sus muros 1 y 2 salen enteros de esta tabla.
+
+**(c) El eslabón sin puerta.** El camino real es **precosteo → congelar → lista de precios →
+cotización**. Los dos extremos ya tenían puerta (botón «Generar lista de precios» en el proyecto;
+«Emitir cotización» en la lista). El que **no** la tenía es **congelar**: al congelar, el sistema decía
+`"Precosto v1 congelado."` y ahí terminaba — nunca decía **para qué sirvió** ni **a dónde ir**.
+
+---
+
+**LA REGLA QUE SE APLICA (es doctrina de la casa, §Post-F9.96).**
+
+> **Capturar es el proceso normal: primero el lugar para llenar, y el aviso sólo si de verdad no se
+> puede.** Un mensaje que dice *"no hay X disponibles"* **sin decir por qué ni qué hacer ES el
+> defecto**, no la ayuda.
+
+**(1) El servidor CLASIFICA, ya no sólo filtra.** La regla de **quién califica** se sacó del `where` a
+una función pura, `motivoNoCandidato`, y la consulta ahora devuelve **los candidatos Y los descartados
+con su motivo**. Los motivos son **cuatro y exhaustivos**, con precedencia declarada: `ya-en-lista` >
+`apagado` > `precosto-borrador` > `sin-precosto`. La precedencia **no es cosmética**: decide qué
+remedio se le ofrece a la persona (un apagado se reactiva, no se congela).
+⚠️ **Corregido el 29-ago-2026 (V1-E8t):** esta línea decía `apagado > ya-en-lista`, al revés de lo que
+`motivoNoCandidato` hace —y de lo que la ficha de V1-E8f ya explicaba: `ya-en-lista` gana **a
+propósito**, porque reactivar un desarrollo que ya está colocado NO lo vuelve cotizable—. Se cazó
+releyendo esta decisión con el código delante.
+
+**(2) El aviso NOMBRA el modelo, el motivo y el acto.** Donde se leía *"No hay desarrollos cotizados
+disponibles para este departamento"* ahora se lee, modelo por modelo y agrupado por motivo: *«Su
+precosto sigue en BORRADOR (1) · A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar
+versión»»*, con **botón a Pre-costeos** cuando hay algo que arreglar ahí — y, **desde V1-E8t
+(§Post-F9.145), sólo si quien lo ve puede entrar a Desarrollo** (`desarrollo.ver`): a quien no, el aviso
+le sigue diciendo qué falta y dónde se arregla, sin ofrecerle un clic que termina en un muro. El que **ya está en una lista
+dice en cuál** (folio), que es el dato con el que se va a buscarla.
+
+**(3) Se acabó la adivinanza en el cliente.** El motivo bajo el botón «Generar lista de precios» del
+proyecto se **deducía del estado derivado del desarrollo**, y su propio comentario admitía que en casi
+toda mezcla *"no se puede separar 'ya está en una lista' de 'le falta congelar' sin mentir"* → salía una
+**disyunción**. Hoy el motivo lo dice el servidor por modelo y se leen los dos hechos por separado, con
+su conteo.
+
+**(4) La pantalla se llama IGUAL en los dos lados: «Listas de precios».** Se retira «Cotizaciones» como
+rótulo del riel (venía de que *"Cotizaciones / Listas de precios"* se **truncaba** feo, Gabriel
+9-jul-2026). **La palabra no se pierde**: encabeza la descripción (⌘K la indexa), sigue en el H1 de la
+pantalla y es el nombre del **documento** que se emite. Lo que se gana es que el nombre que el dueño
+buscó **existe donde lo buscó**, y que dos entradas a la misma pantalla dejan de parecer dos pantallas.
+
+**(5) Congelar dice para qué sirvió.** El aviso pasó a *"Precosto v3 congelado: ya puede incluirse en
+una lista de precios (Desarrollo › Listas de precios)"*.
+
+**(6) El rechazo del API también.** `crearLista` **reusa la misma función** en vez de repetir la regla, y
+su rechazo pasó de *"MOD-X: no tiene un precosto congelado"* a *"MOD-X: su precosto v1 sigue en
+BORRADOR: congélalo («Precosto» → «Congelar versión»)"*.
+
+---
+
+**🔴 LO QUE NO SE HIZO, y por qué.** Daniel supuso que desde Cotizaciones *"jalo un proyecto de
+precosteo"* (muro 3). **No se agregó un selector de proyecto al diálogo**: el diálogo pide cliente +
+departamento porque **la lista es de un cliente+departamento**, no de un proyecto — puede juntar modelos
+de varios proyectos, y ésa es la razón de que exista. Lo que se corrigió es lo que de verdad lo dejó
+parado: que al llegar ahí **no supiera qué le faltaba**. Si Daniel quiere además arrancar la lista
+eligiendo un proyecto, es una decisión suya y **no está construida**.
+
+- **Aplica en:** V1-E8f. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **SIN migración de
+  BD** (no se agregó ni una columna: todo sale de datos que ya existían y nadie leía). **Fecha:**
+  2026-08-27.
+
+#### (Post-F9.129) — ⭐⭐ «NEGRO A Y NEGRO B ES LO MISMO»: EL PACK DEJA DE SER UN COLOR (DANIEL, 27-ago-2026)
+
+> ⚖️ **AJUSTE (28-ago-2026) — lo de abajo dice *«unificar las órdenes ya importadas es una migración
+> que no se hace sin la palabra de Daniel»*. La palabra llegó, y fue la contraria: NO SE MIGRAN.**
+> *«Lo viejo ahorita es irrelevante… vamos a importar de nuevo la información cuando vayamos a
+> producción»* ⇒ **§Post-F9.132**. La limpieza no se hace sobre lo capturado: **se hace en el ETL del
+> arranque**, y ahí sí es obligatoria ⇒ **§Post-F9.133** (el ETL de Access junta los packs igual que
+> el importador de PDF). El bloqueo de «Fusionar colores» sobre un color en uso **se queda tal cual**.
+
+
+**La queja, textual.** Daniel, mirando la pantalla de **Explosión de materiales**:
+
+> *«Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B). Necesitamos agrupar por orden
+> cuando es el mismo color. Habíamos acordado hace tiempo que los packs se verían reflejados en otro
+> campo. Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido
+> separar las compras para cada renglón: veo demasiados registros.»*
+
+**Qué es un "pack".** C&A pide varios **tendidos** en una misma orden de compra: el pack A con una corrida
+de tallas (por ejemplo 2-1-1-3-3-2) y el pack B con otra (1-0-0-2-2-2). Son la misma prenda del mismo
+color; lo que cambia es **cómo se agrupan las piezas para empacarlas**. Un CH negro del pack A y uno del
+pack B son idénticos.
+
+**La causa raíz, medida.** El importador de OC por PDF metía la letra del pack **dentro del nombre del
+color** —`componerColor` armaba `Negro A`— y resolvía-o-creaba **un color por cada pack**. Así nacían
+colores de catálogo `NEGRO A`, `NEGRO B`, `NEGRO C`… y como **todo lo que va aguas abajo agrupa por
+color** (explosión de materiales, MRP, órdenes de compra, inventario, recepción), una misma orden llegaba
+a las compras **partida en dos o tres renglones**. Esto no fue un descuido: fue una copia deliberada de la
+maña del sistema viejo, a petición del propio Daniel cuando se construyó el importador (**§Post-F9.2**), y
+ya estaba señalada como algo a cambiar en **§Post-F9.10** (*"Me gusta que exista un solo Negro y no esté
+fragmentado en miles de colores escritos de diferente manera"*).
+
+### Lo que se decidió
+
+1. **El color de la orden es el color genérico, y ya.** `Negro`, nunca `Negro A`. La letra del pack no
+   entra en el nombre del color ni fabrica catálogo.
+2. **Los packs se SUMAN talla por talla en un solo renglón de la orden.** Si el pack A pide 254 de la
+   talla 5-6 y el B pide 61, la orden lleva **un** renglón `Negro` con **315** en la 5-6.
+3. **El desglose por pack se sigue GUARDANDO en `Orden.packsCliente`** — ése es exactamente **"el otro
+   campo"** que Daniel recuerda haber acordado. Se escribe desde que se construyó el importador
+   (§Post-F9.2), por los dos caminos, y trae íntegro cada pack con su tipo, su número de packs y su
+   corrida por talla, más los SKU del cliente. Es la base del futuro **módulo de EMPAQUE**.
+
+   ⚠️ **Pero decir "no se perdió nada" sería falso, y hay que decirlo completo.** Hoy **nadie consume
+   ese campo**: no hay una sola lectura fuera del importador y sus pruebas, y el impreso de la orden no
+   lo menciona. Hasta este cambio el desglose por pack **se veía** —eran renglones de la matriz, y
+   salían en el impreso de la OP y en el de envío a maquila—; desde aquí **está guardado pero no se
+   muestra en ninguna pantalla ni papel**. Para un taller que tiende por pack eso no es un matiz: hoy
+   esa información tiene que salir de la OC del cliente. La pantalla que lo lea es parte del módulo de
+   empaque.
+
+   ⚠️ **Y hay una pérdida fina:** lo que se guarda es el desglose **del cliente** (las cantidades
+   originales de la OC), **no las que se van a fabricar**. El reparto del 7 % de sobre-pedido entre los
+   packs y las ediciones que el usuario haga en la vista previa **ya no quedan registrados pack por
+   pack** en ningún lado — antes quedaban, porque cada pack era un renglón de la matriz.
+4. **La vista previa del importador sigue mostrando los packs por separado** —Daniel la usa para cotejar
+   contra el papel de la OC, y en el papel los packs existen— pero **etiquetados como packs** («Pack A»,
+   «Pack B»), no como colores que no van a existir. Y el renglón de totales de abajo, que es el que de
+   verdad retrata la orden, ahora dice el nombre del color: **«A fabricar · Negro»**. Se prefirió esto a
+   colapsar la previa: la previa debe ser fiel al papel, pero no debe **mentir** sobre lo que va a quedar
+   en la orden.
+
+### Lo que este cambio NO hace, y por qué
+
+- ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos** (`Negro A`, `Negro B`). El arreglo es
+  **sólo hacia adelante**. Unificarlas es una **migración irreversible** que toca matrices de órdenes
+  vivas, cortes y envíos a maquila ya capturados: ~~no se hace sin la palabra de Daniel y va como pieza
+  aparte~~ → 🔁 **CERRADA *NO* (28-ago-2026, §Post-F9.132): esa migración NO SE HACE.** La limpieza se
+  muda al **ETL del arranque** (§Post-F9.133). *(Es el mismo aviso del banner de arriba, repetido aquí
+  porque es aquí donde se lee.)*
+- 🔴 **«Fusionar colores» ahora SE NIEGA a fusionar un color en uso — se construyó en esta misma
+  etapa.** Era la trampa obvia (juntar `Negro A` y `Negro B` en `Negro` desde Catálogos › Colores ›
+  Fusionar) y **este cambio fabrica el motivo para caer en ella**: deja el catálogo lleno de colores que
+  él mismo declara *"no eran colores, eran empaques"*, y el diálogo prometía que *"las telas que usaban
+  los duplicados pasan al canónico"* sin decir una palabra de las órdenes.
+
+  **El agujero era más ancho de lo que se escribió en la primera redacción** (que decía "no toca los
+  renglones de las órdenes", quedándose corta): `Color` tiene **DOCE** llaves foráneas entrantes y la
+  fusión sólo sabe mover **UNA** (`TelaColor`). Las otras **once** —matriz de órdenes, recetas de tela de
+  la orden, corte/envío/recibo, kardex de PT, renglones de OC de tela y de avío, requerimientos de la
+  explosión, faltantes dados por cubiertos, lotes, inventario cíclico y precios por color de
+  proveedor— quedaban apuntando a un color **apagado**. Y eso rompe una regla que el propio sistema
+  impone al escribir: **una orden viva no puede apuntar a un color inactivo**
+  (`sincronizarMatriz`) — o sea, la orden se volvía **ineditable**.
+
+  **Se decidió BLOQUEAR, no reasignar.** Entre "no hacer nada" y la migración irreversible había un
+  tercer camino que **no toca ni un dato**: negarse y decir por qué. Ahora `fusionarColores` cuenta esas
+  once referencias antes de desactivar nada y, si hay alguna, rechaza nombrando el color, en qué está
+  metido y con cuántos renglones. **Reasignar de verdad NO se hizo, y esa razón sí se sostiene:**
+  mover sólo la matriz dejaría el corte (`EtapaMovimientoDet`) y el kardex de PT (`MovimientoDetPt`)
+  colgando del color viejo, o sea **incoherentes entre sí** — eso es trabajo de la migración del punto
+  anterior. Fusionar colores que **no** se usan sigue funcionando igual. La lista de las once no se
+  mantiene a mano sin red: una prueba **lee `prisma/schema.prisma`** y se pone roja si mañana le cuelgan
+  una FK nueva al color y no la agregan. *(Se enumeraron estas referencias tres veces —el código
+  original miraba 1, la primera redacción de esta decisión dijo 1, una revisión dijo 6— y las tres se
+  enumeraron mal. De ahí la red.)* Deuda actualizada en `HOJA-DE-RUTA.md` §4.
+- **El pack todavía no viaja al corte ni a la maquila.** ⚠️ **YA NO: construido el 2-sep-2026 en la versión
+  0.087** (ficha `V1-E9s`) — el pack es **campo propio** de `OrdenLinea` y `EtapaMovimientoDet` y acompaña al
+  corte y al envío, opcional al recibir. *(Se conserva el párrafo porque su relato sigue siendo cierto para
+  el momento en que se escribió: como antes el pack venía disfrazado de color, la matriz de la orden* de
+  hecho *permitía cortar por pack; entre esta etapa y la 0.087 ya no. Daniel pidió el cambio sabiendo el
+  orden de las cosas —*"me parece bien terminar con las telas y luego retomas esto"*— y el dato siguió
+  guardado en `Orden.packsCliente` hasta que el campo existió.)* ⏳ **Lo que sigue abierto es la 0.095**: las
+  matrices de captura y **el cableado del importador**, que hoy sigue fusionando ⇒ **ninguna orden nacida de
+  un PDF de C&A tiene packs todavía**.
+- **El importador de EXCEL no se tocó**: nunca usó letras de pack.
+
+### Detalles que se resolvieron al construir
+
+- **El pantone no tuvo que desempatarse.** Se temía que dos packs trajeran pantones distintos. No puede
+  pasar: **el pantone es uno por OC** (cada PDF trae un color genérico y un pantone, y el ajuste manual de
+  la vista previa también es por PDF, no por pack). Va tal cual en el único renglón.
+- **La fusión se hace ANTES de guardar, en el importador — no en la matriz de la orden.** La matriz
+  (`sincronizarMatriz`) impone que un color no aparezca dos veces en la misma orden, y es la misma que usa
+  la captura manual: enseñarle a sumar renglones repetidos escondería un error de captura real. Quien sabe
+  que esos renglones son packs del mismo color es el importador.
+- **Una sola puerta, no tres.** La suma se hace en el único punto por donde la matriz de un PDF llega a la
+  orden, así que cubre por igual los dos caminos: la propuesta automática de sobre-pedido **y** la matriz
+  que el usuario editó a mano en la vista previa.
+- **La misma talla escrita distinto ya no revienta la importación.** Si dos packs escriben `CH` y `ch`, al
+  sumarlos caen en una sola celda. Sin eso, el renglón habría llevado la misma talla dos veces y la
+  importación entera se habría abortado.
+- **Ya no queda un color huérfano cuando un pack sale en cero.** *(La primera redacción de este punto
+  describía el caso equivocado —"una orden que el usuario vacía entera"— y era falso: si se vacía toda
+  la OC la matriz sale vacía y `salidaAProduccion` **aborta la transacción entera**, así que el color se
+  revertía igual.)* El huérfano real venía de otro lado: `filasDesdePropuesta` puede producir **una fila
+  toda en cero** —un grupo con `totalPacks = 0` en el cálculo de sobre-pedido— mientras las otras filas
+  sí traen piezas. Ahí la transacción **sí comitea**, y el `resolverOCrearColor` que corría dentro del
+  bucle dejaba el color creado y colgando. Ahora el color sólo se resuelve-o-crea si de verdad quedó
+  corrida. ⚠️ **Este borde no está cubierto por pruebas** (exige un PDF con un grupo de 0 packs y
+  ninguna lo construye): la guarda es correcta, pero no se presuma verificada.
+
+- **Aplica en:** V1-E8g. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  ⇒ **NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-27.
+
+---
+
+#### (Post-F9.130) — ⭐⭐⭐ EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA: nace el botón «Corregir» (DANIEL, 27-ago-2026)
+
+> ⚖️ **AJUSTE (28-ago-2026) — el punto 6 espera *«la palabra de Daniel»* para la reparación en bloque.
+> Llegó, y la respuesta es que NO HACE FALTA:** *«Lo viejo ahorita es irrelevante… no importan ahorita
+> las órdenes que ya hay»* (**§Post-F9.132**). ⇒ **La reparación en bloque de las órdenes viejas se
+> CANCELA**; el botón «Corregir» de una orden a la vez se queda —sirve para lo que se capture de aquí
+> en adelante— y el detector se vuelve **insumo del ETL del arranque**, no de una campaña de limpieza.
+>
+> 📐 **Y una corrección de ANCLA de esta misma entrada (28-ago):** más abajo el motor que normaliza la
+> bandera al nacer la orden se nombra **`sembrarRecetaDeOrden`**, y **ese símbolo NO es el motor: es un
+> helper de PRUEBAS** (`backend/src/pruebas/receta.ts`, sólo lo importan tests). El motor real es
+> **`copiarRecetaDelModelo`** (`backend/src/dominio/produccion/receta-orden.ts`), donde
+> `consumoPorTalla: porMedida.has(a.idAvio) ? false : a.consumoPorTalla` es la línea que apaga la
+> contradicción — y por ahí pasan **tanto la captura normal como el ETL**. Lo que la entrada afirma
+> sigue siendo cierto; el nombre con el que lo señalaba, no.
+
+
+> *"Sigue estando mal lo de los cierres… me sigue multiplicando por las medidas… Y me sigue poniendo
+> 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo modelo desde el principio para que
+> funcione bien? o sigue siendo algún tema de programación? **Siento que estamos atorados en lo mismo
+> desde hace varias versiones. No podemos desatorarlo.**"* — Daniel, usando el sistema.
+
+### Por qué llevábamos varias versiones atorados
+
+**Porque se arreglaba el MOTOR y el DATO seguía congelado.** Son dos cosas distintas y las tres
+correcciones anteriores (§Post-F9.66 · §Post-F9.105 y su remate) tocaron sólo la primera:
+
+- El **motor está sano** desde el 18-ago-2026: cuando nace una orden, el sistema apaga solo la
+  contradicción (`sembrarRecetaDeOrden`). ⇒ **una OP nueva sale bien, y salía bien ya entonces.**
+- Pero **la receta de cada orden es una foto**, congelada el día que la orden nació — y eso es a
+  propósito (es lo que permite que dos clientes del mismo modelo lleven cosas distintas). **Ninguna
+  corrección del motor vuelve hacia atrás a tocar esas fotos**, y ninguna debía: son datos de órdenes
+  vivas.
+- ⇒ Daniel arreglaba el cálculo, abría la **misma orden vieja** (la 5562) y veía **el mismo número**.
+  Desde su silla eso se lee como *"no lo arreglan"*; desde el código eran dos problemas, y sólo se
+  había resuelto uno.
+
+### 🔴 Y el defecto que quedaba no era el cálculo: era el REMEDIO
+
+Al 27-ago el sistema ya hacía **todo** lo difícil, y aun así el usuario no podía avanzar:
+
+1. **Detectaba** el renglón contradictorio (avío que se compra POR MEDIDA con *"se consume por talla"*
+   encendido de una captura vieja).
+2. **Sabía la magnitud**: cuánto pide hoy la orden y cuánto debería pedir.
+3. Y cerraba el aviso con: **«Guarda el renglón para normalizarlo.»**
+
+Eso es **un conjuro**. Daniel no es programador: *normalizar* no es una palabra del negocio ni el
+rótulo de ningún botón, y «guardar el renglón» exige saber que cualquier guardado —el precio, el
+proveedor— dispara por dentro una corrección invisible. **Un sistema que detecta el error, sabe la
+solución y le pide al usuario que adivine el hechizo está PEOR que uno que no lo detecta**: le enseña
+que hay algo roto y lo deja sin salida.
+
+### Lo que se decide
+
+1. **Un BOTÓN «Corregir», en el renglón, pegado al aviso.** No en un menú aparte, no en otra pantalla:
+   donde se lee el problema. Apaga la bandera vieja — exactamente lo mismo que ya hacía el guardado,
+   pero con nombre.
+2. **El aviso se reescribe en lenguaje de negocio y ABRE por la cifra**: *«Esta orden pide 53,095 pza y
+   deberían ser 3,200 pza: el requerido sale MULTIPLICADO por 16.6…»*. Antes abría con dos renglones de
+   explicación técnica y el número quedaba sepultado en medio. Lo que Daniel necesita para decidir son
+   los dos números.
+3. **Sigue siendo un acto EXPLÍCITO de una persona (D3).** Lo que §Post-F9.66 decidió y **NO se
+   revierte**: la bandera no se apaga sola al abrir la pantalla, porque *una lectura no cambia datos, y
+   voltear el cálculo de una orden viva sin que nadie lo pida sería el cambio callado que D3 prohíbe*.
+   Es un endpoint propio (`POST …/receta/renglones/avio/{id}/corregir`), con bitácora que guarda la foto
+   íntegra de lo que había **y la magnitud** (qué pedía y qué pide).
+4. **Corregir NO borra nada** (las cantidades por talla se quedan, sólo dejan de mandar), **NO toca** el
+   consumo por prenda, el precio ni el amarre, y **NO marca el renglón como «ajustado»** — marcarlo
+   apagaría para siempre los avisos de *"el modelo cambió"* de ese renglón, o sea que reparar un defecto
+   nuestro le costaría al usuario una señal que sí necesita.
+5. **SÍ tumba la firma de ESE renglón** (y sólo de ése): el requerido cambia —y mucho—, así que
+   Desarrollo tiene que volver a mirarlo antes de que se compre. Hay que **volver a Liberar**.
+6. **Se corrige UNA ORDEN A LA VEZ.** ⚠️ **No hay reparación en bloque, y es deliberado**: tocaría de un
+   golpe los datos de muchas órdenes vivas —cambiando lo que compran— y ~~**eso necesita la palabra de
+   Daniel, que todavía no está dada**~~ → 🔁 **CERRADA *NO* (28-ago-2026, §Post-F9.132): la reparación
+   en bloque se CANCELA.** El **detector** (`migracion/analisis/avios-por-medida-
+   contradictorios.ts`) ~~sigue siendo la lista de trabajo y el insumo para pedirle esa decisión con
+   números~~ → pasa a ser **insumo del ETL del arranque** (§Post-F9.133).
+7. **Ningún sitio vuelve a decir «guarda para normalizarlo».** El aviso de la explosión de materiales
+   manda al botón por su nombre; el del BOM del modelo, a su propio «Guardar medida por talla».
+
+### Lo que esto NO arregla (declarado, no enterrado)
+
+- **Las órdenes viejas no se arreglan solas.** Cada una hay que corregirla, renglón por renglón, desde
+  su receta. El botón hace el trabajo de un clic; el recorrido sigue siendo humano.
+- **La habilitación/surtido sigue enseñando el mismo número inflado** mientras el renglón no se corrija
+  (usa el mismo cálculo). Es la deuda que §Post-F9.105 ya había dejado con nombre.
+- ⚖️ **Corregir NO toca la orden de compra que ya se autorizó**, y es un límite deliberado: la guarda de
+  §Post-F9.79 existe para que nadie **vacíe** una compra comprometida (sólo se dispara si el requerido
+  quedaría en CERO), **no para vigilar el exceso**. Bajar de 53,095 a 3,200 con una OC viva por 53,095
+  pasa sin decir nada: la receta queda bien y **la OC hay que revisarla aparte**. Va escrito en el
+  historial de versiones, porque es exactamente el caso de la orden que Daniel nombró.
+- **Un renglón EXCLUIDO también ofrece el botón** aunque hoy no compre nada: puede revivir, y más vale
+  que reviva ya sano. ⚠️ Pero **ahí el aviso no lleva cifras**: decir *"esta orden pide 53,095"* de un
+  renglón que la orden **no pide** sería una afirmación falsa — y con un botón al lado, un clic que no
+  cambia nada. Lo mismo con un renglón apagado para producción. *Un condicional que no aplica es ruido;
+  un enunciado factual falso es el mecanismo por el que se deja de creerle al sistema.*
+
+- **Aplica en:** V1-E8h. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  (reusa `desarrollo.administrar`, el mismo que ya exige editar la receta) ⇒ **NO requiere
+  `SEED_ON_START`**. **Fecha:** 2026-08-27.
+
+#### (Post-F9.131) — ⭐⭐ CAPTURAR EL AVANCE DE UN CLIC: «lo que falta por cortar» y «lo que se cortó» (DANIEL, 28-ago-2026)
+
+> *"Sería muy bueno que tenga la opción de **marcar el corte como completo** (un botón que llene los
+> campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a maquila con la
+> información exacta de lo que se cortó**."* — Daniel, capturando avances de producción.
+
+**El problema, en corto.** Capturar un corte o un envío a maquila obliga a teclear **talla por talla**
+lo que **casi siempre es exactamente lo esperado**: se corta lo que pide la orden, y se manda a maquila
+lo que se cortó. Una orden con 6 tallas × 4 colores son 24 campos que se copian a mano de un papel al
+que ya se le sacó la cuenta. Cada uno es una oportunidad de equivocarse, y el sistema **ya sabe** el
+número correcto.
+
+### Lo que se decidió
+
+1. **Dos botones, uno por captura, pegados a la matriz que llenan.**
+   - En el **corte**: **«Llenar con lo que falta por cortar»**.
+   - En la **entrega a maquila** (y en la de arte/estampado): **«Llenar con lo que se cortó»**.
+
+   Cada botón muestra **el total que va a poner** entre paréntesis —*«Llenar con lo que se cortó (240
+   pza)»*— para que se vea el número **antes** de picarlo.
+
+2. 🔴 **PRECARGAN, NO GUARDAN.** El botón **llena los campos** y ahí se detiene: quien captura revisa,
+   ajusta lo que haya que ajustar y **después** da «Guardar movimiento», igual que siempre. Es un
+   atajo de captura, **no** una acción que escriba sola en el sistema. Bajo el botón lo dice con todas
+   sus letras: *"No guarda nada: revisa y ajusta antes de Guardar."*
+
+3. **PISAN lo que ya esté capturado, no lo suman.** Si ya había cantidades tecleadas, el botón las
+   reemplaza. **Por qué pisar y no sumar:** sumar haría que un segundo clic **duplicara** las cantidades
+   en silencio y sin vuelta atrás; pisar es reversible —se vuelve a picar el botón y queda igual— y es
+   lo que la etiqueta promete. Las celdas que el sistema no propone quedan **vacías**, no en su valor
+   anterior: si no, un intento previo dejaría restos mezclados con la propuesta y el total ya no sería
+   "lo que falta".
+
+4. ⭐ **El botón del corte propone lo que FALTA, no lo ordenado a secas.** Daniel lo pidió como *"las
+   cantidades que se ordenaron"*, y **en el caso normal es exactamente eso**: una orden que todavía no
+   se corta tiene "lo que falta" = "lo que se ordenó". La diferencia sólo aparece cuando **ya se
+   capturó un corte parcial**: ahí proponer de nuevo lo ordenado **duplicaría piezas**. Se propone el
+   resto.
+
+5. ⭐⭐ **El botón del envío propone lo cortado MENOS lo que ya se le envió a ese proceso** — el caso
+   del **segundo envío parcial**. Es la trampa que este botón tenía que esquivar: el sistema **no deja**
+   enviar a maquila más de lo cortado (regla vieja, decisión (g) de F3-E2), así que si de 100 cortadas
+   ya se mandaron 60 y el botón precargara **100**, al dar Guardar el sistema lo **rechazaría** — y el
+   usuario se comería el error con la matriz ya llena. **Un botón que produce un error no es un atajo,
+   es una trampa.** Ahora propone **40**.
+
+6. ⚠️ **Lo cortado NO es lo ordenado.** Cortar de más **sí se permite** (decisión (f) de F3-E2), así que
+   una orden de 100 puede tener 104 cortadas. El botón del envío lee **lo realmente cortado** (104), no
+   lo que pedía la orden. El botón del **corte**, en cambio, nunca propone cantidades **negativas**: si
+   en una talla ya se cortó de más, esa talla simplemente no se propone (cortar de más se sigue
+   pudiendo, tecleándolo a mano).
+
+7. **Cuando no hay nada que precargar, el botón se ve APAGADO y con la razón al lado** — nunca mudo, y
+   **la matriz sigue ahí para capturar a mano**. Las cuatro razones, en palabras de taller:
+   - *"Esta orden no trae desglose por color y talla: no hay de dónde copiar cantidades."*
+   - *"Ya está cortado todo lo que pide la orden. Si vas a cortar de más, tecléalo: se permite."*
+   - *"Todavía no hay ningún corte capturado en esta orden, así que no hay nada que enviar."*
+   - *"Todo lo cortado ya se le envió a este proceso: no queda nada por enviar."*
+
+   Y si la consulta falla, lo dice (*"No se pudo consultar qué falta. Captura las cantidades a mano."*)
+   con un **Reintentar** al lado. El atajo puede fallar; la captura no se bloquea nunca.
+
+8. ⚠️ **En la entrega de PRENDAS YA TERMINADAS a un proceso de arte, el botón se APAGA** (y dice por
+   qué). Ahí lo que se manda ya es producto terminado que sale del almacén, y el sistema exige **dos**
+   cosas, no una: que no se mande más de lo cortado **y** que el almacén de verdad tenga esas prendas.
+   El botón sólo sabe la primera, así que con 1,000 cortadas y 400 recibidas te ofrecería 1,000 y al
+   guardar te rebotaría por existencia — *la misma trampa que este atajo vino a cerrar*. Ahí se captura
+   a mano, con el aviso al lado: *"Estas prendas salen del almacén de producto terminado y hay que
+   respetar lo que hay en existencia."* Que el botón también mire la existencia queda pendiente.
+
+9. **Si un color o una talla se quitó de la orden DESPUÉS de cortarse, el botón no lo propone.** Esa
+   celda ya no se dibuja en la pantalla de captura y el sistema la descarta al guardar: proponerla
+   haría que el botón prometiera 240 piezas y se guardaran 200. Sólo se propone lo que se puede ver y
+   capturar.
+
+10. **El RECIBO de maquila NO lleva botón.** Su pendiente no es del proceso sino **de cada maquilero**
+   (a quién se le entregó, cuánto debe), y eso ya se resuelve con el desglose por maquilero que la
+   pantalla muestra desde el 28-jul-2026. Meter aquí un botón "por proceso" ofrecería a un maquilero
+   piezas que tiene otro.
+
+### Un defecto que se cazó al revisar: el botón repetía el número de la pantalla anterior
+
+Si acababas de estar en el **corte** y abrías **Entrega a arte**, el botón salía encendido con la cifra
+de *lo que falta por cortar* —no la de lo que se cortó— mientras el aviso de al lado te pedía elegir
+primero el proceso. **El botón y su aviso se contradecían**, y al picarlo la tabla se llenaba con la
+respuesta de otra pregunta. Corregido: el botón sólo se enciende cuando la consulta de **esa** pantalla
+está de verdad viva. Es el mismo principio que gobierna toda esta etapa: **una cifra que el sistema
+afirma tiene que ser verdad**, o no se dice.
+
+### Un remate técnico que venía de antes
+
+El número que el botón propone **lo calcula el servidor**, no la pantalla: *"cuánto se puede enviar
+todavía"* **es** la regla del sobre-envío mirada del otro lado, y la misma regla escrita en dos lados
+acaba derivando. Al hacerlo se encontró que la pantalla **ya estaba** re-derivando por su cuenta cuánto
+se había cortado (restaba *pedido − lo que falta por cortar*) para poner los topes de la matriz en el
+**primer** envío de un proceso. Ese cálculo se borró: ahora el servidor manda lo cortado ya sumado.
+
+- **Aplica en:** V1-E8i. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  (la consulta reusa `produccion.wip-ver`, el mismo con el que ya se ve el panel de avance) ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.132) — 🔴🔴 LO VIEJO NO SE REPARA: toda la limpieza se muda al ETL DEL ARRANQUE (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Tres correcciones seguidas de la jornada —los packs metidos dentro del color
+(§Post-F9.129), el botón «Corregir» de los avíos por medida (§Post-F9.130) y las que se decidieron
+hoy— dejaron abierta **la misma pregunta**: ¿y los datos que ya están capturados? Preguntado de frente
+si había que repararlos, Daniel:
+
+> *«Lo viejo ahorita es irrelevante. Acuérdate que vamos a importar de nuevo la información cuando
+> vayamos a producción… no importan ahorita las órdenes que ya hay.»*
+
+### Lo que se decide
+
+1. **Las órdenes ya capturadas en `prueba` NO se reparan.** Ni a mano, ni con una migración, ni con una
+   acción en bloque. Ningún arreglo del sistema tiene que volver hacia atrás a tocarlas.
+2. **Por qué se sostiene.** `prueba` es un ambiente de **captura de práctica**: lo que hay ahí lo tecleó
+   Daniel para probar el sistema, no para operar el negocio. El arranque de producción **vuelve a
+   importar desde Access** (§Post-F9.24 — la ventana 2025–2026; §Post-F9.25 — el almacén de PT arranca
+   de un conteo físico). Reparar hoy es trabajo que se tira el día del go-live.
+
+### ⚠️ La consecuencia, que es lo IMPORTANTE de esta decisión
+
+🔴 **Todo el peso de la limpieza se mueve al ETL del arranque.** Cada defecto que hoy se declara *"no se
+repara hacia atrás"* **deja de ser deuda de un ambiente de pruebas y se vuelve REQUISITO del ETL de
+go-live**. Si el ETL no lo trae resuelto, el sistema **arranca en producción con exactamente la basura
+que hoy estamos llamando irrelevante** — y ese día ya no será irrelevante: serán las órdenes con las que
+se compra y se corta.
+
+**La lista viva de lo que el ETL tiene que traer resuelto** (se le agrega cada vez que se decida "sólo
+hacia adelante"):
+
+| Defecto declarado "sólo hacia adelante" | Dónde se decidió | Qué debe hacer el ETL |
+|---|---|---|
+| El pack metido dentro del nombre del color (`Negro A` / `Negro B`) | §Post-F9.129 · §Post-F9.10 | Fusionarlos en un solo color — **§Post-F9.133**, con su censo previo |
+| Renglones de avío *"se compra por medida"* + *"se consume por talla"* que inflan el requerido | §Post-F9.130 punto 6 | ✅ **YA LO HACE — verificado en el código, 28-ago.** El ETL crea sus órdenes por la MISMA puerta que la captura normal (**`backend/src/dominio/produccion/migracion.ts`** llama a **`copiarRecetaDelModelo`**), y esa función apaga la bandera contradictoria al copiar la receta a la orden. ⚠️ **Pero sólo la limpia en la ORDEN:** el BOM del modelo se queda con la contradicción, y ahí se arregla a mano (§Post-F9.130 punto 7). Confirmarlo con una corrida real, no darlo por hecho. |
+
+3. **Lo que esta decisión NO autoriza.** No baja el listón de lo que se construye **hacia adelante**: una
+   orden nueva sigue teniendo que nacer bien. *"Lo viejo es irrelevante"* justifica **no reparar**, nunca
+   **dejar de arreglar el motor**.
+4. ⚠️ **Y tiene fecha de caducidad.** Es cierto **mientras** lo capturado en `prueba` sea práctica. El día
+   que Daniel capture ahí algo que quiera conservar —o el día del go-live, lo que llegue primero— esta
+   decisión deja de aplicar y hay que volver a preguntarle. **No es una regla permanente: es un permiso
+   con fecha.**
+
+- **Aplica en:** el ETL de F10 (go-live) y toda etapa que decida corregir "sólo hacia adelante". **Hoy no
+  se construye código por esta decisión** — lo que hace es **mover un requisito de sitio**. **Fecha:**
+  2026-08-28.
+
+---
+
+#### (Post-F9.133) — 🔴 EL ETL DE ACCESS TAMBIÉN JUNTA LOS PACKS: `Negro A` y `Negro B` entran como UN solo `Negro` (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel lo marcó él mismo con la palabra *«Importante»*, justo después de aceptar que las
+órdenes viejas de `prueba` no se reparan (§Post-F9.132):
+
+> *«Importante. Pero sí toma en cuenta lo de los colores y packs para las órdenes nuevas que importemos
+> de Access y también de las nuevas OP. Un color Negro A y un Negro B de la misma orden, es el mismo
+> modelo, es un solo negro. Por eso el pack debe de ir en otro campo y de esa manera no duplicamos
+> colores.»*
+
+**Lo que dice, en corto:** la regla de §Post-F9.129 **no es una regla del importador de PDF**. Es una
+regla del sistema, y tiene **tres puertas**: el importador de PDF (✅ hecha), **el ETL de Access**
+(⏳ ésta) y **la captura manual de una OP nueva** (⏳, es la segunda mitad de §Post-F9.10: el pack como
+campo propio). Cerrar sólo la primera dejaba el catálogo limpiándose por delante y ensuciándose por
+detrás el día del arranque.
+
+### Lo que se midió (28-ago-2026) — el ETL no sabe nada de packs
+
+- `migracion/loaders/ordenes.ts` → `cargarOrdenes` llama a **`precrearColores`**, que resuelve-o-crea
+  **un color por cada texto distinto** de la columna `Color` de `OrdenesDet.csv`, normalizado con
+  **`normalizarClaveColor`** (`migracion/comun/tallas-orden.ts`), que sólo baja mayúsculas, quita
+  acentos y colapsa espacios. ⇒ **`NEGRO A` y `NEGRO B` son dos claves distintas y se crean al vuelo,
+  como dos colores de catálogo.**
+- **No hay una sola línea de lógica de packs en el loader.** No es que esté mal escrita: **no existe**.
+- ⚠️⚠️ **ESTE PÁRRAFO QUEDÓ OBSOLETO EL 2-sep-2026 (v0.091) — y su petición SE CUMPLIÓ.** Decía:
+  *«lo que YA existe es la SUMA, no la regla: `fusionarPacksEnUnaCorrida`
+  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`) … no sabe qué es un pack … y devuelve UNA sola
+  corrida a propósito»*. **Hoy es falso en nombre, ruta, retorno y responsabilidad**: esa función **ya no
+  existe**. La sustituyó **`agruparPacksEnRenglones`** (`backend/src/dominio/pedidos/packs-cya.ts`), que
+  **NO funde**: agrupa **por pack** y devuelve **un renglón por tendido**. ⭐ **Y sí sabe qué es un pack**,
+  porque usa **`normalizarPack` del dominio de producción** — que es **exactamente la regla compartida que
+  el punto siguiente pedía escribir UNA vez**. ⇒ **El ETL de Access ya no tiene que inventarla: la importa.**
+  Lo que sigue siendo suyo es **agrupar primero por color base**, porque una orden de Access trae muchos
+  colores y un PDF de C&A trae uno. ⚠️ **Una orden de Access trae
+  MUCHOS colores**, así que el ETL no puede llamarla y ya: tiene que **agrupar primero por color base**
+  y usarla para sumar cada grupo.
+- 🔴 **Dónde está el riesgo real de dos implementaciones: en la REGLA, no en la suma.** *"Qué es un
+  pack"* hoy **sólo vive en el parser del PDF de C&A**. El ETL la necesita, y la **captura manual de
+  OP** también (segunda mitad de §Post-F9.10). **Hay que escribirla UNA vez y compartirla entre los
+  tres**; si cada puerta se hace la suya, los colores se vuelven a separar dentro de un año y nadie
+  sabrá cuál de las tres tenía razón.
+
+### 🔴 Por qué NO se escribió la regla hoy: una regla ciega es peligrosa
+
+**Falta ver los nombres REALES del volcado.** Los CSV viven en `Respaldo CLAUDE/TABLAS/` (**CP850**, ver
+CLAUDE.md §4) y **no están en el contenedor donde se trabajó** (verificado: la carpeta no existe ahí).
+Sin ese censo, cualquier regla se escribe a ciegas.
+
+⚠️ **Y el riesgo es real, no teórico:** la regla obvia —*"colapsa todo lo que termine en una letra
+suelta"*— **fusionaría colores legítimamente distintos**. Un `AZUL M` puede ser "azul marino" abreviado y
+no el pack M de un azul; veinte años de captura libre producen nombres que ningún patrón adivina. **Y
+fusionar dos colores que no eran el mismo no se nota**: se descubre meses después, cuando el inventario
+de producto terminado suma peras con manzanas.
+
+### Cómo se propone construirlo (a confirmar contra el censo, antes de escribir código)
+
+1. **Fusionar sólo DENTRO DE LA MISMA ORDEN**, nunca como un reemplazo global del catálogo. Es
+   literalmente la condición que Daniel puso: *"un color Negro A y un Negro B **de la misma orden**"*.
+   Dos o más renglones de una misma orden cuya **base coincide** y que difieren **sólo** en un sufijo de
+   una letra ⇒ son packs, se suman talla por talla.
+2. **Un `NEGRO A` solitario —sin hermano en su orden— NO se toca: se LISTA.** Ahí no hay evidencia de que
+   la letra sea un pack, y una fusión a solas es indistinguible de renombrar un color de verdad.
+3. **Todo lo que se fusione va al reporte de cuadre, orden por orden.** Es la regla §7 del ETL de este
+   proyecto —*nada se pierde en silencio*— y aquí manda doble: es la única forma de que Daniel pueda
+   revisar si alguna fusión estuvo mal **antes** de operar sobre ella.
+4. **Primero se cuenta, luego se fusiona.** Una pasada de sólo lectura sobre el volcado que diga cuántos
+   colores traen sufijo de letra, cuántos tienen hermanos en su orden y cuántos están solos. Ese conteo
+   es lo que convierte esta decisión en construible.
+
+- **Aplica en:** el ETL de F10 (`migracion/loaders/ordenes.ts`) y, por separado, la captura manual de OP
+  (segunda mitad de §Post-F9.10). **Pendiente de construir**; el censo del volcado es su
+  prerrequisito. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.134) — 🔴 EL MODELO SIEMPRE NACE EN DESARROLLO — y el catálogo escondía justo lo que acababas de crear (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel, usando el sistema:
+
+> *«Generé dos modelos en precosteo… y no los veo en modelos. ¿Dónde lo edito?»*
+
+Y razonando en voz alta sobre el orden de las cosas:
+
+> *«Si me voy en orden, primero está el modelo y luego el precosteo. Creo que no está bien. **Siempre se
+> va a empezar creando un modelo de desarrollo**… el modelo de producción podríamos hacerlo en la parte
+> de producción, a la hora de dar de alta las órdenes de producción.»*
+
+**La causa, medida — son DOS cosas que se juntan, y por separado ninguna se ve mal:**
+
+1. Un modelo creado desde Desarrollo **nace marcado como `desarrollo`**:
+   `crearDesarrolloConModeloNuevo` (`backend/src/dominio/desarrollo/desarrollos.ts`) llama a
+   `crearModelo` y **enseguida le pone `origen: 'desarrollo'`**.
+2. El listado de modelos **arranca filtrado a producción**: el esquema de filtros
+   `esquemaListarModelosDominio` (`backend/src/dominio/modelos/modelos.ts`) trae
+   `origen: z.enum(['produccion','desarrollo','todos']).default('produccion')`.
+
+⇒ **La pantalla le esconde por defecto exactamente lo que acaba de crear.** Cada mitad tiene su razón
+—la de arriba viene de §Post-F9.34 punto 2, *"no quiero llenar de basura el catálogo"*— y juntas
+producen un sistema que se traga el trabajo del usuario sin decir nada. **Un filtro que oculta lo
+recién creado no se lee como un filtro: se lee como que no se guardó.**
+
+### Lo que se decide
+
+1. **El default del filtro de origen pasa a `todos`, con la ETAPA visible en cada renglón.** El motivo de
+   §Post-F9.34 sigue siendo válido —no llenar el catálogo de desarrollos que nunca salen— pero **se
+   sirve mejor con una columna que dice qué es cada renglón que escondiendo la mitad**. El filtro
+   sigue ahí para quien quiera ver sólo producción. *(La mitad visual **ya existe**: el renglón pinta
+   un chip «Desarrollo» —`ModelosPagina.tsx`—; lo que hay que cambiar es el default, no inventar la
+   columna.)*
+
+   🔴 **EL DEFAULT VIVE EN CUATRO SITIOS, Y CAMBIAR UNO SOLO NO CAMBIA NADA.** Medido el 28-ago:
+
+   | # | Dónde | Qué es |
+   |---|---|---|
+   | 1 | `backend/src/dominio/modelos/modelos.ts` (`esquemaListarModelosDominio`) | el default del dominio |
+   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaModelosQuery`, que es donde vive el `.default()`; `esquemaFiltroOrigenModelo` es sólo el enum y NO lleva default) | el default del contrato/OpenAPI |
+   | 3 | `frontend/src/modulos/modelos/ModelosPagina.tsx` | `useState('produccion')` del listado |
+   | 4 | `frontend/src/modulos/modelos/GaleriaModelos.tsx` | `useState('produccion')` de la galería |
+
+   ⚠️ **Y el que manda es el frontend, no el backend:** la pantalla envía `origen` **explícito** en cada
+   consulta (hay una prueba que lo fija: *"el valor concreto importa: con 'todos' (o sin el campo) la
+   vitrina traería los desarrollos"*, `ModelosPagina.test.tsx`). ⇒ **Tocar sólo el dominio no arregla
+   nada de lo que Daniel reportó.** Es «todas las puertas o ninguna» (§Post-F9.116(d)) aplicado al
+   filtro: **se cambian los cuatro, o no se cambia**.
+
+   📌 **Y la prueba que fija el default hay que VOLTEARLA con él** —`ModelosPagina.test.tsx`, *"el
+   catálogo pide SOLO producción por default"*—: **se va a poner en rojo, y eso es lo correcto, no algo
+   que se rompió.** Se invierte con su rastro dentro (por qué el sistema llegó a ese estado), como se
+   hizo en §Post-F9.123 con la prueba que afirmaba lo contrario sobre Aurora.
+
+   ⚠️ **El costo, aceptado de frente:** la lista se hace más larga y trae modelos que quizá nunca se
+   fabriquen. Se prefiere **ver de más a no encontrar lo que uno acaba de hacer**.
+2. **Se retira el alta directa de modelo de PRODUCCIÓN.** Hoy `crearModelo`
+   (`backend/src/dominio/modelos/modelos.ts`) crea el modelo **en producción** —es el default de la
+   columna— y le deriva su nº de producción del código. Esa puerta se cierra: **el catálogo de
+   producción se llena por la acción «pasar a producción»**, no por un alta suelta. Daniel:
+
+   > *«Creo que nunca va a pasar que dé de alta un modelo de producción si no tiene ya una orden
+   > asignada. No tendría sentido poner ahí una puerta. Mejor siempre desde producción.»*
+
+   ⚠️ **Lectura del lead sobre la última frase, que hay que confirmar con Daniel:** *"mejor siempre
+   desde producción"* se entiende como **"que llegue a producción siempre por la puerta de «pasar a
+   producción»"**, es decir, naciendo en desarrollo y promoviéndose —que es lo que el resto del párrafo
+   dice y lo que §Post-F9.34 punto 4 ya construyó—. Se deja **textual y señalado** en vez de suavizado,
+   porque leída al pie de la letra la frase dice lo contrario del resto y **no es honesto corregirle las
+   palabras a Daniel dentro de una comilla**.
+
+3. **Por qué cerrar la puerta y no dejarla "por si acaso".** Un modelo que nace directo en producción
+   **se salta todo lo que Desarrollo pone antes**: precosteo, receta revisada, aprobación del precio,
+   linaje de versiones. Mientras exista el atajo, algún día se usará —y el modelo que llegue por ahí no
+   tendrá con qué costearse.
+
+4. **La GALERÍA va incluida, no es un caso aparte.** §Post-F9.34 punto 2 hablaba del *"catálogo **y la
+   galería**"*, y `GaleriaModelos.tsx` tiene **el mismo `useState('produccion')`** y por tanto **el
+   mismo defecto**: un modelo recién creado en Desarrollo tampoco aparece ahí. Cambia igual, por la
+   misma razón. *(Sin esto, el banner de sustitución de §Post-F9.34 estaría prometiendo más de lo que
+   esta decisión entrega.)*
+
+### Lo que se construyó (V1-E8j, 28-ago-2026)
+
+**A) Se cerraron las CUATRO puertas del punto 1** —la tabla de arriba las nombra, y ésa es la lista
+buena; repetirla aquí sólo invitaba a que las dos derivaran—. **La galería entre ellas**, tal como manda
+el punto 4: no es un caso aparte, es el mismo `useState('produccion')` y el mismo defecto, y
+§Post-F9.34 punto 2 hablaba del *«catálogo **y la galería»***. Lo que la construcción confirmó midiendo:
+**el frontend manda `origen` explícito en la query**, así que cambiar sólo el esquema del dominio no
+habría movido nada de lo que Daniel reportó — «todas las puertas o ninguna» (§Post-F9.116(d)).
+
+**Cada puerta quedó con una prueba que la mata.** Las que sostienen la etapa **no se conforman con leer
+el default del esquema** —eso pasaría verde con el defecto vivo en la pantalla, que era el defecto
+real—: miden que, **con la pantalla recién abierta y sin tocar un filtro, un modelo de DESARROLLO esté
+en la lista** (las dos de pantalla) y que el listado **traiga de verdad** el modelo recién creado (las
+dos del servidor, `nomenclatura.int.test.ts` y `modelos.int.test.ts`, contra Postgres). Aparte, un
+unitario —`dominio/modelos/filtro-origen.test.ts`— duplica las dos del servidor **sin base de datos**:
+la del dominio con un Prisma falso que captura el `where` (comprueba que `origen` va **ausente**), y la
+del contrato sí sobre la querystring, que ahí **es** la puerta. Así ninguna queda sin candado en una
+máquina sin Postgres.
+
+**B) La ETAPA, dicha en cada renglón.** Columna **Etapa** en la tabla del catálogo (chip *Desarrollo* /
+*Producción*), el mismo chip en la tarjeta de móvil, y un chip *Desarrollo* en la tarjeta de la galería
+(ahí producción no lleva chip: es el caso normal y la vitrina no lo repite). El chip suelto que colgaba
+del nombre se retiró: decirlo dos veces en el mismo renglón sólo le comía ancho al nombre.
+
+**C) `crearModelo` ya no fabrica modelos de producción.** El modelo nace con `origen: 'desarrollo'`,
+`numeroProduccion: null` y `codigoDesarrollo = codigo` —el código vigente y el de desarrollo valen lo
+mismo mientras vive ahí (§Post-F9.34 punto 5), así que el código tecleado **se conserva y sigue
+buscable** cuando la promoción lo sustituya por el número (D3)—. El alta lo dice de frente: *"Nace en
+DESARROLLO: su número de producción se le asigna al pasarlo a producción"*. En `desarrollos.ts` se
+**borró** el `update` que ponía `origen`/`codigoDesarrollo` aparte: ahora lo hace `crearModelo` y
+escribirlo dos veces sólo invitaba a que los dos lados derivaran.
+
+**D) El cabo suelto se cerró solo, como se esperaba.** `proponerNumeroProduccion` ya alimentaba los DOS
+puntos donde se captura el número —el diálogo «Pasar a producción» y el panel «Generar OP»—, que llegan
+**precargados** con el hueco libre y son editables (§Post-F9.46). El único sitio que hacía teclear un
+número a pelo era el alta directa; cerrada ésa, **no queda ningún lugar donde se capture un nº de
+producción sin propuesta**.
+
+**E) Tres cosas que se revisaron ANTES de cerrar la puerta, y una que no se tocó:**
+
+- 🔴 **El ETL del histórico SÍ dependía de esa puerta.** `backend/migracion/loaders/modelos.ts` carga los
+  ~4,987 modelos del Access llamando a `crearModelo` (regla A1: nunca `prisma.create` del catálogo), y
+  ésos **son de producción y no tienen orden**: su código de 5 dígitos *es* su nº de producción. Con la
+  puerta cerrada habrían quedado todos marcados como desarrollo, con un nº de desarrollo inventado y sin
+  poblar `numeroProduccion` —o sea, el generador del consecutivo habría dejado de ver ocupadas las
+  series reales—. Se resolvió con el patrón que el proyecto ya usa en órdenes, compras, notas,
+  inventarios, RC y terceros: un **modo migración dedicado**,
+  `crearModeloMigrado` (`backend/src/dominio/modelos/migracion.ts`). ⚠️ **No llama a `crearModelo`:**
+  los dos comparten `crearModeloNucleo` y la marca de nomenclatura viaja en el propio `create` (ver
+  «El remate…» más abajo, que es donde quedó explicado el diseño final). El servicio normal queda
+  **sin banderas de migración** y el modo migración **no se expone en ninguna ruta REST**.
+- **El `@default(produccion)` de la columna `Modelo.origen` NO se cambió, y se documentó por qué.** El
+  dominio escribe `origen` siempre explícito, así que ese default sólo lo alcanzan las escrituras crudas
+  (`prisma.modelo.create`) que viven en las fixtures de pruebas y del ETL — donde el modelo sembrado es
+  justamente uno de producción ya existente. Cambiarlo exigiría una migración y voltearía en silencio el
+  significado de esas fixtures, a cambio de nada.
+- **Renombrar un modelo de desarrollo ahora arrastra su nº de desarrollo.** Era un defecto latente
+  (`codigoDesarrollo` se quedaba con el valor viejo y el modelo terminaba con dos códigos buscables y
+  sólo uno visible) que era raro mientras el catálogo creaba modelos de producción, y con esta decisión
+  pasa a ser el caso normal. Se arregló en la misma ronda.
+- ❌ **NO se tocó el límite 1:1** (`Modelo.codigoDesarrollo @unique` / `numeroProduccion @unique`): que de
+  un desarrollo nazcan VARIOS de producción con una sola receta es **§Post-F9.135**, otra pieza.
+  *(Decía «con estructura por diseñar»; ese mismo día, más tarde, **V1-E8n** la diseñó y la escribió — el
+  plan es la sección «⭐ EL PLAN» de §Post-F9.135. Sigue **sin construirse**, y el límite 1:1 sigue
+  intacto.)*
+
+🔴 **Y la lección de la ronda de corrección, que vale más que el arreglo:** toda la etapa se blindó
+puerta por puerta y **el cambio del ETL —el único cuyo fallo es irreversible y masivo, los 4,987 modelos
+históricos— se quedó sin una sola prueba**. Se demostró revirtiendo el loader a su versión anterior:
+**typecheck, lint y las 221 pruebas seguían en VERDE**, porque el único test que lo ejercita afirmaba
+**conteos** —y los conteos no cambian: los modelos se crean igual, sólo que marcados como desarrollo,
+con un nº de desarrollo inventado y sin nº de producción—. *No bastaba con decir «lo juzga el CI»: el CI
+tampoco lo juzgaba.* Se cerró con una prueba que afirma el **estado de las tres columnas** (y un fixture
+con código de 5 dígitos, porque los que había eran todos no numéricos y la derivación del número no la
+ejercitaba nadie), **vista morir** con el loader revertido y verde con el arreglo. **Un conteo que no se
+mueve no es un candado.**
+
+⚠️ **El costo nuevo, dicho de frente:** un modelo dado de alta en el catálogo **sin tipo de prenda y sin
+género** no se puede promover —`digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lo dice
+pidiendo justo eso—. Antes daba igual porque nacía en producción. No se hicieron obligatorios esos dos
+campos (el ETL carga sin ellos, y volverlos obligatorios es una decisión de negocio); en su lugar, el
+alta lo pide en su aviso.
+
+❓ **PREGUNTA ABIERTA PARA DANIEL, con su default propuesto:** *¿se vuelven OBLIGATORIOS el tipo de
+prenda y el género al dar de alta un modelo en el catálogo?* **Default propuesto: SÍ.** Son los dos
+dígitos con los que el sistema le arma su número; un modelo sin ellos se queda a medio camino y el error
+sólo aparece más tarde, al querer generar su OP. Hoy quedan opcionales porque el ETL del histórico carga
+sin ellos —pero ese camino ya va por su modo migración, así que la excepción no obliga a nada—.
+
+⚠️ **Y una consecuencia que hay que saber, porque cambia lo que se ve:** al generar la OP de un modelo
+recién dado de alta, **el modelo cambia de código** (pasa de `ORD-1234` al nº de 5 dígitos que le toque).
+Es exactamente lo que Daniel pidió —*"el modelo de producción a la hora de dar de alta las órdenes"*—, el
+código viejo se conserva como nº de desarrollo y sigue buscable (D3), y el aviso del sistema lo dice:
+*"modelo de producción 71001 (antes ORD-1234, que se conserva)"*. Esta onda expansiva sólo se vio al
+barrer los e2e: dos specs daban de alta su modelo sin los dos dígitos y le generaban la OP enseguida —lo
+que antes no promovía nada— y habrían salido rojos. Se arreglaron capturando los dígitos, que es lo que
+un usuario tendría que hacer. ⚠️ **Pero ese barrido se quedó corto y el CI lo demostró:** los DOS
+importadores también terminan generando OP, por otra puerta, y ahí el usuario **no puede** capturar
+nada en medio del asistente — de ahí que la solución acabara siendo cerrar el hueco **en el alta**
+(ver el remate de abajo), no pedirle nada al importador.
+
+### El remate que destapó el CI: los dos dígitos pasan a ser OBLIGATORIOS en el alta
+
+Cerrar el alta directa dejó un hueco que **sólo apareció en el CI**: un modelo del catálogo **sin tipo
+de prenda ni género no se puede numerar**, y al generar su OP el sistema lanzaba *«falta capturar el
+tipo de producto del modelo y el género»*. Eso **rompía la importación de la OC del cliente** —el flujo
+diario— porque `confirmarImportacion` es UNA transacción: se caía **el pedido y todas las OP del
+archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdenes creadas; no supuesto.)*
+
+**Se decide: tipo de prenda y género son OBLIGATORIOS al dar de alta un modelo en el catálogo.**
+
+> ⚠️ **Ejecutado sobre el DEFAULT PROPUESTO a Daniel, pendiente de que lo ratifique.** La pregunta se
+> le planteó la noche del 28-ago —*«¿tipo de prenda y género pasan a ser obligatorios al dar de alta un
+> modelo?»*, con **default propuesto: sí**— y no la objetó antes de dormirse, dejando instrucción de
+> seguir. Si al despertar dice otra cosa, **se revierte** — cómo, justo abajo.
+
+**Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así se escribió las
+dos primeras veces y las dos fue **falso**—. Son **OCHO** puntos, y esta lista **se ejecutó entera
+antes de escribirse**: aplicándola, `npm run typecheck` sale **0 en los dos lados** (con siete todavía
+no).
+
+1. `contrato/esquemas/modelo.ts` → `esquemaModeloCrear`: los dos ids vuelven a `.optional()`.
+2. `dominio/modelos/modelos.ts` → quitar la llamada `exigirDigitosDeNomenclatura(...)` de
+   `crearModelo` (si no, no compila: los ids pasan a `number | undefined`).
+3. `dominio/modelos/modelos.ts` → quitar la llamada `exigirNoDesnumerar(...)` de `actualizarModelo`.
+4. `dominio/modelos/modelos.ts` → **borrar las dos funciones**, no sólo sus llamadas: sin llamador
+   quedan muertas y `noUnusedLocals` tumba el typecheck (`TS6133`). De paso quedan un `{@link}`
+   colgando y un párrafo `⭐` describiendo una regla que ya no existiría.
+5. `frontend/.../esquemas.ts` → `esquemaModeloFormularioAlta` deja de extender con los `.min(1)`.
+6. `DialogoModelo.tsx` → `exigeNomenclatura` a `false`, el `resolver` a `esquemaModeloFormulario`, y
+   en `aCuerpoCrear` **quitar el `?? 0`** y volver a omitir los ids vacíos. *(Sin esto un alta sin
+   género mandaría `idGenero: 0` y el servidor la rechazaría con «debe ser positivo»: reversa
+   aplicada al pie de la letra, producto roto.)*
+7. `DialogoModelo.tsx` → **borrar el `import` de `esquemaModeloFormularioAlta`**, que queda sin uso
+   (`TS6133` otra vez — el mismo error del punto 4, un nivel más arriba).
+8. 🔴 **REGENERAR EL CONTRATO**: `npm run openapi` (backend) + `npm run gen:api` (frontend). Sin
+   esto, `ModeloCrear` sigue exigiendo los dos ids y **el punto 6 no puede compilar**. Es §7.6 del
+   `CLAUDE.md`, pero una lista cuyo argumento es *«se verificó aplicándola»* no puede dejarlo
+   implícito.
+
+Y **SEIS pruebas** afirman la regla y hay que voltearlas con ella. En `modelos.int.test.ts`: *«sin tipo
+de prenda o sin género, el alta se RECHAZA (400)»* · *«a un modelo de DESARROLLO no se le pueden quitar
+los dos dígitos…»* · sus dos gemelas de dígito sin capturar · *«R4-H1: no se versiona un modelo al que
+le falta un dígito»*. Y en `DialogoModelo.test.tsx`: *«sin tipo de prenda ni género NO envía el alta…»*.
+Más el bloque `esquemaModeloCrearMigracion` del contrato. *(La versión anterior decía «tres» y nombraba
+cinco — el nit que cazó el reviewer.)*
+
+**Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
+avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el
+modelo»* a *«promueve si puede»*, y deja **modelos con OP viviendo en desarrollo** — un estado a medias
+que nadie pidió y que después hay que explicar.
+
+**Y no inventa una regla:** el alta de **Desarrollo ya exigía las dos cosas**, con el mismo criterio
+(que el catálogo tenga el dígito capturado, no sólo que se haya elegido algo). Esto **alinea la segunda
+puerta con la primera** — el hueco nació porque V1-E8j abrió un segundo camino hacia «desarrollo» que se
+saltaba esa exigencia.
+
+**Lo que ve Daniel:** en «Nuevo modelo» los dos selectores llevan asterisco, dicen *«Primer dígito del
+número del modelo»* / *«Segundo dígito…»*, y el aviso del alta lo explica en una frase: *"son los dos
+primeros dígitos de ese número: sin ellos no se le puede generar la orden de producción"*.
+⚠️ **En la EDICIÓN siguen siendo opcionales PARA LOS MODELOS DE PRODUCCIÓN** —los ~4,987
+migrados del Access, que no traen género y cuya ficha quedaría bloqueada para corregir cualquier
+otra cosa—; **a uno de DESARROLLO no se le pueden quitar** (`exigirNoDesnumerar`): lo dejaría tan
+innumerable como crearlo sin ellos.
+
+**Y el ETL sigue cargando sin ellos.** La regla vive en **UNA sola capa**: `crearModelo`. El modo
+migración (`crearModeloMigrado`) **no pasa por ahí** — los dos comparten `crearModeloNucleo`, que hace
+lo común y recibe la nomenclatura ya decidida, y la exigencia queda **por encima** del núcleo. Así la
+migración entra por debajo sin banderas y sin que nadie tenga que acordarse de excluirla.
+
+- **Aplica en:** el módulo de Modelos —**listado Y galería**— más el alta, y Desarrollo. Son los
+  **cuatro sitios del default** de la tabla de arriba. **CONSTRUIDA en V1-E8j (28-ago-2026)**:
+  **SIN migración de BD** (no se agregó ni cambió una columna) y **SIN permisos nuevos** ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.135) — 🔴🔴 DE UN MODELO DE DESARROLLO NACEN VARIOS DE PRODUCCIÓN (1:N), CON UNA SOLA RECETA (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Es el dato que le faltaba al sistema entero, y salió de una frase suelta:
+
+> *«De un modelo de desarrollo pueden nacer 4 modelos de producción… y los 4 tendrían la misma receta
+> (es el mismo modelo en distintos colores).»*
+
+**Por qué son cuatro modelos y no uno con cuatro colores** —preguntado exactamente eso—:
+
+> *«Es el mismo modelo en diferentes colores. Pero los manejamos con diferentes modelos porque cada uno
+> tiene una OC del cliente distinta. Me dan 4 pedidos diferentes, uno por color.»*
+
+**Y el argumento que cerró la discusión, que es suyo:**
+
+> *«Al final esos modelos tendrían que estar en un catálogo, porque a partir de la OP, los modelos de
+> producción son los que se van a inventariar. Los de desarrollo son sólo de desarrollo, esos no llevan
+> inventarios.»*
+
+⇒ **La línea queda trazada por el INVENTARIO:** el modelo de producción es la cosa que se cuenta en el
+anaquel; el de desarrollo es un expediente de trabajo. Por eso los cuatro tienen que existir como
+modelos de verdad, no como una etiqueta o un atributo de la orden.
+
+### Lo que se decide
+
+1. **La relación desarrollo → producción es 1:N.** Un modelo de desarrollo puede promover **varios**
+   modelos de producción, cada uno con su número de 5 dígitos y su OC del cliente.
+2. **⭐ UNA SOLA RECETA, COMPARTIDA — no copias.** Es requisito literal de Daniel:
+
+   > *«Todos los modelos deben de llevar lo mismo. ¿Cómo lo controlas?»*
+
+   **Por eso compartida y no copiada:** con cuatro copias no se *controla* que lleven lo mismo, se
+   *vigila* — y vigilar depende de que alguien se acuerde de replicar cada cambio en las otras tres.
+   **Una sola receta hace de la igualdad una propiedad estructural en vez de una disciplina.** La
+   pregunta de Daniel no era retórica: era la especificación.
+3. **Si el modelo cambia después de que ya hay OP, se ofrece corregir las órdenes que dependen de él —
+   todas de un golpe.**
+
+   > *«Si se modifica el modelo después de tener la OP ya hecha, que dé la opción de corregir las
+   > órdenes que dependan de ese modelo. Y que sean todas al mismo tiempo.»*
+
+   🔴 **Y aquí va el candado, porque la acción en bloque es la parte peligrosa:** algunas de esas órdenes
+   **ya compraron material o ya se cortaron**. La regla es **aplicar donde se puede, SALTAR Y REPORTAR
+   donde no**:
+   - **Nunca abortar el lote entero** porque una orden no se dejó (eso convierte una acción útil en una
+     que nunca funciona cuando más se necesita).
+   - **Nunca saltar en silencio** (eso es peor: el usuario cree que corrigió las cuatro y corrigió dos).
+   - **Bitácora POR ORDEN, no del lote.** Un solo asiento *"se corrigieron 4 órdenes"* no sirve para
+     nada seis meses después; lo que se audita es qué le pasó **a la orden 5562**.
+
+### ⚠️ Tres correcciones del lead, escritas con su nombre — valen más que la conclusión
+
+**(a) «Ya está unificado, no hay que unificar nada» — CIERTO DEL CÓDIGO, FALSO COMO CONCLUSIÓN.**
+El lead afirmó eso apoyado en §Post-F9.34 punto 1 (*"NO se separa la tabla `Modelo`"*), que es verdad:
+desarrollo y producción **son la misma entidad** con una marca de origen. Pero la afirmación **suponía
+1:1** —un desarrollo, un modelo de producción, el mismo registro promovido—. Con 1:N la promoción deja
+de ser *"cambiarle la marca al registro"* y pasa a ser *"crear N registros que comparten una receta"*.
+**El código estaba bien; el modelo mental estaba mal**, y ésa es la clase de error que ninguna revisión
+técnica encuentra.
+
+**(b) El número corto como ATRIBUTO DE LA ORDEN — DESCARTADO POR MEDICIÓN.**
+El lead propuso no crear cuatro modelos y guardar el número de producción como un dato de la orden. Se
+midió `prisma/schema.prisma`, **`model MovimientoDetPt`** (el detalle del kardex de producto
+terminado): la llave del inventario PT es **`idModelo` + `idColor` + `idTalla`** (más `idOrden` y el
+almacén desde F6-E2 / ADR-0014). **`idModelo` es OBLIGATORIO**: es el modelo, y sólo el modelo, lo que
+identifica la prenda contada en el anaquel. Con el número corto colgado de la orden, **la existencia
+habría quedado colgando del modelo de DESARROLLO** — justo el que Daniel dice que *"no lleva
+inventarios"*. La propuesta no era discutible por gusto: la contradecía el esquema.
+
+> 📐 **Precisión sobre `idOrden`, para que nadie la repita mal:** es **nullable**, pero **no es "sólo de
+> rastreo"** — desde F6-E2 **forma parte de la llave de existencia** (modelo×color×talla×orden×almacén,
+> con el NULL casado por `IS NOT DISTINCT FROM`). Nullable porque el histórico migrado y los
+> movimientos manuales no traen orden. Lo que sostiene el argumento de arriba es que **`idModelo` no es
+> nullable**, no que `idOrden` sea decorativo.
+
+**(c) «Primero copien la receta» — RECTIFICADO MIDIENDO, en la misma conversación.**
+El lead recomendó de entrada **copiar** la receta a cada modelo de producción, por miedo a que compartir
+una receta viva expusiera órdenes ya lanzadas a cambios de última hora. Al medirlo, el miedo resultó
+infundado: **compras, costos y producción NO leen el BOM del modelo — leen la receta CONGELADA DE LA
+ORDEN** (V1-E3d). La receta se copia a la orden al nacer, con `copiarRecetaDelModelo`
+(`backend/src/dominio/produccion/receta-orden.ts`), y vive en sus propias tablas **`OrdenTela` /
+`OrdenAvio` / `OrdenArte`** — que son las que lee `armarReceta` en el mismo archivo, y de las que
+depende la explosión de materiales (`backend/src/dominio/compras/mrp.ts`, que exige
+`exigirRecetaLiberada` / `exigirMaterialesLiberados` de la orden).
+⇒ **La protección ya vive en la ORDEN, no en el modelo.** Compartir la receta entre los cuatro modelos
+de producción **no pone en riesgo nada de lo que ya se lanzó**, y por eso el requisito de Daniel
+—*"todos deben llevar lo mismo"*— se puede cumplir de la forma fuerte. *Es también la razón por la que
+el punto 3 de arriba (corregir las órdenes) tiene que existir: como la orden trae su copia, cambiar el
+modelo **no** las alcanza solo.*
+
+- **Aplica en:** Modelos + Desarrollo + la acción «pasar a producción» (§Post-F9.34 punto 4, que pasa de
+  1:1 a 1:N). **DISEÑADO, no construido** — el plan completo (lo medido, la estructura, la receta
+  compartida, la acción en bloque, el troceado y las 10 preguntas) es la sección **⭐ EL PLAN** de aquí
+  abajo, escrita el **28-ago-2026** en la etapa **V1-E8n**, que **no tocó ni una línea de código**.
+  Es alcance grande: toca el linaje de versiones, el generador de nomenclatura y la receta. **Bloqueado
+  hasta que Daniel conteste las 10 preguntas. Fecha:** 2026-08-28.
+
+### ⭐ EL PLAN (28-ago-2026) — diseñado y MEDIDO contra el código; espera las 10 respuestas de Daniel
+
+> **Por qué está escrito aquí y no en la ficha de una etapa.** El plan se diseñó en sesión y vivía
+> sólo en el chat. La regla del proyecto es que **lo que no está en el repo no existe**, y su
+> corolario: lo enterrado en la ficha de una etapa se pierde. **Esto es DISEÑO, no construcción:** al
+> escribirlo no cambió ni una línea de código, y **ninguna de las 10 preguntas de abajo está
+> contestada todavía**.
+>
+> ⚠️ **Este plan pasó por una ronda de corrección** (28-ago) que **retiró una afirmación falsa** —*«toda
+> la receta se lee por tres funciones»*, ver punto 1.6— y **un requisito derivado de un lector que no
+> existe** (punto 3.1). El diseño de fondo salió intacto; lo que cambió es lo que el plan **afirmaba**.
+
+#### 1. Lo que se midió — y lo que sorprendió
+
+1. 🔴 **«Hoy es 1:1» es cierto en el efecto y engañoso en la magnitud.** No hay dos filas emparejadas:
+   hay **UNA fila que se transforma**. `promoverAProduccionNucleo`
+   (`backend/src/dominio/modelos/nomenclatura.ts`) hace **un solo `update` sobre el mismo id** —
+   cambia `codigo`, escribe `numeroProduccion` y pone `origen: 'produccion'`, conservando
+   `codigoDesarrollo`. **No nace ninguna fila nueva.** ⇒ el trabajo no es «duplicar el otro lado de
+   una relación»: es **hacer nacer filas donde hoy no nace ninguna**.
+2. **El síntoma de Daniel, medido.** Sus 4 OC → 4 renglones de pedido → 4 llamadas a
+   `salidaAProduccion` (`backend/src/dominio/produccion/salida-produccion.ts`): la **primera**
+   promueve y las otras tres entran por el `if (modelo.origen === 'desarrollo')`, lo encuentran ya en
+   producción y **heredan el mismo número**. Resultado: 4 órdenes, **1** modelo de producción, **1**
+   renglón de inventario PT. Ése es el hueco exacto que él describe.
+3. ✅ **La maquinaria de «nacer un hijo con receta copiada» ya existe entera** en
+   `backend/src/dominio/modelos/versiones.ts`: la auto-relación `Modelo.idModeloPadre` / `versiones`,
+   `mintearVersionDeModelo` con su advisory lock, `CAMPOS_FICHA_HEREDADOS` y `copiarRecetaAlHijo`.
+   ⚠️ Los dos últimos son **privados del módulo** (no exportados): reusarlos es exportarlos o subirlos,
+   no simplemente importarlos.
+4. 🔴 **`idModeloPadre` NO se puede reusar para este linaje.** `esVersionDeModelo`
+   (`backend/src/dominio/modelos/revision-modelo.ts`) devuelve `true` si
+   `idModeloPadre !== null || versionDesarrollo !== null`, y `exigirRevisionAprobadaParaProducir`
+   —llamada **dentro** de `promoverAProduccionNucleo`— lanza si esa «versión» no está aprobada.
+   Colgar los hijos de ahí **bloquearía su propia promoción**. Hace falta **columna nueva**.
+5. 🔴 **`Modelo.codigoDesarrollo` es `@unique`** ⇒ los hijos van con `NULL` y el linaje se sostiene por
+   la FK, no por el código. (`numeroProduccion` también es `@unique`, y eso está **bien**: cada hijo
+   estrena el suyo.) Sigue vivo el CHECK `modelos_desarrollo_sin_numero_produccion_check`
+   (`origen <> 'desarrollo' OR numero_produccion IS NULL`), que los hijos cumplen por nacer ya en
+   producción.
+6. 🔴 **La receta NO se lee por tres funciones — esa frase era FALSA y es la que dimensiona E2.**
+   `leerTelasBom` / `leerAviosBom` (`backend/src/dominio/modelos/bom-modelo.ts`) y `leerArtesModelo`
+   (`backend/src/dominio/modelos/arte-modelo.ts`) son la lectura **CANÓNICA** del BOM, y por ahí pasa
+   la mayoría — pero **además hay decenas de sitios que leen las tablas DIRECTO por `idModelo`**, y
+   ésos también necesitan el resolver. Medido (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate`
+   sobre `modeloTela`, `modeloAvio`, `modeloAvioTalla`, `modeloArte`, `modeloArteFoto`, excluyendo
+   pruebas, ayudantes de prueba y el cliente Prisma generado): **44 sitios en 10 archivos** — 36 en
+   `src/` (`arte-modelo.ts` 10, `bom-modelo.ts` 10, `produccion/receta-orden.ts` 7, `versiones.ts` 4,
+   `medidas-avio-talla.ts` 3, `avios-favoritos.ts` 1, `modelos.ts` 1) y 8 en el ETL
+   (`migracion/cuadre-fase.ts` 5, `migracion/loaders/bom-modelos.ts` 2,
+   `migracion/loaders/fotos-modelos.ts` 1). *El número se mueve con el filtro; la conclusión no.*
+
+   🔴 **Y el agravante que hunde la frase: `ModeloAvioTalla` —las medidas por talla, R18— NO la lee
+   NINGUNA de las tres.** Medido: `leerAviosBom` no menciona esa tabla ni una vez. Pero el embudo sí
+   la cuenta como receta (`revision-modelo.ts` nombra «medidas por talla» entre las cinco familias, y
+   el guardián `receta-embudo.test.ts` la lleva en `TABLAS_DE_RECETA`). ⇒ **con el resolver puesto
+   sólo en las tres funciones, cada orden de un hijo nacería SIN medidas por talla, en silencio** — y
+   eso mueve el requerido del MRP.
+
+   **Los sitios que hay que resolver a mano, por símbolo** (mínimo; no es la lista completa):
+   - **`copiarRecetaDelModelo`** (`produccion/receta-orden.ts`) — **el más caliente: por ahí pasa el
+     100 % de las órdenes**. Lee `tx.modeloAvioTalla.findMany` **incondicionalmente**, y en la rama
+     `sinPrecios` (la del ETL) lee `tx.modeloTela.findMany` / `tx.modeloAvio.findMany` **directo**,
+     saltándose las dos funciones canónicas.
+   - Los **tres `modeloAvioTalla.findMany` por `orden.idModelo`** dentro del motor que **E4 va a
+     reusar**: `agregarRenglonReceta`, `restaurarRenglonReceta` y **`traerDelModelo`**.
+   - **`medidas-avio-talla.ts`** entero (3 lecturas + `deleteMany`/`createMany`/`update`).
+   - **`idsAviosDelBom`** (`avios-favoritos.ts`), que lee `modeloAvio` directo.
+   - **La tela principal del LISTADO** (`modelos.ts`), `modeloTela.findMany({ where: { idModelo: { in: ids } } })`.
+   - **`copiarBom`** (`bom-modelo.ts`), que lee y escribe `modeloTela`/`modeloAvio`/`modeloAvioTalla` del origen.
+
+   ✅ **Lo que SÍ sigue siendo cierto y sigue abaratando la receta compartida:** las tablas son cinco y
+   están acotadas, el conjunto de archivos que las toca es **enumerable** (los 10 de arriba) y **el
+   guardián del embudo ya obliga a declarar cualquier archivo nuevo**. Barato ≠ tres llamadas.
+7. ✅ **El embudo de escritura ya existe y está vigilado.** `tocarModeloPorCambioDeReceta`
+   (`revision-modelo.ts`) es el **único** escritor de `recetaTocadaEn` / `recetaTocadaCambio` —medido:
+   el resto del backend sólo las lee— y `backend/src/dominio/modelos/receta-embudo.test.ts` **barre el
+   código fuente** de `src/` y `migracion/` y se pone rojo si un archivo escribe receta sin pasar por
+   el embudo, con las excepciones **declaradas nominalmente**.
+8. ✅ **El precedente de «aplicar donde se puede, saltar y reportar» ya está construido.**
+   `traerDelModelo` (`backend/src/dominio/produccion/receta-orden.ts`) devuelve **`traidos` +
+   `respetados`**, con el motivo redactado por renglón; a su alrededor viven `enRecetaEditable`,
+   `exigirNoSacarLoComprado`, `desviadoAProposito` y `revocarFirmaDeRenglones`. Y el precedente de
+   **alcanzar hacia atrás a todas las órdenes de un modelo** es `recalcularEstadoOrdenesDeModelo`
+   (`backend/src/dominio/produccion/requisitos-orden.ts`), que ya escribe **bitácora POR ORDEN**.
+9. ⚠️ **Tensión con una decisión previa de Daniel.**
+   `backend/src/dominio/produccion/recetas-por-liberar.ts` documenta que él **quitó** el botón masivo
+   de liberar: *"siempre se debe liberar uno por uno… no tiene sentido liberar las cosas sin ver"*.
+   ⇒ la acción en bloque puede **traer y corregir, pero NO puede firmar**: lo aplicado nace sin
+   `liberadoEn`.
+10. 🔴 **El riesgo que nadie había nombrado: se acaban los números.** `consecutivosUsados`
+    (`nomenclatura.ts`) corre con `CONSECUTIVO_MAX = 999` **por par (concepto, género)**. Pasar a 1:N
+    **multiplica el consumo por el número de colores/OC**. Que `Genero.digitoAlterno` exista
+    —hoy sólo Caballero, `1 → 5`, porque su serie `x1` ya llegó a 999— **prueba que agotar una serie
+    ya pasó en la vida real, en el Access**.
+
+#### 2. La estructura propuesta
+
+**Columna nueva** en `model Modelo`: **`idModeloDesarrollo Int?`** (`@map("id_modelo_desarrollo")`),
+con relación de **nombre propio** (distinta de `ModeloVersion`) y su `@@index`. Semántica: *«este
+modelo de PRODUCCIÓN nació del de DESARROLLO N, y su receta es la de N»*. `NULL` = no nació por esta
+vía — que es el caso de los ~4,987 modelos migrados del Access.
+
+**Migración aditiva y SIN backfill**, y eso es **decisión, no omisión**: inventarles un padre a los
+migrados sería mentir, y el resolver trata `NULL` como *«la receta es la mía»*, que es exactamente la
+conducta de hoy.
+
+**Función nueva `derivarModeloDeProduccion`**, hermana de `promoverAProduccionNucleo`, reusando el
+**mismo advisory lock del par**, `proponerNumeroProduccion`, `CAMPOS_FICHA_HEREDADOS` y
+`crearModeloNucleo` (este último **sí** está exportado, en `modelos.ts`). **No copia receta: la
+comparte.** Y la compuerta `exigirRevisionAprobadaParaProducir` se evalúa contra el **padre**, no
+contra el hijo recién nacido —que no tiene revisión propia ni tendría por qué.
+
+#### 3. La receta — la respuesta a *«¿cómo controlas que todos lleven lo mismo?»*
+
+**UNA SOLA receta compartida por referencia**, vía un resolver
+`idModeloDeLaReceta(modelo) = modelo.idModeloDesarrollo ?? modelo.id`, metido **dentro** de las tres
+funciones canónicas de lectura **y, uno por uno, en los ~44 sitios que leen las tablas directo por
+`idModelo`** (punto 1.6) **y en los escritores**. ⚠️ **No son tres llamadas**: creer eso es el defecto
+que este plan ya cometió una vez.
+
+**Por qué así:** con cuatro copias no se *controla*, se *vigila* — y vigilar depende de que alguien se
+acuerde. **Con una sola receta la igualdad es estructural: no se puede violar aunque se quiera.**
+
+**Qué se rompe y hay que CONSTRUIR (no descubrir):**
+
+1. `recetaTocadaEn` / `recetaTocadaCambio` viven **en la fila**, y con el resolver la escritura cae en
+   el **padre**. ⚠️ **Esto NO es un ítem de trabajo hoy, y hay que decirlo con precisión porque la
+   primera redacción de este plan inventó aquí un lector que no existe.** Medido: esas dos columnas
+   aparecen **sólo** en `revision-modelo.ts` (que las escribe), `costo-viejo.ts` y `listas-precios.ts`
+   — **cero** veces en `backend/openapi.json`, **cero** en `backend/src/contrato/` y **cero** en
+   `frontend/src/api/esquema.gen.ts`. **No están en el contrato, no llegan al frontend y ninguna ficha
+   las enseña.** Y su único lector, `avisoDeCostoViejo`, llega por `linea.desarrollo.modelo` — o sea
+   **por el padre**, que es justo donde caería la escritura. ⇒ **hoy no se rompe nada.** **Si algún día
+   se exponen** (la ficha del modelo, un aviso en la pantalla de un hijo), **entonces** el resolver
+   tendrá que alcanzar esa lectura — anotado como condicional, no como pendiente.
+2. `invalidarRevisionSiAprobada` pasa a tumbar la firma **del padre** (la llama
+   `tocarModeloPorCambioDeReceta`, que ya recibe el id resuelto). Es lo correcto, pero hay que decirlo.
+3. El guardián `receta-embudo.test.ts` **se pone rojo** si el resolver vive en un archivo nuevo que
+   escribe receta y no importa el embudo. Se cierra declarándolo, no relajando la prueba.
+4. La ficha de un hijo enseña **una receta que no es suya**: la pantalla tiene que decirlo, o alguien
+   creerá que editó «sólo aquí».
+5. `copiarBom` (`bom-modelo.ts`) sobre un hijo **pisaría la receta de toda la familia**.
+
+**Alternativas descartadas, con su razón:**
+
+| Alternativa | Por qué NO |
+|---|---|
+| **Copias sincronizadas** entre los N hermanos | La igualdad depende de que la réplica nunca falle; cualquier escritura fuera del embudo las desincroniza **en silencio** |
+| **Copia-al-nacer**, como `versiones.ts` | Es la más barata y **no contesta la pregunta de Daniel**: a la semana siguiente ya no llevan lo mismo |
+| **El número corto como atributo de la ORDEN** | Ya descartado por medición en la corrección **(b)** de arriba: `MovimientoDetPt.idModelo` es NOT NULL y es la llave del inventario PT |
+
+⚠️ **No choca con la receta congelada de la orden**, y por qué: lo compartido vive en el plano del
+**catálogo**; lo congelado, en el de la **orden**. `copiarRecetaDelModelo` sigue copiando al nacer la
+orden, exactamente como hoy. 🔴 **Pero hay que DECÍRSELO a Daniel:** dos órdenes creadas en fechas
+distintas pueden llevar recetas distintas **aunque los cuatro modelos lleven lo mismo** — y el botón
+que él pidió (corregir las órdenes en bloque) es justo el remedio de eso.
+
+#### 4. La acción en bloque
+
+**Universo:** las órdenes de la familia, **vivas**, de la empresa de la sesión.
+
+⚖️ **Las de OTRA empresa no se tocan: se listan y se avisan.** Va como **regla escrita, no como
+pregunta** — Daniel ya cerró que **sólo opera FR Moda** (§Post-F9.37 punto 7: *"Con el archivo basta.
+Ya no operan ahorita. Solo activa FR Moda"*), así que hoy **el caso no existe** y preguntárselo sólo
+gastaría una de sus respuestas. Queda anotado por si algún día se activa una segunda.
+
+**Se salta y se reporta:** la orden **cancelada** · el renglón **excluido** (la lápida) · el renglón
+`ajustado` o `agregadoAMano` · el material con **OC autorizada o recibida** (con el folio en el
+mensaje, como ya lo redacta `exigirNoSacarLoComprado`).
+
+**NO se salta:** el renglón **ya liberado cuyo contenido cambia** — se aplica y **se le cae la firma**,
+reportado como consecuencia (es lo que ya hace `enRecetaEditable` con `cambiaElContenido`).
+
+🔴 **Transacción POR ORDEN, no global** — y **esto hay que escribirlo en el código**, porque a primera
+vista parece violar A2 y **no lo hace**: la operación atómica del negocio es *«corregir la orden
+5562»*, y una transacción global abortaría el lote entero por una sola orden, que es justamente lo
+prohibido. **Bitácora por orden** (el precedente es `recalcularEstadoOrdenesDeModelo`). **No toca
+kardex**, y debe haber una prueba que lo afirme.
+
+**Los tres niveles, y hasta dónde se construye:**
+
+| Nivel | Qué hace | ¿Se construye? |
+|---|---|---|
+| **N1** | **Traer** lo que le falta a la orden y el modelo sí lleva | ✅ Sí (default) |
+| **N2** | **Actualizar** lo que difiere y nadie tocó a mano | ✅ Sí (default) |
+| **N3** | **Quitar** lo que el modelo ya no lleva | ❌ NO se construye — sólo se avisa |
+
+**Permiso: `desarrollo.administrar`**, el mismo que ya exigen `traerDelModelo` y `enRecetaEditable`.
+⇒ **CERO permisos nuevos en toda la fase**, y por lo tanto **ninguna etapa requiere `SEED_ON_START`**.
+
+🔴 **El hueco que el repo NO puede contestar solo:** `enRecetaEditable` **no mira** si la orden ya se
+cortó — medido: `receta-orden.ts` no menciona `EtapaMovimiento` ni una vez; sólo exige orden **viva**
+(`exigirOrdenViva`). ⇒ **hoy la receta de una orden ya cortada SÍ se puede editar de a una.** Si Daniel
+dice que no se debe, el candado va en **las dos puertas** (la de a una y la del bloque), y eso es
+**etapa propia** (E5), porque cierra una puerta hoy abierta. ⚠️ **Por eso la pregunta 6 va partida en
+dos mitades:** contestar «no la corrijas en bloque» —que es el default y lo que cualquiera contestaría—
+**no** dispara E5; lo que la dispara es la mitad **6b**, la de prohibirlo también a mano. Si no se
+partiera, Daniel creería haber cerrado la puerta y quedaría abierta la de a una.
+
+#### 5. Troceado
+
+| Etapa | Qué entrega | BD / permisos |
+|---|---|---|
+| **E1** | El **linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion` | 🔴 **Única con migración** (aditiva). Sin permisos |
+| **E2** | El **resolver** de receta: las tres lecturas canónicas **+ los ~44 sitios que leen directo** (punto 1.6) + los escritores. 🔴 **`ModeloAvioTalla` no pasa por ninguna de las tres** — si se olvida, las órdenes de los hijos nacen sin medidas por talla **en silencio** | Sin migración, sin permisos |
+| **E3** | La **salida a producción** que hace nacer N modelos | Sin migración, sin permisos |
+| **E4** | **Corregir en bloque** las órdenes de la familia (N1+N2) | Sin migración, sin permisos |
+| **E5** | El **candado de «ya cortada»** en **las DOS puertas** (la de a una y la del bloque) — **sólo si contesta que SÍ a la segunda mitad de la pregunta 6 (6b)** | Sin migración, sin permisos |
+
+**Orden obligado 1 → 2 → 3 → 4.** E5 cuelga de la respuesta, no del orden.
+
+#### 6. Las 10 preguntas para Daniel, cada una con su default
+
+✅ **CONFIRMADAS POR DANIEL (30-ago-2026).** Él mismo lo dijo: *«Ya contesté esas 10 preguntas»*. La
+columna de la derecha era el **default propuesto** y quedó **confirmada tal cual**. De dos hay cita
+textual suya: **6b** — *«No se prohibe, se puede hacer a mano (Solo yo)»* — y **6a** — *«Ok como
+propones»*.
+
+🔴 **Consecuencia dura de la 6b: ELIMINA la etapa E5 del troceado de §7.** El plan 1:N pasa de
+**cinco etapas a cuatro** — el candado de «ya cortada» **NO se construye**.
+
+✅ **CORREGIDO EL 31-ago: el «límite» que decía esta línea YA NO EXISTE.** Decía que sólo 6a y 6b tenían
+cita textual y que las otras ocho se daban por confirmadas «en bloque». **Falso, y por una razón que vale
+la pena saber:** las respuestas **sí estaban escritas, con su cita textual y las erratas de Daniel** — en
+**§Post-F9.146**, una decisión que se había **perdido** (entró por el PR #251 y nunca llegó a `prueba`;
+rescatada el 31-ago). ⇒ **Las diez tienen respuesta suya, verificable, en §Post-F9.146.** Ahí están sus
+palabras una por una — desde los *«De acuerdo»* secos de la 1 y la 2 hasta la 4 completa con su ejemplo del
+cierre café, y la 5, donde **no contestó lo que se le preguntó y contestó algo más grande**: *«Solo yo puedo
+modificar una OP»*.
+
+⚠️ **Se le presentan en SU idioma, y eso obliga a dos cosas** que la primera redacción no cumplía:
+**(1)** nunca decirle *«el hijo»* ni *«el padre»* —jerga nuestra, jamás suya—, y **(2)** no gastarle
+una respuesta preguntándole algo que ya contestó o que el sistema ya hace. *(Por eso la vieja pregunta
+sobre la OTRA empresa salió de la lista: ya la cerró en §Post-F9.37 punto 7 —* «Solo activa FR Moda» *—
+y quedó escrita como regla en §4, arriba.)*
+
+| # | La pregunta | Default propuesto |
+|---|---|---|
+| 1 | ¿El modelo de desarrollo se queda en desarrollo **para siempre**? | **Sí**, y **nunca lleva inventario**. Los que ya se convirtieron en `prueba` se quedan como están |
+| 2 | ¿Qué hace nacer un modelo de producción nuevo? | **Uno por renglón de pedido** (= una OC del cliente). Si se **re-surte** la misma OC, se **reusa** el que ya nació |
+| 3 | ¿El modelo de producción lleva escrito el **color**? | **No**: el color sigue siendo de la **orden**. Si lo quiere en el nombre, eso es la **descripción** |
+| 4 | Si alguien entra a **uno de los cuatro** modelos de producción y le cambia la receta, ¿qué pasa? | **Se les cambia a los cuatro** (es una sola receta), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza |
+| 5 | ¿Hasta dónde llega «corregir las órdenes»? | **(a) agregar** lo que falta **+ (b) actualizar** lo que cambió y nadie tocó. **NO (c) quitar** |
+| **6a** | El botón que corrige **todas de un golpe**: cuando una de esas órdenes **ya se cortó**, ¿la corrige o la deja? | **La deja y te la lista** («la 5562 no se tocó porque ya se cortó»). El lote **nunca se detiene** por ella |
+| **6b** | 🔴 **Segunda mitad, y es la que cuesta:** hoy esa orden ya cortada **sí se puede cambiar a mano, de a una**. ¿Quiere además que **se prohíba**? | **No se prohíbe** — se queda como hoy. ⚠️ **Si dice que sí, es TRABAJO APARTE** (es la etapa E5) y hay que cerrarlo en **las dos puertas**, o el sistema niega en masa lo que permite de a una |
+| 7 | Una orden que **ya compró** ese material, ¿se corrige? | **Para ese material no** (ya lo impide y dice **en qué OC** está); **para lo demás sí** |
+| 8 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** |
+| 9 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** |
+| 10 | 🔴 **Se van a acabar los números de 5 dígitos.** Cada modelo se lleva uno, y ahora se gastarán **tantas veces más rápido como colores tenga el modelo — en su caso, 4**. La serie da **999 por concepto+género**, y **con Caballero ya se llenó una vez** en el Access: se le abrió la continuación `1 → 5`. **El aviso y el salto YA ESTÁN CONSTRUIDOS** (el sistema avisa al bajar de 50 libres y brinca solo a la serie de continuación) — **lo que falta es lo único que sólo usted puede decidir: ¿qué segundo dígito le abrimos a Dama, Niño, Niña, Bebo y Beba?** Hoy **ninguno de ellos tiene a dónde seguir**; sólo Caballero | **Decidirlo el día que pase**, con el aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas**. ⚠️ El riesgo de esperar: cuando la serie se llena de golpe, el número **hay que teclearlo a mano** y el alta se frena |
+
+---
+
+#### (Post-F9.136) — 🔴 PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel, describiendo algo que pasa en el taller y que el sistema no sabía nombrar:
+
+> *«Tendríamos que tener una entrada adicional para prendas incompletas. Sucede que a veces alguna pieza
+> de la prenda no salió bien y no la cosen. Pero sí les pido que me traigan todo, porque los faltantes
+> se los cobro… aunque son prendas inservibles, necesito que me las entreguen (eso no se va a ningún
+> inventario… sólo al registro de la entrada como incompleta; tampoco se pagan).»*
+
+**Qué es, en el negocio.** No es una segunda (una prenda con defecto que **sí** se puede vender más
+barata). Es una prenda **que no existe como prenda**: le falta una pieza y nunca se terminó de coser. Se
+exige que la traigan **porque el faltante se le cobra al maquilero**, y la única forma de saber si de
+verdad faltó es que la tela regrese.
+
+### La decisión, cerrada — se le presentaron dos caminos y eligió el A
+
+| | Qué proponía | Consecuencia |
+|---|---|---|
+| **A ✅ ELEGIDA** (parcialmente SUPERADA, ver abajo) | La incompleta **no cuenta como producida**: es una entrega registrada, y nada más | De 100 mandadas con 95 buenas + 5 incompletas, **la orden produjo 95** |
+| **B** | La incompleta **sí cuenta como recibida**, en un balde aparte que cierra el WIP | *(Razón que se dio al descartarla, y que resultó ser falsa:)* «la orden habría dado por **cumplidas las 100** y el pendiente contra el maquilero se cerraba solo — justo lo que Daniel necesita **abierto** para cobrar el faltante» |
+
+> 🔴 **SUPERADA EN PARTE por §Post-F9.147 (29-ago-2026).** Lo que sigue en pie de la opción A: la
+> incompleta **no produce, no se inventaría y no se paga** (reglas 1-4 de abajo, intactas). Lo que
+> **cae**: la coletilla de *"el pendiente se queda abierto para cobrar el faltante"*. Ese razonamiento
+> **confundía la INCOMPLETA con el FALTANTE**. DANIEL lo separó: *«Al registrarlas como incompletas
+> entregadas, dejan de estar en la maquila. El ya termino de entregar las 100»*. La incompleta **ya
+> volvió**, así que sale del tránsito; el **faltante** —la prenda que nunca volvió— es lo que queda
+> abierto y se le cobra. **Detalle y construcción en §Post-F9.147.**
+
+1. **La prenda incompleta NO cuenta como producida.** De 100 mandadas, si vuelven 95 buenas y 5
+   incompletas, **la orden produjo 95**. No es una tercera calidad: es una **no-prenda**.
+2. **No entra a ningún inventario.** Ni primeras, ni segundas, ni un almacén aparte. No hay nada que
+   vender ni que contar.
+3. **No se paga.** No genera cargo al maquilero — es exactamente lo que Daniel dijo: *"tampoco se pagan"*.
+4. **Pero SÍ se registra en la entrada, y SÍ se ve.** Su remate fue el requisito completo:
+
+   > *«Sólo quisiera ver reflejado en algún lado que sí las entrego, para revisar los temas de pago.»*
+
+   ⇒ **Se ven en el ESTADO DE CUENTA DEL MAQUILERO, fuera del cargo.** Ése es el papel donde se discute
+   el pago, y ahí es donde la pregunta *"¿me trajiste las 5 que faltaban?"* tiene respuesta. Aparecen
+   como información —cuántas incompletas entregó— **sin sumar ni restar al importe**.
+
+### ⚠️ La trampa que hay que esquivar al construirlo (medida, 28-ago)
+
+🔴 **Si las incompletas se suman a la cantidad recibida, se PAGAN y se INVENTARÍAN** — exactamente lo
+contrario de lo que Daniel pidió. El camino está medido:
+
+- `registrarReciboMaquila` (`backend/src/dominio/produccion/recibos.ts`) crea el `EsMaCargo` **propuesto**
+  a partir del recibo, y **la cantidad del cargo se DERIVA de los detalles**: en `aCargoSalida`
+  (`backend/src/dominio/esma/cargos.ts`), **`cantidadPropuesta` es exactamente la suma de
+  `etapaRecibo.detalles.cantidad`** —nada más—, y **`importePropuesto` es esa cantidad × el precio**.
+  *(El precio de referencia sale de la ORDEN según el proceso —`maquilaOrd` para costura,
+  `aplicacionOrd` para los demás— y el `precioPactado` del recibo es sólo el respaldo cuando la orden
+  no lo trae.)* ⇒ **Toda pieza que entre a `cantidad` acaba multiplicada por un precio: se cobra.**
+- La misma `cantidad` es la que alimenta el kardex de PT (primeras a su almacén, segundas al suyo).
+- Y `aplanarYValidar` (mismo `recibos.ts`) **impone que `cantidadPrimeras + cantidadSegundas = cantidad`**
+  ⇒ meter las incompletas ahí **rompe la invariante** o las disfraza de segundas.
+
+⇒ **Las incompletas van en SU PROPIO CAMPO** del detalle del recibo (`EtapaMovimientoDet`), **fuera** de
+`cantidad`: ni suman al total recibido, ni al cargo, ni al inventario. Es un dato del recibo, no una
+calidad de la prenda.
+
+### 📌 Nota: las PRIMERAS y SEGUNDAS ya existían — Daniel no las había encontrado
+
+En la misma conversación quedó claro que **el desglose de calidad ya está construido desde F3-E4**, y no
+se estaba usando: `EtapaMovimiento` tiene **`idAlmacenPrimeras`** e **`idAlmacenSegundas`** (los dos
+destinos del recibo) y `EtapaMovimientoDet` tiene **`cantidadPrimeras`** y **`cantidadSegundas`** por
+color×talla, con el kardex mandando cada una a su almacén.
+
+*(Ojo con el nombre al buscarlo: **no existe una tabla `Recibo`**. El recibo es un `EtapaMovimiento` con
+`tipo = recibo_maquila`; ahí viven esos campos.)*
+
+⇒ **Que una función construida y correcta no se encuentre es un defecto igual de real que si faltara.**
+Vale la pena revisar cómo se presenta la captura del recibo, no sólo agregarle un campo más.
+
+### ✅ CÓMO QUEDÓ CONSTRUIDO (V1-E8k, 28-ago-2026)
+
+**El campo.** `EtapaMovimientoDet.cantidadIncompletas` (`cantidad_incompletas`, `INTEGER` nullable),
+migración **100 % aditiva** `20260828120000_prendas_incompletas`. NULL en corte/envío/entrega y en
+**todo lo migrado** (el Access nunca tuvo el concepto); todos los derivados lo leen como 0. **Sin
+backfill** y **sin `SEED_ON_START`**: no hay permisos, roles ni catálogos nuevos — la captura reusa
+`produccion.recibo` y la consulta `esma.ver-pagos`.
+
+**Dónde vive la aritmética.** Un módulo nuevo, `backend/src/dominio/produccion/incompletas.ts`, con
+`piezasDevueltas` / `recibiblePorCelda` (el tope) e `incompletasDeMaquilero` (dónde se ven). Las dos
+puertas de cada regla llaman a la MISMA función, no a un resumen suyo. *(`recibiblePorCelda` se
+renombró a `pendientePorCelda` en V1-E8v, cuando pendiente y recibible se volvieron el mismo número.)*
+
+**Las cuatro reglas, y cómo se cumplen:**
+
+1. **No cuentan como producidas.** Todo lo que produce, inventaría, cobra o mide —el kardex de PT,
+   `esma/cargos.ts`, `esma/conciliacion.ts`, el EDR, los KPIs, el WIP— suma `cantidad`, y las
+   incompletas viven fuera de ella: quedan excluidas **por construcción**, no por un filtro que
+   alguien pueda olvidar mañana. `registrarReciboMaquila` las persiste aparte y `aplanarYValidar`
+   mantiene intacta la invariante `primeras + segundas = cantidad` (meterlas ahí lanza un error que
+   lo dice con todas sus letras).
+2. **No entran a inventario.** El kardex se arma de `primeras`/`segundas`, que no las incluyen. Y un
+   recibo que trae SOLO incompletas ya **no pide almacén destino** (no hay nada que guardar) — lo
+   descubrió la prueba de integración, no el razonamiento: antes de este campo un recibo sin piezas
+   era imposible, así que la puerta es nueva.
+3. **No se pagan.** `aCargoSalida` sigue derivando `cantidadPropuesta` de `Σ detalles.cantidad`, sin
+   tocarlas, y un recibo que trae **solo** incompletas **no genera `EsMaCargo`** (antes eso no podía
+   pasar; sin el cambio la cola de validación se llenaría de cargos de $0).
+4. **Sí se ven, donde se revisa el pago.** Bloque `incompletas` en las **dos** vistas del estado de
+   cuenta (unificada y desglosada) — y de ahí al **PDF** (sección propia, sin columna de importe) y
+   al **Excel** (hoja «Prendas incompletas»). También en la **cola de validación de cargos**, donde
+   alguien teclea la cantidad a pagar: si no las viera ahí, podría sumarlas a mano creyendo que se le
+   olvidaron al capturista. Y en el **recibo semanal por maquilero** y en el **PDF del recibo**.
+
+**🔴 ~~Lo que la opción A obliga y no era obvio: el PENDIENTE se queda ABIERTO.~~ — AFIRMACIÓN
+RETIRADA por §Post-F9.147 (29-ago-2026).** Lo que esta sección sostuvo, y hoy es falso, se cita **en
+pasado para desmentirlo**: *«de 10 enviadas con 8 buenas + 2 incompletas, el WIP sigue diciendo "faltan
+2" — que es exactamente lo que Daniel necesita para cobrar el faltante»*, y de ahí que el contrato
+publicara **dos números** (`cantidad`, el pendiente abierto, y `recibible`, el tope real) más un aviso
+ámbar que explicaba por qué no coincidían.
+
+**Lo que de verdad pasa desde V1-E8v:** esas 2 piezas **ya salieron del taller**, así que **cierran el
+pendiente** y de paso **no se pueden volver a recibir como buenas**. Pendiente y recibible son **el
+mismo número**, el campo `recibible` **se retiró del contrato** y la función quedó una sola
+(`pendientePorCelda`). El tope de `recibido ≤ enviado` (decisión (g)) sigue contando
+`cantidad + incompletas`, como ya hacía. **Detalle en §Post-F9.147.**
+
+**Lo que NO se construyó, a propósito:** el **cobro automático del faltante**. Daniel explicó *por qué*
+pide que se las entreguen (*"los faltantes se los cobro"*), pero **no pidió que el sistema haga ese
+cargo**. Se registra y se muestra; el cobro sigue siendo una decisión suya.
+
+- **Aplica en:** el recibo de maquila (`EtapaMovimientoDet` + la pantalla de captura del avance), el
+  estado de cuenta del maquilero (pantalla, PDF y Excel), la cola de validación de cargos EsMa, los
+  recibos semanales y el PDF del recibo. ✅ **CONSTRUIDO** (V1-E8k, 28-ago-2026, versión **0.048**);
+  **lleva migración de BD** (aditiva, sin backfill, sin `SEED_ON_START`).
+  **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.137) — ⭐ «ESCÓNDESELA»: el costo REAL del listado de modelos deja de verse sin permiso (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Cierra **la nota que §Post-F9.123 dejó levantada a propósito** y no resolvió por
+iniciativa propia. El caso era éste: la columna **«costo actual»** del listado de modelos muestra el
+costo **unitario del último costeo real (F7)** de una orden de ese modelo —o sea, **cómo terminamos**,
+no lo que se planeó— y la gobierna `consultas.ver-importes`, que **Gerencial ya tenía desde antes**. Eso
+choca de frente con lo que Daniel había dicho de Aurora: *«tampoco costos finales reales»*.
+
+Preguntado si esconderla o dejarla, la respuesta fue de una palabra:
+
+> **«Escóndesela.»**
+
+**Por qué es coherente y no un capricho.** Es la misma línea que Daniel ha sostenido en todas las
+decisiones del territorio: *«solo yo defino los precios de los clientes»* (§Post-F9.123) y, sobre los
+factores, **dos frases suyas que en §Post-F9.125 están registradas por separado y aquí se citan como
+tales**: *«los factores sólo yo los puedo mover»* y *«y no son visibles para nadie más»*. Desarrollo
+**ve el plan**; **el resultado es del dueño**.
+
+### Lo que se decide
+
+1. **Esconder Y BLOQUEAR — las dos cosas.** Sin el permiso, **la columna no se pinta** y **el servidor no
+   manda el dato**. Es el principio que este proyecto ya adoptó en **§Post-F9.68**: esconder sin bloquear
+   es maquillaje, porque el número sigue viajando en la respuesta del API y basta con mirarla.
+   **Ésta es la decisión, y se construyó tal cual** — el CÓMO está abajo, en «✅ CONSTRUIDO».
+2. ⚠️ **El riesgo, que Daniel aceptó de frente: hay un permiso de por medio que no gobierna sólo esta
+   columna, y esconderle la columna podría costarle a Aurora algo más.** **Si lo estaba usando, se va a
+   quejar.** La decisión se toma sabiéndolo: **cuando pase, se destapa lo que haga falta, con nombre y
+   por petición suya — no se revierte en silencio.** Un permiso que se devuelve calladito porque alguien
+   se quejó es un permiso que nadie volverá a creer. *(Al construir se midió cuál era ese costo de
+   verdad y se encontró una salida que **no le quita nada**; ver abajo. El riesgo de la queja **no
+   desaparece**: la columna sí se le esconde.)*
+
+> 🗄️ **Cómo se creía en el momento de decidir (28-ago, ANTES de medir) — se conserva porque explica de
+> dónde venía el plan, y NO describe el código de hoy:** se daba por hecho que el candado del servidor
+> vivía en `listarModelos` bajo `consultas.ver-importes` y que *«lo que cambia es quién tiene ese
+> permiso»*, o sea sacar a Aurora de él, asumiendo que el daño colateral se limitaba a los importes de
+> **Costos y Márgenes**. **Las dos cosas resultaron inexactas:** el candado colgaba de
+> `adjuntarAgregadosListado` (no de `listarModelos`), y ese permiso gobierna **además el PRE-COSTEO**.
+> ⇒ **Ese plan se DESCARTÓ.** Lo que hoy hay en el código está en «✅ CONSTRUIDO».
+
+### ✅ CONSTRUIDO (V1-E8l, 28-ago-2026, versión **0.049**) — y el mecanismo salió DISTINTO al previsto
+
+⚠️ **La DECISIÓN de los dos puntos de arriba se sostiene entera; lo que cambió es el CÓMO** — el plan
+que se creía (recuadro 🗄️ de arriba) era sacar a Aurora de `consultas.ver-importes`, contando con que el
+daño se limitaba a los importes de Costos y Márgenes. **Medido antes de construir, el costo real de esa
+salida era mucho mayor, y caía justo sobre lo que Daniel dijo que ella SÍ debe ver:**
+
+🔴 **`consultas.ver-importes` es también el candado de importes del PRE-COSTEO.** `calcularPreCosto` y
+`listaPrecios` (`backend/src/dominio/costos/pre-costo.ts`) devuelven **todos** sus importes y precios
+sugeridos en `null` sin él. O sea que quitárselo a Gerencial le habría **apagado el precosteo entero** —
+el instrumento con el que ella *«arma un excel con todos los costos»* y monta la cotización que Daniel
+aprueba (§Post-F9.123)—. **Habría cumplido la letra de «escóndesela» rompiéndole el trabajo**, que es
+exactamente lo que Daniel excluyó al decir que *«puede hacer sus cálculos»*.
+
+⭐ **La salida, que no le quita nada a nadie: colgar la columna del permiso que YA significa «el
+RESULTADO».** La propia tabla de §Post-F9.123 nombra a `costos.ver` como *«costo real de la orden, costo
+real desde compras, márgenes»* y lo marca **❌ correcto** para Gerencial: Aurora **ya estaba fuera de él
+por diseño**. El candado del listado pasa de `consultas.ver-importes` a **`costos.ver` Y
+`consultas.ver-importes` (los dos)** — `puedeVerCostoRealDeModelo`,
+`backend/src/dominio/modelos/modelos.ts`—. Ejecutando `definirRoles()` (no leyéndolo), el resultado es
+el pedido: lo ven **Administrador, AdministracionDireccion y Directivo**; **Gerencial y todo lo de abajo,
+no**.
+
+**Se exigen los DOS y no sólo `costos.ver`** porque en la cascada del seed el primero ya implica al
+segundo, pero **los roles son datos editables** (`roles.administrar`): un rol a la medida podría llevar
+`costos.ver` sin el de importes. Pedir los dos sólo puede ESTRECHAR el conjunto, nunca ampliarlo.
+
+**Consecuencias de haber ido por aquí:**
+
+- 🟢 **El seed NO cambia y NO hace falta `SEED_ON_START=true`** (a diferencia de lo que esta entrada
+  anticipaba): no se movió el reparto de roles, se movió el candado del programa. **No hay permiso
+  nuevo.**
+- 🟢 **Aurora conserva íntegro el precosteo, las listas de precios, la negociación y las recetas.** Lo
+  único que deja de ver es la columna «costo actual» del listado de modelos.
+- 🔴 **El riesgo del punto 2 se reduce pero NO desaparece:** si ella usaba esa columna, se va a quejar.
+  Sigue en pie lo acordado — **se destapa y se decide con nombre, no se revierte en silencio.**
+
+**Esconder Y bloquear, las dos mitades, cada una con su prueba en las DOS direcciones** (lo que se pide
+ocultar se prueba que NO se ve, y con el permiso puesto, que SÍ se ve):
+
+- **Servidor:** `modelos-listado.int.test.ts` estrena el caso que el candado viejo dejaba pasar —
+  `consultas.ver-importes` PUESTO y `costos.ver` ausente, o sea Gerencial exacto—. La prueba que ya
+  existía (*«sin `consultas.ver-importes` el costo viene null»*) **pasaba en verde con el hueco
+  abierto**, porque quitaba el permiso que Aurora sí tiene.
+- **Pantalla:** `ModelosPagina.test.tsx` fija que sin `costos.ver` **no se pinta ni el encabezado ni la
+  celda** en ninguno de los dos pintados (tabla de escritorio y tarjeta de móvil), y que el resto del
+  listado le sigue llegando entero.
+
+- **Aplica en:** V1-E8l — versión **0.049**. **SIN migración, SIN permiso nuevo, SIN `SEED_ON_START`.**
+  **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.138) — ⭐⭐ EL NEGOCIADOR EN VIVO: un renglón tipo Excel donde el precio y el margen se persiguen en las dos direcciones (DANIEL, 29-ago-2026)
+
+> *"es importante tener un campo donde vaya poniendo el precio y me de el porcentaje de margen que
+> tengo, tomando en cuenta todas las condiciones. Ese campo lo voy usando para ir midiendo que margen
+> voy teniendo con los precios que me piden los clientes."*
+
+> *"Tambien me gustaria tener todos los elementos casi como si fuera un excel. Tengo que tener todos
+> los precios en un renglon para ir moviendo en vivo e ir viendo como se va moviendo el margen si
+> modifico cada elemento. Pero no quiero poner un boton que me lleve a otra pantalla para actualizar
+> los precios. Quiero campos que vengan con los costos que tenga la receta y yo poder ir moviendo en
+> vivo. Posiblemente el unico campo que si puedo pasar a otra pantalla para quitar y poner o mover,
+> sean los avios."*
+
+> *"Ejemplo.... estoy a media negociacion y el cliente me dice: ponle una jareta mas barata y bajame 3
+> pesos... entonces yo voy jugando en tiempo real con la receta para llegar al costo que me pide. Por
+> eso siempre tengo que saber el margen que tengo"*
+
+### Lo que se decide
+
+1. **Las dos direcciones, en el mismo renglón.** Se escribe **precio** → sale el **margen**; se mueve un
+   **costo** de la receta → se mueve el margen. No es un campo de precio con un reporte al lado: es un
+   instrumento que se persigue solo, en los dos sentidos, porque así es como Daniel negocia (*"ponle una
+   jareta mas barata **y** bajame 3 pesos"* son las dos direcciones en una sola frase del cliente).
+2. **Un RENGLÓN, no una pantalla por concepto.** *"casi como si fuera un excel"*: todos los elementos de
+   costo visibles a la vez y editables en el sitio. El margen se recalcula **en vivo**, sin guardar y sin
+   recargar.
+3. 🔴 **NINGÚN botón que saque de la pantalla.** Es un requisito explícito y va literal: quien está en la
+   mesa con el cliente enfrente no puede perder el hilo por navegar. **La única excepción que Daniel
+   concede** es la de los **avíos** (quitar, poner o mover), que *"posiblemente"* sí puede vivir en otra
+   pantalla — y es una excepción, no una puerta abierta a más.
+4. **Los campos nacen cargados con los costos de la receta.** No se teclea desde cero: se **parte** de lo
+   que la receta ya sabe y se mueve desde ahí. *"Quiero campos que vengan con los costos que tenga la
+   receta y yo poder ir moviendo en vivo."*
+5. **"Tomando en cuenta todas las condiciones"** — el margen que se enseña es el del precio **puesto en
+   las condiciones de ese cliente**, no el margen bruto sobre costo pelón. Los cuatro factores del cliente
+   ya están decididos y son **sólo del dueño** (§Post-F9.125): este instrumento los usa, y por eso vive
+   detrás del mismo candado.
+
+### De dónde viene y con qué se enlaza
+
+Es la **mecánica** de la mesa que §Post-F9.110 dejó planteada (*"la negociación edita la receta en vivo"*)
+y que esa decisión dejó explícitamente pendiente. §Post-F9.110 fijó **dónde** se escribe (en la versión
+del precosto, **nunca en el modelo**) y **qué queda de testimonio** (`NegociacionEvento` encadena
+anterior → nueva); esta decisión fija **cómo se opera**: un renglón, dos direcciones, sin navegar.
+
+⚠️ **No re-abre lo ya cerrado:** la negociación **sigue sin tocar el modelo** (§Post-F9.110), el precio de
+venta y sus factores **siguen siendo sólo del dueño** (§Post-F9.125), y si la receta se mueve bajo un
+precio ya aprobado el sistema **avisa, no tumba la firma** (§Post-F9.127).
+
+### ⭐ MEDIDO CONTRA EL CÓDIGO (29-ago-2026) — media decisión YA ESTÁ CONSTRUIDA
+
+No se parte de cero, y conviene saber exactamente por dónde va el corte antes de estimar nada:
+
+| Lo que pide Daniel | Estado medido |
+|---|---|
+| **Dirección 1:** escribo **precio** → sale el **margen** | ✅ **YA EXISTE** — `simularNegociacion` (`backend/src/dominio/desarrollo/negociacion.ts`) recibe `precioObjetivo` y devuelve `margenBrutoPct`, `margenObjetivoPct`, `precioNeto` y `cumpleObjetivo`. La aritmética vive en `simularMargenNegociacion` (`backend/src/dominio/costos/precio-lista.ts`). |
+| *"tomando en cuenta todas las condiciones"* | ✅ **YA EXISTE** — simula sobre los **factores snapshot** de la lista, con la cascada completa. |
+| **Dirección 2:** muevo un **costo** → se mueve el margen | ~~🔴 **NO EXISTE.** El `costo` sólo puede venir del `costoUnit` **vigente** del renglón o de un precosto **`congelado`** (`'Sólo se puede simular sobre una versión CONGELADA del precosto.'`). **No hay forma de pasarle costos movidos a mano**, que es justo lo que la mesa necesita.~~ ✅ **CONSTRUIDA en `V1-E8u`** (29-ago-2026): `simularMesa` recibe el renglón de importes **libres** y devuelve `costoSimulado` · `deltaCosto` · `precioSugerido`. *(El texto tachado era cierto al medirse y se conserva: es lo que había antes.)* |
+| **El renglón "casi como un excel"** (todos los elementos editables a la vez) | ~~🔴 **NO EXISTE.** Hoy la simulación es de **un precio contra un costo total**, no de los elementos por separado.~~ ✅ **CONSTRUIDO en `V1-E8u`**: `MesaNegociacion` pinta un campo por concepto —**precargado** con el desglose que `desgloseCostoLinea` ya sumaba en el servidor— y el precio al lado. |
+
+⇒ **El trabajo real es la dirección 2 y el renglón**, no la calculadora de margen. Y ojo: `simularNegociacion`
+es **lectura pura que no muta nada** — esa propiedad hay que **conservarla** al abrirla a costos libres
+(§Post-F9.139: la mesa no escribe en el catálogo).
+
+### ✅ CÓMO QUEDÓ CONSTRUIDA (`V1-E8u`, 29-ago-2026) — y las dos cosas que la medición cambió
+
+1. ⭐ **La otra mitad NO se construyó desde cero: la semilla ya existía.** Los campos *"que vengan con
+   los costos que tenga la receta"* salen de **`desgloseCostoLinea`** (`desarrollo/listas-precios.ts`),
+   que desde el rediseño §4.8 ya devuelve los conceptos del precosto agrupados y **sumados en el
+   servidor**. Lo nuevo es `simularMesa`, que recibe esos importes **ya movidos a mano**.
+2. 🔴 **Se abrió —y se cerró— una CUARTA puerta a los factores, que esta misma entrada no había
+   previsto.** La dirección 2 obliga a devolver un **precio sugerido**, y
+   `precioSugerido ÷ costoSimulado` entrega el **multiplicador combinado** de los cuatro factores…
+   con el costo puesto por quien pregunta, así que basta repetir con otro costo para que el redondeo
+   al alza deje de estorbar. **Sale `null` sin `listas.aprobar`**, por el mismo
+   `puedeVerFactoresDePrecio` de §Post-F9.125(b). El aviso de arriba decía *"si el instrumento nuevo
+   entrega margen, entrega margen con el mismo candado"* — resultó que **también había que taparle el
+   PRECIO**, que no es lo mismo y no estaba dicho.
+3. ⭐⭐ **PERO DANIEL RELATIVIZÓ EL CANDADO, y hay que escribirlo TEXTUAL antes de que alguien lo
+   defienda como invariante sagrada.** Se le enseñó la fuga del `precioSugerido` y contestó:
+
+   > *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+   > *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+   ⚠️ *(Erratas suyas, sin corregir: `mofldificar`.)*
+
+   ⇒ **El candado queda por PRECAUCIÓN BARATA, no porque el riesgo le importe.** Costó una condición
+   ternaria y no le quita nada a nadie **hoy**, porque hoy el único que negocia es él. Eso es todo lo
+   que lo sostiene.
+
+   🔴 **Y la condición que lo volvería importante — al revés de lo que parece:** el día que **alguien
+   MÁS negocie** (Ventas, o quien sea que no apruebe precios), el candado deja de ser gratis: le quita
+   **un número útil para hacer su trabajo** a cambio de proteger algo que el dueño acaba de decir que
+   no le preocupa. Ése es el día de revisarlo — **no** el día en que a alguien se le ocurra que la fuga
+   es grave.
+
+   ⭐ **Y la precisión que evita una falsa sensación de cierre** (la levantó el reviewer): llamarla
+   *«la CUARTA puerta»* es correcto **como puerta nueva**, pero **no era la única abierta**. El renglón
+   de la lista **ya sirve `costoUnit` y `precioCalculado`** con `consultas.ver-importes` ⇒ **el
+   multiplicador ya se podía sacar con una división**, y eso es exactamente el **límite declarado y
+   ACEPTADO** de §Post-F9.125(b) (*"se oculta el NÚMERO, no la ARITMÉTICA"*). Taparle el sugerido al
+   instrumento nuevo está bien —no se agrega una fuga por comodidad—, pero **no cierra nada que
+   estuviera cerrado**.
+
+4. ⭐ **Guarda gemela, porque son el mismo número en la misma pantalla.** El margen de la mesa y el de
+   la calculadora de §4.8 salen los dos de **`proyectarMargen`** (vecina de las dos funciones en
+   `negociacion.ts`), y una prueba los compara campo por campo sobre el mismo costo. Dos cuentas
+   "casi" iguales se desincronizan en la primera corrección.
+5. 🔴 **La propiedad que hubo que CONSERVAR se probó, no se afirmó:** una prueba toma la **huella md5
+   de todas las tablas** antes y después de simular con costos movidos y un estimado inexistente, y
+   exige que sean idénticas.
+6. ⚠️ **Lo que NO entró:** los estimados **no se persisten** (eso es §Post-F9.139 y lleva migración).
+   La mesa es el **instrumento**; el testimonio sigue siendo el `NegociacionEvento` que ya existe.
+
+⚠️ **Y hay un candado que NO se toca:** los cuatro factores salen en `null` sin `listas.aprobar`
+(§Post-F9.125(b) — *"ésta era la tercera puerta a los factores, y era la más ancha"*). Ampliar el
+simulador **no puede** convertirse en una cuarta puerta: si el instrumento nuevo entrega margen, entrega
+margen **con el mismo candado**.
+
+### 🔁 NOTA DE AFINACIÓN (29-ago-2026, §Post-F9.144) — lo que se teclea en el renglón son METAS
+
+⚠️ **Nada de arriba se retira.** Daniel explicó ese mismo día el proceso completo (§Post-F9.144) y una
+frase suya cambia **qué significa** lo que este instrumento captura: *"me quitan un cierre y yo le pongo
+que estimos que la maquila costara 5 pesos menos… pero ya en la oficina se tiene que buscar una mquila de
+ese costo"*.
+
+⇒ El número que se mueve en el renglón **no es un costo**: es **el costo que hay que salir a conseguir**,
+y Daniel advierte *"no es seguro que se consiga"*. La mecánica de las dos direcciones sigue siendo
+exactamente la de arriba; lo que se agrega es que **el resultado de la mesa es una promesa con desenlace**,
+y ese desenlace es lo que la bandeja de §Post-F9.140 tiene que poder enseñar (ver la nota de afinación de
+esa entrada). **Detalle en §Post-F9.144 (b).**
+
+- **Aplica en:** Desarrollo/Cotización — `simularMesa` + `proyectarMargen` (`desarrollo/negociacion.ts`),
+  `POST /api/listas-precios/lineas/:idLinea/simular-mesa`, y la pantalla `MesaNegociacion` dentro del
+  diálogo de negociación del renglón. ✅ **CONSTRUIDA en `V1-E8u`** (29-ago-2026; ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`). **SIN migración, SIN permisos nuevos** ⇒ **NO requiere
+  `SEED_ON_START`**. ⬜ **Queda abierto**: persistir los estimados (§Post-F9.139). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.139) — ⭐⭐ LOS ESTIMADOS: en la mesa se negocia con NÚMEROS LIBRES, y el catálogo no se toca (DANIEL, 29-ago-2026)
+
+> *"que pasa si me pide una jareta mas barata. Yo se que con algun proveedor puedo conseguir algo mas
+> barato, pero en el momento no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una
+> jareta ahi, que ni certeza tengo de cuanto cuesta. Necesito ir poniendo estimados de distintas cosas,
+> y despues ya en mi oficina poder ir cuadrando los avios que quiero meter al modelo..."*
+
+**Ésta es la pieza que cambió el diseño**, y no es un detalle de captura: parte la negociación en **dos
+momentos** que hasta ahora se estaban pensando como uno solo.
+
+### Los dos momentos
+
+| | **Negociar** (con el cliente enfrente) | **Cuadrar** (después, en la oficina) |
+|---|---|---|
+| Con qué se trabaja | **Estimados**: números libres | Materiales **reales** del catálogo |
+| Certeza del precio | Ninguna — *"ni certeza tengo de cuanto cuesta"* | Se busca proveedor y se confirma |
+| Qué toca del sistema | **NADA**: no crea catálogo | Ahí sí se da de alta y se amarra |
+| Para qué sirve | Llegar al precio que pide el cliente | Que la receta de producción sea verdad |
+
+### Lo que se decide
+
+1. **El simulador acepta números LIBRES.** Un renglón de estimado es un **importe** (con su etiqueta para
+   acordarse de qué era), **no una referencia al catálogo**. No exige que el avío exista, ni proveedor, ni
+   precio confirmado.
+2. 🔴 **El simulador NO CREA NADA.** Ni avío, ni proveedor, ni precio, ni medida. Nada de lo que se teclea
+   en la mesa aparece después en un catálogo.
+3. **El estimado se queda marcado como tal.** Lo negociado con estimados **no es una receta de
+   producción** y no puede confundirse con una: es lo que obliga a que exista el filtro posterior
+   (§Post-F9.140).
+
+### ⭐ El porqué MEDIDO — no es una precaución teórica, es una cicatriz propia
+
+Coincide exactamente con la razón por la que **§Post-F9.106** eligió el **alta por clic** y no el alta
+automática. Ahí quedó escrito, y se cita porque es el mismo mecanismo de daño:
+
+> *"Se elige la del clic, **por una cicatriz propia**: el catálogo de **medidas de avío** se fragmentó
+> porque el texto libre creó `"53 cm"`, `"53cm"` y `"53"` como tres medidas distintas"* — y con eso **la
+> orden de compra salió partida en tres**.
+
+⇒ **Crear filas de catálogo a media prisa es cómo se ensucia un catálogo.** Y la mesa de negociación es
+el lugar de MÁS prisa que hay en todo el sistema: cliente enfrente, precio moviéndose y, por confesión
+del propio Daniel, **sin saber todavía cuánto cuesta la cosa**. Es exactamente la peor combinación
+posible para dejar que algo escriba en un catálogo. §Post-F9.106 lo evitó pidiendo **un clic con una
+persona decidiendo el nombre**; aquí se evita **no escribiendo nada en absoluto**.
+
+*Y hay un segundo motivo, del propio texto de Daniel: dar de alta un avío del que **no se conoce el
+precio** no sólo ensucia el catálogo — mete al sistema un dato que se va a usar para costear y que
+**nadie confirmó**.*
+
+### 🔁 NOTA DE AFINACIÓN (29-ago-2026, §Post-F9.144) — los momentos son TRES, y el tercero NO lo opera Daniel
+
+⚠️ **La tabla de dos columnas de arriba sigue siendo cierta; le faltaba una columna y le faltaba el
+DUEÑO de cada momento.** Daniel lo explicó completo el mismo día:
+
+1. **Hay un momento CERO: VENDER.** *"Se hace la receta y lista de precios para poder ir a vender."* La
+   receta y la lista **ya existen** antes de sentarse en la mesa — no se improvisan ahí.
+2. ⭐ **El momento de «cuadrar» lo opera DESARROLLO, no el dueño.** *"No puedo yo modificar la receta
+   estando en la negociacion... eso se hara mas adelante por la gente de desarrollo en base a la
+   informacion que meti en lanegociacion."* La columna «Cuadrar» de arriba no dice quién la trabaja, y
+   **no es la misma persona** que negoció: es alguien que llega **después**, leyendo lo que no vivió.
+3. **De ahí sale una VERSIÓN NUEVA de la receta**, no una corrección de la vieja: *"para produccion ya
+   debera de salir una receta revisada parea produccion"*.
+4. ⭐ **El estimado es una META, no un dato pendiente de captura** — y **puede fallar** (*"no es seguro
+   que se consiga"*). Eso es lo que obliga a que el filtro de §Post-F9.140 tenga **dos** desenlaces.
+
+**Detalle completo en §Post-F9.144 (a) y (b).** Los tres puntos que esta entrada decide (números libres ·
+el simulador no crea nada · el estimado queda marcado) **no cambian**.
+
+- **Aplica en:** el negociador en vivo de §Post-F9.138. ✅ **CONSTRUIDA A MEDIAS en `V1-E8u`**
+  (29-ago-2026), y hay que ser preciso con cuál mitad:
+  - ✅ **Puntos 1 y 2 — HECHOS.** El renglón de la mesa es `{ etiqueta, importe }`: **ningún id de
+    catálogo**, ni en el contrato ni en el dominio, así que no hay dónde exigir que el avío exista. Y
+    **`simularMesa` no escribe nada** — su único acceso a la base es un `findFirst`, probado con la
+    huella md5 de todas las tablas antes/después y con dos mutaciones (escribir el renglón · dar de
+    alta el avío del estimado) que mueren las dos.
+  - ⬜ **Punto 3 — ABIERTO, y es el que lleva trabajo de esquema.** *"El estimado se queda marcado como
+    tal"* exige **persistirlo**, y sigue siendo cierto que necesita **su propia forma de guardarse**
+    dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`). Hoy
+    los estimados **viven sólo mientras la pantalla está abierta**.
+  ⇒ **Consecuencia que NO cambia todavía:** el criterio de entrada de la bandeja de §Post-F9.140
+  (*"sólo las negociadas CON ESTIMADOS"*) **sigue esperando**, porque ese dato **aún no se guarda**.
+  **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.140) — ⭐⭐ DESPUÉS DE LA NEGOCIACIÓN, UN FILTRO: la bandeja que ya existe y que Daniel ya aprobó (DANIEL, 29-ago-2026)
+
+> *"Creo que despues de una negociacion, tiene que haber una validadcion de la receta original. O sea,
+> de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y como se
+> cerro. Hay muchos modelos que si se aceptan tal cual como esta la receta, pero otros que habra que
+> cambiar en vivo (a estimado) y despues buscar proveedor y cambiar la receta para produccion"*
+
+### Lo que se decide
+
+1. **Hay una bandeja de negociaciones cerradas que esperan cuadre.** Es el *"filtro"* que pide Daniel: el
+   puente entre el momento de negociar y el de cuadrar (§Post-F9.139).
+2. ⭐ **Sólo caen ahí las que se negociaron CON ESTIMADOS.** Lo dice el propio Daniel: *"Hay muchos
+   modelos que si se aceptan tal cual como esta la receta"* — **ésas pasan derecho**, no hay nada que
+   cuadrar. La bandeja se llena sola con las que tienen algo que resolver, y por eso no se convierte en
+   un trámite que hay que despachar para todo.
+3. ⭐⭐ **LA FORMA YA EXISTE Y DANIEL YA LA APROBÓ — no se inventa una nueva.** Es la bandeja **«Recetas
+   por liberar»** (`consultarRecetasPorLiberar`,
+   `backend/src/dominio/produccion/recetas-por-liberar.ts`), nacida en V1-E3h, de la que Daniel dijo
+   **«está buenísima»**, y cuya regla de operación la fijó él mismo:
+
+   > *"siempre se debe liberar uno por uno… no tiene sentido liberar las cosas sin ver"*
+
+   ⇒ Esa regla (§Post-F9.72 / V1-E3k, que **retiró la liberación en bloque incluso del contrato**) es
+   **exactamente** lo que este filtro necesita: cuadrar un estimado es, por definición, algo que hay que
+   **ver uno por uno**.
+4. 🔴 **LA BANDEJA NO FIRMA: LLEVA.** Distinción que hay que respetar al construir. Esta bandeja
+   **muestra** lo que quedó pendiente de cuadrar y **lleva** a la pantalla donde se cuadra; **la firma de
+   Desarrollo sigue siendo la que ya existe** y sigue viviendo donde vive. No se duplica la compuerta ni
+   se crea una segunda autoridad que libere.
+
+### Cómo encaja con lo ya decidido
+
+Es la **REVISIÓN bisagra** que §Post-F9.110 declaró indispensable —*"debe de haber una revisión antes de
+mandar a producir. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
+imprudencia o un error"*—, **ahora con forma concreta y con su criterio de entrada** (sólo las de
+estimados). §Post-F9.110 dijo *que* tenía que existir; esto dice **qué es** y **a qué se parece**.
+
+⚠️ **Afina §Post-F9.110, no la contradice:** aquélla decía que alguien *"revisa la versión aceptada y la
+PROMUEVE a la receta del modelo"*. Sigue siendo eso. Lo que se agrega es (a) que la cola tiene **forma de
+bandeja ya conocida** y (b) que **no todas** las negociaciones pasan por ella.
+
+### ⭐ MEDIDO CONTRA EL CÓDIGO (29-ago-2026) — la COMPUERTA ya existe; lo que falta es la BANDEJA
+
+> ⚠️⚠️ **CADUCÓ CON LA 0.071 (31-ago-2026, §Post-F9.169).** Todo lo que sigue describe **la compuerta
+> viva**, y era exacto cuando se escribió. **Ya no existe:** `exigirRevisionAprobadaParaProducir` se
+> eliminó del repo y la revisión pasó de **puerta** a **registro**. Se conserva porque su medición —los
+> eslabones, quién llama a quién— es el mapa que hizo posible disolverla; **léelo como historia, no
+> como el sistema de hoy.** Y **un dato de esa medición ya era falso al ejecutarse**: la 0.069 añadió un
+> **segundo** llamador (`derivarModeloDeProduccion`) donde aquí dice *«único sitio de llamada»*.
+
+
+⚠️ **Corrección importante para quien construya:** la revisión que §Post-F9.110 pidió **ya se construyó**
+en `V1-E7d`, y hay que no volver a construirla:
+
+- ✅ **La compuerta existe.** `exigirRevisionAprobadaParaProducir`
+  (`backend/src/dominio/modelos/revision-modelo.ts`) impide que una **versión** salga a producción sin
+  firma, y vive dentro de `promoverAProduccionNucleo` para cubrir **también** la puerta lateral de
+  generar la OP. `Modelo.revisionEstado` + `idRevisadoPor` + `revisadoEn` + `revisionNota` guardan el
+  acto (A7). **`null` se lee como PENDIENTE.**
+- ✅ **La BANDEJA ya existe — la construyó `V1-E8r` (29-ago-2026).** Hasta ese día no había ninguna
+  consulta que **listara** lo que espera revisión: el estado se escribía (`versiones.ts`) y se **exigía**
+  al promover, pero **nadie podía ver la cola**, así que la compuerta era un **muro al final del
+  camino** y no un filtro que alguien trabaja. Hoy la cola es
+  `consultarRecetasPorRevisar` (`backend/src/dominio/modelos/recetas-por-revisar.ts`) →
+  `GET /api/recetas-por-revisar` (`modelos.ver`) → pantalla **«Recetas por revisar»** en el riel de
+  Desarrollo. **Sin migración y sin permisos nuevos.**
+
+⇒ **Esto es exactamente lo que Daniel está pidiendo**, y por eso su petición no es un duplicado: *"de
+alguna manera deberia de pasar un filtro"* — el filtro se topa hoy cuando ya quieres producir, en vez de
+poder trabajarlo antes. **Lo que se construye es la cola (y su criterio de entrada), no una segunda
+compuerta.**
+
+### ⭐ CÓMO QUEDÓ CONSTRUIDA (`V1-E8r`, 29-ago-2026) — y las dos correcciones que la medición obligó
+
+1. 🔴 **La población NO es `revisionEstado = 'pendiente'`, y escribirlo así habría sido el defecto.** La
+   compuerta le niega producción a una versión con `pendiente`, con **`null`** (las que ya existían al
+   desplegarse V1-E7d — su migración lo dice: *"para ellas NULL se lee como `pendiente`"*) **y** con
+   `rechazada`. Con el predicado obvio, esas dos poblaciones quedarían **bloqueadas y a la vez
+   invisibles**: el estado exacto que esta decisión viene a matar. Se resolvió con **guardas gemelas**:
+   `revisionBloqueaProduccion` (TS, y es literalmente lo que la compuerta pregunta antes de lanzar) +
+   `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL), **vecinas en `revision-modelo.ts`** y con una prueba que las
+   corre a las dos sobre las **16 combinaciones** y las compara fila por fila.
+2. ⚠️ **El criterio de entrada del punto 2 de arriba (*"sólo las que se negociaron CON ESTIMADOS"*) NO se
+   pudo aplicar todavía, y no se fingió que sí:** los estimados son §Post-F9.139 y **no están
+   construidos**, así que ese dato no existe. *(Al día del 29-ago-2026, tras `V1-E8u`, la frase sigue
+   valiendo **con una precisión**: los estimados ya se pueden **teclear** en la mesa, pero **no se
+   guardan** —§Post-F9.139 punto 3 sigue abierto—, así que la bandeja continúa sin poder preguntar por
+   ellos.)* Lo que **sí** acota la bandeja —y la mantiene corta, que
+   era el propósito de ese punto— es que **sólo caen ahí las VERSIONES**: lo que Daniel describe como
+   *"muchos modelos que sí se aceptan tal cual"* nunca genera una versión, así que no aparece. Cuando
+   los estimados existan, ese criterio se **estrecha** dentro de la misma consulta.
+3. **Lo que estorba primero, arriba** (punto 2 de la bandeja hermana, adaptado): se midió que **por los
+   caminos de la UI una versión frenada no llega a tener OP** —generarla exige promover, y el muro lo
+   impide—, así que "el modelo con OP ya generada" no servía como criterio. ⚠️ **No es un absoluto:**
+   queda la TERCERA PUERTA que ya documenta `revision-modelo.ts` (`POST /api/ordenes` → `crearOrden`
+   crea la OP **sin promover**), hueco **sólo por API**, **pre-existente** desde F2 y anotado como deuda
+   con nombre en `V1-etapas.md` §V1-E7d; no cambia el criterio ni esconde nada, porque el modelo sigue
+   en `desarrollo` y bloqueado ⇒ **sigue en la bandeja**. Se usa la **fecha comprometida más próxima de
+   los pedidos vivos** que están detenidos detrás de esa receta; luego las que tienen pedido; luego la
+   más vieja.
+4. **La marca de «ya está frenando dinero»** (`conOrdenCompra` allá) es aquí **`conPedido` + las piezas
+   detenidas**: el cliente ya lo ordenó y la OP no puede nacer.
+5. **Sólo `origen = 'desarrollo'`:** una versión ya promovida no la frena el muro (y firmarla es
+   imposible: `exigirVersionRevisable` la rechaza), así que listarla sería un renglón sobre el que nadie
+   puede actuar.
+
+### 🔁 NOTA DE AFINACIÓN (29-ago-2026, §Post-F9.144) — la bandeja pregunta lo que NO es
+
+⚠️ **La bandeja construida en `V1-E8r` NO se retira ni se rehace: funciona y está bien.** Lo que sigue es
+una **afinación de la PREGUNTA que hace**, y **no está construido**.
+
+Tal como se pensó, la bandeja contesta *«¿ya lo capturaste?»* — binaria, de trámite, **con un solo final
+bueno**. Pero ese mismo día Daniel explicó que lo que se teclea en la mesa son **METAS**, no datos: *"me
+quitan un cierre y yo le pongo que estimos que la maquila costara 5 pesos menos… pero ya en la oficina se
+tiene que buscar una mquila de ese costo"*, y remató: **_"no es seguro que se consiga"_**.
+
+⇒ **La respuesta puede ser QUE NO, y eso tiene que verse.** La pregunta correcta no es *«¿ya lo
+capturaste?»* sino ***«¿se logró lo que se prometió, sí o no?»***.
+
+🔴 **El estado prohibido que esto evita:** Desarrollo cuadra con la maquila que **sí** consiguió, el
+renglón sale de la cola como "resuelto", y **nadie se entera** de que el margen que Daniel le vendió al
+cliente ya no existe. Un cuadre que sólo puede terminar en "listo" **convierte un incumplimiento en un
+silencio**.
+
+⚠️ **Lo que NO cambia:** el punto 4 sigue mandando — **la bandeja NO FIRMA, LLEVA**. Enseñar el desenlace
+no la vuelve una segunda autoridad.
+
+🔴 **Y el punto 3 de «CÓMO QUEDÓ CONSTRUIDA» VA A CADUCAR — Daniel ya lo decidió (§Post-F9.144(c)).** Ese
+punto se apoya en que *"por los caminos de la UI una versión frenada no llega a tener OP"*. Es verdad
+**hoy**, y **deja de serlo** en cuanto se construya lo que Daniel contestó el 29-ago: *"si, mueve la
+compuerta al comprar"*. Con la compuerta disuelta en la firma por renglón, **sí habrá versiones frenadas
+CON OP viva** —de hecho serán el caso normal, que es el punto— ⇒ **hay que revisar el criterio de orden y
+la marca `conPedido` de esta bandeja en la misma etapa que mueva la compuerta.** No es una posibilidad
+remota: es la consecuencia directa de una decisión ya tomada. **Detalle en §Post-F9.144 (b) y (c).**
+
+- **Aplica en:** Desarrollo/Cotización — bandeja con la forma de `recetas-por-liberar.ts`, **reusando la
+  compuerta ya existente de `revision-modelo.ts`**. ✅ **CONSTRUIDA en `V1-E8r`** (29-ago-2026; ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`). ⬜ **Queda abierto** el criterio de entrada por ESTIMADOS, que
+  depende de §Post-F9.139. ⬜ **Y queda abierta la afinación de arriba** (los dos desenlaces),
+  §Post-F9.144. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.141) — ⭐ LOS COMENTARIOS SON DE LA NEGOCIACIÓN, NO DEL MODELO — y van en HILO (DANIEL, 29-ago-2026)
+
+> *"y tambien necesito meter comentarios para cada modelo"*
+
+Preguntado si eran comentarios **del MODELO** (que viajarían a todos los clientes y todos los proyectos)
+o **de la NEGOCIACIÓN**, la respuesta fue:
+
+> *"es en esta negociacion"*
+
+### Lo que se decide
+
+1. **Van en el RENGLÓN de la lista** — o sea en la pareja **cliente + modelo** de esa negociación—, **NO
+   en el catálogo de modelos.** La frase *"para cada modelo"* describe **dónde se escriben** (uno por
+   renglón), no **de quién son**. Un comentario de mesa como *"aceptó si le quitamos el cierre"* es
+   verdad **de este cliente en esta negociación**, y ponerlo en el modelo se lo contaría a todos los
+   demás.
+2. **En HILO: varios, con autor y fecha, INMUTABLES.** No es un campo de notas que se reescribe.
+3. **El patrón es `OrdenComentario`** (`backend/prisma/schema.prisma`), que viene del Access viejo y ya
+   tiene exactamente esta forma: `idUsuario`, `comentario`, `fecha`, y su comentario en el esquema dice
+   **«log inmutable»** y **«Inmutable»**. Se copia ese patrón; no se inventa otro.
+4. ⚠️ **`Desarrollo.notas` es la OTRA forma y NO es la que se quiere aquí.** Es un campo suelto
+   (`String?`) que se sobreescribe. Queda dicho para que nadie lo reuse por parecer más barato.
+
+### El porqué
+
+**Los comentarios de una negociación son HISTORIA**, y la historia no se edita. Un campo que se reescribe
+deja que **el segundo comentario borre al primero** — y justo lo que Daniel pidió en §Post-F9.110 fue
+*"el registro de cómo fue construido el modelo y cómo fue cambiando con la necesidad del cliente"*. Un
+campo que se pisa a sí mismo es incapaz de guardar eso.
+
+*Es además la misma línea que el resto del sistema ya sostiene: los movimientos no se editan, se
+cancelan con su inverso (D3); la auditoría es uniforme (A7).*
+
+### 🔴 Lo que se midió al construirlo (V1-E8q, 29-ago-2026) — esta decisión pedía MENOS trabajo del que creía
+
+Al ir a construirlo se midió primero, y **el hilo YA EXISTÍA**: `NegociacionEvento`
+(`backend/prisma/schema.prisma`), nacido en **F8-E1** y operado desde **F8-E5**. Cuelga del **renglón de
+la lista** (`ListaPreciosLinea` = cliente + modelo), es **INMUTABLE** por construcción, y guarda
+`acuerdo` (el texto), `registradoPorId`, `registradoEn` y —cuando el comentario acompaña un cambio de
+número— `precioAnterior`/`precioNuevo` + las versiones del precosto. O sea: **los cuatro puntos de
+arriba ya estaban resueltos**, incluido el patrón `OrdenComentario` y el rechazo de `Desarrollo.notas`.
+También estaba ya el comentario **sin** cambio de número (`registrarAcuerdo` con `precioAcordado`
+opcional), que es el tercer ejemplo de Daniel (*"dimos un precio más bajo porque nos van a comprar 20
+mil unidades"*).
+
+⚠️ **Dos afirmaciones de esta decisión eran FALSAS y se corrigen aquí:**
+
+1. **NO lleva migración, ni tabla nueva.** La tabla existe desde F8-E1. Escribir "migración aditiva"
+   venía de no haber medido: la decisión se redactó desde el pedido, no desde el código.
+2. **No estaba todo pendiente.** Lo único que faltaba era **una cosa, y era real**: el hilo **no
+   pintaba el AUTOR**. Se leía *qué* se acordó y *cuándo*, nunca **de quién** venía. El dato estaba
+   guardado (`registradoPorId`) pero jamás llegaba a la pantalla, y aun llegando habría sido un id
+   crudo: `NegociacionEvento` **no tiene FK física al usuario** —es un log inmutable, igual que
+   `OrdenComentario`—, así que el nombre hay que **resolverlo en el servidor** (patrón de
+   `admin/bitacora.ts`). Eso es lo que construyó V1-E8q.
+
+*La lección que deja: una decisión escrita desde el pedido puede pedir una tabla que ya existe. **Medir
+antes de codear** convirtió "una fase con migración" en una columna y un resolvedor de nombres.*
+
+### 🔁 NOTA DE AFINACIÓN (29-ago-2026, §Post-F9.144) — el hilo es la MATERIA PRIMA del momento 3, no un adorno
+
+⚠️ **Nada de arriba cambia.** Lo que se agrega es **para qué sirven** estos comentarios, que hasta ahora se
+leía como testimonio histórico. Daniel: *"eso se hara mas adelante por la gente de desarrollo **en base a
+la informacion que meti en lanegociacion**"* y *"se hace modificaciones en una nueva version a la receta
+que va a salir a produccion **en base a los comentarios y cotizacion negociada**"*.
+
+⇒ El hilo **es la entrada de trabajo de Desarrollo**: quien reconfigura la receta **no estuvo en la mesa**
+y no tiene otra fuente. Un comentario ausente o vago no es una nota que falta — es **trabajo que no se
+puede hacer**. Eso sube la exigencia sobre esta pantalla: tiene que leerse **completa y en orden** desde el
+momento 3, no sólo consultarse. **Detalle en §Post-F9.144 (a).**
+
+- **Aplica en:** Desarrollo/Cotización (la lista de la negociación). ✅ **CONSTRUIDA en `V1-E8q`**
+  (29-ago-2026): el hilo ya existía desde F8-E5; esta etapa le puso el **autor** (nombre resuelto en el
+  servidor + columna «Quién» en el panel de negociación). **SIN migración, SIN permisos nuevos** —
+  escribe quien ya tenía `listas.negociar`, lee quien ya tenía `listas.ver`. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.142) — ✅ EL CANDADO DE LA FIRMA: Daniel describió, sin ver el código, la regla que el sistema YA TIENE (DANIEL, 29-ago-2026)
+
+> *"Si, podriamos avanzar pero si el modelo aun no esta firmado, no se pueden comprar los avios. Es
+> indispensable revisar y modificarlo, antes de comprar nada"*
+
+> *"bloquear solo lo que no esta firmado. Es comun que se avance con la compra de tela, que es lo que
+> mas timepo tarda, en lo que se van aprobando otros avios..."*
+
+⚠️ **Esta entrada NO abre trabajo: registra una CONFIRMACIÓN.** El sistema ya se comporta así. Lo que
+vale la pena guardar no es la decisión —está construida desde V1-E3h— sino que **Daniel, sin haber visto
+el código, describió la regla exacta que el sistema implementa, incluida su granularidad**. La segunda
+cita es, casi palabra por palabra, lo que hace `exigirMaterialesLiberados`. ⇒ **§Post-F9.72 («se compra
+LO LIBERADO») acertó**, y esto es su validación independiente: el dueño del negocio llegó solo al mismo
+diseño.
+
+### Lo que el sistema ya hace, por símbolo (medido el 29-ago-2026)
+
+Las dos puertas viven en `backend/src/dominio/produccion/receta-orden.ts`:
+
+| Símbolo | Qué hace |
+|---|---|
+| **`exigirRecetaLiberada`** | Lanza `ErrorConflicto` (409) **sólo si NADA está firmado** — *"no hay nada autorizado que comprar"*, y el mensaje dice dónde se libera. **Con algo firmado PASA y devuelve la lista de lo que falta.** ⚠️ Hace **las dos cosas**: lanzar y devolver la lista **no son excluyentes** — leer que "devuelve la lista" no autoriza a concluir que no lanza. |
+| **`exigirMaterialesLiberados`** | Lanza 409 por **el MATERIAL CONCRETO** que se está comprando sin firma, nombrándolo. **Es la mitad que cumple literalmente la segunda cita de Daniel:** deja comprar la tela firmada mientras los avíos siguen aprobándose. |
+
+**Los cinco sitios donde se invocan** (ninguno es de pruebas). ⚠️ **Por NOMBRE de función, no por
+número de línea** — los números se pudren al primer cambio:
+
+- **`validarLineas`** (`compras/ordenes-compra.ts`) — llama a **las dos** puertas. Es **la OC capturada
+  A MANO**, la puerta de atrás: gasta el mismo dinero contra la misma receta.
+- **`planearCompra`** (`compras/mrp.ts`) — llama a **las dos** puertas. Es **generar la OC** desde la
+  explosión.
+- **`explosionarUna`** (`compras/mrp.ts`) — llama a `exigirRecetaLiberada`. Es **explotar**.
+
+### 🔴 La regla real es «sin nada firmado no hay nada que comprar» — y NO «sólo se gatea al generar la OC»
+
+Se propuso al redactar esto que el candado fuera únicamente al generar la OC, *"porque explotar es mirar,
+y mirar debe poder hacerse siempre"*. **El código dice otra cosa y manda el código:** `explosionarUna`
+(`compras/mrp.ts`) **también** gatea al explotar cuando no hay **nada** firmado. Y es coherente, no un descuido — con cero
+renglones autorizados la explosión no tendría nada que enseñar, y devolver un resultado vacío sin
+explicación sería peor que el 409 que sí dice qué pasa y dónde se arregla.
+
+⇒ Queda escrita **la regla del código**: *sin nada firmado no hay nada que comprar* — y por eso frena en
+las tres puertas. Lo que **nunca** se frena es el piso: **cortar, enviar a maquila, recibir y entregar no
+pasan por aquí a propósito**, tal como Daniel pidió (*"podriamos avanzar"*). Se detiene el dinero, no la
+producción.
+
+### `avisosDeMaterialSinLiberar` NO bloquea — a propósito, y no es el hueco
+
+`compras/mrp.ts` levanta además un aviso amarillo en el paso de avanzar (*"X NO entra en esta compra"*).
+**Ése no bloquea, y está bien que no lo haga**: es §Post-F9.64 (*"avisar no es bloquear"*) — comprar lo
+liberado y dejar el resto para otra OC es una forma legítima de trabajar, justo la que §Post-F9.72 abrió.
+Su propio comentario en el código deja dicho que el caso que atiende **hoy nunca corre en producción**,
+porque `exigirMaterialesLiberados` rechaza con 409 unas líneas antes. **Es defensa a futuro, no un
+agujero.**
+
+### 🩹 La cicatriz, escrita porque sirve más escrita que callada
+
+El 29-ago-2026, al preparar esta misma entrada, **se afirmó —con seguridad y a Daniel— que el sistema
+«avisa pero no bloquea»**. Era **falso**. La medición se había hecho con un `grep` de `throw` **acotado a
+`mrp.ts` y alrededor de `sinLiberar`**, y **las dos puertas viven en `receta-orden.ts`**: el barrido
+completo las encontró y desmintió la afirmación antes de que llegara al documento.
+
+⇒ Es exactamente la regla que este proyecto ya paga cara: **se verifica lo que se construye, no lo que se
+escribe sobre lo construido** — y un `grep` acotado al archivo donde uno *cree* que está la lógica
+confirma la hipótesis en vez de probarla. *La lección concreta, para la próxima: un símbolo que devuelve
+una lista puede además lanzar; hay que abrir la función, no inferirla desde su sitio de llamada.*
+
+### 🔁 NOTA (29-ago-2026, §Post-F9.144(c)) — estas dos puertas pasan a ser EL ÚNICO candado del gasto
+
+Ese mismo día Daniel ordenó **mover a la compra** la compuerta que hoy impide generar la OP de una versión
+sin revisar (`exigirRevisionAprobadaParaProducir`), y dio como razón **la granularidad que esta entrada
+documenta**:
+
+> *"si, mueve la compuerta al comprar. Por que de hecho ya habiamos visto quer podria haber elementos de la
+> receta ya aprobados y otros no. Asi podemos ir comprando la tela en lo que se terinan de aprobar los
+> demas elementos"*
+
+⚠️ **La forma correcta de hacerlo NO es mudar aquella compuerta aquí** —es *todo o nada* sobre el modelo y
+bloquearía comprar **todo**, justo lo contrario de lo que él pide—, sino **disolverla**: se quita de
+`promoverAProduccionNucleo` y **estas dos funciones se quedan haciendo el trabajo solas**, que es lo que ya
+hacían.
+
+🔴 **Consecuencia para quien las toque de aquí en adelante:** dejan de ser *"la segunda línea"* y pasan a
+ser **la única**. Cualquier hueco en `exigirRecetaLiberada` / `exigirMaterialesLiberados` —o en sus tres
+llamadores— ya no lo tapa nadie más arriba. **Detalle en §Post-F9.144 (c).**
+
+- **Aplica en:** nada — ✅ **YA CONSTRUIDO** (V1-E3d §Post-F9.43(c) + V1-E3h §Post-F9.72). **Sin
+  migración, sin permisos, sin trabajo pendiente.** Esta entrada es registro y validación.
+  **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.143) — 🔴🔴 EL COLOR FUSIONADO REVIVÍA Y QUEDABA IMPOSIBLE DE VOLVER A FUSIONAR: la fusión ahora deja RASTRO (V1-E8s, 29-ago-2026)
+
+**El estado prohibido, en una frase:** *un color que Daniel fusionó revive con la siguiente OC y queda
+imposible de volver a fusionar.*
+
+**Cómo pasaba.** Daniel limpia el catálogo: junta «Blanco» en «Blanco Óptico». La fusión retira al
+absorbido **apagándolo** (borrado suave, D3) y no guardaba en ningún lado **a quién se lo llevó**. Al día
+siguiente entra la siguiente OC de C&A con la misma palabra en el papel, y `resolverOCrearColor`
+(`dominio/pedidos/importacion-pdf.ts`) se topa con "un color apagado" y lo **REACTIVA**. La limpieza dura
+menos que la siguiente importación.
+
+**Y aquí era PEOR que en departamentos** (§Post-F9.122(a), donde se cerró el mismo defecto), por dos
+vueltas de tuerca:
+
+1. ese resolver **devuelve el id y lo AMARRA a la matriz color×talla de la OP** — el de departamentos
+   devuelve `void` y no amarra nada ⇒ el color resucitado **vuelve a acumular referencias**;
+2. y `fusionarColores` **se niega a fusionar un origen que ya tenga usos** (§Post-F9.129, que existe por
+   una razón buenísima: la fusión sólo sabe mover `TelaColor` y dejaría once FKs colgando de un color
+   apagado) ⇒ con órdenes nuevas encima, **ese color ya no se puede volver a fusionar nunca**.
+
+⇒ La siguiente OC no sólo deshacía la limpieza: **la dejaba irrepetible**.
+
+### La decisión: el color absorbido NO revive — se REDIRIGE al canónico
+
+Cuando la OC nombra un color que una fusión se llevó, la orden se amarra al **color bueno**, que es
+justamente lo que la fusión quiso decir (*«Blanco» en realidad es «Blanco Óptico»*). Para poder hacerlo,
+**la fusión ahora deja rastro**: `Color.idFusionadoEn` apunta al canónico que absorbió a cada origen.
+
+**La regla, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* Un color apagado
+**sin** rastro (lo apagó su dueño a mano) se sigue reactivando como siempre — ahí no hay ninguna limpieza
+que deshacer, y la matriz exige color activo.
+
+### Las otras dos salidas, y por qué se midieron y se descartaron
+
+- **Crear un color nuevo** (tratar al absorbido como inexistente): **imposible**. `Color.nombre` es
+  **único global**, así que el alta chocaría (P2002) o habría que inventarle un nombre distinto — o sea,
+  **fabricar de vuelta el duplicado** que la fusión acababa de quitar. Peor que el problema.
+- **Rechazar el PDF con motivo** (hay precedente: sin liga a un modelo, el importador descarta con
+  razón): **es un callejón sin salida**. El nombre del color **no es editable** en la vista previa — sale
+  del papel del cliente, y lo único que se puede ajustar ahí es la matriz y el pantone. El usuario se
+  quedaría sin forma de importar esa OC salvo **reactivando el color a mano**, que es exactamente
+  deshacer la limpieza… pero ahora a mano.
+- **Copiar literal la medicina de departamentos** (*"reúsalo pero no lo reactives"*): medido, **tumba la
+  importación**. `sincronizarMatriz` rechaza un color inactivo con *«El color "Blanco" está desactivado;
+  no se puede usar»* (la mutación que lo devuelve tal cual mata dos pruebas con ese error exacto).
+
+### La medición que más vale de esta etapa: ¿hay más puertas?
+
+El mismo resolver tiene **hermanos** que también reactivaban a ciegas — `resolverOCrearTalla` y
+`resolverOCrearCampo`. Se midieron: **`fusionar…` sólo existe para COLORES y para DEPARTAMENTOS de
+cliente** (barrido de todo el repo, no del archivo). `Talla` y `ClienteCampo` **no tienen fusión**, así
+que ahí no hay ninguna limpieza que un import pueda deshacer, y reactivarlas es lo correcto: la matriz
+exige talla activa y la referencia (D7) exige su campo vivo. Lo que **sí** faltaba en las tres puertas
+era **decirlo**: la reactivación ahora deja **bitácora** (A7), como el alta. Y queda escrito en cada
+resolver que, el día que a las tallas se les construya fusión, **ese resolver es la puerta a cerrar**.
+
+### Lo que se decidió NO compartir, con la razón explícita
+
+Departamentos y colores **no comparten función**, a propósito: el criterio de cada uno es distinto porque
+el problema lo es (uno tira el resultado, el otro lo amarra a la orden). Una función común sería un
+resumen que miente sobre una de las dos. Lo que sí comparten —y lo dice el docblock de cada una,
+enlazándose— es **la regla**: *una limpieza de catálogo no puede durar menos que la siguiente
+importación.*
+
+### Detalles que conviene no re-descubrir
+
+- **Reactivar un color a mano BORRA su rastro** (`actualizarColor`): reactivar es deshacer la fusión, y
+  el rastro sólo vale mientras el color esté apagado.
+- **El destino de una fusión pierde el suyo**: al canónico no lo absorbe nadie ⇒ **el DOMINIO no puede
+  cerrar un círculo** (fusionar A→B y luego B→A deja `B→A` con `A` terminal).
+  🔴 **Pero el BACKFILL de la migración SÍ podría**, y hay que decirlo con todas sus letras: lee la
+  **bitácora**, que guarda la historia COMPLETA —incluidas fusiones que después se deshicieron a mano—,
+  así que de dos renglones («A→B» y «B→A») reconstruye un anillo que nunca existió a la vez. El camino es
+  alcanzable **sólo con la UI**: fusionar A→B, corregir fusionando B→A y apagar a mano al sobreviviente.
+  Por eso la migración **rompe explícitamente** cualquier ciclo que haya sembrado, **de cualquier
+  longitud** (se reprodujeron de dos y de tres; una guarda sólo para pares no basta): a los colores del
+  anillo se les **borra el rastro**, porque el dato es ambiguo y no hay canónico honesto que nombrar —
+  sin rastro vuelven al comportamiento de siempre en vez de tumbar la importación. Un color que sólo
+  **apunta** a un anillo sin ser parte de él **conserva** su rastro.
+  El **tope de saltos** de la caminata es el **paracaídas, no la solución**: sigue ahí por si un dato
+  viejo dejara un anillo, y corta con un error que dice cómo romperlo.
+- **La relación reflexiva NO bloquea la fusión.** `absorbidos` es contabilidad de la propia fusión, no un
+  uso del color: bloquear por ella impediría encadenar «A→B» y luego «B→C», que es legítimo. Queda
+  excluida a propósito, y la prueba que deriva la lista de `schema.prisma` **exige que la exclusión sea
+  explícita** (quitarla la pone roja).
+
+- **Aplica en:** V1-E8s. ⚠️ **SÍ LLEVA MIGRACIÓN** (`20260829120000_a_donde_se_fue_el_color`): aditiva —
+  una columna nullable `colores.id_fusionado_en` + su índice + la FK reflexiva — **más un BACKFILL** que
+  siembra el rastro de las fusiones YA HECHAS leyéndolo de la **bitácora** (que desde F1-E6 venía
+  guardando `{operacion:"fusionar", fusionadoEn:{id,nombre}}` por cada origen absorbido). Sin ese
+  backfill, un color fusionado antes de este deploy seguiría resucitando. **SIN permisos nuevos** ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.144) — ⭐⭐⭐ CÓMO SE NEGOCIA DE VERDAD: tres momentos, estimados que son METAS, y la compuerta de la OP que SE MUEVE A LA COMPRA (DANIEL, 29-ago-2026)
+
+⚠️ **Numeral por MÁXIMO, no por posición:** este archivo **no está ordenado** (§Post-F9.113 vive antes
+que §Post-F9.122) ⇒ el hueco se busca con el **máximo** de todos los numerales usados, nunca mirando la
+última entrada. Máximo al escribir esto: **143**.
+
+Daniel explicó **el proceso completo de su negociación**, que hasta ahora sólo se conocía por pedazos.
+Lo que sigue no abre una decisión nueva de la nada: **afina** §Post-F9.138/.139/.140/.141, **corrige el
+encuadre** de la pregunta abierta de §Post-F9.106, **ratifica** §Post-F9.125, y **destapa un choque
+medido** entre lo que Daniel necesita y lo que el sistema hoy permite.
+
+### Las citas, TEXTUALES
+
+⚠️ **Van con sus erratas, sin corregir** (`negociacionlas`, `sone stimados`, `mquila`, `parea`,
+`lanegociacion`, `Se busan`, `arets`, `muchaos`, `estaimacion`). Es regla del proyecto: la palabra del dueño no se
+"limpia" — se cita y **la lectura del lead va al lado, marcada como del lead**.
+
+> *"Se hace la receta y lista de precios para poder ir a vender. En la negociacionlas cosas suceden muy
+> rapido y muchaos elementos pueden modificarse y sone stimados. todo eso se registra pero no se puede
+> cambiar la receta por que no estoy viendo los catalogos. Mas bien, despues de la negociacion, ya en la
+> oficina, se revisa lo que se negocio y se hace modificaciones en una nueva version a la receta que va a
+> salir a produccion en base a los comentarios y cotizacion negociada. Se busan los avios, arets, maquilas
+> acorde a lo que se negocio. Todo eso se intentara hacer asi, pero no es seguro que se consiga. Por
+> ejemplo, me quitan un cierre y yo le pongo que estimos que la maquila costara 5 pesos menos. Esa es mi
+> estaimacion en ese momento, pero ya en la oficina se tiene que buscar una mquila de ese costo con las
+> nuevas caracteristicas de la prenda. Entonces para produccion ya debera de salir una receta revisada
+> parea produccion."*
+
+> *"Si en la negociacion cerre un modelo y tengo la OC del cliente.... deberia de poder meter la OP y
+> dejar pendiente la reconfiguracion de la receta para que se hagan las modificaciones antes de aprobar y
+> comprar todo."*
+
+> *"No puedo yo modificar la receta estando en la negociacion... eso se hara mas adelante por la gente de
+> desarrollo en base a la informacion que meti en lanegociacion."*
+
+Y sobre inventarios:
+
+> *"no se puede dar de alta un color al recibir. El color se da de alta en la OC. Por que no puede recibir
+> nada que no se haya comprado con una OC. Y ahi es donde se define el color. Por que recibiria algo que
+> no este dado de alta? quiere decir que no hubo una OC previa?"*
+
+Y antes, en la misma conversación:
+
+> *"Nadie mas que yo ve los factores por favor...."*
+
+---
+
+### (a) EL PROCESO SON TRES MOMENTOS SEPARADOS, no dos
+
+Hasta ahora la documentación manejaba **dos** momentos (§Post-F9.139: *negociar* / *cuadrar*). Son
+**tres**, y el primero cambia lo que puede exigirse de los otros dos.
+
+| | **1 · VENDER** (antes) | **2 · NEGOCIAR** (con el cliente enfrente) | **3 · OFICINA** (después) |
+|---|---|---|---|
+| Qué ya existe al entrar | La **receta** y la **lista de precios**, hechas — *"se hace la receta y lista de precios para poder ir a vender"* | La receta base y la lista que se llevaron a la mesa | Los comentarios y la cotización negociada |
+| Quién opera | Desarrollo + el dueño | **El dueño**, solo | ⭐ **Desarrollo, NO el dueño** |
+| Con qué se trabaja | Catálogo real | **Estimados**: números libres — *"no estoy viendo los catalogos"* | Catálogo real: se busca proveedor |
+| Ritmo | Normal | *"las cosas suceden muy rapido"* | El que haga falta |
+| Qué toca del sistema | La receta del modelo | **NADA de catálogo**; se registran estimados y comentarios | Nace una **VERSIÓN NUEVA** de la receta |
+| Qué sale | Algo que vender | Un acuerdo **con metas**, no con costos confirmados | *"una receta revisada parea produccion"* |
+
+**La frase que lo cierra, y va literal:** *"para produccion ya debera de salir una receta revisada parea
+produccion"*. La receta con la que se produce **no es la que se negoció**: es una **versión nueva**, hecha
+después, a partir de lo que la mesa dejó escrito.
+
+### ⚠️ Y quién hace qué: la reconfiguración NO la hace Daniel
+
+> *"eso se hara mas adelante por la gente de desarrollo en base a la informacion que meti en
+> lanegociacion"*
+
+**Dos roles que la documentación venía mezclando quedan separados aquí:**
+
+- **El dueño NEGOCIA y REGISTRA.** No modifica recetas ni catálogos, ni siquiera cuando sabe lo que
+  quiere: en la mesa no tiene los catálogos delante.
+- **Desarrollo RECONFIGURA y SALE A BUSCAR.** *"Se busan los avios, arets, maquilas acorde a lo que se
+  negocio"* — buscar es su trabajo, y es trabajo de días, no de la mesa.
+
+⇒ *(Lectura del lead)* Cualquier pantalla que se construya para el momento **2** no necesita —y no debe
+tener— poder de escritura sobre el catálogo, y cualquier pantalla del momento **3** tiene que estar
+pensada **para otra persona** que llega **después**, leyendo lo que ella no vivió.
+
+---
+
+### (b) ⭐⭐ LOS ESTIMADOS NO SON DATOS: SON METAS
+
+**Éste es el reencuadre que cambia el diseño**, y hay que escribirlo con todas sus letras porque es
+contraintuitivo:
+
+> *"me quitan un cierre y yo le pongo que estimos que la maquila costara 5 pesos menos. Esa es mi
+> estaimacion en ese momento, pero ya en la oficina se tiene que buscar una mquila de ese costo con las
+> nuevas caracteristicas de la prenda."*
+
+Cuando Daniel teclea *"la maquila baja 5 pesos"* **no está registrando un hecho que alguien confirmará
+después**. Está **fijando el precio que hay que salir a conseguir**. Es un **compromiso hacia afuera**
+—ya se lo dijo al cliente— y una **orden de trabajo hacia adentro**.
+
+Y él mismo pone el límite, en la misma explicación:
+
+> *"Todo eso se intentara hacer asi, pero **no es seguro que se consiga**."*
+
+⇒ **La meta puede FALLAR.** Un estimado no es un dato pendiente de captura, es una **promesa pendiente de
+cumplimiento**, y su desenlace tiene **dos** finales posibles, no uno.
+
+### 🔴 La consecuencia de diseño — AFINA §Post-F9.140 (la bandeja ya construida)
+
+⚠️ **Esto es una AFINACIÓN de una decisión ya construida, NO algo construido.** La bandeja «Recetas por
+revisar» existe desde `V1-E8r` (29-ago-2026) y funciona; lo que sigue **no está hecho** y no debe leerse
+como si lo estuviera.
+
+La bandeja, tal como se pensó, contesta *«¿ya lo cuadraste?»* — una pregunta **binaria de trámite**, con
+un solo final bueno: se captura y se cierra el renglón. Pero si el estimado es una **meta**, la pregunta
+correcta es otra:
+
+| | Pregunta que la bandeja hace hoy | ⭐ Pregunta que el proceso real necesita |
+|---|---|---|
+| Enunciado | *¿ya capturaste la receta revisada?* | *¿se **logró** lo que se prometió — sí o no?* |
+| Finales posibles | Uno: capturado ⇒ se va de la cola | **Dos**: se consiguió · **NO se consiguió** |
+| Qué pasa con el "no" | No existe como respuesta ⇒ **se vuelve invisible** | Se **ve**, con la brecha: prometí 5, conseguí 2 |
+| A quién le importa | A quien despacha la cola | **Al dueño**, que ya le dio ese precio al cliente |
+
+🔴 **El estado prohibido que esto evita, en una frase:** *Desarrollo cuadra la receta con la maquila que
+sí consiguió, el renglón se va de la bandeja como "resuelto", y nadie se entera de que el margen que
+Daniel vendió ya no existe.* Un cuadre que sólo puede terminar en "listo" **convierte un incumplimiento
+en un silencio**.
+
+*(Lectura del lead)* Es la misma línea que el sistema ya sostiene en otro sitio: §Post-F9.64 (*"avisar no
+es bloquear"*) y §Post-F9.127 (si la receta se mueve bajo un precio firmado, **el sistema avisa**). Aquí
+el aviso es el mismo tipo de cosa: **no impedir el "no se consiguió", sino que se vea**.
+
+⚠️ **Lo que NO cambia:** la bandeja **sigue sin firmar** (§Post-F9.140 punto 4: *NO FIRMA, LLEVA*). Que
+muestre el desenlace no la convierte en una segunda autoridad.
+
+---
+
+### (c) 🔴🔴 EL CHOQUE MEDIDO, Y CÓMO SE RESUELVE: Daniel necesita meter la OP con la receta pendiente, el sistema HOY la rechaza, y la compuerta se DISUELVE en la firma por renglón
+
+> *"Si en la negociacion cerre un modelo y tengo la OC del cliente.... deberia de poder meter la OP y
+> dejar pendiente la reconfiguracion de la receta para que se hagan las modificaciones antes de aprobar y
+> comprar todo."*
+
+**Esto no se puede hoy.** No es una impresión: se midió abriendo las tres funciones el 29-ago-2026.
+
+### La cadena, POR NOMBRE DE SÍMBOLO (los números de línea se pudren; los nombres no)
+
+| # | Símbolo | Archivo | Qué hace |
+|---|---|---|---|
+| 1 | **`salidaAProduccion`** | `backend/src/dominio/produccion/salida-produccion.ts` | Genera la OP de un renglón de pedido. En su **paso 4**, si el modelo tiene `origen === 'desarrollo'`, llama a `promoverAProduccionNucleo`. |
+| 2 | **`promoverAProduccionNucleo`** | `backend/src/dominio/modelos/nomenclatura.ts` | Núcleo compartido por el endpoint «pasar a producción» **y** por la salida a producción. Antes de tomar el lock del par, llama a `exigirRevisionAprobadaParaProducir`. |
+| 3 | **`exigirRevisionAprobadaParaProducir`** | `backend/src/dominio/modelos/revision-modelo.ts` | ⭐ **LA COMPUERTA.** `nomenclatura.ts` es su **único sitio de llamada** en todo el repo fuera de pruebas. **Lanza** `ErrorConflicto` si el modelo es una versión sin firma. ⚠️ **YA NO EXISTE (0.071).** Y «único sitio de llamada» **caducó antes**: la 0.069 añadió `derivarModeloDeProduccion`. |
+| 4 | **`revisionBloqueaProduccion`** | `backend/src/dominio/modelos/revision-modelo.ts` | El predicado que decide: `esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada'` — o sea **es versión Y no está aprobada** (el `null` y el `rechazada` también bloquean). ⚠️ **Vive, renombrado a `revisionSinAprobar` (0.071)**: el nombre viejo afirmaba un bloqueo que ya no existe. **Su trabajo no cambió** — llena la cola de «Recetas por revisar». |
+
+Y el eslabón que cierra el círculo: **la versión nacida de la negociación entra por la puerta 1**. En
+`crearVersionDeModelo` (`backend/src/dominio/modelos/versiones.ts`) la hija se crea con
+**`origen: 'desarrollo'`** y **`revisionEstado: 'pendiente'`** — su propio comentario lo dice: *"la versión
+NACE PENDIENTE DE REVISIÓN"*.
+
+⇒ **El silogismo completo, sin huecos:**
+
+1. La negociación produce una **versión** (`idModeloPadre` ≠ null) ⇒ `esVersionDeModelo` = **true**.
+2. Nace `pendiente` ⇒ `revisionEstado !== 'aprobada'` = **true**.
+3. ⇒ `revisionBloqueaProduccion` = **true**.
+4. Es `origen: 'desarrollo'` ⇒ `salidaAProduccion` **sí** entra a promoverla.
+5. ⇒ `exigirRevisionAprobadaParaProducir` **lanza** ⇒ **la OP se rechaza**.
+
+> ⚠️ **El paso 5 dejó de ser cierto el 31-ago (0.071).** Los pasos 1–4 siguen exactos; **el 5 se cayó**
+> con la compuerta. Hoy la OP **sale**, y lo que se frena es **comprar**, renglón por renglón. El
+> silogismo se conserva porque es el que demuestra por qué el orden estaba invertido — que es
+> precisamente lo que la 0.071 corrigió.
+
+**El sistema obliga a cuadrar ANTES de la OP. Daniel necesita cuadrar DESPUÉS de la OP y ANTES de
+comprar.** No es un matiz de secuencia: es **el orden invertido**.
+
+### 🔴 Y no es teórico — es exactamente el caso de Daniel
+
+*"cerre un modelo y tengo la OC del cliente"*: hay **pedido real**, con fecha comprometida, y la OP —el
+papel con el que arranca el piso— **no puede nacer** hasta que Desarrollo termine de buscar maquila. Es,
+palabra por palabra, lo que `V1-E8r` describió como *«la compuerta era un muro al final del camino»*, sólo
+que ahora se ve **quién se estrella contra el muro y con qué en la mano**.
+
+### ✅ DANIEL CONTESTÓ (29-ago-2026): LA COMPUERTA SE MUEVE A LA COMPRA
+
+> *"si, mueve la compuerta al comprar. Por que de hecho ya habiamos visto quer podria haber elementos de la
+> receta ya aprobados y otros no. Asi podemos ir comprando la tela en lo que se terinan de aprobar los
+> demas elementos"*
+
+⚠️ *(Erratas suyas, sin corregir: `quer`, `terinan`.)*
+
+**La decisión está TOMADA.** La OP entra con la receta pendiente; lo que frena es **comprar**.
+
+⭐ **Y fíjate en el porqué que él da, porque es el que determina CÓMO se construye:** no dice *"muévela
+porque me estorba"*. Dice *"ya habiamos visto que podria haber elementos de la receta ya aprobados y otros
+no"* — está invocando **la granularidad POR RENGLÓN** (§Post-F9.142/§Post-F9.72), y pidiendo que el
+resultado la conserve: *"asi podemos ir comprando la tela en lo que se terinan de aprobar los demas
+elementos"*.
+
+- La OP **entra** con la receta pendiente, y **queda visible** en la bandeja «Recetas por revisar»
+  (§Post-F9.140) — que hoy ya la listaría igual: el modelo sigue en `desarrollo` y bloqueado.
+- **Nada se compra** de lo que no esté firmado; **lo firmado sí se compra**.
+- El piso puede arrancar lo que no depende de la compra; el dinero no se mueve.
+
+### 🔴🔴 EL MATIZ QUE CAMBIA CÓMO SE CONSTRUYE: la compuerta NO se mueve — se DISUELVE
+
+⚠️ **Medido después de la respuesta de Daniel.** *«Mover la compuerta a la compra»* leído al pie de la
+letra **recrearía el problema un paso más adelante**, y hay que decirlo antes de que alguien lo codee así.
+
+Son **dos mecanismos con granularidad distinta**, y ahí está todo:
+
+| Mecanismo | Dónde vive | Granularidad |
+|---|---|---|
+| **`Modelo.revisionEstado`** | `backend/prisma/schema.prisma`, tabla `Modelo` | 🔴 **TODO O NADA** — el modelo entero está aprobado, o no lo está |
+| **`OrdenTela/OrdenAvio/OrdenArte.liberadoEn`** | `backend/prisma/schema.prisma` | ✅ **POR RENGLÓN** — una firma por material |
+
+🔴 **Si la compuerta del modelo se mudara tal cual a la compra, bloquearía comprar TODO hasta que el
+modelo entero estuviera aprobado** — o sea, **impediría exactamente lo que Daniel acaba de decir que
+necesita** (*"ir comprando la tela en lo que se terinan de aprobar los demas elementos"*). El candado
+grueso puesto en la puerta fina la vuelve gruesa.
+
+⇒ **Por eso no se mueve: se DISUELVE en la que ya funciona.** El plan es de dos piezas:
+
+1. **Quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo`**
+   (`backend/src/dominio/modelos/nomenclatura.ts`) ⇒ la OP entra con la receta pendiente. *(Es su único
+   sitio de llamada, así que la compuerta queda sin llamadores.)*
+2. **Que una versión sin revisar tenga sus renglones SIN FIRMAR**, para que el candado que **ya existe**
+   haga el trabajo: `exigirMaterialesLiberados` bloquea **sólo el material sin firmar** — que es,
+   literalmente, lo que Daniel pidió.
+
+⇒ ⭐ **No hay compuerta nueva que mantener.** La granularidad que él necesita **ya estaba construida**; lo
+que sobraba era la puerta gruesa de más arriba.
+
+### ✅ MEDIDO — la pieza 2 YA ESTÁ CONSTRUIDA, y es mucho más chica de lo que parecía
+
+Se fue a medir con qué firma nacen hoy los renglones al copiar la receta, **antes** de escribir esto como
+plan. **Nacen SIN FIRMAR, y no hace falta cambiar nada para lograrlo:**
+
+- **`copiarRecetaDelModelo`** (`backend/src/dominio/produccion/receta-orden.ts`) — por donde pasa **el
+  100 % de las órdenes— **no menciona `liberadoEn` ni una sola vez** en su cuerpo. Sus tres escrituras
+  (`ordenTela.createMany`, `ordenAvio.create`, `ordenArte.createMany`) simplemente **no traen el campo**.
+- **El esquema no le pone `@default`**: `liberadoEn DateTime? @map("liberado_en")` en las tres tablas.
+
+⇒ **Todo renglón nace `liberadoEn = NULL` = sin firmar, hoy, por construcción.** La firma la escriben
+**sólo dos sitios**, los dos deliberados: el acto de **liberar** (`receta-orden.ts`, `liberadoEn: new
+Date()` + `liberadoPorId: sesion.id`) y el **ETL de migración** (`produccion/migracion.ts`, que sella las
+órdenes históricas con `liberadoPorId: null` a propósito).
+
+⭐ **Consecuencia para quien construya: la pieza 2 no es trabajo, es una verificación.** Lo que hay que
+hacer es **comprobar que sigue siendo cierto** (una prueba que lo fije, para que nadie le ponga un
+`@default` o un "liberar al crear" más adelante) — no construir el comportamiento, que ya existe. **El
+trabajo real de esta decisión es la pieza 1**, que son unas líneas, más lo que se enumera abajo.
+
+### ⚠️ LA CONSECUENCIA QUE HAY QUE DEJAR DICHA: aprobar el modelo deja de frenar la producción
+
+Al quitar la exigencia de `promoverAProduccionNucleo`, **`Modelo.revisionEstado` deja de frenar la
+producción por sí solo.** Su efecto pasa a ser otro: que los renglones de esa receta **nazcan sin firma**
+⇒ **frena la COMPRA, no la captura del pedido ni la OP.**
+
+🔴 **Si alguien esperaba lo primero, ya no va a ocurrir**, y por eso se escribe aquí en vez de descubrirse
+en producción. **Está dicho a Daniel y él lo aceptó en el mismo mensaje** (es justo el intercambio que
+pide: la OP entra, el dinero espera).
+
+*(Es, además, coherente con la línea del sistema: `receta-orden.ts` ya dice que **cortar, enviar a maquila,
+recibir y entregar no pasan por las puertas de la firma a propósito** — "el piso no se detiene porque
+Desarrollo no haya terminado". Con este cambio, **generar la OP se suma a esa lista**.)*
+
+### ⭐ El argumento que la sostiene: EL CANDADO QUE DE VERDAD PROTEGE YA EXISTE, Y ESTÁ EN EL LUGAR CORRECTO
+
+Ésta es la parte que hay que dejar escrita, porque es lo que convierte la propuesta en algo distinto de
+"aflojar un candado":
+
+| Símbolo | Archivo | Qué frena |
+|---|---|---|
+| **`exigirRecetaLiberada`** | `backend/src/dominio/produccion/receta-orden.ts` | Lanza 409 **sólo si NADA está firmado** — *"no hay nada autorizado que comprar"*. |
+| **`exigirMaterialesLiberados`** | `backend/src/dominio/produccion/receta-orden.ts` | Lanza 409 por **el material concreto** que se está comprando **sin firma**, y **sólo por ése**: la tela firmada se compra mientras los avíos siguen aprobándose. |
+
+Las llaman `validarLineas` (`compras/ordenes-compra.ts`, la OC a mano), `planearCompra` y `explosionarUna`
+(`compras/mrp.ts`). **Es §Post-F9.142** — la regla que **el propio Daniel describió sin haber visto el
+código**: *"bloquear solo lo que no esta firmado"*.
+
+🔴 **Y ahí está el punto:** **producir no gasta; comprar sí.** El candado del dinero ya vive en la puerta
+del dinero, con la granularidad fina, y **no depende de la compuerta de la OP para nada**. La compuerta de
+la OP no protege el gasto: protege que no se **fabrique** contra una receta sin revisar — y Daniel está
+diciendo que ese riesgo lo asume él, a cambio de no detener el pedido de un cliente que ya firmó.
+
+⚠️ **Lo que la ETAPA tendrá que resolver, y NO debe descubrirse a media construcción** *(lectura del
+lead; la decisión de fondo ya está tomada)*:
+
+1. 🔴 **La OP se lleva una COPIA de la receta — y ése es el punto caro.** `copiarRecetaDelModelo` copia el
+   BOM del modelo **al crear la orden** y ahí se congela (§Post-F9.34 / V1-E3d pieza B). Si la OP nace
+   **antes** de que Desarrollo reconfigure, se copia la receta **VIEJA**, y hay que decidir qué pasa con
+   esa copia cuando la versión buena aparezca: ¿se re-copia?, ¿se avisa la desalineación —que ya existe
+   como detector—?, ¿se deja y se corrige a mano en la OP? **Esto no lo contestó Daniel** y es lo que más
+   mueve el alcance.
+2. **¿Y cortar?** Cortar tela **sí** consume material real y **hoy no pasa por ninguna de las dos puertas
+   de la firma** —a propósito: *"el piso no se detiene porque Desarrollo no haya terminado"*
+   (`receta-orden.ts`). Con la OP entrando sin revisar, hay que preguntarle a Daniel **si cortar también
+   puede**, o si ahí sí hay una raya. **No se le pone default.**
+3. **La TERCERA PUERTA** que `revision-modelo.ts` ya documenta (`POST /api/ordenes` → `crearOrden` crea OP
+   **sin promover**, hueco sólo por API, pre-existente desde F2) **deja de ser un hueco**: con la pieza 1
+   hecha, ya no hay compuerta que saltarse. Al construir, hay que **borrar esa advertencia del código y de
+   la deuda de `V1-etapas.md` §V1-E7d** en vez de dejarla contando un peligro que ya no existe.
+4. **La pieza 2 es una PRUEBA, no código** (ver la medición de arriba): fijar que los renglones siguen
+   naciendo `liberadoEn = NULL`, para que nadie le ponga un `@default` o un "liberar al crear" después.
+
+---
+
+### (d) ⭐⭐ INVENTARIOS: no falta una función — hay un SÍNTOMA. Y el lead estaba equivocado
+
+> *"no se puede dar de alta un color al recibir. El color se da de alta en la OC. Por que no puede recibir
+> nada que no se haya comprado con una OC. Y ahi es donde se define el color. Por que recibiria algo que no
+> este dado de alta? quiere decir que no hubo una OC previa?"*
+
+### Lo que estaba escrito, y por qué estaba mal encuadrado
+
+§Post-F9.106 (extensión `V1-E8o`, 29-ago) cerró con esta **pregunta abierta para Daniel**: *«¿quién puede
+dar de alta un color de tela desde el ALMACÉN?»*, con dos opciones de permiso sobre la mesa. **La pregunta
+daba por buena su propia premisa:** que el almacén *debe* poder dar de alta colores y que lo único por
+resolver era **con qué permiso**.
+
+**Daniel rechaza la premisa entera, y da la razón de negocio:**
+
+- El color **se da de alta en la OC** — ahí es donde se define.
+- **No se recibe nada sin OC previa** ⇒ si hay algo que recibir, su color **ya existe**.
+
+⇒ ✅ **La pregunta abierta de §Post-F9.106 queda CERRADA — en contra: el alta desde el almacén NO se
+construye.** No hace falta elegir permiso, porque la función no debe existir.
+
+### 🔴 El reencuadre, que es lo valioso
+
+*(Lectura del lead, corrigiendo al lead)*
+
+| | Cómo lo trataba el lead | ⭐ Lo que Daniel muestra que es |
+|---|---|---|
+| Naturaleza | **Una función que falta** en la pantalla de recibir | **Un SÍNTOMA** de una falla que ocurrió **antes** |
+| Dónde está el problema | En inventarios | En **compras**: se está recibiendo algo sin OC |
+| Qué haría el "arreglo" | Dejar dar de alta el color ahí | **Tapar la evidencia** de que faltó una OC |
+
+🔴 **Y ésa es la parte grave:** poner el alta ahí no habría resuelto nada — habría **borrado la única
+señal** de que algo entró al almacén sin haberse comprado. La deuda estaba **bien identificada como
+molestia y mal identificada como causa**.
+
+### ⇒ Afinación del LETRERO (V1-E8o) — y **NO se construye aquí**
+
+⚠️ **Sólo queda escrito.** No se tocó código en esta entrada.
+
+El letrero que `V1-E8o` puso en `CapturaRenglonesTelaColor`
+(`frontend/src/modulos/inventarios/CapturaRenglonesTelaColor.tsx`, el bloque con
+`data-testid="captura-color-sin-colores"`) hoy dice **a dónde ir**:
+
+> *«X» no tiene colores capturados… Dalos de alta en **Catálogos › Telas** y vuelve — o, si tú compras, en
+> el renglón de la explosión con «＋ Nuevo color…».*
+
+Con lo que Daniel acaba de explicar, debería además decir **qué significa** — algo del orden de:
+
+> *Este color no viene de ninguna OC. Verifica que la compra exista: no debería recibirse material que no
+> se haya comprado.*
+
+⭐ **Es convertir un callejón sin salida en un DIAGNÓSTICO.** El letrero actual manda a arreglar el
+síntoma (*ve y captura el color*); el afinado nombra la causa (*falta la OC*) y deja que el almacenista
+levante la mano en vez de improvisar. Es exactamente el patrón de §Post-F9.130 (*el aviso ya sabía todo y
+no daba la puerta*) y de §Post-F9.128 (*el aviso que no decía por qué ni qué hacer*), aplicado al revés:
+aquí el aviso **da la puerta y no dice el porqué**, y el porqué es lo que importa.
+
+⚠️ **Lo que NO se decide aquí:** si el sistema debe además **impedir** recibir tela sin OC ligada, o sólo
+advertirlo. Eso es una pregunta para Daniel y no se le pone default.
+
+---
+
+### (e) LOS FACTORES: RATIFICACIÓN EXPLÍCITA DEL DUEÑO
+
+> *"Nadie mas que yo ve los factores por favor...."*
+
+⚠️ **Esto NO es un cambio: es una CONFIRMACIÓN.** Ya está así, y se midió el 29-ago-2026. Se registra
+porque una regla incómoda que sólo vive en el código **se afloja "por comodidad"** en cuanto alguien
+pregunte *"¿y por qué Aurora no ve esa columna?"*. Con la ratificación escrita, aflojarla es contradecir al
+dueño, no simplificar una pantalla.
+
+**Las tres capas, por símbolo:**
+
+| Capa | Dónde | Qué hace |
+|---|---|---|
+| **Servidor** | `puedeVerFactoresDePrecio` (`backend/src/dominio/desarrollo/cliente-factores.ts`) | Es `tienePermiso(sesion, 'listas.aprobar')`. Lo consultan `negociacion.ts`, `listas-precios.ts` y el catálogo del cliente ⇒ **los cuatro factores salen en `null`** sin ese permiso. La ocultación la decide **el dominio**, no la ruta. |
+| **Pantalla** | `frontend/src/modulos/clientes/EditorFactoresCliente.tsx` | Usa **el mismo criterio** que el servidor, y su propio comentario lo dice. La pantalla es cortesía; el servidor es la regla. |
+| **Reparto de permisos** | `backend/src/datos/roles-reparto.test.ts` | Afirma que **Gerencial NO tiene `listas.aprobar`** —y que `consultas.ver-importes` **no alcanza**, aunque Gerencial sí lo tenga—. **Si alguien se lo da a un rol, la prueba se pone roja.** |
+
+⭐ **La tercera capa es la que hace que esto sobreviva al tiempo:** las otras dos protegen a los usuarios
+de hoy; ésa protege la regla **del próximo seed**. Es lo contrario de la cicatriz que este proyecto ya
+paga (*"un defecto conocido no es menor… los seeds, roles y permisos cambian"*).
+
+*Verificación al escribir esto: el archivo `roles-reparto.test.ts` contiene **10** pruebas, y su corrida
+reportada es **10/10 en verde**. ⚠️ **No se re-corrió en este worktree** — se preparó fuera del árbol
+principal y no tiene dependencias instaladas; lo que sí se verificó aquí, abriendo el archivo, es que las
+tres aserciones citadas existen con esos nombres.*
+
+---
+
+### Qué afina esta decisión (y qué NO reabre)
+
+- **Afina §Post-F9.138** — el negociador en vivo sigue igual, pero lo que se teclea son **metas**, no
+  costos.
+- **Afina §Post-F9.139** — los dos momentos son **tres**, y el tercero **lo opera Desarrollo**, no el
+  dueño.
+- **Afina §Post-F9.140** — la bandeja pregunta *«¿se logró?»*, con **dos** finales, no *«¿ya lo
+  capturaste?»*.
+- **Afina §Post-F9.141** — los comentarios de la mesa son **la materia prima** con la que Desarrollo
+  reconfigura (*"en base a la informacion que meti en lanegociacion"*): no son adorno, son la entrada del
+  momento 3.
+- **Cierra en contra la pregunta abierta de §Post-F9.106** (alta de color desde el almacén).
+- **Ratifica §Post-F9.125** (los factores).
+- **Se apoya en §Post-F9.142** (el candado de la firma) sin moverlo — y lo **asciende**: al disolverse la
+  compuerta de la OP, la firma por renglón pasa a ser **el único** candado del gasto. Ver la nota fechada
+  en esa entrada.
+- ⚠️ **NO reabre §Post-F9.110** en lo esencial: la negociación **sigue sin tocar el modelo**. Lo que se
+  corrige de ella es **quién** hace la reconfiguración y **cuándo** (ver la nota fechada en esa entrada).
+
+- **Aplica en:** Desarrollo/Cotización + Producción (la compuerta de la OP) + Inventarios (el letrero).
+  ⬜ **NADA de esto está construido, y esta entrada NO abre etapa** (pero sí **habilita** una). Lo que
+  hay es: (b) una **afinación** de la bandeja ya construida en `V1-E8r`; (c) ✅ **DECIDIDO POR DANIEL** —
+  la compuerta se mueve a la compra, **disolviéndola** en la firma por renglón que ya existe: **pieza 1**
+  = quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo`; **pieza 2** = ya
+  construida (los renglones nacen sin firmar), sólo hay que fijarla con una prueba; **falta cerrar con él
+  el punto 1 de la lista de arriba** (qué pasa con la copia de la receta) y el 2 (si cortar puede); (d)
+  una **afinación de texto** de un letrero ya puesto, más una pregunta cerrada en contra; (e) una
+  **ratificación** sin trabajo. **Sin migración, sin permisos, sin seed. No sube la versión** (esta
+  entrada no cambia nada del sistema). **Fecha:** 2026-08-29.
+#### (Post-F9.145) — ⭐⭐ EL AVISO QUE PIDE UN DATO TIENE QUE LLEVAR A LLENARLO (DANIEL, 29-ago-2026)
+
+> ℹ️ **Por qué esta sección salta de la .143 a la .145 en este árbol.** La **.144** —la decisión de
+> *cómo se negocia de verdad*— se escribió **en paralelo, en otra rama**, y entra por su propio PR.
+> Nació primero y se queda con el número; ésta se corrió a la .145. Se cita **por su título** a
+> propósito: hasta que ese PR mergee, aquí no hay una .144 a la que apuntar, y una referencia a un
+> número inexistente es de las que envejecen mal.
+
+**Cómo salió.** Daniel intentó armar una lista de precios y el sistema le contestó:
+
+> *«Este cliente/departamento no tiene factores de precio capturados, así que no se le puede armar la
+> lista. Los captura el DUEÑO (quien aprueba precios) desde la ficha del cliente.»*
+
+**Y Daniel ES el dueño.** El mensaje le nombraba a la persona que lo estaba leyendo y lo mandaba a
+buscar una pantalla a mano. Sus palabras:
+
+> ⭐ *«estaría bueno desde ahí poder acceder al botón donde necesito llenar los datos»*
+
+🔴 **Y el precedente estaba en la MISMA pantalla:** el aviso hermano de dos secciones abajo
+(«no hay desarrollos candidatos», §Post-F9.128) **sí** trae su botón «Ir a Pre-costeos» desde V1-E8f.
+Dos avisos del mismo diálogo, con dos criterios distintos.
+
+**La regla, que ya era doctrina de la casa (§Post-F9.96) y aquí se vuelve explícita:**
+
+> **Un aviso que dice que falta un dato tiene que ofrecer el lugar donde se llena** — y ofrecerlo
+> **antes**, no después de tirar el trabajo hecho. *Decir dónde no es llevar.*
+
+**Lo que se decide:**
+
+- **(a)** **El aviso de los factores llega ANTES**, en cuanto se elige cliente + departamento — no
+  después de escoger los modelos y apretar «Crear lista». Y **«Crear lista» queda apagado** mientras
+  falten (el servidor lo rechazaba igual: ahora se dice en vez de rebotar).
+- **(b)** **Con puerta al LUGAR EXACTO:** la ficha de **ESE** cliente con su sección de factores a la
+  vista — no el catálogo de clientes a buscarlo de nuevo. El cliente va **preseleccionado**.
+- **(c)** 🔴 **La puerta se pinta SÓLO a quien puede cruzarla.** Los factores son facultad del dueño
+  (§Post-F9.125). A quien no los puede capturar **no se le da botón: se le dice a quién pedírselo**.
+  *Mandar a alguien a una pantalla donde no puede hacer nada es peor que no mandarlo.*
+- **(d)** **El aviso nombra al cliente y al departamento por su NOMBRE**, no por su id.
+- **(e)** **Y la regla se aplicó al barrido, no sólo al caso.** La puerta «Ir a Pre-costeos» que ya
+  existía **se pintaba sin medir** si quien la ve puede entrar a Desarrollo: el aviso se sirve con
+  `listas.ver` y el destino exige `desarrollo.ver`. Ahora se mide, con la misma función, en sus **tres**
+  apariciones — y el vacío de «Listas de precios», que nombraba el lugar sin llevar, **ahora lleva**.
+  ⚠️ **Dicho con la medición delante:** corriendo `definirRoles()` del seed, **ningún rol sembrado hoy
+  tiene `listas.ver` sin `desarrollo.ver`** (los dos cascadean hasta Secretarial), así que esto **no
+  destapa un caso vivo**: blinda uno **alcanzable**, porque los roles son **datos editables** desde la
+  pantalla de roles y el permiso es granular. *Se dice así porque la primera redacción de esta línea
+  afirmaba lo contrario **sin haberlo corrido**.*
+  🔴 **Lo que sí está vivo hoy** es el otro lado: Gerencial, Ventas, Logística, Asistente y Secretarial
+  **ven** el aviso de los factores y **no** pueden capturarlos (`listas.aprobar` sólo lo tienen
+  Administrador, AdministraciónDirección y Directivo) ⇒ la rama *"pídeselos al dueño"* es el camino
+  **real** de cinco de los nueve roles.
+- **(f)** ⚠️ **Los avisos que se dejan SIN puerta, y por qué.** El de «falta aprobar el precio» es
+  facultad del dueño y su remedio está **en la misma pantalla**; los de catálogo desactivado nombran la
+  única acción que falta. Ésos **ya dicen a quién le toca**, que es lo único accionable para quien los
+  lee. **Una puerta que termina en un 403 es peor que ninguna.**
+- **(g)** 🔴 **Y el recíproco de (c), que es la mitad que se me olvidó escribir:** *a quien SÍ puede
+  cruzarla, se le pinta.* En la primera versión el aviso del **tipo de prenda sin dígito** se dejó sin
+  puerta con la razón *"quien lo ve no administra el catálogo de Calidad"* — **falsa, y falsa
+  justo para Daniel**: medido con `definirRoles()`, `Administrador` (su rol) y
+  `AdministracionDireccion` tienen `desarrollo.administrar` **y** `calidad.administrar-catalogo`
+  (**2 de 9 roles**). El dueño veía el aviso, podía componerlo él, y tenía que ir a buscar la pantalla
+  a mano — **el encargo de esta misma decisión, sin resolver, declarado como resuelto.** La puerta se
+  construyó: sale **sólo si de verdad hay un tipo sin dígito**, lleva al catálogo de Tipos de producto,
+  y a los otros 7 roles se les dice a quién pedírselo.
+- **(h)** ⚠️ **Un eco del mismo aviso quedó FUERA del barrido, y se dice en vez de callarse:** el
+  **género sin dígito de nomenclatura** (`desarrollos.ts`) es el gemelo del anterior **con otras
+  palabras**, y por eso un barrido por frase no lo vio. **No se le construye puerta porque la rama es
+  inalcanzable hoy** —medido: `/api/generos` es sólo GET, no hay pantalla de alta y el seed re-siembra
+  el dígito de los 8 en cada arranque—, así que sólo un `UPDATE` a mano en la base la alcanza. Queda
+  como **deuda con nombre** en `HOJA-DE-RUTA.md` §4. *Lo que estaba mal no era dejarlo sin puerta: era
+  afirmar que el barrido estaba completo.* ⚠️ **Y al repasar la TABLA del inventario apareció un
+  segundo omitido** —el vacío de Proyectos, que **el propio grep del barrido había devuelto** y nunca
+  se pasó al inventario—: fuera del estado prohibido (tiene su tarjeta al lado), **dentro** de la idea
+  buscada, también deuda con nombre. El conteo fue **16 → 17 → 18**: *se mueve el número, no la
+  afirmación.*
+- **(i)** 🔴 **Y una lección de FORMA, la misma que esta jornada repitió seis veces:** la corrección de
+  (g) se escribió primero **donde se EXPLICA el error** (esta decisión, la hoja de ruta, el historial) y
+  **no en la fila del inventario que lo declaraba como HECHO** — la tabla que alguien lee para saber qué
+  se hizo siguió sosteniendo el veredicto viejo **en presente**. ⇒ **Al desmentir algo, hay que
+  cambiarlo también donde está afirmado como resultado, no sólo donde se cuenta la historia.** Citar la
+  afirmación falsa **en pasado, para desmentirla**, es el patrón correcto; dejarla en presente en una
+  celda de veredicto es el defecto.
+
+**Guarda gemela (la parte técnica que sostiene todo lo anterior):** *¿este cliente+departamento tiene
+factores?* se contesta con **UNA sola función** (`buscarFactoresResueltos`), la misma que usa el
+**bloqueo** al crear la lista. El aviso no re-implementa la cascada override→default: si mañana esa
+cascada cambia, cambia en un solo lugar. Un "¿hay factores?" escrito por segunda vez para el aviso es
+exactamente cómo nacen las guardas gemelas que se desincronizan en la primera corrección.
+
+🔴 **Y como esta decisión ABRE UNA PUERTA HACIA LOS FACTORES, se auditó contra la ratificación de
+Daniel del 29-ago-2026 —** *«Nadie más que yo ve los factores por favor….»* **— con tres
+comprobaciones:**
+
+1. **La puerta sólo existe con `listas.aprobar`.** Probado quitándola *y* excediéndola: pintarla sin
+   el permiso pone roja la prueba que exige que no haya botón.
+2. **El dato nuevo del contrato es un BOOLEANO, no un valor.** `faltanFactores` sale de comparar con
+   `null`; en la respuesta de candidatos **no viaja ni un porcentaje**. ⚖️ Sí divulga **un bit**
+   (*"¿ya tiene factores?"*) a quien tiene `listas.ver` — pero **ese bit ya se servía a la misma
+   audiencia**: `GET /clientes/:id/factores` es `listas.ver` desde §Post-F9.125 y ya devolvía los
+   renglones existentes con los cuatro porcentajes en `null`. **La superficie no crece.** Cerrar
+   incluso ese bit exigiría subir esa consulta a `listas.aprobar` y dejaría la ficha del cliente sin
+   sección para todos los demás: se anota como opción, **no se toma por cuenta propia**.
+3. **La pantalla destino sigue detrás de su permiso**, no sólo el botón: quitar esa reja pone rojas
+   las dos pruebas de §Post-F9.125(b), y en el servidor no se movió **ninguna** línea de permiso.
+
+- **Aplica en:** V1-E8t. **SIN migración, SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**.
+  El contrato SÍ cambia de forma (la respuesta de `/api/listas-precios/candidatos` gana
+  `faltanFactores`), así que backend y frontend suben juntos. **Fecha:** 2026-08-29.
+
+---
+
+> ## 🔴 RESCATADA EL 31-ago-2026 — esta decisión **se había perdido**
+>
+> Entró al repo en la rama `trabajo/respuestas-29-ago` (PR **#251**) y **nunca llegó a `prueba`**. El PR se
+> cerró el 30-ago por considerarlo superado: se verificó que sus decisiones estuvieran en `prueba`… pero
+> **se verificaron las MENCIONES, no los ENCABEZADOS**. §Post-F9.146 se menciona en varios sitios y por eso
+> pasó el filtro, mientras **su texto completo —613 renglones— nunca entró**. Fue la **única** de las 11
+> que se perdió; las otras diez sí estaban.
+>
+> ⭐ **Y es justo la que Daniel reclamaba.** Cuando dijo *«ya te había contestado todo lo que dices… ya
+> contesté esas 10 preguntas»* (§Post-F9.159), **tenía razón y las respuestas estaban AQUÍ**: nueve de las
+> diez del plan 1:N, **con su cita textual y sus erratas**. Al no estar, se le volvieron a listar como
+> pendientes — que es exactamente lo que su queja denunciaba.
+>
+> 📌 **La lección, que corrige el método del barrido de §Post-F9.160:** *verificar que una decisión «está»
+> buscando su número **no basta** — hay que buscar su **encabezado**.* Un texto que se cita en diez lugares
+> y no existe en ninguno pasa desapercibido para siempre.
+
+#### (Post-F9.146) — ⭐⭐⭐ LAS 14 RESPUESTAS DE UNA SENTADA: la trazabilidad de CADA PRENDA CORTADA se vuelve invariante, y la OP nace SIN receta (DANIEL, 29-ago-2026)
+
+> ⚠️ **Numeral por MÁXIMO, no por posición.** Este archivo **no está ordenado** (§Post-F9.113 vive antes
+> que §Post-F9.122) ⇒ el hueco se busca con el **máximo de todos los numerales usados**, y **no sólo en
+> este árbol**: se barrieron las **122 ramas remotas**. Máximo global: **145**. Por eso esta entrada es
+> la **.146** — cuando se escribió, `prueba` sólo llegaba a **143** y el hueco *«libre»* que se veía era
+> el `.144`: **tomarlo habría chocado con DOS entradas ya escritas** en ramas sin mergear.
+>
+> 📌 **Cómo quedó al rebasar sobre `prueba` (29-ago, `b41e6ec3`):** la **`.145`** ya aterrizó (PR #250,
+> `V1-E8t`) y convive aquí sin conflicto. La **`.144`** —*«cómo se negocia de verdad»*— **sigue fuera de
+> `prueba`**, en `origin/trabajo/proceso-negociacion`; se cita por su número porque el número ya está
+> tomado en firme, pero **la nota que le corresponde no se pudo echar** (ver §11).
+
+**Cómo salió.** Daniel contestó **catorce preguntas abiertas de una sola sentada**, y dijo por qué:
+
+> *«quiero resolver todo para limpiar todo lo que tenemos pendiente»*
+
+> *«no quiero seguir avanzando con la revision con tantas cosas pendientes… siento que luego se pierden
+> algunas cosas»*
+
+⇒ **Esta entrada existe para que no se pierdan.** Vivían sólo en un chat. Las citas van **textuales, con
+sus erratas**; lo que está al lado, marcado, es lectura del lead — no palabra suya.
+
+**Qué son las catorce.** **Diez** son las preguntas del plan 1:N (§Post-F9.135 §6, cada una con su
+default) y **cuatro** son sueltas, nacidas de los cabos que dejó abiertos `V1-E8k`.
+
+⭐ **LAS CATORCE QUEDAN CONTESTADAS.** La **6** volvió de rebote —Daniel no la entendió y devolvió dos
+preguntas propias—, el lead se las explicó **el mismo día** y él cerró las dos mitades en el acto. **No
+queda ninguna abierta**, que era exactamente lo que pidió: *«limpiar todo lo que tenemos pendiente»*.
+
+⚠️ **Con una salvedad, y es del lead, no suya:** la **5** la contestó con **otra cosa** —más grande y más
+útil—, así que **su propio default (el alcance de «corregir las órdenes») no quedó ratificado por él**.
+Se dice abajo, en su lugar. No es una pregunta que Daniel dejara abierta: es un cabo que el lead no debe
+dar por cerrado.
+
+---
+
+### 🔴 LO MÁS IMPORTANTE DE TODO: EL INVARIANTE DE LAS CUATRO CUBETAS
+
+La pregunta 13 era chica —*¿qué hacemos con el saldo de tránsito que dejan las incompletas?*— y la
+respuesta trajo debajo **una regla de las duras**, del tamaño de *«existencias = suma de movimientos»*.
+
+Primero la respuesta a la pregunta, textual:
+
+> *«Al registrarlas como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar
+> las 100. Si solo entrega 95 buenas, 4 incompletas y 1 faltante, entonces ese faltante si se le queda y
+> se le quita a mando (normalmente descontandole esas prendas faltantes). Pro las incompletas, ya no
+> quedan como pendientes de entregar. Y tampoco entra al inventario.... es decir se pierden esas prendas.
+> Pero si seria bueno saber en algun lado que esas prendas que se perdieron estan incompletas.»*
+
+⚠️ *(Erratas suyas, sin corregir: `Pro`, `a mando`.)*
+
+Y en seguida, sin que nadie se lo pidiera, **el porqué** — que es lo que la convierte en invariante:
+
+> ⭐ *«O sea, siempre es indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si se
+> cortan 100 y se entregan 100 al maquilero, debemos de saber que paso con cada prenda despues (primers,
+> segundas, faltantes (cobradas al maquilero), o incompletas)»*
+
+⚠️ *(Errata suya, sin corregir: `primers`.)*
+
+#### ⭐ EL INVARIANTE, escrito para que se pueda comprobar
+
+> **De cada prenda cortada, el sistema sabe siempre en cuál de las cuatro cubetas terminó.**
+>
+> **enviado = primeras + segundas + faltantes + incompletas**
+
+Léase como se leen las otras invariantes de la casa: **no es una meta ni un reporte, es una identidad que
+tiene que cerrar siempre**. Si un día no cierra, hay un defecto — no un dato pendiente de capturar.
+
+| | Qué pasó | ¿Sale del maquilero? | ¿Entra a inventario? |
+|---|---|---|---|
+| **Primeras** | buenas | **sí** | **sí** |
+| **Segundas** | defecto vendible (se vende más barata) | **sí** | **sí** |
+| **Incompletas** | te las devolvió, **no sirven** (le faltó una pieza y nunca se cosió) | **SÍ — ya no las debe** | **NO: se pierden** |
+| **Faltantes** | **no** te las devolvió | **NO — sigue debiéndolas** | no, y **se le cobran** |
+
+*(Cuatro cubetas, cuatro renglones. La columna vacía del encabezado es el nombre de la cubeta.)*
+
+🔴 **Lo que las separa es UNA sola pregunta: ¿volvió la prenda?** Incompleta y faltante se parecen —
+ninguna de las dos se vende, ninguna de las dos entra al almacén— y por eso el sistema las confundió.
+Pero la incompleta **volvió** (por eso deja de deberla) y la faltante **no** (por eso se le cobra). Todo
+lo demás sale de ahí.
+
+#### 🔴 Y ESTO CONVIERTE UN CABO ABIERTO EN UN DEFECTO CON ARREGLO DEFINIDO
+
+`HOJA-DE-RUTA.md` §4 y `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»* tenían anotado,
+como **O1**, lo siguiente: *«una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para
+siempre»*, y lo cerraban con *«darle salida automática sería inventar una merma que Daniel no pidió»*.
+
+⇒ **Daniel acaba de pedirla.** *«dejan de estar en la maquila… se pierden esas prendas»* es exactamente
+esa salida. **O1 deja de ser una duda de negocio y pasa a ser un defecto con arreglo definido:** hoy el
+sistema hace **lo contrario** de lo que él decidió.
+
+**Medido el 29-ago-2026, por nombre de símbolo** *(los números de línea se pudren; los nombres no)*:
+
+| Símbolo / archivo | Qué se midió | Veredicto |
+|---|---|---|
+| **`devolverPrendasDeTransito`** · `backend/src/dominio/produccion/transito.ts` | El único camino de vuelta desde el almacén de tránsito | ✅ El cabo es **real** |
+| **`registrarReciboMaquila`** · `backend/src/dominio/produccion/recibos.ts` | Sus **dos** llamadas a `devolverPrendasDeTransito` (`devolver(idAlmacenPrimeras, lineasPrimeras)` y `devolver(idAlmacenSegundas, lineasSegundas)`) | ✅ **Sólo primeras y segundas** vuelven; las incompletas **nunca** salen del tránsito |
+| **`transito.ts`** completo | Búsqueda de la palabra `incompleta` en todo el archivo | ✅ **Cero apariciones** — el módulo no conoce el concepto |
+| **`pendientePorMaquilero`** · `backend/src/dominio/produccion/wip.ts` | Cómo calcula el pendiente | 🔴 `cantidad: enviado − recibido BUENO`, con el comentario *«Las incompletas NO lo cierran»* |
+| **`recibiblePorCelda`** · `backend/src/dominio/produccion/incompletas.ts` | El tope del recibo, que sí las cuenta | ⭐ **Ya existe la cuenta correcta**: `enviado − (bueno + incompletas)` |
+
+⭐ **El hallazgo que abarata el arreglo: el número correcto YA SE CALCULA.** El sistema publica **dos**
+números por celda y ya no coinciden a propósito — `cantidad` (el pendiente, que ignora las incompletas)
+y `recibible` (el tope, que sí las resta). Daniel acaba de decir **cuál de los dos es «el pendiente»**:
+el segundo. **Las dos puertas de la misma regla ya discrepaban en el árbol**, y su respuesta dice cuál
+tenía razón.
+
+**Lo que hay que construir, entonces, son dos cosas y no un módulo:**
+
+1. **Que la incompleta DESCUENTE del tránsito.** Salida del almacén de tránsito por la vía de siempre —
+   un movimiento de kardex auditado, **nunca** una edición de saldo (D3)— con su propio motivo, para que
+   el saldo del maquilero deje de arrastrarla y **el papel diga en qué cubeta cayó**. La invariante de
+   arriba es su prueba: `enviado − primeras − segundas − incompletas` tiene que ser **el faltante**, y
+   nada más.
+2. **Que el PENDIENTE deje de contarlas.** El pendiente pasa a ser `recibible` — lo que el maquilero
+   **todavía debe**—, que es lo que Daniel describe: *«ese faltante si se le queda… Pro las incompletas,
+   ya no quedan como pendientes de entregar»*.
+
+⚠️ **Y el remate suyo, que es requisito y no adorno:** *«si seria bueno saber en algun lado que esas
+prendas que se perdieron estan incompletas»*. La prenda **se pierde del inventario, no del expediente**.
+La baja se registra **nombrando la cubeta**, no como una merma anónima.
+
+---
+
+### Las diez del plan 1:N (§Post-F9.135 §6) — nueve contestadas, la 6 sigue abierta
+
+Las preguntas con su default **no se repiten aquí**: viven en §Post-F9.135, sección «⭐ EL PLAN» §6, y
+allá quedaron marcadas como contestadas con la respuesta **al lado de cada default**. *No se copian: una
+copia deriva.* Aquí van sólo las **respuestas textuales** y lo que cada una mueve.
+
+| # | Lo que contestó Daniel (TEXTUAL) | Qué mueve |
+|---|---|---|
+| **1** | *«De acuerdo»* | Nada: el default queda |
+| **2** | *«De acuerdo»* | Nada: el default queda |
+| **3** | *«De acuerdo. El color va en la OP. Un modelo de desarrollo puede tener varias OP con distintos colores»* | **Confirma el default** y de paso ratifica el 1:N con sus palabras |
+| **4** | *«De acuerdo. Normalmente todas las OP deben de ir iguales. Puede pasar que una OP del grupo de le cambie algun avio (por ejemplo, no hubo cierre de ese tono y se compr otro tipo de cierre solo para la cafe... se debe de poder hacer, pero advirtiendo de la diferencia.»* ⚠️ *(erratas suyas: `de le cambie`, `se compr`, y el paréntesis sin cerrar)* | ⭐ **Pieza nueva 1**: la excepción se **permite**, con **aviso de la diferencia** |
+| **5** | *«No entendi bien la pregunta.... pero hay algo importante. Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP.... solamente quien sea responsable de definir y aprobar las recetas, eso si puede ir cambiando por los responsables.»* ⚠️ *(erratas suyas: `entendi`, `UNa`)* | 🔴 **No contestó lo que se le preguntó** (el alcance a/b/c de «corregir las órdenes») y contestó **algo más grande**: ⭐ **pieza nueva 2**, la separación de mando |
+| **6a** | Primero devolvió la pregunta: *«A) necesito entender que se corrije y por que?»*. Explicada, cerró: **✅ *«Ok como propones»*** | **Confirma el default**: la orden ya cortada **se DEJA y se lista** («la 5562 no se tocó porque ya se cortó»), y **el lote nunca se detiene** por ella |
+| **6b** | Primero devolvió la pregunta: *«B) a que parte de la orden te refieres? cantidades?»*. Explicada, cerró: **✅ *«No se prohibe, se puede hacer a mano (Solo yo)»*** | 🔴 **Contestó que NO se prohíbe — y añadió una regla que no estaba en ninguna de las catorce: *«solo yo»*.** ⇒ ⭐ **pieza nueva 6**, y **E5 cambia de forma** (ver abajo) |
+| **7** | *«Habria que ver si se puede cancelar el material al Proveedor.... creo que hay que dejar una ventana para poder cancelar la OC interna y entonces poder modificar.»* | ⭐ **Pieza nueva 3**: la ventana para **desandar** la compra |
+| **8** | *«De acuerdo. Si se corrije, se borra la autorizacion»* ⚠️ *(errata suya: `autorizacion`)* | **Confirma el default y lo endurece**: no sólo «nace sin firma» — **se le CAE la que tenía** |
+| **9** | *«Solo yo puedo corregir una OP. Y la receta, si alguien la quiere modificar despues de haber comprado, tendria que cancelar antes las compras si es que aun se puede.»* | 🔴 **Corrige el default** (`desarrollo.administrar` **no alcanza** para la ORDEN) + refuerza las piezas **2** y **3** |
+| **10** | *«De acuerdo»*, y el remate: *«Lo vemos cuando suceda»* | **Confirma el default palabra por palabra** (decidir el dígito el día que pase, no ahora a ciegas) |
+
+*(Once renglones bajo un encabezado de tres columnas: las diez preguntas, con la 6 partida en sus dos
+mitades tal como se le presentó.)*
+
+#### ⚠️ EL ÚNICO CABO QUE QUEDA, y es del LEAD — no una pregunta abierta de Daniel
+
+**La 5 no cierra su propio default.** Preguntaba *«¿hasta dónde llega corregir las órdenes: (a) agregar,
+(b) actualizar, (c) quitar?»*. Daniel dijo *«No entendi bien la pregunta»* y contestó **otra cosa** —la
+separación de mando, que resultó más valiosa que la respuesta pedida—. ⇒ el default **(a) + (b), NO (c)**
+**sigue siendo una propuesta del lead**, no una decisión suya.
+
+**No se marca como pregunta abierta** (Daniel ya dio su sentada y la cerró) **pero tampoco se da por
+ratificada**: escribirlo como decisión suya sería ponerle en la boca algo que no dijo. Se construye con
+el default, **declarando que es del lead**, y se le confirma de pasada la primera vez que se le enseñe
+funcionando. *(La 4 y la 9 lo respaldan de refilón: las dos hablan de cambiar y de comprar, ninguna de
+quitar renglones del modelo hacia las órdenes.)*
+
+#### 🔴 EL PRINCIPIO que aparece al juntar la 5, la 9 y la 6b — vale más que las tres por separado
+
+Las tres dicen lo mismo desde tres lados:
+
+> *«Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP»* **(5)** ·
+> *«Solo yo puedo corregir una OP»* **(9)** · *«No se prohibe, se puede hacer a mano (Solo yo)»* **(6b)**
+
+⇒ **La regla, escrita como una:**
+
+> **Cambiar a mano una orden YA CORTADA es privilegio del dueño.** El lote automático **la salta
+> siempre**; sólo Daniel puede tocarla **de a una**.
+
+⚠️ **HABÍA UNA TENSIÓN APARENTE, Y DANIEL LA RESOLVIÓ ÉL MISMO.** En la **5** dijo que la receta sí la
+mueve *«quien sea responsable de definir y aprobar las recetas»* (Desarrollo); en la **6b**, **«solo yo»**.
+El lead lo leyó como *«el permiso depende del ESTADO DE LA ORDEN: antes del corte, Desarrollo; después,
+sólo el dueño»* — **una interpretación del lead, que Daniel corrigió** con algo más limpio.
+
+### ✅ LA ACLARACIÓN DE DANIEL (29-ago-2026) — no eran dos permisos sobre la misma receta: son DOS RECETAS
+
+> *«Es que una cosa es poder modificar la OP, y otra cosa es poder modificar la receta en el desarrollo.
+> Creo que una vez que la receta ya este revisada en la OP, ya no se deberia de poder cambiar a menos que
+> yo lo autorice. No se si estoy contadiciendome en algo, pero chance no lo habia entendido bien.»*
+
+> *«O sea, si la OP ya tiene una receta congelada, ya no se puede cambiar a menos que yo lo autorice. O
+> sea, tendria que haber algun proceso de reversion de la receta solo hecho por mi. No se si esto es
+> complicado.... si es asi, avisame y lo hacemos la manera mas sencilla posible. Espero que no vaya a ser
+> algo muy comun»*
+
+⚠️ *(Erratas suyas, sin corregir: `este`, `contadiciendome`, `habia`, `reversion`, `mas`.)*
+
+⇒ **No se estaba contradiciendo: hablaba de dos objetos distintos.** Y el error de lectura fue del lead,
+que los trataba como uno solo.
+
+| Objeto | De quién |
+|---|---|
+| La receta **del modelo, en Desarrollo** | **de Desarrollo** — es su trabajo |
+| La receta **ya congelada en la OP** | **del dueño** — una vez revisada ahí, se toca sólo con su autorización |
+
+📌 **La línea la traza el CONGELAMIENTO, no el corte.** Es una regla más limpia que la del lead y además
+más temprana: la receta de la OP queda bajo llave **al revisarse**, sin esperar a que haya tela cortada.
+
+### ⭐⭐ EL PATRÓN QUE ESTO CIERRA — la MISMA regla en cuatro sitios
+
+Escrito aparte porque vale más que cualquiera de sus cuatro instancias:
+
+> ⭐ **Lo que ya se consolidó, lo desanda el dueño — y mientras está desandado, se congela lo que dependa
+> de ello.**
+
+| Instancia | Lo consolidado | Quién lo desanda |
+|---|---|---|
+| **Prendas incompletas** (§Post-F9.136 + la 13) | la prenda entregada, que ya no vuelve | el dueño decide qué se le cobra |
+| **La orden ya cortada** (la 6b) | el corte contra esa orden | *«solo yo»* — el lote la salta siempre |
+| **La receta congelada de la OP** (esta aclaración) | la revisión de la receta en la OP | *«tendria que haber algun proceso de reversion de la receta solo hecho por mi»* |
+| **La OC autorizada** (§Post-F9.79, ya construido) | la firma de compra | `desautorizarOC`, permiso propio sólo de dirección |
+
+*(Cuatro instancias, cuatro renglones. La cuarta es la única ya construida — y es el precedente sano
+para las otras tres.)*
+
+### ✅ CÓMO QUEDA LA PIEZA: la opción (b), CONFIRMADA POR DANIEL, con un candado que él añadió
+
+**El lead le advirtió que esto NO va a ser raro, y por qué** *(hay que dejarlo escrito porque cambia el
+diseño)*: él espera que *«no vaya a ser algo muy comun»* y **va a serlo — su propio flujo lo provoca**.
+Negocia con **estimados** → la OP entra → Desarrollo cuadra y firma → **si el estimado no se logró, hay
+que tocar algo ya firmado**. No es la excepción: es **el caso normal cuando un estimado falla**. Con
+autorización cambio por cambio, Daniel acabaría firmando todo el día.
+
+Por eso se le presentaron dos caminos, y eligió:
+
+| | Qué autoriza el dueño | Veredicto |
+|---|---|---|
+| **(a)** | **cada cambio**, uno por uno | ❌ Descartada — lo convierte en cuello de botella |
+| **(b) ✅ ELEGIDA** | **«abrir» la receta de esa OP**; mientras está abierta Desarrollo trabaja libre, y al cerrarla vuelve a quedar bajo llave | Mismo control, **una fracción de las interrupciones**, mismo rastro |
+
+> ✅ *«esta bien la B.... pero entonces pongamos un candado que no se pueda comprar nada hasta que este
+> cerrado otra vez.»*
+
+⚠️ *(Erratas suyas, sin corregir: `esta`, `este`.)*
+
+🔴 **EL CANDADO ES SUYO, NO DEL LEAD, Y ES LA MITAD IMPORTANTE:** mientras la receta de la OP está
+**abierta**, **esa orden no compra nada**.
+
+> 📌 **Lectura del LEAD, marcada como suya** *(el porqué; el qué es de Daniel)*: **ni siquiera lo ya
+> firmado.** Si la receta se está rehaciendo, **las cantidades pueden moverse**, y comprar sobre algo en
+> obra es comprar a ciegas. Al **cerrarla**, vuelve a regir la regla normal de §Post-F9.142: se compra
+> **lo firmado, material por material**.
+
+#### ⚠️ LA TENSIÓN APARENTE CON §Post-F9.142, DESACTIVADA POR ESCRITO — parece un choque y no lo es
+
+Daniel dijo antes *«bloquear solo lo que no esta firmado… asi podemos ir comprando la tela en lo que se
+terinan de aprobar los demas elementos»*, y ahora dice *«que no se pueda comprar nada»*. **Son dos
+momentos distintos**, y hay que escribirlo así o el próximo lo leerá como una contradicción y "arreglará"
+uno de los dos:
+
+| Momento | Regla |
+|---|---|
+| Receta **en construcción normal**, renglones firmándose uno a uno | **Se compra lo firmado**, material por material (§Post-F9.142: `exigirRecetaLiberada` + `exigirMaterialesLiberados`) |
+| Receta **REABIERTA** por el dueño tras estar consolidada | **No se compra NADA** en esa orden hasta cerrarla |
+
+*(Dos momentos, dos renglones.)* ⇒ **es exactamente el principio de arriba:** *mientras está desandado,
+se congela lo que dependa de ello*.
+
+#### ✅ EL CASO DE BORDE — CONTESTADO POR DANIEL (1-sep-2026, §Post-F9.173(a))
+
+> ⚠️ **Este encabezado decía «SIN contestar» una hora después de que Daniel lo contestara** — es la
+> octava marca de esta clase corregida en 24 h, y la más reciente de todas. **El patrón no falla:** la
+> respuesta se registra en una entrada nueva (§Post-F9.173) y **el sitio viejo nadie lo vuelve a mirar**.
+>
+> ### ✅ Daniel, textual: *«Si ya está comprado, **solo avisa** que ya está comprado… **no se puede
+> cancelar la OC en automático, eso hay que negociarlo con el proveedor**.»*
+>
+> ⇒ **El default de abajo se CONFIRMA** —abrir frena lo nuevo, no revierte lo hecho— **y se le añade lo
+> que faltaba: el AVISO**, que hoy no existe. Detalle y alcance medido en **§Post-F9.173(a)**; se
+> construye en la **0.085**.
+
+**¿Qué pasa con lo que YA se compró antes de abrir?** Lo que se le dijo, y su respuesta lo confirmó:
+
+> **Default propuesto: lo ya comprado NO se deshace solo.** La OC autorizada sigue en pie; para
+> desandarla está **`desautorizarOC`**, que ya existe y ya es del dueño. ⇒ **abrir frena lo nuevo, no
+> revierte lo hecho.**
+
+#### 🔴 MEDIDO (29-ago-2026) — qué parte existe y qué parte no
+
+| Qué se midió | Resultado |
+|---|---|
+| **`revocarFirmaDeRenglones`** (`backend/src/dominio/produccion/receta-orden.ts`) — el mecanismo de quitar la firma | ✅ **YA EXISTE.** Editar el contenido de un renglón firmado se la quita, con bitácora |
+| Sus **llamadores** | 🔴 **UNO SOLO**, y es implícito: `enRecetaEditable`, sólo cuando `cambiaElContenido === true`. **No está exportada**: no es un acto que alguien ejecute, es un **efecto colateral** de editar |
+| Su **dueño** | 🔴 **Ninguno propio**: hereda `desarrollo.administrar` de `enRecetaEditable` |
+| Un estado **abierta / cerrada** de la receta de la OP | 🔴 **NO EXISTE.** `Orden.recetaLiberadaEn` es **DERIVADO** (*"todo lo vivo está liberado"*, V1-E3h/§Post-F9.72) — nadie lo pone a mano; no sirve como interruptor |
+| Un acto de **reabrir** receta en todo el dominio | 🔴 **Ninguno.** (`reabrir` sólo existe para **listas de precios**, otro módulo) |
+
+⇒ **Lo que hay que construir, con nombre:**
+
+1. **El ESTADO abierto/cerrado** de la receta de la OP — 🔴 **es lo único que probablemente pide
+   migración** (columna nueva en `Orden`; no hay campo que reciclar).
+2. **Los dos actos, con dueño:** `abrir` y `cerrar`, **sólo del dueño**, con **motivo obligatorio** y
+   **bitácora** — el molde exacto es `desautorizarOC` (§Post-F9.79).
+3. **El candado de compra:** mientras esté abierta, la orden **no compra nada**. Va en las **mismas
+   puertas** que §Post-F9.142 ya usa (`exigirRecetaLiberada` / `exigirMaterialesLiberados`), no en una
+   tercera — o serán dos reglas escritas en dos lados, que es como divergen.
+4. **Ponerle dueño a lo que ya existe:** mientras la receta esté **cerrada**, tocar un renglón firmado
+   (y por tanto disparar `revocarFirmaDeRenglones`) deja de bastar con `desarrollo.administrar`.
+
+⚠️ **Y lo que NO hay que hacer:** construir *«un proceso de reversión»* nuevo. Daniel lo pidió con esas
+palabras y preguntó *«no se si esto es complicado»* — la respuesta medida es **no**: el desandar ya está,
+lo que falta es **el interruptor, su dueño y el candado**.
+
+🔴 **Y ESTO LE CAMBIA LA FORMA A LA ETAPA E5 DEL TROCEADO.** El plan decía que E5 era *«el candado de
+"ya cortada" en las DOS puertas, **sólo si contesta que SÍ a la 6b**»*. **Contestó que NO se prohíbe** ⇒
+**E5 ya no es un candado: es una RESTRICCIÓN DE PERMISO.** No se cierra la puerta — **se estrecha a quién
+la cruza**. Y **sigue existiendo**: la mitad automática (el lote) la salta siempre, y la mitad manual se
+reserva al dueño. *(Anotado también en el troceado de §Post-F9.135 §5.)*
+
+---
+
+### Las cuatro sueltas
+
+#### 11 · ¿QUÉ RECETA SE LLEVA LA OP? — 🔴 CORRIGE LA PROPUESTA DEL LEAD
+
+> *«Si esta pendiente la receta, no debe de meterla todavia en la OP. No tiene sentido. La OP Queda como
+> incompleta, hasta que se meta la receta y se libere.»*
+
+⚠️ *(Erratas suyas, sin corregir: `esta`, `todavia`, `Queda`.)*
+
+**El lead había propuesto lo contrario:** que la OP naciera **con la receta de hoy congelada** (aunque
+estuviera pendiente) y que el candado por renglón hiciera el resto. Daniel dice que **no se le mete
+nada**: la OP nace **sin receta** y queda marcada **incompleta** hasta que la receta se meta *y* se
+libere.
+
+⭐ **MEDIDO, y la mitad ya está construida** (29-ago-2026):
+
+- **`requisitosOrden`** (`backend/src/dominio/produccion/requisitos-orden.ts`) ya evalúa **tallas +
+  receta liberada + arte (si aplica)** y pone la orden en `completa` **automáticamente**. Su propio
+  encabezado cita a Daniel del 26-jul-2026 diciendo justo esto. Una orden sin receta liberada **hoy ya
+  se queda en `capturada`**.
+- La pantalla **«Órdenes incompletas»** (`/produccion/incompletas`, F2-E4) **ya las lista** — es
+  literalmente la palabra que él usó.
+- El estado es **INFORMATIVO a propósito**: ninguna pantalla de captura filtra por él; lo único que
+  impide operar es `cancelada`. Eso también es lo que Daniel quiere (el piso arranca; el dinero espera).
+
+⇒ **Lo único genuinamente nuevo de la 11 es NO COPIAR una receta pendiente.** Es **pieza nueva 4**, y es
+chica: el comportamiento «queda incompleta» ya existe y ya se llama así.
+
+🔴 **Y ESTO CORRIGE §Post-F9.144 (c).** Aquella entrada planeaba que la OP entrara **con la receta
+copiada sin firmar** y que la compuerta se disolviera en la firma por renglón. Daniel dice que la receta
+pendiente **ni siquiera se copia**. Las dos coinciden en el fondo —*la OP entra, el dinero espera*— y
+difieren en **qué trae la OP al nacer**.
+
+> ⚠️ **NO SE PUDO ANOTAR ALLÁ, y hay que hacerlo.** §Post-F9.144 **no existe en `prueba`**: vive sólo en
+> `origin/trabajo/proceso-negociacion`, sin mergear. *(Re-verificado el 29-ago **después** de rebasar
+> esta rama sobre `origin/prueba` = `b41e6ec3`: lo que aterrizó fue el **PR #250**, que es la `.145`
+> —`V1-E8t`—, **no** la `.144`.)* Anotarla desde aquí obligaría a inventar el texto o
+> a resolver el conflicto a ciegas. ⇒ **Tarea explícita para quien mergee ese PR:** echar en
+> §Post-F9.144 (c) una nota fechada del 29-ago-2026 que apunte a esta §Post-F9.146 §11 y diga que **la
+> receta pendiente no se copia a la OP**. *Sin reescribir lo que ese plan decía: se anota al lado.*
+
+#### 12 · ¿LAS INCOMPLETAS PESAN EN EL KPI DEL MAQUILERO? — SÍ, PERO CON UMBRAL
+
+> *«Si.... habria que determinar un parametro. no deberia de ser mas de un %. Lo mismo con las
+> segundas...»*
+
+⚠️ *(Erratas suyas, sin corregir: `habria`, `parametro`.)*
+
+Cierra el cabo **O3** de `V1-E8k` — y lo cierra **más grande que la pregunta**: no dijo sólo *«sí,
+cuéntalas»*, dijo **cómo**: un **umbral configurable**, y *«lo mismo con las segundas»*. ⇒ **pieza nueva
+5**.
+
+⚠️ **Y de paso corrige una imprecisión de O3, medida hoy.** O3 decía que las incompletas se le escapan al
+KPI *«porque el indicador mira primeras vs. segundas»*. **Eso no es lo que hace el indicador.**
+`kpisCalidadMaquilero` (`backend/src/dominio/indicadores/kpis.ts`) se arma **de las auditorías AQL**
+(`aprobadas` / `calificadas` sobre la vista `kpi_calidad_maquilero`), y `cantidadSegundas` **no tiene ni
+un consumidor** fuera de `produccion/recibos.ts` (kardex) y del ETL de migración. ⇒ **la razón de segundas
+no existe hoy en ningún indicador.** La 12 no es «agregarle una columna al KPI»: es **construir una
+medición que no está**.
+
+#### 13 · EL SALDO DE TRÁNSITO
+
+⭐ **Está arriba, en su propia sección** — es el corazón de esta entrada.
+
+#### 14 · TIPO DE PRENDA Y GÉNERO OBLIGATORIOS AL DAR DE ALTA UN MODELO — RATIFICADO
+
+**La pregunta, tal como se le hizo** *(la hizo el lead en el chat; no vivía en el repo — por eso se pega
+aquí, que es el punto entero de esta entrada)*:
+
+> *«**Tipo de prenda y género obligatorios** al dar de alta un modelo: se ejecutó sobre mi propuesta.
+> ¿Lo ratificas?»* — propuesta: **«Sí, obligatorios. Es revertible si estorba.»**
+
+**Su respuesta:**
+
+> *«Si, obligatorio, asi esta bien»*
+
+⚠️ *(Errata suya, sin corregir: `asi`.)*
+
+⇒ **RATIFICADO, y no hay nada que construir.** Es de la clase que más vale registrar: **algo que ya se
+había ejecutado sobre una propuesta del lead y que ahora tiene la firma del dueño.** Sin su palabra, era
+una decisión nuestra viviendo en el código; con ella, es del negocio. *(Se ejecutó como remate de la
+etapa que volvió obligatorios los dos dígitos en el alta — ver §Post-F9.135 y el remate que destapó el
+CI.)* **La reversibilidad ofrecida sigue en pie:** si algún día estorba, se afloja — pero ya no por
+iniciativa propia.
+
+---
+
+### ⭐ LAS SIETE PIEZAS NUEVAS que salen de estas respuestas — PENDIENTES, no construidas
+
+> ⚠️ **Ninguna de las siete está construida.** Esta entrada es **sólo documentación**: no se tocó una
+> línea de código y **no sube la versión**. Se escriben con nombre para que se puedan agendar.
+
+#### Pieza 1 — El AVISO de la OP que se desvía del grupo *(de la 4)*
+
+Una OP del grupo **puede** llevar un avío distinto al de sus hermanas (*«no hubo cierre de ese tono y se
+compr otro tipo de cierre solo para la cafe»*). ✅ **Encaja con lo ya construido y no lo contradice:** el
+modelo comparte la receta, pero **la orden guarda su copia congelada** (`OrdenTela`/`OrdenAvio`/
+`OrdenArte`, V1-E3d) ⇒ tocar la copia de UNA orden ya es posible por diseño.
+
+**Lo que falta es el remate que él pidió: *«advirtiendo de la diferencia»*.** Que el sistema **sepa y
+diga** que esa OP ya no va igual que sus hermanas — en la orden, y en la familia. Sin eso, la diferencia
+existe pero es invisible, que es justo lo que la pregunta 4 del plan quería evitar.
+
+#### Pieza 2 — La SEPARACIÓN DE MANDO: la ORDEN es de Daniel, la RECETA es de Desarrollo *(de la 5 y la 9)*
+
+> *«Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP.... solamente
+> quien sea responsable de definir y aprobar las recetas, eso si puede ir cambiando por los
+> responsables.»* · *«Solo yo puedo corregir una OP.»*
+
+Es **la misma línea** que ya trazó dos veces —*«es indispensable tener un botón para desautorizar las
+órdenes, que solo yo tenga acceso»* (§Post-F9.67) y *«cuando digo yo, es mi perfil»*— aplicada ahora a la
+**orden de producción**.
+
+🔴 **MEDIDO CONTRA EL CÓDIGO (29-ago-2026): HOY NO ES ASÍ.** Y el defecto no está donde parecía.
+
+| Qué se midió | Resultado |
+|---|---|
+| **La RECETA** — `enRecetaEditable` (`backend/src/dominio/produccion/receta-orden.ts`) | Exige **`desarrollo.administrar`**. ✅ Es la mitad que Daniel describe |
+| **La ORDEN** — `actualizarOrden`, `guardarMatrizOrden`, `copiarDetalleOrden`, `guardarReferenciasOrden`, `agregarComentarioOrden` (`backend/src/dominio/produccion/ordenes.ts`) | Exigen **`ordenes.administrar`**. `cancelarOrden` exige `ordenes.cancelar` |
+| **Las dos claves existen y son distintas** | ✅ Sí. **No hay que inventar permisos** |
+| 🔴 **A QUÉ ROLES las reparte el seed** (`backend/prisma/seed.ts`, `definirRoles()`) | 🔴 **A LOS MISMOS.** Las dos se cortan **en el mismo escalón**: `const logistica = sin(ventas, …)` les quita `ordenes.administrar`, `ordenes.cancelar` **y** `desarrollo.administrar` de un golpe |
+| ⇒ **Quién puede tocar la ORDEN hoy** | Administrador, AdministraciónDirección, Directivo, **Gerencial** y **Ventas** — los mismos cinco que pueden tocar la receta |
+| **Cualquier candado de «ya está generada»** en `actualizarOrden` / `guardarMatrizOrden` | ❌ **Ninguno.** Lo único que frena es `estado === 'cancelada'` |
+
+⇒ **VEREDICTO, dicho sin adornos: la separación de mando NO existe.** Los dos permisos están, pero
+**ningún rol sembrado tiene uno sin el otro**, así que en la práctica es una sola llave con dos nombres.
+Y *«una vez que está generada, nadie mueve nada de la OP»* **no está construido en ninguna forma**: la
+orden es editable mientras esté viva.
+
+📌 **Un detalle que conviene no re-descubrir:** existe además una clave **`ordenes.modificar`**, heredada
+1:1 de `Accesos.csv` del Access (`backend/src/contrato/permisos.ts`, acceso #3, *"Poder Modificar la
+Orden de produccion"*). **No la verifica nadie**: su única aparición en todo el repo es su propia
+definición en el catálogo (y el `esquema.gen.ts` generado). El propio archivo lo dice: los permisos
+legados *"NO se reutilizan para el CRUD nuevo de la orden"*. ⚠️ **Quien construya esta pieza va a
+tropezarse con ella y va a creer que ya existe el candado.** No existe: es una etiqueta sin puerta.
+
+**Qué decidir antes de construir** *(no se decide aquí — es negocio)*: si el corte es **de rol** (que
+`ordenes.administrar` suba al escalón del dueño, como ya pasó con `compras.desautorizar`) o **de momento**
+(que la orden se cierre al generarse y sólo el dueño la reabra). Son cosas distintas y su respuesta cambia
+el trabajo entero.
+
+#### Pieza 3 — LA VENTANA para desandar la compra *(de la 7 y la 9)*
+
+> *«creo que hay que dejar una ventana para poder cancelar la OC interna y entonces poder modificar»* ·
+> *«tendria que cancelar antes las compras si es que aun se puede»*
+
+⭐ **MEDIDO: la ventana YA EXISTE, y la construyó él mismo hace ocho días.** `desautorizarOC`
+(`backend/src/dominio/compras/ordenes-compra.ts`, V1-E3y, §Post-F9.79) le quita el sello a una OC
+autorizada, la devuelve a `borrador`, exige motivo y deja bitácora; su permiso propio
+**`compras.desautorizar`** el seed lo reparte **sólo a los perfiles de dirección**, por petición literal
+suya: *«es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga acceso»*. Su
+docstring ya declara **exactamente** el propósito que Daniel acaba de volver a describir: *«es la MARCHA
+ATRÁS que vuelve honesto el bloqueo de la receta… Sin ella el bloqueo sería una trampa sin salida»*.
+
+Y su frase *«si es que aun se puede»* **coincide con el límite ya construido**: una OC
+`recibida_parcial`/`recibida_total` **no** se puede des-autorizar (Daniel, 20-ago-2026: *«una vez recibido
+no se puede desautorizar»*) — el camino es devolución o ajuste, no deshacer la firma.
+
+⇒ **Lo que queda de la pieza 3 NO es el mecanismo. Son tres cosas más chicas y una que no es del sistema:**
+
+1. 🔴 **El camino no LLEVA.** `exigirNoSacarLoComprado` (`produccion/receta-orden.ts`) **nombra** el
+   remedio —*"hay que DES-AUTORIZAR esas órdenes de compra en Compras › Órdenes de compra y volver
+   aquí"*— pero no ofrece la puerta. Es **el caso exacto** de §Post-F9.145: *«un aviso que dice que falta
+   un dato tiene que ofrecer el lugar donde se llena; decir dónde no es llevar»*. Y ya tiene medida la
+   mitad delicada: el mensaje **ya distingue** a quien puede cruzar de quien no (*"Ese botón es del
+   perfil de Dirección: si no te aparece, pídeselo a quien lo tenga"*).
+2. **El caso RECIBIDO no tiene salida.** Ahí Daniel no pidió abrirla —dijo *«si es que aun se puede»*—,
+   pero conviene que la pantalla lo diga **antes**, no al rebotar.
+3. **La secuencia completa no está escrita en ningún lado** como un solo camino: des-autorizar → corregir
+   la receta → volver a firmar → volver a comprar. Hoy son tres pantallas y ninguna anuncia la siguiente.
+4. ⚖️ **Y lo que NO es del sistema:** *«Habria que ver si se puede cancelar el material al Proveedor»* —
+   eso es una llamada al proveedor, no una función. El sistema **no debe** dar por cancelado lo que el
+   proveedor no aceptó cancelar.
+
+#### Pieza 4 — El estado «OP INCOMPLETA» y la receta que NO se copia *(de la 11)*
+
+Ya explicada arriba en §11. En una línea: **la mitad grande está construida** (`requisitosOrden` +
+la pantalla «Órdenes incompletas»); **lo nuevo es no copiar una receta pendiente a la OP**, y **anotar la
+corrección en §Post-F9.144 (c) cuando ésa aterrice en `prueba`**.
+
+⚠️ **Ojo con el nombre (cabo O4 de `V1-E8k`, que esta decisión vuelve más filoso):** «incompleta» ya
+significa **dos cosas** en el sistema —la **ORDEN** incompleta (sin tallas/receta/arte, F2-E4) y la
+**PRENDA** incompleta (V1-E8k)—. Con la 11 y la 13 contestadas, **las dos van a aparecer en el mismo
+territorio**. Antes de nombrar nada nuevo «incompletas», hay que decidir cómo se distinguen en pantalla.
+
+#### Pieza 5 — El UMBRAL configurable de calidad *(de la 12)*
+
+Las **incompletas** *y* las **segundas** pesan en el KPI del maquilero **sólo al pasarse de un %
+configurable**. Tres partes, y **ninguna existe hoy**:
+
+1. **El parámetro** — un % por concepto (incompletas / segundas), configurable, no una constante en el
+   código. *(Dónde vive es decisión técnica; que sea configurable es decisión de Daniel.)*
+2. **La medición de segundas** — 🔴 **no existe**: `cantidadSegundas` no alimenta ningún indicador (ver
+   §12 arriba). Hay que construirla.
+3. **La medición de incompletas** — tampoco existe; el dato sí (`cantidadIncompletas`, V1-E8k).
+
+⚠️ **Y ojo con el orden:** esta pieza mide **el saldo del maquilero**, así que **depende del invariante de
+las cuatro cubetas**. Medir el % de incompletas mientras el tránsito siga arrastrándolas daría un número
+que no cuadra con el papel. **Primero la 13, después la 12.**
+
+#### Pieza 6 — LA ORDEN YA CORTADA: el lote la salta, y a mano sólo el dueño *(de la 6b, con la 5 y la 9)*
+
+> *«No se prohibe, se puede hacer a mano (Solo yo)»*
+
+Es **la mitad manual** de la separación de mando (pieza 2), acotada al momento que a Daniel le preocupa:
+**después del corte**.
+
+🔴 **MEDIDO CONTRA EL CÓDIGO (29-ago-2026): HOY NO EXISTE, EN ABSOLUTO.**
+
+| Qué se midió | Resultado |
+|---|---|
+| `backend/src/dominio/produccion/receta-orden.ts`, apariciones de **`EtapaMovimiento`** | **0** |
+| El mismo archivo, apariciones de **`TipoEtapaMovimiento`**, `etapaMovimiento` o `cortad` | **0** |
+| **`enRecetaEditable`** — todo lo que exige antes de dejar mutar | **Exactamente dos cosas**: `verificarPermiso(sesion, 'desarrollo.administrar')` y `exigirOrdenViva(orden)` |
+
+⇒ **La receta de una orden YA CORTADA se puede editar hoy, de a una, por cualquiera de los cinco roles
+que tienen `desarrollo.administrar`** (Administrador, AdministraciónDirección, Directivo, Gerencial,
+Ventas). El sistema **ni siquiera se entera** de que hubo corte: la puerta no mira la producción.
+*(Esto ya estaba medido y escrito en el plan de §Post-F9.135 §4 —«`enRecetaEditable` no mira si la orden
+ya se cortó»— y se vuelve a medir aquí porque de ello depende el tamaño de la pieza.)*
+
+**Lo que hay que construir, entonces, son dos mitades y no una:**
+
+1. **La mitad automática (el lote) la SALTA siempre** — es el default de la 6a, ya confirmado: *«Ok como
+   propones»*. Se salta **y se lista**, con la bitácora **por orden** (nunca del lote), como manda
+   §Post-F9.135 §4.
+2. **La mitad manual (de a una) se estrecha al dueño** — no se cierra. `enRecetaEditable` tiene que
+   **empezar a mirar si la orden ya se cortó** y, si sí, exigir la llave del dueño en vez de
+   `desarrollo.administrar`.
+
+🔴 **SU MITAD DE *RECETA* LA ABSORBE LA PIEZA 7 — y con un disparador MÁS TEMPRANO.** Daniel aclaró
+después que la línea la traza el **congelamiento de la receta en la OP**, no el corte (*«una vez que la
+receta ya este revisada en la OP, ya no se deberia de poder cambiar a menos que yo lo autorice»*). ⇒ **la
+receta de la OP queda cubierta por el abrir/cerrar de la pieza 7**, que muerde antes y no depende de que
+haya tela cortada. **Lo que queda de la pieza 6 es la ORDEN misma** —matriz, cantidades, encabezado:
+*«nadie mueve nada de la OP»*— y **el salto del lote**, que sigue siendo suyo.
+
+⚠️ **Lo que hay que decidir con Daniel antes de codear:** **si «solo yo» es un permiso nuevo o el reparto
+de uno que ya existe.** El precedente sano es `compras.desautorizar` (§Post-F9.79): **permiso propio,
+repartido sólo a dirección**, con motivo obligatorio y bitácora.
+
+#### Pieza 7 — ABRIR / CERRAR la receta congelada de la OP, y el candado de compra *(de la aclaración de Daniel)*
+
+⭐ **Es la pieza que él mismo diseñó**, y la única de las siete que trae **decisión cerrada sobre el
+CÓMO**, no sólo sobre el qué. El detalle, las citas y la medición están arriba, en *«✅ CÓMO QUEDA LA
+PIEZA»*. En corto:
+
+- **Acto «abrir la receta de la OP»** → **sólo el dueño**, con **motivo**, en **bitácora**.
+- **Mientras está abierta:** Desarrollo edita **sin pedir permiso cambio por cambio** *(era la opción (a),
+  descartada)* · y **la compra de esa orden se bloquea ENTERA** — candado que añadió Daniel: *«pongamos
+  un candado que no se pueda comprar nada hasta que este cerrado otra vez»*.
+- **Acto «cerrar»** → vuelve a regir §Post-F9.142: se compra **lo firmado, material por material**.
+- ⏳ **Sin contestar:** qué pasa con **lo ya comprado antes de abrir** (default propuesto: **no se
+  deshace solo**; para eso está `desautorizarOC`).
+
+🔴 **Lo NUEVO es el estado, no el mecanismo:** `revocarFirmaDeRenglones` **ya desanda la firma** — pero
+es un **efecto colateral** de editar (un solo llamador, no exportada) y **hereda `desarrollo.administrar`**.
+**No existe** ningún estado abierto/cerrado (`Orden.recetaLiberadaEn` es **derivado**) ni ningún acto de
+reabrir en el dominio. ⇒ **es la única de las siete que probablemente pide MIGRACIÓN.**
+
+⚠️ **Y la advertencia que se le dio, escrita porque cambia el diseño:** Daniel espera que *«no vaya a ser
+algo muy comun»* y **va a serlo** — negocia con estimados → la OP entra → Desarrollo cuadra y firma → **si
+el estimado no se logró, hay que tocar algo ya firmado**. **Es el caso normal cuando un estimado falla,
+no la excepción.** Por eso la (a) se descartó: lo habría vuelto cuello de botella.
+
+---
+
+### 🧹 Prosa que estas respuestas vuelven FALSA (barrida por comando **y por idea**)
+
+Se anota **con nota fechada, sin reescribir la historia** — el texto original se queda, porque explica
+por qué se pensó así.
+
+| Dónde | Qué decía | Por qué ya no |
+|---|---|---|
+| `HOJA-DE-RUTA.md` §4, cabo **O1** | *«darle salida automática sería inventar una merma que Daniel no pidió»* | 🔴 **La pidió** (respuesta 13). ✅ Anotado |
+| `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k, **O1** | Lo mismo, en su ficha | 🔴 Igual. ✅ Anotado |
+| `HOJA-DE-RUTA.md` §1, `V1-E8k` | *«el pendiente se queda ABIERTO —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra»* | 🔴 Le cobra **el faltante**, no la incompleta. ✅ Anotado |
+| §Post-F9.136, *«Lo que la opción A obliga…»* | *«el PENDIENTE se queda ABIERTO»* aplicado a las incompletas | 🔴 Igual: el razonamiento vale para el faltante y se aplicó de más. ✅ Anotado allá |
+| `HOJA-DE-RUTA.md` §4 y `V1-etapas.md`, **O3** | *«el indicador mira primeras vs. segundas»* | 🔴 **Falso hoy**: el KPI se arma de auditorías AQL y nada mide segundas. ✅ Anotado |
+| §Post-F9.135, *«ninguna de las 10 preguntas está contestada»* · *«Bloqueado hasta que Daniel conteste las 10»* | — | ✅ **Las diez contestadas.** Anotado con nota fechada |
+| `HOJA-DE-RUTA.md` §1 y §4, *«BLOQUEADO hasta que Daniel conteste las 10 preguntas»* | — | ✅ **Ya no bloquea nada.** Anotado |
+| `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n, *«No contestó ninguna de las 10 preguntas»* | — | ✅ Anotado |
+| §Post-F9.135 §5, troceado, fila **E5** | *«el candado de "ya cortada" en las DOS puertas — **sólo si contesta que SÍ a 6b**»* | 🔴 Contestó que **NO** se prohíbe, pero **«solo yo»** ⇒ E5 **existe igual** y cambia de naturaleza: **restricción de permiso**, no candado. ✅ Anotado |
+| `HOJA-DE-RUTA.md` §4, deuda de `V1-E4b` | *«Dar de baja el faltante NO cierra el pendiente del WIP»* | ⚖️ **Se parte en dos:** vale para el **faltante**; para la **incompleta** ya no — deja de ser deuda y pasa a defecto. ✅ Anotado |
+| `docs/modulos/produccion-wip.md`, cuadro del tránsito | *«la diferencia SE QUEDA VIVA en Tránsito»* · *«Ese saldo vivo **es** el faltante»* | 🔴 Desde `V1-E8k` esa diferencia son **dos** cosas; la incompleta **no** se queda. ✅ Anotado |
+| §Post-F9.142, *«se compra lo firmado, material por material»* | — | ⚖️ **No es falso: le falta la segunda mitad.** Con la receta **reabierta** no se compra **nada**. ✅ Anotado allá, con la tabla de los dos momentos |
+| §Post-F9.144 (c) *(sigue SIN mergear a `prueba`, verificado tras el rebase del 29-ago sobre `b41e6ec3`)* | La OP nace con la receta pendiente **copiada** | 🔴 La 11 dice que **no se copia**. ⚠️ **NO anotado — la entrada no existe en `prueba`**; queda como tarea del merge |
+
+🔴 **Y lo que NO se tocó porque esta tarea es sólo `.md`** — pero hay que arreglarlo cuando se construya
+el invariante, porque **son comentarios que hoy afirman lo contrario de lo decidido**:
+
+- `backend/src/dominio/produccion/wip.ts`, en `pendientePorMaquilero`: *«PENDIENTE = enviado − recibido
+  BUENO. Las incompletas NO lo cierran (§Post-F9.136, decisión A: Daniel lo necesita abierto para cobrar
+  el faltante)»*, y el campo documentado como *«NO restan del pendiente»*.
+- `backend/src/dominio/produccion/incompletas.ts`, encabezado del módulo: *«⚠️ El PENDIENTE por recibir NO
+  se cierra con las incompletas: Daniel lo necesita ABIERTO para cobrar el faltante»*.
+- `frontend/src/components/dominio/MatrizColorTalla.tsx`: *«8 buenas + 2 incompletas, el panel dice
+  "faltan 2"»*.
+
+---
+
+- **Aplica en:** el recibo de maquila y el almacén de **tránsito** (invariante de las cuatro cubetas), el
+  **WIP**, el **KPI de calidad** del maquilero, la **generación de la OP** y su receta, los **permisos**
+  de orden vs. receta —incluida **la receta de una orden ya cortada**— y el plan **1:N** de
+  §Post-F9.135, que con esto **queda DESBLOQUEADO** (era lo único que le faltaba). ⬜ **NADA CONSTRUIDO** — es **sólo
+  documentación**: no se tocó una línea de código, **sin migración, sin permisos, sin seed** y **NO sube
+  la versión** (`HISTORIAL-DE-VERSIONES.md` no se toca: no cambia nada del sistema).
+  **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.147) — 🔴🔴 LA PRENDA INCOMPLETA **SALE DEL TRÁNSITO**: ya volvió, así que deja de ser pendiente (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Repasando lo construido en V1-E8k, Daniel corrigió el encuadre. Sus palabras, textuales:
+
+> *«Al registrarlas como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar
+> las 100. Si solo entrega 95 buenas, 4 incompletas y 1 faltante, entonces ese faltante si se le queda y
+> se le quita a mando (normalmente descontandole esas prendas faltantes). Pro las incompletas, ya no
+> quedan como pendientes de entregar. Y tampoco entra al inventario…. es decir se pierden esas prendas.
+> Pero si seria bueno saber en algun lado que esas prendas que se perdieron estan incompletas.»*
+
+Y el porqué de fondo, que es el requisito real:
+
+> *«O sea, siempre es indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si se
+> cortan 100 y se entregan 100 al maquilero, debemos de saber que paso con cada prenda despues (primers,
+> segundas, faltantes (cobradas al maquilero), o incompletas)»*
+
+### ⭐ LA INVARIANTE DE LAS CUATRO CUBETAS
+
+```
+enviado = primeras + segundas + faltantes + incompletas
+```
+
+Las cuatro son **excluyentes** y suman lo enviado. `primeras + segundas` son las buenas (lo que produce,
+se inventaría y se paga); las **incompletas** son las que volvieron sin terminar de coser (se pierden);
+el **faltante** es el residuo — lo único que sigue en poder del maquilero, y lo que se le cobra.
+
+### 🔴 QUÉ CORRIGE ESTO — y qué NO
+
+**Corrige la decisión A de §Post-F9.136**, que decía: *«el PENDIENTE por recibir NO se cierra con las
+incompletas: Daniel lo necesita ABIERTO para cobrar el faltante»*. Ese razonamiento **confundía la
+incompleta con el faltante**. Daniel los separó él mismo en la frase de arriba: de 100 mandadas con 95
+buenas + 4 incompletas + 1 faltante, **lo que se le queda y se le cobra es 1**, no 5. La incompleta ya
+volvió físicamente al almacén; el faltante nunca llegó.
+
+**NO cambia nada de las reglas 1-4 de §Post-F9.136.** La incompleta sigue: (1) sin contar como
+producida, (2) sin entrar a ningún inventario —*«se pierden esas prendas»*—, (3) sin pagarse, y (4)
+viéndose en el estado de cuenta del maquilero. **Lo único que cambia es que deja de contar como
+pendiente de entregar.** Es una regla menos, no una más.
+
+### ✅ CÓMO QUEDÓ CONSTRUIDO (V1-E8v, 29-ago-2026, versión 0.059)
+
+**La fórmula, en una sola función.** `pendientePorCelda(enviado, devuelto)` en
+`backend/src/dominio/produccion/incompletas.ts` — el renombre de `recibiblePorCelda`, porque el nombre
+viejo ya no describía lo que hace. Con `devuelto = buenas + incompletas`, ésa es la fórmula del
+pendiente **y** del tope del guardado bajo lock: **son el mismo número**.
+
+🔴 **Y por eso el campo `recibible` del contrato SE RETIRÓ.** Existía únicamente porque el pendiente y
+el tope eran cifras distintas; al volverse idénticas, publicar las dos sería **verdad duplicada** —dos
+nombres para un número igual derivan en cuanto alguien toque uno—. La pantalla de captura y el selector
+de maquilero ahora leen `cantidad`, y el aviso ámbar que explicaba la discrepancia se reescribió para
+decir la verdad nueva (*«ya salieron de su taller… pero se pierden»*).
+
+**Las DIEZ puertas que llevaban la fórmula vieja.** El inventario de partida decía tres; barriendo por
+IDEA (no por la palabra «incompleta», que seis de ellas ni siquiera contenían) resultaron **ocho**; el
+reviewer encontró la **novena** —que no contenía ni la palabra ni la fórmula, porque era **la misma
+regla escrita al revés** (despejaba `enviado` a partir del pendiente)— y la **décima**, que fue una
+**regresión del arreglo de la novena** (ver el recuadro tras la tabla):
+
+| # | Dónde | Qué decía mal |
+|---|---|---|
+| 1 | `wip.ts::pendientePorMaquilero` | el pendiente por maquilero, celda y total |
+| 2 | `wip.ts::wipDeOrden` → `porRecibir` | el pendiente por proceso |
+| 3 | `recibos.ts::pendientesPorRecibir` | el pendiente de la pantalla de captura |
+| 4 | 🔴 `wip.ts::consultarExistenciaMaquilero` | **«Existencias en poder del maquilero»** — la pantalla que Daniel describió literalmente: decía que el maquilero tenía piezas que ya había devuelto |
+| 5 | `resumen/resumen.ts::contarOrdenesAbiertas` | «N órdenes abiertas» de la portada: la orden entregada del todo **no cerraba nunca** |
+| 6 | `resumen/resumen.ts::contarMaquilerosConSaldo` | «en N maquileros» del pie de la tarjeta WIP |
+| 7 | `wip.ts::pendientesDerivados` (+ `agregadoWip`, el tablero) | el «por recibir» por orden |
+| 8 | 🔴 la vista materializada **`kpi_wip`** | el ÚNICO sitio con la fórmula congelada en SQL ⇒ **lleva migración** |
+| 9 | 🔴🔴 `AvanceProduccion.tsx::pasosDesdeWip` (la halló el reviewer) | **despejaba lo ENVIADO invirtiendo la fórmula del pendiente** — el reverso del estado prohibido: el stepper decía que al maquilero se le mandaron **menos** piezas de las que se le mandaron, y las regalaba al conteo de Arte. Arreglado publicando `enviadoCostura` desde el servidor (A1) |
+| 10 | 🔴🔴 `AvanceProduccion.tsx::ResumenAvance` (la halló el reviewer) | **REGRESIÓN del arreglo de la 9**: restaba `enviadoCostura − recibidoCostura`, que con el despeje daba el pendiente correcto **por casualidad** y con la suma directa pasó a valer `enviado − buenas`, **con las incompletas dentro**. Arreglado consumiendo `totalPendiente` del servidor |
+
+> 🔴 **LA LECCIÓN DE LA DÉCIMA, que es la de toda la etapa:** *cuando se cambia el significado de un
+> campo hay que barrer a sus **LECTORES**, no sólo a quien lo produce, y preguntarse qué hacían con él
+> antes.* La novena era un despeje hacia atrás; la décima, una **resta de dos hechos publicados** que
+> el propio arreglo de la novena volvió falsa. **Restar dos hechos publicados ES re-derivar la regla:**
+> si el servidor ya publica el pendiente, se consume — no se reconstruye desde sus insumos.
+
+**La consecuencia que más se va a notar:** la orden que se entregó completa con incompletas **ahora
+cierra**. Antes se quedaba abierta para siempre, esperando prendas que ya nadie iba a traer.
+
+**La trazabilidad, donde se ve.** Las cuatro cubetas se leen juntas en dos pantallas:
+
+- el **drill-down del tablero WIP** de una orden gana dos métricas —«Incompletas» y «Por recibir»— junto
+  a «Enviado» y «Recibido», y cuadran a la vista;
+- **«Existencias en poder del maquilero»** gana una columna «Incompletas», de modo que el renglón dice
+  `enviado = recibido + incompletas + en poder`.
+
+**Migración `20260830120000_la_incompleta_sale_del_transito`.** Recrea la vista materializada `kpi_wip`
+(DROP + CREATE: Postgres no deja agregarle una columna) con `incompletas` y sus **dos índices
+idénticos** — el UNIQUE sobre `id_orden` NO es cosmético: `REFRESH MATERIALIZED VIEW CONCURRENTLY`, que
+usa el job de KPIs, lo exige. Queda `WITH DATA` para que el tablero no aparezca vacío entre el deploy y
+el primer refresco del cron. **SIN permisos, roles ni catálogos nuevos ⇒ NO requiere `SEED_ON_START`.**
+
+**⚠️ Deuda con nombre (no se calla).** Cuando el proceso va **después** de la costura (V1-E4b: envío de
+prenda YA TERMINADA), el envío saca las prendas al almacén **Tránsito** y el recibo las devuelve. Las
+**incompletas de ese caso se quedan en Tránsito** —no vuelven a primeras ni a segundas, porque no se
+inventarían—. Es coherente con *«se pierden esas prendas»*, pero deja saldo vivo en un almacén cuyo
+nombre dice «en proceso». **No se resuelve aquí a propósito:** darles salida exigiría un tipo de
+movimiento nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**. Además el caso
+es marginal: una prenda «incompleta» es una que nunca se terminó de **coser**, así que casi siempre
+aparece en el recibo de costura, donde no hay tránsito. Anotada en `HOJA-DE-RUTA.md` §4.
+
+- **Aplica en:** el WIP (tablero, drill-down y existencias del maquilero), la pantalla de captura del
+  avance, el Resumen operativo y el tablero WIP de Indicadores. ✅ **CONSTRUIDO** (V1-E8v, 29-ago-2026,
+  versión **0.059**); **lleva migración de BD** (recrea `kpi_wip`; sin `SEED_ON_START`). El contrato
+  cambia de forma (se retira `recibible`; se agregan `incompletas`, `pendientePorRecibir` y
+  `enviadoCostura`), así que
+  **backend y frontend suben juntos**. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.148) — ⚖️ EL CANDADO DEL PRECIO SUGERIDO: se queda como precaución barata, no porque el riesgo importe hoy (DANIEL, 29-ago-2026)
+
+**Cómo salió.** V1-E8u construyó un candado que **oculta el `precioSugerido` a quien no tiene
+`listas.aprobar`** — la lógica: ese precio sale de los factores del cliente, y de un precio sugerido más
+un precosto se puede despejar el margen (§Post-F9.125, la ratificación de Daniel *«Nadie más que yo ve
+los factores por favor….»*). Se le preguntó a Daniel si el candado le hacía sentido. Sus palabras,
+textuales:
+
+> *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+>
+> *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+**Lo que queda asentado, porque hoy no estaba escrito en ningún lado — y lo que no está en el repo no
+existe:**
+
+1. **El candado se queda**, tal como está. Es la instrucción literal (*«déjalo así por ahora»*).
+2. 🔴 **Pero NO se queda porque el riesgo le importe a Daniel.** Se queda porque **es barato**: ya está
+   construido, no estorba a nadie y no hay razón para desarmarlo. La razón que se le dio al construirlo
+   —*«se puede despejar el margen»*— **él la considera menor**: son varios factores encadenados, y el
+   despeje no le preocupa. ⇒ **No se debe citar este candado como evidencia de que el despeje del margen
+   es un riesgo que Daniel quiere cerrado.** No lo es.
+3. ⏳ **Cuándo SÍ pasa a importar: el día que negocie alguien más que Daniel.** Hoy **sólo él negocia**,
+   así que el único que ve el precio sugerido es el dueño de los factores. En cuanto haya un segundo
+   negociador sin `listas.aprobar`, este candado deja de ser precaución y pasa a ser la regla — y
+   entonces hay que revisarlo en serio, junto con las otras puertas a los factores.
+4. **Está en periodo de prueba.** *«Lo pruebo y te aviso»*: si vuelve con un cambio, **su palabra manda
+   sobre el diseño actual**, no al revés.
+
+- **Aplica en:** la mesa de negociación y la lista de precios (`precioSugerido`, permiso
+  `listas.aprobar`). ✅ **YA CONSTRUIDO** en V1-E8u (versión 0.058) — esta decisión **no cambia código**,
+  sólo asienta el criterio que lo justifica. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.149) — 🔴 LOS COSTOS ESTIMADOS DE LA NEGOCIACIÓN **SE GUARDAN** (DANIEL, 29-ago-2026)
+
+**Cómo salió.** La mesa de negociación en vivo (V1-E8u, versión 0.058) calcula y muestra los costos
+estimados, pero **no persiste ninguno**: se quedó abierto a propósito y anotado como deuda. Daniel lo
+corrigió — **no es deuda opcional, es indispensable.** Sus palabras, textuales:
+
+> *«En la negociación terminó con ciertos costos estimados. Esos son los que dices que se borran??*
+>
+> *Estos son indispensables que se queden. Fue con la información que vendí. O sea. Entre los costos que
+> fui dando u los comentarios que voy metiendo es como se va a armar la nueva receta.»*
+
+Y sobre **cuándo** se guardan, corrigiendo un supuesto que se le planteó (se propuso que los estimados
+quedaran pegados a la ronda de negociación):
+
+> *«Sin exacto. Voy jugando y al terminar la negociación guardo la última información que metí. Si está
+> bien que lo pongas después de la 59 para que ya se quede funcional.»*
+
+### Lo que queda decidido
+
+1. **EL QUÉ — se persiste el DESGLOSE, no sólo el total.** Los costos estimados que Daniel mueve a mano
+   en la mesa se guardan **por concepto** (tela, maquila, avío…). Junto con los comentarios del hilo,
+   son **la materia prima con la que la gente de Desarrollo arma la receta revisada de producción**
+   (engancha con §Post-F9.144: *«despues de la negociacion, ya en la oficina, se revisa lo que se negocio
+   y se hace modificaciones en una nueva version a la receta»*). Un total sin desglose no sirve para eso.
+2. **EL CUÁNDO — al cerrar, no al teclear.** **NO** hay autosave continuo ni rastro de cada tecla. Daniel
+   **juega libremente** con los números y **al terminar guarda la última información que metió**: es un
+   guardado **explícito**, y lo que queda es el **último estado**, no el historial de tanteos.
+3. ⚠️ **LO QUE YA PERSISTE HOY Y NO HAY QUE RECONSTRUIR** (medido en el esquema): `NegociacionEvento` ya
+   guarda **precio anterior/nuevo**, **precosto anterior/nuevo** y el texto del **`acuerdo`**; lo escribe
+   `DialogoNegociacionRenglon`. **Lo único que falta es el desglose de costos estimados de la mesa.**
+   Escrito así de acotado a propósito: van tres premisas falsas en este proyecto por no medir antes de
+   construir.
+4. **PLANIFICACIÓN: versión 0.060**, inmediatamente después de la 0.059. **Lleva migración** (tabla o
+   columnas nuevas).
+
+- **Aplica en:** la mesa de negociación en vivo y el paso a la receta revisada. ✅ **CONSTRUIDA**
+  (V1-E8w, 30-ago-2026, versión **0.060**); **lleva migración de BD** (tabla
+  `negociacion_evento_costo` + columna `negociacion_evento.costo_estimado`; **sin permisos nuevos**).
+  Cómo quedó, contra los cuatro puntos de arriba:
+  - ✅ **El DESGLOSE, no el total** (punto 1): cada renglón guarda `conceptoCodigo`/`conceptoNombre`,
+    su **etiqueta libre**, su `consumo`, su `precioUnit` y su `importe` — la misma forma que
+    `PrecostoLinea`, a propósito, para que Desarrollo lo lea igual que una receta. Se pinta en el
+    hilo del renglón, debajo del comentario: guardarlo sin enseñarlo habría sido no guardarlo.
+  - ✅ **Al cerrar, no al teclear** (punto 2): un botón **«Guardar la mesa»** y nada más. El
+    simulador **sigue sin escribir** (probado con la huella md5 de todas las tablas antes/después,
+    ahora con `guardarMesa` ya existiendo a un renglón de distancia). Volver a guardar **AGREGA**
+    otra constancia; jamás pisa la anterior (D3).
+  - ✅ **Lo que ya persistía no se reconstruyó** (punto 3): el guardado es un `NegociacionEvento` más
+    —con su autor, su fecha, su comentario y sus precios—, con el desglose colgado. Se le agregó
+    exactamente lo que faltaba.
+  - ✅ **Versión 0.060, con migración** (punto 4).
+  - ⚠️ **Una decisión de diseño que NO estaba dicha y aquí se declara:** el comentario es
+    **obligatorio**. Razón: *«entre los costos que fui dando **u los comentarios que voy metiendo**»*
+    son las dos cosas que Daniel nombró juntas, y unos números sin la frase que los explica no
+    cuentan la negociación. Si estorba en la práctica, se afloja — pero se afloja a sabiendas.
+  **Fecha:** 2026-08-29 · **Construida:** 2026-08-30.
+
+---
+
+#### (Post-F9.150) — ⭐ EL **TARGET PRICE** DEL CLIENTE: el precio objetivo que él nos da, a la vista en la negociación (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel, textual:
+
+> *«hay un tema mas que no te habia dicho nunca…. aveces los clientes nos dan sus target prices…. y es
+> importante saberlo a la hora de la negociacion. Eso lo debe de poner Aurora desde que hace la lista de
+> precios. (o los modelos). Debe de tener un liugar para poner el target que le dio el cliente si es que
+> nos lo dio. Y me debe de aparecer en la negociacion.»*
+
+### Lo que queda decidido
+
+1. **QUÉ ES.** El precio objetivo que **el CLIENTE** le da a FR Moda para un modelo. Es un dato **que
+   viene de fuera**: el sistema no lo calcula. **Es OPCIONAL** — *«si es que nos lo dio»*: muchas veces
+   no hay target, y la ausencia es normal, no un hueco por llenar.
+2. **QUIÉN Y CUÁNDO.** Lo captura **Aurora al armar la lista de precios**, antes de la negociación. **NO**
+   es un campo que Daniel llene en la mesa.
+3. **DÓNDE VIVE** *(lectura del lead, no palabras de Daniel)*: en el **renglón de la lista**
+   (`ListaPreciosLinea`), no en el modelo ni en el desarrollo. Razón: **el target es del CLIENTE**, y un
+   mismo modelo vendido a dos clientes puede traer dos targets distintos; la lista ya es por
+   Cliente+Departamento, así que el renglón es su lugar natural. **Un solo número por modelo** (no por
+   talla ni por color: es un precio).
+4. **PARA QUÉ.** Aparece en la **mesa de negociación**, junto al precio, para que Daniel vea contra qué
+   está negociando. **INFORMA, NO BLOQUEA**: quedar arriba del target no impide nada, sólo se ve.
+5. ⚠️ **Nota de cuidado para quien lo construya** (V1-E8b + la ratificación de Daniel del 29-ago:
+   *«Nadie mas que yo ve los factores por favor….»*): comparar **precio contra target** es aritmética
+   limpia y **no toca los factores del cliente** (margen/descuentos/regalías/costo de ventas), así que
+   se puede mostrar a quien vea la mesa. Lo que **no** se puede es derivar del target ninguna señal que
+   dependa de los factores. **Ya van cuatro puertas cerradas a ese dato; la quinta no se abre por
+   descuido.**
+6. **PLANIFICACIÓN: versión 0.060**, junto con el resto del reacomodo de la mesa (tela con precio y
+   consumo separados, avíos desglosados y movibles, foto principal del modelo, encabezado) **y el
+   guardado de estimados de §Post-F9.149**. Van juntos **a propósito**: los tres primeros cambian la
+   FORMA de lo que hay que persistir, y guardar antes de reacomodar obligaría a **dos migraciones**.
+
+- **Aplica en:** la lista de precios (captura) y la mesa de negociación (lectura). ✅ **CONSTRUIDA**
+  (V1-E8w, 30-ago-2026, versión **0.060**); **lleva migración de BD**
+  (`lista_precios_linea.precio_target`, nullable; **sin permisos nuevos**). Cómo quedó:
+  - ✅ **Opcional y borrable** (punto 1): `null` es el estado normal, y el diálogo trae un botón
+    **«Borrar target»** — *"si es que nos lo dio"* no puede convertirse en una trampa para quien
+    capturó un número por error, porque **un target falso en la mesa es peor que ninguno**.
+  - ✅ **Lo captura Aurora** (punto 2): el permiso es **`listas.administrar`** —el que ella tiene, y
+    la misma puerta con la que se agrega y se quita un renglón—, **NO `listas.aprobar`**, que es del
+    dueño. Probado en los dos sentidos: Aurora lo pone; quien sólo aprueba precios no.
+  - ✅ **Vive en el renglón** (punto 3): columna propia en la lista, entre el costo y el precio
+    calculado.
+  - ✅ **Aparece en la mesa y NO bloquea** (punto 4): pegado al precio, con un badge «llega / no
+    llega». Por debajo del target la mesa contesta igual de completa y aprobar el precio se permite;
+    probado a nivel de RENDER, que es donde vive el riesgo de que un aviso se convierta en un
+    candado.
+  - ✅ **La quinta puerta no se abrió** (punto 5): `precioTarget` y `cumpleTarget` NO llevan el
+    candado de los factores, y la razón está **medida, no supuesta** — el target lo puso el CLIENTE y
+    el objetivo lo teclea quien pregunta, así que ninguna división entre ellos despeja margen,
+    descuentos, regalías ni costo de ventas. Lo que sí los habría delatado —comparar el target contra
+    el `precioSugerido`— sigue tapado, porque el sugerido ya sale `null` sin `listas.aprobar`. Hay
+    una prueba dedicada a eso: sin `listas.aprobar`, el target se ve y los cinco derivados no.
+  **Fecha:** 2026-08-29 · **Construida:** 2026-08-30.
+
+---
+
+#### (Post-F9.151) — ⭐ ESTADOS DEL **MODELO** DENTRO DE LA LISTA DE PRECIOS: abierto → en negociación → cerrado → dropeado (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel pidió poder distinguir, dentro de una lista, qué modelos ya cerró:
+
+> *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y los
+> otros ya no los vendo»*
+
+Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
+
+> *«Que empiece todo en "Abierto", y luego estan los otros 3 estados. En negociacion, cerrado, dropeado.
+> en total son 4 estados»*
+
+### Lo que queda decidido
+
+1. **Cuatro estados por MODELO:** **Abierto** (el inicial — **todo renglón nace aquí**) → **En
+   negociación** → **Cerrado** → **Dropeado**.
+2. 🔴 **«Dropeado» es la palabra de Daniel** — jerga del negocio para el modelo que al final no se
+   vendió. **NO se traduce a «no vendido» ni se «mejora»**: las citas de Daniel van textuales, y aquí
+   además es el nombre que **él va a leer en pantalla**.
+3. ⚠️ **Es un estado del RENGLÓN (`ListaPreciosLinea`), DISTINTO del estado de la LISTA**, aunque tres
+   de los nombres se parezcan. Se anota explícito para que quien lo construya **no los confunda ni reuse
+   `EstadoLista` sin pensarlo**: son dos ejes, uno del documento y otro de cada modelo dentro de él.
+
+   🔴 **CORREGIDO al medirlo (30-ago, ver §Post-F9.155):** este punto decía que *«los renglones no
+   tienen ninguno»*, **y era falso**. El renglón YA tiene un eje de estado —**Aprobado / Pendiente**,
+   respaldado por `precioAprobado`— y **ya ocupa una columna «Estado» propia** en la pantalla de la
+   lista. Quien construya esto NO llega a lienzo en blanco: llega a una columna ya ocupada por otro
+   eje, y tiene que decidir si los cuatro estados la comparten, la sustituyen o abren una segunda.
+   ⚠️ Y el choque de nombres es peor de lo que decía este punto: **«En negociación» no se PARECE al de
+   la lista, ES EL MISMO STRING**, carácter por carácter — y las dos etiquetas van a convivir en la
+   misma pantalla (el chip de la lista arriba, el del renglón abajo) significando cosas distintas.
+
+   ⚠️ **El atajo equivocado que hay que evitar:** `EstadoLista` **no es un enum, es una tabla-catálogo
+   con CRUD y pantalla propia** (los estados de la lista son ampliables, decisión de Daniel). Así que
+   existe un camino trivial —**teclear «Dropeado» en ese catálogo**— que no pide ni migración y que
+   parecería resolver la versión. Es exactamente lo que este punto 3 prohíbe.
+4. **PLANIFICACIÓN: versión 0.062** (era 0.061; corrió un lugar cuando las decisiones del
+   30-ago entraron como 0.061 — ver la tabla del programa en `HOJA-DE-RUTA.md` §1).
+
+- **Aplica en:** la lista de precios (renglón por modelo) y la mesa de negociación. ✅ **CONSTRUIDA**
+  (versión **0.062**, 30-ago-2026). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.152) — ⭐ COTIZAR EN LA MESA UN MODELO QUE NO EXISTE (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel, textual:
+
+> *«Hay algo más. Perdon. Se me ocurre que a veces estando en la cita, me piden cotizar algun modelo que
+> no tengamos en muestrario que llevamos. Y tengo que darles ahí un precio. Necesito armarlo desde cero
+> estimando cosas. O bien podría copiar algún modelo de losnquenyabtenemisndesareollados y cambiarle
+> cosas.*
+>
+> *Me puedes dejar espacio para meter nuevos modelos y hacerlos ahí con datos estimados.»*
+
+### Lo que queda decidido
+
+1. **QUÉ.** En plena cita, el cliente pide precio de un modelo que **no va en el muestrario**. Daniel
+   necesita **crearlo ahí mismo** y cotizarlo, por dos caminos: **(a) desde cero** con datos estimados, o
+   **(b) copiando un modelo ya desarrollado** y cambiándole cosas.
+2. **DÓNDE.** Desde la **mesa de negociación**, sin volver a la oficina. El modelo nace **dentro de la
+   lista que está negociando**.
+3. ⚠️ **LO QUE YA EXISTE, MEDIDO — para que nadie reconstruya el motor** *(van tres premisas falsas en
+   este proyecto por no medir antes)*:
+   - **`crearDesarrolloConModeloNuevo`** (`backend/src/dominio/desarrollo/desarrollos.ts:284`) crea
+     **desarrollo + modelo en UNA transacción** y **mintea el código él mismo**
+     (`mintearCodigoDesarrollo`). Exige `desarrollo.administrar` **y** `modelos.administrar`.
+   - **`copiarBom`** (`modelos/bom-modelo.ts:896`) y **`copiarArteDeOtroModelo`**
+     (`modelos/arte-modelo.ts:618`) ya copian receta y arte de otro modelo ⇒ el camino (b) tiene motor.
+   - **`PrecostoLinea`** ya guarda `descripcion`, `consumo` y `precioUnit` renglón por renglón, con la
+     bandera **`ajustado`** que impide que un recálculo desde el BOM pise lo movido a mano.
+
+   ⇒ **El trabajo no es construir el motor: es abrir el camino desde la mesa y armarlo en pocos toques.**
+4. 🔴 **LA FRICCIÓN REAL — y aquí la medición corrige DOS veces, la segunda a la primera corrección.**
+   Se dijo que `crearModelo` exige *«temporada, curva, género y tipo de prenda»*: **falso**.
+   ⚠️ La primera corrección respondió *«son DOS, no cuatro»* — **también falso, y en la misma frase que
+   reprendía por no medir**. Medido a fondo en `contrato/esquemas/modelo.ts` (`esquemaModeloCrear`):
+   **son TRES los obligatorios** — **`codigo`** (`.min(1)`, y `crearModelo` además lo valida con
+   `exigirCodigoLibre`, `modelos/modelos.ts:611`), **`idGenero`** e **`idTipoProducto`**; de los dos
+   últimos salen los dígitos del nº de producción (§Post-F9.134). **`idTemporada` e `idCurvaTalla` sí
+   son OPCIONALES** (`.optional()`), que era lo esencial de la corrección y sigue en pie. El alta de
+   desarrollo (`esquemaDesarrolloModeloNuevoCuerpo`, `contrato/esquemas/desarrollo.ts:85-118`) pide
+   **tres**: `anioEntrega`, `idTipoProducto` e `idGenero` — y **no pide `codigo` porque lo MINTEA ella
+   misma** (`mintearCodigoDesarrollo`), que es justo el camino que la mesa debe usar.
+
+   ⇒ **El formulario mínimo de la mesa es corto: año, tipo de prenda y género** (el código se mintea
+   solo). La fricción existe, pero es de tres campos, no de un formulario largo.
+
+   📌 *Dos conteos mal seguidos en la decisión que predica medir. La lección no es el número: es que
+   «medir» significa abrir el esquema entero, no el campo que uno fue a buscar.*
+
+   ⏳ **PENDIENTE de la respuesta de Daniel** (ya se le preguntó): **cuál es el mínimo que acepta teclear
+   en la cita**, y si el resto puede quedar **pendiente de completar en la oficina** con el modelo
+   marcado como **incompleto** — el mismo patrón que él ya eligió para la OP sin receta: *«La OP Queda
+   como incompleta, hasta que se meta la receta y se libere»*. ⚠️ Esa decisión es **§Post-F9.146**, que
+   **no vive en esta rama**: viene en `trabajo/respuestas-29-ago`, todavía sin mergear. Si esta rama
+   entra primero, la referencia apunta a algo que aún no existe — por eso la cita va **textual aquí**
+   y basta por sí sola; el numeral es sólo el puntero para cuando las dos ramas estén juntas. Engancha con el
+   pendiente ya abierto de **ratificar tipo de prenda y género obligatorios**.
+5. **PLANIFICACIÓN: versión 0.064** ⚠️ (decía 0.062, luego 0.063; **ha corrido dos lugares** — la segunda vez por el hotfix del candado del precosto, que entró como 0.063 — ver
+   la tabla del programa en `HOJA-DE-RUTA.md` §1). Va después de la **0.060** (la mesa con su forma real
+   + estimados persistidos + target price) y de la **0.062** (los estados del modelo, que en la
+   numeración vieja eran la 0.061). **Las dos ya están ✅ CONSTRUIDAS y en `prueba`.** Va después
+   **porque necesita que la mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo
+   estimado sin eso no se puede cotizar.
+
+### Lo que se decidió el 31-ago al construirla (Daniel, tres respuestas)
+
+6. **CONTACTOS DEL CLIENTE: cuelgan del CLIENTE, con DEPARTAMENTO OPCIONAL.** Daniel: *«así "Laura,
+   compradora de NIÑOS" se distingue, y "Carlos, crédito" no necesita departamento inventado»*. ⇒
+   `ClienteContacto` es el espejo de `ProveedorContacto` con `idClienteDepartamento` **nullable** y fuera
+   de toda unicidad. Sale de medir la mesa: la lista se negocia CON ALGUIEN y **el cliente no guardaba a
+   nadie** (sólo los tres campos sueltos `contacto`/`telefono`/`email`, uno por cliente).
+7. **PENDIENTES: POR MODELO, NO POR CITA.** Se le ofreció una nota general de la junta y eligió lo otro:
+   *«falta muestra de color»*, *«pedir precio de jareta»* son **de un modelo concreto**, y una nota
+   general los revolvería. ⇒ cuelgan del RENGLÓN de la lista. 🔴 **Son LIBRETA, no bitácora**: el texto se
+   corrige, se tacha y se borra — a diferencia de `NegociacionEvento.acuerdo`, que es obligatorio e
+   INMUTABLE (D3) y **no se reusó** para esto. Y **no son el papel** (no salen en PDF/Excel/cotización),
+   así que **no los frena el cierre de la lista ni el estado del renglón**: tachar *«falta la muestra»*
+   dos semanas después de cerrar el modelo es justo para lo que sirven.
+8. **QUIÉN PUEDE CREAR EL MODELO: Aurora también** — y **ya podía**: §Post-F9.123 bajó
+   `modelos.administrar` hasta **Gerencial**, que es su rol. **Sin permisos nuevos.**
+
+### 🔴 Lo que la MEDICIÓN del 31-ago corrigió del punto 3 de arriba (y es la lección)
+
+El punto 3 decía *«el trabajo no es construir el motor: es abrir el camino»*. Es cierto a medias, y las
+dos mitades falsas son las que dolían:
+
+- 🔴🔴 **`copiarBom` NO trae los costos.** `maquilaBase`, `corteBase`, `numOperaciones`, `composicion` e
+  `idCurvaTalla` son columnas de **`Modelo`**, no del BOM — y `generarPrecosto` toma la maquila y el corte
+  **de ahí**. Un modelo copiado sólo con el BOM **precostea con maquila $0 y corte $0, en silencio**, y de
+  ese precosto sale **el precio que se le dice al cliente en la cara**. ⇒ la copia arrastra **la FICHA
+  además de la receta**. *La frase «copiar los trae todos: cero fricción» era exactamente al revés en lo
+  único que decide el precio.*
+- 🔴🔴 **NO existía forma de agregar un renglón a una lista ya creada.** El ÚNICO escritor de
+  `lista_precios_linea` era el `createMany` de `crearLista` ⇒ el punto 2 de esta decisión —*«el modelo
+  nace dentro de la lista que está negociando»*— era **literalmente imposible**: había que borrar la lista
+  y rehacerla, perdiendo aprobaciones, rondas, acuerdos e historial. **El plan no la nombraba**, y era la
+  pieza más grande de la etapa.
+- ⚖️ **Copiar NO es versionar.** `crearVersionDeModelo` sí arrastra los costos, pero cuelga al hijo de la
+  **familia del padre** (`CYA-26-71-001` → `-01`) y ese código lleva dentro **la abreviatura del cliente
+  del padre**: copiar un modelo de C&A para cotizárselo a Liverpool le pondría un código que dice «CYA».
+  Además deja `revisionEstado: 'pendiente'` y exige `modelos.aprobar-receta`. ⇒ se mintea **código nuevo
+  del cliente de la mesa** y se reusa **sólo** `copiarRecetaAModeloNuevo`.
+- ⚠️ **Y lo que el punto 4 dejaba abierto se resolvió sin preguntar de nuevo:** el alta desde la mesa
+  **NO agrega el renglón**. Un renglón necesita precosto **CONGELADO** y uno recién nacido desde cero no
+  tiene nada costeado (candado de la 0.063) ⇒ la mesa hace **dos actos visibles** —«créalo» y
+  «agrégalo»— en vez de uno que a veces funciona y no dice por qué. El modelo nace con su **precosto
+  borrador** ya generado, así que entre los dos actos sólo hay teclear los estimados.
+
+- **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo, el precosteo y el catálogo de
+  clientes. ✅ **CONSTRUIDA** (V1-E8y, 31-ago-2026, versión **0.064**); **lleva migración de BD**
+  (`cliente_contacto`, `lista_precios.lugar`, `lista_precios_linea_pendiente`) y **SIN permisos nuevos ⇒
+  NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-29 (construida el 2026-08-31).
+
+---
+
+#### (Post-F9.153) — ⭐ EL **COSTO DE EMPAQUE** (tercera ancla fija) + la mesa con su **forma real** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Daniel probó la mesa de negociación en vivo de la 0.058 y, en la misma conversación,
+pidió **cinco cosas de forma** y **una de costeo**. Las cinco de forma cambian **qué hay que persistir**,
+así que se construyeron **junto con** el guardado de §Post-F9.149 y el target de §Post-F9.150 — hacerlo
+al revés habría obligado a **dos migraciones**.
+
+Sus palabras, textuales (con sus erratas):
+
+> *«En el desglose de elementos, es importante poner precio de la tela, y consumo.... por que muchas
+> veces voy estimando el nuevo peso en lugar del costo de multiplicar el consumo por el precio de la
+> tela. O a veces decido meter una tela mas barata, pero el consumo es el mismo.»*
+
+> *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover los
+> costos ahi. Desglosados... no solo el total, por que no se bien de que elementos se compone.»*
+
+> *«Me gustaria ir viendo la foto del modelo. La principal.»*
+
+Y sobre el empaque:
+
+> *«nos falto meter el costo del empaque. Es un campo adicional.... como si fuera corte.»*
+>
+> *«el empaque no es de catalogo.... es simplemente un campo que casi siempre es el mismo costo»*
+>
+> *«Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar»*
+
+### Lo que queda decidido
+
+1. **TELA: precio y consumo son DOS PERILLAS, no una.** La mesa manda `consumo` y `precioUnit`
+   **separados** por renglón y el **servidor** hace el producto. No es cosmética: son dos movimientos
+   distintos del negocio —*"estimo el nuevo peso"* y *"meto una tela mas barata"*—, y con un solo importe
+   había que multiplicar de cabeza. Hacer la multiplicación **en la pantalla** estaba descartado: un
+   producto que decide un precio es lógica de negocio (A1).
+2. **AVÍOS: el panel trae los de la RECETA, desglosados.** Hasta la 0.059 sólo listaba los estimados que
+   se inventaban en la mesa; los avíos reales llegaban aplastados en un solo subtotal. **El defecto era
+   que `desgloseCostoLinea` agrupaba, no que faltara el dato**: el detalle ya vivía en `precosto.lineas`
+   y la mesa nunca lo veía. Ahora el desglose devuelve **grupos con sus renglones** (id, descripción,
+   consumo, precio, importe) **además** del subtotal, que se conserva para los consumidores que sólo
+   querían eso.
+3. **FOTO principal del modelo en la mesa.** Se resuelve en el **desglose de UN renglón** —no en la lista
+   completa—: prefirmar una URL cuesta un viaje a R2, y una lista de 20 modelos habría pagado 20 en cada
+   carga para enseñar una foto a la vez. "Principal" = la **primera por `orden`**, el mismo criterio del
+   carrusel, la galería y el impreso de la orden. Sin fotos **se dice**, no se deja un hueco: en una cita,
+   *"no hay foto"* es un dato (hay que conseguirla), no un fallo de la pantalla.
+4. ⭐ **EMPAQUE = la TERCERA ANCLA FIJA**, junto a `maquila` y `corte` (`CONCEPTOS_ANCLA`): renglón
+   `manual` auto-creado, **único por precosto, editable pero NO eliminable**. *"Como si fuera corte"*,
+   literal.
+5. 🔴 **EL 2.20 NO VA CLAVADO EN EL CÓDIGO.** Vive en **`ConfiguracionEmpresa.costoEmpaqueBase`**
+   (default `2.20`), junto a `pctDesvioCompra`, `jornadaBaseAlmacen` y los `agingLimite*`, con su campo
+   en Administración › Empresas › Configuración. Razón dicha a Daniel: **el empaque va a subir, y el día
+   que sean $2.50 lo cambia él sin un deploy**. Una constante en el código habría sido, otra vez, el
+   arreglo que necesita que alguien haga algo (§Post-F9.17).
+6. 🔴 **CAMBIAR EL DEFAULT NO TOCA NINGUNA RECETA YA HECHA.** Cada precosto se lleva su **copia** del
+   importe en su renglón; el default sólo alimenta los que **nacen** después. Y **un precosto CONGELADO
+   no se toca jamás** (D3: es la foto de lo que se cotizó). Probado con las dos: congelada y borrador, y
+   con un `recalcularDesdeBom` de por medio.
+7. ⚠️ **CONSECUENCIA QUE HAY QUE DECIR EN VOZ ALTA: el empaque SUBE el costo de todas las recetas
+   nuevas** ($2.20 por prenda) y con él el precio sugerido. Es a propósito —ese costo existía y no se
+   estaba contando—, pero las listas ya congeladas **no se mueven**, así que durante un tiempo van a
+   convivir precios con empaque y sin él. Está escrito así en `HISTORIAL-DE-VERSIONES.md` bajo *"qué
+   puede sorprender"*.
+8. **La regla del ancla se corrigió de "concepto PROHIBIDO" a "renglón ÚNICO por precosto".** Escrita
+   como veto al concepto, dejaba **sin salida a todo borrador anterior a esta versión**: nacieron sin
+   empaque, `recalcularDesdeBom` no toca los `manual`, y agregarlo a mano estaba vetado. La regla real
+   siempre fue "no dos veces"; ahora se comprueba la **presencia** en ESE precosto. El duplicado se sigue
+   rechazando igual.
+9. **El encabezado de la lista de precios** se partía palabra por palabra (Daniel mandó la foto). No era
+   el texto: `flex-1` es `flex-basis: 0`, así que el bloque del título "siempre cabía" y el `flex-wrap`
+   del header **nunca llegaba a dispararse** — en su lugar el título se encogía a su ancho mínimo para
+   dejarle sitio a los botones. Se le dio una **base real** y las acciones bajan al renglón de abajo.
+
+- **Aplica en:** la mesa de negociación, el desglose de costo del renglón, el precosto (ancla nueva), la
+  configuración por empresa y el encabezado de la lista de precios. ✅ **CONSTRUIDA** (V1-E8w,
+  30-ago-2026, versión **0.060**); **lleva migración de BD** (`configuraciones_empresa.costo_empaque_base`
+  con `DEFAULT 2.20`) y **REQUIERE `SEED_ON_START=true`** para sembrar el concepto de costo `empaque` —
+  sin él, `generarPrecosto` truena con *"falta el concepto de costo base empaque"*, exactamente como pasó
+  cuando se estrenó `corte`. **Sin permisos nuevos.** **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.154) — ⭐⭐ LA **MERMA**, el **DIVISOR** del costo y **CUÁNDO SE CONGELA** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Al medir el alcance de la 0.061 apareció un problema: el plan citaba §Post-F9.147 como
+su fuente, y esa sección dice literalmente lo contrario — *«darles salida exigiría un tipo de movimiento
+nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**»*. Se le preguntaron las dos
+cosas, y de su respuesta salió una **tercera** que nadie había puesto sobre la mesa y que es la más
+importante de las tres.
+
+**(a) La incompleta sale de tránsito como MERMA, automática.** Desde §Post-F9.147 la prenda incompleta
+cierra el pendiente por recibir, pero se quedaba **atorada en el almacén de tránsito para siempre**. Ahora
+sale sola al registrar el recibo, con un movimiento de merma **auditado y reversible**: cancelar el recibo
+la deshace. **No es retroactiva al histórico migrado** — y no hay que programarlo, lo migrado ni siquiera
+tiene el dato de incompletas (Access no tenía el concepto) ni pasa por esa función.
+
+**(b) El divisor del costo pasa de `cortado` a `recibido`.** Daniel lo razonó por cubetas, y su
+razonamiento coincide **punto por punto** con lo que `recibido` ya significa en el código:
+
+> *"Las 10 faltantes se las voy a cobrar al maquilero…. Entonces esas las sacaría de la ecuación. Y las
+> segundas también se venden a un Saldero. Las únicas que se pierden por completo son las incompletas."*
+
+| Cubeta | ¿Entra al divisor? | Razón de Daniel | En el código |
+|---|---|---|---|
+| Primeras | **Sí** | se venden | entran a PT |
+| Segundas | **Sí** | *"se venden a un Saldero"* | entran a PT (a **su** almacén) |
+| Faltantes | **No** | *"se las cobro al maquilero"* | no entran a PT; se cobran en EsMa |
+| Incompletas | **No** | *"se pierden por completo"* | no entran a PT ⇒ son la merma de (a) |
+
+⚠️ **Daniel dudó y preguntó si convenía dividir entre las CORTADAS.** Se descartó, con su propio ejemplo:
+repartir entre 1,000 hace que cada prenda salga **más barata en el papel de lo que costó** —se pagó tela,
+corte y maquila de 1,000 y sólo hay 950 que cobrar— y **esconde justo lo que este número existe para
+enseñar**: cuánto cuesta la merma. Y no hay riesgo de que un mal lote distorsione los precios, porque
+**este costo NO fija precios**: eso lo hace el precosto (D13/R17). Éste contesta *"¿cuánto gané de verdad
+en esta orden?"*, y a esa pregunta le sirve la verdad cruda.
+
+📌 **Imprecisión declarada, NO corregida:** el cobro al maquilero por los faltantes **no reduce** el costo
+de la orden (vive en EsMa, otra cuenta). Así que el costo de fabricar esas prendas se reparte entre las
+vendibles aunque el dinero se recupere por otra puerta. En el ejemplo de Daniel son **10 de 1,000 = 1 %**.
+Se deja así a propósito: meter el cargo EsMa dentro del costo de la orden mezcla dos cuentas que hoy están
+limpias y separadas. Si algún día pesa, se resuelve aparte y con su propio rastro.
+
+**(c) ⭐ EL COSTO SE CONGELA AL CERRAR LA ORDEN.** Ésta la levantó Daniel solo, y es la que salva a (b):
+
+> *"¿En qué momento se define que ya se cerró el recibo o el costo? ¿Qué pasa si hoy recibo 950 de las
+> 1000 pero en un mes recibo otras 40? ¿En qué momento se genera el costo? ¿O va cambiando?"*
+
+**Va cambiando — medido, no supuesto.** Lo que se persiste es el **dinero** (`costo_orden.costo_total`) y
+**cuál divisor usar** (`base_prorrateo`); la **cantidad** se vuelve a sumar de los movimientos **en cada
+lectura** (`costo-orden.ts:199-204`, vía `cantidades.ts`), así que `costoUnitario` se recalcula siempre.
+Con base `cortado` casi no se nota —se corta una vez, al principio—; **con base `recibido` el costo queda
+vivo hasta el último recibo**. Y no existe ningún cierre: el costo de una orden de hace dos años se
+recalcula hoy si alguien la abre. ⇒ **Adoptar (b) sin (c) habría dejado el costo bailando para siempre.**
+
+**La regla:** cuando ya no falte nada por recibir —la invariante de §Post-F9.147,
+`enviado = primeras + segundas + faltantes + incompletas`, con el pendiente en cero— **el costo unitario
+se congela** con el divisor de ese momento y deja de moverse. Es la propuesta del propio Daniel:
+
+> *"habría que cerrar los recibos 'recibiendo' todo. Es decir, cerrando las 1,000. Si recibo 950 y hay 40
+> incompletas y 10 faltantes, creo que habría que registrarlas así para cerrar las 1,000."*
+
+⚠️ **Consecuencia aceptada:** un recibo tardío sobre una orden ya congelada **no mueve el costo solo**;
+hay que reabrirla a propósito, y eso deja rastro. Es el precio de que el número deje de bailar.
+
+**Alcance.** (a) y (c) llevan **seed** (⇒ `SEED_ON_START=true`) si la merma estrena código de movimiento;
+(b) lleva **migración** sólo por el `@default` de la columna. **Sin permisos nuevos.**
+🔴 **El default de `baseProrrateo` vive en CINCO sitios, no en dos como decía el plan** — y uno de ellos, el
+`.default('cortado')` del Zod de entrada (`contrato/esquemas/costos.ts`), **puede reescribir órdenes ya
+costeadas** en un PUT que omita el campo (su propio TSDoc lo advierte, y el ETL «deja adrede el default»).
+**El cambio aplica a lo que se costee de aquí en adelante; lo ya costeado no se toca.** **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.155) — ⭐ EL **DROPEADO** Y EL PAPEL: una sola regla para los dos momentos (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Al medir el alcance de la 0.062 (§Post-F9.151) apareció un **defecto de diseño que
+habría entregado la versión rota**, y para resolverlo hubo que preguntarle a Daniel algo que ninguna
+decisión previa contestaba.
+
+🔴 **El defecto.** `exigirRenglonesAprobados` (`dominio/desarrollo/cotizaciones.ts`) exige que **TODOS**
+los renglones tengan `precioAprobado`, y lo consumen **los tres** caminos de papel: el **PDF**, el
+**Excel** y la **emisión de la cotización**. Un renglón «Dropeado» —que por definición **nunca se va a
+aprobar**— dejaría la lista **sin PDF, sin Excel y sin cotización para siempre**. Y es *exactamente* el
+escenario con el que Daniel pidió los estados: *«de una lista de 10 modelos, cierro 5 y los otros ya no
+los vendo»*. La única salida hoy sería **borrar** el renglón — justo lo que los estados vienen a evitar.
+
+**Lo que contestó Daniel**, y que reveló un matiz del negocio que el plan no tenía:
+
+> *«El dropeo se hace hasta la negociación. Hay un envío de cotización previa a la negociación. Ahí van
+> todos. Después de la negociación solo hay que mandar los que están vigentes. Quitar los dropeados»*
+
+### Lo que queda decidido
+
+1. ⭐ **UNA SOLA REGLA cubre los dos momentos: el papel muestra los renglones NO dropeados.** No hacen
+   falta dos impresos ni dos tipos de cotización, porque **el dropeo ocurre durante la negociación**:
+   - **Antes de negociar** no hay ninguno dropeado ⇒ **salen todos** — la *cotización previa* de Daniel.
+   - **Después de negociar** ⇒ salen **los vigentes**, sin los dropeados.
+
+   📌 Se prefirió esta forma sobre «dos impresos» precisamente porque el estado ya lleva el tiempo
+   dentro: preguntarle al renglón *"¿estás dropeado hoy?"* contesta las dos preguntas sin que nadie
+   tenga que elegir qué versión del papel bajar.
+
+2. 🔴 **El guard `exigirRenglonesAprobados` deja de mirar a los dropeados.** Exige aprobación **sólo de
+   los renglones vigentes**, en los **tres** consumidores (PDF, Excel y cotización) — no en uno, y no
+   sólo en el render. Un dropeado sin precio aprobado **no puede volver a bloquear la lista entera**.
+
+3. **«Dropeado» NO es definitivo: se puede revivir, y queda el rastro.** Si el cliente se arrepiente, el
+   renglón vuelve a «abierto» o «en negociación» **conservando toda su historia** de precios y
+   comentarios, y se registra **quién lo dropeó, cuándo, y quién lo revivió**. Daniel eligió esto sobre
+   la alternativa estricta (dar de alta un renglón nuevo y negociar desde cero).
+
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026).
+
+**Alcance.** Migración **sí** (la columna de estado del renglón, con valor inicial `abierto` para las
+filas existentes — *todo renglón nace ahí*, §Post-F9.151). **Permisos: NO** — `listas.negociar` ya
+gobierna el cambio de estado de la lista y es el candidato natural para el del renglón. **Seed: NO** si
+los cuatro estados son un **enum** cerrado, que es la lectura correcta de Daniel (*«en total son 4
+estados»*) y evita que alguien agregue un quinto sin pensarlo. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.156) — ⭐ LOS FACTORES SON UNA CALCULADORA; EL PRECIO **CERRADO** ES UN COMPROMISO (DANIEL, 30-ago-2026)
+
+**Cómo salió.** El reviewer de la 0.062 encontró un **callejón sin salida** que la etapa creaba sin querer,
+y que nadie había previsto — lo **ejecutó**, no lo dedujo:
+
+> Lista de 10 modelos, Daniel cierra 5 (los cinco aprobados). Cambia el margen de 30 % a 32 %.
+> ⇒ `editarFactoresLista` tumbaba `precioAprobado` de **los diez**. Pero un renglón `cerrado` ya **no
+> acepta** que se le apruebe precio (candado nuevo de esta versión) ⇒ los 5 quedaban **sin firma y sin
+> forma de volver a firmarla**; y como `cerrado` **sí es vigente**, el guard del papel los nombraba como
+> faltantes ⇒ **la lista entera se quedaba sin PDF, sin Excel y sin cotización**. Única salida: revivir →
+> aprobar → volver a cerrar, ×5 = 15 interacciones y 3 eventos inmutables de ruido por modelo.
+
+**Lo que contestó Daniel:** *«No se tocan: lo cerrado es un compromiso»*. Y al preguntársele por qué, dio
+la frase que **explica la regla y vale más que la regla**:
+
+> *«Los factores son elementos que me ayudan a saber mi margen a la hora de negociar. **Es solo para hacer
+> mis cálculos**.»*
+
+### Lo que queda decidido
+
+1. ⭐ **Son cosas de distinta naturaleza, y por eso mover una no mueve la otra.** Los factores (margen,
+   descuentos, regalías, costo de ventas) son **la calculadora privada de Daniel** — de hecho **sólo él
+   los ve**, §Post-F9.125/.137/.138. El **precio cerrado** es un **acuerdo con el cliente**. Cambiar el
+   margen de 30 % a 32 % cambia *lo que la herramienta sugiere de aquí en adelante*; **no** cambia lo que
+   ya se pactó.
+2. **`editarFactoresLista` SALTA los renglones en estado terminal** (`cerrado` y `dropeado`): ni recálculo,
+   ni firma tumbada, ni evento de invalidación. Los `abierto` y `en_negociacion` siguen recalculándose
+   igual que siempre.
+3. **Para cambiar un precio ya cerrado hay que REVIVIR el renglón** — y eso deja rastro, que es
+   exactamente lo que se quiere: mover un compromiso debe ser un acto deliberado y visible, no el efecto
+   colateral de tocar un porcentaje interno.
+4. 📌 **La bitácora deja de mentir:** además del total registra `renglonesRecalculados` y
+   `terminalesRespetados` (id, estado y precio de cada uno). Antes habría afirmado haber tocado renglones
+   que no tocó.
+
+✅ **CONSTRUIDA** (versión **0.062**, 30-ago-2026): `editarFactoresLista` salta los renglones
+en estado terminal, y la bitácora registra `terminalesRespetados`.
+
+📌 **Anotado, NO cambiado (queda como pregunta abierta, sin fecha):** hoy cambiar factores **también**
+tumba la firma de los renglones **abiertos y en negociación**. Con la frase de Daniel eso admite dos
+lecturas —se cae porque el precio ya no corresponde al cálculo nuevo, o no debería caerse porque aprobar
+fue una decisión suya y no un resultado automático—. **Ese comportamiento es anterior a esta versión y
+Daniel no lo ha reportado como molestia**, así que se deja como está y no se toca por iniciativa propia.
+Si algún día le estorba, el cambio es chico. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.157) — 🔴 REGLA DE TRABAJO: **NO SE FRENA ESPERANDO RESPUESTAS** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** El lead cerró la versión 0.062, contestó una pregunta sobre qué decisiones faltaban… y
+**se quedó quieto, sin nada corriendo**, teniendo por delante la **0.063 completamente decidida** y lista
+para arrancar. Daniel lo detectó con dos preguntas seguidas: *«¿Estás trabajando?»* y *«¿Estás frenado
+esperando las respuestas, o estás trabajando?»*. 🔴 **No estaba bloqueado: estaba parado.** Su instrucción,
+textual:
+
+> *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+
+Y pidió explícitamente que quedara **donde toda sesión nueva lo lea**, no en el chat:
+
+> *«Por favor anota esto donde tengas que anotarlo para atrás, que nunca vuelva a suceder… déjalo como una
+> decisión, para que cuando abra nuevos chats la decisión sea la misma.»*
+
+### Lo que queda decidido
+
+1. ⭐ **Preguntar NO es parar.** Se deja la pregunta puesta —**con su default propuesto**— y **se sigue con
+   lo siguiente que no dependa de ella**. Cuando la respuesta llegue, se retoma donde se dejó.
+2. **Antes de decir «espero respuesta» hay que haber agotado lo que NO depende de ella.** Casi siempre hay
+   algo: otra versión entera del programa, la **medición** de la que sigue, una deuda del §4, o
+   documentación. **Una etapa bloqueada no bloquea el programa: se salta y se sigue.**
+   📌 **Precedente que lo prueba, del mismo día:** la **0.061** (el costo) se aparcó por decisión de Daniel
+   y se pasó **directo a la 0.062**, sin perder un minuto y sin discutir nada dos veces — porque sus
+   decisiones quedaron escritas (§Post-F9.154) antes de aparcarla.
+3. **Sólo se para de verdad** cuando *todo* lo pendiente depende de esa respuesta, o cuando avanzar sin
+   ella arriesgaría trabajo que habría que tirar. En ese caso **se dice con esas palabras** — *«estoy
+   detenido esperando esto»* — y se explica qué se intentó antes de detenerse. Una pausa sin esa frase
+   explícita **es un error, no una espera**.
+4. **Las preguntas se juntan** (refuerza §6 de `CLAUDE.md`): si hay tres decisiones abiertas de un bloque,
+   van **las tres de una vez** con su default, no de a gotas.
+5. **Corolario operativo:** el ritmo del proyecto **no puede depender de que Daniel esté frente a la
+   pantalla**. Él responde cuando puede; el trabajo no se detiene mientras tanto.
+
+- **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0** al inicio de `CLAUDE.md` §7 — el primer
+  archivo que lee cualquier chat nuevo — para que no dependa de que alguien recuerde esta decisión.
+  **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.158) — ⭐⭐ LA RECETA SE COPIA A LA OP **AL LIBERARSE**, Y LA FIRMA GOBIERNA LA COMPRA (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Eran las **dos preguntas abiertas de §Post-F9.144(c)** que bloqueaban el Bloque 2 del
+programa (versiones 0.064–0.067), y que estaban registradas como *«Daniel no lo contestó»*. Las contestó
+de corrido, y de paso **dejó un pendiente nuevo**, explícitamente para después.
+
+### (a) ¿Qué pasa con la COPIA de la receta que la OP se lleva?
+
+**Contexto del problema:** `copiarRecetaDelModelo` congela el BOM **al crear la orden** (§Post-F9.34). Si
+la OP nace **antes** de que Desarrollo termine, se lleva la receta **vieja**. ¿Se re-copia? ¿Basta el
+detector de desalineación? ¿Se corrige a mano? Daniel, textual:
+
+> *«La principal función de la receta son las compras. Para poder hacer las compras se tienen que liberar
+> los elementos por parte de desarrollo. Entonces más bien yo copiaría la receta en la OP **hasta que se
+> libere** por parte de desarrollo. Me parece que es lo más sensato. **No tiene sentido cargarla antes.**»*
+
+⇒ **DECIDIDO: la receta NO se copia al crear la orden. Se copia cuando Desarrollo la libera.** Con eso la
+pregunta se disuelve en vez de resolverse: **no hay receta vieja que arrastrar**, porque no se copia nada
+hasta que hay algo firmado que copiar. ⭐ El razonamiento de Daniel es el que ordena todo: *la receta
+existe para comprar*, así que su momento natural es el de la liberación, no el del alta de la orden.
+
+⚠️ **Consecuencia a manejar al construir:** una OP recién creada **no tendrá receta** — es lo esperado, no
+un error. Es justo lo que la **0.065** («la OP incompleta, marcada hasta que se meta la receta y se
+libere») ya contemplaba. Y encaja con §Post-F9.144(c): *lo que se frena no es producir, es **comprar***.
+
+### (b) ¿Cortar puede hacerse con la receta sin firmar?
+
+> *«Pues se va firmando **por cada elemento**. Para poder comprar la tela, se debe de haber firmado antes
+> la receta **al menos en la tela**. **Sí se puede cortar** antes de firmar la demás parte de la receta.»*
+
+⇒ **DECIDIDO, y confirma el diseño ya construido en V1-E3h/E3k:** la firma es **por renglón**
+(`liberadoEn`), no todo-o-nada, y **lo que gobierna es la COMPRA de ESE elemento**: para comprar la tela,
+la tela tiene que estar firmada; los demás renglones no estorban. **Cortar NO pasa por esas puertas** — se
+mantiene la regla vieja (*«el piso no se detiene porque Desarrollo no haya terminado»*). **No se pone
+ninguna raya nueva en el corte.**
+
+### 📌 (c) PENDIENTE NUEVO que Daniel deja anotado, y pide NO tocar todavía
+
+> *«Acá nos podemos topar con algo que no hemos puesto anteriormente en ningún lugar. Pero **ahorita no
+> quiero moverle. Hasta que se termine todo.** Pero te lo dejo para irlo poniendo, pon un pendiente para
+> después: a veces hay órdenes que **no compramos la tela sino que se ocupa algún stock que tengamos en
+> almacén**. En ese caso ¿cómo va a funcionar? ¿**Se hace una requisición al almacén** para poder sacar la
+> tela del almacén? (Como si fuera una **OC interna**)»*
+
+⚠️ **NO SE CONSTRUYE AHORA. Queda como requisito nuevo, sin número de versión, por instrucción expresa.**
+Lo que plantea: hoy la cadena asume que **todo material se compra** (la explosión propone OC y el kardex
+entra por recepción). La tela que **ya está en el almacén** no tiene camino propio: no hay «requisición
+interna» que la reserve para una OP y la saque contra ella. Daniel mismo propone la forma —**una OC
+interna contra el almacén**—, que encaja con lo ya construido (el motor de kardex y las notas de salida de
+F4 existen; lo que falta es el documento que las amarre a la OP y que la explosión lo reconozca como
+«cubierto» en vez de proponer comprarlo). **Se retoma cuando el programa vigente esté cerrado.**
+
+- **Aplica en:** (a) y (b) desbloquean el **Bloque 2** (0.064–0.067). (c) es requisito nuevo **fuera** del
+  programa vigente. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.159) — 🔴 NO SE RECIBE TELA SIN OC (se IMPIDE), y **el defecto de fondo: las respuestas se usaban pero no se anclaban** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Se le presentaron a Daniel tres «decisiones que faltaban». Su respuesta:
+
+> *«Ya te había contestado todo lo que dices. Debe de estar en algún lado. Ya contesté esas 10 preguntas.
+> Ya contesté el dígito adicional, que cuando haga falta lo decidimos. Y lo de recibir la tela sin OC
+> también ya lo contesté… **es imposible. Porque sin OC no podemos recibir tela. ¿De quién recibiríamos
+> sin OC? No puede suceder.**»*
+
+**Tenía razón en las tres, y al verificarlas apareció el defecto de fondo — que NO era «falta la respuesta»:**
+
+### (a) 🔴 La decisión de la tela sin OC: se IMPIDE. Y el archivo se contradecía a sí mismo
+
+**Ésta es la causa real de que quedara listada como abierta:** `DECISIONES.md` tenía **las dos respuestas,
+opuestas**, y nadie había zanjado cuál manda:
+
+| Dónde | Qué decía |
+|---|---|
+| `DECISIONES.md:736` | *«Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión **sin OC**)»* |
+| `DECISIONES.md:5252` | *«el color se define en la OC, y **no se recibe nada sin OC previa**»* |
+
+⇒ **DECIDIDO: se IMPIDE. Bloqueo, no aviso.** Y con un argumento que no admite vuelta: no es una
+preferencia operativa, es que **no puede ocurrir físicamente** — *«¿de quién recibiríamos sin OC?»*.
+⚠️ **La línea 736 queda SUPERADA** (venía de la propuesta original de Finanzas/proveedores, anterior a que
+la cadena de compras se construyera): **prevalece 5252 y esta decisión**. Al construir el letrero de
+`CapturaRenglonesTelaColor`, el camino «sin OC» **no se advierte: se cierra**.
+
+> ✅ **CONSTRUIDO en la versión 0.080** (1-sep-2026, ficha `V1-E9l`), **no en la 0.072 como decía esta
+> línea.** Era una **predicción**, no un hecho: se escribió el 30-ago dando por sentado qué versión
+> llevaría el cierre, y la 0.072 acabó siendo otra cosa (la receta compartida, pieza B). Se corrige
+> porque una predicción que envejece **se lee como historia**, y `HOJA-DE-RUTA.md` numeraba este mismo
+> trabajo como fila **0.078** ⇒ dos números para una cosa. 📌 **La fila numera el PLAN y la entrega
+> numera la LLEGADA** (ver «Cómo se numeran» en `HISTORIAL-DE-VERSIONES.md`): plan **0.078**, entrega
+> **0.080**, y la 0.072 no tiene nada que ver.
+>
+> Y se cerró **más fuerte** de lo que esta línea anticipaba: no es sólo el letrero. La guarda vive en el
+> **dominio**, en el embudo por el que pasan capturar, editar **y confirmar**, y el contrato exige el
+> renglón de OC. El letrero es la cara visible, no el candado.
+
+### (b) El dígito de continuación YA estaba decidido — el error fue presentarlo como pendiente
+
+`DECISIONES.md` §Post-F9.135 pregunta 10 ya dice, con sus palabras: **«Decidirlo el día que pase**, con el
+aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas»**. ⇒ **La decisión ESTÁ
+tomada: la decisión es diferirla.** Listarla como «decisión que falta» fue un error del lead: una decisión
+diferida a conciencia **no es una decisión pendiente**. No se le vuelve a preguntar.
+
+### (c) 🔴 EL DEFECTO DE FONDO — la tabla no distingue «propuesto» de «decidido»
+
+Las 10 preguntas de §Post-F9.135 **están contestadas** (`HOJA-DE-RUTA.md` §1 lo registra, y cita la
+respuesta a la 6b: *«No se prohibe, se puede hacer a mano (Solo yo)»*, que **elimina la etapa E5** del plan
+1:N). Pero en `DECISIONES.md` **la tabla sigue mostrando sólo la columna «default propuesto»**, sin marca
+de confirmación.
+
+⭐ **Ahí está el defecto que Daniel señaló, y es de FORMA, no de contenido:** quien lee esa tabla **no puede
+distinguir «esto es lo que proponemos» de «esto es lo que Daniel decidió»**. La respuesta se **usó** —el
+plan 1:N ya bajó de cinco etapas a cuatro por la 6b— pero **no se ancló** donde manda. Y el mismo patrón
+apareció hoy en §Post-F9.151 (afirmaba que los renglones no tenían estado, y era falso).
+
+**La regla que queda:** cuando Daniel confirma un default, **se marca como confirmado en la tabla, con la
+fecha**, aunque el texto de la columna no cambie ni una letra. *Un default confirmado y un default a secas
+se leen igual y significan cosas opuestas.* Es la hermana documental de la REGLA 0 (§Post-F9.157): lo que
+no queda escrito donde manda, se vuelve a preguntar — y hacerle repetir una decisión al dueño es el peor
+uso de su tiempo.
+
+- **Aplica en:** (a) la versión **0.072**; (b) y (c) son correcciones documentales, de aplicación
+  inmediata. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.160) — ⭐ TRES DECISIONES DE DANIEL QUE VIVÍAN **SÓLO EN UNA CELDA DE TABLA** (rescatadas 30-ago-2026)
+
+**Cómo salió.** El barrido que nació de la queja de Daniel (*«ya te había contestado todo… debe de estar
+en algún lado»*, §Post-F9.159) encontró **tres decisiones suyas, con cita textual, que nunca llegaron a
+este archivo**: entraron al repo en un solo commit que tocó **únicamente `HOJA-DE-RUTA.md`**, y quedaron
+viviendo dentro de una celda de la tabla del programa. Dos de ellas **llevan esquema de base de datos
+detrás**. Se rescatan aquí, que es donde mandan.
+
+### (a) 🔴 EL CANDADO DE COMPRA: abrir y cerrar la receta de la OP → versión **0.067**
+
+> *«pongamos un candado que **no se pueda comprar nada hasta que esté cerrado otra vez**»*
+
+**La regla:** una receta de OP **ya liberada se puede volver a ABRIR** para corregirla, y **mientras está
+abierta, la compra de esa orden queda bloqueada**; se desbloquea al **cerrarla** de nuevo.
+
+⚠️ **NO es lo mismo que la firma por renglón de §Post-F9.158(b)**, y confundirlas sería un error caro: la
+firma es *«este elemento ya se puede comprar»* (de a uno, hacia adelante); **esto es reabrir lo ya firmado**
+y congelar la compra **de toda la orden** mientras dure la corrección. Son dos mecanismos distintos sobre
+el mismo dato. **Lleva migración.**
+
+### (b) 🔴 LA OP INCOMPLETA → versión **0.066** — ⚠️ **YA ESTÁ CONSTRUIDA, sólo hay que verificarla**
+
+> *«La OP queda como **incompleta**, hasta que se meta la receta y se libere»*
+
+**La regla:** una orden nace **marcada como incompleta** y deja de estarlo cuando su receta entra y se
+libera.
+
+🔴 **MEDIDO EL 31-ago: esto YA ESTÁ CONSTRUIDO.** `produccion/requisitos-orden.ts:11` define el requisito
+**`receta`** como *«Desarrollo liberó la receta de ESTA orden por completo»*, con la etiqueta **«liberar la
+receta»** (`:57`): una OP sin receta queda en estado `capturada` y **ya sale en «Órdenes incompletas» con
+`Falta: liberar la receta`**. ⇒ **La 0.066 no se construye: se VERIFICA.** Lo único abierto es de
+vocabulario — el enum del dato es `capturada | completa | cancelada` y la palabra «incompleta» vive sólo en
+la pantalla. **Default: se queda así**; agregar un cuarto estado sería una migración por una etiqueta. ⭐ **Encaja exactamente con §Post-F9.158(a)** —la receta se copia **al liberarse**, no al crear la
+orden—: sin ese estado, una OP recién creada se vería idéntica a una terminada, y **nadie sabría que le
+falta lo principal**. Es el letrero de esa decisión.
+
+### (c) 🟡 EL KPI DEL MAQUILERO: por UMBRAL, no proporcional → **sin versión, fuera del programa**
+
+> *«**arriba de un cierto porcentaje sí va a pesar**»*
+
+**El principio está decidido** —un **umbral**, no un castigo proporcional— y **el número se fija cuando se
+vea la calificación de maquileros**, no antes. ⚠️ **Y hay un pendiente previo que lo condiciona: las
+segundas HOY NO SE MIDEN** (el KPI se arma con auditorías AQL), así que esa pieza **empieza por medirlas**,
+no por poner dos umbrales.
+
+---
+
+#### (Post-F9.161) — 📌 R22 / MÓDULO 16: SEGUIMIENTO DE ACUERDOS CON CLIENTES — **fuera de la primera versión** (DANIEL, 30-ago-2026)
+
+> *«sería buenísimo que la gente de ventas tenga **todos los pendientes que se tiene con cada cliente** y
+> ahí vamos colgando estas negociaciones… **Pero eso es para otro módulo. Y para una segunda etapa.**»*
+
+**Requisito nuevo (R22) y módulo nuevo (16), explícitamente FUERA del alcance de la primera versión.** Se
+registra aquí —y no sólo en la hoja de ruta— porque es a la vez **un requisito** y **una decisión de
+alcance**: sin este registro, o alguien lo construye por error dentro de la v1, o se pierde.
+
+⭐ **La frase que le da su forma, y que hay que respetar cuando se construya: el seguimiento cuelga DEL
+CLIENTE**, y las negociaciones se cuelgan de él — **no al revés**. Es lo que lo hace un módulo aparte y no
+una pestaña más de la lista de precios.
+
+- **Aplica en:** nada de la primera versión. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.162) — 🔴 EL CANDADO DEL PRECOSTO QUE LA 0.060 DESDENTÓ, y la lección que deja (30-ago-2026)
+
+**Cómo salió.** No lo pidió Daniel: **lo encontró la medición previa de la 0.064** (cotizar en la cita un
+modelo que no existe). Al preguntarse qué pasaría con un modelo creado **desde cero**, apareció que el
+sistema **ya no lo protegía**.
+
+🔴 **El defecto.** `exigirCostoCongelable` existe porque un precosto congelado es **INMUTABLE** y de él
+sale **el precio que se cotiza al cliente**: congelar uno en **$0.00** sería fijar un precio sobre la nada.
+La versión **0.060** metió el **empaque como tercera ancla fija**, y `generarPrecosto` **siempre** agrega
+esa línea con su default (**2.20**). ⇒ Un modelo con la receta vacía **ya no suma cero: suma 2.20**, pasa
+la guarda y **se congela**. La protección seguía ahí, pero **ya no protegía de nada real**.
+
+⭐⭐ **La lección, y es la más importante de la jornada:** *una guarda no se rompe sólo cuando alguien la
+borra — se rompe cuando cambia el terreno que medía.* Nadie tocó `exigirCostoCongelable`; se le movió el
+suelo debajo. **Al agregar un valor que el sistema pone por su cuenta, hay que preguntarse qué umbrales
+dejan de significar lo que significaban.**
+
+### Lo que queda decidido
+
+1. **La regla:** un precosto congela sólo si **algo que NO es el ancla de empaque aporta importe** —
+   cualquier renglón de receta valuado, **o** maquila **o** corte capturados, **o** un renglón manual que
+   una persona haya agregado. **El empaque solo NO basta:** lo pone el sistema, no es una decisión de
+   costeo.
+2. ⭐ **No rechaza nada que fuera congelable antes de la 0.060 — verificado por DEMOSTRACIÓN, no por
+   opinión.** Como **todos los importes son ≥ 0 por contrato** (`precioUnit`, `consumo`, `maquilaBase` y
+   `costoEmpaqueBase` son todos `.nonnegative()`), *«existe un no-empaque > 0»* ≡ *«Σ no-empaque > 0»* ≡ la
+   guarda vieja. Es **literalmente** el candado de siempre con el empaque descontado.
+3. **El costeo por proceso NO se rompe:** un modelo **sin receta** con maquila y/o corte capturados **sí
+   congela** — no todo lleva BOM. Con prueba propia que lo vigila.
+4. **La guarda suma en vez de existir** (`Σ no-empaque > 0`): así no depende de que los importes sigan
+   siendo no-negativos para siempre. Con `∃` bastaba hoy, pero `tela 30 + descuento −30 + empaque 2.20`
+   habría congelado un precosto cuyo total real es la bolsa — **el mismo defecto que este arreglo cierra**.
+   *Una guarda no debe apoyarse en una invariante que otro archivo puede cambiar.*
+5. **Es un candado de ENTRADA (D3): no toca nada ya congelado.** ⚠️~~ **Pendiente operativo de Gabriel:**
+   correr la consulta que busca precostos congelados cuyo total sea sólo empaque. La ventana es corta (la
+   0.060 lleva ~1 día en `prueba`), pero **si aparece alguno y ya está en una lista aprobada, es un precio
+   mal cotizado** — y por D3 no se corrige editando: se genera una versión nueva y se renegocia.~~
+   🔴 **RETIRADO por §Post-F9.163 (mismo día):** los datos de `prueba` son basura y se van a limpiar.
+   **No se audita ni se rescata nada.** El candado de entrada impide que vuelva a pasar, y eso basta.
+
+📌 **Deuda anotada, hermana de este defecto:** `agregarLineaManual` deja nacer renglones en **$0.00 en
+silencio** cuando el avío ligado no tiene precio en ninguna parte de la cascada; la marca
+`sinPrecioCatalogo` va **sólo a la bitácora** y el usuario nunca se entera. Con este candado ya no puede
+congelarse *solo*, pero **sí puede colarse dentro de un precosto que por lo demás está bien**. Merece que
+el aviso llegue a la pantalla.
+
+- **Aplica en:** versión **0.063**. **Sin migración, sin permisos, sin seed** ⇒ no exige `SEED_ON_START`.
+  **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.163) — 🔴🔴 LOS DATOS DE HOY SON BASURA: **EL SISTEMA MIRA HACIA ADELANTE** (DANIEL, 30-ago-2026)
+
+> ## ⏳⏳ ESTA DECISIÓN CADUCA — SÓLO VALE **ANTES DE PRODUCCIÓN**
+>
+> Daniel lo precisó él mismo, el mismo día:
+>
+> > *«cabe aclarar que todo esto que comenté de la información vieja **es válido mientras no hayamos ido a
+> > producción**. Después de que estemos en producción, habrá que **medir qué hacemos** con información que
+> > hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver cómo manejarlo.»*
+>
+> 🔑 **El disparador es concreto y verificable: el día que la versión se rebautice `1.000`** — el hito del
+> arranque, ya definido en `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran». **Mientras el número empiece
+> con `0.`, esta decisión aplica entera. En cuanto empiece con `1.`, deja de aplicar.**
+>
+> **Por qué caduca, y es la razón de fondo:** hoy los datos de `prueba` son basura porque **nadie operó el
+> negocio con ellos** — se capturaron para probar. En producción serán **el negocio**: órdenes reales,
+> compras reales, precios que ya se le cobraron a un cliente. Ahí **no se puede tirar y volver a
+> capturar**, y cada cambio de regla obliga a preguntarse qué pasa con lo ya hecho. Es decir: **lo que hoy
+> está prohibido gastar, en producción será obligatorio pensarlo.**
+>
+> ✅ **Y NO ES UN PENDIENTE QUE ARRASTRAR — Daniel lo cerró así:** *«o sea, aplica a todo lo que se está
+> haciendo ahorita. Cuando entremos en producción, **revisamos esta regla desde el principio** para dejar
+> bien clara la nueva política. **Ahorita no te preocupes por eso.**»*
+>
+> ⇒ **La política de datos en producción NO se diseña por adelantado.** No hay que agendarla, ni
+> prepararla, ni dejar el código «listo por si acaso». Se revisa **el día del rebautizo a `1.000`**, con
+> el sistema ya construido a la vista — que es cuando se puede decidir bien.
+>
+> 📌 **Es el mismo patrón que ya usa el proyecto** con el dígito de continuación de la nomenclatura
+> (§Post-F9.135 pregunta 10): *«decidirlo el día que pase, con el aviso encima, no ahora a ciegas»*.
+> **Una decisión diferida a conciencia NO es una decisión pendiente**, y tratarla como tal es gastar dos
+> veces: hoy preparándola, y el día que llegue rehaciéndola.
+
+
+**Cómo salió.** Daniel lo dijo tras ver, a lo largo de un día entero, que el lead **se frenaba una y otra
+vez cuidando datos que a él no le importan**:
+
+> *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa quieras
+> hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de manera
+> correcta es **información nueva**. No te preocupes incluso por la información que vamos a importar de
+> Access. Hay muchas cosas que ya no van a aplicar a las nuevas cosas que estamos haciendo. **Todo el
+> sistema debe estar enfocado sólo en nueva información**, no en ver cómo arreglamos la que ya se hizo de
+> una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+
+### Lo que queda decidido
+
+1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. **Se
+   limpian, no se reparan.** Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya cargado
+   — salvo que Daniel lo pida por su nombre.
+3. **Una función nueva NO tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien para
+   lo que se capture de aquí en adelante, **está bien**, y ni siquiera hace falta declararlo como límite.
+4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; **no se dobla una función
+   nueva para que le cuadre al histórico**.
+
+### ⚠️ LA FRONTERA — habla de DATOS, no de REGLAS
+
+Escrito con precisión a propósito, porque mal leído esto haría daño. **Lo que NO cambia:**
+
+- **D3 sigue intacto:** lo guardado es **inmutable**; cancelar es un **movimiento inverso auditado**; nunca
+  se edita ni se borra para corregir. ⭐ Eso gobierna cómo el sistema trata **los datos NUEVOS** — y es
+  justamente lo que hace que la información nueva **sí valga**. Tirar los datos viejos y tratar bien los
+  nuevos son la misma idea, no ideas opuestas.
+- **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+- **No es permiso para romper lo que hoy funciona**, ni para saltarse pruebas. Es permiso para **no gastar
+  en reparar el pasado**.
+
+### El matiz sobre ACCESS, que Daniel precisó aparte
+
+> *«si vamos a jalar los datos de Access… pero asumo que todo lo que se hizo en Access viene de una versión
+> con **muchas menos funcionalidades** y **la información va a venir incompleta. Eso lo tengo completamente
+> asumido.**»*
+
+⇒ **El histórico SÍ se importa** —esto no cancela el ETL ni F10— **y llega con huecos a propósito**. Un
+registro migrado al que le falten campos **NO es un defecto que reportar ni que arreglar**: es lo esperado,
+porque el sistema viejo no tenía ese concepto. Ejemplos que ya viven así en el repo y **están bien**:
+`cantidadIncompletas` es `NULL` en todo lo migrado (Access no tenía «prenda incompleta»), y los modelos
+migrados no tienen `codigoDesarrollo` (no había desarrollo).
+
+🔑 **La línea fina, y es la que hay que tener presente al construir: TOLERAR ≠ COMPENSAR.**
+- ✅ **Tolerar:** una función nueva **no se rompe** cuando el dato viejo falta.
+- ❌ **Compensar:** inventar valores, construir pantallas para «completar el histórico», hacer backfills, o
+  **bloquear una función porque el histórico no la puede alimentar**.
+
+📌 Y su corolario práctico: **si una capacidad nueva sólo aplica a lo que se capture de ahora en adelante,
+eso está bien y NO hay que avisarlo como carencia.** Decirlo en cada entrega es otra forma de gastar el
+tiempo de Daniel en algo que él ya dio por asumido.
+
+### 🔑 Cómo se aplica, sin pensarlo — la reformulación que pidió Daniel
+
+Daniel volvió sobre ella para que **no se pierda tiempo ni siquiera en interpretarla**:
+
+> *«deja esto perfectamente bien documentado, para que **en nuevos chats no se detenga a ver cómo resuelve
+> el tema de los datos viejos**. Ni los que están ahorita en prueba ni los que vienen de Access. Más bien
+> sólo hay que ver **cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.**»*
+
+⭐ **La regla, dicha en positivo, es una sola pregunta:** *«¿esto funciona bien cuando el dato NO está?»*
+La otra pregunta —*«¿cómo arreglo los que ya están mal?»*— **no se hace nunca**.
+
+| Si aparece… | Qué se hace | Qué NO se hace |
+|---|---|---|
+| Un campo nuevo y filas existentes sin él | `NULL` o `DEFAULT` en la migración, y se sigue | Backfill, script de relleno, «reparar» filas |
+| Un registro migrado sin el dato que la función necesita | Que **no truene**: vacío, `—`, o no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+| Un defecto que ya dejó datos mal en `prueba` | Se arregla **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño |
+| Una función que sólo tiene sentido para lo capturado desde hoy | Se construye así **y ni se menciona** | Advertirlo como carencia, hacer una variante para el histórico |
+| Una regla nueva que el histórico no cumple | Aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo inconsistente |
+
+⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+de rescate · pantallas para «completar» el histórico · variantes «para los datos viejos» · advertencias de
+que algo «sólo aplica a lo nuevo».
+
+🚫 **Y PROHIBIDO PREGUNTARLE A DANIEL qué hacer con datos ya existentes.** Está contestado para siempre
+aquí: **se limpian; no se arreglan.** Volver a preguntarlo es exactamente lo que esta decisión vino a
+impedir — y ya pasó cuatro veces en un solo día.
+
+📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+desde el primer día.*
+
+### Lo que esta decisión RETIRA de inmediato (casos reales del mismo día)
+
+| Lo que se había pedido/anotado | Qué pasa ahora |
+|---|---|
+| 🔴 **Buscar en `prueba` los precostos ya congelados de puro empaque** (§Post-F9.162 punto 5) — se le había pedido a Gabriel correr una consulta SQL | **RETIRADO.** Son datos basura. El candado de entrada ya impide que vuelva a pasar; lo que quedó mal se limpia con el resto |
+| **Qué hacer con las prendas incompletas que quedaron en tránsito** entre la 0.059 y la merma (§Post-F9.154) | **RETIRADO.** No se limpian a mano ni se barren con un proceso: se van con la limpieza general |
+| **La preocupación de que cambiar el default de `baseProrrateo` reescribiera órdenes ya costeadas** (§Post-F9.154) | La **cautela técnica se conserva** —no queremos una función que reescriba en silencio, y eso vale para datos nuevos— pero **deja de ser un riesgo que frene la decisión** |
+| **«No retroactiva al histórico migrado»** como requisito de la merma (§Post-F9.154) | Sigue siendo cierto por construcción, pero **ya no hay que diseñar para garantizarlo** |
+
+- **Aplica en:** TODA sesión, siempre. Escrita como **REGLA 0-B** en `CLAUDE.md` §7, junto a la REGLA 0,
+  porque las dos atacan lo mismo: **el lead gastando el tiempo de Daniel y los recursos del proyecto en
+  cosas que no avanzan**. **Fecha:** 2026-08-30.
+
+---
+
+#### (Post-F9.164) — ✅ CERRADA: sin la compuerta, **¿para qué sirve la firma de revisión del modelo?** (medido el 31-ago-2026)
+
+> ⚠️ **Este encabezado decía «PENDIENTE DE DANIEL» y ya estaba contestada** — en **§Post-F9.169** de este
+> mismo archivo, que **toma la opción (a)**: *la revisión del modelo deja de ser una PUERTA y pasa a ser
+> un REGISTRO*. Se construyó en la versión **0.071**, ya en `prueba`. **No hay nada que preguntar.**
+>
+> 🔑 Y la razón por la que se decidió sola vale releerla: la regla de filtrado de la bandeja **se
+> justificaba en que «el muro ya no la frena»**, así que al quitar el muro **la justificación se
+> invierte** — los modelos que ya están produciendo pasan de ser los que se esconden a ser **los que
+> urge revisar**. El desarrollo de abajo se conserva porque es la medición que lo demostró.
+
+**Cómo salió.** La medición de la **0.065** (*disolver la compuerta*) encontró que el plan, tal como está
+escrito, **entrega la versión rota** — y de una forma que nadie había visto porque el efecto es a
+distancia, no en el código que se toca.
+
+🔴 **La cadena, medida paso a paso:**
+1. Sin compuerta, generar la OP **promueve la versión igual**, con `revisionEstado = 'pendiente'`
+   (`produccion/salida-produccion.ts:142`).
+2. `exigirVersionRevisable` (`modelos/revision-modelo.ts:250-256`) dice: *«ya está en el catálogo de
+   producción: la revisión es ANTES de mandar a producir y **ya no se puede cambiar**»* ⇒ **aprobar la
+   revisión la rechaza para siempre**.
+3. `recetas-por-revisar.ts:40` filtra por `origen = 'desarrollo'` ⇒ **la versión desaparece de la bandeja**.
+
+⇒ **Toda versión que genere una OP queda `pendiente` de por vida: no se puede firmar y no aparece en
+ninguna cola.** El acto de revisión que Daniel pidió en §Post-F9.140 —*«tiene que haber una validación de
+la receta original»*— **se queda sin camino de ejecución**. Y de rebote, el subsistema de invalidación
+`tocarModeloPorCambioDeReceta` (**12 sitios de llamada**), que existe sólo para mantener honesta esa firma,
+queda como contabilidad sin consumidor.
+
+⚠️ **Esto no se decide sin Daniel: es su propia decisión de §Post-F9.140 la que se estaría deshaciendo.**
+
+### La pregunta, con su default propuesto
+
+> **Al quitar la compuerta, la firma de revisión del modelo se queda sin puerta que guardar. ¿Qué hacemos
+> con ella?**
+
+- **(a) Default propuesto — que deje de ser una PUERTA y pase a ser un REGISTRO.** Se permite firmarla
+  **también con el modelo ya en producción** (quitando el bloqueo de `revision-modelo.ts:250-256`) y la
+  bandeja **deja de filtrar por `origen = 'desarrollo'`**. 📌 Nota fina que lo respalda: esa regla 3 de la
+  bandeja **se justificaba explícitamente en que «el muro ya no la frena»** — al quitar el muro, la
+  justificación se invierte sola.
+- **(b) Retirar el mecanismo completo** —compuerta, firma y los 12 sitios de invalidación— y que la única
+  firma del sistema sea **la de renglón** (`liberadoEn`), que es la que de verdad gobierna la compra.
+- ⚠️ **Lo que NO es opción: dejarlo como quedaría.** Un acto de negocio que existe, nadie puede ejecutar y
+  nadie ve, es peor que no tenerlo.
+
+### Y una segunda, más chica
+
+> **¿`copiarRecetaDelModelo` se mueve dentro de la 0.065, o en versión propia?**
+
+**Default propuesto: versión propia.** Al medirlo aparecieron tres cosas que el plan no contemplaba:
+**(1)** *«copiar al liberarse»* es **circular** tal como suena — `liberarReceta` firma renglones **que ya
+existen, por id**: no se puede liberar lo que no está. La secuencia real es **traer → revisar → firmar**, y
+la palabra de Daniel ya la dice bien: *«hasta que **se meta** la receta y se libere»*. ⇒ no hay que *mover*
+la copia: hay que **dejar de llamarla al crear la orden** y que `traerDelModelo` (que ya existe) sea la
+entrada. **(2)** La bandeja «Recetas por liberar» se arma con renglones **existentes** sin firmar: una OP
+sin receta **no aparece**, así que nacería invisible para Desarrollo — justo el problema que esa bandeja
+vino a matar. Haría falta una segunda entrada: *«órdenes sin receta»*. **(3)** El impreso de la OP saldría
+**sin materiales** al piso, y eso pesa más ahora que Daniel autorizó **cortar sin firmar** (§Post-F9.158(b)).
+
+- **Aplica en:** la **0.065** no se cierra sin (1). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.165) — 🔴 EL CANDADO DE COMPRA (0.067): **el dato que parece el candado NO lo es** (medido el 31-ago-2026)
+
+**Cómo salió.** Medición previa de la 0.067 —*«pongamos un candado que no se pueda comprar nada hasta que
+esté cerrado otra vez»* (§Post-F9.160(a))—. **No está construida**, pero está hecha por dentro en un ~40 %,
+y el plan **describe mal la pieza que falta** de una forma que habría entregado la versión rota.
+
+### 🔴 El hallazgo: el atajo que parece funcionar
+
+El plan sugiere que `Orden.recetaLiberadaEn` es el candado. **No lo es.** El propio código lo dice literal
+(`schema.prisma:3107-3108` y `receta-orden.ts:3540`): *«la PUERTA DE COMPRA ya NO se decide con esta
+columna»*. Y ese derivado **ya se cae solo a NULL** al desfirmar cualquier renglón
+(`sincronizarLiberacionOrden:3568-3574`).
+
+⇒ **Quien lea el plan, vea el derivado caerse solo y concluya «ya está», entrega esto:** la pantalla diría
+*«receta no liberada»* **y la orden de compra saldría igual**. Un candado que se ve puesto y no cierra.
+
+### 🔴 Y un choque de frente que el plan no menciona: §Post-F9.80
+
+Daniel **retiró la liberación en bloque** (*«no tiene sentido liberar las cosas sin ver»*), y `liberarReceta`
+exige **renglones nombrados por id**, rechazando la lista vacía (`receta-orden.ts:2700-2705`).
+⇒ **Reabrir es un acto en bloque cuyo inverso Daniel prohibió.** Si reabrir desfirmara todo, una receta de
+40 renglones costaría **40 clics para volver a cerrarla**. Es la decisión de diseño central de la versión,
+no un detalle.
+
+### Lo que YA está construido (el ~40 %)
+
+`revocarFirmaDeRenglones` (`:3463`) **existe** —la ficha lo nombra bien— pero **NO es la reapertura**: es un
+efecto automático dentro de `enRecetaEditable`, sin endpoint ni botón, que quita la firma **al renglón que
+se edita** (siete mutaciones lo disparan). Además ya están: el derivado que se recalcula solo
+(`sincronizarLiberacionOrden:3549`), **`exigirNoSacarLoComprado`** (`:3398`, en 7 puntos — ya impide sacar
+de la receta un material con OC comprometida), las dos puertas de compra (`:1387`, `:1435`) con sus **cinco
+bocas de gasto** ya cableadas, y la UI de estado (`PanelRecetaOrden.tsx:440-456`).
+
+### Diseño tomado (defaults del lead, derivados de decisiones YA tomadas por Daniel)
+
+1. ⭐ **Reabrir SÓLO MARCA; no desfirma.** Conserva las firmas ⇒ **cerrar es un clic, no cuarenta**. Es lo
+   único compatible con §Post-F9.80. *Si Daniel prefiere otra cosa, se ajusta — pero este default sale de
+   su propia decisión, no de una preferencia técnica.*
+2. **Al cerrar sólo hay que re-firmar lo que se tocó**, y **eso ya funciona solo** (`:1532`): editar un
+   renglón le quita su firma. Cerrar exige que no quede nada sin firmar.
+3. **Motivo obligatorio al abrir**, igual que ya lo pide `quitarRenglonReceta`.
+4. **No se puede abrir una receta que nunca se liberó** (409): sin firma no hay nada que reabrir.
+5. **Las OC ya autorizadas no se tocan** — se bloquean las nuevas. Des-autorizar sigue siendo manual y de
+   Dirección. *(Coherente con la REGLA 0-B: hacia adelante, nada retroactivo.)*
+6. **Bloquea el GASTO, no la lectura**: ver qué falta no cuesta dinero.
+7. 🔴 **La orden reabierta TIENE que verse en una bandeja.** Si reabrir sólo marca, la orden **no aparece
+   en «Recetas por liberar»** (esa bandeja lista por renglones sin firmar, y no habría ninguno) ⇒ quedaría
+   con la **compra congelada, invisible e indefinidamente**. Necesita distintivo propio.
+8. **Mensaje propio para el comprador.** Hoy daría un 409 con el texto *«todavía no la libera Desarrollo»*
+   (`:1405`), que **es falso** en este caso: sí la liberaron, está en corrección.
+
+### Alcance
+
+**Migración SÍ** —y el plan acierta en el «sí» pero **falla en el porqué**: no es que falte dónde guardar la
+fecha, es que **el dato que ya existe no gobierna la compra**. Campos aditivos en `Orden`
+(`receta_abierta_en` / `_por_id` / `_motivo`). **Permisos NO** (`desarrollo.administrar` ya es la llave de
+firmar y de toda mutación de receta; abrir y cerrar son actos del mismo dueño) ⇒ **sin `SEED_ON_START`**.
+**El contrato SÍ se mueve** (campos nuevos junto a `puedeComprar`).
+
+📌 **Solape:** con la 0.065 es **nulo** (otro archivo, otro dato, otro momento: aquélla es la compuerta del
+MODELO al promover). Con la 0.066, **ninguno** — pero conviene recordar que **la 0.066 ya resultó estar
+construida**.
+
+- **Aplica en:** versión **0.067**. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.166) — ⭐⭐ LIBERAR EL MODELO LIBERA **SUS N ÓRDENES DE GOLPE**, no una por una (DANIEL, 31-ago-2026)
+
+**Cómo salió.** Daniel lo aclaró por su cuenta, al ver el trabajo del Bloque 2:
+
+> *«cuando hay 4 órdenes que dependen de un mismo modelo (4 colores diferentes del mismo modelo), **al
+> liberar el modelo se libera automáticamente para las 4 órdenes. No es una por una.**»*
+
+🔴 **Hoy NO funciona así, y es un cambio de fondo, no un ajuste.** `liberarReceta`
+(`backend/src/dominio/produccion/receta-orden.ts:2691`) recibe **`idOrden`**: firma los renglones **de esa
+orden**. Con cuatro colores del mismo modelo, hoy habría que **firmar cuatro veces lo mismo** — que es
+justo lo que él dice que no debe pasar.
+
+### Lo que queda decidido
+
+1. **La liberación es del MODELO y se propaga a todas sus órdenes vivas.** Un acto de Desarrollo, N órdenes
+   servidas. **No se repite por color.**
+2. ⚠️ **NO contradice §Post-F9.80** (*«no tiene sentido liberar las cosas sin ver»*), y conviene decirlo
+   para que nadie las cruce mal: aquella decisión es sobre **QUÉ se firma** —renglón por renglón, viéndolo,
+   nunca en bloque a ciegas—; ésta es sobre **A CUÁNTAS ÓRDENES ALCANZA** esa firma. **Se firma viendo, y
+   lo que se firmó vale para las cuatro.** Son ejes distintos: el *qué* y el *a quiénes*.
+3. **Encaja con §Post-F9.158(a)** (*la receta se copia a la OP al liberarse*): al liberar el modelo, **las
+   N órdenes reciben su copia congelada en el mismo acto**. Un disparador, N efectos.
+4. **Y con la excepción de §Post-F9.146 pieza 1** (su respuesta a la pregunta 4): *«normalmente todas las
+   OP deben ir iguales… puede pasar que a una OP del grupo se le cambie algún avío… se debe poder hacer,
+   pero advirtiendo de la diferencia»*. ⇒ **La liberación es en grupo; la excepción es por orden y avisada.**
+   El default es *todas juntas*, no *cada una por su lado*.
+
+### 🔴 Lo que esto MUEVE de lo ya medido (31-ago)
+
+- **0.065 / 0.067**: las mediciones asumen la liberación **por orden**. La propagación al grupo **es una
+  pieza propia** y no estaba en el plan. ⚠️ El **candado de compra** de la 0.067 hereda la pregunta: si se
+  reabre la receta del modelo, **¿se congela la compra de las cuatro órdenes?** *Default propuesto: sí* —
+  es la misma lógica («un acto, N efectos») y es lo coherente con lo que Daniel acaba de decir.
+- **Bloque 3 (modelos 1:N)**: esto **es** el corazón de su etapa E2 (*la receta compartida*). La aclaración
+  la ratifica desde el lado de la liberación, y **adelanta un requisito** que esa etapa tendrá que cumplir.
+- ⚠️ **Depende del grupo, que todavía no existe.** El vínculo entre las N órdenes del mismo modelo de
+  desarrollo (`idModeloDesarrollo`) **lo construye la 0.069**. Hoy las cuatro OP comparten `idModelo`
+  **sólo por el hueco** que la 0.071 viene a cerrar. ⇒ **La propagación se construye con la familia, no
+  antes** — anclarla hoy en `idModelo` funcionaría y **se quedaría muda** el día que cada color tenga su
+  modelo propio. Es la misma trampa que la medición de la 0.068 acaba de encontrar.
+
+- **Aplica en:** el Bloque 3 (la familia y la receta compartida) y, de rebote, el candado de la 0.067.
+  **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.167) — 🔴🔴 EL BLOQUE 3 (modelos 1:N), MEDIDO: **el plan repitió para LECTURAS el error que ya estaba arreglado para ESCRITURAS** (31-ago-2026)
+
+**Cómo salió.** Medición previa del Bloque 3 —la pieza más grande del programa— contra el árbol. El plan
+dice mal **cinco** cosas, y una de ellas habría entregado un defecto **silencioso que llega al precio del
+cliente**.
+
+### 🔴🔴 (1) El hallazgo grave: el conteo de sitios omite **una clase entera** de lectores
+
+El plan dice *«~44 sitios en 10 archivos leen las tablas DIRECTO»*. **Medido: son 71 en 9** — 42 lecturas
+y **29 escrituras** (que el plan menciona sin dimensionar). Pero el problema no es el número: es **qué
+tipo de sitio se quedó fuera**.
+
+`costos/pre-costo.ts:280,370` usan `include: incluirReceta`, y `desarrollo/precostos.ts:737,813,1206` usan
+`include: incluirBomModelo`. **Esos `include` traen `telas`, `avios`, `avios.tallas` y `artes` por NOMBRE
+DE RELACIÓN, sin nombrar jamás la tabla** ⇒ son **invisibles** a la medición del plan, que buscó
+`.modeloTela.findMany` y hermanos.
+
+⭐ **Y esto ya había pasado, en el mismo repo, en la otra dirección.** El guardián `receta-embudo.test.ts:70-74`
+documenta exactamente este punto ciego **para las escrituras**: *«Prisma deja escribir anidado… el reviewer
+de V1-E7e demostró que ese camino era invisible»*. **El plan repitió para LECTURAS el error que el
+guardián ya arregló para ESCRITURAS.**
+
+🔴 **Lo que se habría entregado:** el precosto de un modelo hijo **con la receta vacía** — sólo maquila,
+corte y el empaque de $2.20. Y de ahí sale **el precio que se cotiza en la cara del cliente**. Es el
+escenario nativo del defecto que la **0.063** acaba de hotfixear (§Post-F9.162), reaparecido por otra
+puerta. **No lanza, no truena: entrega un número menor y se ve normal.**
+
+### (2) La razón que da el plan para no reusar `idModeloPadre` es **falsa** — la conclusión, correcta
+
+El plan dice que `esVersionDeModelo` haría que el hijo *«bloquee su propia promoción»*. **El hijo nunca se
+promueve**: nace ya en producción. Y aunque pasara, el guard de `origen` lanza **antes**. Peor: **la 0.065
+quita esa compuerta**, así que el mecanismo citado ni siquiera existirá.
+
+**El daño real es otro, y sí justifica la columna nueva:** `ModelosPagina.tsx:768` pinta el chip de
+revisión **sólo por el linaje, sin mirar `origen`** ⇒ cada hijo enseñaría *«Revisión pendiente… no puede
+mandarse a producir»* **sin ningún botón para arreglarlo**, sobre un modelo que ya está en producción. Es
+la cicatriz de §Post-F9.119 que V1-E7d vino a cerrar. *Conclusión correcta, mecanismo equivocado — y eso
+importa porque el mecanismo es lo que alguien va a ir a verificar.*
+
+### (3) E3 rompe algo en silencio, y no está en el plan
+
+`requisitos-orden.ts:290-293` busca las órdenes por `Orden.idModelo`. Hoy, apagar `llevaArte` en el modelo
+alcanza a sus 4 órdenes. Después de E3 cada orden apunta a **su propio hijo** ⇒ **tocar el padre no alcanza
+a ninguna**. Y `llevaArte` viaja en la ficha heredada, así que el hijo se lleva su copia.
+
+### (4) §Post-F9.166 **no cabe en las cuatro etapas: es una quinta pieza**
+
+La propagación de la liberación (*«al liberar el modelo se libera para las 4 órdenes»*) necesita la columna
+(E1) **y** que existan varios hijos (**E3**) **y** que liberar dispare la copia congelada (§Post-F9.158(a),
+que hoy **no** es así: la receta se copia al **crear** la orden). ⇒ **cuelga de E3, no de E2** — pese a que
+§Post-F9.166 la llamó *«el corazón de E2»*. **Hoy no tiene casilla en la tabla.**
+
+### (5) Los dígitos alternos: queda **UNO**, no seis
+
+`seed.ts:568-577` siembra 8 géneros con los dígitos 0,1,2,3,4,6,7,9. Libres: el **5** (ya tomado por
+Caballero como alterno) y el **8**, que el propio comentario declara *«no se usa»*. ⇒ la válvula de escape
+alcanza para **un** género más. Multiplicar el consumo ×4 contra una sola serie de repuesto es un techo más
+duro del que el plan pinta. *(No cambia nada hoy: §Post-F9.135 pregunta 10 ya decidió «decidirlo el día que
+pase».)*
+
+### ✅ Lo que el plan acierta
+
+`derivarModeloDeProduccion` e `idModeloDesarrollo` **no existen** (confirmado). `promoverAProduccionNucleo`
+**sí transforma una fila** (un solo `update`, `nomenclatura.ts:776-786`). Las tres lecturas canónicas son
+`leerTelasBom`, `leerAviosBom` y `leerArtesModelo`. **`ModeloAvioTalla` no la lee ninguna de las tres** — el
+plan tenía razón, y por eso su advertencia sobre las medidas por talla es correcta.
+
+### 📐 El troceado: 1→2→3 es obligado, pero **E2 está mal cortada**
+
+- **E2 son 71 sitios en un solo commit sin punto de verificación intermedio.** Se parte en dos:
+  **E2a** = el resolver + las cinco tablas + `copiarRecetaDelModelo` + **los 5 `include` anidados** (el
+  camino por el que pasa el 100 % de las órdenes y del precosto; verificable solo).
+  **E2b** = los escritores + `copiarBom` + el letrero de la ficha.
+- **E4 NO depende de E2** (trabaja sobre `Orden.idModelo`): se puede adelantar.
+- **Añadir la quinta pieza con nombre**: la propagación de la liberación, después de E3.
+- **Meter en E3 explícitamente**: invertir el orden de `salidaAProduccion` (hoy crea la orden **antes** de
+  promover) y arreglar `recalcularEstadoOrdenesDeModelo`.
+- **Añadir a E1, gratis**: excluir a los hijos en **las tres copias** de `esVersionDeModelo` (dominio TS,
+  SQL y frontend), para que el chip fantasma nunca llegue a existir.
+
+### Alcance de la 0.069 (E1)
+
+**Migración: UNA, aditiva** (`id_modelo_desarrollo` + FK `ON DELETE RESTRICT` + índice), **sin backfill**
+(REGLA 0-B; y `NULL` = *«la receta es la mía»*, la conducta de hoy). Conviene un CHECK
+`id_modelo_desarrollo <> id`. **Permisos: CERO. Seed: NO ⇒ no requiere `SEED_ON_START`.**
+
+- **Aplica en:** las versiones **0.069–0.072** y la quinta pieza. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.168) — ✅ CERRADA (Daniel, 31-ago-2026): ¿se puede congelar la compra de una orden con la receta **a medio firmar**?
+
+> ⚠️ **Este encabezado decía «PENDIENTE DE DANIEL» y él ya la había contestado**, en §Post-F9.169(a) de
+> este mismo archivo: *«Lo del candado con receta a medio firmar. **Está bien como dices.**»* ⇒ se
+> confirma el default (a), que la **0.067** ya construyó: sólo se congela la compra de una orden con la
+> receta liberada **por completo**. **No hay trabajo pendiente.**
+>
+> 🔴 **Por qué se corrige y no se borra:** un chat nuevo hace `grep "pendiente de Daniel"` y **le vuelve
+> a preguntar algo que ya contestó**. Es la rama gemela —se actualizó una copia y no la otra—, pero en
+> vez de mentirle a un programador, le hace perder el tiempo al dueño. **El desarrollo de abajo se
+> conserva entero**: el caso de los 39 renglones firmados de 40 es el precio aceptado con conocimiento,
+> y hay que poder releerlo.
+
+**Cómo salió.** Al construir el candado de compra (**0.067**, §Post-F9.165) hubo que fijar **cuándo se
+puede abrir** una receta. La decisión escrita decía *«no se puede abrir una receta que **nunca se
+liberó**»* — o sea, `liberados === 0`. **Se implementó más estricto: exige la receta liberada COMPLETA.**
+
+**Por qué se endureció** (razón del coder, ratificada por el reviewer): si se pudiera abrir una receta a
+medio firmar, un renglón que nadie autoriza dejaría la orden **imposible de cerrar** —congelada para
+siempre—, que es exactamente lo que el candado no debe poder producir. **Se prefirió la regla segura.**
+
+🔴 **Pero deja fuera un caso real, y hay que decirlo:** receta de 40 renglones, **39 firmados y con OC ya
+emitidas**, 1 sin firmar. Desarrollo descubre que la tela está mal. **No puede congelar.** El único rodeo
+sería **firmar el renglón 40 sin haberlo revisado**, sólo para poder abrir — justo lo que **§Post-F9.80**
+quiso evitar (*«no tiene sentido liberar las cosas sin ver»*).
+
+⚠️ Y el estado `en-parte` **no es raro**: desde V1-E3h es normal y soportado (*«se compra lo liberado»*).
+Ahí **sí hay compra que congelar** y el candado no se puede poner.
+
+### La pregunta, con sus tres salidas
+
+> **¿Quieres poder congelar la compra de una orden cuya receta está a medio firmar?**
+
+- **(a) NO — se queda como está** *(lo construido)*. Más seguro: ninguna orden puede quedar imposible de
+  cerrar. Precio: el caso de los 39 de 40 no tiene candado.
+- **(b) SÍ — se permite abrir en `en-parte`.** Para que no cree una orden inmortal habría que **aflojar la
+  regla de cerrar** (hoy: *cerrar exige que no quede nada sin firmar*). ⚠️ Esa regla **no la pidió ninguna
+  decisión**: la puso el coder. Si cerrar sólo limpiara la bandera y dejara que la puerta por renglón siga
+  haciendo su trabajo, se podría abrir en `en-parte` sin riesgo.
+- **(c) SÍ, pero sólo el dueño.** Congelar a medias como acto excepcional con permiso propio.
+
+**Default propuesto: (a)**, que es lo construido — pero **la pregunta se hace igual**, porque el caso de
+los 39 de 40 es el que Daniel se va a encontrar en la práctica.
+
+✅ **CERRADA (Daniel, 31-ago-2026, §Post-F9.171(a)):** *«Está bien como dices»* ⇒ **se queda (a)**, con el
+precio aceptado a sabiendas. **Sin trabajo pendiente.**
+
+📌 **Corrección a §Post-F9.165 punto 3:** decía *«motivo obligatorio al abrir, igual que lo pide
+`quitarRenglonReceta`»*. **La analogía era FALSA** — el motivo de quitar es `.optional()`. Se implementó
+**obligatorio igual**, y con razón mejor: **ese texto ES el 409** que lee el comprador cuando su compra se
+frena; sin él, el mensaje no podría decir por qué.
+
+- **Aplica en:** la **0.067**, ya construida con (a). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.169) — ✅ LA 0.065, CONTESTADA: **lo que no está firmado no se compra, y ya** (DANIEL, 31-ago-2026)
+
+**Cómo salió.** §Post-F9.164 dejó la 0.065 detenida con una pregunta: al quitar la compuerta, **la firma de
+revisión del modelo se quedaría sin poder firmarse nunca y sin aparecer en ninguna cola**. Daniel contestó
+sin rodeos:
+
+> *«**.065.** Todo lo que no está firmado simplemente **no se puede comprar**. Pero **no detiene ni la
+> producción ni los demás renglones ya firmados**.»*
+
+### Lo que queda decidido
+
+1. ⭐ **El único control es la firma POR RENGLÓN.** Un renglón sin firmar **no se compra** — y punto. No hay
+   segunda puerta, ni una condición de «receta completa» por encima.
+2. **No detiene la producción.** Confirma §Post-F9.158(b) y la regla vieja: *el piso no se detiene porque
+   Desarrollo no haya terminado*. **Cortar no lleva ninguna raya nueva.**
+3. ⭐ **No detiene a los demás renglones.** Que la tela esté sin firmar **no frena comprar los avíos que sí
+   lo están**. Es exactamente lo que ya hace `exigirMaterialesLiberados` (material por material) frente a
+   `exigirRecetaLiberada` (≥1 firmado): **la granularidad correcta es el renglón, no la orden**.
+
+### 🔑 La lectura que esto obliga sobre §Post-F9.164 — y por qué
+
+La pregunta abierta era **qué hacer con la firma de REVISIÓN DEL MODELO** (`revisionEstado`), que es otra
+cosa que la firma por renglón (`liberadoEn`). Daniel no la nombró; describió **el mecanismo que gobierna**.
+Y al decir que *«todo lo que no está firmado simplemente no se puede comprar»* **sin mencionar ninguna otra
+condición**, deja claro que el control vive **en el renglón**.
+
+⇒ **Se toma la opción (a) de §Post-F9.164: la revisión del modelo deja de ser una PUERTA y pasa a ser un
+REGISTRO.** Se podrá firmar **también con el modelo ya en producción** (quitando el bloqueo de
+`revision-modelo.ts:250-256`) y la bandeja **dejará de filtrar por `origen = 'desarrollo'`**.
+
+📌 **Lo que respalda esa lectura, y no es una interpretación libre:** esa regla 3 de la bandeja **se
+justificaba explícitamente en que «el muro ya no la frena»** — al quitar el muro, **la justificación se
+invierte sola**. Y el subsistema de invalidación `tocarModeloPorCambioDeReceta` (**12 sitios**) existe sólo
+para mantener honesta esa firma: convertirla en registro lo conserva útil, retirarla lo dejaría huérfano.
+
+⚠️ **Lo que NO se hace:** retirar el mecanismo de revisión (la opción (b)). Daniel lo pidió en §Post-F9.140
+(*«tiene que haber una validación de la receta original»*) y **nada en su respuesta lo revoca** — sólo dice
+que **no es lo que gobierna la compra**.
+
+⚠️ **Si esta lectura no es la suya, el punto a corregir es éste**, y es de una línea: *¿la revisión del
+modelo se conserva como registro (a), o se retira del todo (b)?* **Se construye con (a).**
+
+- **Aplica en:** la **0.065**, que queda **DESBLOQUEADA**. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.170) — ⭐ LA ACLARACIÓN DE DANIEL SOBRE EL 1:N, Y UN ARGUMENTO DEL PLAN QUE YA ESTABA RESUELTO (31-ago-2026)
+
+**Cómo salió.** Daniel leyó el mapa del programa, vio el tamaño de la receta compartida y dijo:
+
+> *«La receta compartida: no sé si no me expliqué bien. **Me parece más fácil de lo que expones.** Lo que
+> hay que hacer es simplemente **relacionar el mismo modelo de desarrollo con más de una OP**. ¿Eso es
+> complicado?»*
+
+**Se midió antes de contestar** —podía tener razón y ahorrarnos tres etapas— y de la medición salieron tres
+cosas. Al aclararle la pregunta, él precisó:
+
+> *«No quiero que haya una confusión. Hay **modelos de desarrollo** y **modelos de producción**. Mi
+> comentario es que **cada OP puede compartir modelos de desarrollo. Y cada OP lleva un número de modelo de
+> producción diferente**.»*
+
+### Lo que queda asentado
+
+1. ✅ **Su aclaración CONFIRMA el plan de §Post-F9.135, no lo simplifica.** *«Cada OP lleva un número de
+   modelo de producción diferente»* ⇒ **sí nacen N modelos de producción**, uno por OP. Lo que él llamaba
+   *«simplemente relacionar»* **es el vínculo**, que es justo lo que la **0.069 ya construyó** (E1).
+2. ⭐ **Y por eso la receta compartida (0.070) SÍ hace falta.** Precisamente porque cada OP tiene su propio
+   modelo de producción, cada uno necesita receta: **copiarla a los N** obliga a mantenerlas iguales a
+   mano; **leerla del desarrollo** hace la igualdad estructural. Es su propia pregunta del 28-ago la que
+   lo decide — *«Todos los modelos deben de llevar lo mismo. **¿Cómo lo controlas?»*** — porque con copias
+   no se *controla*: se *vigila*, y vigilar depende de que alguien se acuerde.
+
+### 📌 Lo que la medición SÍ desmintió del plan
+
+🔴 **El argumento del inventario ya estaba resuelto, y el plan lo arrastraba como si no.** §Post-F9.135
+justifica los N modelos así: *«los modelos de producción son los que se van a inventariar»* — dando a
+entender que **sin** N modelos el inventario no distinguiría los colores. **Medido: sí los distingue.**
+`MovimientoDetPt` lleva **`idModelo` + `idColor` + `idTalla`** (`schema.prisma:4163-4168`), y el color vive
+en `OrdenLinea` con su pantone propio (`:3320-3324`). Además **nada impide hoy** que varias órdenes
+compartan modelo (no hay `@@unique` sobre `Orden.idModelo`).
+
+⇒ **El motivo real de los N modelos NO es el inventario: es el NÚMERO DE CATÁLOGO** — que cada color tenga
+su número de producción de 5 dígitos, como Daniel acaba de decir. La conclusión del plan era correcta; **su
+argumento, no**. Se corrige aquí para que nadie vuelva a apoyarse en él.
+
+### ✅ RATIFICADO POR DANIEL, sin ambigüedad (31-ago-2026)
+
+Puestas las dos formas enfrente —copiar la receta a los N modelos, o que los N lean la del desarrollo—
+contestó:
+
+> *«**Que los cuatro lean la del desarrollo. Ésta es la correcta.**»*
+
+⇒ **La receta es UNA, la del modelo de desarrollo, y los N modelos de producción la LEEN.** No se copia, no
+se replica, no se sincroniza. Es la decisión central del Bloque 3 y queda cerrada con sus palabras, no por
+inferencia. **La 0.070 se construye exactamente así.**
+
+- **Aplica en:** confirma el Bloque 3 tal como está planeado (0.069 ✅ · **0.070 ← se está construyendo** ·
+  0.071 · 0.072). **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.171) — ✅ EL CANDADO A MEDIO FIRMAR: se queda como está · y ⭐ LAS FOTOS SON DE LA OP, NO DEL DESARROLLO (DANIEL, 31-ago-2026)
+
+**Dos respuestas suyas del mismo mensaje.**
+
+### (a) ✅ §Post-F9.168 CERRADA — el candado exige la receta liberada COMPLETA
+
+> *«Lo del candado con receta a medio firmar. **Está bien como dices.**»*
+
+⇒ Se confirma el **default (a)**, que es lo que la **0.067** ya construyó: **sólo se puede congelar la compra
+de una orden cuya receta está liberada por completo**. Queda aceptado con conocimiento del precio —el caso
+de **39 renglones firmados de 40**, donde no se podrá congelar— porque la alternativa es peor: una orden
+**imposible de cerrar**. **No hay trabajo pendiente**: la versión ya está en `prueba`.
+
+### (b) ⭐ LAS FOTOS DEL ARTE SON DE LA ORDEN, con herencia opcional
+
+> *«La foto debería de ser **de la OP no del desarrollo**. Si el desarrollo tiene fotos está bien que
+> podamos **heredarlas**, pero también la opción de **quitarlas de la OP** y **meter fotos directo a la
+> OP**. Eso me parece que ya existe.»*
+
+🔴 **Medido: existe la MITAD, no la otra.** Su memoria acierta en el renglón y falla en la foto:
+
+| Lo que pide | ¿Existe? |
+|---|---|
+| Que la OP tenga su lista de artes, congelada | ✅ `OrdenArte`, congelada al crear la orden |
+| **Quitar** un arte de la OP sin tocar el modelo | ✅ ya se puede |
+| **Agregar** un arte a mano, sin vínculo al modelo | ✅ `idModeloArte` es `NULL` = agregado a mano |
+| Descripción y posición propias de esa orden | ✅ viven en `OrdenArte` |
+| ~~🔴 **Meter FOTOS directo a la OP**~~ | 🔴 **ESTA LÍNEA ERA FALSA — corregida el 1-sep-2026.** Para las fotos del **MODELO** ✅ **SÍ existe**, desde F2-E3 y ajustado en jul-2026 **a petición del propio Daniel**: `frontend/src/modulos/ordenes/FotosModeloOrden.tsx` combina las fotos del modelo con las **subidas a la orden**, deja **subir** a la orden y **quitar** las subidas. ⭐ **Daniel dijo «eso me parece que ya existe» y TENÍA RAZÓN**; la medición que lo desmintió era la equivocada. *(Para las fotos del **ARTE** sí sigue siendo cierto: `OrdenArte` no expone fotos en absoluto.)* |
+| 🔴 **Quitar una foto sólo en la OP** | ❌ **NO existe** — y **verificado el 1-sep-2026 que sigue siendo cierto**: el botón de quitar sólo se pinta con `foto.origen === 'orden'` (`FotosModeloOrden.tsx`, el botón sólo se pintaba con `foto.origen === 'orden'` — **la línea se movió al construirlo**, por eso se nombra la condición y no el número) y no hay ningún mecanismo de ocultar/excluir en el backend. **Es la media frase de Daniel que de verdad falta** |
+
+**Las fotos cuelgan de `ModeloArteFoto` → `ModeloArte`**, o sea **del modelo**. `OrdenArte` **no tiene fotos
+propias**: las toma del arte del modelo por su vínculo. ⇒ **Consecuencia hoy: un arte agregado a mano en la
+OP —sin vínculo— NO PUEDE TENER FOTO**, y no hay forma de subir una que valga sólo para esa orden.
+
+**Lo que queda decidido:** las fotos del arte pasan a ser **de la orden**, con **herencia del desarrollo**
+como valor inicial y la posibilidad de **quitarlas o sustituirlas sólo ahí**. Es el mismo patrón que ya
+gobierna la descripción y la posición del arte (§Post-F9.52): *lo del modelo es el punto de partida; lo de
+la orden es lo que manda*.
+
+📌 **Alcance: una tabla nueva de fotos por `OrdenArte` + su pantalla.** No es grande, pero **no está**, y no
+se cuenta como existente. **Sin número de versión todavía** — se contrasta y se ordena con el resto.
+
+⭐ **Y esto contesta, de paso, una duda que el reviewer levantó dos veces:** post-E3 los N modelos hijos
+saldrían **sin foto** en el catálogo porque `ModeloFoto` no se hereda. **La respuesta de Daniel apunta al
+otro lado**: la foto que importa operativamente es **la de la OP**, no la del modelo. La duda del catálogo
+sigue abierta, pero deja de ser urgente.
+
+- **Aplica en:** (a) nada, ya construido. (b) pieza nueva sin número. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.172) — ✅ LAS DOS, CONTESTADAS POR DANIEL EL MISMO DÍA (31-ago-2026)
+
+> ⚠️ **Este encabezado decía «DOS PREGUNTAS ABIERTAS» y Daniel ya había contestado las dos** — (a)
+> *«está bien la 3»* y (b) *«se reúsa cuando sea el mismo modelo»*, ambas registradas abajo el mismo
+> día. Se corrige por la misma razón de siempre: un chat nuevo hace `grep` de «pendiente» y le
+> **vuelve a preguntar al dueño**. De (b) queda **sólo el borde (A) vs (B)**, con default **(B)**, que
+> se construye en E3.
+
+> **Ninguna de las dos frena nada** (REGLA 0): quedan aquí con su default y el programa sigue. Se anotan
+> **con su medición**, para que un chat nuevo no las re-descubra ni se las vuelva a preguntar mal.
+
+### (a) ✅ CERRADA (DANIEL, 31-ago-2026): la búsqueda entiende los DOS nombres — el papel del cliente NO se toca
+
+**Abierta desde la versión 0.053** (`HISTORIAL-DE-VERSIONES.md`: *«Es una decisión tuya y por eso no se
+tocó… Cuando decidas, se hace»*). **No consta respuesta.**
+
+🔑 **El defecto NO está en la búsqueda ni en la fusión — las dos están bien escritas.** Medido el 31-ago:
+el importador escribe la División **dos veces** (`dominio/pedidos/importacion-pdf.ts:1165-1174`): al
+catálogo **con FK** (`resolverOCrearDepartamento`) y como **texto crudo** en `OrdenReferencia.valor`, que
+es un `String` sin llave (`schema.prisma:3385-3397`). `fusionarDepartamentosCliente` repunta **las cinco**
+llaves entrantes —con una prueba que lee el `schema.prisma` y se pone roja si aparece una sexta— pero **el
+texto no es una llave**. Fusionar «2-HOMBRE» en «Caballeros» mueve el catálogo; la orden **sigue diciendo
+`2-HOMBRE`** y el `contains` de `armarBusqueda` (`produccion/ordenes.ts:1237-1250`) no lo alcanza.
+El propio código lo declara con nombre (`cliente-departamentos-fusion-referencias.ts:32-42`): *«no se
+arregla aquí porque tocar un valor capturado de un documento del cliente es una decisión de negocio»*.
+
+| camino | qué implica | tamaño |
+|---|---|---|
+| (i) dejarlo | la búsqueda sigue partida | 0 |
+| (ii) **reescribir** el texto de las órdenes al fusionar | ⚠️ toca **un valor capturado del documento del cliente** | ~40 líneas |
+| (iii) **búsqueda por sinónimos** | no toca el dato; resuelve al buscar | **una etapa entera** |
+
+> ### ✅ DANIEL, textual: *«Está bien la 3. Lo que propones.»*
+>
+> ⇒ **CAMINO (iii): BÚSQUEDA POR SINÓNIMOS.** El texto capturado del documento del cliente **NO se
+> reescribe nunca**. Buscar «Caballeros» encuentra también las órdenes que dicen «2-HOMBRE» porque el
+> sistema **sabe** que uno se fusionó en el otro — **no porque le haya cambiado el papel**.
+
+**Por qué es el correcto y no sólo el propuesto:** (ii) reescribiría lo que el cliente puso en su papel —
+justo lo que `Cotizacion.nombreDepartamento` se congela **a propósito** para no hacer. Que Daniel busque
+por lo que tiene en la mano y no lo encuentre es una pérdida en silencio; que el sistema le cambie el
+texto de su documento es **peor**: rompería la única prueba de qué pidió el cliente.
+
+### 🔨 Qué hay que construir (medido el 31-ago, para que no se re-descubra)
+
+**Dónde se aplica, y por qué es barato:** `armarBusqueda` (`dominio/produccion/ordenes.ts:1237-1250`) hace
+hoy un `contains` sobre `referencias.some.valor`, y **la comparten tres consumidores** — el buscador
+global, las consultas ligeras (`consultas.ts:18`) y el Centro de Órdenes (`centro-comando.ts:83`). ⇒ **se
+arregla en un solo sitio y los tres quedan cubiertos**: es el patrón «embudo» del proyecto.
+
+⚠️ **LLEVA MIGRACIÓN, y conviene saber por qué:** a diferencia de los colores, la fusión de departamentos
+**no deja rastro en columna**. `Color` tiene `idFusionadoEn` con FK reflexiva e índice
+(`schema.prisma:1015`), pero `ClienteDepartamento` **sólo tiene `activo`** (`schema.prisma:7286-7310`): su
+fusión (`dominio/catalogos/cliente-departamentos.ts:375-454`) repunta bien **las cinco** llaves entrantes y
+deja **bitácora**, y ahí se acaba el rastro. ⇒ hay que darle **la misma columna que los colores ya tienen**,
+para resolver el sinónimo sin leer la bitácora.
+
+🔴 **LA TRAMPA, dicha con nombre: el sinónimo se resuelve en LOS DOS SENTIDOS.** Buscar el **destino**
+(«Caballeros») debe encontrar las órdenes que dicen el **origen** («2-HOMBRE») — y **también al revés**,
+porque quien tiene el papel viejo en la mano busca por el nombre viejo. **Es una rama gemela**: cubrir un
+sentido y no el otro **pasaría en verde** y fallaría justo en el caso que originó la decisión. Y la cadena
+puede tener **más de un salto** (A→B→C), como ya contempla `colorCanonico` (`catalogos/colores.ts:481`) —
+que es el precedente a copiar, no a reinventar.
+
+### (b) ✅ CERRADA (DANIEL, 31-ago-2026): **SE REUSA cuando sea el mismo modelo**
+
+**Hay que resolverla antes de construir E3**, porque las dos respuestas son suyas y dicen cosas distintas:
+
+- **§Post-F9.135 pregunta 2**, que contestó *«De acuerdo»*: **uno por renglón de pedido; si se re-surte la
+  misma OC, se REUSA el que ya nació.**
+- **§Post-F9.170**: *«**cada OP lleva un número de modelo de producción diferente**»* — leído literal,
+  daría **un modelo nuevo por cada resurtido**.
+
+> ### ✅ DANIEL, textual: *«**Se reúsa cuando sea el mismo modelo.**»*
+>
+> ⇒ **La contradicción se resuelve así: el número pertenece al MODELO, no a la OP.** Modelos distintos
+> (colores distintos) ⇒ números distintos — que es lo que quería decir *«cada OP lleva un número
+> diferente»* en su caso, cuatro OC de cuatro colores. **Mismo modelo ⇒ mismo número, siempre.**
+
+**Por qué importa:** si estrenara número en cada resurtido, **la misma prenda quedaría partida en dos
+modelos de catálogo** y su existencia repartida entre dos renglones de inventario.
+
+### ⏳ EL BORDE QUE FALTA FIJAR — no es una duda retórica: es una llave de base de datos
+
+**Medido el 31-ago:** el **modelo hijo NO guarda el color**. Sus campos propios son `numeroProduccion` e
+`idModeloDesarrollo` (`schema.prisma:2241` y `:2309`); **no hay columna de color**, porque Daniel decidió
+que ***«el color va en la OP»***. El color vive en `OrdenLinea` — con `@@unique([idOrden, idColor])` cuando se
+escribió esto; **desde la 0.087 la llave es `@@unique([idOrden, idColor, pack])`** (`schema.prisma:3536`),
+porque el pack se volvió campo propio. *(El argumento de abajo no cambia: sigue sin haber columna de color
+en el modelo hijo.)* ⇒ **el sistema no le puede preguntar a la fila del modelo «¿de qué color eres?»**,
+así que *«el mismo modelo»* hay que traducirlo a una llave, y hay dos candidatas:
+
+| | qué reusa | qué pasa con una **OC NUEVA del mismo color** |
+|---|---|---|
+| **(A)** llave = **renglón de pedido** | el resurtido de la MISMA OC | **estrena** número ⇒ 🔴 la misma prenda, **dos números de catálogo** |
+| **(B)** llave = **desarrollo + color** | el resurtido **y** cualquier OC posterior de ese color | reusa ⇒ **un número por prenda real** |
+
+⭐ **DEFAULT PROPUESTO: (B).** Su respuesta dice *«el mismo **modelo**»*, no *«la misma orden»* — y el daño
+que él mismo nombró (la prenda partida en dos renglones de inventario) **lo produce (A)** en cuanto llegue
+una segunda OC de ese color, que es lo normal en un resurtido de temporada. (A) es literalmente su
+respuesta anterior a la pregunta 2 (*«uno por renglón de pedido»*), pero **ésa se escribió antes de medir
+que el hijo no lleva color**.
+
+⚠️ **(B) cuesta un dato, y se puede tener sin contradecirlo:** para reusar por color hay que **poder saber
+de qué color nació un hijo**. Se guarda en el hijo **el color de catálogo del que nació** — dato de
+**identidad**, no de operación: la OP sigue mandando sobre lo que se produce, que es lo que él quiso decir
+con *«el color va en la OP»*. Es una columna con índice único `(idModeloDesarrollo, idColor)` que **de paso
+ES la llave de idempotencia** que hoy **no existe** y sin la cual **un doble clic genera dos modelos**.
+
+📌 **No bloquea nada salvo E3.** Si Daniel no precisa el borde, se construye **(B)**.
+
+> ### ✅ CONSTRUIDO — el borde se cerró en **(B)** (1-sep-2026, versión **0.078**, ficha `V1-E9j`)
+>
+> El default se confirmó **con su propia frase**, no por comodidad: con (A), una OC nueva del mismo color
+> **estrenaría otro número** ⇒ la misma prenda con **dos números de catálogo**, que es lo contrario de
+> *«se reúsa cuando sea el mismo modelo»*. La llave `(idModeloDesarrollo, idColor)` quedó como índice
+> único **y**, tal como se anticipó aquí, **es la idempotencia que nunca existió**.
+>
+> 🔑 **Y lo anticipado sobre el dato se sostuvo entero:** `Modelo.idColor` es **identidad, no operación**
+> — nadie lo lee para decidir qué cortar; lo que se produce lo sigue mandando la OP (`OrdenLinea`).
+> Anulable y **sin backfill** (REGLA 0-B): los ~4,987 migrados y todo lo capturado a mano **no nacieron de
+> un color**, y `NULL` es la respuesta correcta, no un hueco.
+>
+> ⚠️ **Una consecuencia que no estaba prevista aquí y sí hubo que resolver:** un color que ya bautizó
+> modelos **ya no se puede fusionar con otro**. Absorberlo dejaría a la llave sin poder reconocer ese
+> color en la siguiente OC, y estrenaría número para una prenda que ya lo tiene ⇒ la relación entra en
+> `REFERENCIAS_QUE_BLOQUEAN_FUSION`.
+
+📌 **Y esto no es sólo una etiqueta: hoy NO HAY LLAVE DE IDEMPOTENCIA.** Medido: el freno actual es un
+**efecto de borde** —la primera llamada deja el modelo en `origen:'produccion'`, así que la segunda entra
+por el `else` y hereda—. Con E3 el padre se queda en `desarrollo` **para siempre**, así que *cada* llamada
+derivaría ⇒ **doble clic = 2 modelos**, y se queman números de una serie de **999 por par**. La llave
+natural (`Orden.findFirst({ where: { idPedidoLinea } })` + `pg_advisory_xact_lock` sobre `idPedidoLinea`)
+**implementa a la vez la respuesta «reusar»**. ⇒ elegir «reusar» no cuesta trabajo extra: **lo ahorra**.
+
+- **Aplica en:** (a) ✅ **CERRADA** — etapa propia, sin número, **con migración**. (b) ✅ **CERRADA**:
+  **se reusa**. Queda por precisar sólo **el borde (A) vs (B)**, con default **(B)**; se construye en
+  **E3**, que la necesita como llave. **Fecha:** 2026-08-31.
+
+---
+
+#### (Post-F9.173) — ⭐ SI YA SE COMPRÓ, EL SISTEMA **AVISA**; CANCELAR SE NEGOCIA · y los parámetros de calidad esperan a las CALIFICACIONES (DANIEL, 1-sep-2026)
+
+### (a) 🔴 CORRIGE lo que la 0.067 construyó: falta el AVISO
+
+**Daniel, textual:**
+
+> *«Si ya está comprado, **solo avisa que ya está comprado** para ver si se puede cancelar la OC interna,
+> o que **el comprador sepa que cambió**, para hacer lo que tenga que hacer. **No se puede cancelar la OC
+> en automático… eso hay que negociarlo con el proveedor.**»*
+
+**Qué confirma y qué corrige.** La mitad construida está bien: **reabrir la receta NO revierte nada** —la
+OC autorizada sigue en pie— porque **el sistema no puede deshacer un compromiso con un tercero**. Eso era
+el default y él lo ratifica con la razón de fondo: *cancelar se negocia, no se ejecuta*.
+
+🔴 **Lo que FALTA, y es lo que él pidió: el sistema hoy se queda CALLADO.** Reabrir una receta con compra
+detrás no avisa a nadie. El comprador **se entera cuando se entera**, y para entonces la tela puede venir
+en camino. ⇒ **El aviso no es cosmético: es el que permite que alguien alcance a negociar.**
+
+**Lo que hay que construir** (queda como **0.085**):
+1. **Al reabrir una receta, decir que ya hay compra**, con qué se compró y en qué OC — para que se vea si
+   la OC interna se puede cancelar.
+2. **Que le llegue al COMPRADOR**, que es quien tiene que hacer algo — no sólo a quien reabre.
+3. ⛔ **NUNCA cancelar la OC en automático.** Si acaso, **llevar** a `desautorizarOC`, que ya existe y ya
+   es del dueño. *(Mismo patrón que §Post-F9.145: el aviso que pide un acto tiene que llevar a hacerlo.)*
+
+### (b) ⏳ Los parámetros de aceptación: NO se fijan ahora
+
+**Daniel, textual:**
+
+> *«En alguna conversación hablamos de que hay que **fijar un parámetro de aceptación de faltantes y
+> segundas**. Aún no fijamos los parámetros… **lo haremos cuando hagamos las calificaciones de
+> maquileros**.»*
+
+⇒ **La pregunta O3 de V1-E8k queda CONTESTADA por reencuadre, no por defecto.** Se preguntaba si el KPI de
+calidad debía contar las incompletas. **La respuesta es que esa pregunta no se decide sola**: pertenece a
+una pieza mayor —**las calificaciones de maquileros**— donde se fijan **los parámetros de aceptación de
+faltantes Y de segundas**, juntos. Decidir sólo lo de las incompletas sería fijar medio criterio.
+
+⇒ **NO se le vuelve a preguntar** hasta que esa pieza arranque, y entonces se le pregunta **entera**. Queda
+como **0.086**.
+
+- **Aplica en:** (a) **0.085** — corrige y completa lo de la 0.067. (b) **0.086** — y **cierra O3**.
+  **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.174) — ⏳ PENDIENTE DE DANIEL: la receta se COMPARTE, pero la FICHA se COPIA — y diverge (medido el 1-sep-2026)
+
+### El hallazgo, medido por el reviewer de E3 (no deducido)
+
+```
+padre editado a           → "95% ALGODON 5% ELASTANO"
+hijo Rojo (nacido ANTES)  → "ALGODON 100%"              ← se quedó viejo
+hijo Azul (nacido DESPUÉS)→ "95% ALGODON 5% ELASTANO"
+la OP del Rojo se lleva   → "ALGODON 100%"              ← al papel del cliente
+```
+
+### Por qué importa, con sus propias palabras
+
+Daniel preguntó en agosto: ***«todos los modelos deben de llevar lo mismo, ¿cómo lo controlas?»***. La
+respuesta que se construyó —**una sola receta**, §Post-F9.170— **cubre el BOM y NO la ficha**.
+
+`CAMPOS_FICHA_HEREDADOS` (`dominio/modelos/modelos.ts`) **copia** al nacer: composición, maquila y corte
+base, curva de tallas, temporada, género, tipo de prenda, nº de operaciones, secuencia de estampado y
+`llevaArte`. Copiar ≠ compartir ⇒ **dos colores de la misma prenda pueden acabar con composición distinta**,
+y **la OP se la lleva al papel**.
+
+⚠️ **Es PREEXISTENTE de V1-E9a**, no lo introduce E3. **Pero E3 lo pone en el camino principal**: hasta hoy
+casi no había hijos; a partir de E3 nacen cuatro por cada modelo que se produce en cuatro colores.
+
+### Las tres salidas, con su precio
+
+| | Qué haría | Precio |
+|---|---|---|
+| **(a)** Dejarlo | cada hijo congela la ficha del día que nació | La divergencia sigue, silenciosa. Es lo de hoy |
+| **(b)** Compartir también la ficha | el hijo lee del padre, como la receta | ⚠️ Un cambio de composición **reescribiría** lo que dicen OP ya impresas |
+| **(c)** Avisar de la divergencia | el hijo la conserva, y el sistema **dice** que difiere del padre | No reescribe nada; el patrón *«avisar no es bloquear»* que este sistema ya usa |
+
+⭐ **DEFAULT PROPUESTO: (c).** Razón: (b) tiene el mismo problema que Daniel rechazó para el texto de la
+División —reescribir un hecho ya impreso—, y (a) es lo que produjo el hallazgo. **(c) es el patrón que él ya
+aprobó dos veces**: §Post-F9.135 p.4 (*«se debe de poder hacer, **pero advirtiendo de la diferencia**»*) y
+§Post-F9.64 (*«avisar no es bloquear»*).
+
+📌 **NO bloquea nada.** E3 entra sin esto; se construye después, en la **0.087**.
+
+- **Aplica en:** **0.087**. **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.175) — ⏳ PENDIENTE DE DANIEL: ¿el botón «Pasar a producción» se RETIRA? (planteada el 1-sep-2026 por E3)
+
+### El residuo, medido — no un riesgo teórico
+
+Desde la **0.078**, el camino normal de entrar a producción es **generar la OP**: nace un modelo de
+producción **por color** y el desarrollo **permanece**. El botón «Pasar a producción» del catálogo hace lo
+**contrario**: **transforma** el modelo de desarrollo en el de producción, con **UN solo número**, y **no
+hay vuelta atrás** — desde ahí sus OP salen todas por la rama `heredado`.
+
+`promoverAProduccionNucleo` rechaza **UN solo caso**: un desarrollo **con hijos**. ⇒
+
+```
+desarrollo SIN HIJOS todavía  →  se promueve sin una queja  →  sus 4 OC de 4 colores
+                                                                salen con UN número
+```
+
+🔴 **Tenga o no ficha de Desarrollo.** Es **el bug original de Daniel, al pie de la letra**, sólo que
+alcanzable por otra puerta y **sin vuelta atrás**.
+
+### Por qué NO se cerró con una guarda, aunque se probó
+
+Se construyó una segunda guarda —rechazar el que tuviera **ficha de Desarrollo**— y **se retiró**: rompía
+un camino existente y probado (`crearDesarrolloConModeloNuevo` → promover, cubierto por
+`nomenclatura.int.test.ts`). ⇒ **no era una valla contra un descuido: era retirar una capacidad.** Y una
+capacidad no se retira desde el código.
+
+### Las dos salidas
+
+| | Qué pasa | A favor |
+|---|---|---|
+| **(a) Se RETIRA el botón** | asignar el nº de producción a mano deja de existir | Desde **V1-E8j** *«todo modelo nace en desarrollo»* y desde la **0.078** el nº se lo da su OP ⇒ **ya no hay razón para asignarlo a mano** |
+| **(b) Se QUEDA como está** | sigue disponible, con su aviso | Puede haber un caso de captura que no pasa por OP y que el sistema no conoce |
+
+⭐ **DEFAULT PROPUESTO: (b), se queda** — pero **sólo porque retirar una capacidad sin que el dueño lo pida
+es exactamente lo que E3 se negó a hacer**, no porque el residuo sea aceptable. Mientras tanto queda con
+**su única guarda, la prueba `RESIDUO MEDIDO` y el aviso ámbar antes del clic**.
+
+⚠️ **Lo que hay entre el usuario y el bug es UNA sola cosa: el aviso.** Si alguien reordena ese diálogo y
+se lleva el aviso por delante, el clic vuelve a ser silencioso. Por eso el aviso quedó **con tres
+aserciones propias** (que dice *un número a todo el modelo* · que el camino bueno es **la OP** · que *no
+hay vuelta atrás*), y reponer la guarda retirada **pone roja** la prueba del residuo — de modo que
+reponerla sea **un acto visible y deliberado, no un silencio**.
+
+📌 **NO bloquea nada.** El sistema opera igual con cualquiera de las dos respuestas.
+
+- **Aplica en:** el catálogo de modelos (`pasarModeloAProduccion` + `DialogoPasarAProduccion`).
+  **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.176) — ⏳ PENDIENTE DE DANIEL: «la foto de la OP», ¿la del ARTE o la del MODELO? (medido el 1-sep-2026)
+
+### Por qué se pregunta: las dos lecturas dan trabajos de tamaños muy distintos
+
+Al medir la fila **0.079** contra el código apareció que **§Post-F9.169(b) tenía una línea falsa** (ya
+corregida arriba): meter fotos directo a la OP **sí existe** para las fotos del **MODELO**. ⇒ la frase de
+Daniel admite dos lecturas, y **sólo una de ellas es trabajo grande**:
+
+| | Qué falta de verdad | Tamaño |
+|---|---|---|
+| **(a)** habla de la foto del **ARTE** | **TODO**: `OrdenArte` **no expone fotos en absoluto**; cuelgan de `ModeloArteFoto → ModeloArte` | migración + contrato + dominio + frontend |
+| **(b)** habla de la foto del **MODELO** en la OP | **sólo** poder **ocultar una heredada** | pequeño |
+
+> ### ⭐ DEFAULT PROPUESTO: **(b)**
+>
+> Y no por comodidad, sino por sus propias palabras: dijo ***«eso me parece que ya existe»***, y lo que
+> existe es exactamente el mecanismo del **MODELO** (heredar + subir a la orden + quitar las subidas). Si
+> hablara del **arte** —que no tiene **ninguna** foto en la OP— difícilmente habría dicho que ya existe.
+
+⚠️ **Un dato que importa si la respuesta es (a):** un arte **agregado a mano** en la OP
+(`idModeloArte = NULL`) **hoy no puede tener foto en absoluto** — no es que herede una que no quiere: es
+que **no hay dónde ponerla**.
+
+📌 **Cómo se construye (b) sin romper D3:** **ocultar ≠ borrar**. La foto del modelo **no se toca**; se
+guarda una **exclusión por orden**, igual que `OrdenArte.excluido` ya hace con los artes. Reversible,
+auditada, y la galería del modelo intacta.
+
+**NO bloquea nada:** se construye (b) —que es lo que él nombró y falta en las dos lecturas— y si contesta
+(a), el arte se hace aparte.
+
+- **Aplica en:** fila **0.079**. **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.177) — ✅ CERRADA (DANIEL, 1-sep-2026): las fotos son **de la OP**, y aplica a la PRENDA **y** al ARTE
+
+> *«Un modelo de desarrollo que se va a usar para **4 órdenes diferentes** no puede usar la misma foto ni
+> del modelo ni de arte para todas las OP. Tendría que haber la posibilidad de **modificar las fotos
+> directamente en la OP**. Entiendo que **la OP es de donde cuelgan las fotos directamente, no del
+> desarrollo**. ¿Así está?»*
+>
+> *«Y **aplica para fotos de la prenda pero también del arte**.»*
+
+⇒ **Cierra §Post-F9.176 en el lado GRANDE: no era (b), eran LAS DOS.** El default propuesto era (b) —sólo
+la prenda— razonando sobre su *«eso me parece que ya existe»*. 🔴 **Se equivocaba el default, no él**: lo
+que ya existía era el mecanismo de la **prenda**, y él estaba enunciando el **principio** para ambas.
+
+### La respuesta a su pregunta, medida el 1-sep-2026: **así está A MEDIAS**
+
+| | Estado real |
+|---|---|
+| **PRENDA — heredar del modelo** | ✅ existe desde F2-E3 (ajuste jul-2026 **a petición suya**) |
+| **PRENDA — subir fotos propias a la OP** | ✅ existe (adjuntos de orden, presigned a R2) |
+| **PRENDA — quitar de la OP una heredada** | ✅ **construido el 1-sep** (versión **0.082**) — era la media frase que faltaba |
+| **ARTE — cualquier foto en la OP** | ✅ **CONSTRUIDO el 1-sep (versión 0.083)** — heredar, quitar de la OP y subir propias, **y el arte AGREGADO A MANO por fin puede llevar foto** (antes imposible). El impreso de la OP respeta lo apagado y por fin saca el arte a mano. *(Antes de esa versión: no existía nada.)* ⏳ **Lo que queda: la «Ficha de arte» del estampador sigue sin imagen** ⇒ fila **0.094**, con default *sí* |
+
+🔴 **Agravante medido:** un arte **agregado a mano** en la OP (`idModeloArte = NULL`) **hoy no puede tener
+foto en absoluto** — no es que herede una que no quiere: **no hay dónde ponerla**.
+
+### ⚠️ El matiz que gobierna el diseño, confirmado con él
+
+**«Hereda por defecto y la OP manda»**, NO «la OP nace vacía» — apoyado en sus propias palabras previas
+(§Post-F9.169(b)): *«si el desarrollo tiene fotos está bien que podamos **heredarlas**»*. Con heredar +
+quitar + agregar, cuatro órdenes acaban con **cuatro juegos distintos** sin obligarle a resubir lo mismo
+cuatro veces. *(Si algún día quiere que la OP nazca en blanco, es cambiar el default — decisión suya.)*
+
+📌 **Y la invariante que no se mueve (D3): OCULTAR NO ES BORRAR.** La galería del modelo no se toca nunca,
+R2 no se toca nunca, y **lo que una OP oculta las demás lo siguen viendo**.
+
+> ✅ **LAS DOS MITADES ENTREGADAS EL MISMO DÍA:** la **prenda** en la **0.082** y el **arte** en la **0.083**. ⭐ Y en el arte el coder **corrigió el encargo del lead**: las fotos del arte de la OP las gobierna **`desarrollo.administrar`** —el permiso con el que Daniel dijo *«nadie va a tener permiso de modificar la OP más que yo»*— y no `ordenes.*`, que habría pintado el botón y devuelto **403**.
+>
+> ⏳ **Único cabo, numerado y esperando a Daniel (fila 0.094):** la **«Ficha de arte» que va al estampador** no imprime ninguna imagen, ni antes ni ahora. **Si la OP manda sobre la foto del arte, ése es el papel que el proveedor tiene en la mano.** Default: **sí debe llevarla**; barata, porque la 0.083 ya resuelve cuál foto manda.
+
+- **Aplica en:** la prenda → versión **0.082**. El **ARTE** → versión **0.083**. El impreso del estampador → fila **0.094**. **Fecha:** 2026-09-01.
+
+---
+
+#### (Post-F9.178) — ✅ CONSTRUIDA: §Post-F9.144(b) ya tiene su segundo final (2-sep-2026, versión **0.084**)
+
+Cierra el reencuadre de Daniel: *«un estimado no es un dato pendiente de captura, es una **promesa pendiente
+de cumplimiento**»* — *«no es seguro que se consiga»*.
+
+**Lo que se construyó:** al firmar se puede contestar **si se logró o no** y **con cuánto** se cerró; y una
+pantalla **«Promesas incumplidas»** enseña la brecha, **lo que cuesta** (brecha × piezas pedidas) y el
+**total de la cartera**, ordenado por lo que más duele.
+
+### Las tres reglas de Daniel que NO se movieron
+
+1. **«NO FIRMA, LLEVA»** (§Post-F9.140 p.4): contestar es **opcional**; firmar sin decir nada funciona
+   idéntico a antes. La bandeja **enseña, no decide**.
+2. **«Avisar no es bloquear»** (§Post-F9.64): un «no se consiguió» **no frena** producción ni compra.
+3. **Sólo quien ve importes ve el precio** (§Post-F9.144(e), *«nadie más que yo ve los factores»*): la
+   columna «Prometido» va **tras la reja de importes**. Ventas, Logística, Asistente y Secretarial ven la
+   **fila entera** —qué falta, de qué padre salió, qué pedido espera— **pero no el número**.
+
+### 🔴 Y de paso destapó un defecto EN VIVO
+
+**La columna «Cliente» de la bandeja salía SIEMPRE vacía** por el camino normal: buscaba el expediente de
+la versión, y **versionar un modelo no crea expediente** (cuelga del padre). Es el mismo eslabón que hacía
+falta para encontrar la meta, así que se arregló junto.
+
+⚠️ **Y el linaje es una CADENA, no un salto:** cuando se negocia **por segunda vez** y se versiona una
+versión, la mesa vive **dos escalones arriba**. Sin eso, la fila aparecía con la brecha en blanco — *«sé
+que algo se incumplió y no cuánto»*, silencio parcial en la pantalla que existe para romper el silencio.
+
+📌 **Lo que sigue sin medirse, y es otra cosa:** las **segundas** y los **faltantes**. Van con las
+calificaciones de maquileros, cuando Daniel fije los parámetros de aceptación (§Post-F9.173(b), fila
+**0.086**).
+
+- **Aplica en:** versión **0.084**, ficha `V1-E9p`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.180) — ✅ CERRADA (DANIEL, 2-sep-2026): el aviso de la OP que se desvía **arranca MUDO sobre lo migrado**
+
+Al construir la Pieza 1 de §Post-F9.156 apareció una decisión que **nadie había planteado** y que **tiene
+consecuencia el día del arranque**.
+
+**El problema, medido.** La comparación es **por mayoría**, y **una orden entregada hace años sigue contando**
+—el sistema **no tiene estado de «cerrada»**— ⇒ N órdenes viejas contra 1 nueva **señalaban a la nueva y
+correcta**. 🔴 **Eso invertía el aviso.**
+
+**Lo que se hizo:** las recetas escritas por un **backfill** (distinguibles porque **quedaron firmadas sin
+autor**) **no votan**.
+
+**⚠️ LO QUE CUESTA, medido y dicho entero.** Sobre una familia venida de Access el aviso **no habla** — y eso
+**incluye el caso que originó la pieza** (*«no hubo cierre de ese tono y se compró otro tipo de cierre sólo
+para la café»*): si las cuatro hermanas vienen migradas, **no hay aviso**, y **en el Centro de Órdenes la fila
+sale limpia**. La otra comparación **tampoco lo dice**: calla a propósito lo agregado a mano.
+
+⭐ **La mitigación, que es lo que lo hace un buen trato:** **el silencio no es permanente** — la orden **vuelve
+al grupo en cuanto una persona firma su receta**. **Calla el pasado, no el futuro.**
+
+**Por qué no hay tercera vía.** Se estudió que el histórico **sirviera de referencia sin votar**: **no sirve**
+— el caso bueno y el malo son **indistinguibles para la regla de la mayoría** (una minoría decidida frente a
+una mayoría migrada).
+
+> ✅ **RESPUESTA DE DANIEL, textual:** *«Como dijimos. La información que no se genera en este sistema, puede
+> no tener todas las cosas que tiene este sistema. Va a migrar la información que hay. **Lo que no haya no
+> importa.** Asumo que las órdenes viejas no tengan todas las funciones que las nuevas generadas en este
+> sistema.»*
+
+⇒ Encuadrado por él en **REGLA 0-B**: el histórico llega con huecos **a propósito**, y una función que sólo
+aplique a lo que se capture desde hoy **está bien**.
+
+- **Aplica en:** versión **0.090**, ficha `V1-E9v`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.181) — ✅ RESPUESTAS DE DANIEL del 2-sep-2026 (tarde): cinco filas cerradas o reencuadradas
+
+Cinco decisiones de una misma conversación. **Con ellas no queda ninguna pregunta abierta que frene
+desarrollo.** *(Las tres reglas del pack, §Post-F9.179, quedaron confirmadas en la misma conversación —ver
+allí la respuesta textual.)*
+
+**(a) 0.061(c) · «El costo se congela al cerrar la orden»** — respuesta a la pregunta que **él mismo levantó**
+el 30-ago (*«¿en qué momento se define que ya se cerró el costo? ¿O va cambiando?»*).
+⚠️ **MEDIDO, y hay que saberlo antes de construir: «cerrar la orden» NO EXISTE HOY.** `EstadoOrden` es
+`capturada | completa | cancelada`, **no había «cerrada»** —la construyó la fila 0.061—, y 🔴 **`completa` NO significa «terminada»**: el
+propio esquema la define como **completitud de CAPTURA** (tallas + receta liberada + arte). **El nombre invita
+al error.**
+⚠️ **Y el candidato automático NO sirve — lo desmiente la propia decisión (a) de §Post-F9.154:** como los
+**faltantes** se le cobran al maquilero y las **incompletas** salen como merma, **no vuelven** ⇒ una orden que
+perdió piezas **nunca llega al 100 % entregado** y **su costo no se congelaría jamás**.
+⇒ **Propuesta: construir el acto de CERRAR la orden** (explícito, auditado A7, con permiso, reversible sólo
+por reapertura auditada D3). **Esto agranda la 0.061**: ya no son «un código de catálogo y una rama».
+
+**(b) 0.086 · el parámetro de aceptación** — *«podríamos dejar **2 %** como máximo entre segundas y faltantes.
+Pero creo que debería de ser una tela variable puesta en algún lugar de la configuración… **modificable en el
+tiempo**»* ⇒ **parámetro configurable, default 2 %.** ⏳ Dos precisiones menores con default: **¿2 % sumando
+segundas + faltantes o cada uno?** *(default: sumados)* y **¿global o por maquilero?** *(default: global)*.
+📌 **Medir antes de construir** si hoy se capturan las dos cifras por separado.
+
+**(c) 0.094 · la ficha del estampador** — *«si lleva foto la ficha de estampado»* ⇒ **sí lleva foto.**
+
+**(d) 0.087 · ⏸️ APARCADA, con un reencuadre que no se puede perder** — *«…la composición de la tela real se
+va a definir con la compra de la tela… entonces **la OP debe definir llevar 50-50. Como se hizo la compra.**
+Pero la verdad es algo poco relevante. **No quiero perder tiempo en esto. Ya quiero sacar la primer
+versión.**»*
+⭐ **Su reencuadre vale más que las dos opciones que se le propusieron** (compartir vs. avisar): para la
+composición **la verdad no está ni en el padre ni en el hijo — está en LA COMPRA**. ⇒ De los **12** campos de
+ficha heredados (`modelos.ts:139`; ⚠️ la fila 0.087 decía **9**, y son **12** — le faltaban `descripcion` e
+`idMaquileroCotizado`), **la composición no debería heredarse y congelarse, sino DERIVARSE de la tela
+comprada**; los otros 11 sí son ficha de diseño y ahí la pregunta original sigue en pie.
+**Coste de aparcarla, dicho:** un hijo **nacido antes** de editar el padre **se lleva el texto viejo al papel
+del cliente**. Daniel lo califica de *«poco relevante»*.
+
+**(e) 0.088 · ✅ CERRADA EN CERO** — *«Ok. Déjalo.»* ⇒ opción **(b)**: el botón **se queda con lo que hoy
+tiene**, y **no se construye nada**. **Lo que queda siendo verdad:** el botón **sigue pudiendo transformar un
+desarrollo SIN HIJOS**, con un número para todos los colores y sin vuelta atrás; **entre el usuario y eso hay
+una sola cosa: el aviso ámbar, que ya existe**. No queda desprotegido: queda **protegido por un aviso y por
+nada más**, y así lo aprobó el dueño. ⚠️ **No se añade una segunda guarda**: ya se probó y **retiraba una
+capacidad**, no protegía de un descuido.
+
+- **Aplica en:** versión **0.090** (registro). **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.182) — 🔍 DANIEL PIDE REVISAR **INVENTARIOS** y **FINANZAS**: dos módulos completos que nunca ha mirado (2-sep-2026)
+
+> **Daniel, textual:** *«Recuerda que aún falta inventarios y finanzas. **Ya quiero entrarle a eso**.»*
+
+**El hueco es del MAPA, no del código, y es exactamente lo que la regla «nada pendiente existe sin número»
+vino a impedir:** son **dos módulos construidos y desplegados** —Inventarios entre junio y julio, **Finanzas
+completa el 10-jul-2026 (F9, 6/6)**— y **el dueño del negocio nunca los ha revisado**. Hasta hoy **ninguna fila
+los representaba**.
+
+⇒ **Se numeran: 0.096 (Inventarios) y 0.097 (Finanzas)**, uno cada uno porque son **temas distintos** (la
+regla permite agrupar acciones del mismo tema, no fundir dos).
+
+### ⚠️ Qué NO son estas filas
+**No son funciones a construir.** Son **la verificación del dueño**. Lo que salga de cada repaso **nace con su
+propio número** — igual que pasó el 13-ago-2026, cuando el repaso de Daniel produjo
+`docs/DIAGNOSTICO-FLUJO-COMPLETO.md`, nueve decisiones y **el track V1 entero**.
+
+### El método, fijado por ese precedente
+**Antes de que él entre**, una **pasada medida** de cada módulo, escrita **en lenguaje de negocio y para que
+la lea él**: qué se puede hacer hoy y quién puede hacerlo · **dónde está flojo** (pantallas a medias, límites
+que el código declara y nadie ha leído) · **qué hacía el Access viejo que aquí no esté**
+(`Documentacion_MJD/04-Inventarios.md` para el primero) · y las preguntas **con el caso concreto que las
+origina y un default propuesto**.
+📌 **El objetivo es que Daniel JUZGUE, no que DESCUBRA.**
+
+### Pendientes operativos ya conocidos que hay que poner delante de él en la 0.097
+1. **El ETL de saldos de apertura de Finanzas está LISTO y NO CORRIDO** — espera **su corte de SINUBE** (D15c).
+2. Falta **capturar el RFC de FR Moda** en Administración › Empresas (sin él no se rechaza un CFDI de receptor
+   ajeno).
+3. El menú de Finanzas **exige `SEED_ON_START=true`** por los permisos de F9.
+
+- **Aplica en:** filas **0.096** y **0.097**. **Fecha:** 2026-09-02.
+#### (Post-F9.179) — ✅ CERRADA (DANIEL, 2-sep-2026): las **tres reglas del pack** quedan TAL CUAL
+
+> 📌 **No frenan nada** (REGLA 0): están construidas con su default y **Daniel sólo confirma o ajusta**. Si
+> cambia alguna, es un cambio chico y localizado — las tres viven en una función pura y su guarda.
+
+Al construir §Post-F9.10 (el pack como campo propio) hicieron falta tres reglas que **Daniel nunca enunció**.
+Se tomaron con default y se declaran aquí para que no pasen por decisión suya sin serlo.
+
+> ✅ **RESPUESTA DE DANIEL (2-sep-2026), textual:** *«Está bien ya como está. **Nunca va a pasar que se
+> mezcle en una OP pack y no pack.**»* ⇒ **las tres confirmadas tal cual.**
+>
+> ⭐ **Y el «filo» de (a) DESAPARECE — por dato del negocio, no por diseño.** Se había advertido que la
+> regla obligaría a **etiquetar el blanco** en una OP donde el negro llega en dos tendidos y el blanco en
+> uno solo. **Ese caso no ocurre**: si una OP viene con packs, **todos sus colores vienen con packs** ⇒ la
+> regla **no fuerza a nadie** y **la UI no tiene que suavizarla**. ⚠️ **La guarda se queda igual**, como
+> barrera contra un **error de captura**, no contra un caso normal del negocio.
+>
+> 📌 **Lección del lead, anotada:** la frase *«la regla obliga a etiquetar el blanco»* se escribió **sin
+> comprobar que ese caso existiera**. Era una afirmación de negocio, y bastó preguntar para que se cayera.
+
+**(a) Una orden es CON packs o SIN packs, nunca mezclada.** *Default tomado: sí.*
+**Por qué:** si un color trae tendidos «A» y «B» y otro no trae etiqueta, el saldo del segundo vive en un
+bucket vacío `''` que se ve y se cuadra distinto de los demás; permitirlo obligaría a explicar dos
+aritméticas en la misma pantalla.
+⚠️ **El filo que hay que preguntarle:** en una OP multicolor donde el **negro** llega en dos tendidos y el
+**blanco** en uno solo, la regla obliga a **inventarle una etiqueta al blanco**. El importador de C&A no lo
+sufre (una OC = un color), **pero la captura manual sí**.
+
+**(b) El pack de un renglón con producción viva NO se cambia.** *Default tomado: sí, y es el más firme.*
+**Por qué:** es la traducción de **D3** a este campo. El cortado queda llaveado con el pack viejo y el envío
+busca el nuevo ⇒ **esas piezas cortadas no se podrían enviar nunca**, con un error que además culparía al
+usuario. 🔴 Se rechazó una primera versión porque **fallaba en silencio por dos puertas** (borrar y recrear,
+y `copiarDetalleOrden`); hoy compara **por color**, no por identidad de fila. Un color quitado entero o uno
+nuevo **sí** pasan.
+
+**(c) La etiqueta del pack mide como máximo 12 caracteres.** *Default tomado: 12.*
+**Por qué:** cubre de sobra lo que C&A manda («A», «B», «PACK 1»). Es el más inocuo de los tres.
+
+- **Aplica en:** versión **0.087**, ficha `V1-E9s`. **Fecha:** 2026-09-02.
+
+---
+
+#### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
+
+Es la **ejecución** de lo que Daniel ya decidió en **§Post-F9.210·6** (*«Número propio, pero hoy no se ve
+el campo de la segunda tela para meter la info. Sólo se ve el campo de la tela principal»*) y en
+**§Post-F9.214** (*«sí es importante meterlo como complemento porque hay proveedores que así lo manejan y
+para el control de la tela siempre es mejor ponerla como un complemento de su tela»*). Aquí sólo se
+escribe **lo que hubo que decidir para construirlo**, que él no había contestado porque no se le había
+preguntado — con su default y su razón, para que pueda corregirlo de un vistazo.
+
+**Lo que la fila entregó:** el consumo del complemento se captura en la receta del modelo, **al lado del
+consumo de la tela y sin desplegar nada**, rotulado con el nombre que el catálogo le da a ese complemento
+(«Cardigan»); viaja congelado a la receta de la ORDEN; y desde ahí la explosión del MRP **ya emite la
+orden de compra con la cantidad de cárdigan puesta**, en vez de dejarla PENDIENTE para que alguien la
+teclee orden por orden.
+
+---
+
+##### (a) 🔑 La CANTIDAD de la orden de compra se calcula como una RAZÓN sobre el cuerpo de esa línea
+*Default tomado por el coder.* **⏳ Pendiente de que Daniel lo confirme o lo corrija.**
+
+El consumo del complemento es un **número propio** (eso ya lo decidió él y no se toca): se teclea
+`0.15 kg de cárdigan por prenda`, no «un 12 % de la felpa». La pregunta que quedaba es **otra**: cuando la
+orden de compra pide **480 kg de felpa** —después de netear existencias, repartir entre OP y aplicar los
+ajustes que tecleó el comprador—, ¿cuánto cárdigan pide?
+
+- **Lo que se hizo:** `cárdigan = cuerpo de esa línea × (consumo del cárdigan ÷ consumo de la felpa)`.
+- **Por qué:** el cárdigan **viaja con su felpa**. Se compra en el mismo renglón, al mismo proveedor y
+  —lo que da sentido a toda la fila— **en el mismo lote** (`CLAUDE.md` §5, de la ingeniería inversa:
+  *«doble componente ExTela1/ExTela2 — mismo lote»*). Si se compran 480 kg de felpa en lugar de los 500
+  calculados, lo que hace falta es el cárdigan **de esos 480**. Un requerimiento calculado por separado
+  (piezas × consumo) se **separaría de su cuerpo** en cuanto alguien tocara una cantidad, que es
+  exactamente el caso que Daniel describió en §Post-F9.99 (*«compré 480 en lugar de 481»*).
+- **La alternativa que se descartó**, y qué habría que hacer si él la prefiere: netear el complemento
+  **contra su propia existencia** y repartirlo aparte. Es más trabajo y —mientras cuerpo y complemento
+  se compren en el mismo renglón— daría números que no cuadran con el rollo que llega.
+- ⭐ **Dónde se calcula, y por qué importa: en el PLAN, no en la generación.** El subtotal de una línea
+  de orden de compra es `cantidad × precio + complemento × (precioComplemento ?? precio)`, así que en
+  cuanto el cárdigan deja de nacer vacío **empieza a costar dinero**. Si se calculara al generar, la
+  **revisión previa** prometería un total MENOR del que la orden acabaría pidiendo — justo la
+  separación que §Post-F9.85 existe para impedir (*«una revisión previa que no fuera el mismo cálculo
+  sería una promesa que el sistema no cumple»*). Ahora el número nace **una sola vez**, en el plan: la
+  previa lo enseña en su importe y la generación **lo copia**. Queda fijado con una prueba que compara
+  el total prometido contra el guardado. ⚠️ Como la OC automática no captura precio del complemento, el
+  cárdigan se valúa **al precio del cuerpo** (`precioComplemento ?? precio`, la regla que ya existía).
+- ⚠️ **Y la segunda mitad de eso, que apareció al medir:** la previa pinta literalmente
+  `cantidad × precio = importe`, así que un importe que ya trae el cárdigan **deja de cuadrar a la
+  vista**. Cada renglón dice ahora **cuánto complemento incluye**, con el nombre del catálogo:
+  *«36 kg × $90.00 = $3,645.00 (incluye 4.5 kg de Cardigan)»*.
+
+##### (b) Quién lleva complemento lo dice el CATÁLOGO; cuánto lleva, la RECETA
+*Default tomado. Es el mismo reparto que ya gobernaba la línea de orden de compra desde §Post-F9.18.*
+
+La receta **rechaza** capturar consumo de complemento en una tela que no lo declara
+(`Tela.nombreComplemento`), con un error que dice qué hacer (*«decláraselo primero en el catálogo de
+telas»*). Y si a una tela se le **quita** el complemento después de que una orden ya lo congeló, la
+compra **no lo pide** y no se rompe: manda el catálogo de hoy.
+**Por qué:** sin esa puerta, un número congelado sin sentido llegaría a la orden de compra y
+`validarLineas` **rechazaría la OC entera** —incluidas sus otras líneas— con un error sobre un renglón
+que el comprador nunca capturó.
+
+##### (c) Capturarlo es OPCIONAL, y no capturarlo deja el sistema exactamente como estaba
+*Default tomado.*
+
+Sin el número, la orden de compra **sigue naciendo con el complemento pendiente** y `autorizarOC` lo
+sigue exigiendo antes de dejarla pasar. Es la respuesta a la única pregunta que la **REGLA 0-B** permite
+—*«¿esto funciona bien cuando el dato NO está?»*—: sí, se comporta como el sistema de ayer.
+**Por qué no se hizo obligatorio:** volverlo obligatorio dejaría **sin poder guardar** cualquier receta
+existente que tenga una tela con complemento, obligando a completar el histórico — justo lo que la REGLA
+0-B prohíbe gastar. ⏳ Si Daniel prefiere que sea obligatorio **de aquí en adelante**, se puede: es una
+línea en el dominio.
+
+##### (d) Cero no es un valor válido
+*Default tomado.* Un cárdigan que consume 0 **no es un cárdigan**: se deja el campo en blanco. Además, la
+línea de orden de compra ya exigía que la cantidad del complemento fuera **positiva**, así que un 0
+guardado reventaría la creación de la OC.
+
+##### (e) 🔴 La tela suelta NO se retiró, y no se va a retirar
+Daniel dijo que hay cárdigans que se dan de alta como tela independiente **porque son especiales**. Eso
+sigue siendo válido y no se tocó ni un renglón de ese camino. Lo que esta fila arregla es que el otro
+camino —el que él prefiere— **ya no sea imposible**.
+
+##### (f) 🔴 LO QUE ESTA FILA **NO** HIZO, y hay que decidir: el COSTO del complemento
+**Medido, no supuesto:** `backend/src/dominio/costos/` **no menciona «complemento» ni una sola vez**.
+El precosto y el costo real de una tela valúan **sólo el cuerpo** (`consumoPorPrenda × precio`).
+
+Mientras el cárdigan se daba de alta como **tela suelta**, eso no se notaba: entraba al costo como su
+propio renglón. **Desde esta fila el cárdigan puede vivir dentro de su felpa — y entonces su costo
+desaparece del precosto.** ⚠️ De ese precosto sale **el precio que se le cotiza al cliente**, así que
+el número quedaría BAJO justo cuando alguien haga lo que Daniel pidió.
+
+**Por qué no se construyó aquí, dicho completo:** valuar el complemento obliga a decidir **con qué
+precio**. Hoy el único precio de complemento que existe es `TelaColor.precioComplemento` —que es **por
+COLOR**, y la receta del modelo **no tiene color** (el color llega con la orden)—, y **no hay ninguna
+cascada de resolución de precios para el complemento**, como sí la hay para el cuerpo
+(`costos/resolucion-precios.ts`). Inventarla de pasada habría metido una regla de **dinero** que nadie
+decidió, en una fila que venía a arreglar otra cosa.
+
+⏳ **Queda como decisión abierta, con recomendación del coder: 🔴 debería bloquear V1.** Es dinero, y es
+la mitad que falta para que llevar el cárdigan **como complemento** sea de verdad equivalente a llevarlo
+**suelto** — que es la promesa entera de §Post-F9.214. Anotada también en `HOJA-DE-RUTA.md` §6.
+
+
+##### (g) 🔴 SON **CINCO** PUERTAS, NO CUATRO — lo encontró la revisión, y la lección es la puerta que se enumera sola
+*Corregido en la ronda de corrección; la primera vuelta decía «cuatro».*
+
+Copiar una receta no es una operación: son **cinco**, y cada una es un `createMany`/`create` que
+**enumera sus campos a mano**. Cuatro llevan al complemento a la ORDEN —alta
+(`copiarRecetaDelModelo`), agregar renglón, restaurar y «traer del modelo»— y la quinta lo lleva a
+**otro MODELO**: `modelos/versiones.ts::copiarRecetaAModeloNuevo`, con **dos llamadores reales**
+(`crearVersionDeModelo` y `desarrollo/modelo-en-la-mesa.ts`, el *«copiar un modelo ya desarrollado»*
+que Daniel pidió en la 0.064).
+
+🔴 **Ésa se quedó fuera en la primera vuelta**, y el daño es exactamente el que esta fila vino a
+cerrar: el modelo nuevo nace **sin cárdigan**, sus órdenes vuelven a nacer con el complemento
+pendiente, y **nadie se entera** — omitir un campo en un `createMany` no rompe nada, Prisma escribe
+NULL. El comentario encima de esa misma puerta decía, palabra por palabra, *«misma razón que en
+`copiarBom`»*… y `copiarBom` sí lo copiaba.
+
+📌 **LA LECCIÓN, que vale más que el arreglo: un `createMany` que enumera campos es una puerta que
+hay que CONTAR, y contarlas se hace midiendo, no leyendo.** El reviewer destripó **tres puertas a la
+vez** y la suite entera —241 archivos, 3555 unit, 289 de integración— se quedó **en verde**: sólo la
+del alta estaba medida. Por eso ahora hay **una prueba por puerta**, con su nombre («PUERTA 2 ·
+AGREGAR…»), y no una que las cubra de paso: *una garantía sin su propia prueba no es una garantía,
+aunque el código esté bien escrito.*
+
+---
+
+- **Aplica en:** versión **0.129**, fila **0.156**. **Fecha:** 2026-09-07.
+- **Migración** `20260907130000_consumo_del_complemento_en_la_receta`: **aditiva y nullable**, dos
+  columnas (`modelo_tela` y `orden_tela`) porque son **dos momentos** —lo que se teclea y lo que la
+  orden congela—; la explosión lee la receta de la ORDEN y nunca el BOM del modelo (V1-E3d), así que sin
+  la segunda el número no llegaría jamás a la compra. **SIN backfill, SIN semillas, SIN permisos nuevos.**
+
+---
+
+#### (Post-F9.217) — ⭐ EL NÚMERO DE PRODUCCIÓN LO PONE DANIEL AL IMPORTAR (7-sep-2026, fila 0.151 / v0.127)
+
+**Daniel, probando el flujo real:** *«me generó el pedido y la OP **sin preguntar el número de modelo
+interno**…. **Quedamos que ese lo ponía yo, con una sugerencia previa.** …**No me gustó que todo sea
+completamente automático antes de poder verificar.**»* Y su punto 17: *«**en la OP no veo el modelo de
+desarrollo**»*.
+
+🔑 **Era un hueco de CABLEADO, no de diseño.** `salidaAProduccion` **ya aceptaba** el número —su propio
+`describe` decía *«el sistema lo precarga y el usuario lo puede cambiar»*— y el importador **nunca se lo
+pasaba**. La mitad del linaje ya estaba registrada en **§Post-F9.209**; esta sección cierra la otra mitad.
+
+**DECIDIDO:**
+1. **El número se teclea al importar**, con la sugerencia precargada, igual que en «Generar OP».
+2. **La sugerencia es INFORMATIVA, no una reserva.** `proponerNumeroProduccion` exige `tx` y toma un
+   advisory lock ⇒ entre verla y confirmar, otro puede tomarla. **La pantalla no promete exclusividad.**
+3. **La casilla se apaga fuera de `nacido`.** En `reusado`/`heredado`, `nomenclatura.ts` **descarta** el
+   número capturado; ofrecerlo ahí prometería algo falso.
+4. **La OP enseña su LINAJE** (`idModeloDesarrollo` + código), que es un **hecho**.
+
+⚠️ **Y lo que NO se hace, con su razón medida — para que nadie lo reabra creyendo que se olvidó:**
+- **No hay propuesta en vivo para un modelo elegido a mano.** La única forma correcta es que el servidor
+  renumere **la TANDA** (cuatro colores del mismo modelo necesitan cuatro números). **Medido por el
+  reviewer:** `consultarPropuestaProduccion` llama a `proponerNumeroProduccion` **sin `reservados`** y
+  sólo depende del *modelo*, no del color ⇒ **las cuatro filas recibirían el MISMO número**, que es el
+  defecto que `numero-produccion-pdf.ts` vino a cerrar.
+- **No se liga el expediente de Desarrollo solo.** `Desarrollo` es `@@unique([idProyecto, idModelo])`
+  (`schema.prisma:8535`) ⇒ **un modelo puede tener N expedientes, uno por proyecto**: ligarlo
+  automáticamente sería **adivinar el proyecto**. Por eso se contesta con el linaje.
+
+🔴 **Y el agujero que apareció al retomar la fila, que era EL CASO DE ESTRENO.** El servidor numera **una
+sola vez, al analizar, con la liga APRENDIDA** — pero **la primera vez de cada modelo del cliente se liga
+A MANO en la vista previa** (lo dice el propio importador). ⇒ ese renglón **no ofrecía casilla** y la OP
+nacía con el número del sistema: **la queja de Daniel sin cubrir, justo cuando nace el modelo**.
+⇒ **La numeración CADUCA** por dos caminos: el renglón cambió de modelo, **o** su desenlace es `reusado`
+y **alguna** liga de la tanda cambió. Es una **sobre-aproximación deliberada** —la pantalla no puede saber
+si ese `reusado` viene de la tanda o de la base—, y el lado seguro es barato: ofrece una casilla opcional
+con su explicación. El otro lado **repite la queja**.
+
+🔴 **Dos promesas falsas más, cazadas por el reviewer.** ⚠️ **La primera se midió contra Postgres
+real; la segunda NO** — se estableció leyendo el contrato del combo (`origen: 'todos'`) y el filtro
+de `listarModelos`, más pruebas en jsdom. *(La distinción la pidió el propio reviewer: decir «las
+dos» era afirmar más de lo medido, que es la falta que más ha caído en esta sesión.)*
+- **La previa anunciaba un reuso que el confirm RECHAZA.** Buscaba el hijo del color **sin mirar
+  `activo`**, y `obtenerODerivarModeloDeProduccion` lanza si está **descontinuado** (§Post-F9.119) ⇒ la
+  previa decía *«la OP se va a hacer con él»* y el confirm reventaba, **con A2 revirtiendo la importación
+  entera**. Es la invariante que el propio módulo declara: *«la vista previa y el confirm tienen que decir
+  lo MISMO»*. ⇒ ahora **no anuncia número**, avisa de que está descontinuado y **da el mismo remedio con
+  las mismas palabras** que el error del confirm. 📌 Se conserva el desenlace `reusado` **sin añadir un
+  cuarto valor**, porque ese enum lo comparten la previa **y** lo que de verdad pasó, donde un `bloqueado`
+  no puede existir.
+- **El pie de la casilla prometía el desenlace `nacido`** (*«si lo dejas vacío, lo asigna el sistema»*),
+  pero el combo trae `origen: 'todos'` ⇒ **ligar a un modelo de producción del Access es camino normal**, y
+  ahí nada se asigna. Ahora el pie **enumera los dos desenlaces**.
+
+📌 **Muere un aviso que MENTÍA:** *«modelo anterior al módulo de Desarrollo»* en una OP nacida del PDF —
+estaba en **cuatro sitios de tres pantallas**, hoy en cero, y también se corrigió en las **specs del
+rediseño**, que lo describían como conducta vigente y **mandan sobre la implementación**.
+⏳ **Queda una, a criterio de Daniel:** la frase sigue en `docs/rediseno/prototipo.html` (un `toast` del
+demo). **Es su mockup**, no una spec en prosa, y editarlo es otro tipo de acto.
+
+#### (Post-F9.216) — ⭐ QUÉ ES «EL PRECIO NEGOCIADO» QUE SE VE DESDE FUERA (7-sep-2026, fila 0.153 / v0.126)
+
+**Daniel:** *«dice precio aprobado, **pero dentro de la negociación quedó otro**. Debe de haber
+congruencia»*, y su propia salida: *«**o estaría bien poner los dos, mejor**»*.
+
+**DECIDIDO — y es SÓLO LECTURA.** Se añade el precio de la negociación **al lado** del aprobado, sin
+tocar ninguna ruta de escritura, ningún permiso ni el reparto de responsabilidades.
+
+⚠️ **La separación negociador/aprobador NO se toca, y es deliberada** (`negociacion.ts:8-12`):
+**negociar no aprueba**. El **aprobado sigue siendo el que manda** en el PDF, el Excel, la cotización al
+cliente y —lo que más pesa— **el precio que viaja a la ORDEN de producción**. Escribir `precioAprobado`
+al cerrar la mesa habría borrado ese reparto, y **no es lo que Daniel pidió**.
+
+### El criterio: «el último evento con precio», y por qué incluye uno que nadie pactó
+
+`NegociacionEvento` **no tiene columna de tipo** (`schema.prisma:8907-8935`), y el evento que escribe
+**`editarFactoresLista`** (`listas-precios.ts:1127`) es **estructuralmente idéntico** a un
+`registrarAcuerdo` con precio (`negociacion.ts:292`): precostos `null`, `costoEstimado` `null`, ambos
+precios no nulos. **Verificado por el reviewer comparando los cinco escritores.** ⇒ separarlos exigiría
+**adivinar leyendo la prosa de un comentario**, que es de las cosas que se rompen en silencio.
+
+Se eligió **incluirlo**, por dos razones:
+1. Lo que se pidió es **congruencia con el diálogo**, y ese evento **es** la última fila del historial.
+   Enseñar «el último acuerdo» afuera mientras adentro se lee otro número más abajo **mudaría la queja
+   de sitio** en vez de resolverla.
+2. Se hace **visible**, no se esconde: queda fijado con prueba propia.
+
+🔴 **Y el rótulo se corrigió por eso mismo.** La columna se llamaba «Precio negociado», y el reviewer
+midió el caso real: **en cuanto el dueño mueve los factores, CADA renglón aprobado recibe un evento con
+`precioNuevo = precioCalculado`**, y la pantalla queda con dos columnas contiguas repitiendo el mismo
+número — la que dice «negociado» exhibiendo la fórmula. **Es la misma especie de confusión que originó
+la fila.** La aclaración honesta existía… en el `title`, **invisible en táctil**. ⇒ el encabezado pasa a
+decir lo que el `title` ya decía bien: **«Último precio de la negociación»**.
+📌 Es la cicatriz de `CLAUDE.md` §8 aplicada: *el aviso que importa es el que está pegado a la cosa, no
+el que vive en el documento correcto*.
+
+### ⏳ PREGUNTA ABIERTA PARA DANIEL (default: como está)
+
+**¿El «precio negociado» debe ser el último de TODO el historial —como está hoy— o SÓLO el de un
+acuerdo?** Distinguirlos obliga a **añadir una columna de tipo** a la tabla de eventos y tocar sus cinco
+rutas de escritura, o sea **migración**.
+📌 **Y la pregunta que sólo él puede contestar** (regla §7.5, la clasificación depende de la frecuencia
+real del negocio): **¿cada cuánto mueve los factores de una lista YA aprobada?** Si es frecuente, la
+columna pasará buena parte del tiempo repitiendo el precio calculado, y esta pregunta deja de ser
+teórica.
+
+### 📌 Corrige una medición del lead, y deja un cabo anotado
+
+Se había dicho que `NegociacionEvento.precioNuevo` se leía en **dos** sitios, **ambos dentro del diálogo
+de negociación**. Son **TRES**, y el tercero está **fuera**: `SeccionDesarrolloOrden.tsx:191-193`, en la
+pantalla de la **ORDEN**, vía `liga-orden.ts:465`. (Confirmado por el coder y por el reviewer.)
+⚠️ **No cambia el diseño entregado, pero deja un cabo:** en esa pantalla **persiste la incongruencia
+original** —el precio sugerido sale del **aprobado** mientras los acuerdos de abajo muestran otro—, así
+que **la queja de Daniel puede reaparecer ahí**. Fuera del alcance de esta fila.
+
+---
+
+#### (Post-F9.220) — LOS DÍAS VENCIDOS DE LOS JUEVES: cómo se calculan, y las tres decisiones que el lead tomó con default (fila 0.121, 7-sep-2026)
+
+**De dónde viene.** Daniel arma cada jueves un Excel a mano para decidir a quién le paga:
+*«Este archivo lo necesito **todos los jueves**… ahí voy decidiendo qué vamos a pagar y lo voy
+capturando. Me gustaría que **todo eso lo haga directo en el sistema**»*. La presentación ya la cerró
+él en **§Post-F9.218(a)**: *«**Solo con que pongas los días vencidos es suficiente**»* ⇒ un número por
+renglón, sin cubetas. Lo que faltaba —y es lo que esta fila construyó— es que **ese número exista
+para los maquileros**.
+
+### 🔴 LA CAUSA, MEDIDA: no era que el plazo no llegara — es que la deuda de maquila nunca pasa por el motor
+
+`calcularVencimiento()` **sí** se llama al registrar, y **sí** funciona. Lo que pasa es que los cargos
+de maquila **no son movimientos del motor**: viven en las tablas de EsMa (F6), y la convivencia de F9
+las re-expresa **por LECTURA** sin migrarlas (`convivencia-esma.ts`, opción (b) de F9-E1). Esas tablas
+**no tienen columna de vencimiento** —`EsMaCargo` ni siquiera tiene columna de fecha: su fecha es su
+`creadoEn`— así que la proyección escribía `fechaVencimiento: null` **para los cuatro conceptos, a
+mano**, y de ahí salía el «—» que Daniel veía.
+
+⇒ **El arreglo no es guardar una columna: es DERIVARLA al leer.** Fecha del cargo + los días de
+crédito del proveedor, con la MISMA aritmética del motor (`sumarPlazo`, que se extrajo de
+`calcularVencimiento` y vive en `aging-comun.ts`). **No se guarda nada, no se toca ni un movimiento
+ya registrado, y no hay migración** — REGLA 0-B cumplida sin esfuerzo, porque un número derivado no
+tiene pasado que reparar.
+
+🔒 **Y confirma la regla que Daniel dictó:** *«las inconsistencias son errores de Lupita»* ⇒ **el plazo
+es SIEMPRE del proveedor y la fecha se calcula sola.** No hay ni un campo nuevo que teclear: cambiar
+`Proveedor.diasCredito` cambia la antigüedad de toda su deuda, y nada más la cambia.
+
+### ⚠️ LA TRAMPA QUE CASI CUESTA EL ARREGLO: en EsMa el «abono» es un CARGO
+
+`SIGNO_SALDO` (`esma/formula-saldo.ts`) lo dice desde F6: en EsMa **cargo +, abono +, pago −,
+descuento −** — el abono es un **cargo extra al maquilero**. Pero el `abono` del **motor** RESTA. La
+proyección etiqueta los renglones de EsMa con los orígenes del motor, así que preguntarle a
+`calcularVencimiento` —que decide por el ORIGEN— habría devuelto `null` para un abono de EsMa: un
+renglón que **sí** envejece se habría quedado sin edad, en silencio, sólo para ese concepto.
+⇒ **Quién envejece se decide por el SIGNO**, leído de `SIGNO_SALDO`, nunca por la etiqueta. Está
+medido con una mutación (cambiar el signo por la etiqueta pone dos pruebas en rojo).
+
+### ✅ Las TRES decisiones que el lead tomó con default — ⏳ PENDIENTES DE RATIFICACIÓN DE DANIEL
+
+**(a) ¿QUÉ número es «los días vencidos» de un proveedor que debe varias cosas?**
+**Default tomado: los días del cargo MÁS VIEJO que todavía no se ha pagado.** Es el que decide la
+urgencia; un promedio ponderado escondería justo la factura vieja que hay que sacar, y sumar las
+edades no significa nada. Coincide con cómo lo lee él en su archivo (*«BORDA PRINT lleva 8 días»*: una
+edad por beneficiario, no una por factura).
+⚠️ **El matiz honesto:** los pagos **no están amarrados a un cargo concreto** (el motor todavía no liga
+pago↔factura; ya lo advierte `aging-comun.ts`), así que «el más viejo que sigue sin pagarse» hay que
+**suponerlo**. Se supone con **la misma convención que ya usan las cubetas**: los créditos se aplican
+de más viejo a más nuevo. Reusarla es lo que impide que esta columna y la bandeja cuenten historias
+distintas del mismo proveedor. *(Si Daniel prefiriera «el más viejo a secas, aunque ya le haya pagado»,
+es cambiar una línea — pero entonces un proveedor al corriente saldría marcado en rojo para siempre.)*
+
+**(b) ¿Y si debe pero todavía no le vence nada?**
+**Default tomado: TRES estados distintos, que no se colapsan.** `—` = no hay nada que envejecer (no
+debe, o los pagos ya lo cubrieron) · `al día` = debe, pero está dentro de su plazo · `n d` = su cargo
+más viejo lleva `n` días vencido. Un `0` a secas donde debería ir `—` se lee como *«no debe nada»*,
+que es lo contrario de lo que pasa; por eso son tres y no dos.
+
+**(c) ¿Dónde va la columna, y se puede trabajar sobre ella?**
+**Default tomado: en la corrida semanal que ya existe (fila 0.113), NO en una pantalla nueva.** Esa
+pantalla **ya es** la sesión de decisión de los jueves —Daniel la dibujó en §Post-F9.189(f): *«Eso
+puede vivir en la pantalla y de ahí ir llenando la información de pagos»*— y tiene el campo abierto
+para capturar lo que se paga. Construir una segunda relación habría duplicado la que él pidió y
+partido en dos el total que sólo tiene sentido junto. La columna vive **pegada al saldo**, y es la
+**única de referencia que vale igual para un maquilero y para un proveedor**.
+
+📌 **Lo que NO se tocó, a propósito:** el **aging por cubetas** sigue exactamente donde estaba y sigue
+configurable (§Post-F9.218(a) lo pide así). La cubeta «Maquila» de la bandeja de CxP **sigue sin
+repartirse** en las cuatro cubetas: para eso haría falta que EsMa registrara por el motor, y no hacía
+falta para lo que Daniel pidió. ⇒ En la bandeja, `vencido` sigue siendo **sólo del motor**; los días
+vencidos son los que cruzan la frontera.
+
+- **Aplica en:** fila **0.121**, versión **0.128**. Confirma y ejecuta **§Post-F9.218(a)**.
+  **Fecha:** 2026-09-07.
+
+---
+
+#### (Post-F9.218) — TRES RESPUESTAS DE DANIEL: ANTIGÜEDAD, FACTORES Y PERMISOS (7-sep-2026)
+
+Tres preguntas que el lead había dejado abiertas con su default propuesto, contestadas de una vez
+(regla de §6: las preguntas se juntan y no frenan el trabajo).
+
+**(a) LA ANTIGÜEDAD DE SALDOS NO LLEVA CUBETAS: LLEVA DÍAS VENCIDOS (fila 0.121).**
+
+Se le preguntó por los tramos (7 / 14 / 21+) con los que agrupar la antigüedad de los maquileros.
+**Daniel:** *«Es irrelevante. Ni siquiera veo eso. **Solo con que pongas los días vencidos es
+suficiente**.»*
+
+**DECIDIDO:** el reporte de los jueves muestra, por renglón, **los días vencidos como número** — no una
+cubeta. ⚠️ Esto **NO retira** el aging por cubetas que ya existe y es configurable: sigue donde está
+para quien lo use. Lo que se decide es que **la pantalla de los jueves no se diseña alrededor de las
+cubetas**, porque él no las mira.
+
+🔑 **Y no confundir: su respuesta simplifica la PRESENTACIÓN, no el arreglo.** El hueco que la fila
+0.121 recoge sigue entero — hay maquileros a los que él **sí** envejece el saldo y el sistema les pone
+`fechaVencimiento: null` ⇒ **sin fecha de vencimiento no hay días vencidos que enseñar**. Calcular esa
+fecha sigue siendo el trabajo de la fila; lo que se ahorra es diseñar cubetas para ella.
+
+**(b) LOS FACTORES SON DEL CLIENTE, SE MUEVEN DESDE CLIENTES, Y NADA SE PROPAGA SOLO.**
+
+Se le preguntó con qué frecuencia mueve los factores de una lista ya aprobada. **Daniel:** *«Cada
+cliente se le pone sus factores por default. Cuando quiera moverlos, **los muevo desde clientes**. **Que
+no se haga nada automático**.»*
+
+**Confirma y extiende §Post-F9.156** (*«los factores son su calculadora, el precio cerrado es un
+compromiso»* ⇒ mover un factor **no toca** a los terminales).
+
+✅ **MEDIDO — el sistema ya cumple, y por construcción, así que no hay nada que construir.**
+`ClienteFactores` cuelga del cliente, y `ListaPrecios` guarda un **SNAPSHOT** copiado al crearla
+(`backend/prisma/schema.prisma:8729` y `:8745`). Y `clienteFactores` **no se lee en vivo desde ningún
+cálculo de precio**: las únicas lecturas de producción en todo el repo están en su propio CRUD
+(`dominio/desarrollo/cliente-factores.ts`) y en la fusión de departamentos
+(`dominio/catalogos/cliente-departamentos.ts` y `…-fusion-referencias.ts`) ⇒ **no existe ninguna vía por
+la que mover un factor del cliente altere una lista ya hecha**. *(Establecido leyendo el esquema y
+cruzando las lecturas de `clienteFactores` en `backend/src`; no se midió contra una base de datos.)*
+
+📌 **El único cabo, y se deja como está:** el snapshot de la lista **también es editable ahí**
+(`schema.prisma:8745`: *«editables aquí»*). Daniel no pidió retirarlo, y su frase dice dónde vive el
+**default**, no que se prohíba el ajuste puntual ⇒ **se conserva**, como escotilla para una negociación
+suelta. Si algún día dice que sólo desde Clientes, es quitar la edición de un sitio.
+
+**(c) LOS PERMISOS SE DEFINEN AL SALIR — pero el DEFECTO se arregla antes (fila 0.120).**
+
+Se le preguntó qué debe pasar en los **cinco** sitios donde `roles.administrar` se usa como interruptor
+de «es admin». **Daniel:** *«Hay que definir los permisos **una vez que vayamos a salir**.»*
+
+⚠️ **No es una respuesta nueva: es la MISMA de hace cuatro días**, y el lead volvió a preguntar sin
+comprobarlo. El 3-sep ya había dicho (**§Post-F9.187(c)**): *«déjalo así por ahora. **Lo arreglamos
+cuando vayamos a producción**»*. La fila lo recogía, palabra por palabra, y aun así se le volvió a
+poner delante. *(Cicatriz: antes de preguntar, mirar si la fila ya trae la respuesta.)*
+
+**DECIDIDO — sin cambio de fondo, y con una consecuencia de calendario que sí es nueva:** «cuando
+vayamos a salir» **es ahora**, porque V1 está a días. ⇒ la 0.120 deja de ser un pendiente lejano y
+**entra en el trabajo del arranque**, que es exactamente por lo que sigue marcada 🔴 **BLOQUEA V1**.
+
+🔑 **Y dentro de ese trabajo, el orden importa:** el arreglo de código va **antes** de que él reparta,
+no después. Mientras los cinco poderes cuelguen de `roles.administrar`, el día que se siente a asignar
+permisos **no habrá cinco interruptores que mover** — dárselo a alguien para que administre roles le
+abrirá, en silencio, cinco módulos que nadie le concedió. Separar cada poder en su permiso explícito es
+lo que convierte su reparto en un reparto **real** y no en una ilusión. **No se adelanta nada: se
+ordena.**
+
+**Y un pendiente manual que se cierra:** *«Teníamos pendiente subir el RFC. **Ya lo subí**»* ⇒ el RFC de
+FR Moda **ya está capturado** en Administración › Empresas. Era uno de los dos requisitos operativos que
+la fila **0.097** (su repaso de Finanzas) tenía que dejar listos antes de que él entre. Queda el otro:
+el **ETL de saldos de apertura**, construido y **sin correr**, esperando su corte de SINUBE (D15c).
+
+- **Aplica en:** filas **0.120**, **0.121** y **0.097**, y confirma **§Post-F9.156**.
+  **Fecha:** 2026-09-07.
+
+---
+
+#### (Post-F9.215) — ✅ EL BORRADOR DE ORDEN DE COMPRA **NO** CUENTA COMO COMPRADO (Daniel, 7-sep-2026)
+
+**Decisión pedida por el lead al construir la guarda de cancelación (fila 0.150) y contestada por Daniel
+en una línea:**
+
+> *«no cuenta como comprado»*
+
+**El contexto de la pregunta.** Daniel había dicho *«si no hay nada **comprado** ni producido y borra el
+pedido está bien cancelar en cascada»*, y «comprado» tiene **dos definiciones distintas** en el código,
+que `compras/comprometido-en-oc.ts` mantiene **a propósito separadas** (su TSDoc `:71-78` avisa de que
+copiar una en la otra *«habría dejado el defecto vivo»*):
+
+| Lista | Incluye borrador | Contesta |
+|---|---|---|
+| `ESTATUS_OC_QUE_CUBREN` (`:57`) | **SÍ** | *«¿hace falta volver a comprar esto?»* |
+| `ESTATUS_OC_COMPROMETIDA` (`:84`) | **NO** | *«¿ya me comprometí con el proveedor?»* |
+
+⇒ **La guarda usa `ESTATUS_OC_COMPROMETIDA`.** Un borrador **no compromete a nadie** frente al
+proveedor, así que **no impide cancelar** el pedido ni conserva la orden.
+
+📌 **Alcance:** esta decisión gobierna **la cancelación**. NO cambia el neteo de la explosión, que sigue
+contando el borrador para no duplicar la compra — son dos preguntas distintas y siguen con criterios
+distintos, que es justo lo que el archivo defiende.
+
+⚠️ **Y esta sección existe porque FALTABA.** La cita de Daniel estaba en el código, en
+`HISTORIAL-DE-VERSIONES.md` y en `docs/modulos/pedidos.md`, pero **en ninguna parte de `DECISIONES.md`**
+—que es donde `CLAUDE.md` §7 paso 2 obliga a registrarla—. Lo cazó el reviewer de la 0.150, no el
+verificador de documentos (que sólo cruza números de versión y el contador de filas). **Es la cicatriz
+del §8 otra vez: un dato repetido en varios sitios necesita un cruce, y aquí el sitio que faltaba era
+justo el maestro.**
+
+---
+
+#### (Post-F9.214) — 🔴 EL CÁRDIGAN SÍ VA COMO COMPLEMENTO (7-sep-2026): Daniel corrige una clasificación mal hecha del lead
+
+**Cómo se torció, porque la lección vale más que la corrección.** Al clasificar las filas pendientes se
+le preguntó a Daniel por la frecuencia del cárdigan. Contestó:
+
+> *«La mayoría lleva cárdigan. Pero **a veces el cárdigan está dado como una tela independiente**, porque
+> es un cárdigan especial. **Hoy es más común meter felpa por un lado y cárdigan como otra tela** por
+> otro.»*
+
+🔴 **El lead concluyó de ahí que ésa era la forma BUENA**, bajó la fila 0.156 a post-V1 y llegó a
+proponer *«si la práctica normal es tela separada, ¿vale la pena conservar el complemento?»*.
+
+**Daniel lo corrigió de inmediato:**
+
+> *«**Sí es importante meterlo como complemento**, porque **hay proveedores que así lo manejan** y **para
+> el control de la tela siempre es mejor ponerla como un complemento de su tela**.»*
+
+⇒ **Lo hacen separado PORQUE LA RECETA NO SABE LLEVAR EL COMPLEMENTO, no porque sea mejor.** Un rodeo
+no es una preferencia.
+
+⭐ **Y la evidencia le da la razón, y estaba a la vista del lead todo el tiempo** — `CLAUDE.md` §5, de
+la ingeniería inversa del sistema viejo, validada por Daniel hace meses:
+
+> *«Telas: doble componente `ExTela1`/`ExTela2` (ej. felpa + cardigan, **mismo lote**).»*
+
+🔑 **El cárdigan comparte LOTE con su felpa.** Darlo de alta como tela independiente **rompe ese vínculo
+en silencio** — y eso pega justo donde se acaba de trabajar: la fila **0.142** (v0.122) hizo que el lote
+**viaje** en los traspasos, y el aviso de riesgo de tono depende de poder nombrar el lote. Dos telas
+separadas no pueden decir «éstas dos vinieron del mismo rollo».
+
+**DECIDIDO: 0.156 sube a 🔴 BLOQUEA V1.** El consumo del complemento va como **número propio** (no
+proporción del cuerpo, ya decidido en §Post-F9.210). Lleva **migración** ⇒ es **más barata ahora que
+después de arrancar** (REGLA 0-B: mientras la versión empiece por `0.`, los datos son desechables).
+
+---
+
+📌 **LA LECCIÓN, que es el motivo de escribir esta sección aparte:**
+**un RODEO no es una PREFERENCIA.** Cuando alguien describe cómo hace hoy las cosas, eso NO dice que sea
+como quiere hacerlas: puede ser lo único que el sistema le deja. **La pregunta que faltó es de una línea:
+*«¿lo haces así porque es mejor, o porque el sistema no te deja hacerlo de otra forma?»***
+⚠️ Y es exactamente el modo de fallo que el propio lead había advertido dos mensajes antes —*«el riesgo
+es que empiece a marcar cosas como post-V1 para que el camino se vea más corto»*—, sólo que aquí no fue
+comodidad sino **una inferencia mal hecha sobre una frase de Daniel**. Que la advertencia existiera no lo
+impidió; lo impidió que Daniel leyera la clasificación. **Por eso la regla §7.5 exige su aprobación y no
+sólo su información.**
+
+---
+
+#### (Post-F9.213) — ⭐⭐ EL COLOR EN LA EXPLOSIÓN: avíos que no van por color, y la misma tela en dos colores (Daniel, 7-sep-2026)
+
+Salió mirando la pantalla de **Explosión de materiales** con datos suyos. Son **dos problemas
+distintos** que la pantalla junta, y al medirlos aparecieron **tres defectos apilados** en el primero.
+
+---
+
+### A · «Hay avíos que NO se compran por color»
+
+> *«hay ciertos avíos que **no se compran por color**. Debería de sumar todos. Como la **etiqueta de
+> lavado**. En este caso me los pone por separado, yo creo que porque es otro color. **¿Cómo le puedo
+> hacer para definirle que algunas cosas se compran juntas sin tomar en cuenta el color?**»*
+
+Su pantalla, bajo «Etiquetas Industrial»: `E01 — Etiqueta de lavado` **dos veces** — 11,771 pz con
+color «Blanco Hueso Pantone 14-0002 Tcx Pumice Stone» (órdenes 5565/5566) y 1,387 pz con «Blanco
+Hueso» (orden 5567).
+
+**MEDIDO — son TRES defectos, no uno:**
+1. **La explosión parte por color SIEMPRE, sin excepción posible.** El avío se abre en un renglón por
+   cada color de la matriz de la OP (`compras/mrp.ts:1359-1376`) y `claveAgrupada` (`mrp.ts:1557-1577`)
+   lleva **un segmento de color incondicional**. **No existe ninguna bandera** que diga «este avío no
+   va por color» (leído `Avio` entero, `schema.prisma:2146-2229`).
+   ⚠️ **`esGenerico` NO sirve y hay que decirlo**: es **otro eje** —*«¿me lo compro contra stock o
+   contra la orden?»* (`schema.prisma:2167`)— y su único efecto es netear contra el kardex
+   (`mrp.ts:1358, 1386-1392`). El array `porColor` se construye **antes y sin mirarlo**, así que un
+   genérico con 3 colores **sale igual en 3 renglones**. Marcar la etiqueta como genérica no la
+   juntaría, y encima le cambiaría la valuación del costo.
+2. 🔴 **Los dos «Blanco Hueso» son dos colores distintos que HOY NO SE PUEDEN FUSIONAR.**
+   `Color.nombre` es `@unique` (`schema.prisma:1152`) ⇒ necesariamente son dos filas. La fusión existe
+   (`Color.idFusionadoEn`, `catalogos/colores.ts:507` `colorCanonico`) pero **`fusionarColores` se
+   NIEGA** si el color origen ya se usó fuera de las telas (`colores.ts:400-403`), y **la primera
+   referencia bloqueante de la lista es justo ésta**: `OrdenLinea.idColor`
+   (`colores-fusion-referencias.ts:54-59`). Los suyos están los dos en órdenes ⇒ **atascado con el
+   duplicado para siempre**.
+3. 🔴 **Y aunque se fusionaran, el MRP los seguiría partiendo:** `colorCanonico` **no aparece en
+   ningún archivo de `dominio/compras/`**; `colorDelRenglon` devuelve el **id crudo**
+   (`comprometido-en-oc.ts:123-129`) y `claveAgrupada` lo mete tal cual.
+
+✅ **La buena noticia, medida eslabón por eslabón: el camino de «SIN COLOR» YA EXISTE y aguanta.**
+`RequerimientoOrden.idColorPrenda` es nullable **sin unique que incluya color** · `claveAgrupada`
+tiene rama `'sin'` explícita · en el neteo el renglón sin color es **el caso privilegiado** (*«se
+lleva el acervo entero… aquí NO hay ambigüedad que marcar»*, `comprometido-en-oc.ts:388-393`) ·
+`CompraLinea` nunca **exige** color · **la recepción ni se entera** (el cruce por color es exclusivo
+de telas) · y **el kardex de avíos NO TIENE COLOR EN ABSOLUTO** (`MovimientoDetAvio` es avío × lote ×
+almacén; el propio esquema lo dice en `:5766-5767`).
+⇒ **El arreglo es UN solo sitio**: la construcción de `porColor` (`mrp.ts:1360-1374`). Sin migración
+de datos, sin tocar `claveAgrupada`. REGLA 0-B: el snapshot se regenera solo y el diff ya contempla
+el paso de «con color» a «sin color» (`mrp.ts:1954`).
+
+---
+
+### A-bis · ⭐ A QUIÉN LE CUENTAN LAS CUBETAS HUÉRFANAS (7-sep-2026) — decisión de diseño nacida al construir la 0.158
+
+Al colapsar el avío apareció un defecto **que habría costado dinero**: marcar un avío cuyas OP **ya
+tenían OC por color** hacía que la explosión **volviera a ofrecer todo lo ya comprado** (`enOc: 0 /
+pendiente: 100`, medido con sonda por el camino real) ⇒ **se compraba dos veces**. Causa: en
+`repartirComprometidoPorColor` (`compras/comprometido-en-oc.ts`) el renglón **sin color** se llevaba
+sólo la cubeta `porColor[null]`, y **las cubetas CON color que ningún renglón reclama se caían al
+piso**.
+
+**DECIDIDO — la regla tiene DOS mitades, y las dos importan:**
+1. ✅ **El renglón sin color absorbe las cubetas huérfanas SÓLO SI es el ÚNICO renglón de ese
+   material.** Entonces sí pide todo el material de la orden y contarle esas líneas no es una elección.
+2. ⛔ **Si hay hermanos CON color en la mesa, NO las absorbe.** Ahí el renglón sin color es **una PARTE
+   de la orden**, y darle lo que una OC pidió para otro tono **sería inventar un hecho** (§Post-F9.86).
+
+🔴 **La segunda mitad nació de una regresión REAL, no de una precaución.** La primera versión absorbía
+siempre, y el reviewer midió el daño en **TELAS**: en `mrp.ts` los colores **sin amarre de tono** caen
+en la llave `'sin'` **junto a** los que sí lo tienen, así que una misma tela emite a la vez renglones
+con color y uno sin color. Con la absorción abierta, **80 m de negro no se compraban nunca**,
+acreditados con 100 que la OC pidió como **vino**. ⚠️ **Y el intercambio era el malo:** cambiaba una
+**sobre-compra visible y recuperable** por una **sub-compra silenciosa que para la producción**.
+
+📌 **La puerta que lo hace alcanzable, y por eso no es teórico:** el amarre de color se cambia
+libremente mientras la OC sea **borrador** (`color-de-la-tela.ts`, porque `borrador` **no** está en
+`ESTATUS_OC_COMPROMETIDA`) **pero el borrador SÍ cuenta para el neteo** (`ESTATUS_OC_QUE_CUBREN`). Un
+borrador más un cambio de tono fabrica la cubeta huérfana.
+
+⚠️ **Se descartó el atajo de absorber y marcar con `desdeAcervoSinColor`:** el número seguiría neteando
+y el material seguiría sin comprarse — sólo se avisaría del daño.
+
+🔑 **Y la lección de método, que es de las que se repiten:** el defecto no estaba en la aritmética,
+estaba **en una frase del comentario** —*«como pide todo el material de esa orden»*— que era cierta
+para un avío y falsa para una tela. Se corrigió el código **y la frase**, más la invariante, que estaba
+enunciada para cualquier mesa cuando sólo vale con el sin-color como **único** renglón. **Enunciarla de
+más era justo lo que autorizaba absorber en el caso mixto.**
+⚠️ **Las 3 344 pruebas de integración en verde no lo desmentían:** ninguna combinaba *tela mixta* **con**
+*cubeta huérfana*. Ese hueco tiene ahora su prueba.
+
+---
+
+### B · «La misma TELA en dos colores dentro de la misma prenda»
+
+> *«a veces hay modelos que llevan **dos colores en la misma prenda**. Ejemplo: **mangas de otro
+> color**… es la misma tela, pero las mangas van de otro color. En la receta pongo que lleva 200
+> gramos. Pero la realidad es que lleva **150 de un color y 50 de otro**. ¿Cómo lo manejamos en la
+> explosión? ¿Cómo puedo definir eso (aunque sea de forma manual)?»*
+
+⭐⭐ **Y LA DECISIÓN DE DISEÑO LA PUSO ÉL, sin que se la preguntaran** — es la frase que gobierna la
+solución:
+
+> *«el concepto de **dividirlo desde la receta es lo ideal**. Porque **la gente de desarrollo son los
+> que realmente tienen esa información**… sí debe de venir desde allá.»*
+
+⇒ **El reparto NACE EN LA RECETA, no en la explosión ni en la compra.** Desarrollo lo dice **una vez
+por modelo** y todo lo de aguas abajo lo hereda; la explosión deja de tener que adivinarlo orden por
+orden. Es la misma lógica que ya gobierna el resto del sistema (la receta manda, la orden la congela).
+
+🔑 **Y ACOTÓ EL ALCANCE ÉL MISMO, en el mensaje siguiente — esto es lo que hay que construir:**
+
+> *«**no sé si con su color, pero sí con el consumo por partes** cuando el modelo lleva más de un
+> color»*
+
+⚠️ **La receta lleva LAS PARTES Y SU CONSUMO, NO EL COLOR.** Y la distinción no es un detalle: es la
+que mantiene la receta como ficha técnica del modelo y deja el color donde ya vive.
+- **En la RECETA (Desarrollo, una vez por modelo):** *«esta tela: 0.150 cuerpo + 0.050 mangas»*. Es
+  información **técnica y estable** — la misma para todos los colores en que se venda el modelo.
+- **En la ORDEN (comercial, por pedido):** *«para la prenda azul, el cuerpo va azul y las mangas van
+  blancas»*. Es información **variable**: el mismo modelo con dos combinaciones distintas en dos
+  pedidos no cambia de receta.
+
+📌 **Encaja con lo que ya existe, y por eso es el diseño barato.** Hoy `OrdenTelaColor`
+(`schema.prisma:4014-4038`) traduce **color de prenda → color de tela** con
+`@@unique([idOrdenTela, idColor])`. Con partes, esa traducción pasa a ser **(color de prenda, parte) →
+color de tela**: una columna más en la llave, **no una tabla nueva ni un concepto nuevo**. Y el cerrojo
+`@@unique([idOrden, idTela])` **se puede dejar intacto**, porque el reparto vive DENTRO del renglón de
+la tela (sus partes), no en renglones repetidos de la misma tela.
+
+⇒ Si el consumo por partes existe pero nadie asigna colores distintos, **el comportamiento de hoy no
+cambia**: la suma de las partes es el consumo total y todo sale del mismo color. La función nueva sólo
+aplica a lo que se capture con partes — REGLA 0-B, sin retrocompatibilidad que inventar.
+
+✅ **RESUELTO POR DANIEL, y CORRIGE al lead.** Se le propuso un **catálogo** de partes; contestó:
+
+> *«Preferiría **nombrarlo como "combinación 1", "combinación 2"**, etc., porque poner un catálogo de
+> partes podría ser **muy extenso** y va a pasar lo mismo. A veces puede ser una **franja lateral**, a
+> veces una **pretina**, mangas, capucha, **parte interna de la capucha**, etc. Chance es más fácil
+> manejarlo como combinación. O simplemente **con un texto abierto**. **No importa que a veces diga
+> manga y a veces Mangas. Al final NUNCA vas a agrupar esos dos conceptos. Son cosas que viven en esa
+> orden y no afecta a nada más.**»*
+
+⇒ **DECIDIDO: combinaciones numeradas con etiqueta de TEXTO LIBRE. NO hay catálogo de partes.**
+
+🔑 **Y el argumento del lead era una MALA ANALOGÍA — conviene dejarlo escrito para que nadie lo
+repita.** Se justificó el catálogo diciendo que «mangas»/«Mangas» sería el mismo problema que los dos
+«Blanco Hueso» (§Post-F9.213·A). **No lo es, y la diferencia es exactamente la que Daniel nombró:**
+- **Por COLOR el sistema AGRUPA** — es la clave de compra de toda la explosión (`claveAgrupada`,
+  `mrp.ts:1557-1577`). Dos entradas para el mismo color real **parten un renglón de compra en dos**:
+  daño real y medible.
+- **Por PARTE no se agrupa NUNCA.** La combinación no suma entre modelos, no alimenta ningún reporte,
+  no es clave de nada. Es una **etiqueta local** a ese renglón de receta.
+
+**Un catálogo existe para hacer cosas comparables.** Si nada se compara, el catálogo sólo añade una
+puerta que alguien tiene que abrir —dar de alta «parte interna de la capucha»— **antes** de que
+Desarrollo pueda capturar un modelo. Es fricción pura, y en un negocio donde la lista es abierta por
+naturaleza (franja lateral, pretina, capucha, forro de capucha…) esa puerta se convierte en un freno.
+
+**Forma concreta:** cada combinación de un renglón de tela es una fila con **id propio**, su
+**etiqueta libre** (default «Combinación 1», «Combinación 2»… editable a «manga», «pretina», lo que
+sea) y su **consumo**. ⚠️ **La orden referencia la combinación POR SU ID, jamás por el texto** — así la
+etiqueta se puede reescribir sin romper nada, que es justo lo que la vuelve segura siendo libre.
+
+**MEDIDO — el techo de hoy es estructural, no un campo que falte:**
+- **El color viene de la MATRIZ DE LA ORDEN, no de la receta**: `piezasPorColorOrden`
+  (`mrp.ts:499-514`) lee `OrdenLinea.idColor`, y `OrdenTelaColor` traduce color de prenda → color de
+  tela **en la orden** (`schema.prisma:4014-4038`). La cantidad es `consumo × piezas del color`
+  (`mrp.ts:1265`). La receta aporta **una** cifra y **cero** información de color.
+- **Ni `ModeloTela` (`schema.prisma:2808-2838`) ni `OrdenTela` (`:3910-3989`) tienen `idColor`**, ni
+  campo de parte/posición. (`posicion` existe, pero en `OrdenArte`, que es el bordado.)
+- 🔴 **Y el cerrojo que mata la solución obvia:** `@@unique([idOrden, idTela])` (`schema.prisma:3982`)
+  ⇒ **la misma tela NO se puede meter dos veces** en la receta de una orden, ni a mano. El dominio lo
+  rechaza con letras: *«ya está en la receta de esta orden: edítalo en su renglón en vez de volver a
+  agregarlo»* (`receta-orden.ts:531-545`).
+
+**El camino MANUAL que sí existe hoy** (medido paso a paso): en la revisión previa teclear 15 en vez
+de 20 → contestar **«sigue pendiente»** (NO «cubierto») → generar la OC → **agregar a mano** un
+segundo renglón de la misma tela por los 5 kg, ligado a la misma OP (`EditorLineasOc.tsx:66`, sin
+restricción de unicidad en la OC). El neteo funciona y el renglón no reaparece.
+🔴 **PERO tiene un agujero que hay que decirle:** ese renglón añadido a mano **nace SIN COLOR y no hay
+control para ponérselo** (`EditorLineasOc.tsx:300-325`: *«aquí no se ELIGE… aquí se VE, y se puede
+quitar»*) ⇒ en la recepción el cruce de color **sólo se hace si el renglón lo tiene**
+(`recepciones.ts:1079-1090`), así que esos 5 kg **se pueden recibir de cualquier tono** y quien recibe
+vuelve a inventar la correspondencia — justo el mal que V1-E3u cerró.
+**En una frase: hoy se puede COMPRAR el caso, pero no DEFINIRLO.**
+
+---
+
+### C · ✅ EL REDONDEO YA FUNCIONA, y el sistema lo tenía previsto
+
+De su Excel se reconstruyó el método: matriz **piezas por color × orden** → consumo por tela (Felpa
+España `0.135`, Cardigan 2x1 `0.045`) → kg (1,320 × 0.135 = **178.2**, cuadra al decimal) → suma por
+color **por proveedor** → **cantidad REDONDEADA** (178.2 → **180**; 365.6 → **370**).
+
+**Ese último paso YA SE PUEDE HACER HOY**: `cantidadTotal` en la revisión previa es
+`z.number().positive()` **sin tope respecto de lo propuesto** (`contrato/esquemas/mrp.ts:559-568`).
+Y el esquema **anticipó este caso textualmente** (`schema.prisma:200-202`): *«así que **redondear al
+rollo o al mínimo del proveedor** no cría alarmas de mentira, pero comprar un rollo entero de más sí
+llega a quien autoriza»*. Sus redondeos son **+1.0 %** y **+1.2 %**, muy por debajo del **10 %**
+(`ConfiguracionEmpresa.pctDesvioCompra`) que marca la OC para autorización.
+⚠️ **`menor-al-minimo` NO es un mínimo de proveedor** — es el mínimo **guardable** de la columna
+(0.01, `mrp.ts:2500-2501`). **No existe ningún campo de mínimo ni de múltiplo de compra** en el
+esquema (comprobado). Automatizar el redondeo **sí** sería trabajo nuevo.
+
+---
+
+### ORDEN APROBADO POR DANIEL (*«Sí, está bien»*)
+**0.158** la marca «no va por color» · **0.159** la fusión de colores (que se pueda y que el MRP la
+respete) · **0.160** el color en la línea de compra añadida a mano · **0.161** ⭐ **la parte de la
+prenda en la receta** — la de fondo, y la que él mismo situó en Desarrollo.
+
+---
+
+#### (Post-F9.212) — ⭐⭐ SE DESCARTA EL BORRADO FÍSICO (7-sep-2026): se previene el error en vez de limpiarlo
+
+⚠️ **Esta decisión REVOCA la de §Post-F9.211.** Daniel pidió allí el borrado completo con folios
+devueltos; después preguntó *«¿qué piensas? ¿cuál es tu recomendación real? No quiero tampoco poner en
+riesgo nada de lo que ya está hecho y tampoco hacer que se tenga que programar mucho sólo para poder
+borrar. **Si no se puede, no es tan relevante**… Puedo ser muy flexible con esto. **No es algo que me quite
+el sueño.**»* — y con lo medido encima, **aceptó no construirlo**: *«ok, adelante con la guarda y lo de
+prevenir el error»*.
+
+🔑 **LO QUE CAMBIÓ LA DECISIÓN FUERON TRES MEDICIONES: cancelar YA resuelve todo lo que le estorbaba.**
+
+| Lo que temía | Qué pasa hoy al cancelar | Dónde se midió |
+|---|---|---|
+| basura en las pantallas | **no la ve**: lo cancelado se esconde por defecto | `pedidos.ts:920` (`incluirCancelados ? {} : { pedCancelado: false }`) · `ordenes.ts:1451` (`estado: { not: 'cancelada' }`) |
+| no poder resubir esa OC | **sí puede**: el detector de duplicados **ignora lo cancelado** | `oc-duplicada.ts:135` (`estado: { not: 'cancelada' }`) y `:59` (*«pedido **no cancelado** con esa referencia»*) |
+| que se siga produciendo | **se detiene**: la cascada apaga las OP | `pedidos.ts:833-859` |
+
+⇒ El borrado sólo añadiría **devolver el número de 5 dígitos** y **no saltarse un folio**.
+
+⚠️ **Y UNA CORRECCIÓN DEL LEAD A SÍ MISMO, que es la que movió la aguja.** En §Post-F9.— se dijo que el
+número quemado era *«el único daño permanente real»* y que dejar teclear el número era *«la mitigación más
+barata del único daño permanente»*. **Como afirmación de permanencia era cierta; como medida de IMPORTANCIA
+estaba inflada.** Son **999 por concepto×género**: a cinco errores por año, veinte años gastan el **1 %** de
+una serie. No es un recurso escaso — es un número redondo que suena grave. Y un folio saltado no cuesta nada
+operativamente. **Prosa que pesaba más de lo que medía: la misma cicatriz de siempre, esta vez en la
+priorización y no en un hecho.**
+
+🔴 **EL COSTO QUE SE EVITA no es escribirlo, es MANTENERLO.** Una `Orden` cuelga de **~16 relaciones**
+(inventario cíclico, fichas de verificación, EsMa, hitos, auditorías, costo, EDR, RC, notas de salida,
+compras, kardex…): **cada tabla nueva que se relacione con una orden, para siempre, tendría que acordarse
+de entrar en ese borrado**. El día que alguien lo olvide: o revienta al borrar, o deja huérfanos. Es un
+impuesto permanente sobre todo el desarrollo futuro. Y el terreno tiene trampas ya medidas: al kardex de
+una orden se llega por **tres caminos** distintos (PT por columna, tela por `origenTipo/origenId` de texto,
+avíos por `NotaSalidaLinea`), y `cancelarMovimientoPt` **copia `idOrden` al movimiento inverso**
+(`comun/kardex.ts:535`), así que contar movimientos **nunca da cero**.
+
+**QUÉ SE CONSTRUYE EN SU LUGAR — prevenir, no limpiar:**
+1. ✅ **LA GUARDA (sigue en pie, y es un DEFECTO, no una mejora).** Hoy `cancelarPedido` tiene **sólo dos**
+   guardas y **con la cascada marcada cancela una OP AUNQUE YA ESTÉ PRODUCIDA**. Desenlace **(b)**: se
+   cancela el pedido y las OP sin actividad, y **las que sí tienen se quedan vivas y NOMBRADAS**.
+2. ✅ **El número de producción se teclea AL IMPORTAR**, con la sugerencia delante — la máquina ya lo
+   acepta (`esquemas/salida-produccion.ts:60`), el importador sólo no se lo pasa. **Razón corregida: no
+   vale por ahorrar un número, vale porque EVITA el error en vez de limpiarlo.**
+3. ✅ **La OP enseña de qué modelo de desarrollo nació** (su punto 17). Es lo que le habría evitado
+   *«me puso el mismo modelo para las ordenes y no me di cuenta»*.
+
+📌 **NO es una puerta cerrada.** Si operando resulta que los huecos o los números quemados sí molestan, se
+retoma **con datos reales de cuántas veces pasó** — decisión informada, no precaución.
+
+---
+
+#### (Post-F9.211) — ⭐⭐ BORRAR DE VERDAD LOS ERRORES DEL DÍA, FOLIOS INCLUIDOS (7-sep-2026): Daniel cierra el punto que quedaba abierto
+
+**Contestó la pregunta que se le dejó puesta** (descarte acotado vs. sólo liberar el número) **y pidió más
+de lo que se le ofrecía.** Textual:
+
+> *«Para las ordenes que acabo de hacer y me equivoque, me gustaria poder **borrar por completo.
+> Absolutamente todo. No quisiera ni perder folios de OP….. me gusta tener todos los folios ocupados y sin
+> que se salte ninguno.** Hay errores que me gustaria **solo yo** poder eliminar. Y normalmente son errores
+> míos que no vale la pena dejarlos vivir en nada. Ejemplo, subí la OC equivocada al importar, o subí una
+> que ya había dado de alta…. o cualquier otro error de esa índole. **No hay ninguna necesidad de
+> perjudicar el sistema.**
+>
+> **Otro tema es cuando ya hay trabajo hecho…. ahí sí estoy de acuerdo en dejar rastro.»*
+
+🔑 **La frontera la puso él, y es limpia: TRABAJO HECHO vs. ERROR DE CAPTURA.** No es «borrar» contra
+«cancelar» por gusto: es que un pedido de hace diez minutos sin nada colgando **no es un hecho del
+negocio**, y un pedido con tela surtida sí. **D3 no se relaja**: sigue gobernando todo lo que tiene
+trabajo detrás. Lo que se reconoce es que **un fantasma no tiene historia que preservar**.
+
+**DECIDIDO:**
+1. **Borrado FÍSICO y completo** (no cancelación) cuando se cumplen TODAS las condiciones de «sin vida».
+2. **Los folios se devuelven** — de pedido y de OP. Él lo pidió por su nombre: *«me gusta tener todos los
+   folios ocupados y sin que se salte ninguno»*.
+3. **Sólo él.** Permiso propio, no un botón para todos.
+4. **Con trabajo hecho: se cancela y se deja rastro.** Ahí no se discute.
+
+**CÓMO SE DEVUELVE EL FOLIO — medido, y con su límite dicho.** `siguienteFolio` (`comun/secuencias.ts:62-67`)
+es `INSERT … ON CONFLICT DO UPDATE SET valor = valor + 1` sobre una fila `(id_empresa, clave, valor)`.
+⇒ se puede retroceder con un **UPDATE condicionado**: `SET valor = valor - 1 WHERE … AND valor = <el folio
+que se descarta>`. Es atómico (bloquea la misma fila que `siguienteFolio`) y **se comporta solo**:
+- si el descartado es **el último emitido** → el contador retrocede y **no queda hueco**. Es el caso normal
+  de Daniel: se equivocó y lo deshace en el momento.
+- si **alguien tomó un folio después** → el `WHERE` no casa, no pasa nada y **el hueco queda**. No se puede
+  cerrar sin renumerar a otro, y renumerar folios ajenos sería mucho peor que un hueco.
+⚠️ **Esto hay que decírselo con esas palabras**: la promesa es «sin huecos **cuando lo deshaces en el
+momento**», no «sin huecos nunca».
+
+**EL NÚMERO DE 5 DÍGITOS es más fácil:** no hay contador que retroceder. `consecutivosUsados`
+(`nomenclatura.ts:231-259`) lo calcula **leyendo los modelos existentes**, así que borrar el modelo hijo
+libera el número solo.
+
+**⚠️ DOS COSAS QUE EL BORRADO TAMBIÉN TIENE QUE DESHACER, y que no son obvias** (se miden antes de
+construir, no se asumen):
+1. 🔴 **La liga aprendida.** `aprenderLiga` (`pedidos/importacion-pdf.ts:469`) hace **upsert** en
+   `ClienteModeloLiga` dentro de la misma transacción del confirm. Si Daniel importó con el modelo
+   EQUIVOCADO y descarta, **la liga equivocada sobrevive y le vuelve a sugerir lo mismo la próxima vez** —
+   que es exactamente el escenario de su punto 17. Hay que medir si el upsert **creó** o **actualizó** para
+   saber qué se deshace.
+2. **El PDF en R2.** El adjunto sube a Cloudflare R2, y hay **deuda conocida**: `comun/archivos.ts` no tiene
+   `DeleteObject`, así que borrar el registro deja el objeto huérfano (backlog de `HOJA-DE-RUTA.md` §4).
+   Un borrado que se llama «absolutamente todo» es **el sitio donde esa deuda por fin importa**.
+
+**ABIERTO — una sola cosa, con default:** ¿sobrevive **un renglón de bitácora** del descarte? El lead
+recomienda **sí**, y la razón NO es vigilarlo: es que **cuando el folio NO se puede devolver** (el caso de
+arriba), ese renglón es lo único que contesta *«¿por qué falta el 1043?»*. Vive en un log que él nunca
+mira y no ensucia ninguna pantalla. **Su decisión.**
+
+---
+
+#### (Post-F9.210) — ⭐⭐ LA TANDA DEL 7-sep-2026: Daniel contesta once de los diecisiete hallazgos, y deja UNA abierta que es la más grande
+
+Contestó por lista, sobre el resumen que le entregó el lead. **Van sus palabras textuales** y, debajo,
+qué queda decidido. Lo que NO contestó se marca ⏳ y **no frena nada** (REGLA 0).
+
+---
+
+##### ✅ (14) el semáforo del target — **RATIFICADO**
+> *«1. OK»*
+
+Sale en la versión **0.123**. Ver §Post-F9.208.
+
+---
+
+##### ⏳🔴 (16) BORRAR vs CANCELAR — **ABIERTA, y es la decisión más grande de la tanda**
+> *«Que pasa si me cancelan un pedido, pero la OC ya esta producida? **No quiero que se borren las OP
+> en ese caso.** Pero si no hay nada comprado ni producido y borra el pedido esta bien cancelar en
+> cascada. **No quiero gastar modelos de produccion si me equivoque en dar de alta un pedido.** No sé
+> qué tan común es que me equivoque, pero seguramente me va a pasar en algún momento. **Hoy en access
+> todo eso lo controlo. Sé cuándo puedo borrar porque sólo fue un error y ni caso tiene dejar huella, y
+> sé cuándo hay que cancelar y dejar huella de lo que se hizo.** ¿Qué recomiendas?»*
+
+🔴 **PRIMERO, UN DEFECTO QUE SU PREGUNTA DESTAPÓ.** Las guardas de `cancelarPedido` en cascada
+(`dominio/pedidos/pedidos.ts:759`) son **sólo dos**: que ya esté cancelada, y que la orden esté
+**cerrada** (`exigirOrdenAbierta`, `cierre-orden.ts:102`). **NO hay ninguna guarda por producción,
+corte, WIP, compras ni recibos.** ⇒ **hoy, marcando la casilla de cascada, se cancela una OP aunque ya
+esté producida** — exactamente lo que él dice que no quiere. Eso no es diseño, es un hueco.
+
+**RECOMENDACIÓN DEL LEAD — dos cosas separadas, y sólo una es «borrar»:**
+
+**A · La guarda (no se discute, es el defecto de arriba).** La cascada debe **negarse a tocar las OP
+con actividad**, nombrándolas; el pedido se cancela y esas OP siguen vivas.
+
+**B · «DESCARTAR»: un borrado ACOTADO, con condiciones que verifica la MÁQUINA, no la memoria.**
+Ésa es la mejora sobre Access: allí **él** decide de memoria porque es el único que opera; en v2 son
+23 personas y *«yo sé cuándo fue sólo un error»* no se puede delegar — pero **la capacidad sí hay que
+dársela**, porque perderla sería que v2 fuera PEOR que Access en algo que usa.
+Condiciones, **todas**: cero movimientos de kardex · **ninguna OC que lo mencione, ni en borrador**
+(⚠️ **CORREGIDO 7-sep**: aquí se citó `comprometido-en-oc.ts:56-63` para decir que «los borradores ya cuentan como comprometido». **La cita era la lista EQUIVOCADA** —esas líneas son `ESTATUS_OC_QUE_CUBREN`, la que contesta *«¿hace falta volver a comprar?»* y **sí** incluye el borrador—. La lista de compromiso es `ESTATUS_OC_COMPROMETIDA` (`:84`) y **excluye** el borrador. Y Daniel decidió ese mismo día que **el borrador NO cuenta como comprado** — ver §Post-F9.215) · ninguna receta
+liberada. Si se cumplen, **no hay nada que auditar**: desaparecen pedido, renglones, OP, matrices **y
+los modelos de producción nacidos de él** —que es lo que devuelve los números de 5 dígitos—, y
+**sobrevive UN renglón de bitácora** con qué se descartó y por qué. *No queda el fantasma, pero queda
+quién lo borró.* Con **permiso propio**, no un botón para todos.
+
+**Por qué el número de 5 dígitos y no los folios:** los folios de pedido/OP también se queman
+(`comun/secuencias.ts:51`, A3) pero **un hueco en la numeración no cuesta nada**. El de producción sí:
+son **999 por concepto×género**, lo consume el **Modelo** hijo (no la orden), y **ni descontinuarlo lo
+libera** — `consecutivosUsados` (`nomenclatura.ts:231-259`) lee `modelos` **sin filtrar por `activo`**.
+**Liberar el número sólo puede pasar en el descarte, JAMÁS al cancelar:** una OP cancelada después de
+producir conserva su número porque hay papeles con él; bajo las condiciones del descarte no los hay.
+
+📌 **NO es una reparación de datos viejos** (no lo mate nadie citando la REGLA 0-B): es capacidad
+nueva mirando hacia adelante, para lo que se capture de aquí en adelante. Él mismo lo dijo:
+*«seguramente me va a pasar en algún momento»*.
+
+⏳ **Falta que elija:** el descarte acotado (B), o sólo la mitad barata —liberar el número y seguir
+cancelando—, que deja la basura en pantalla.
+
+---
+
+##### ✅ (8) copiar modelo desde otro — **CERRADO SIN TRABAJO**
+> *«8 - ok»* — ya existe («Copiar receta de…»). Nada que hacer.
+
+##### ✅ (1) el comprador — **VA EN EL PROYECTO**
+> *«solo que ese catalogo debe de tener la opcion de seleccionar al comprador cuando se hace un
+> precosteo. **Normalmente un proyecto va dirigido a un solo comprador**»*
+
+⇒ FK **opcional** `idClienteContacto` en `Proyecto` + selector en su diálogo. El catálogo
+`ClienteContacto` ya existe completo (alta/baja y cambio de departamento incluidos, §Post-F9.152).
+
+##### ✅ (13) los avíos en la negociación — **UN SOLO RENGLÓN CON EL TOTAL**
+> *«si, solo quitarlos de la pantalla de negociacion y solo dejar **un solo registro de avios con el
+> total** de lo que esta en la ventana emergente»*
+
+⇒ Se filtra el desglose en `MesaNegociacion.tsx:313` y se deja el subtotal, que **ya lo calcula el
+servidor** (`desgloseCostoLinea`). El popup **ya existe**. Frontend puro.
+
+##### ✅ (7) avíos favoritos — **SE QUEDA COMO ESTÁ. CERO TRABAJO**
+> *«7 - ok de acuerdo, **dejalo asi como esta**»*
+
+Aceptó el argumento de §Post-F9.90 (su propia instrucción anterior + la regla de los ocho clics).
+**Registrado para que nadie lo vuelva a abrir.**
+
+##### ✅⭐ (12) el material sin catálogo — **VIVE EN LA MESA, NUNCA EN LA RECETA**
+> *«Si, pero eso en todo caso **debe de estar en la ventana de negociacion y no puede ser parte de la
+> receta**…. al final en desarrollo deben de poder cambiar la receta **después** de la negociación. El
+> problema que quede por ahí vivo en la OP lo que meto sin catálogo, es que **se duplican las cosas**.»*
+
+✅ **BUENA NOTICIA MEDIDA: lo que teme YA NO PASA.** Nada lleva un renglón de precosto ni de la mesa a
+la receta de la orden — `receta-orden.ts:302` copia **del BOM del MODELO**, y las únicas menciones de
+«precosto» en ese archivo son de **criterio compartido** (cómo promediar medidas, la bandera
+`ajustado`), nunca un camino de datos. **El material suelto muere en Desarrollo.**
+
+**DECISIÓN, con el matiz que la hace construible:** el texto libre se conserva **sólo en la mesa de
+negociación** (que es donde vive el caso de la jareta estimada, §Post-F9.139 — así **no se rompe** esa
+decisión suya anterior). El **precosteo deja de ser un tercer sitio** para teclear material: para
+**tela y avío** se exige el **catálogo**. ⚠️ **Los conceptos de COSTO** (corte, maquila, empaque y los
+que se inventen) **siguen libres**: ahí el texto libre *es* el punto, y prohibirlo sería malinterpretar.
+
+##### ✅ (3) consumo en corte/maquila/empaque — **SÓLO PRECIO**
+> *«Solo debe de llevar el precio. **no la cantidad**»*
+
+⇒ Era **especificación, no queja**. Se quita la casilla de Consumo que hoy se pinta sin condición al
+editar esos tres renglones (`DialogoPrecosto.tsx:552-560`). La columna sigue siendo nullable para todos.
+
+##### ✅ (9) la fecha de la lista — **SE QUEDA, ROTULADA «FECHA DE CITA»**
+> *«Ok, dejala… **solo ponle fecha de cita**»*
+
+⇒ Camino (a) de §Post-F9.—: **es la fecha de la junta**, no la de captura. Se etiqueta así, junto a
+`lugar`. Deja de parecer redundante con `creadoEn`. ⚠️ **Arrastra a `Cotizacion`**, que tiene la misma
+forma (`cotizaciones.ts:433`).
+
+##### ✅ (2) el género y el año — **EN EL PROYECTO, Y EL MODELO LO HEREDA**
+> *«**en el proyecto** y cada modelo hereda esa información (**con opción a cambiarla**)»*
+
+⇒ Campos en `Proyecto` (ni el `ClienteDepartamento` ni la `Temporada` los tienen hoy), y
+`crearDesarrolloConModeloNuevo` los **precarga** en vez de exigirlos en blanco. 🔑 **Vale más que la
+comodidad:** un modelo sin género/tipo **no se puede numerar**, y el error salta hasta «Generar OP»,
+**después de teclear la matriz completa** (`nomenclatura.ts:222`).
+
+##### ✅ (6) el cárdigan — **NÚMERO PROPIO**, y confirma lo medido
+> *«**Numero propio**, pero hoy **no se ve el campo de la segunda tela** para meter la info. Sólo se ve
+> el campo de la tela principal»*
+
+⇒ Confirma de primera mano el hueco de §—: `ModeloTela` tiene **un solo** `consumoPorPrenda`. Por eso
+`mrp.ts:3628-3631` deja el complemento **PENDIENTE** en cada OC automática y alguien lo teclea a mano,
+orden por orden. El consumo del complemento va como **número propio**, no como proporción del cuerpo.
+
+##### ✅ (11c) la descripción ampliada — **EN EL MODELO**
+> *«si, esta bien… **del modelo**»* ⇒ se escribe una vez y sale en todas sus cotizaciones.
+
+##### ✅ (0.149) el botón «pasar a producción» — **RATIFICADO**
+> *«De acuerdo con lo que dices del boton en el caso del modelo 54002 que tocamos»*
+
+---
+
+#### (Post-F9.209) — ⭐ EL BOTÓN QUE SE OFRECE Y NO PUEDE FUNCIONAR: «pasar a producción» sobre un modelo que ya tiene hijos (fila 0.149, 7-sep-2026)
+
+**Nació de una pregunta de Daniel, y la pregunta era mejor que su respuesta.** Textual:
+
+> *«me generó una OP y le puso por default el modelo de producción **54002**. Si me voy a ese modelo de
+> desarrollo, hay un botón que dice "pasar a producción", y me pide que le ponga un modelo de producción
+> y me ofrece poner el **54003**. ¿Qué pasa si lo pongo???»*
+
+✅ **La respuesta medida: NO PASA NADA MALO — se lo rechaza.** La **GUARDA A** de
+`promoverAProduccionNucleo` (`backend/src/dominio/modelos/nomenclatura.ts:775-787`) impide transformar un
+padre que ya tiene hijos, **y los nombra en el mensaje**:
+
+> *El modelo "…" ya tiene modelos de producción nacidos de él por color (54002): su número no es suyo, es
+> el de cada color. Pasarlo a producción le daría un número MÁS a la misma prenda. Si falta un color, sale
+> solo al generar la OP de ese color.*
+
+🔴 **Pero la incongruencia que él percibe es REAL, y son TRES sitios que no miran si hay hijos:**
+1. **El botón se pinta** con sólo `origen === 'desarrollo'` (`frontend/src/modulos/modelos/ModelosPagina.tsx:906`).
+2. **La propuesta le ofrece el 54003 a ciegas:** `consultarPropuestaProduccion`
+   (`nomenclatura.ts:1391-1408`) sólo comprueba `yaEnProduccion`; **no sabe que hay hijos**. Le sugiere un
+   número que el camino de escritura va a rechazar.
+3. **El aviso ámbar del diálogo** (`DialogoPasarAProduccion.tsx:165-173`) explica bien el peligro *general*
+   —*«Esto le da UN número a todo el modelo, no uno por color… No hay vuelta atrás»*— pero **no dice lo
+   único que aplica a su caso**: que a él ya no le va a dejar.
+
+⚠️ **Y el peligro ERA real antes de la primera OP.** Pulsado entonces **sí** funcionaba, y **no tiene
+vuelta atrás**: el modelo se queda con **UN número para todos sus colores** y **sus OP dejan de hacer
+nacer modelos por color para siempre**. Que hoy lo bloquee es la red de seguridad haciendo su trabajo;
+que se lo ofrezca es el defecto.
+
+🔑 **Los dos botones hacen lo OPUESTO, y el código ya lo decía en una línea** (`nomenclatura.ts:900-906`):
+> *«promover **transforma la fila** del desarrollo (un `update`: le cambia el código, le pone el número y
+> lo muda de catálogo); derivar **crea una fila NUEVA** y deja el desarrollo intacto y en su catálogo, que
+> es lo único que permite que de un mismo desarrollo salgan cuatro.»*
+
+📌 **Va junto con el punto 17 de sus hallazgos** (*«En la OP no veo el modelo de desarrollo…»*): es la misma
+carencia en la otra dirección. El linaje **existe en la base** (`Modelo.idModeloDesarrollo`) y **ninguna
+pantalla lo enseña** — ni del padre hacia los hijos ni del hijo hacia el padre. `esquemas/orden.ts:487-489`
+**ni siquiera lo transporta** al frontend.
+
+⭐ **Y el propio código había dejado la pregunta escrita, sin contestar** (`nomenclatura.ts:735-737`):
+*«La pregunta —¿se retira el botón del catálogo?— va planteada ahí.»* **El recorrido de Daniel la
+contestó: sí, cuando ya hay hijos.**
+
+---
+
+#### (Post-F9.208) — ⭐ EL SEMÁFORO DEL PRECIO TARGET ESTABA INVERTIDO (fila 0.148 → versión 0.123, 6/7-sep-2026)
+
+**Lo encontró Daniel probando la mesa de negociación.** Textual:
+
+> *«En la negociación hay un precio target y abajo hay una leyenda de "llega y no llega"….. no se a que se
+> refiere. **Esta al revés.** Si el cliente pide 200 y le doy 190, claro que llega. Y si se pasa, entonces
+> no llega. **La misma etiqueta en precio sugerido si esta bien.**»*
+
+🔴 **Era un DEFECTO, no una mejora — y el propio esquema lo delataba.** `ListaPreciosLinea.precioTarget`
+está documentado (`backend/prisma/schema.prisma:8818`, de §Post-F9.150) como **«TARGET PRICE del CLIENTE:
+el precio objetivo que ÉL nos da»** — o sea, **el precio que el cliente quiere PAGAR**. Cotizar por DEBAJO
+lo cumple. Pero `simularMesa` (`dominio/desarrollo/negociacion.ts:741`) calculaba:
+
+```ts
+cumpleTarget: datos.precioObjetivo >= precioTarget   // ❌ al revés
+```
+
+con `precioObjetivo` = **nuestro** precio de venta. **Consecuencia, con su propio ejemplo:**
+- target $200, cotizando **$190** → `190 >= 200` = `false` → **«no llega» en ROJO**, justo cuando sí se llega.
+- target $200, cotizando **$210** → `true` → **«llega» en VERDE**, estando caros.
+
+⇒ **El semáforo estaba al revés en los DOS sentidos**, no sólo la palabra: pintaba de verde el precio que
+no le sirve al cliente.
+
+**DECISIÓN — la dirección correcta es `<=`, y la IGUALDAD CUMPLE:** cotizarle exactamente su target es
+dárselo. Arreglo quirúrgico de una comparación.
+
+**Lo que NO se tocó, y por qué:**
+- **Los colores.** Con el booleano corregido, `default` (verde) / `destructive` (rojo) ya quedan bien;
+  cambiarlos lo habría vuelto a invertir.
+- **La otra etiqueta.** El `Cumple`/`Debajo` sobre el **margen** (`MesaNegociacion.tsx:467`, desde
+  `cumpleObjetivo`) es **otra comparación y es correcta** — lo confirmó el propio Daniel al reportar.
+
+⚠️ **Las pruebas DEFENDÍAN el defecto** (`negociacion.int.test.ts` :1171 / :1181 / :1263, escritas con la
+lógica vieja) y se voltearon **releyendo el precio de cada caso, no el booleano** — señal de que se releyó:
+el `ajustarPrecioLinea` que prueba *«aprobar un precio que NO cumple se permite»* se movió de 90 a **106**,
+porque con la corrección el precio que no cumple es el otro. Se añadieron dos que no existían: **el caso de
+la igualdad** —sin él, un futuro `<` en vez de `<=` pasaría todas— y una que **clava la dirección con el
+ejemplo literal de Daniel** (200/190/210). **Medido con mutación:** reponer `>=` deja **3 rojas**; poner `<`
+estricto deja **1**, y es justo la de la igualdad.
+
+🔴 **PERO EL REVIEWER ENCONTRÓ QUE ESO NO BASTABA, Y ES LA LECCIÓN QUE HAY QUE GUARDAR.** La primera ronda
+se **RECHAZÓ**: las pruebas del frontend aseguraban **sólo `data-cumple-target`** —un pasa-manos del
+booleano del servidor— y **no las palabras ni el color**. Lo demostró mutando `MesaNegociacion.tsx`:
+invertir el texto (`:389`) → **17/17 en VERDE**; invertir el `variant` (`:385`) → **17/17 en VERDE**.
+⇒ **el defecto exacto que este arreglo corrige habría vuelto a pasar todas las compuertas.**
+
+📌 **La regla que se lleva de aquí:** *un guardián puesto en el dato que viaja no vigila lo que el usuario
+lee.* Daniel no vio un booleano: vio la palabra «no llega» en rojo. La prueba tiene que aseverar **eso**.
+Por eso la segunda ronda añade la aserción del **letrero en sus dos estados** y del **color**, comprobadas
+—también con mutación— dejando la prueba en rojo al invertir cada una.
+
+⚠️ **Y una corrección de prosa del propio lead, que el reviewer cazó:** este apartado afirmaba que las
+pruebas se añadieron *«para que esto no se pueda volver a invertir en silencio»*. Con la primera ronda eso
+era **cierto para la aritmética del backend y FALSO para el letrero y el color**. Es la cicatriz de siempre
+—prosa que asegura más de lo medido— y aquí queda anotada en vez de callada.
+
+**SIN migración, SIN permisos nuevos, SIN semilla.**
+
+---
+
+#### (Post-F9.207) — SEGUIR AÑADIENDO PDF A UN PEDIDO YA HECHO (fila 0.147, 7-sep-2026)
+
+**Pedido por Daniel mientras probaba el flujo real**, y **su razón es de diseño, no comodidad**:
+
+> *«es importante poder meter mas PDF al pedido ya hecho. Y prefiero siempre hacer una OP de la misma
+> manera **para tener toda la info completa de la OC del cliente**. […] Pero si ponlo como un punto a
+> corregir…. que se pueda seguir añadiendo mas PDF **aunque ya esten hechas algunas OP**.»*
+
+⚠️ **Corrige al lead.** Se le había propuesto el rodeo de *capturar el segundo modelo a mano* en el pedido
+bueno. **NO es equivalente:** se pierden los **SKUs**, los **packs**, la **referencia** y el **pantone** que
+el importador extrae del PDF. El rodeo le habría costado información.
+
+🔴 **MEDIDO: hoy es imposible.** `confirmarImportacionPdf` (`dominio/pedidos/importacion-pdf.ts:810`) hace
+`tx.pedido.create` (`:987`) — **el importador sólo sabe CREAR, nunca AÑADIR** — y el contrato
+(`esquemas/importacion-pdf.ts:400-425`) **ni siquiera acepta un pedido de destino**. Cada PDF nace en su
+propio pedido y la explosión no los junta.
+
+**El matiz que decide el tamaño es suyo: «aunque ya estén hechas algunas OP».** Permitir añadir a un pedido
+abierto es una cosa; permitirlo cuando ya parió órdenes obliga a decidir qué pasa con lo que ya nació —y eso
+**no está medido**: falta ver en `compras/mrp.ts` si la explosión junta renglones nuevos con OP vivas del
+mismo pedido.
+
+🔑 **Es la otra cara del punto 16 de sus hallazgos** (el importador crea el pedido y la OP de golpe, sin
+dejar verificar ni deshacer): **un flujo que sólo sabe crear** — ni añade, ni deja mirar antes, ni corregir
+después. **Se miden juntos.**
+
+📌 **Rodeo que él mismo usó para no frenarse:** meter la OP nueva desde su propio PDF y juntarlas en la
+explosión con «agregar una OP de otro pedido».
+
+---
+
+#### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
+
+**Lo que SÍ decidió Daniel ya está escrito y no se repite aquí:** es el punto **1 de §Post-F9.201** —
+*«el traspaso conserva el lote de origen (y su reparto, si la pata mueve varios); aditivo y sin backfill»*.
+Lo que sigue son **cuatro decisiones que la construcción obligó a tomar**, con su default aplicado.
+⚠️ **ESTADO AL 6-sep por la tarde (§Post-F9.205):** **P2 YA LA CONTESTÓ** — *«está bien que decida el
+sistema»*, **y añadió** que se pueda **elegir otro lote a mano** cuando el cortador escoja uno concreto
+(eso NO entra aquí: va en **fila 0.146**, encima de esta). **P1, P3 y P4 siguen sin contestar** y son las
+únicas que hay que volver a ponerle delante — **repreguntar P2 sería preguntarle dos veces lo mismo**. **Ninguna cambia lo que él pidió**;
+todas son cómo se cumple.
+
+**(P1) La cuenta de lotes del aviso de tono pasa a NETO (entradas − salidas), no a acumulado de entradas.**
+*Default tomado: sí.* **Por qué, y es la mitad no obvia de la fila:** al hacer que el traspaso nombre el
+lote, la **salida** del origen también lo nombra. Si el aviso siguiera sumando **sólo entradas** —como hacía
+desde la 0.101— un lote traspasado entero seguiría contando en la bodega **para siempre**, y la fila habría
+cambiado *«callar»* por *«avisar de más»*: la bodega vacía gritaría «hay dos lotes, escoge» sin tener nada
+en el anaquel. Con el neto, los dos lados de la comparación (`existencia` contra `Σ saldos`) son por fin la
+misma clase de número — un neto de hoy contra un neto de hoy —, que es justo el segundo defecto que la fila
+0.142 venía a curar. **Efecto lateral que se aprovechó:** una partida cancelada ya no necesita filtro
+especial, se neutraliza sola en la Σ (su inverso copia el `idPartida`).
+
+**(P2) El reparto es FIFO por folio de partida, AUTOMÁTICO y sin pantalla nueva.** *Default tomado: FIFO.*
+⚠️ **Ojo: leer el recuadro rojo del final de esta sección** — el FIFO sobre un saldo por lote inflado
+podía nombrar un lote ya consumido; se acotó, y su límite quedó declarado. ✅ **P2 la ratificó Daniel el
+6-sep por la tarde** (§Post-F9.205·1) **antes** de que ese recuadro se reescribiera con su redacción
+honesta; **lo que sigue sin contestar de este mismo asunto son las dos preguntas del recuadro, (i) y
+(ii)** — y la **(ii)** es la que de verdad importa, porque es donde el default elige *arriesgarse a
+nombrar* en vez de *callar*.
+La captura del traspaso **no cambia** (color + cantidad, como siempre) y el sistema decide de qué lotes sale,
+del folio más viejo al más nuevo. **Por qué no se le pide al usuario que escoja:** sería una pantalla nueva
+en el flujo más rutinario del almacén (mandarle tela al cortador), para una decisión que en el 90 % de los
+casos no tiene alternativa —hay un solo lote— y que ya se toma físicamente al cargar el bulto. FIFO es
+además lo que el almacén hace en la realidad con la tela: sale primero la que lleva más tiempo. 🔻 **Lo que
+cuesta:** si alguien mueve a propósito el rollo NUEVO y deja el viejo, el papel dirá el viejo. Se cambia en
+una función (`repartirPorPartidaFifo`) el día que Daniel lo pida.
+
+**(P3) La salida a orden SIGUE sin nombrar lote — no se tocó.** *Default tomado: no tocarla.*
+⚠️ **Y es la RAÍZ del defecto del recuadro rojo del final**: por eso P3 dejó de ser una decisión inocua. Es la decisión
+de Daniel de §Post-F9.9 (*el consumo empareja por color*) y cambiarla es otra fila, con su propia pantalla y
+su propia conversación. ⚠️ **Pero tiene una consecuencia que hay que decir en voz alta, y quedó escrita en el
+código y en el doc del módulo: el saldo por lote NUNCA cuadra del todo en un almacén que consume.** Como la
+salida a orden no descuenta el lote, su saldo se queda **por encima** de lo que de verdad hay ⇒ el aviso de
+tono **puede listar un lote que la producción ya se llevó**. Es el precio explícito de no pedirle al almacén
+que escoja partida en cada salida, y está **medido** en la integración para que nadie lo descubra de golpe.
+
+**(P4) La hoja del traspaso lleva DESGLOSE por lote.** *Default tomado: sí.* Una columna «Lote» con el
+número del **proveedor** primero —que es lo que viene escrito en el rollo y lo que quien recibe puede casar a
+la vista— y el **folio de la partida** entre paréntesis; «—» cuando el sistema no lo sabe. Sin esto, el
+reparto existiría sólo dentro de la base y el papel seguiría diciendo «300 kg de marino» sin decir de cuál
+tono. Un color puede ocupar **varias filas** en la hoja (una por lote), que es exactamente como el kardex lo
+guardó.
+
+**Y una advertencia para quien lea el número del aviso:** los lotes de la tela **traspasada antes de esta
+fila** siguen sin nombre y **no se van a reparar** (REGLA 0-B). Esa tela sigue saliendo por la línea neutra
+*«no se sabe de qué partidas es»* hasta que se consuma. **No es un defecto: es lo acordado.**
+
+---
+
+### 🔴🔴 DANIEL: ESTO HAY QUE LEERLO **ANTES** DE RATIFICAR P2 Y P3 — el sistema puede escribir el número de lote equivocado
+
+Lo encontró el reviewer de esta fila **midiéndolo contra la base**, y cambia lo que P2 y P3 significan en la
+práctica. **No es una posibilidad teórica: es el flujo normal de la bodega.**
+
+**Qué puede pasar, en el lenguaje del almacén.** La bodega hace dos cosas con la misma tela: **surte
+órdenes** y **manda tela al cortador**. Cuando surte una orden, el sistema **no apunta de qué lote salió**
+(eso es P3, y es una decisión vieja de Daniel: el consumo empareja por color, no por lote). Entonces:
+
+1. Entran **500 kg del lote A**.
+2. Se surten **500 kg a una orden** ⇒ **físicamente ya no queda nada del lote A**, pero el sistema sigue
+   creyendo que sí, porque nadie le dijo de cuál lote salió.
+3. Entran **300 kg del lote B** — es **lo único que hay** en la bodega.
+4. Se le mandan esos 300 al cortador.
+
+**Sin arreglo, el sistema le pone el nombre del lote A**, porque reparte del más viejo al más nuevo y cree
+que el A sigue ahí. El cortador recibe la nota con **un lote que no es**, la pantalla le dice **«sin riesgo
+de tono»**, y nadie revisa nada.
+
+🔑 **Y eso sería PEOR que antes de esta versión.** Antes, el cortador leía *«no sé de qué lote es esta
+tela»* — que era **verdad**, y le hacía ir a mirar el rollo. Cambiar un «no sé» honesto por **una
+afirmación falsa dicha con total confianza** es exactamente lo que este proyecto no hace.
+
+**Qué se construyó (la mitigación).** Antes de repartir, el sistema **compara lo que los lotes dicen tener
+contra lo que de verdad hay en el anaquel**, y le quita la diferencia a los lotes más viejos. En el ejemplo,
+el lote A queda en cero y el reparto acierta con el B. ⭐ **Lo que el freno cambia —y es lo que
+importa para decidir— es QUÉ LOTE SE ESCRIBE, no cuánta tela se manda:** en el ejemplo de arriba, en vez
+del lote que ya se había acabado escribe **el que de verdad está en el anaquel**. Eso está **medido** con
+ese mismo escenario de cuatro pasos. Lo que no alcance a explicarse se manda **sin lote**, que es la verdad.
+
+⚠️ *(Corrección de una versión anterior de este recuadro, que decía «garantiza que nunca se nombra más tela
+de la que hay». Eso ya lo hacía el sistema desde antes —no deja sacar más de lo que hay—, así que como
+argumento a favor del freno **no valía nada** y hacía parecer que el freno apenas sirve. Sirve, y sirve
+justo donde duele: en el nombre que va escrito en el papel.)*
+
+**Qué NO arregla — y esto hay que leerlo, porque una primera versión de este texto prometió de más y una
+prueba lo desmintió.** La raíz es P3, y el freno la acota sin curarla, en **dos** situaciones:
+- **(a) Varios lotes y consumo parcial.** El sistema no sabe de cuál se consumió, así que quita del más
+  viejo **por hipótesis**. Si la hipótesis falla, el nombre puede ser el del **lote de al lado**.
+- **(b) Si además ha entrado tela SIN lote** (un ajuste de conteo cíclico, una salida cancelada, un
+  traspaso viejo), los dos desajustes **se tapan entre sí** y el freno se queda corto: **puede seguir
+  nombrando un lote que ya se acabó**. Medido: 500 consumidos sin apuntar + 200 entrados sin lote ⇒ el
+  freno sólo ve 300 de diferencia y le deja al lote fantasma 200 kg que no son suyos.
+
+⏳ **Las dos preguntas para Daniel, y el default del lead:**
+- **(i)** ¿Está bien que el sistema **suponga** que lo que se consumió sin apuntar salió de lo más viejo?
+  *Default: sí* — es lo que el almacén hace de hecho, y es la misma regla del reparto.
+- **(ii)** ¿O prefiere que, cuando la bodega tenga varios lotes y no cuadren, el traspaso mande la tela
+  **SIN nombre de lote** en vez de arriesgar el equivocado? *Default: no* — nombrar acotado da al cortador
+  algo con qué trabajar en el caso normal (un solo lote, que es la mayoría), y el caso ambiguo ya sale
+  avisado por la pantalla de tono. **Pero es SU decisión**, porque es su papel el que va con el bulto.
+
+🔑 **La salida definitiva es apuntar el lote también al surtir la orden** (revertir P3). Eso es otra fila, y
+otra conversación: obligaría a escoger lote en cada salida, que es justo lo que Daniel no quiso en
+§Post-F9.9.
+
+- **Aplica en:** fila 0.142. **Fecha:** 2026-09-06.
+
+---
+
+#### (Post-F9.205) — LA TANDA DE RESPUESTAS DEL 6-sep-2026 (tarde): once decisiones, y una que CORRIGE al lead
+
+**Contexto.** El lead le puso a Daniel las preguntas abiertas de tres bloques con su default. Contestó
+casi todas. Se registran **con sus palabras**, no parafraseadas.
+
+**1. ⭐ EL LOTE SE PUEDE ELEGIR A MANO (cambia el alcance).** *«Está bien que decida el sistema **pero
+que haya posibilidad de seleccionar otro si es que el cortador decide un lote específico**.»*
+⇒ El **FIFO automático se queda** tal cual. La **selección manual va en FILA APARTE**, encima: la 0.142
+lleva tres rondas y sólo cubre el reparto automático; añadirle pantalla reabriría el ciclo y retrasaría
+lo que ya sirve. Decisión de alcance del lead, comunicada.
+
+**2. `0.143` · existencias de PT:** *«Está bien paginar»* ⇒ default (b) confirmado.
+
+**3. ⭐ `0.140` · IMPRESO POR LOTE — DE 10 EN 10.** *«Casi nunca imprimo tantas de golpe. Si es problema
+la memoria, **pon de 10 en 10 máximo** y listo.»* ⇒ el tope duro pasa de **100 a 10** órdenes por PDF.
+⚠️ **El tope de peso por imagen SIGUE haciendo falta**, medido: 10 × 7 × 12 MB ≈ **840 MB**. La decisión
+reduce el riesgo 10×, **no lo elimina**. Se construyen las dos cosas.
+
+**4. Corrida de pagos ejecutada:** *«Si. Está bien el default»* ⇒ **no** hay botón que revierta la
+corrida completa; se corrige movimiento por movimiento. Y **sí** se arregla que un **borrador vacío** se
+pueda borrar (hoy se queda en la lista para siempre).
+
+**5. ⭐ ESMA NO SE FUSIONA — y la razón la dio él.** *«Lo que pasa con EsMa de Access es que **es un
+estado de cuenta especializado para maquileros porque desde ahí reviso entradas y defino el renglón que
+abona a su estado de cuenta**. Si lo quieres fusionar con cuentas por pagar, **esa funcionalidad es sólo
+del maquilero, no de otros proveedores**. No sé cómo lo harías»* → y al oír la propuesta: *«Ok. Lo que
+comentas de EsMa»*.
+🔑 **EsMa NO es "otra vista del mismo saldo": es su MESA DE TRABAJO del maquilero.** Tiene una función
+que CxP no tiene y que no aplica a un proveedor de telas. ⇒ **Las dos pantallas se quedan**, con papeles
+distintos: **EsMa = donde se DECIDE** (revisar lo recibido, definir qué se abona, descuentos);
+**CxP = el libro único del dinero**. Lo que se arregla son las **tres contradicciones medidas**:
+(a) **no cuentan a la misma gente** —un maquilero dado de baja con saldo vivo sale en CxP y no en
+EsMa, así que sumar una columna y la otra da distinto—; (b) desde CxP se **ven** los renglones de
+maquila pero **no se pueden tocar** (la 0.145 abre esa puerta); (c) **ninguna pantalla dice que la otra
+existe**. Y se **quita del menú la etiqueta de «interina»** que EsMa arrastra desde antes de F9.
+⚠️ **Esto DESMIENTE el enunciado de la fila 0.135**, que trataba la convivencia como duplicidad a
+eliminar. No lo es: **es división del trabajo**, y fusionarlas le quitaría la pantalla donde opera.
+
+**6. 🔴 LOS PLAZOS DEL MAQUILERO — DANIEL CORRIGE AL LEAD, y el dato cambia el diseño.**
+*«Los maquileros cobran normalmente en **una o dos semanas máximo**. **No hay plazos de 30 días.** El
+que estás viendo (bordados computarizados) **es un proveedor de etiqueta**. O sea: los maquileros cobran
+en el **99 % de las veces esa misma semana o la siguiente**. No más.»*
+🔴 **Lo que el lead afirmó y era FALSO:** que «los 8 y 30 días del archivo son los días de crédito de dos
+**maquileros**». BORDADOS COMPUTARIZADOS **no es maquilero**. El dato se leyó del Excel **sin cruzarlo
+con quien conoce a los terceros** — la cicatriz de siempre.
+⭐ **Consecuencia de diseño para la fila 0.121 y para el aging:** la antigüedad de un **maquilero** NO se
+mide con la escala del **proveedor**. Proveedor: 30/60/90 (Daniel usa **150/200/250**). Maquilero: **la
+semana en curso o la siguiente** ⇒ **un maquilero a 30 días no es "vencido normal": es una ANOMALÍA que
+debe saltar a la vista.** Meterlos en cubetas de 30/60/90 haría que **todo maquilero atrasado se vea "al
+corriente"**, que es justo el defecto que la 0.121 viene a curar. ⇒ **Los tramos de maquila van en
+SEMANAS y son propios.** Default propuesto **7 / 14 / 21+**, a confirmar al construir la fila.
+
+**7. Cancelar un pago/abono de maquilero:** *«Ok»* — y añadió: *«**Aunque me gustaría poder editarlo yo
+cuando sea sin factura. Mismo criterio que los estados de cuenta de proveedores que no tienen
+facturas**»*. ⇒ **Es exactamente la fila 0.145**, ya construida: corrige **por movimiento**, no por
+proveedor, y deja intocable el renglón con CFDI detrás aunque sea del mismo tercero.
+
+**8. Constancia de situación fiscal:** *«Si»* ⇒ obligatoria **también para clientes**, como bloqueo suave.
+
+**9. CFDI en volumen:** *«De acuerdo con default»* ⇒ arrastrar varios XML a la misma pantalla, con
+resumen de importados / duplicados / sin proveedor.
+
+**10. Los XML de apertura:** *«Si son con facturas, voy a subir **todos los XML que estén vivos**»* ⇒
+ratifica §Post-F9.201·5 y **los aporta él**.
+
+**11. Las muestras de la carga de apertura:** *«Mañana subo una prueba»* ⇒ **desbloquea la fila 0.131**.
+
+⏳ **SIGUEN ABIERTAS de §Post-F9.206:** P1, P3, P4 y las dos del recuadro — **(i)** ¿el sistema supone
+que lo consumido sin apuntar salió de lo más viejo? y **(ii)** ¿nombrar un lote acotado o **mandar la
+tela sin nombre** cuando no está seguro? La **(ii)** se le repreguntó sin jerga por ser la única donde
+el default elige *arriesgarse a nombrar* en vez de *callar*.
+
+
+#### (Post-F9.204) — LA REPARACIÓN COMO TERCER SERVICIO SOBRE LA ORDEN (fila 0.144, 6-sep-2026): las cuatro las decidió Daniel
+
+**Cómo nació.** Daniel, por su cuenta: *«a veces hay que hacer reparaciones a un modelo… funciona
+similar a lo que es empaque o el corte. Es sólo una cantidad a un precio que se le paga y **se le debe
+de cargar al costo**. Me parece que el desarrollo que hiciste con lo del corte y empaque ya está
+variable para poder meter un servicio más, ¿no?»*
+
+**Lo que se midió antes de contestarle — su instinto acierta en una mitad, y hay una sorpresa en la otra:**
+- ✅ **El PAGO sí está preparado.** `crearCargoDeServicio` (`dominio/produccion/etapas.ts:596`) recibe el
+  servicio **por parámetro**; el CHECK de la migración de la 0.114 es
+  `(id_tipo_proceso IS NULL) <> (servicio IS NULL)` y **no nombra valores**, así que un tercer servicio
+  no lo rompe; y la etiqueta vive en un `Record<ServicioOrden,string>` **exhaustivo**
+  (`dominio/esma/etiqueta-cargo.ts:21`), de modo que al ampliar el enum **el compilador obliga** a
+  nombrarla. ⚠️ **Pero NO es un catálogo de pantalla:** es el enum de BD `ServicioOrden { corte, empaque }`
+  (`schema.prisma:4336`) ⇒ meter la reparación es **migración + los puntos que marque el compilador**.
+  Es código, no captura. Se le dijo así.
+- 🔴 **EL COSTO NO EXISTE — ni para la reparación, NI para corte y empaque.** `costo-orden.ts:162-165`
+  calcula `procesos = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes`, y **ningún
+  archivo de `dominio/costos/` ni de `dominio/edr/` lee `EsMaCargo`** (verificado enumerando sus
+  lectores: sólo terceros/esma/produccion). ⇒ **hoy se paga el corte y ese dinero NO llega al costo de
+  la prenda** salvo que alguien lo teclee en «procesos». **Es la pieza que falta, y falta para los tres.**
+
+**LAS CUATRO DECISIONES DE DANIEL:**
+1. **Se paga POR PIEZA reparada**, con su cantidad y su precio — como corte y empaque. *(Suyo: «es sólo
+   una cantidad a un precio».)*
+2. ⭐ **La registra CUALQUIER proveedor que ya tenga un rol de maquila** (`ROLES_MAQUILA_ESMA`:
+   costura, estampado, bordado, lavado, aplicación, corte, empaque). **SIN rol nuevo y SIN casilla que
+   marcar.** Lo levantó él: *«el reparador puede ser un proveedor de empaque o de maquila… no sé cómo
+   vamos a manejar eso. Tú recomiéndame»*, y aceptó la recomendación. **Las razones, en su orden:**
+   (a) un rol nuevo obligaría a **repetir el paseo manual de la 0.114** —marcar «Empaque» taller por
+   taller—, y por lo que él describe habría que marcárselo a casi todos; (b) **es la verdad del negocio**:
+   el reparador *es* su maquilero, y un rol aparte modelaría una frontera que en su taller no existe;
+   (c) al estar todos en `ROLES_MAQUILA_ESMA`, **el reparador cae solo** en el rubro maquila de la
+   corrida semanal y en su estado de cuenta, sin enseñarle nada nuevo a finanzas.
+   ⚙️ **Lo que exige técnicamente:** `exigirTerceroConRol` (`etapas.ts:705`, `:826`) pide **UN** rol
+   exacto ⇒ hace falta una **variante que acepte una LISTA**.
+   ⛔ **Descartado abrirlo a cualquier proveedor:** dejaría registrar una reparación a nombre del que
+   vende tela. 📌 Y si algún día el selector largo estorba, **la casilla se puede añadir después sin
+   romper nada**: lo guardado apunta al proveedor, no al rol.
+3. **Avisa, NO bloquea** contra lo recibido — como el empaque. Reparar dos veces la misma pieza es real.
+4. ⭐ **El costo recoge lo REAL pagado** (cargos de corte + empaque + reparación) en vez de teclearse.
+   ⚠️ Esto **toca el motor de costeo**, que es el que produce las cifras que ya se están viendo ⇒
+   **considerar partirla en dos entregas**: (a) la reparación se paga; (b) el costo recoge los tres.
+   Decidir con el diff delante.
+
+⛔ **Lo que NO se hace:** convertir la reparación en un `TipoProceso` — la metería al flujo envío→recibo
+que Daniel dijo que estos servicios **no** son (§Post-F9.195). `idTipoProceso = NULL` sigue siendo la
+marca de «servicio sobre la orden».
+
+#### (Post-F9.203) ⭐⭐ CORREGIR UN MOVIMIENTO SIN FACTURA — «sólo yo, ni con permiso» (fila 0.145, 6-sep-2026)
+
+**Lo que pidió Daniel, textual (6-sep-2026):**
+
+> *«Quiero tener manera de modificar cualquier registro que se meta en cualquier estado de cuenta de
+> los proveedores **sin factura**. **Sólo yo. Nadie más ni con permiso. Sólo yo.**»*
+
+Y sobre la FORMA, después de que se le planteara el costo de guardar el rastro:
+
+> *«Sí, está bien **con rastro**.»*
+
+---
+
+### De dónde nace: una asimetría medida
+
+De los cuatro conceptos de EsMa, **sólo el descuento** se podía cancelar (`esma/formula-saldo.ts`,
+fila 0.109, y sólo para el *deshacer* de un cierre de orden). ⇒ **un abono o un pago a un maquilero
+capturado por error NO se podía anular NUNCA.** En Cuentas por pagar, en cambio, se cancela todo
+desde F9-E1. Esta decisión cierra esa asimetría — y la cierra con la forma que Daniel pidió, que **no
+es «cancelar»**.
+
+### (a) LA FORMA: un gesto para quien corrige, dos hechos para la contabilidad
+
+En pantalla se comporta como **editar**: se abre el renglón con sus valores, se cambia lo que haga
+falta, se guarda. Por dentro, **en UNA transacción**: el movimiento viejo queda **cancelado** —con su
+**inverso auditado**, en el motor de terceros— y nace uno **nuevo** que lo sustituye, **ligado** a él.
+
+⇒ **D3 queda intacto**: nada se edita ni se borra, el saldo sigue siendo Σ de movimientos y el pasado
+se sigue pudiendo reconstruir. Lo que cambia no es la regla: es que ahora hay **una forma de
+ejercerla en un solo gesto**, en vez de pedirle al dueño que cancele y vuelva a capturar.
+
+🔑 **Eso es exactamente lo que significa «con rastro»**, y es lo que Daniel aprobó cuando se le dijo
+que costaba: la corrección **no ahorra el asiento**, ahorra los **clics**.
+
+### (b) «SÓLO YO, NI CON PERMISO» ⇒ una BANDERA en la PERSONA, no un permiso
+
+Campo nuevo `Usuario.puedeCorregirSinFactura`, con el patrón que el sistema ya tenía para
+`Usuario.esAuditor` — pero **un paso más allá**: `esAuditor` sí se asigna desde Administración de
+perfiles; ésta **no se asigna desde ninguna pantalla ni desde ningún endpoint**. Se prende **sólo por
+base de datos**.
+
+**Las tres cosas que se descartaron, con su razón:**
+
+1. **NO un permiso nuevo** (`cxp.corregir` o parecido). Un permiso existe para **repartirse**, y
+   Daniel dijo *«ni con permiso»* con esas palabras. Crear uno habría sido contestar otra pregunta.
+2. **NO reusar `roles.administrar`** ni ningún permiso de administración como interruptor de «es el
+   dueño». Es **exactamente el defecto de la fila 0.120** que el propio Daniel señaló: un permiso que
+   gobierna el gobierno del sistema acabó decidiendo cinco cosas que no tenían que ver con él.
+3. **NO exigirla sólo en la ruta.** La bandera se exige **en el DOMINIO** (A1): quien llame por otro
+   camino —otra ruta, un script, una composición futura— topa con la misma pared.
+
+⚠️ **La bandera NO exime del permiso del módulo.** Corregir sigue pidiendo `terceros.administrar` /
+`cxp.administrar` (motor) o `esma.modificar` / `esma.ver-pagos` (EsMa), y si el movimiento estaba
+`revisado` también `esma.revisar` —porque el corregido **hereda** ese estado, y nacer `revisado` es un
+acto de validación (regla de la fila 0.128)—. La bandera **abre una puerta que no existía**; no abre
+las demás. Todo falla **cerrado**.
+
+### (c) «SIN FACTURA» es del MOVIMIENTO, no del proveedor
+
+Medido: `resolverConFactura` (`dominio/esma/facturacion.ts`) lo decide **movimiento por movimiento**,
+y un proveedor de modalidad `ambos` tiene de los dos. ⇒ **un renglón con CFDI detrás queda INTOCABLE
+aunque sea del mismo proveedor**, y el de al lado sí se corrige. Es una guarda dura, **con prueba en los DOS libros** —el
+motor y EsMa—. ⚠️ No siempre fue así: en la primera vuelta la de EsMa se podía **borrar entera con la
+suite en verde**, y lo cazó el reviewer mutando esa línea. Si algún día alguien vuelve a tocarla,
+tiene que caerse `correccion-sin-factura.int.test.ts` §«m17».
+
+**Por qué el renglón con factura no entra:** un comprobante fiscal **se cancela ante el SAT y se
+vuelve a timbrar**; no se edita por dentro. Corregirlo aquí dejaría la contabilidad y el sistema
+diciendo cosas distintas del mismo documento.
+
+📌 El **`conFactura` sin definir (`null`)** de lo migrado cuenta como **sin factura** —es lo que ya
+hace la partición `whereSegmentoFactura('sin')` desde la 0.113—, así que lo viejo también se puede
+corregir. **REGLA 0-B**: el dato viejo se tolera, no se repara.
+
+### (d) Lo que la corrección NO cambia
+
+**Importe, fecha y observaciones.** El **proveedor** y el **tipo de movimiento** no son campos del
+cuerpo (`z.strictObject` ⇒ mandarlos es un **400 explícito**, no un cambio ignorado en silencio) y el
+servidor los toma **del movimiento corregido**. *Cambiar de proveedor o de concepto no es corregir un
+renglón: es otro renglón* — y para eso ya existían cancelar y capturar de nuevo.
+
+Una corrección **que no cambia nada** se rechaza: quemaría dos folios y metería dos renglones vacíos
+de contenido en el estado de cuenta.
+
+### (e) ⭐⭐ El caso difícil, resuelto: el PAGO ya aplicado a cargos
+
+Un pago de EsMa no es un renglón suelto: **consume «prendas por pagar»** de cargos concretos y de ahí
+se deriva el estatus `Orden.pagada`. Cancelarlo cambiando sólo su renglón habría dejado los cargos
+**marcados como pagados con dinero que ya no existe** — el maquilero dejaría de cobrar lo que se le
+debe.
+
+**Cómo se resolvió, sin romper D3:** las prendas por pagar se cuentan por la **suma VIVA** de
+`PagoAplicacion` (las de pagos no cancelados). Corregir un pago aplicado **deshace su aplicación y la
+vuelve a hacer** —bajo el bloqueo por maquilero, con `cantidadPagada` y `Orden.pagada` recalculados—,
+de modo que las prendas **no se duplican ni se pierden**. Las filas de `PagoAplicacion` del pago
+cancelado **NO se borran**: siguen ahí como rastro; lo que cambia es que la suma que manda las
+excluye.
+
+### (f) Los DOS LÍMITES declarados (no callados)
+
+1. **El IMPORTE de un pago APLICADO no se corrige.** Su monto no es un dato suelto: es
+   `Σ(prendas × precio del cargo)`, y el modelo promete `monto = Σ aplicaciones.importe`. Se corrigen
+   su fecha y sus observaciones; para cambiar el dinero hay que cambiar las prendas aplicadas, y eso
+   es capturar el pago de nuevo. La pantalla lo **dice** en el propio cajón, no lo esconde.
+2. **El DESCUENTO que propuso un CIERRE de orden no se corrige suelto.** Su liga al cierre es única e
+   intransferible: el sustituto no podría heredarla y el *deshacer* del cierre se quedaría buscando un
+   descuento que ya nadie usa. Se arregla **deshaciendo el cierre**.
+
+### (g) Efecto de fondo: los tres movimientos planos vuelven a ser el mismo criterio
+
+La condición de **estar vivo** (`canceladoEn IS NULL`) sube de ser sólo del descuento a serlo de los
+**tres** movimientos planos, en la definición única de `esma/formula-saldo.ts`. Como esa definición
+alimenta a la vez a Prisma y al SQL crudo, la condición viaja sola a **las cinco sumas del saldo** y a
+las listas: un movimiento cancelado ni suma al saldo ni sigue apareciendo como «esperando tu
+decisión».
+
+### (h) Cómo lo sabe la pantalla
+
+**No lo adivina.** Cada renglón del estado de cuenta llega del servidor con su `corregible` ya
+calculado (bandera + sin factura + vivo + no ser un inverso + —en EsMa— no ser un cargo de recibo) y
+su `importeCorregible`. Así nunca se ofrece un botón que el servidor vaya a rechazar, ni al revés. Por
+eso la bandera **no** viaja en `GET /api/sesion`: la interfaz no debe re-derivar la regla.
+
+🔧 **PASO MANUAL, y es el único:** la bandera se prende **en la base de datos**
+(`UPDATE usuarios SET puede_corregir_sin_factura = TRUE WHERE username = '…'`). Ninguna pantalla la
+reparte, ningún seed la siembra y ningún endpoint la escribe — que es justo lo que Daniel pidió.
+
+- **Aplica en:** fila **0.145**. **Fecha:** 2026-09-06.
+#### (Post-F9.202) — EL CONTEO CÍCLICO DE LAS TRES DIMENSIONES (fila 0.099, 6-sep-2026): un hallazgo que cambió el alcance y dos decisiones tomadas solas, con default
+
+Las **cuatro decisiones del dueño** que esta fila ejecuta ya están escritas y **no se repiten aquí**: son los puntos **4, 5 y 6** de §Post-F9.193 (se captura *lo contado* con el saldo a la vista; el cíclico se extiende a telas y avíos; si el almacén se movió, **avisar y dejar decidir, no bloquear**) más la adenda de la misma sección (**se puede anotar mercancía con existencia cero**). Lo que sigue es lo que apareció **al construirla**.
+
+⭐ **EL HALLAZGO QUE CAMBIÓ EL ALCANCE: la decisión 6 faltaba TAMBIÉN EN PRODUCTO TERMINADO.** La fila pedía el aviso para telas y avíos —las dimensiones nuevas—, dando por hecho que el cíclico de PT ya lo hacía. **No lo hacía.** `generarAjusteCiclico` aplicaba `delta = contado − teórico congelado` y sólo leía la existencia de ahora para el no-negativo, **nunca para compararla contra el teórico**: con **100 congelado, 95 contado y 20 piezas que entraron de verdad** mientras se contaba, escribía −5 y dejaba **115** donde el anaquel decía **95**, sin una palabra y **sin una sola prueba del caso**. ⇒ **El aviso se construyó para las TRES dimensiones**, no para las dos nuevas. No es una extensión de alcance por gusto: es el mismo defecto que Daniel describió, viviendo desde F7-E5 en el módulo que la fila venía a copiar.
+
+**Y el corolario de diseño:** el aviso viaja como **dato de la respuesta (200)**, artículo por artículo, con lo congelado, lo que hay AHORA, lo contado, el ajuste y **en cuánto va a quedar la existencia si se aplica**; el primer intento **no escribe nada** y el segundo, con `confirmarMovimiento`, aplica. Esa última cifra es lo que convierte el aviso en algo accionable: sin ella, «el almacén se movió» no le dice a nadie si conviene aplicar o volver a contar.
+
+**Dos decisiones tomadas solas, con default:**
+
+1. ⚠️ **PRECONDICIÓN, hermana de la que la 0.137 encontró en avíos: no existía ningún almacén de TELAS en el seed.** El seed sembraba tres de producto terminado (F3-E1) y uno de avíos (0.137); los de telas nacían **sólo del ETL de Access** (`migracion/loaders/almacenes.ts`). En una base sembrada **sin correr el ETL**, el guard de tipo de la 0.137 dejaba a los flujos de tela sin un solo almacén válido — y el cíclico de telas, que **es la pantalla del arranque**, se quedaba sin almacén que ofrecer en el alta. **Default tomado (el mismo que la 0.137):** el seed crea de forma idempotente **un** almacén global **«Almacén de telas»** de tipo TELA. Uno, no seis: los seis del viejo llegan por el ETL si se corre. Daniel puede renombrarlo. **No se audita ni se migra nada de lo ya cargado** (REGLA 0-B).
+2. **Qué renglones llevan segundo componente lo dice el teórico CONGELADO, no el catálogo de hoy.** Una hoja abierta ya fijó su forma al congelarse, y el ajuste **sólo puede mover el componente cuyo teórico congeló**. Se midió que las dos mitades decidían distinto: la captura miraba el `nombreComplemento` de la tela **en ese momento** y el ajuste el valor congelado. ⇒ ponerle complemento a una tela con la hoja abierta obligaba a capturar un número que el ajuste **ignoraba en silencio**; y quitárselo dejaba la hoja **imposible de cerrar** (la existencia del complemento se leía como 0 y el no-negativo chocaba contra ese cero falso). **Default tomado:** manda **lo congelado**, en las dos mitades y también al re-leer la existencia para cerrar; del catálogo sólo se toma la **etiqueta**.
+
+3. 🔴 **LA LLAVE DE IDEMPOTENCIA DEL SEED ES EL TIPO, NO EL NOMBRE** *(decisión del lead en la ronda de corrección, 6-sep; la levantó el reviewer independiente)*. La primera versión del seed buscaba por `(nombre, tipo, global)`, y eso convertía **un renombre en un duplicado silencioso**: el catálogo permite renombrar un almacén —y el historial de versiones se lo dice a Daniel con esas palabras—, el `@@unique (idEmpresa, nombre)` **no atrapa los NULL** de los almacenes globales, y `SEED_ON_START=true` es **permanente** en `prueba` ⇒ el primer despliegue después de un renombre habría creado un **segundo** almacén global del mismo tipo: dos «telas» en el desplegable y el inventario partido en dos, que es el daño exacto que la 0.137 vino a evitar. **Se cura de raíz, y en las DOS dimensiones:** la pregunta pasa a ser *«¿existe ya un almacén GLOBAL de este TIPO?»*, sin mirar el nombre, y los dos seeds vecinos (avíos de la 0.137 y telas de la 0.099) comparten **un solo helper** —dejarlos con llaves distintas habría sido peor que el defecto—. Con eso **renombrar deja de ser peligroso** y la frase del historial se queda. El seed nunca le devuelve el nombre de fábrica a un almacén que alguien renombró a propósito.
+
+**Y una consecuencia de gobierno que conviene tener escrita:** el ajuste de telas y avíos exige **ADEMÁS** de `indicadores.ciclicos-consulta` el `.mover` de su dimensión (`inventario-telas.mover` / `inventario-avios.mover`), porque escribe en **su** kardex — abrir el cíclico a telas no debía regalarle esa llave a quien no la tenía. En PT **no cambia nada** (no había permiso extra y sigue sin haberlo). Y el movimiento que nace de un ajuste cíclico **no se cancela desde Inventarios**: la hoja quedaría `cerrado` contando otra historia que el kardex; si el conteo estuvo mal, se corrige con un **movimiento manual nuevo** (compatible con D3).
+
+**Lo que añadió la RONDA DE CORRECCIÓN (reviewer independiente, 6-sep):** diez hallazgos, ninguno funcional — **todos de guardas y precondiciones sin una sola prueba**, el patrón que ya hundió la 0.098 y la primera ronda de la 0.137. Lo que quedó cubierto: la guarda del almacén **al agregar un renglón y al cerrar** (borrarla de cualquiera de las dos dejaba la suite entera en verde, y **no hay segunda barrera**: el motor de kardex no mira el almacén) · el **seed de telas** (romperle la idempotencia o borrar la llamada entera no rompía nada, mientras su gemelo de avíos sí tenía prueba cinco líneas más arriba) · la **escala decimal de telas** (mutarla a piezas dejaba todo verde: contar 12.5 kg de felpa habría escrito 13, en la pantalla del arranque) · el **rechazo de capturar un complemento que la hoja no congeló** (en telas es la ÚNICA defensa: PT y avíos llevan un segundo cinturón en su `guardarConteo`, `tela.ts` no) · y que **`idsTela`/`idsAvio` filtren de verdad**. Más tres frases falsas corregidas: la guarda se pasa **tres** veces y no dos, la migración decía «SIN semillas nuevas» cuando sí las hay —y **quien despliega lee la migración**—, y el TSDoc de `existenciasTelaColorPorColor` describía sólo su uso viejo (lectura sin lock) cuando esta fila le dio un segundo llamador que la usa como **lectura autoritativa bajo lock**.
+
+- **Aplica en:** versión **0.120**, fila 0.099. **Fecha:** 2026-09-06.
+
+---
+
+#### (Post-F9.201) LAS CUATRO QUE DEPENDÍAN DE DANIEL — contestadas de una vez (5-sep-2026)
+
+**Contexto.** El lead le enumeró a Daniel qué falta para cerrar la V1 y le puso delante **las cuatro cosas
+que dependían de él**, cada una con un default para confirmar o ajustar. Daniel: *«De acuerdo con todo los
+defaults»* — y de ahí salió una quinta decisión, que él preguntó por su cuenta.
+
+1. **⭐ FILA 0.142 — QUE LA PARTIDA VIAJE EN EL TRASPASO: SÍ, SE HACE.** Era la **única de las cuatro que
+   bloqueaba trabajo**. Hoy la pata de entrada de un traspaso se escribe sin lote de origen, así que en un
+   almacén alimentado sólo por traspasos —**el del cortador**, que es donde arranca la pantalla de salida de
+   tela— el sistema **nunca** sabe de qué lotes es la tela del anaquel, y las dos mitades de lo que Daniel
+   pidió en §Post-F9.193 (*«sólo cuando hay más de una partida»* y *«con la lista de partidas a la vista»*)
+   **no se pueden entregar ahí**. ⇒ El traspaso conserva el lote de origen (y su reparto, si la pata mueve
+   varios). **Aditivo y sin backfill** (REGLA 0-B): cambia lo que se escribe de aquí en adelante y no toca
+   ni un movimiento ya registrado; la tela vieja se queda sin lote y la línea neutra sigue saliendo para
+   ella. Se preguntó en vez de hacerse porque **toca el motor del kardex y D3**.
+2. **FILA 0.131 — LOS ARCHIVOS DE LA CARGA DE APERTURA: las muestras YA; el corte de SINUBE, EL DÍA DEL
+   ARRANQUE.** Cualquier corte anterior se desactualiza y habría que rehacerlo. Con las muestras (un Excel
+   de estados de cuenta **con** factura, otro **sin**, el archivo de SINUBE y unos XML) el lead mide la
+   estructura y ajusta el cargador para que lea *esa* forma, cargando **cada factura pendiente con su
+   fecha** para que la antigüedad funcione desde el día uno. El día del arranque sólo se corre.
+3. **FILA 0.097 (FINANZAS) VA ANTES QUE LA 0.096 (INVENTARIOS).** El repaso de Finanzas se hace primero, en
+   una sesión de Daniel con el sistema abierto, y **el lead le prepara antes una pasada medida** de qué hay
+   construido y qué está a medias — el método del 13-ago: *que JUZGUE y no DESCUBRA*. Lo que salga nace con
+   su propio número.
+4. **EL REPASO DE INVENTARIOS, DESPUÉS DE QUE ATERRICEN SUS FILAS** (0.099, 0.102, 0.103, 0.104, 0.130,
+   0.143). Si entra antes, juzgaría pantallas que ya se sabe que van a cambiar.
+5. **⭐ LOS XML HISTÓRICOS: SÓLO LOS VIVOS.** Daniel preguntó dónde se cargan los archivos y, con la
+   respuesta, decidió: *«Solo los que están vivos. Tanto de clientes como de proveedores»* ⇒ **se importan
+   únicamente los CFDI de facturas PENDIENTES DE PAGO (o de cobro)**, no el histórico completo. Son los que
+   forman la cartera y hacen que la antigüedad sirva desde el día uno; los ya saldados no cambian ningún
+   saldo. **No es una puerta que se cierre**: el cargador masivo admite el resto después si el contador los
+   pide.
+
+**Y cómo llegan los archivos, que fue la duda que abrió el punto 5.** Hay **tres caminos distintos** y no
+uno solo: (a) los **XML sueltos** tienen pantalla — *Cuentas por pagar → «Importar CFDI»* y *Cuentas por
+cobrar → «Importar CFDI»*, **uno a la vez**; (b) los **XML en volumen** van por el cargador masivo, que lee
+una **carpeta entera** y lo corre el lead; (c) el **corte de SINUBE y los Excel** **no tienen pantalla, a
+propósito** — es una carga de una sola vez que hay que cuadrar antes de aplicar, y una pantalla invitaría a
+repetirla. 🔴 **Y la regla que las cruza todas: los archivos con datos reales NO entran al repositorio** —
+ni las muestras—, y el lead **los abre y los revisa antes de usarlos** aunque vengan presentados como
+irrelevantes. Es la cicatriz del 3-sep (fila 0.123): unos Excel «ya limpios» traían **77 nombres completos
+pegados a lo que se le paga a cada quien**, y el repositorio es público.
+
+#### (Post-F9.200) Cerrar la orden y congelar el costo — los seis valores por omisión (fila 0.061, 4-sep-2026)
+
+**Contexto.** Daniel decidió el 30-ago (§Post-F9.154) que la prenda incompleta sale de tránsito como merma,
+que el divisor del costo pasa a `recibido`, y —contestando su propia pregunta *«¿en qué momento se define que
+ya se cerró el costo? ¿o va cambiando?»*— que **el costo se congela al cerrar la orden**. Al construirlo
+apareció que **cerrar la orden no existía**: `EstadoOrden` era `capturada | completa | cancelada`, y
+`completa` significa completitud de **captura**, no «terminada». Hubo que construir el acto, y con él estas
+seis decisiones. **Van implementadas con el valor de abajo; Daniel confirma o ajusta.**
+
+1. **Quién puede cerrar y reabrir.** Permiso nuevo `ordenes.cerrar` → **Administrador, Administración /
+   Dirección y Directivo**. Es el mismo círculo que ya cierra dinero.
+2. **Qué bloquea el cierre.** Toda captura y todo lo que mueva el costo: encabezado, matriz de tallas,
+   copiar matriz, referencias del cliente, precio de maquila, receta congelada, cancelación de la orden.
+   **Quedan libres** los comentarios, los adjuntos y consultar/imprimir.
+3. **El motivo.** **Opcional al cerrar** (es el final normal de una orden) y **obligatorio al reabrir** (es
+   la excepción, y debe quedar dicho por qué).
+4. **Cerrar una orden cancelada** → se **rechaza**. Una orden ya tiene un final; no se le ponen dos.
+5. **Cerrar dos veces** → se **rechaza**; hay que reabrir primero. Así nadie re-congela un costo distinto en
+   silencio.
+6. **Reabrir no restaura el estado que la orden tenía**: lo **vuelve a computar** de sus requisitos, que es
+   la única fuente que no puede quedar desfasada.
+
+⚠️ **Consecuencia de la decisión (a) que conviene tener presente:** como las incompletas salen como merma y
+**no vuelven**, una orden que perdió piezas **nunca llega al 100 % entregado**. Por eso el cierre es un acto
+de una persona y no algo que el sistema pueda deducir solo.
+
+#### (Post-F9.199) — LO PENDIENTE DE LA DECISIÓN SE VE JUNTO AL SALDO (fila 0.111, 4-sep-2026): qué cuenta como «por revisar» y cómo se valúa
+
+**Contexto.** Daniel, 3-sep: *«cada semana me pueda meter a algún lugar donde estén todos los maquileros que tengan algo pendiente por pagar o por descontar»* · *«**no quiero otra pantalla** para ver los pendientes»* · *«es una de las pantallas más importantes del sistema, debe estar muy bien hecha»*. El tablero ya existía y desde la 0.115 tenía su columna «Por revisar», pero **sólo contaba abonos, descuentos y pagos capturados**: los **cargos `propuesto`** —los recibos de maquila (y, desde la 0.114, los cortes y empaques) que esperan que él fije cantidad y precio— no contaban en ninguna de las tres puertas. Un maquilero con diez recibos sin validar y nada más tenía saldo cero, pendiente cero y era **invisible**, que es exactamente el trabajo que hay que decidir cada semana.
+
+**Lo que se construyó:** el criterio de «¿qué cargo espera decisión?» vive en la definición única del saldo (`formula-saldo.ts`: `estado = 'propuesto'` **y** `sin_costo = FALSE`), y la **valuación** en un solo módulo nuevo (`esma/cargo-propuesto.ts`), en sus dos formas —TypeScript y SQL agregada— derivadas de la misma constante. El precio de referencia es el de la orden por proceso (costura `maquilaOrd`, el resto `aplicacionOrd`) con caída al `precioPactado` de la etapa; un **cargo de servicio** (corte o empaque, fila 0.114) se valúa **sólo** con su propio `precioPactado`, porque la orden no tiene precio de corte ni de empaque. Las tres puertas leen del mismo agregado: tablero, bandeja de CxP y corrida semanal.
+
+**Decisiones del lead (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido |
+|---|---|---|
+| a | ¿El importe por revisar suma al saldo? | **No**: el saldo sigue siendo sólo lo revisado; lo pendiente se enseña al lado, con su conteo. |
+| b | ¿Un cargo `sinCosto` (segundas que no se pagan) cuenta como pendiente? | **No**: ni como partida ni como importe. |
+| c | ¿Qué pasa con un cargo propuesto **sin precio**? | Cuenta como **partida** y se declara aparte que no se puede valuar (nunca vale cero ni desaparece). |
+| d | ¿En qué relación cae un cargo propuesto al partir por segmento? | En la **sin factura**: su `conFactura` es NULL hasta que se valida, y ése es el criterio único de siempre. |
+
+**Hallazgo medido durante la construcción:** al agregado en lote que alimenta la bandeja de CxP le faltaba incluir a los proveedores que sólo tienen cargos propuestos; sin ese arreglo, el maquilero con sólo recibos por validar **nunca** habría aparecido en Cuentas por pagar, ni siquiera con la columna nueva.
+
+---
+
+#### (Post-F9.198) — VALIDAR ES DE DANIEL (fila 0.128, 4-sep-2026): un permiso nuevo, cinco perfiles sin validar, y cuatro defaults que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (1): *«la entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo»*. El repaso midió que validar cargos (`esma.cargo-validar`) y revisar partidas (que colgaba de `esma.modificar`, el mismo permiso que capturar) se sembraban en TODOS los perfiles: cualquiera podía convertir un recibo en deuda fijando el precio.
+
+**Lo que se construyó:** nace `esma.revisar` («Revisar y autorizar partidas de maquila: convertir lo capturado en deuda o pago real»); `revisarMovimiento` y su ruta lo exigen; `esma.modificar` se queda para capturar; `esma.cargo-validar` sigue siendo el permiso de validar cargos. El seed da los dos permisos de validar sólo al círculo y se los quita a los cinco perfiles operativos. Como `sembrarRoles` **sincroniza** los roles de sistema (borra las ligas que sobran), basta `SEED_ON_START=true`; un rol personalizado conserva lo que tenga. Todos los caminos que escriben `revisado`/`validado` quedaron recorridos: la corrida semanal crea pagos ya revisados bajo `pagos.corrida-armar` (sólo administrador: más estrecho, no una puerta lateral); el cierre de maquila deja el descuento capturado y se autoriza aparte; el ETL histórico transcribe hechos ya revisados en Access, fuera del API. La puerta lateral de CxP («entrada sin factura») ya era sólo del administrador.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Quién es «el círculo» que valida? | Administrador + Administración/Dirección + **Directivo**. | Mover `esma.revisar` y `esma.cargo-validar` a «sólo administrador» (dos listas del seed, sin migración). |
+| b | ¿El perfil Gerencial valida cargos de maquila? | **No** (pierde `esma.cargo-validar`). | Devolvérselo en el seed. |
+| c | ¿Revisar partidas y validar cargos son un permiso o dos? | **Dos** (`esma.revisar` y `esma.cargo-validar`): fusionarlos después es barato; separarlos después, no. | Fusionarlos en el catálogo y el seed. |
+| d | ¿Capturar abonos/descuentos (`esma.modificar`) sigue llegando hasta Secretarial? | **Sí**, Daniel no lo mencionó; candidato al recorte cuando arme los perfiles por puesto real. | Quitarlo en el seed a los perfiles que no capturan. |
+
+---
+
+#### (Post-F9.197) — LA RECEPCIÓN CONTRA LA OC HACE NACER LA DEUDA (fila 0.129, 4-sep-2026): cuatro defaults del lead que Daniel confirma o ajusta
+
+**Contexto.** Daniel, §Post-F9.192 (2)(3): *«la persona que recibe (a partir de una OC) mete las cantidades y precios… el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano… es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta»* · *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. Todo se recibe a partir de la OC. Tanto telas como avíos.»* El repaso midió que las telas ya lo hacían (la deuda nace al confirmar la entrada, en cuatro casos) y los avíos no: la recepción contra OC movía inventario y actualizaba la OC, pero nunca tocaba Cuentas por pagar.
+
+**Lo que se construyó:** la regla de «qué cargo nace de una entrada de mercancía» se sacó a **un solo sitio** (`terceros/cargo-de-entrada.ts`) y la usan las dos puertas: la entrada de tela (sin cambiar su comportamiento) y la recepción de avíos contra OC. La decisión es la de la 0.124: `emiteFactura(modalidadFacturacion)` — **sólo el proveedor marcado «sólo sin factura» genera el cargo no fiscal en el acto**; con factura, «ambos» o sin definir, la recepción queda **«factura pendiente»** y la deuda nace cuando el CFDI se importa en Finanzas. El precio por renglón se precarga de la OC y se puede corregir; el importe se calcula con lo capturado; el cargo nace en la misma transacción que el kardex; reversar la recepción cancela el cargo.
+
+**Cuatro defaults construidos (Daniel confirma o ajusta):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿Los renglones LIBRES de la OC (un flete, una maquila suelta, algo sin catálogo) entran a la deuda? | **Sí**: no mueven inventario pero sí se deben, así que suman al cargo. | Se excluyen del importe en `importeDeRecepcion` (una condición). |
+| b | Proveedor que factura (o «ambos») ⇒ ¿nace un cargo provisional al recibir? | **No**: queda «factura pendiente» y la deuda nace con el CFDI, igual que en telas. Evita cobrar dos veces (provisional + factura). | Habría que diseñar el cargo provisional y su sustitución por el CFDI (alcance nuevo). |
+| c | Precio capturado distinto al de la OC | **Se acepta sin bloquear** (Daniel: «el precio debería de ser el de la OC», pero quien recibe lo puede corregir); se resalta en pantalla y la bitácora guarda los dos. | Bloquear o exigir permiso: una guarda en `recibirCompra`. |
+| d | Recepción sin número de factura/remisión | **El cargo nace igual**, con «(sin documento)» en la observación. | Exigir el número antes de crear el cargo. |
+
+**Cicatriz de proceso (lead):** la fila se construyó primero sobre `prueba` v0.105, que aún no tenía la 0.124 (estaba en PR), y el helper nació sobre la casilla `factura` retirada. Se corrigió fusionando la rama de la 0.124 antes de la revisión. Regla desde hoy: si una fila depende de otra que aún está en PR, su worktree se corta de la rama de esa PR o la fusiona enseguida.
+
+**Alcance nuevo (no entra):** ligar el CFDI importado en Finanzas con la recepción que lo originó; subir el XML desde la recepción de avíos (hoy sólo la entrada de tela sella CFDI).
+
+---
+
+#### (Post-F9.196) — EL DOCUMENTO PARA FACTURAR (fila 0.118, 4-sep-2026, madrugada): seis defaults del lead que Daniel confirma o ajusta, y la ficha fiscal de la empresa
+
+**Contexto.** Daniel (§Post-F9.186(k)): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene que facturar… no al revés. Y eso debe salir del sistema»*; el 4-sep: *«lo ideal es que facture lo que es en total. Por eso quedamos que nosotros le vamos a dar un documento con el que va a facturar»* y *«las facturas son sólo transferencias»*. La fila volvió a la V1 por su decisión («Está bien en la fase 1», §190 adenda). Se construyó como **impreso por PAGO** sobre la corrida semanal (0.113): el pago de maquila nace «a cuenta» y el de proveedor es un movimiento de CxP sin aplicaciones, así que hoy no hay forma honesta de desglosar por orden.
+
+**Lo que hace:** para cada renglón de una corrida **con factura**, pagado por **transferencia**, a un maquilero o proveedor, con la corrida **cerrada o ejecutada** y con la ficha fiscal completa de los dos lados, el sistema arma la hoja con la que el proveedor debe timbrar: receptor (FR Moda: razón social, RFC, régimen, CP fiscal, uso de CFDI), emisor (proveedor: razón social, RFC, régimen, CP de expedición), concepto (el del renglón o, si no trae, por rubro y semana), referencia, forma de pago 03, método PUE, MXN y la tabla subtotal / IVA / total. Si falta un dato de cualquiera de los dos lados, **no se emite y se dice qué falta y de quién** (REGLA 0-B: tolerar, avisar, jamás inventar). El PDF de la corrida completa trae delante la hoja de «no se emitieron».
+
+**Seis defaults construidos (Daniel confirma o ajusta; cada uno se cambia en un solo sitio):**
+
+| # | Decisión | Default construido | Si Daniel dice lo contrario |
+|---|---|---|---|
+| a | ¿El `monto` de la corrida es total con IVA o subtotal? | **TOTAL con IVA** = lo que se transfiere; el documento lo parte hacia atrás (`subtotal = total / 1.16`, `iva = total − subtotal`, redondeo al centavo con `subtotal + iva === total` siempre). | `comun/iva.ts::desglosarIva`, nada más. |
+| b | ¿Se emite desde una corrida en borrador? | **No**: sólo cerrada o ejecutada (en borrador los montos se mueven). | Se quita la rama `estado` de `evaluarFacturabilidad`. |
+| c | Uso de CFDI cuando el proveedor no lo tiene capturado | **«G03 Gastos en general» impreso y marcado como SUGERIDO**; no bloquea (es un dato que declara el receptor). | Se agrega a la lista de faltantes y bloquea (una línea). |
+| d | Retenciones de IVA/ISR | **No se calculan**: retener cambia lo que se deposita y el monto ya es el depósito; el CFDI del proveedor las resta por su cuenta. | Decidir primero si el monto tecleado es antes o después de la retención (dinero, no código). |
+| e | Renglón en cero | **No factura** (`motivo: sinMonto`); ni sale en la relación ejecutable. | — |
+| f | Tasa de IVA | **16 %** (general; la franja fronteriza del 8 % no aplica). | `comun/iva.ts`. |
+
+**La ficha fiscal de la empresa.** `Empresa` sólo tenía RFC y razón social; un CFDI 4.0 exige del receptor también **régimen fiscal** y **código postal del domicilio fiscal**. Se agregaron (migración aditiva, nullable, sin backfill) y se capturan en Administración › Empresas. ⚠️ **Paso manual de Gabriel:** capturar los de FR Moda (están en la constancia de situación fiscal que Daniel subió el 4-sep). Hasta entonces no se emite ningún documento, y el sistema lo dice con esas palabras.
+
+**Decisiones técnicas del coder aceptadas por el lead:** el documento **no lleva número de cuenta** (se le manda al proveedor; lo bancario vive en la relación ejecutable) y el nombre del archivo PDF lleva folio + renglón, nunca el nombre del taller (repo público, correos reenviados); los datos fiscales se leen **al día**, no congelados (lo contrario le impediría timbrar a quien cambió de régimen), mientras el destino del dinero sí sigue congelado en el renglón; el botón sale **deshabilitado con tooltip**, no escondido; sin permisos nuevos (los del concentrado: ver corrida + ver importes).
+
+**Pendiente (alcance nuevo):** desglose por orden cuando el pago de maquila lleve aplicaciones; la lectura automática de la constancia (0.119) llenará estos datos sin teclearlos.
+
+---
+
+#### (Post-F9.195) — CORTE Y EMPAQUE SON SERVICIOS SOBRE LA ORDEN: cómo se construyó la fila 0.114 (lead, 4-sep-2026, madrugada; Daniel confirma o ajusta)
+
+**Contexto.** Daniel dictó la regla el 3-sep (§Post-F9.185(c)): *«en corte no necesitas mandar y recibir mercancía… sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene. Lo mismo el empaque… el empaque no toca el inventario»*; y la frontera (§185(b)): *«corte es parte de maquilas, no de proveedores: el monto a pagar sale de una orden»*. El repaso midió que el modelo ya distinguía las dos formas (`registrarCorte` crea la etapa con `idTipoProceso = NULL` y no toca inventario) pero nadie la había usado para el pago: el corte no escribía precio, no nacía cargo, y el empaque no existía.
+
+**Lo que se decidió (defaults del lead, construidos en la 0.114):**
+
+1. **Un cargo de maquila aprende «servicio sobre la orden».** `EsMaCargo.idTipoProceso` pasa a nullable y nace `EsMaCargo.servicio ∈ {corte, empaque}`, con un CHECK en base de datos: **exactamente uno** de los dos está informado. ⛔ **No se convirtieron corte/empaque en `TipoProceso`**: eso los habría metido al flujo de envío/recibo que Daniel dice que NO son. La etiqueta del cargo («Costura», «Corte», «Empaque») sale de **una sola función** (`esma/etiqueta-cargo.ts`) para todos los consumidores.
+2. **El corte se paga desde la orden.** La captura del corte gana **precio por prenda** (opcional) y crea, en la misma transacción, el cargo `propuesto` al cortador —igual que un recibo de maquila crea el suyo—. Quien valida el cargo fija cantidad y precio reales. **Un corte sin precio también genera su cargo** (nace sin precio y quien valida lo teclea), porque sólo hay cortes de terceros con rol `corte` y siempre hay a quién pagarle.
+3. **El empaque es un acto nuevo, calcado del corte.** `registrarEmpaque`: empacador con el rol nuevo `empaque`, matriz color×talla, fecha, precio, observaciones. **No toca el kardex** y **no se topa contra lo recibido** (regla de C&A: 1,000 fabricadas / 990 empacadas ⇒ se paga lo empacado y las 10 se quedan quietas en inventario). La pantalla sólo **avisa** en ámbar si el total empacado excede lo recibido de costura; el servidor acepta, como el sobre-corte libre. Permiso nuevo `produccion.empaque`, sembrado en los mismos perfiles que `produccion.corte`. El acto vive en el panel de **Avance de producción** como séptima etapa (sin menú nuevo) y el tablero WIP publica `empacado`.
+4. **La frontera de Daniel en la corrida.** `corte` y `empaque` entran a los roles de maquila de EsMa ⇒ el cortador y el empacador caen en el rubro **maquila** de la corrida semanal (0.113) y aparecen en «Saldos de todos los maquileros», con su saldo hecho de cargos validados de servicio. (Hasta hoy el cortador caía en «proveedores», como avisaba §189(j).)
+5. **El precio de un servicio se valúa sólo con su propio precio pactado.** `maquilaOrd`/`aplicacionOrd` son precios de MAQUILA; prestárselos a un corte sería peor que no proponer nada.
+6. **Cancelar un corte/empaque arrastra su cargo** como lo hace el recibo: cargo propuesto ⇒ se cancela junto; cargo **validado** ⇒ hace falta `esma.cargo-validar` y entonces sí se cancela; sin el permiso no se cancela nada (una sola transacción).
+
+**Tres desviaciones de la ficha, medidas por el coder y aceptadas por el lead:**
+- La ruta es `POST /api/produccion/empaques` (la convención del archivo: `/cortes`, `/envios`), no `/etapas/empaque`.
+- El precio del corte/empaque **no se esconde** al capturar sin `ordenes.ver-precio-real-maquila`: medido, el envío tampoco lo esconde —ese permiso gobierna la **lectura** (el servidor redacta el precio al devolver la etapa), no la captura—; gatear la captura dejaría a Logística/Asistente/Secretarial capturando sin precio y el cargo nacería sin él.
+- **El empaque NO emite evento de Ruta Crítica.** El proceso RC `empaque` **ya tiene dueño**: lo completa el hito de orden de tipo `empaque`. Un segundo escritor con otra regla de completitud haría que un empaque **parcial** (990 de 1,000, el caso de Daniel) **des-completara** un hito ya registrado. Queda escrito en el TSDoc de `registrarEmpaque`.
+
+**⏳ Pendientes de Daniel (sin frenar):**
+- **¿El empaque capturado debe cerrar solo su proceso de Ruta Crítica?** Si sí, hay que decidir **cuál de los dos manda** (hito o etapa) y **con qué regla de completitud** (¿basta con capturar algo? ¿hay que cubrir la matriz? ¿990 de 1,000 es completo?). Default de hoy: **el hito sigue mandando** y el empaque no toca la RC.
+- Confirmar los defaults 2, 3 y 6.
+
+**⚠️ Deploy a `prueba`:** migración automática (`20260904080000_corte_y_empaque_servicios_sobre_la_orden`, sin tocar filas existentes) + **`SEED_ON_START=true` OBLIGATORIO** (rol de proveedor `empaque` y permiso `produccion.empaque`) + **un paso manual**: marcar la casilla **«Empaque»** a los talleres que empacan en el catálogo de proveedores (el rol nace vacío). Los cortes capturados antes de esta versión no tienen cargo, y eso está bien (REGLA 0-B).
+
+**Lo que NO entró (a propósito, alcance nuevo si se quiere):** el `origen` del libro unificado de terceros sigue proyectando corte/empaque como `recibo_maquila` (la fila sí dice «Orden #N · Corte» en observaciones); el costo real de corte/empaque no se refleja aún en el EDR; el «Corte semanal por cortador» sigue siendo un reporte de cantidades (ahora podría valuarse); no hay impreso PDF de empaque ni de corte.
+
+---
+
+#### (Post-F9.194) — EL ALMACÉN DEL TIPO CORRECTO (fila 0.137, 4-sep-2026): dos decisiones tomadas solas, con default, y una precondición de despliegue
+
+Del repaso de inventarios (§Post-F9.193, «otras cosas»): *nadie verifica que el almacén sea del tipo correcto*. Al construirlo se midió que **ninguno de los once escritores del dominio validaba el tipo** — ni uno — y salieron tres cosas que el encargo no fijaba:
+
+1. **Cambiar el tipo de un almacén que ya tiene movimientos se rechaza.** Sin esto la regla era adorno (cambiar el tipo, guardar, regresarlo) y dejaría mercancía en un almacén cuyo tipo dice otra cosa. Sin movimientos sí se corrige (el caso legítimo). Mensaje: *«desactívalo y da de alta otro almacén con el tipo correcto»*. **Default: así se queda.**
+2. **La recepción de compra con renglones libres** (servicios, cosas que no van al inventario) comparte el almacén del encabezado, que ahora se exige de avíos. Si algún día se quisiera recibir servicios contra otro almacén, la salida es un almacén por renglón, no relajar la regla. **Default: así se queda.**
+3. ⚠️ **PRECONDICIÓN: no existe ningún almacén de avíos.** Ni el seed de instalación (siembra tres de producto terminado) ni la migración de Access (que mapea los almacenes viejos a producto terminado o telas) crean uno. Si en `prueba` los avíos se mueven en un almacén tipado como telas, **ajuste/traspaso de avíos, recepción de compra y notas de salida empezarán a rechazar** con el mensaje de la regla. **Resuelto con el default (REGLA 0-B, lo viejo se tira, no se arregla) — el reviewer lo puso como bloqueante y con razón:** el seed crea de forma idempotente **un** almacén global «Almacén de avíos» activo de tipo AVIO (uno, no tres: el negocio no separa avíos por bodega), y de aquí en adelante se usa ése; el almacén viejo se deja como está, y si aún no tiene movimientos se le puede corregir el tipo desde Administración › Almacenes. Los diez desplegables de almacén quedaron filtrados por tipo en la misma versión. ⇒ **El deploy de esta versión requiere `SEED_ON_START=true`.** Daniel puede renombrar el almacén; lo que no se hace es auditar ni migrar los avíos que hoy cuelguen de un almacén de telas.
+
+Donde NO se puso la regla, a propósito: las **cancelaciones** (el inverso es el mecanismo de corrección, D3, y hereda el almacén del original) y el **ETL** (relaja validaciones por diseño). **Producción** (recibo de maquila, entrega al cliente, envío de prendas terminadas) ✅ **quedó cerrada en la 2ª pasada (v0.116, 5-sep-2026)**: los cuatro sitios exigen `PT`. Y al medirla apareció que el envío **no tenía laguna sino duplicación** —ya exigía PT a mano, con una segunda lectura del mismo renglón, y **sin ninguna prueba que lo vigilara**—. En esa pasada `exigirAlmacen` (la versión sin tipo) se quedó en cero llamadores y **se retiró**.
+
+- **Aplica en:** la versión que cierra la fila 0.137. **Fecha:** 2026-09-04.
+
+---
+
+#### (Post-F9.193) — LAS DOCE RESPUESTAS DEL REPASO DE INVENTARIOS, textuales, y su mapa contra las filas (Daniel, 4-sep-2026, madrugada)
+
+Daniel pegó el **Repaso de Inventarios** del 2-sep (fila 0.096: cuatro cosas graves, lo que el Access hacía y aquí no está, ocho cosas flojas y doce decisiones con default) y debajo su respuesta: *«**Todo está correcto**… excepto la 11, sí quiero que haya un lugar donde está ubicado. Principalmente para telas y avíos, pero podríamos dejarlo también para producto terminado.»* Y sobre la 12: *«debería de haber manera de sacar por ejemplo una devolución, o una venta de avíos que ya no se usen, de alguna manera que no sea mediante la descarga o aplicación a una OP. Esto **autorizado siempre por mí**. Lo mismo en telas… el 99 % sale por medio de una OP pero deberíamos de tener la opción de sacar alguna venta o cualquier otra cosa.»* Con §Post-F9.190, **inventarios entra completo en la V1** («a fuerzas»). Se cruzó todo contra las filas 0.099–0.104: **ocho decisiones ya tenían fila; cuatro cosas no y ahora la tienen (0.136–0.139)**.
+
+| # | Decisión del repaso (default aceptado con «todo está correcto») | Dónde vive |
+|---|---|---|
+| 1 | Imprimir el inventario de telas desde la pantalla nueva (tela, color, cuerpo y complemento, por almacén) y quitar el botón de la vieja | **0.136** (nueva): junto con las dos pantallas del menú de Telas que hablan con el inventario muerto |
+| 2 | El traspaso de producto terminado lleva hoja impresa con el folio que ya existe | **0.100** |
+| 3 | Meter o sacar producto terminado a mano exige motivo, como telas y avíos | **0.100** (adenda) |
+| 4 | Al contar tela se captura **lo contado** con el saldo a la vista; el sistema calcula y aplica la diferencia | **0.099** (adenda: es **la pantalla del arranque**, la que carga el inventario de telas el día uno; hoy sin ninguna prueba automática) |
+| 5 | El conteo cíclico se extiende a telas y avíos | **0.099** |
+| 6 | Si el almacén se movió durante el conteo, avisar al generar el ajuste y dejar decidir; no bloquear | **0.099** (adenda) |
+| 7 | Las prendas viejas de Access «(sin especificar)» se quedan como están y salen sólo por conteo cíclico | **Sin fila a propósito**: no se construye nada (REGLA 0-B); queda escrito aquí |
+| 8 | Al sacar tela para una orden, avisar sin bloquear si se saca más de lo que la orden pide | **0.101** |
+| 9 | El aviso de «riesgo de tono» sólo cuando hay más de una partida del color, con la lista de partidas a la vista | **0.101** |
+| 10 | Consumo de tela por corte y por modelo | **0.102** |
+| 11 | Ubicación física en el almacén: **sí** (la única que cambió el default) | **0.103** (ya cerrada el 3-sep con sus palabras: texto libre, sin catálogo) |
+| 12 | Salida de avíos y telas que no es por OP (devolución, venta), autorizada sólo por Daniel | **0.104** (ya cerrada el 3-sep: en PT existe; en telas y avíos se construye; lo abre sólo él) |
+
+**Las «otras cosas» del repaso que no eran decisión y no tenían número:** **0.137** nadie verifica que el almacén sea del tipo correcto (se puede meter producto terminado en la bodega de telas) → validación en el dominio · **0.138** el kardex de producto terminado no se puede filtrar por fechas (con diez años cargados trae todo) y nadie midió el volumen de la consulta de existencias → filtro y medición · **0.139** ⏸️ «comprometido» y «disponible» en producto terminado no existen → **fase 2** (no bloquea operar; el pedido y la orden ya dicen qué está prometido). El conteo cíclico que **no incluye lo que el sistema cree que no tiene** va como adenda de **0.099** (poder anotar mercancía con existencia cero).
+
+**Lo que este repaso deja listo:** las filas de inventarios se construyen **cuando finanzas cierre** (§Post-F9.192(k)), en este orden propuesto: 0.136 (grave, arranque) → 0.099 (la pantalla del arranque) → 0.104 → 0.100 → 0.101 → 0.137 → 0.103 → 0.102 → 0.138 → 0.130 (venta de sobrantes de PT). Daniel ya no tiene preguntas abiertas de inventarios: **las doce están contestadas**.
+
+**Corrección medida (4-sep, 02:50 UTC):** la **0.136 ya estaba construida** —la entregó la v0.093 (fila 0.098) el 3-sep, un día después del repaso que la midió rota—; el coder lo midió antes de tocar y no escribió código. Queda ✅ «cerrada midiéndola». Lección para los repasos: **antes de numerar lo que un repaso dice roto, medirlo contra `prueba` del día.**
+
+- **Aplica en:** las filas 0.136–0.139 y las adendas nacen en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+---
+
+#### (Post-F9.192) — LAS OCHO RESPUESTAS DEL REPASO DE FINANZAS, textuales, y su mapa contra las filas (Daniel, 4-sep-2026, madrugada)
+
+Daniel pegó el **Repaso de Finanzas** del 2-sep (fila 0.097: tres reglas, dos pendientes, ocho decisiones con default) y **debajo sus respuestas**, pidiendo verificar *«que todo lo que te puse efectivamente esté mapeado»*. Se cruzó cada punto contra las filas nacidas del repaso (0.110–0.126) y contra lo ya entregado. **Cinco cosas no tenían fila y ahora la tienen (0.128–0.132); tres van a fase 2 (0.133–0.135).**
+
+| # | Pregunta del repaso (default) | Respuesta de Daniel, textual | Dónde vive |
+|---|---|---|---|
+| 1 | ¿Quién puede validar los cargos de maquila? (default: sólo Administrador y Administración/Dirección) | *«La entrada la da la persona responsable de recibos o de producción. Pero **la validación sólo la doy yo**. O sea, es un permiso para meter lo recibido y otro para validarlo.»* | **0.128** (nueva). 0.095 sólo cambió *cómo* se declaran los permisos, no quién valida; 0.115 hizo que sólo lo revisado sume. El reparto por puestos reales lo arma Daniel antes de producción (0.120) |
+| 2 | Avíos que NO facturan: ¿cuándo nace la deuda? (default: al recibir, por lo recibido × precio de la OC, como telas) | *«Sí, la persona que recibe (a partir de una OC) mete las cantidades y precios a los que está entregando (el precio debería de ser el de la OC, la cantidad puede variar un poco, por eso se mete a mano)… pero **es la misma entrada que se ocupa tanto para inventario como para su estado de cuenta**.»* | **0.129** (nueva). Hoy la recepción de avíos contra OC mueve inventario y no toca CxP |
+| 3 | Avíos que SÍ facturan: ¿al recibir o al llegar la factura? (default: cargo provisional al recibir, sustituido por la factura) | *«Lo ideal es recibir con la factura. Pero si no fuera el caso, está bien dejarla como pendiente. **Todo se recibe a partir de la OC. Tanto telas como avíos.**»* | **0.129** (misma fila: la recepción por OC es la única puerta, para telas y avíos) |
+| 4 | Los movimientos viejos sin marca con/sin: ¿dónde los pones? (default: «sin factura» en todas las pantallas) | *«Vamos a generar Exceles con estados de cuenta de los que tienen factura y de los que no tienen factura. Esos te los vamos a mandar por aparte. Tenemos que ver cómo va la info de SINUBE y de Access, pero eso lo mandamos después. **Todo el tema de inventarios va a ser irrelevante como haya llegado. No te metas en eso para hacerlo más fácil.** Los saldos y estado de cuenta los mandaremos aparte.»* | El criterio único ya entró con **0.113** («sin» = false o sin definir, en todas las pantallas). Los saldos reales llegan por **0.131** (nueva): la carga de apertura desde SUS archivos (Excel con/sin factura + SINUBE + XML), y lo viejo es basura (REGLA 0-B) |
+| 5 | ¿Los dos listados separados también en la bandeja de CxP? (default: selector Todos / Con / Sin con totales y antigüedad partidos) | *«Sí, está bien tu recomendación.»* | **0.132** (nueva). La corrida (0.113) ya vive por segmento; la **bandeja** sigue con un solo saldo revuelto |
+| 6 | ¿Tus clientes también tienen con y sin factura? (default: no aplica) | *«Mis clientes a los que llevo todo el proceso de producción, **todos van con factura**. Clientes que les llego a vender sin factura son sólo **calderos** que les vendo lo que sobra (normalmente segundas). Eso ahorita lo hacemos como **una salida aparte**… ¿Cómo lo propones hacer?… no sería necesario llevar todo el proceso sin factura. **Sólo registrar lo que sale del inventario para determinado cliente.**»* | **0.130** (nueva), con propuesta abajo. CxC se queda **sin** separación con/sin (confirmado) |
+| 7 | ¿Cuándo sacas el corte de SINUBE? | *«Te voy a mandar un archivo de SINUBE para que veas cómo va a salir la información de ese sistema… Estos datos son irrelevantes porque se van a borrar cuando empecemos con producción, pero para que veas la estructura de los archivos. Te mando también los XML para que los revises y veas que te cuadra todo.»* | **0.131** (nueva): revisar la estructura de los tres tipos de archivo contra el ETL de apertura (D15c) **antes** de que lleguen los reales |
+| 8 | ¿Capturas ya el RFC de FR Moda? | *«Sí. Te puedo subir la constancia de situación fiscal (que es como deberíamos de dar de alta a todos los clientes y proveedores, para que tengas la información de un documento oficial). **Esto por favor hay que tomarlo en cuenta. Para dar de alta un proveedor o cliente que factura, debemos de subir la constancia de situación fiscal.**»* | El RFC lo captura Daniel/Gabriel en Administración › Empresas (pendiente manual de 0.097). La constancia es **0.119** — y con esta respuesta la fila **crece**: no es «leer un PDF», es **la puerta de alta** de todo proveedor o cliente que factura, y también para **clientes** |
+
+**Lo que ya estaba mapeado y dónde:** la casilla de modalidad de facturación → **0.110 ✅** (v0.096) · las dos banderas que se contradicen → **0.124** · el cotejo de la factura del maquilero → **0.117** · la antigüedad → **0.121** · el «Ojo» de las dos cifras de «sin factura» → resuelto en **0.113**. **La puerta lateral** de la regla 1 (una «entrada sin factura» en CxP a un maquilero no pasa por validación) queda **aceptada**: ese permiso ya está restringido al círculo de Daniel, y 0.128 lo vuelve a mirar al repartir los permisos.
+
+**Tres cosas flojas del repaso que no tenían número y van a FASE 2** (criterio §Post-F9.190: hoy hay con qué operar): **0.133** el PDF del reporte fiscal se trunca en periodos largos (el Excel trae todo: para el contador manda el Excel) · **0.134** los pagos no se ligan a la orden de compra (no se sabe si una compra concreta ya se pagó) · **0.135** la fusión de EsMa dentro de Finanzas nunca ocurrió (el menú la marca «interina»; conviven dos vistas del mismo maquilero).
+
+**Propuesta para la 6 (venta de sobrantes y segundas a «calderos», sin factura) — ✅ CONFIRMADA por Daniel (4-sep, 01:35 UTC: *«Está bien tu propuesta para la venta de sobrantes»*):** una **salida de inventario de producto terminado por «venta directa»**: se elige el cliente (del catálogo; se puede marcar como *ocasional*), las piezas por color y talla, el precio unitario y **cómo se cobró** (efectivo / transferencia / «queda a deber»). Sale del kardex como movimiento inverso auditado (D3) con motivo «venta directa», imprime una nota de salida sencilla, y **no arranca pedido, orden ni proceso**. Si «queda a deber», nace un cargo en cuentas por cobrar del segmento sin factura; si se cobró en el acto, no toca CxC. Es el gemelo para producto terminado de la **0.104** (la salida de material que no es por OP), con el mismo candado: **la autoriza sólo Daniel**.
+
+- **Aplica en:** las filas 0.128–0.135 nacen en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+---
+
+#### (Post-F9.191) — CERRAR LA ORDEN CON EL MAQUILERO (fila 0.109, 4-sep-2026): las decisiones que se tomaron solas, con su default
+
+Construida de noche bajo la REGLA 0. Daniel ya había dicho lo esencial en §Post-F9.147 (*«ese faltante sí se le queda y se le quita a mano, normalmente descontándole esas prendas faltantes»*); lo que sigue son las decisiones de diseño que el encargo no fijaba y que quedan **con default, pendientes de que Daniel confirme o cambie**:
+
+1. **El cobro es un DESCUENTO al maquilero, no un cargo** (contra la letra del encargo, que decía «propone un `EsMaCargo`»). Se midió contra la definición única del saldo (`saldo = Σcargos + Σabonos − Σpagos − Σdescuentos`): un cargo **sube** lo que se le debe — le habríamos *pagado* las prendas que no devolvió, además de dejárselas. El descuento nace `capturado` (**propone, no cobra**), se ve en el estado de cuenta con la marca de «por revisar» de la 0.115 y se aprueba con el mismo flujo de revisión; sus observaciones las redacta el sistema (*«Faltante de la orden #… · Costura: N pza(s) que no se devolvieron»*).
+2. **Se puede cerrar más de una vez** la misma orden + maquilero + proceso: si después de cerrar se le envía más mercancía, ese saldo nuevo es un faltante nuevo con su propio acto y su propio descuento.
+3. **Cerrar no exige** que el tipo de proceso siga activo ni que el proveedor conserve su rol (el recibo sí lo exige): cerrar es limpieza sobre un saldo que ya existe, y bloquearlo porque cambió el catálogo dejaría ese pendiente vivo para siempre. La guarda real es más fuerte: **sin faltante derivado no hay cierre**.
+4. **Con/sin factura** sólo se pregunta cuando el proveedor está en modalidad «ambos»; el resto lo dicta su catálogo (regla de la 0.110). Sin modalidad capturada, el cierre lo dice con nombre y no sigue.
+5. **Órdenes migradas de Access sin precio pactado** (1,309 envíos): el cierre **salda igual** —el pendiente desaparece— pero **no propone cobro** y lo dice: el descuento se captura a mano en el estado de cuenta. No se inventa un precio (REGLA 0-B).
+6. **El descuento del maquilero ahora se puede cancelar** (marca con fecha, quién y motivo; nunca se borra, D3), y la definición única del saldo excluye los cancelados en sus dos criterios.
+7. **Deshacer un cierre** lo marca (fecha, quién, motivo) y cancela su descuento si aún estaba `capturado`; el pendiente vuelve a aparecer. Nada se borra.
+
+Queda un **gancho para la 0.061**: al cerrar y al deshacer se publica el evento `cierre-maquila-resuelto`; hoy nadie lo consume.
+
+**✅ DANIEL CONTESTÓ (4-sep, 06:40–06:50 UTC), y precisó el camino:** *«Los descuentos son mediante una nota de crédito si es que ya está la factura completa.»* Y aclaró: *«O sea, **lo ideal es que facture lo que es en total**. Por eso quedamos que **nosotros le vamos a dar un documento con el que va a facturar**. La nota de crédito es en **caso remoto** que ya haya hecho la factura y no pueda cancelarla.»*
+
+⇒ Tres cosas quedan decididas: (1) el **descuento** (punto 1) se confirma como figura interna del estado de cuenta; (2) **el camino normal** para el maquilero que factura es que facture **el total ya neto del faltante**, y eso lo garantiza **el documento «yo te digo qué facturarme»** (fila 0.118) llevando el descuento — lo que abre la pregunta de si la 0.118 vuelve a la V1 (estaba en fase 2 por criterio del lead, no de Daniel: ver §Post-F9.190); (3) la **nota de crédito** es el caso remoto: se numera (fila **0.141**) y se aparca a **fase 2**; mientras, si ocurre, el descuento queda «por revisar» y Daniel lo aprueba con motivo cuando tenga la nota de crédito en la mano.
+
+- **Aplica en:** la versión que cierra la fila 0.109. **Fecha:** 2026-09-04.
+
+---
+
+#### (Post-F9.190) — «YA QUIERO SALIR»: la caja chica y lo demás que vive en Excel se van a FASE 2 (Daniel, 4-sep-2026, madrugada)
+
+Al proponerle la fila **0.127** (el libro de caja chica con reposición calculada, nacido de leer su archivo semanal), Daniel cortó por lo sano:
+
+> *«Está bien hacer el desarrollo de la caja chica. Pero **ya no quiero entorpecer más la primera versión de
+> salida. Necesito ya empezar a operar con el sistema** y creo que ese tipo de desarrollos los podemos dejar
+> para una segunda etapa. Por ahora funciona con el archivo de la caja chica, que al final no va ligado a nada
+> de producción. Podemos implementar sin ese desarrollo. Para la fase dos hay varias cosas que quiero integrar
+> que hoy funcionan en Exceles. No es lo único. Pero **ya quiero salir**.»*
+
+**Lo que queda decidido:**
+
+1. **La fila 0.127 nace APARCADA** (⏸️, fase 2). En la V1 «caja chica» es lo que ya construyó la 0.113: un
+   concepto **predeterminado** del catálogo (0.125) que se carga en cero cada semana y al que Daniel le pone
+   el monto de la reposición a mano, mirando su archivo. Ese archivo sigue vivo y **no se importa**.
+2. **Criterio para todo lo que venga: lo que hoy funciona en un Excel y no toca producción NO entra en la
+   V1.** Se numera (para que exista, «nada pendiente existe sin número»), se marca ⏸️ y se lista en la
+   **fase 2**. Daniel dirá cuáles son esas «varias cosas»; no se le preguntan ahora, se recogen cuando las
+   nombre.
+3. **La V1 se cierra con lo que ya está en vuelo y con lo que bloquee operar**, no con todo lo numerado. El
+   corte concreto —qué filas ⬜ son V1 y cuáles fase 2— se le propone a Daniel con defaults, fila por fila,
+   y se registra aquí cuando conteste (REGLA 0: mientras tanto se sigue con lo que es claramente V1).
+
+**El corte, confirmado por Daniel (4-sep, 01:00 UTC).** Se le propuso fila por fila con defaults y contestó
+*«Sí. Y aún faltan los inventarios. Que ése **sí tiene que ir a fuerzas en la primera etapa**.»*
+
+| | Filas |
+|---|---|
+| **V1 — en vuelo** | 0.108 · 0.113 + 0.125 · 0.109 |
+| **V1 — bloquea operar o es un error** | 0.124 · 0.114 · 0.106 · 0.107 · 0.111 · 0.061 · 0.117 · 0.121 · 0.123 (Gabriel) · **al final** 0.120 y 0.116 (Daniel ya la había despriorizado: *«sólo estético, hazlo cuando ya no tenga pendientes»*) |
+| **V1 — INVENTARIOS, completo** (Daniel: *«a fuerzas»*) | 0.096 y todas sus hijas: 0.099 · 0.100 · 0.101 · 0.102 · 0.103 · 0.104 — **más lo que Daniel agregue** cuando se cierre finanzas (*«no te quiero dar nada de inventarios hasta terminar con finanzas»*, 3-sep) |
+| **Fase 2 — ⏸️** | 0.127 · 0.126 · 0.118 · 0.122 · 0.086 · **0.072** (Daniel preguntó qué era —corregir la receta en toda la familia de órdenes de una vez, saltando la ya cortada—, y al saber que el camino de a una ya existe: *«Ok. La 72 en la V2»*) · y 0.087, ya aparcada |
+| **V1 — rescatada por Daniel (4-sep, 01:25)** | **0.119** leer la constancia de situación fiscal: *«creo que es chico y va a ser bueno para dar de alta a los proveedores. Nos ahorra mucho tiempo en el kick off»* ⇒ entra, y **antes del arranque** (es para el alta masiva de proveedores) |
+
+Orden de trabajo: **finanzas primero** (0.124 → 0.114 → 0.111 → 0.117 → 0.121), los defectos (0.106 · 0.107) en cuanto haya hueco, **luego inventarios entero**, 0.061, y 0.120 al final. Las «varias cosas» de Excel para la fase 2 se numeran ⏸️ cuando Daniel las nombre.
+
+- **Aplica en:** la fila 0.127 nace aparcada y las cinco de fase 2 se aparcan en la versión que cierra 0.113. **Fecha:** 2026-09-04.
+
+
+**Ajuste del corte (4-sep, 06:55 UTC): la 0.118 VUELVE a la V1.** Estaba en fase 2 por criterio del lead («hoy se hace a mano»), no de Daniel. Al precisar él que el maquilero debe facturar *«lo que es en total»* porque *«nosotros le vamos a dar un documento con el que va a facturar»* (§Post-F9.191), ese documento pasó a ser el mecanismo normal de la 0.109 para los maquileros que facturan. Daniel: *«Está bien en la fase 1.»* Orden propuesto: tras 0.114, antes de 0.117. La fila 0.141 (nota de crédito, caso remoto) sí queda en fase 2.
+
+---
+
+#### (Post-F9.189) — LA CORRIDA SEMANAL, dictada por Daniel (3-sep-2026, tarde): ocho respuestas para la fila 0.113
+
+> **Cómo nació.** El analista de 0.113 midió el código y levantó quince preguntas de diseño; el lead las
+> juntó en ocho y se las llevó a Daniel de una vez, cada una con default (regla de §6). Contestó las ocho.
+
+## (a) ✅ LA CORRIDA SE GUARDA, y son DOS por semana: la de CON factura y la de SIN factura
+> *«Buen punto. No lo dije nunca. Pero debemos de guardar **cada corrida (la de con y sin factura) de manera
+> semanal**.»*
+⇒ Entidad persistida con ciclo (borrador → cerrada → ejecutada), **una por segmento y semana**. El
+concentrado del martes dice lo mismo que el del lunes. Es lo que hace posible el cotejo bancario después.
+
+## (b) ✅ EL MONTO LO TECLEA DANIEL — no se deriva de los recibos
+> *«Lo que teclee. **Yo voy decidiendo los montos a pagar de cada uno. Manualmente.**»*
+⇒ El renglón de la corrida lleva **monto libre**. El pago que nace de ahí NO exige aplicaciones a cargos
+(hoy `crearPagoMaquilero` exige ≥1 — la corrida necesita el pago **a cuenta**). El saldo y los recibos de
+la semana se enseñan **como referencia** al lado, nunca como el número que se paga.
+🔑 Corolario ya dicho en §Post-F9.186(h): el **anticipo** es un pago sin recibos — en EsMa el «abono» SUBE
+lo que se le debe al maquilero, el pago lo BAJA; un anticipo debe dejarlo en negativo ⇒ **es pago**.
+
+## (c) ✅ EFECTIVO O TRANSFERENCIA: default por proveedor, **cambiable por pago** — y un CATÁLOGO NUEVO
+> *«Podemos dejarlo como default de cada proveedor. Pero **con opción a cambiarlo**. De pronto un maquilero
+> me pide que le pague una semana en efectivo.»*
+⇒ `formaPago` default en el proveedor; cada renglón de la corrida lo puede cambiar. Con cuenta ⇒
+transferencia; en efectivo el beneficiario es el proveedor mismo.
+> *«También quiero dejar pagos para cosas que **no necesariamente están dadas de alta como proveedores**
+> (nóminas por fuera, gratificaciones, pago de algún servicio como agua, o cualquier otra cosa). Debería de
+> poder tener como **un catálogo de otras cosas que no son proveedores**.»*
+🔴 **Esto no existía en ninguna fila.** Nace la **0.125 — el catálogo de conceptos de pago que NO son
+proveedores** (nombre, rubro, forma de pago default, cuentas de pago con la misma forma que las del
+proveedor), **prerequisito** de la relación sin factura. ✅ **Daniel confirmó (misma tarde): «que sean un
+catálogo aparte, no proveedores»** — no tienen RFC, ni orden, ni estado de cuenta, y colarlos al catálogo de
+proveedores contaminaría CxP y los reportes fiscales.
+⭐ **Y con PREDETERMINADOS:** *«algunos de ellos quiero que se carguen por default en la relación, porque son
+conceptos que cada semana pago y no quiero que se me vaya a olvidar ponerlo (caja chica, nómina por fuera,
+etc.). De ese catálogo poder definir cuáles son los predeterminados para que **siempre se carguen en cero**
+para que yo le ponga la cantidad.»* ⇒ el concepto lleva la marca `predeterminado`; cada corrida nueva nace
+con esos renglones **en cero**, y los demás se agregan desde el catálogo cuando hagan falta.
+
+## (d) ✅ LA GUARDA FISCAL BLOQUEA
+> *«De acuerdo.»* ⇒ Un pago CON factura sólo sale a una cuenta **fiscal**; sin cuenta fiscal capturada, ese
+proveedor no se puede pagar con factura hasta tenerla (la corrida lo dice con su nombre). Lo SIN factura
+sale a cualquier cuenta.
+
+## (e) ✅ UNA SOLA RELACIÓN, **separada por rubro** — como su Excel
+> *«Misma relación pero separada por rubro. Así como mi archivo de Excel.»*
+⇒ Maquileros, otros proveedores, nóminas, servicios… **secciones de una misma corrida**, no módulos
+distintos. Cada renglón sabe de dónde viene (EsMa, CxP, catálogo de otros).
+
+## (f) ✅ EL PRODUCTO ES LA PANTALLA, no el Excel
+> *«Ni siquiera necesito el Excel. **Eso puede vivir en la pantalla y de ahí ir llenando la información de
+> pagos.** No necesito el Excel. Está bien poder generarlo por cualquier cosa, pero la idea es trabajarlo
+> ahí mismo.»*
+⇒ 0.113 es **una pantalla de trabajo** donde Daniel decide semana a semana (renglón por renglón, monto y
+forma de pago, con saldo y recibos de referencia al lado) y la cierra. El Excel/PDF del concentrado es una
+**salida secundaria**, para Lupita y para el banco — no el entregable.
+🔑 **Y Daniel dibujó la pantalla de la relación de remisiones (sin IVA):** *«me imagino que en la pantalla
+donde están los **saldos de todos los proveedores** con **un campo abierto a un lado** para capturar lo que
+se le va a pagar esa semana. Y en esa misma pantalla cargar por default estos conceptos que te comento,
+también con el campo a un lado para capturar lo que se le va a pagar. Y tener la posibilidad de cargar el
+concepto que necesito del catálogo de conceptos nuevo.»* ⇒ la corrida sin factura **ES el tablero de
+saldos con una columna de captura**, más los predeterminados del catálogo en cero, más «agregar concepto».
+No es una pantalla nueva desde cero: es el tablero de 0.115 con la columna «a pagar esta semana».
+
+## (g) ✅ PERMISOS NUEVOS
+> *«Correcto.»* ⇒ *armar y cerrar la corrida* (Daniel) y *ver la relación* (finanzas, sólo lectura).
+**Requiere `SEED_ON_START` al desplegar 0.113.**
+
+## (h) Fuera de 0.113, con número
+- **0.126 — el cotejo contra el estado de cuenta del banco** (lado con factura): 0.113 produce la lista
+  esperada; cruzarla es otra pieza. *(Era «0.125» en la propuesta del lead; corre un número porque el
+  catálogo de otros beneficiarios se numeró antes.)*
+- El **IVA explícito** en el renglón va con el documento «yo te digo qué facturarme» (**0.118**).
+- **Corte y empaque** como cargos pagables (**0.114**).
+
+**(f-bis) UNA SOLA PANTALLA, por rubros** — pregunta de Daniel del 3-sep (noche):
+UNA SOLA PANTALLA, por rubros — pregunta de Daniel del 3-sep (noche)
+> *«Acuérdate que en esa relación van maquileros y proveedores sin factura y también los conceptos que
+> dijimos ahorita. No sé si en la misma pantalla sean las dos cosas. O vemos maquileros por un lado y
+> proveedores por otro, y después las juntamos en una sola?»*
+✅ **DANIEL DECIDIÓ** (*«de acuerdo, me encanta así todo junto»*): **una sola pantalla con secciones por rubro** (maquileros ·
+proveedores sin factura · conceptos del catálogo, y dentro de conceptos los rubros que Daniel defina).
+**Por qué:** la corrida ES la unión; los totales de efectivo y transferencia sólo tienen sentido sobre el
+conjunto; partirla en dos pantallas obliga a «juntarlas después» a mano — que es exactamente el paso de su
+Excel donde el total no cuadra (§Post-F9.186(f): los 2,277 que nadie sabía explicar). Lo que SÍ cambia por
+sección son las **columnas de referencia** (nunca el número que se paga): maquileros → saldo EsMa +
+pendiente por revisar + recibos de la semana; proveedores CxP → saldo + vencido (cubetas de la bandeja);
+conceptos → sin referencia, nacen en cero. La columna «a pagar esta semana» y el selector
+efectivo/transferencia son iguales en las tres. 📌 Si algún día quiere ver maquileros y proveedores por separado, se resuelve con **filtros/pestañas dentro de la
+misma corrida**, nunca con dos corridas.
+
+**(g-bis) Decisiones que el coder tomó solo — defaults puestos, pendientes de Daniel:**
+Dos decisiones que el coder tomó solo — defaults puestos, pendientes de Daniel 
+1. **`Proveedor.formaPago` (texto libre con clave del SAT) quedó SUPERADO** por el enum nuevo `formaPagoPreferida` (efectivo | transferencia): sigue en base y contrato (REGLA 0-B) pero ya no se captura ni se muestra. Añadir un segundo campo habría repetido el defecto de la 0.124 (dos campos para una pregunta). ⚠️ Riesgo: si el timbrado vía PAC (R14, futuro) necesita la clave SAT de forma de pago, se reabre ese día — hoy nadie la lee.
+2. **En la corrida CON factura, la guarda fiscal bloquea también el EFECTIVO** — lectura literal de «un pago con factura sólo sale a una cuenta fiscal». ⚠️ Riesgo: si Daniel a veces paga en efectivo a alguien que factura, ese renglón se traba. **Default: bloquear** (es lo que dijo); si Daniel quiere permitir efectivo con factura, es un cambio de una condición.
+3. `RubroPago` es un enum cerrado (6 valores: un rubro nuevo pide migración) — aceptable mientras los rubros sean los de su Excel.
+
+**(i) El archivo semanal de finanzas, medido** (3-sep, noche; el archivo NO entra al repo, sin nombres ni cuentas): una hoja «pagos a proveedores y compras en efectivo» = **la relación sin factura** (~37 renglones, todos los rubros mezclados: proveedores, «nómina por fuera <fecha>», compras en efectivo, servicios; cada uno con **concepto libre**, beneficiario + CLABE cuando es transferencia, columnas Factura/Remisión con importe, y **folios** en notas); pie con **tres totales que no cuadran entre sí** porque las columnas de clasificación no son excluyentes. ⇒ El sistema **cuadra por construcción**: un renglón = un monto = un segmento = una forma de pago; cada renglón lleva `concepto` y `referencia`; «nómina por fuera <fecha>» es un concepto del catálogo (0.125) con la fecha en el texto. Las otras dos hojas son **libros de caja chica** con importe fijo, gastos, saldo corriente y reposiciones ⇒ «caja chica» en la corrida **es la reposición**, no un gasto: hoy concepto predeterminado con monto a mano; el libro es la fila **0.127**.
+
+**(c-bis) Textual de Daniel sobre el catálogo** (3-sep, noche), para que no se pierda la frase: *«Que sean un catálogo aparte, no proveedores. Y algunos de ellos quiero que se cargue por default en la relación. Porque son conceptos que cada semana pago y no quiero que se me vaya a olvidar ponerlo (caja chica, nómina por fuera, etc). De ese catálogo poder definir cuáles son los predeterminados para que siempre se carguen en cero para que yo le ponga la cantidad.»* Y sobre su archivo semanal, al compartirlo: *«Ese archivo se va a reemplazar con la pantalla de saldos.»*
+
+**(k) El orden de trabajo lo fijó Daniel** (3-sep, tarde): *«No te quiero dar nada de inventarios hasta terminar con finanzas y los otros pendientes.»* ⇒ finanzas primero; inventarios se abre cuando finanzas cierre — y desde el 4-sep (§Post-F9.190) entra completo en la V1. Y sobre el método, dos veces el mismo día: *«por favor no frenes para tener mis respuestas. Tienes muchos pendientes que hacer»* (REGLA 0) y *«Checa bien las reglas de Gabriel. No estoy seguro si pueden haber dos coders al mismo tiempo. Chance solamente si hacen cosas completamente diferentes que no se toquen»* ⇒ se verificó la regla de Gabriel (un coder por ÁRBOL; en paralelo sólo en worktrees separados) y así se trabajó.
+
+**(j) Decisiones del lead en la revisión** (4-sep): la pantalla de trabajo muestra **toda la cartera del segmento** a propósito (no hay «agregar proveedor»; esconder = no cobrar), ordenada con lo que pide decisión primero; `pagos.corrida-ver` **implica** ver los saldos de la semana (no se exige `cxp.ver`/`esma.ver-pagos` aparte; razón escrita en el TSDoc del permiso); `corte`/`empaque` caen hoy en la sección de proveedores hasta la **0.114**.
+
+- **Aplica en:** versión **0.102** (filas 0.113 + 0.125; 0.127 nace aquí). **Fecha:** 2026-09-04.
+
+
+**(g-ter) ✅ Daniel confirmó los defaults de (g-bis) el 4-sep (06:40 UTC):** *«Sí. Las facturas son sólo transferencias.»* ⇒ en la relación CON factura se bloquea también el efectivo, tal como quedó construido en 0.102. Y añadió la regla de la nota de crédito para los descuentos a maquileros que ya facturaron (§Post-F9.191, fila 0.141).
+
+---
+
+#### (Post-F9.188) — LAS CINCO DE LA TARDE (3-sep-2026): Daniel despierta y contesta lo que la noche dejó abierto
+
+> **Cómo nació.** Daniel preguntó *«¿qué necesita de mí?»* y el lead le entregó cinco decisiones, cada una
+> con su propuesta (regla de §6). Contestó las cinco de una vez.
+
+## (a) ✅ LA BANDEJA DE CxP: el maquilero con todo sin revisar **NO desaparece** — sale con saldo 0 y su pendiente
+Con la fila 0.115 el saldo sólo suma lo **revisado**. Un maquilero cuyos movimientos estén **todos** sin
+revisar quedaría con saldo 0 y, con el corte viejo de la bandeja (`saldo ≠ 0`), **desaparecería** de la
+pantalla donde Daniel decide a quién paga. **Decisión:** que **no desaparezca**: aparece con el saldo en
+cero y la columna **«pendiente de tu decisión»** con su importe. ⇒ El corte de la bandeja de CxP pasa a
+`saldo ≠ 0 **o** pendiente ≠ 0`, el mismo criterio que **0.115 le pone al tablero de EsMa** (hoy ese
+tablero también corta sólo por `saldo ≠ 0`, `saldos-todos.ts`). *Va en 0.115.*
+
+## (b) ✅ LA CUENTA FISCAL: **libre**, no se fuerza a una sola por proveedor
+Daniel había dicho *«tendría una cuenta Fiscal»*; la fila 0.112 **no** lo forzó. **Decisión: se queda
+libre.** Un mismo RFC puede tener dos cuentas a su nombre, y forzarlo dejaría a Daniel sin poder capturar
+su realidad el día de la carga. La guarda futura (0.113) queda como *«el pago con factura sale a **una**
+cuenta fiscal»*, que es igual de correcta.
+
+## (c) ✅ EL REPOSITORIO: **se pone privado** mientras se pide el purgado
+Es la decisión (ii) de la fila **0.123**. **Decisión: privado**, mañana a primera hora, mientras Gabriel
+pide a GitHub el purgado. Es reversible y no cuesta nada. 📌 Dato que empeoró lo medido: la primera medición
+contó **77** nombres en una columna de un archivo; la revisión de los cinco `.xlsx` contó **~169 · ~174 · ~140 · ~29 · ~7** cadenas con forma de
+nombre (heurística Title-Case/MAYÚSCULAS de 2–4 palabras; un segundo conteo independiente dio 169 / 182 /
+156 / 30 / 8 — **el orden de magnitud es el dato, la cifra exacta se fijará con un script cuando se
+trabaje la 0.123**), más autores reales en los metadatos de cada uno. ⏳ Las
+decisiones (a)/(b)/(c) de 0.123 sobre qué dato personal cabe en la prosa **siguen abiertas**.
+
+## (d) 🔴 LOS DOS CAMPOS QUE CHOCAN SOBRE SI FACTURA: **SÍ se corrigen — es un error que existan** (fila 0.124)
+`Proveedor.factura` (booleano) y `Proveedor.modalidadFacturacion` (`solo_con` · `solo_sin` · `ambos`)
+**contestan la misma pregunta** y nada impide que se contradigan; un proveedor incoherente **parte sus pagos
+por los dos caminos** según por qué puerta entraron. Daniel: *«¿se va a corregir? Es un error que existan,
+¿no?»* — **sí, se corrige.**
+📌 **Y NO nació de las dos sesiones en paralelo**: los dos campos **ya existían antes de esta noche**
+(`schema.prisma` líneas 666 y 727 al arrancar el día) — vienen de **dos fases distintas** que resolvieron
+la misma pregunta por separado (el proveedor enriquecido de **F1-E1B/R15** puso `factura`; **EsMa F6-E4**,
+decisión (h), puso `modalidadFacturacion` — migración `20260701120000_f6_e4_esma_movimientos`). El PR #290 **los encontró**, no los creó; su aviso no bloqueante fue la mitigación
+correcta para no encerrar a los migrados.
+**Cómo se corrige (0.124):** **una sola verdad**, `modalidadFacturacion` —la rica—; `factura` deja de
+capturarse y se **deriva** de ella (`solo_sin` → false; `solo_con`/`ambos` → true) donde todavía se lea.
+⚠️ **REGLA 0-B**: sin backfill; lo migrado que sólo traiga `factura` **se tolera**.
+
+## (e) ✅ EL PRECOSTEO LO ARMA **AURORA**
+*«De Aurora. Ella debe de armar el precosteo.»* Cierra la contradicción de §Post-F9.186 (una vez «el
+cliente», otra «Aurora»): el `Precosteo_Propuesta_Milano.xlsx` **lo arma Aurora**, la gerente general.
+Consecuencia para (m): el hallazgo de que la fórmula compone mal los factores se mide contra **un documento
+interno**, no contra lo que manda el cliente — y la pantalla de la fila 0.122 es **para Aurora y Daniel**.
+
+
+**(d-bis) CORREGIDO en la fila 0.124 (v0.106, 4-sep):** una sola verdad, `modalidadFacturacion`; la casilla `factura` dejó de capturarse y se deriva de la modalidad en todos los consumidores (entrada de tela, CFDI, CxP, EsMa, corrida). La columna se conserva como histórico (REGLA 0-B, sin backfill).
+
+---
+
+#### (Post-F9.187) — LAS CUATRO DE LA NOCHE (3-sep-2026): Daniel contesta antes de dormirse
+
+> **Cómo nació.** El lead le entregó las cuatro decisiones que podían frenar el trabajo de la noche, cada
+> una con su default propuesto (regla de §6: todas de una vez, no de a gotas). Daniel contestó las cuatro
+> y se fue a dormir con la instrucción *«dale toda la noche… necesitamos enfocarnos en desarrollar la
+> mayor cantidad de renglones posibles, manteniendo las reglas que puso Gabriel»*.
+
+## (a) LOS ARCHIVOS EXPUESTOS: **esperar a Gabriel** — no se toca nada
+> *«Esperamos a mañana a Gabriel a ver qué dice. Ahorita déjalo así.»*
+
+⛔ **NO se ejecuta ninguna acción de remediación**: no se cierra el PR #287, no se borra su rama, no se
+pide el purgado a GitHub y no se cambia la visibilidad del repositorio. **Todo eso es de Gabriel** y
+espera a que él decida. La fila **0.123** queda ⬜ con esa nota.
+
+🔴 **Y el terreno cambió DESPUÉS de esta decisión, sin que Daniel lo supiera:** a las **07:20 UTC de ese
+mismo día el PR #287 se mergeó a `prueba`** —lo hizo la sesión que lo había abierto, no Gabriel ni
+Daniel—, así que **los cinco archivos ya están en la rama compartida**, no sólo en una rama de trabajo.
+⚠️ Su instrucción se tomó **al pie de la letra igual**: **no se retiran**. Retirarlos del tip no arregla
+la exposición (el historial y `refs/pull/287/head` quedan; sólo el purgado de GitHub lo arregla), así que
+adelantarse habría sido una acción de riesgo sin beneficio, y contra lo que él dijo. **Lo que sí se hizo
+es que la fila 0.123 diga la verdad nueva**, para que quien la lea mañana no trabaje con el mapa viejo.
+
+✅ **Lo que sí siguió** (es lo contrario de una acción de riesgo): retirar de la prosa **el nombre de
+persona física que el #287 dejó vivo** y que hoy sigue publicado en `prueba` (§Post-F9.186(f)). Los otros
+tres —dos en §Post-F9.185 y uno más en la fila 0.112— **los retiró el propio #287 al mergearse**.
+⏳ **Sigue abierta** la pregunta de si los alias de proveedores persona física («CESAR VICTORIA 1») deben
+seudonimizarse en todo el repo.
+
+## (b) 🔽 LA FÓRMULA DEL PRECIO DE LISTA: **NO SE TOCA** (cierra la mitad de la fila 0.122)
+> *«Es irrelevante que haya un peso de diferencia. Déjalo así. **Me da igual**.»*
+
+El sistema **suma los factores y divide una vez**; Daniel divide **tres veces seguidas**. Con el redondeo
+al alza eso da **un peso arriba en 1 de cada 3-4 modelos** (medido: Milano 92.20 → él 167 / el sistema
+168; C&A 83.11 → él 136 / el sistema 137). **Queda como está, por decisión suya.**
+
+🔑 **Y es una decisión, no un olvido:** el helper `costos/precio-lista.ts` está aislado y es puro
+justamente para poder cambiarlo en una línea el día que haga falta. No hace falta.
+
+⚠️ **OJO — esto cierra la mitad de la fila 0.122, NO la fila entera.** Lo que Daniel descartó es **la
+aritmética**. Sigue vivo, y es lo valioso: **la FORMA de la pantalla** —nunca salir de la cuadrícula
+(*«me preguntan de un modelo mientras negocio otro»*), llegar tecleando el código, editar en celda con
+recálculo al instante, guardado continuo, el desglose de avíos en ventana emergente— y sobre todo **el
+margen del CONJUNTO ponderado por piezas mientras negocia**, que es lo que Excel no puede darle (medido
+en su archivo: 39.1 % calculado contra 33.3 % cerrado, sobre 39 modelos). **Confundir «me da igual el
+peso» con «me da igual la fila» perdería justo lo que sí pidió.**
+
+## (c) `roles.administrar`: **se arregla al ir a producción**, no ahora (fila 0.120)
+> *«Déjalo así por ahora. **Lo arreglamos cuando vayamos a producción.**»*
+
+Dar «administrar roles» concede hoy **de pasada** capturar cualquier proceso de Ruta Crítica, ver la
+bandeja completa y **editar una OC ya autorizada**, en 5 sitios del código. **Hoy no cambia nada** porque
+está dentro de `SOLO_ADMINISTRADOR`.
+
+⇒ La fila **0.120 se queda ⬜** y **entra al checklist de F10 (Migración + Go-live)**, que es cuando se
+reparten los permisos de verdad entre los 23 usuarios reales — el momento exacto en que el defecto
+dejaría de ser teórico. 📌 Cuando se haga: **leer los 5 sitios primero**; puede que cada uno necesite un
+permiso **distinto**, y meterlos bajo uno solo **repetiría el defecto con otro nombre**.
+
+## (d) LA PRIORIDAD DE LA NOCHE: **la cadena de pagos**
+> *«Está bien como propones. **Con temas de pagos**.»*
+
+Orden confirmado: **0.115** (el estado «revisado» que sólo manda en los cargos) → **0.110** (la
+facturación no puede quedar sin definir) → **0.112** (destinos de pago: beneficiario y varias cuentas).
+Es la cadena que desemboca en **0.113**, la corrida semanal que mata sus dos Excel.
+
+🔑 **Por qué 0.115 va primero y no es un rodeo:** cerrarla hace que **el anticipo que pidió en
+§Post-F9.186(h) salga gratis** —el mecanismo (`estadoRevision: capturado`) ya existe— y evita que el
+descuento por faltante de §Post-F9.185 baje el saldo desde el momento de proponerlo.
+
+---
+
+#### (Post-F9.186) — ⭐ LA NOCHE DE LOS ARCHIVOS REALES (3-sep-2026): cinco Excel de Daniel corrigen el plan
+
+> **Cómo nació esta sección.** Daniel subió **cinco archivos reales** —la relación de pagos sin factura, el
+> Excel semanal de maquilas de producción, la antigüedad de saldos, el precosteo de la propuesta de un
+> cliente **que arma Aurora** (✅ confirmado por Daniel el 3-sep, §Post-F9.188(e): *«ella debe de armar el
+> precosteo»* — la documentación lo había atribuido una vez al cliente y otra a Aurora, y **es de Aurora**,
+> la gerente general de la casa) y la
+> lista de precios que él arma—. **Cada uno corrigió algo que ninguna conversación había sacado.** Textual
+> suyo, al final: *«el me manda la información de referencia con **miles de errores**… por eso yo tengo que
+> ver lo que realmente se entregó»*.
+> 🔑 **La regla que deja esta noche: el proceso se puede contar; los ERRORES sólo aparecen en los datos.**
+>
+> ## 🔴 LOS CINCO ARCHIVOS **SÍ ENTRARON** AL REPOSITORIO, y la limpieza que traían FALLÓ
+>
+> Entraron con el **PR #287, mergeado a `prueba` el 3-sep a las 07:20 UTC** — mientras esta revisión estaba
+> en curso y con la recomendación expresa de **no** mergearlo ya puesta por escrito.
+>
+> **Lo que se midió abriendo el XML de los cinco:** cuentas, CLABE, tarjetas y RFC **sí** estaban quitados
+> —cero rastros, verificado— pero quedaron dentro **77 nombres completos de beneficiarios**, cada uno
+> **pegado al monto que cobra** (`relacion-pagos-sin-factura.xlsx`, hoja «General», columna O), y **nombres
+> de autor reales en los metadatos** (`docProps/core.xml`). El mismo PR **tachaba esos nombres en esta
+> prosa** y los subía crudos en el adjunto de al lado.
+>
+> 🔑 **La lección, que vale para todo el proyecto:** *un dato personal no se quita del texto, se quita del
+> **archivo**; y una limpieza que no se puede **volver a correr** no es una limpieza, es una afirmación.*
+> Un `.xlsx` es un ZIP de XML: la revisión tiene que mirar **las celdas y los metadatos** —ahí sobrevivió
+> el nombre del autor de la cotización— y no la prosa que lo acompaña.
+>
+> ⚠️ **Y en git no hay vuelta atrás**: lo que entra queda en el historial, y este repositorio es **público**.
+> ⛔ **Los archivos NO se retiran desde aquí**, aunque estén medidos y el diagnóstico esté cerrado: Daniel
+> lo dejó dicho esa misma noche (*«esperamos a mañana a Gabriel… ahorita déjalo así»*, §Post-F9.187(a)).
+> El pendiente tiene número: **fila 0.123**.
+
+---
+
+## (a) 🔴 EL PAGO CON FACTURA NACE DEL BANCO; EL SIN FACTURA, DE LA RELACIÓN — **son dos mundos**
+> *«Prefiero que los pagos formales salgan del pago que esté en **el estado de cuenta**, no de lo que yo
+> pongo acá. Porque hay pagos que hago en la semana que no salen de esta relación: **de repente un martes me
+> piden pagar algo urgente**, me mandan la factura y se paga.»*
+> *«Son dos temas completamente distintos… Cuando es **sin IVA**, los pagos que va a tomar el sistema **sí
+> son los que definí en el archivo**. Cuando termino de definirlo, **los pagos se hacen tal cual**.»*
+
+| Mundo | De dónde NACE el pago | Por qué |
+|---|---|---|
+| **CON factura** | **El estado de cuenta del banco** | Llegan facturas toda la semana + urgentes ⇒ su relación es sólo un **estimado** |
+| **SIN factura** | **La relación que Daniel define** | **No es un estimado: es la INSTRUCCIÓN de pago.** Se ejecuta **tal cual** |
+
+🔴 **CORRIGE AL LEAD, dos veces.** Primero afirmó que *«si decides los pagos en el sistema, el pago ya quedó
+registrado; el estado de cuenta sólo confirma»* — **falso**: lo de la relación es una **intención**, y
+registrar desde ahí inventaría pagos que no ocurrieron y perdería los que sí. Luego **unificó los dos
+mundos** — también falso: en el lado sin factura la relación **sí** es autoritativa.
+
+⭐ **Consecuencias que esto dispara:**
+- **§Post-F9.184(f) / fila 0.110 deja de ser cosmética**: la marca con/sin factura **decide de dónde sale el
+  pago**. Un proveedor sin clasificar deja al sistema sin saber por cuál camino meterlo ⇒ **el pago se
+  pierde o se duplica**. **Es la bifurcación del mecanismo**, no una separación de vista.
+- **El cotejo bancario se vuelve FÁCIL**: la corrida produce **la lista esperada**; lo que sobre del cruce
+  son **exactamente los pagos ad-hoc** (el martes urgente), señalados para atribuir. ⚠️ Aun así:
+  **proponer, no aplicar en silencio** — dos pagos del mismo monto son ambiguos.
+
+## (b) LAS CUENTAS BANCARIAS — el beneficiario casi nunca es el proveedor
+De leer su archivo real (`08_28_26.xlsx`, ~150 beneficiarios): «CESAR VICTORIA 1» → *otra persona* · «LEOPOLDO DIAZ» → *otra persona* ·
+«ARTURO LOPEZ» → *otra persona* (nombres reales omitidos a propósito: son datos personales). **Daniel no lo había mencionado.**
+
+🔴 **Y el lead leyó mal el resto**: creyó que «CESAR VICTORIA 1/2/3» eran **tres proveedores**. Daniel:
+> *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
+> **historial de cuentas**, para poder **reutilizarlas**.»*
+**Es UN proveedor con TRES cuentas**, partido en tres renglones **porque Excel no sabe modelar otra cosa**.
+
+**Y la marca fiscal** (confirmado *«sí, cuentas bancarias»*):
+> *«Tendría **una cuenta Fiscal**, y podría tener **más de una cuenta no fiscal**.»*
+⇒ Cada cuenta lleva `esFiscal`. **Habilita una guarda que hoy no existe: un pago CON factura sólo puede
+salir a la cuenta FISCAL** — si sale a la cuenta personal de alguien, el pago y el comprobante dejan de
+corresponder. Lo sin factura se reparte libremente.
+🔑 **La misma marca gobierna las dos puntas: de dónde NACE el pago y a dónde PUEDE SALIR.**
+
+## (c) PARTIR UN PAGO = DOS PAGOS. No hay dispersión.
+> *«**Puedes meter los dos pagos por separado** en el estado de cuenta… **da lo mismo**. Pero sí debo
+> hacerlo con dos pagos al mismo proveedor la misma semana desde cuentas distintas. **Así debe salir en la
+> relación** para poder hacer las dos transferencias.»*
+
+**Un pago = una cuenta destino = UN renglón de la relación.** Estado de cuenta: dos pagos. Relación: dos
+renglones, cada uno con su banco, beneficiario y cuenta.
+⚠️ **NO colapsar por proveedor al armar el concentrado** — sería lo "ordenado" y **rompería las
+transferencias**. Se distinguen por **beneficiario + cuenta**; el alias («1», «2») se guarda con la cuenta.
+🔴 **El lead había advertido que dos pagos «no cuadrarían». ERA FALSO** — 30 + 20 da lo mismo que 50 en el
+saldo. **Era alarmismo**, y retirarlo **simplificó el diseño** (fuera el modelo de dispersión).
+
+## (d) CORTE, EMPAQUE Y REPARACIONES: **servicios sobre la orden**, no maquilas de ida y vuelta
+> *«En corte **no necesitas mandar y recibir mercancía**… sólo hay que poner **su cantidad y precio**, pero
+> **no va y viene**. Lo mismo el empaque… **el empaque no toca el inventario**. Y el corte es donde **nace
+> la cantidad**, pero no sale ni entra mercancía. **Simplemente sucede y ya.**»*
+> *«Hay otro dato importante: **las reparaciones**… quiero colgar de una orden la reparación que hizo el
+> maquilero y el precio. Ese es un **sobreprecio** importante de saber y costear, **porque son cosas que no
+> están cotizadas**.»*
+
+**SON TRES FORMAS DE PROVEEDOR, NO DOS:**
+| Forma | Cómo funciona | Ejemplos |
+|---|---|---|
+| **Maquila de ida y vuelta** | envío → recibo; **mueve WIP e inventario** | costura, estampado, bordado, lavado, aplicación |
+| **⭐ Servicio sobre la orden** | **cantidad + precio → cargo. NO mueve nada** | **corte, empaque, reparaciones** |
+| **Proveedor por estado de cuenta** | el monto nace de su cuenta | transportistas, etc. |
+
+⭐ **El modelo YA distinguía las dos primeras y nadie lo había usado para el pago**: `registrarCorte` crea
+`EtapaMovimiento(tipo=corte, **idTipoProceso=NULL**, idTercero=cortador)` y no toca inventario. Ese `NULL`
+**es** la marca de «no es maquila de ida y vuelta».
+🔴 **Falta:** corte **no escribe `precioPactado`** ⇒ sin precio **no nace el cargo**. **Empaque y
+reparaciones no existen** como acto.
+🔑 **Regla de C&A:** la cantidad del empaque **es propia, NO se deriva del recibo** — 1000 fabricadas / 990
+entregadas: se paga lo empacado y **las 10 restantes no se mueven, se quedan quietas en inventario**.
+⛔ **NO convertirlos en `TipoProceso`** — los metería al flujo de envío/recibo que él dice que NO son.
+⚠️ **Y la reparación NO es un décimo concepto de costo más**: si se suma como los demás **se diluye**. Debe
+marcarse **NO COTIZADA**, para poder decir *«esta orden costó X más de lo cotizado, y fue en reparaciones»*
+y responder **¿qué modelos y qué maquileros generan reparaciones?** — *un maquilero barato que siempre
+necesita reparación no es barato*.
+
+## (e) 🔴 EL IVA VIENE ESCONDIDO EN UNA COLUMNA QUE DICE «BONOS / AJUSTES»
+Medido en el Excel semanal de producción (`pagos_04_de_septiembre.xlsx`): los **dos** renglones `FACTURA`
+llevan el precio **× 1.16 exacto** (Borda Print 9 → 10.44; Rimabell 25 → 29). Los `REMISION`, nada.
+⇒ **No es un bono ni un ajuste: es el IVA**, y **el nombre de la columna miente**. En el sistema va
+**explícito**: si el proveedor factura, el pago lleva IVA **y se ve como IVA**.
+📌 `TIPO DE COBRO = REMISION | FACTURA` es la separación con/sin factura **ya viviendo en el proceso real**.
+
+## (f) 🔴 EL TOTAL DE ESE ARCHIVO NO CUADRA — y la razón NO ESTÁ ESCRITA
+Suma de pagos programados **105,310.20**; el total dice **103,033.20**. Diferencia: **2,277 exactos** = el
+renglón de un maquilero **cuyo nombre se omite: es una persona física**. Daniel: *«es porque le
+dimos un anticipo la semana pasada»*.
+🔑 **Pero la columna `ANTICIPOS PAGADOS` de ese renglón está VACÍA.** El anticipo **existe en la cabeza de
+alguien, no en el documento**. Textual: *«normalmente me mandan información **sin especificar bien qué es
+cada cosa**… muchas fallas»*.
+⇒ **Es EL argumento del proyecto, en su propio dato**: en el sistema el anticipo es **un movimiento**, el
+saldo **se netea solo**, y el número **carga su explicación**.
+
+## (g) ⭐ UN PASO DE SU PROCESO YA SOBRA — medido
+Daniel reteclea cantidad y precio *«para evitar algún error… en lugar de poner 100 ponen 1000 y ahí me
+aparece que recibió 900 prendas más de lo que le mandamos»*.
+🔴 **En v2 ese error es IMPOSIBLE**: `registrarReciboMaquila` **topa** el recibo contra lo pendiente, bajo
+lock (`produccion/recibos.ts:373, 746-747`). ⇒ **Su reteclear era la compensación de un defecto de Access.**
+Su paso pasa a ser **revisar y ajustar**. ⚠️ Lo que el tope NO caza y sí necesita sus ojos: **capturar de
+menos** y **el precio**.
+
+
+## (h) EL ANTICIPO ES UN ABONO, y lo SOLICITA producción
+> *«Es simplemente **un abono** y queda con **saldo negativo** el maquilero.»* ⇒ **NO hay amortización
+> contra trabajo futuro**: el saldo negativo se consume solo conforme entren sus cargos.
+> *«El encargado de producción debe poder **solicitarme un anticipo** para algún maquilero… que lo ponga y
+> al ver yo los pendientes me aparezca ese maquilero. **Si es muy complicado, por ahora por correo.**»*
+
+⭐ **NO hace falta el correo: el mecanismo ya existe.** `AbonoMaquilero` ya nace en `estadoRevision:
+capturado`. Producción captura → aparece en los pendientes de Daniel → él aprueba → saldo negativo.
+🔴 **PERO hay un defecto que lo impide hoy** (ver (i)).
+
+> *«Es importante que yo pueda ver **qué tiene el maquilero en su inventario** para decidir si le puedo dar
+> el monto que solicita.»*
+**Medido:** `consultarExistenciaMaquilero` **ya existe** y filtra por maquilero — pantalla **«En poder del
+maquilero»** (`/produccion/existencias-maquilero`). 🔴 **Pero da PIEZAS, no importe**: para decidir sobre
+30,000 pesos, *«5,000 prendas»* no sirve. **Es calculable** (`Σ enPoder × precioPactado`).
+📌 **Y el enlace va en la PANTALLA DE PAGOS** (decisión suya), no navegando a Producción — está marcada
+`subVista`, **por eso él no la conocía**.
+⚠️ **Dicho y aceptado:** ese respaldo **es una referencia, no una garantía** — lo del taller todavía no es
+suyo; si desaparece, el anticipo ya salió.
+
+## (i) 🔴 EL ESTADO «REVISADO» SÓLO MANDA EN LOS CARGOS — y está DUPLICADO
+Medido en **dos** implementaciones del saldo:
+- `esma/saldos.ts` — cargos `where { estado: 'validado' }` ✅; **abonos, pagos y descuentos: sin filtro** 🔴
+- `esma/saldos-todos.ts` (SQL) — cargos `AND "estado" = 'validado'` ✅; **los otros tres: sin filtro** 🔴
+
+⇒ **8 agregaciones, 6 mal.** Y como cada pantalla usa la suya, **arreglar un archivo pasaría en VERDE**.
+🔑 **El campo existe en los cuatro conceptos y sólo manda en uno**: un guardián que parece que cuida y no
+cuida. **Consecuencias vivas:** el anticipo de (h) **movería el saldo antes de que Daniel apruebe**, y el
+descuento por faltante de §Post-F9.185 **bajaría el saldo desde el momento de proponerlo**.
+
+## (j) LA ANTIGÜEDAD DE SALDOS DE LOS JUEVES
+> *«Este archivo lo necesito **todos los jueves**… ahí voy decidiendo qué vamos a pagar y lo voy
+> capturando. **Me gustaría que todo eso lo haga directo en el sistema.**»*
+
+✅ **Casi todo existe**: `Proveedor.diasCredito`, `calcularVencimiento(...)` ya se llama al registrar, aging
+con **cubetas configurables**, y los maquileros **entran a la cuenta** por `convivencia-esma.ts`. Sus cubetas
+(150/200/250) **se configuran**, no se programan.
+🔴 **El hueco — y CORRIGE al lead**, que había dicho *«los maquileros sin antigüedad está bien, a ellos les
+pagas cada semana»*: **su propio archivo lo desmiente** — **BORDA PRINT (maquilero de estampado con factura)
+lleva 8 días** y **BORDADOS COMPUTARIZADOS 30**. **Daniel SÍ los envejece**; el sistema les pone
+`fechaVencimiento: null` y los manda a una cubeta sin edad.
+🔒 **Y el plazo es SIEMPRE del proveedor**: *«las inconsistencias son **errores de Lupita**, no
+incongruencias del proveedor»* ⇒ **no hace falta plazo por documento**, y **la fecha se calcula sola**:
+otra clase de error que desaparece por construcción.
+📌 **Lupita no debería capturar nada**: las facturas entran por **importación de CFDI** (ya existe) y los
+pagos, por (a).
+
+## (k) ⭐ «NADIE ME FACTURA SI NO LE MANDO YO EL DOCUMENTO»
+> *«Lo que me gustaría implementar es que **nadie me facture si no le mando yo un documento con los datos
+> con los que me tiene que facturar**… no al revés. **Y eso debe salir del sistema.**»*
+
+**Invierte el flujo**: hoy el proveedor factura lo que cree y Daniel reconcilia; con esto **él dicta el
+contenido** y el CFDI sólo tiene que **coincidir**.
+✅ **Los datos fiscales YA EXISTEN** (`razonSocial`·`rfc`·`regimenFiscalSat`·`usoCfdiHabitual`·
+`codigoPostalExpedicion`) ⇒ **es un IMPRESO, no un módulo**. **El IVA va explícito**, no escondido como en (e).
+⚠️ **Proveedores sin RFC**: el documento **no se puede emitir** ⇒ **avisar cuál falta**, nunca inventarlo.
+📌 *Es lo que C&A le hace a él*: le mandan la orden con lo que van a pagar en vez de dejarlo facturar libre.
+
+## (l) LEER LA CONSTANCIA DE SITUACIÓN FISCAL
+> *«Que el sistema lea toda la información de su constancia… **El sistema no se equivocará porque es un PDF
+> y siempre es el mismo formato.**»* · *«Yo le pediré siempre a los proveedores que me la manden **en el PDF
+> original**. No escaneada ni impresa. **Si cambia el formato, te pido actualizarlo y listo.**»*
+
+✅ **El lugar de guardarla YA EXISTE**: `TipoArchivoProveedor` incluye **`CONSTANCIA`**.
+⚠️ **Su premisa es correcta a medias, y quedó dicho:** con el PDF original el texto se extrae **exacto**;
+pero **el riesgo no es leer mal una letra, es leer el CAMPO EQUIVOCADO** — una constancia escaneada no tiene
+texto, y **cuando el SAT cambia el formato un lector por posición no truena: devuelve el campo de al lado**.
+**Las dos condiciones, aceptadas:** (1) **mostrar lo leído antes de guardar** la primera vez de cada
+proveedor; (2) **si no reconoce el formato, DECIRLO** en vez de llenar tres campos y dejar dos vacíos.
+🔑 **Su plan de «si cambia me avisas» DEPENDE de la condición 2**: si el lector adivina, el formato cambia y
+**él nunca se entera**. ⭐ Y la regla del PDF original **se puede hacer cumplir sola**: un escaneado no tiene
+texto ⇒ el sistema lo rechaza y pide el original.
+
+## (m) EL PRECOSTEO — F8 se construyó **sin haber visto una cotización real**
+Medido contra sus dos archivos (`Precosteo_Propuesta_Milano.xlsx`, **el precosteo que arma Aurora** —Daniel,
+§Post-F9.188(e)—, y `Gaby_2026.xlsx` / `Niños_2026_Inv.xlsx`, la lista de precios que **arma él**):
+
+🔴 **La composición de los factores está mal.** Daniel divide **tres veces seguidas**
+(`costo/(1−margen)/(1−comisión)/(1−descuentos)`); el sistema **suma los últimos y divide una vez**. Con el
+redondeo al alza **no da lo mismo**: **Milano** 92.20 → él **167**, el sistema **168**; **C&A** 83.11 → él
+**136**, el sistema **137**. ⇒ **1 de cada 3-4 modelos sale un peso arriba**, en un precio ya negociado.
+⭐ **El código PREDIJO este momento**: `costos/precio-lista.ts:16-20` dice *«Daniel podría subir un Excel con
+la composición EXACTA… por eso este helper está AISLADO y es PURO: se cambia SOLO aquí, una línea»*.
+🔽 **Daniel lo relativizó**: *«no pasa nada que tenga un peso de diferencia, eso es lo de menos. **Justo la
+intención es que veas cómo se va trabajando**»* ⇒ **se arregla, pero NO sin su visto bueno**: cambiar la
+aritmética de un precio no se hace sin él delante.
+
+✅ **Lo que sí está bien**: los **cuatro factores** existen (`margenPct`·`descuentosPct`·`regaliasPct`·
+`costoVentasPct` = su comisión), **son por cliente** (C&A 35 %/5 % vs Milano 40 %/7 %, confirmado en sus
+archivos), el **redondeo al alza**, y **tela 1 + tela 2** con precio/consumo/costo.
+🔽 **El precio sugerido al público** —`(precio × 1.16)/(1 − margen cliente)`, verificado exacto— **no existe
+en el sistema**, pero Daniel lo bajó de prioridad: *«el precio correcto **no es el de venta**… lo común es
+precio de venta **de nosotros**»*.
+
+### La FORMA de la pantalla — **descarta el diseño obvio**
+> *«Tener **los modelos como en renglones** e ir jugando ahí mismo con cada uno.»* · *«Hay muchas cosas que
+> son cómodas manejándolo **como si fuera un Excel, viendo todo junto**.»* · *«Luego **me preguntan de un
+> modelo mientras estoy negociando otro**, y hay que tener la manera de verlo **muy rápida y fácil**.»*
+
+⛔ **Cuadrícula → clic → se abre su pantalla → regresas NO SIRVE**: abrir el modelo B **lo saca del A** y
+pierde lo que tenía a medias. **La negociación no es secuencial.**
+⇒ **Nunca salir de la cuadrícula** (el detalle se abre **encima o al lado**) · **llegar tecleando el
+código** · **editar en la celda con recálculo instantáneo** · **el estado sobrevive** · **guardar continuo**,
+no al final.
+⭐ **El desglose de avíos va en ventana emergente** (petición suya) *«con precios y total, para ver de dónde
+poder ajustar algún precio o quitar algo»*. **Los datos YA EXISTEN**: `PrecostoLinea` guarda avío,
+descripción, **`consumo` con 4 decimales** (su caja de cartón a 0.02 cabe), `precioUnit` e `importe`.
+
+### 🔴 EL PRECIO CERRADO NO ES EL CALCULADO — y a veces es MAYOR
+Su hoja lleva **`PRECIO ESTABLECIDO`** con **su propio margen recalculado**, aparte del `PRECIO` que sale de
+la fórmula. Medido en C&A: calculado **105** → cerró **103** · **160** → **155** · pero **136** → **139**,
+y en otro **121** → **139** (**+18**).
+🔑 **La fórmula NO es un techo: es un PUNTO DE PARTIDA.** Cede en unos y gana en otros, y **el margen real de
+cada modelo sólo se sabe después de negociar**.
+⇒ El sistema debe guardar **las DOS cosas** —lo que calculó y lo que se cerró— porque ahí está la respuesta a
+**«¿cuánto gané de verdad con este cliente?»**, que hoy no se puede contestar.
+⏳ **Por medir**: si F8 ya guarda el precio negociado con esa forma (tiene «negociación por versiones con
+acuerdos»), o si sólo guarda el calculado.
+
+### ⭐ Lo que Excel NO puede darle, y el sistema sí
+Excel **no sabe cuántas piezas lleva cada modelo** ⇒ Daniel **no ve a dónde va el conjunto** mientras
+negocia. Medido en su archivo de C&A: de **39 modelos cerrados**, el margen si hubiera cobrado lo calculado
+sería **39.1 %** y el del conjunto que cerró, **33.3 %** *(sin ponderar por volumen — y ahí está justo la
+trampa de mirarlo en Excel)*. **Cede en unos para ganar en otros** (hasta +18 pesos en uno), así que **el
+modelo suelto no dice nada**. ⇒ La pantalla debe mostrar, **mientras mueve un precio, en qué queda el
+conjunto ponderado por piezas** contra el margen que buscaba.
+
+## (n) 📌 TAREAS DE DANIEL PARA EL DÍA DE LA MIGRACIÓN (no del desarrollo)
+> *«Todo eso lo voy a hacer **en producción**… la información real la haremos hasta que esté en producción.»*
+> *«**Yo me encargo de ponerlo bien cuando hagamos la migración de datos reales.**»*
+
+Le tocan a él, con datos reales: **la modalidad de facturación** de cada proveedor (de ella depende por cuál
+camino entra cada pago) · los **datos fiscales + constancia** · las **cuentas bancarias con beneficiario y
+marca fiscal** · el **plazo de crédito**.
+⚠️ **Va al checklist de F10**, y obliga a que **el sistema tolere el dato ausente** hasta ese día.
+
+---
+
+#### (Post-F9.185) — ⭐ EL PROCESO DE PAGO SEMANAL, dictado por Daniel (3-sep-2026)
+
+> *«Es **una de las pantallas más importantes dentro del sistema**. Debe estar muy bien hecha.»*
+
+## Cómo es HOY (Access + dos Excel)
+1. **Producción** le manda un Excel semanal con lo que se paga de maquilas: teclea **órdenes, cantidades,
+   precios e importes** entregados por cada maquilero.
+2. Daniel **entra a Access a revisar las entradas** de cada maquilero listado, donde están las cantidades
+   que la persona de recibos **realmente contó**.
+3. En su pantalla de pendientes, **selecciona cada orden y RETECLEA cantidad y precio**. Eso entra al
+   estado de cuenta como «recibo».
+4. Arma **otro Excel** con lo que cobra cada maquilero y **se lo pasa a finanzas** — **dos relaciones: con
+   factura y sin factura**.
+
+## ⭐ (a) UN PASO DE SU PROCESO YA SOBRA — y es un hallazgo, no una opinión
+Daniel retecleaba **para cazar errores**: *«me ha pasado que en lugar de poner 100 ponen 1000 y ahí me
+aparece que recibió 900 prendas más de lo que le mandamos»*.
+🔴 **En v2 ese error es IMPOSIBLE**: `registrarReciboMaquila` **topa** el recibo contra lo pendiente, bajo
+lock y con la misma aritmética que muestra la pantalla (`produccion/recibos.ts:373, 746-747, 1323-1328`).
+⇒ **Su reteclear era la compensación de un defecto de Access.** Su paso deja de ser *«recapturo todo por si
+acaso»* y pasa a ser lo que él mismo pidió: **revisar y ajustar** (precio, descuento por entregar mal).
+⚠️ **Lo que el tope NO caza y sí necesita sus ojos:** que capturen **de menos** (50 cuando llegaron 100) y
+**el precio** (el sistema no sabe si es el pactado o el renegociado esta semana).
+
+## (b) LA FRONTERA NO ES «MAQUILA VS. LO DEMÁS» — corrección suya
+> *«**Corte es parte de maquilas**, no de proveedores. Tengo proveedores de corte que **el monto a pagar
+> sale de una orden**, lo mismo que un maquilero. Y una **maquila de empaque** también… (recuerda que
+> definimos que los proveedores de maquila **pueden hacer distintos procesos**). **Transportistas y demás
+> proveedores sí salen del estado de cuenta.**»*
+
+| El monto nace de… | Quiénes | Módulo |
+|---|---|---|
+| **una ORDEN** | costura, arte, **corte**, **empaque**, cualquier proceso | EsMa |
+| **un ESTADO DE CUENTA** | transportistas y demás proveedores | CxP / terceros |
+
+## (c) CORTE Y EMPAQUE SON **SERVICIOS SOBRE LA ORDEN**, no maquilas de ida y vuelta
+> *«En corte **no necesitas mandar y recibir mercancía**. Mando tela y corta una cierta cantidad. Sólo hay
+> que poner **su cantidad y precio** para meterlo en la OP, pero **no va y viene**. Lo mismo el empaque…
+> **el empaque no toca el inventario**. Y el corte es donde **nace la cantidad**, pero no sale ni entra
+> mercancía. **Simplemente sucede y ya.**»*
+
+⇒ **Son TRES formas de proveedor, no dos**: maquila de ida y vuelta (mueve WIP) · **servicio sobre la orden
+(corte, empaque — sólo cantidad + precio → cargo, NO mueve nada)** · proveedor por estado de cuenta.
+
+⭐ **El modelo YA distinguía las dos primeras y nadie lo había usado para el pago**: `registrarCorte` crea
+`EtapaMovimiento(tipo=corte, **idTipoProceso=NULL**, idTercero=cortador)` y no toca inventario. Ese `NULL`
+**es** la marca de «no es maquila de ida y vuelta».
+🔴 **Falta:** corte **no escribe `precioPactado`** ⇒ sin precio no nace el cargo. **Empaque no existe.**
+🔑 **Regla de C&A:** la cantidad del empaque **es propia, NO se deriva del recibo** — 1000 fabricadas /
+990 entregadas: se paga lo empacado y **las 10 restantes no se mueven, se quedan quietas en inventario**.
+⛔ **NO convertirlos en `TipoProceso`** — los metería al flujo de envío/recibo que él dice que NO son.
+
+## (d) LAS CUENTAS BANCARIAS — y una corrección al lead
+De leer su Excel real (`08_28_26.xlsx`, 158 filas): la hoja «General» es un **directorio permanente** de
+~150 beneficiarios (`NOMBRE` · `PAGAR` efectivo · `DEPOSITO` transferencia · `BANCO` · **`BENEFICIARIO`** ·
+`CUENTA`), y «Transfers Concentrado» es **la lista ejecutable** (sólo los que llevan monto, ordenados por
+monto). Totales de esa semana: **30,000 efectivo + 108,201 transferencia**.
+
+⭐ **El BENEFICIARIO casi nunca es el proveedor** — «CESAR VICTORIA 1» → *otra persona*;
+«ARTURO LOPEZ» → *otra persona*. **Daniel no lo había mencionado; salió de leer el archivo.**
+
+🔴 **Y el lead leyó mal el resto: «CESAR VICTORIA 1/2/3» NO son tres proveedores.** Daniel:
+> *«Estaría bien poder tener **más de una cuenta**, definir una como **default**, pero tener las demás como
+> **historial de cuentas**, para incluso poder **reutilizarlas**. Y en ocasiones me pide el proveedor
+> **partir un pago grande en más de una cuenta**: 30 mil en una y 20 mil en la otra la misma semana.»*
+
+**Un proveedor con varias cuentas**, partido en tres renglones **porque Excel no sabe modelar otra cosa**.
+
+## (e) PARTIR UN PAGO = DOS PAGOS. No hay dispersión.
+> *«**Puedes meter los dos pagos por separado** en el estado de cuenta… **da lo mismo**. Pero **sí debo
+> hacerlo con dos pagos al mismo proveedor en la misma semana desde cuentas distintas. Así debe salir en la
+> relación** para poder hacer las dos transferencias.»*
+
+⇒ **Un pago = una cuenta destino = UN renglón de la relación.** Estado de cuenta: dos pagos. Relación: dos
+renglones, cada uno con su banco, beneficiario y cuenta.
+⚠️ **NO colapsar por proveedor al armar el concentrado** — sería lo "ordenado" y **rompería las
+transferencias**. Los dos renglones **no pueden decir ambos «César Victoria» a secas**: se distinguen por
+**beneficiario + cuenta**, y el **alias** («1», «2») se guarda con la cuenta.
+🔴 **El lead había advertido que dos pagos «no cuadrarían» con el estado de cuenta. ERA FALSO**: 30 + 20 da
+exactamente lo mismo que 50 en el saldo. Sólo se pierde saber que fueron una sola decisión, y Daniel dijo
+que eso da igual. **Era alarmismo, no un hallazgo** — y simplificó el diseño (fuera el modelo de dispersión).
+
+## (f) Lo que quiere, en una frase
+Ver **la lista de maquileros que entregaron esa semana** (la mete quien recibe), **validar él** lo que
+realmente se paga, **determinar ahí mismo** lo de cada uno, y que **finanzas lo consulte en el sistema**.
+**Cero Excel.** La relación sin factura junta **maquilas** + **otros proveedores** (los que hoy le pasa
+Lupita), en **efectivo o transferencia**, y la salida es *«una relación con todo lo que se paga… de todo lo
+que yo mismo definí»*. Acepta **dos relaciones si hicieran falta**.
+
+## (g) ⏳ Sigue abierto
+**Anticipos.** *«También debería tener la posibilidad de dar anticipos. Esa información me la va a pasar el
+encargado de producción.»* **NO existen hoy** como concepto (hay `abonos`, sin amortización contra trabajo
+futuro). Falta que Daniel precise si un anticipo es simplemente un abono o si necesita ver **cuánto le
+queda por amortizar**.
+
+⇒ **Filas: 0.112** (beneficiario y varias cuentas) · **0.113** (la corrida y el concentrado) ·
+**0.114** (corte y empaque como servicios sobre la orden).
+
+---
+
+#### (Post-F9.184) — ✅ Las respuestas de Daniel del **3-sep-2026** (versión **0.093**)
+
+Una tanda larga, en una sola sesión. Se agrupan aquí porque **varias se corrigen entre sí** y leerlas
+sueltas induce al error que ya cometió el lead.
+
+**(a) Ubicación del material — TEXTO LIBRE, sin catálogo** *(cierra la pregunta 11 del repaso de
+Inventarios; fila **0.103**)*.
+> *«De texto libre está bien. **Por ahora no un catálogo de posiciones** — si en algún momento se requiere
+> lo hacemos. Ahorita **ya quiero salir a producción de la manera más rápida posible sin perder lo que hoy
+> hacemos en Access**.»*
+
+⭐ **Esa última frase es una VARA DE MEDIR para toda la cola**, no un comentario: la pregunta por fila deja
+de ser *«¿es buena idea?»* y pasa a ser **«¿se pierde algo que hoy Access sí hace, si salimos sin esto?»**.
+Si se pierde ⇒ **paridad**, bloquea el arranque. Si no ⇒ **mejora**, se hace si es barata o espera.
+
+**(b) La salida que no es por OP — SÓLO INVENTARIO, y NO es un ajuste** *(cierra la pregunta 12; fila
+**0.104**)*.
+> *«Por ahora que toque **sólo inventarios**… pero **sí debe existir una salida de ambas cosas por otro
+> medio que sólo ajuste de inventario**. Es una realidad que a veces (pocas) sacamos materiales que no
+> tienen nada que ver con las OP. **Siempre autorizada sólo por mí. Nadie más.**»*
+
+⇒ **Tipo de movimiento propio, NO `ajuste-salida`.** Un ajuste dice *«conté y había menos»*; esto dice
+*«salió, y por esto»*. Meterlo como ajuste **haría irrecuperable la razón** dentro de un año.
+
+**(c) Los permisos NO se heredan en cascada** *(fila **0.105**)*.
+> *«Habíamos hablado que los permisos por cascada no son funcionales. Así lo hice en la primera versión que
+> hice en Access, y luego lo modifiqué por **permisos concretos**… puede haber alguien que tenga el permiso
+> A pero no el B, y otra persona que tenga el B pero no el A. Si se hace por cascada nos vamos a tener que
+> conformar con que **algunas personas accedan a cosas que no deberían**.»*
+
+Y dos precisiones suyas del mismo hilo:
+- **Los perfiles concretos se arman AL FINAL**: *«te voy a dar los puestos de todos los usuarios más
+  adelante para ir decidiendo uno por uno»*. ⇒ la fila construye **el mecanismo**, no el contenido.
+- **Un permiso suelto encima del perfil**: *«que una persona con el perfil X tenga esos permisos, pero
+  aparte le podría dar un permiso específico aunque esté fuera de su perfil»*. ⭐ **Ya se puede hoy**: un
+  usuario lleva **varios perfiles** y sus permisos efectivos son la **unión**.
+
+**(d) FALTANTE ≠ INCOMPLETA — y la definición es suya** *(filas **0.086** y **0.109**)*.
+> *«**Faltante** es cuando no entrego nada (ejemplo: de 1000 entrego 995 y faltan 5). **Incompleta** es
+> cuando regreso las 5 prendas sin confeccionar por algún motivo pero **no faltan, ahí están**. Las
+> faltantes **normalmente se las cobramos**. Las incompletas **no**.»*
+
+🔴 **CORRIGE UN DEFAULT DEL LEAD**, que había propuesto medir el umbral de calidad sobre
+*«segundas + incompletas»* razonando que lo que nunca vuelve *«merece su propio umbral por ser más
+grave»*. **Al revés en lo económico**: la faltante es la que **cuesta dinero** y es la que Daniel nombró
+literalmente junto a las segundas. ⇒ **el 2 % es `segundas + faltantes`**, tal como él lo dijo.
+📌 **Lección registrada:** *cuando el dueño usa dos palabras del negocio, la duda es **qué significan**, no
+cuál conviene.* La pregunta correcta era de una línea: **«¿qué es un faltante?»**.
+*(§Post-F9.136 decisión A ya había confundido los dos términos una vez — ver `incompletas.ts`. Es la
+segunda vez que este par engaña a alguien.)*
+
+**(e) Cobrar el faltante SALDA el pendiente** *(fila **0.109**)*.
+> *«Una vez que se determina cobrar el faltante al maquilero, **se debe descontar como prendas que aún
+> tiene por entregar**… si tiene faltantes de pocas prendas, **no sigan apareciendo siempre como pendiente
+> de entregar**… se va a hacer una lista grande si no las descontamos. Lo que tiene por entregar **deben
+> ser prendas que realmente va a entregar**. Lo que ya asumimos que se le cobra se le da una "entrada"
+> para borrarlo de ahí **(aunque obviamente no entra en el inventario ni en recibo)**.»*
+
+Y el diseño, cerrado con él en el mismo hilo:
+- **Se cierra POR ORDEN** (textual). El botón dice *«ya terminó de entregar»*, no *«cóbrale»*.
+- **Lo aprieta quien recibe, no Daniel**: *«ese cierre lo puede hacer la persona que recibe. No yo
+  necesariamente. Lo que sí debo ver yo muy claro es **lo que tengo pendiente por cobrar o por perdonar**»*.
+- **Saldar y cobrar van separados**: a veces se cierra y **no** se cobra (cortesía, culpa nuestra). Si el
+  descuento del pendiente dependiera del cobro, **esos casos se quedarían en la lista para siempre** — que
+  es justo el problema. Dos desenlaces, los dos limpian la lista: **cerrado y cobrado** · **cerrado y
+  perdonado**.
+- **El cargo vive en «Descuentos»**: *«en general con los proveedores de maquila hay un campo de
+  "Descuentos"… chance ahí podría vivir ese cargo»*. `DescuentoMaquilero` ya existe y **ya nace en estado
+  `capturado`** ⇒ el mecanismo de su visto bueno **ya está construido**.
+
+**(f) La facturación es OBLIGATORIA** *(fila **0.110**)*.
+> *«¿Sin segmentar permite las dos cosas? ¿Y es el default? Más bien que simplemente se marque lo que
+> aplica (con o sin factura)… **Y es un campo obligatorio de llenar. A fuerzas hay que definir si es con,
+> sin o ambas.**»*
+
+**(g) NINGUNA pantalla nueva para los pendientes** *(fila **0.111**)*.
+> *«**No quiero otra pantalla** para ver los pendientes.»* · *«Cada semana me pueda meter a algún lugar
+> donde estén todos los maquileros que tengan algo pendiente por pagar o por descontar y cada semana
+> terminar con esa lista, pagando las cuentas… **así es como pago realmente cada semana**.»*
+
+🔴 **Retira una propuesta del lead**, que iba a construir una bandeja nueva. **El estado de cuenta ya es una
+línea de tiempo unificada de los cuatro conceptos con la marca de "pendiente de revisión"**, y el tablero de
+saldos de todos los maquileros **también existe**. Lo que falta es **una columna**, no una pantalla.
+📌 **Lección:** *medir antes de **PROPONER**, no sólo antes de codear — una propuesta equivocada le cuesta a
+Daniel el trabajo de rechazarla.* **Él lo cachó antes que el lead.**
+
+**(h) ⏳ Queda pendiente de explicar, por petición suya:** el **proceso semanal de pago completo**, que
+incluye **anticipos** (hoy no existen como concepto; hay `abonos`, sin amortización contra trabajo futuro).
+Daniel: *«esa es una de las pantallas más importantes dentro del sistema. **Debe estar muy bien hecha**»*.
+
+---
+
+#### (Post-F9.183) — ⏳ PENDIENTE DE DANIEL: el pack **distingue mayúsculas** (2-sep-2026, versión **0.091**)
+
+> 📌 **No frena nada** (REGLA 0): está construido con su default y **Daniel sólo confirma o ajusta**.
+
+Al cablear la captura de packs apareció una decisión que **§Post-F9.179 no tomó**: esa sección fijó **el
+LARGO** de la etiqueta (12), **no la caja**.
+
+**Hoy `a` y `A` son DOS TENDIDOS DISTINTOS** del mismo color, porque `normalizarPack` **sólo recorta
+espacios**.
+
+**Dónde puede pasar y dónde no, medido:**
+- **Desde el PDF de C&A: NO puede.** El parser sólo emite **una letra `[A-Z]`** (`parseo-pdf-cya.ts:161`) y
+  **la vista previa no deja editarla** — las letras salen del parseo, no del teclado.
+- **Capturando a mano: SÍ.** El campo de pack acepta cualquier caja.
+- **No es invisible**: los dos tendidos salen apilados en la misma columna, a la vista.
+
+### Por qué NO se normalizó en la pantalla (y esto es lo que hay que preservar)
+1. El campo admite **12 caracteres para un rótulo** («Tendido 2»); subirlo a mayúsculas **reescribiría lo que
+   el usuario teclea mientras teclea**.
+2. ⭐ **La UI no es la única puerta**: el API y el ETL también escriben packs ⇒ normalizar ahí sería
+   **exactamente «un guardián que falla en silencio»**: parecería una invariante y no lo sería.
+3. ⭐⭐ **Y la razón de fondo, que aportó el reviewer: sería re-decidir una regla de negocio en la capa
+   equivocada (A1).** El sitio del arreglo real, si se quiere, es **`normalizarPack` en el dominio** — una
+   línea, y vale para las tres puertas.
+
+**Default propuesto: dejarlo así.** Si Daniel dice que el tendido **no** debe distinguir mayúsculas, se
+cambia en `normalizarPack` y aplica a todo.
+
+- **Aplica en:** versión **0.091**, ficha `V1-E9w`. **Fecha:** 2026-09-02.
+
+---

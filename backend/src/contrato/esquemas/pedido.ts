@@ -191,6 +191,13 @@ export type DatosPedidoCopiar = z.infer<typeof esquemaPedidoCopiarCuerpo>;
  *  • con `cancelarOrdenes: true`, se cancelan también sus OPs en la MISMA transacción — y eso
  *    exige `ordenes.cancelar` (el mismo permiso que cancelar una OP a mano), más un `motivo`, que
  *    es obligatorio para cancelar cualquier orden.
+ *
+ * ⭐⭐ **0.150 — la cascada NO es total, y a propósito.** DANIEL: *«¿Qué pasa si me cancelan un
+ * pedido, pero la OC ya está producida? **No quiero que se borren las OP en ese caso.**»* Marcar
+ * `cancelarOrdenes` cancela SÓLO las OPs sin movimientos; las que ya tienen producción, compras,
+ * tela surtida, cierres, auditorías o costo se CONSERVAN y viajan nombradas en la respuesta
+ * (`esquemaPedidoCancelarSalida`). El pedido se cancela igual: no rechazar es lo que evita el
+ * callejón sin salida en el que caía la orden CERRADA.
  */
 export const esquemaPedidoCancelarCuerpo = z.object({
   cancelarOrdenes: z
@@ -258,7 +265,12 @@ export const esquemaPedidoLineaSalida = z
       .int()
       .nullable()
       .describe(
-        'Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción.',
+        'Nº interno de producción del MODELO del renglón (R3, B4), o null. ⚠️ V1-E3 (§Post-F9.172(b)): para un renglón de modelo de DESARROLLO es null SIEMPRE, no «aún no» — el desarrollo ya NO se transforma al generar la OP; nacen modelos de producción POR COLOR y el número es de cada uno de ellos, no del renglón. Aquí sólo trae número el caso legado (el renglón ya apuntaba a un modelo de producción). Los números por color viajan aparte, en `numerosProduccion` (el mismo dato que agrega `pedidos-mes`).',
+      ),
+    numerosProduccion: z
+      .array(z.number().int())
+      .describe(
+        '⭐ Nº de producción de los MODELOS que nacieron de este renglón — uno por color/OP VIVA, sin repetir y en orden ascendente. Es el mismo dato que `pedidos-mes.numerosProduccion` (§Post-F9.172(b)), y por la misma razón: el renglón sigue apuntando a su modelo de DESARROLLO, así que `numeroProduccion` es null para siempre y sin esto el detalle del pedido no podría enseñar ningún nº de 5 dígitos. Vacío = el renglón todavía no tiene OP viva (o sus modelos no tienen número, caso del histórico `51783a`/`M-18`).',
       ),
   })
   .describe('Renglón de un pedido interno.');
@@ -310,6 +322,60 @@ export const esquemaPedidoSalida = z
 
 /** Forma de un pedido interno en la API. */
 export type PedidoSalida = z.infer<typeof esquemaPedidoSalida>;
+
+/**
+ * ⭐⭐ 0.150 — UNA OP QUE SE QUEDÓ VIVA al cancelar su pedido, **con el porqué**.
+ *
+ * DANIEL: *«¿Qué pasa si me cancelan un pedido, pero la OC ya está producida? **No quiero que se
+ * borren las OP en ese caso.**»* La cascada dejó de arrastrarlas — y como la cancelación del pedido
+ * SÍ ocurre, lo único que impide que eso sea una sorpresa silenciosa es que la respuesta las NOMBRE
+ * y diga por qué se conservaron. El `porque` viaja HECHO desde el servidor (mismo criterio que los
+ * avisos de `documento-facturacion`): que la pantalla lo redacte por su cuenta es como dos sitios
+ * acaban diciendo cosas distintas del mismo hecho.
+ */
+export const esquemaOrdenConservadaSalida = z
+  .object({
+    id: z.number().int().describe('Id de la orden que sigue viva.'),
+    folio: z.number().int().describe('Folio de la orden (con el que el usuario la busca).'),
+    porque: z
+      .string()
+      .describe('Por qué se conservó, en lenguaje de negocio ("ya tiene producción capturada…").'),
+  })
+  .describe('OP que NO se canceló al cancelar su pedido, y su razón.');
+
+/** Una OP conservada por la cascada. */
+export type OrdenConservadaSalida = z.infer<typeof esquemaOrdenConservadaSalida>;
+
+/**
+ * ⭐⭐ 0.150 — Respuesta de cancelar un pedido: el pedido + **qué pasó con sus OPs**.
+ *
+ * Antes devolvía el pedido a secas, porque la cascada era todo-o-nada. Desde que las OPs con vida
+ * se CONSERVAN, la respuesta tiene que poder decir cuáles se cancelaron y cuáles no: sin eso, el
+ * usuario marca «cancelar también sus OPs», el sistema conserva tres, y nadie se lo dice — la misma
+ * clase de mentira que V1-E4 vino a matar en esta pantalla.
+ *
+ * `aviso` es el texto YA REDACTADO (o `null` si no hay nada que advertir): nombra las OPs por folio,
+ * dice qué pasa si no se hace nada y ofrece la salida — el mismo estilo del 409 que rechaza cuando
+ * no se pidió la cascada.
+ */
+export const esquemaPedidoCancelarSalida = z
+  .object({
+    pedido: esquemaPedidoSalida.describe('El pedido ya cancelado.'),
+    foliosOrdenesCanceladas: z
+      .array(z.number().int())
+      .describe('Folios de las OPs que SÍ se cancelaron en cascada.'),
+    ordenesConservadas: z
+      .array(esquemaOrdenConservadaSalida)
+      .describe('OPs que siguen VIVAS porque ya tienen movimientos, con su razón.'),
+    aviso: z
+      .string()
+      .nullable()
+      .describe('Aviso listo para mostrar cuando quedaron OPs vivas, o null si no quedó ninguna.'),
+  })
+  .describe('Resultado de cancelar un pedido (con el desenlace de cada OP).');
+
+/** Forma de la respuesta de cancelar un pedido. */
+export type PedidoCancelarSalida = z.infer<typeof esquemaPedidoCancelarSalida>;
 
 /** Parámetros del listado de pedidos EN LA URL (querystring). */
 export const esquemaListarPedidos = z

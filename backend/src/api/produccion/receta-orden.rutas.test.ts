@@ -33,13 +33,20 @@ const obtenerRecetaOrden = vi.fn();
 const marcarRecetaRevisada = vi.fn();
 const liberarReceta = vi.fn();
 const traerDelModelo = vi.fn();
+const corregirCapturaAvio = vi.fn();
 const consultarRecetasPorLiberar = vi.fn();
+/** ⭐⭐ V1-E8z — el candado de compra: abrir (con motivo) y cerrar. */
+const abrirReceta = vi.fn();
+const cerrarReceta = vi.fn();
 
 vi.mock('../../dominio/produccion/receta-orden.js', () => ({
   obtenerRecetaOrden: (...a: unknown[]) => obtenerRecetaOrden(...a) as unknown,
   marcarRecetaRevisada: (...a: unknown[]) => marcarRecetaRevisada(...a) as unknown,
   liberarReceta: (...a: unknown[]) => liberarReceta(...a) as unknown,
   traerDelModelo: (...a: unknown[]) => traerDelModelo(...a) as unknown,
+  corregirCapturaAvio: (...a: unknown[]) => corregirCapturaAvio(...a) as unknown,
+  abrirReceta: (...a: unknown[]) => abrirReceta(...a) as unknown,
+  cerrarReceta: (...a: unknown[]) => cerrarReceta(...a) as unknown,
   agregarRenglonReceta: vi.fn(),
   editarRenglonReceta: vi.fn(),
   quitarRenglonReceta: vi.fn(),
@@ -125,6 +132,7 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
     marcarRecetaRevisada.mockResolvedValue(undefined);
     liberarReceta.mockResolvedValue(undefined);
     traerDelModelo.mockResolvedValue(undefined);
+    corregirCapturaAvio.mockResolvedValue(undefined);
     consultarRecetasPorLiberar.mockResolvedValue(undefined);
   });
 
@@ -154,7 +162,7 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
   });
 
   describe('Las MUTACIONES no se ensancharon: siguen en `desarrollo.administrar`', () => {
-    // LAS SIETE rutas de escritura del módulo, con un cuerpo que su esquema acepta.
+    // LAS DIEZ rutas de escritura del módulo, con un cuerpo que su esquema acepta.
     const mutaciones: readonly [
       nombre: string,
       metodo: 'POST' | 'PATCH' | 'DELETE',
@@ -180,6 +188,16 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
       ['editar renglón', 'PATCH', '/api/ordenes/50/receta/renglones/tela/3', { precio: 10 }],
       ['quitar renglón', 'DELETE', '/api/ordenes/50/receta/renglones/tela/3', { motivo: 'x' }],
       ['restaurar renglón', 'POST', '/api/ordenes/50/receta/renglones/tela/3/restaurar'],
+      // ⭐⭐ V1-E8h (§Post-F9.130) — el botón «Corregir». Es una ESCRITURA (apaga el
+      // `consumoPorTalla` heredado), así que pasa por la misma puerta que las demás: nadie repara
+      // la receta de una orden con permiso de sólo lectura.
+      ['corregir captura del avío', 'POST', '/api/ordenes/50/receta/renglones/avio/3/corregir'],
+      // ⭐⭐ V1-E8z (§Post-F9.160(a)) — EL CANDADO DE COMPRA. Abrir y cerrar la receta son actos del
+      // MISMO dueño que firma, así que entran por la misma puerta y **no traen permiso nuevo**
+      // (este deploy no requiere `SEED_ON_START`). El motivo es obligatorio, así que el cuerpo de
+      // «abrir» tiene que traerlo o la ruta contestaría 400 y taparía el 403 que se mide.
+      ['abrir la receta', 'POST', '/api/ordenes/50/receta/abrir', { motivo: 'el cliente cambió' }],
+      ['cerrar la receta', 'POST', '/api/ordenes/50/receta/cerrar'],
     ];
 
     for (const [nombre, metodo, url, cuerpo] of mutaciones) {
@@ -188,8 +206,8 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
       });
     }
 
-    it('son SIETE: si alguien agrega una escritura sin gate, esta cuenta lo delata', () => {
-      expect(mutaciones).toHaveLength(7);
+    it('son DIEZ: si alguien agrega una escritura sin gate, esta cuenta lo delata', () => {
+      expect(mutaciones).toHaveLength(10);
     });
 
     it('…y con `desarrollo.administrar` la puerta se abre (la gemela positiva)', async () => {
@@ -197,6 +215,71 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
         await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/revisar'),
       ).not.toBe(403);
       expect(marcarRecetaRevisada).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * ⭐⭐ V1-E8h (§Post-F9.130) — la gemela positiva del botón «Corregir», y **con los argumentos**.
+     * La ruta lleva el tipo FIJO (`/avio/`) en vez de un `:tipo`, así que lo que puede torcerse es
+     * que el handler mande el id equivocado: se afirma la pareja (orden, renglón) tal cual viaja.
+     */
+    it('⭐ «corregir» llama al dominio con la orden y el renglón de la URL', async () => {
+      expect(
+        await codigo(
+          con('desarrollo.administrar'),
+          'POST',
+          '/api/ordenes/50/receta/renglones/avio/3/corregir',
+        ),
+      ).not.toBe(403);
+      expect(corregirCapturaAvio).toHaveBeenCalledTimes(1);
+      expect(corregirCapturaAvio.mock.calls[0]?.slice(1)).toEqual([50, 3]);
+    });
+  });
+
+  /**
+   * ⭐⭐ V1-E8z — LAS GEMELAS POSITIVAS DEL CANDADO, **con los argumentos**. Lo que puede torcerse
+   * aquí no es el permiso (ya lo cubre la tabla de arriba) sino que el handler mande la orden o el
+   * motivo equivocados: si «abrir» perdiera el `motivo` por el camino, el candado se pondría sin
+   * decir por qué y el 409 del comprador quedaría mudo.
+   */
+  describe('POST /ordenes/:id/receta/abrir | /cerrar — el candado (V1-E8z)', () => {
+    it('«abrir» llama al dominio con la orden de la URL y el MOTIVO del cuerpo', async () => {
+      expect(
+        await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/abrir', {
+          motivo: 'el cliente cambió el cierre',
+        }),
+      ).not.toBe(403);
+      expect(abrirReceta).toHaveBeenCalledTimes(1);
+      expect(abrirReceta.mock.calls[0]?.slice(1)).toEqual([
+        50,
+        { motivo: 'el cliente cambió el cierre' },
+      ]);
+    });
+
+    /**
+     * ⚠️ Lo que se afirma es que **el dominio NI SE TOCA** sin motivo, no el código HTTP: este
+     * Fastify va pelado, sin el `errorHandler` de la app, así que el fallo de esquema sale como 500
+     * en vez del 400 real. El código lo fija el contrato (`esquemaAbrirRecetaCuerpo`, probado en
+     * `contrato/esquemas/receta-orden.test.ts`); aquí lo que importa es que la validación corre
+     * ANTES del handler y el candado no se pone sin razón escrita.
+     */
+    it('«abrir» SIN motivo no llega al dominio: el contrato lo corta antes', async () => {
+      expect(
+        await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/abrir', {}),
+      ).not.toBe(200);
+      expect(
+        await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/abrir', {
+          motivo: '   ',
+        }),
+      ).not.toBe(200);
+      expect(abrirReceta).not.toHaveBeenCalled();
+    });
+
+    it('«cerrar» llama al dominio con la orden de la URL, y sin cuerpo', async () => {
+      expect(
+        await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/cerrar'),
+      ).not.toBe(403);
+      expect(cerrarReceta).toHaveBeenCalledTimes(1);
+      expect(cerrarReceta.mock.calls[0]?.slice(1)).toEqual([50]);
     });
   });
 

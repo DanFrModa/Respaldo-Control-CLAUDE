@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { esquemaFrenteAlGrupo } from './hermanas-op.js';
 import { esquemaEstadoOrden } from './orden.js';
 
 /**
@@ -80,6 +81,17 @@ export const esquemaOrdenCentroFila = z
       .describe(
         'Requisitos que le faltan a la orden para estar COMPLETA (vacío si ya lo está o si está cancelada). Transparencia del estado: la UI lo muestra como "Falta: …".',
       ),
+    /*
+     * ⭐⭐ fila 0.068 (a) — **EL AVISO EN LA FAMILIA.** Daniel pidió que la diferencia se vea *"en la
+     * orden, y en la familia"*; ésta es la mitad de la familia: el Centro es la única pantalla que
+     * enseña juntas todas las OP de un modelo, así que es donde se reconoce a la que se salió del
+     * grupo sin abrirlas una por una.
+     *
+     * Lo AGREGA EL SERVIDOR por lote de la página (jamás un `await` por fila, ni un pivote en el
+     * cliente — misma regla que Σ cortado y la OC de tela) y es exactamente el MISMO objeto que
+     * publica la receta de la OP: una sola definición para las dos pantallas.
+     */
+    frenteAlGrupo: esquemaFrenteAlGrupo,
   })
   .describe(
     'Fila del centro de comando de órdenes (13 columnas del proto, agregadas en servidor).',

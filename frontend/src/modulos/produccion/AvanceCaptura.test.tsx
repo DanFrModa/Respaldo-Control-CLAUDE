@@ -18,7 +18,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 
 const useOrden = vi.fn<() => unknown>();
 const useWipOrden = vi.fn<() => unknown>();
-const useProveedores = vi.fn<() => unknown>();
+const useProveedores = vi.fn<(...a: unknown[]) => unknown>();
 const navegar = vi.fn();
 
 vi.mock('@/api/ordenes', () => ({ useOrden: () => useOrden() }));
@@ -26,9 +26,17 @@ vi.mock('@/api/wip', () => ({ CLAVE_WIP: ['wip'], useWipOrden: () => useWipOrden
 // Los mocks incluyen `isError`/`refetch` porque el panel ofrece un AVISO REINTENTABLE de catálogos
 // (V1-E3a): sin `refetch` el botón "Reintentar" tronaría.
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => useProveedores(),
+  // ⚠️ Los argumentos se PASAN (misma lección que `useSugerenciaCaptura`, H2 del reviewer): la
+  // pantalla acota el catálogo por el ROL de la etapa, y con `() => useProveedores()` ese filtro
+  // quedaba invisible para los tests — se podía pedir el rol equivocado y todo seguía en verde.
+  useProveedores: (...a: unknown[]) => useProveedores(...a),
   useRolesProveedor: () => ({
-    data: [{ id: 9, codigo: 'maquila-costura', nombre: 'Costura' }],
+    data: [
+      { id: 9, codigo: 'maquila-costura', nombre: 'Costura' },
+      { id: 10, codigo: 'corte', nombre: 'Corte' },
+      // 0.114: el rol del EMPACADOR (lo siembra `ROLES_PROVEEDOR_BASE`).
+      { id: 11, codigo: 'empaque', nombre: 'Empaque' },
+    ],
     isError: false,
     refetch: vi.fn(),
   }),
@@ -58,16 +66,28 @@ vi.mock('@/api/tipos-proceso', () => ({
     refetch: vi.fn(),
   }),
 }));
+const crearCorte = vi.fn();
+/** 0.114: el EMPAQUE (servicio sobre la orden, hermano del corte). */
+const crearEmpaque = vi.fn();
+const cancelarEmpaque = vi.fn();
 const crearEnvio = vi.fn();
 const crearRecibo = vi.fn();
 const cancelarEnvio = vi.fn();
 const useEtapasOrden = vi.fn<() => unknown>();
+/** V1-E8i: qué propone el servidor para precargar la matriz (los botones de un clic). */
+const useSugerenciaCaptura = vi.fn<(...a: unknown[]) => unknown>();
 vi.mock('@/api/etapas', () => ({
   CLAVE_ETAPAS: ['etapas'],
   useEtapasOrden: () => useEtapasOrden(),
-  useCrearCorte: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⚠️ H2 del reviewer: los argumentos se PASAN. Con `() => useSugerenciaCaptura()` el mock los
+  // descartaba y mutar el proceso a uno inexistente pasaba las 75 pruebas en verde — ni este lado
+  // ni el servidor verificaban a QUÉ PROCESO se le pregunta.
+  useSugerenciaCaptura: (...a: unknown[]) => useSugerenciaCaptura(...a),
+  useCrearCorte: () => ({ mutate: crearCorte, isPending: false }),
+  useCrearEmpaque: () => ({ mutate: crearEmpaque, isPending: false }),
   useCrearEnvio: () => ({ mutate: crearEnvio, isPending: false }),
   useCancelarCorte: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelarEmpaque: () => ({ mutate: cancelarEmpaque, isPending: false }),
   useCancelarEnvio: () => ({ mutate: cancelarEnvio, isPending: false }),
   urlImpresoEnvio: (id: number) => `/api/produccion/envios/${id}/impreso`,
   urlFichaEstampado: (id: number) => `/api/produccion/envios/${id}/ficha-estampado`,
@@ -90,6 +110,20 @@ vi.mock('@/api/entregas-cliente', () => ({
   urlComprobanteEntrega: (id: number) => `/api/produccion/entregas-cliente/${id}/comprobante`,
 }));
 vi.mock('@/api/ordenes-centro', () => ({ CLAVE_ORDENES_CENTRO: ['centro'] }));
+/**
+ * ⭐ V1 (fila 0.109) — CERRAR LA ORDEN CON UN MAQUILERO. Se simula igual que el resto de la capa de
+ * datos: sin red. `useCierresMaquila` arranca vacío (ninguna orden cerrada) y las pruebas del bloque
+ * de cierre lo sobreescriben cuando necesitan uno.
+ */
+const cerrarOrden = vi.fn();
+const deshacerCierre = vi.fn();
+const useCierresMaquila = vi.fn<() => unknown>();
+vi.mock('@/api/cierre-maquila', () => ({
+  CLAVE_CIERRES_MAQUILA: ['cierres-maquila'],
+  useCierresMaquila: () => useCierresMaquila(),
+  useCerrarOrdenMaquila: () => ({ mutate: cerrarOrden, isPending: false }),
+  useDeshacerCierreMaquila: () => ({ mutate: deshacerCierre, isPending: false }),
+}));
 vi.mock('react-router-dom', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useNavigate: () => navegar,
@@ -100,6 +134,8 @@ const { AvanceProduccion } = await import('./AvanceProduccion');
 const PERMISOS = [
   'produccion.wip-ver',
   'produccion.corte',
+  // 0.114: el empaque tiene permiso propio (es otro acto, otro proveedor y otro servicio).
+  'produccion.empaque',
   'produccion.envio',
   'produccion.recibo',
   // V1-E3a: la entrega a cliente es una etapa más del panel, gateada por su permiso de siempre (A4).
@@ -122,8 +158,10 @@ function orden(idMaquilero: number | null, maquilero: string | null): Orden {
     maquilero,
     lineas: [
       {
+        // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10): es el caso de siempre.
         idColor: 7,
         color: 'Rojo',
+        pack: '',
         tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
       },
     ],
@@ -139,10 +177,17 @@ function wip(
     maquilero: string;
     pendiente: number;
     /** Celdas explícitas; por default, una sola celda con el pendiente. */
-    celdas?: { cantidad: number }[];
+    celdas?: { cantidad: number; incompletas?: number }[];
+    /** V1 (fila 0.109): lo SALDABLE que publica el servidor. Default: el pendiente si es positivo. */
+    saldables?: number;
+    /** Precio pactado e importe propuesto, ya derivados y redactados por el servidor. */
+    precio?: number;
+    importe?: number;
   }[],
 ): WipOrden {
-  const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+  // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). Toda celda del WIP lo trae
+  // desde que el pack es campo propio; vacío es el caso de siempre y la pantalla lo ignora.
+  const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '' };
   return {
     idOrden: 1,
     folio: 5424,
@@ -155,13 +200,24 @@ function wip(
     cortado: 10,
     enviado: 10,
     recibido: 0,
+    incompletas: 0,
+    faltantesSaldados: 0,
+    pendientePorRecibir: 10,
+    // Lo publica el SERVIDOR desde V1-E8v (antes la pantalla lo despejaba del pendiente, que era la
+    // NOVENA puerta): 10 enviadas al proceso de costura.
+    enviadoCostura: 10,
     recibidoCostura: 0,
+    // 0.114: Σ empacado de la orden (etapas de empaque vivas). Nada empacado todavía.
+    empacado: 0,
     entregado: 0,
     porEntregar: 0,
     // `porCortar` trae SIEMPRE todas las celdas de la orden, ceros incluidos: el servidor lo arma
     // sobre pedido ∪ cortado sin filtrarlos (`wip.ts`). Con las 10 ya cortadas, el pendiente de
     // corte es 0 — el fixture tenía `[]`, que en el servidor solo pasa con una orden SIN celdas.
     porCortar: [{ ...celda, cantidad: 0 }],
+    // `cortadoCeldas` = Σ corte por celda, tal como lo manda el servidor (V1-E8i): es la base del
+    // disponible a enviar cuando el proceso todavía no tiene envíos.
+    cortadoCeldas: [{ ...celda, cantidad: 10 }],
     cortadoPorEnviar: [],
     porRecibir: [
       {
@@ -169,6 +225,14 @@ function wip(
         tipoProceso: 'Costura',
         codigoProceso: 'costura',
         generaEntradaPt: true,
+        // El envío base NO es de prenda ya terminada (V1-E4b): no sale de PT ni vuelve del tránsito.
+        devuelveAPt: false,
+        stockSinOrden: false,
+        // ⚠️ Las celdas del PROCESO llevan sólo `cantidad` (esquema `esquemaWipCelda`); las
+        // `incompletas` viajan únicamente en el desglose POR MAQUILERO (`esquemaWipCeldaPorRecibir`),
+        // que es donde la pantalla las usa. Este fixture ponía `incompletas` aquí también —una
+        // respuesta que el servidor NO produce— y el `as unknown as` lo tapaba (hallazgo del
+        // reviewer). Ahora el objeto se valida con `satisfies`, así que la forma no puede mentir.
         celdas: [{ ...celda, cantidad: 10 }],
         totalPendiente: 10,
         porMaquilero: porMaquilero.map((m) => ({
@@ -177,13 +241,23 @@ function wip(
           celdas: (m.celdas ?? [{ cantidad: m.pendiente }]).map((c) => ({
             ...celda,
             cantidad: c.cantidad,
+            incompletas: c.incompletas ?? 0,
           })),
           totalPendiente: m.pendiente,
+          totalIncompletas: (m.celdas ?? []).reduce((t, c) => t + (c.incompletas ?? 0), 0),
+          // ⭐ V1 (fila 0.109). `faltantesSaldables` NO se deriva de `pendiente` a propósito: es un
+          // número que manda el SERVIDOR (Σ del pendiente POSITIVO por color×talla) y que puede
+          // diferir de la suma plana cuando hay celdas negativas. El fixture deja ponerlo aparte
+          // justo para poder probar ese caso; por default coincide con lo que se le debe.
+          faltantesSaldados: 0,
+          faltantesSaldables: m.saldables ?? Math.max(0, m.pendiente),
+          precioFaltante: m.precio ?? null,
+          importeFaltantePropuesto: m.importe ?? null,
         })),
       },
     ],
     entregadoCeldas: [],
-  } as unknown as WipOrden;
+  } satisfies WipOrden;
 }
 
 function pintar(props: { etapaInicial?: string } = {}): void {
@@ -193,7 +267,7 @@ function pintar(props: { etapaInicial?: string } = {}): void {
       alCerrar={vi.fn()}
       {...(props.etapaInicial === undefined
         ? {}
-        : { etapaInicial: props.etapaInicial as 'corte' | 'recibo-aplicacion' })}
+        : { etapaInicial: props.etapaInicial as 'corte' | 'empaque' | 'recibo-aplicacion' })}
     />,
     { sesion: estadoSesionDePrueba([...PERMISOS]) },
   );
@@ -209,7 +283,11 @@ async function abrirCaptura(
 }
 
 beforeEach(() => {
+  useCierresMaquila.mockReturnValue({ data: { idOrden: 1, folioOrden: 5424, filas: [] } });
   navegar.mockReset();
+  crearCorte.mockReset();
+  crearEmpaque.mockReset();
+  cancelarEmpaque.mockReset();
   crearEnvio.mockReset();
   crearRecibo.mockReset();
   // La cancelación responde OK por default (el panel reacciona en `onSuccess`).
@@ -219,6 +297,22 @@ beforeEach(() => {
   );
   crearEntrega.mockReset();
   useEtapasOrden.mockReturnValue({ data: { etapas: [] }, isPending: false });
+  // Default: no hay nada que precargar (los tests que lo prueban lo re-mockean con su caso), y el
+  // motivo CUADRA con las celdas — H5 del reviewer: el default anterior decía `motivo: 'hay'` con
+  // `celdas: []`, una forma que el servidor nunca emite.
+  useSugerenciaCaptura.mockReturnValue({
+    data: {
+      idOrden: 1,
+      base: 'corte',
+      idTipoProceso: null,
+      celdas: [],
+      total: 0,
+      motivo: 'todo-cortado',
+    },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
   useEntregasOrden.mockReturnValue({ data: { entregas: [] }, isPending: false });
   useSeguimientoEntrega.mockReturnValue({ data: undefined, isPending: false });
   useOrden.mockReturnValue({
@@ -356,6 +450,41 @@ describe('Captura del avance · recibo de maquila', () => {
     });
   });
 
+  it('el SELECTOR no ofrece al maquilero que ya entregó todo en incompletas', async () => {
+    // LA CUARTA PUERTA (hallazgo del reviewer): una pantalla ANTES de la matriz. Con 10 enviadas y
+    // 8 buenas + 2 incompletas, el maquilero ya entregó las 10 y su pendiente es 0 (V1-E8v,
+    // §Post-F9.147): no hay que ofrecérselo ni anunciarle piezas «por recibirle».
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 0,
+          celdas: [{ cantidad: 0, incompletas: 2 }],
+        },
+        {
+          idMaquilero: 88,
+          maquilero: 'Otra Maquila',
+          pendiente: 4,
+          celdas: [{ cantidad: 4, incompletas: 0 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+
+    // Al que ya entregó todo (0 pendientes) NO se le ofrece…
+    expect(await screen.findByText('Otra Maquila')).toBeInTheDocument();
+    expect(screen.queryByText('Maquila del Norte')).not.toBeInTheDocument();
+    // …y sobre todo: NO se anuncia «2 pza(s) por recibirle», que era la mentira.
+    expect(screen.queryByText('2 pza(s) por recibirle')).not.toBeInTheDocument();
+    // El que sí tiene pendiente se anuncia con su número real.
+    expect(screen.getByText('4 pza(s) por recibirle')).toBeInTheDocument();
+  });
+
   it('el maquilero que ya devolvió todo no se ofrece (no hay qué recibirle)', async () => {
     useWipOrden.mockReturnValue({
       data: wip([
@@ -445,6 +574,173 @@ describe('Captura del avance · SEGUNDAS del recibo (migradas de /produccion/rec
     expect(screen.queryByTestId('avance-toggle-segundas')).not.toBeInTheDocument();
     await abrirCaptura(usuario, 'entrega-maquila');
     expect(screen.queryByTestId('avance-toggle-segundas')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * V1-E8k (§Post-F9.136) — PRENDAS INCOMPLETAS. *"Aunque son prendas inservibles, necesito que me las
+ * entreguen (eso no se va a ningún inventario… tampoco se pagan)."* Lo que estas pruebas cuidan es
+ * que la captura las mande en su PROPIO campo: si acabaran dentro de `cantidad`, se pagarían y se
+ * inventariarían — exactamente lo contrario de lo pedido.
+ */
+describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
+  it('⭐ manda las incompletas en su propio campo, FUERA de la cantidad recibida', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '2');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearRecibo).toHaveBeenCalledTimes(1);
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      lineas: { tallas: Record<string, unknown>[] }[];
+    };
+    // 4 recibidas + 2 incompletas: la cantidad NO se infla a 6.
+    expect(cuerpo.lineas[0]?.tallas[0]).toEqual({
+      idTalla: 11,
+      cantidad: 4,
+      cantidadIncompletas: 2,
+    });
+  });
+
+  it('deja guardar un recibo que es SOLO de incompletas, y sin exigir almacén', async () => {
+    // El caso de Daniel: el maquilero llega únicamente con las que no pudo coser. Nada entra a
+    // inventario, así que el almacén no se pide (el servidor tampoco lo exige).
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '3');
+
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      idAlmacenPrimeras?: number;
+      lineas: { tallas: Record<string, unknown>[] }[];
+    };
+    expect(cuerpo.idAlmacenPrimeras).toBeUndefined();
+    expect(cuerpo.lineas[0]?.tallas[0]).toEqual({
+      idTalla: 11,
+      cantidad: 0,
+      cantidadIncompletas: 3,
+    });
+  });
+
+  it('el tope de la matriz cuenta las incompletas: 4 + 3 sobre 6 pendientes se bloquea', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '3');
+
+    // 4 + 3 = 7 piezas físicas sobre 6 pendientes ⇒ el servidor lo rechazaría bajo lock; la
+    // pantalla lo para antes para no mandar al usuario a comerse un 400 con la matriz tecleada.
+    expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    expect(crearRecibo).not.toHaveBeenCalled();
+  });
+
+  it('el tope NO se cierra de más: 4 + 2 sobre 6 pendientes (el límite exacto) SÍ se guarda', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '2');
+
+    // Justo en el límite (4 + 2 = 6). Un tope "cerrado de más" lo rechazaría.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
+  it('el toggle NO existe en el corte ni en el envío', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
+    await abrirCaptura(usuario, 'entrega-maquila');
+    expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
+  });
+
+  it('EXPLICA por qué el pendiente bajó cuando el maquilero YA entregó incompletas', async () => {
+    // El pendiente YA descuenta las incompletas (V1-E8v): de 6 enviadas al 77, 2 volvieron
+    // incompletas ⇒ pendiente 4. Sin esta línea, ese 4 parecería un error de cuentas contra las 6
+    // que el usuario recuerda haber mandado.
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 4,
+          celdas: [{ cantidad: 4, incompletas: 2 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+
+    const aviso = screen.getByTestId('avance-aviso-incompletas-previas');
+    // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena, y '2 prenda(s)…' casa dentro de
+    // '22 prenda(s)…'. `\b` es lo único que distingue 2 de 22 (verificado por mutación).
+    expect(aviso).toHaveTextContent(/\b2 prenda\(s\) incompleta\(s\)/);
+    expect(aviso).toHaveTextContent('salieron de su taller');
+    expect(aviso).toHaveTextContent('se pierden');
+
+    // Y el tope es 4 (el pendiente, ya sin las incompletas): 5 buenas ya excede.
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '5');
+    expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('la matriz del RECIBO nombra su tope en el idioma del recibo', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('que se le puede recibir');
+    expect(screen.getByTestId('avance-matriz')).not.toHaveTextContent('pendiente de la etapa');
+  });
+
+  it('en el CORTE el rótulo sigue siendo el pendiente (ahí sí lo es)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('pendiente de la etapa');
+  });
+
+  it('sin incompletas previas NO aparece esa explicación', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.queryByTestId('avance-aviso-incompletas-previas')).not.toBeInTheDocument();
   });
 });
 
@@ -729,7 +1025,9 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
       isPending: false,
       data: {
         ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 6 }]),
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 4 },
+        ],
       },
     });
     const usuario = userEvent.setup();
@@ -761,7 +1059,16 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
             tipoProceso: 'Costura',
             codigoProceso: 'costura',
             generaEntradaPt: true,
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 10,
+              },
+            ],
             totalPendiente: 10,
           },
         ],
@@ -791,7 +1098,13 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         cortado: 0,
         enviado: 0,
         // `porCortar` trae TODAS las celdas de la orden (el servidor no filtra los ceros ahí).
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
+        // Nada cortado: el servidor manda la celda en CERO (no la omite). Cero es un tope real.
+        cortadoCeldas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 0 },
+        ],
         cortadoPorEnviar: [],
       },
     });
@@ -816,7 +1129,12 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         ...wip([]),
         cortado: 10,
         enviado: 0,
-        porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 }],
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 0 },
+        ],
+        cortadoCeldas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
         cortadoPorEnviar: [],
       },
     });
@@ -839,7 +1157,8 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     );
     const usuario = userEvent.setup();
     // Sesión SIN el permiso de ver el precio real, pero CON el de enviar: es el caso del seed, donde
-    // `ordenes.ver-precio-real-maquila` se corta de Logística hacia abajo y `produccion.envio` no.
+    // `ordenes.ver-precio-real-maquila` llega hasta Ventas y `produccion.envio` lo lleva todo perfil
+    // menos `Basico` (o sea: Logística, Asistente y Secretarial capturan sin poder ver el precio).
     // Si el campo se escondiera, estos roles capturarían la maquila diaria sin precio y el cargo
     // EsMa nacería sin precio (`esma/cargos.ts` cae al `precioPactado` del recibo).
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
@@ -872,6 +1191,192 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     await usuario.type(screen.getByTestId('avance-matriz-celda'), '2');
     await usuario.click(screen.getByTestId('avance-guardar'));
     expect(crearRecibo.mock.calls[0]?.[0]).toMatchObject({ precioPactado: 3 });
+  });
+});
+
+describe('⭐ Captura del avance · CORTE Y EMPAQUE, servicios sobre la orden (0.114)', () => {
+  it('el CORTE manda su PRECIO por prenda (de ahí nace el cargo del cortador)', async () => {
+    // Daniel: *«sólo hay que poner su cantidad y precio para meterlo en la OP, pero no va y viene»*.
+    // Antes el bloque de precio se escondía en el corte porque el corte no generaba cargo.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // Y NO ofrece fecha compromiso: no hay a quién esperarle (no va y viene).
+    expect(screen.queryByTestId('avance-fecha-compromiso')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-precio'), '3.5');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '10');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearCorte.mock.calls[0]?.[0]).toMatchObject({ idCortador: 99, precioPactado: 3.5 });
+  });
+
+  it('el precio del CORTE se captura SIN `ordenes.ver-precio-real-maquila` (igual que el envío)', async () => {
+    // MISMA regla que ya fijaba el envío: ese permiso gobierna la LECTURA (el backend redacta el
+    // campo al devolverlo), no la escritura. Esconderlo dejaría sin precio justo a los perfiles que
+    // capturan la producción diaria, y el cargo del cortador nacería sin precio.
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.corte']),
+    });
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.getByTestId('avance-precio')).toBeInTheDocument();
+  });
+
+  it('el EMPAQUE es su propia etapa y manda `idEmpacador` + precio, sin proceso', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+
+    // No pide tipo de proceso: el empaque NO es maquila (esa es su marca).
+    expect(screen.queryByTestId('avance-tipo')).not.toBeInTheDocument();
+    // Ni almacén: no toca inventario.
+    expect(screen.queryByTestId('avance-almacen-primeras')).not.toBeInTheDocument();
+    // Ni fecha compromiso: no va y viene.
+    expect(screen.queryByTestId('avance-fecha-compromiso')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-precio'), '1.25');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearEnvio).not.toHaveBeenCalled();
+    expect(crearCorte).not.toHaveBeenCalled();
+    const cuerpo = crearEmpaque.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo).toMatchObject({ idOrden: 1, idEmpacador: 99, precioPactado: 1.25 });
+    expect(cuerpo).not.toHaveProperty('idTipoProceso');
+    expect(cuerpo).not.toHaveProperty('fechaCompromiso');
+  });
+
+  it('el selector del EMPAQUE busca proveedores con rol `empaque` (no cortadores ni maquileros)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    // El mock de roles mapea código→id (`empaque` = 11): lo que importa es que se pida ESE rol.
+    // Sin este candado, la captura podría ofrecer cortadores y el servidor rechazaría al guardar.
+    await waitFor(() => {
+      expect(useProveedores).toHaveBeenCalledWith(
+        expect.objectContaining({ rol: 11 }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('el selector del CORTE sigue pidiendo el rol `corte` (no se lo llevó el empaque)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    await waitFor(() => {
+      expect(useProveedores).toHaveBeenCalledWith(
+        expect.objectContaining({ rol: 10 }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('⭐ empacar MÁS de lo recibido AVISA pero NO bloquea (la cantidad es propia, regla C&A)', async () => {
+    // El caso de Daniel al revés y al derecho: se fabrican 1,000 y se empacan 990 —eso es normal—;
+    // y si alguien empaca de más, el servidor lo acepta igual. La pantalla sólo pone el número.
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]),
+        recibidoCostura: 10,
+        empacado: 4,
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    // 4 ya empacadas + 9 = 13 sobre 10 recibidas ⇒ excede en 3.
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+
+    const aviso = screen.getByTestId('avance-aviso-empaque-excede');
+    expect(aviso).toHaveTextContent('3 pieza(s)');
+    expect(aviso).toHaveTextContent('Se permite');
+    // NO es el aviso destructivo del sobre-envío, y el botón sigue vivo.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
+  it('empacar DENTRO de lo recibido no dice nada (el caso normal no se marca)', async () => {
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0 }]),
+        recibidoCostura: 10,
+        empacado: 0,
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'empaque');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '9');
+    expect(screen.queryByTestId('avance-aviso-empaque-excede')).not.toBeInTheDocument();
+  });
+
+  it('sin `produccion.empaque` la etapa se VE pero no ofrece capturar (A4)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.corte']),
+    });
+    await usuario.click(screen.getByTestId('avance-stepper-empaque'));
+    expect(screen.queryByTestId('avance-abrir-captura')).not.toBeInTheDocument();
+  });
+
+  it('el permiso del CORTE no abre el empaque, ni al revés', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.empaque']),
+    });
+    // Con SÓLO `produccion.empaque`: el empaque sí, el corte no.
+    await usuario.click(screen.getByTestId('avance-stepper-empaque'));
+    expect(screen.getByTestId('avance-abrir-captura')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('avance-stepper-corte'));
+    expect(screen.queryByTestId('avance-abrir-captura')).not.toBeInTheDocument();
+  });
+
+  it('el historial pinta el EMPAQUE en su etapa y lo deja cancelar', async () => {
+    useEtapasOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        etapas: [
+          {
+            id: 31,
+            folio: 12,
+            tipo: 'empaque',
+            idTipoProceso: null,
+            tipoProceso: null,
+            idTercero: 99,
+            tercero: 'Maquila del Sur',
+            fecha: '2026-09-04',
+            cancelado: false,
+            lineas: [],
+            totalPiezas: 9,
+            creadoPorNombre: 'Usuario de Prueba',
+            creadoEn: '2026-09-04T10:00:00.000Z',
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar({ etapaInicial: 'empaque' });
+    expect(await screen.findByText('Maquila del Sur')).toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('avance-cancelar-movimiento'));
+    await usuario.type(screen.getByTestId('avance-motivo-cancelar'), 'Se recontó');
+    await usuario.click(screen.getByTestId('avance-confirmar-cancelar'));
+    // Va al endpoint del EMPAQUE, no al del corte ni al del envío.
+    expect(cancelarEmpaque).toHaveBeenCalledWith(
+      { id: 31, cuerpo: { motivo: 'Se recontó' } },
+      expect.anything(),
+    );
   });
 });
 
@@ -1146,10 +1651,11 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             devuelveAPt: false,
             celdas: [],
             totalPendiente: 4,
+            stockSinOrden: false,
             porMaquilero: [],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1176,21 +1682,45 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             codigoProceso: 'estampado',
             generaEntradaPt: false,
             devuelveAPt: true,
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            stockSinOrden: false,
+            // Celdas del PROCESO: sólo `cantidad` (las incompletas viajan por maquilero, V1-E8v).
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 4,
+              },
+            ],
             totalPendiente: 4,
             porMaquilero: [
               {
                 idMaquilero: 77,
                 maquilero: 'Maquila del Norte',
                 celdas: [
-                  { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 },
+                  {
+                    idColor: 7,
+                    color: 'Rojo',
+                    idTalla: 11,
+                    etiquetaTalla: 'CH',
+                    pack: '',
+                    cantidad: 4,
+                    incompletas: 0,
+                  },
                 ],
                 totalPendiente: 4,
+                totalIncompletas: 0,
+                faltantesSaldados: 0,
+                faltantesSaldables: 4,
+                precioFaltante: null,
+                importeFaltantePropuesto: null,
               },
             ],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1296,7 +1826,7 @@ describe('Captura del avance · tránsito y bucket de existencia (V1-E4b, H5/H1)
             porMaquilero: [],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1307,5 +1837,1007 @@ describe('Captura del avance · tránsito y bucket de existencia (V1-E4b, H5/H1)
     const bucket = screen.getByTestId('avance-bucket-stock');
     expect(bucket).toHaveValue('sin-orden');
     expect(bucket).toBeDisabled();
+  });
+});
+
+/**
+ * V1-E8i (§Post-F9.131) — los DOS botones de un clic que pidió Daniel: «Llenar con lo que falta por
+ * cortar» (corte) y «Llenar con lo que se cortó» (envío a maquila). Lo que estas pruebas defienden:
+ *   • PRECARGAN, NO GUARDAN (el usuario revisa y ajusta antes de dar Guardar);
+ *   • PISAN lo ya capturado (no suman: un segundo clic no puede duplicar cantidades);
+ *   • el número lo pone el SERVIDOR — el del envío es lo cortado MENOS lo ya enviado a ese proceso,
+ *     así que un segundo envío parcial no propone un sobre-envío que el servidor rechazaría;
+ *   • cuando no hay nada que precargar, el botón se ve APAGADO y con la razón al lado (nunca mudo).
+ */
+describe('Captura del avance · los botones de precarga de un clic (V1-E8i)', () => {
+  /** Respuesta del servidor para la celda única del fixture (Rojo × CH). */
+  function sugerencia(cantidad: number, motivo = 'hay', base = 'corte'): unknown {
+    const celdas =
+      cantidad > 0
+        ? [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad }]
+        : [];
+    return {
+      data: {
+        idOrden: 1,
+        base,
+        idTipoProceso: base === 'corte' ? null : 5,
+        celdas,
+        total: cantidad,
+        motivo,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  }
+
+  it('CORTE: llena la talla con lo que falta por cortar, lo dice en el botón y NO guarda', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(10));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    const boton = screen.getByTestId('avance-precargar');
+    expect(boton).toHaveTextContent('Llenar con lo que falta por cortar (10 pza)');
+    await usuario.click(boton);
+
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+    // ⚠️ Precarga, NO guarda: el atajo llena los campos y ahí se detiene.
+    expect(crearCorte).not.toHaveBeenCalled();
+  });
+
+  it('PISA lo que ya estaba capturado (no suma: un segundo clic no duplica)', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(10));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '3');
+
+    await usuario.click(screen.getByTestId('avance-precargar'));
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+    // Y otro clic deja lo mismo (sumar habría dado 20 en silencio y sin vuelta atrás).
+    await usuario.click(screen.getByTestId('avance-precargar'));
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+  });
+
+  it('ENVÍO tras un envío PARCIAL: propone el RESTO, no el bruto cortado (no sería enviable)', async () => {
+    // El caso trampa: 10 cortadas, 6 ya enviadas → el botón debe poner 4. Poner 10 daría un
+    // sobre-envío que el servidor rechaza bajo lock (decisión (g)), y el usuario se comería el 400.
+    useSugerenciaCaptura.mockReturnValue(sugerencia(4, 'hay', 'envio'));
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([]),
+        cortadoPorEnviar: [
+          {
+            idTipoProceso: 5,
+            tipoProceso: 'Costura',
+            codigoProceso: 'costura',
+            generaEntradaPt: true,
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                pack: '',
+                cantidad: 4,
+              },
+            ],
+            totalPendiente: 4,
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    const boton = screen.getByTestId('avance-precargar');
+    expect(boton).toHaveTextContent('Llenar con lo que se cortó (4 pza)');
+    await usuario.click(boton);
+
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(4);
+    // Y con el resto exacto no salta el aviso de sobre-envío ni se bloquea el guardado.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(crearEnvio).not.toHaveBeenCalled();
+  });
+
+  it('sin nada que precargar el botón queda APAGADO y con la razón al lado (nunca mudo)', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(0, 'todo-enviado', 'envio'));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Todo lo cortado ya se le envió a este proceso',
+    );
+    // El lugar para llenar SIGUE ahí: el aviso explica, no reemplaza a la matriz.
+    expect(screen.getByTestId('avance-matriz')).toBeInTheDocument();
+  });
+
+  it('con la orden ya cortada, el botón del CORTE explica que no queda nada que copiar', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(0, 'todo-cortado'));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Ya está cortado todo lo que pide la orden',
+    );
+  });
+
+  it('si la consulta falla lo dice y ofrece Reintentar (se puede seguir capturando a mano)', async () => {
+    const refetch = vi.fn();
+    useSugerenciaCaptura.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Captura las cantidades a mano',
+    );
+    await usuario.click(screen.getByTestId('avance-precarga-reintentar'));
+    expect(refetch).toHaveBeenCalled();
+    // La matriz sigue tecleable pese al fallo del atajo.
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '7');
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(7);
+  });
+
+  it('el RECIBO no ofrece precarga (su pendiente es por maquilero, no por proceso)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    expect(screen.queryByTestId('avance-precarga')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ronda de corrección de V1-E8i — los tres huecos que encontró el reviewer y que las pruebas de la
+ * primera ronda dejaban pasar en verde:
+ *   • **H2** — el mock descartaba los argumentos, así que nadie comprobaba **a qué proceso** se le
+ *     pregunta (mutar el id a uno inexistente pasaba 75/75);
+ *   • **H3** — con prendas YA TERMINADAS el servidor exige además que el almacén las tenga, y la
+ *     sugerencia sólo conoce el tope de lo cortado: el atajo se apaga con su razón;
+ *   • **H4** — «las celdas no propuestas quedan VACÍAS» estaba documentado tres veces y probado por
+ *     nadie: con un fixture de UNA celda, mezclar en vez de pisar pasaba limpio.
+ */
+describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)', () => {
+  /** Orden de DOS tallas (CH y M) del mismo color: hace falta para poder probar H4. */
+  function ordenDosTallas(): Orden {
+    return {
+      ...orden(77, 'Maquila del Norte'),
+      lineas: [
+        {
+          idColor: 7,
+          color: 'Rojo',
+          pack: '',
+          tallas: [
+            { idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+            { idTalla: 12, etiquetaTalla: 'M', cantidad: 20 },
+          ],
+        },
+      ],
+      totalPiezas: 30,
+    } as unknown as Orden;
+  }
+
+  it('⭐ H2 · en el CORTE se le pregunta al servidor SIN proceso (la base es la orden)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // El hook se llama en cada render; lo que importa es con qué se le pregunta AL FINAL.
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1); // la orden
+    expect(ultima?.[1]).toBeUndefined(); // sin proceso → base CORTE
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)', async () => {
+    // Es la mitad frontend de D8: costura y arte consumen las mismas piezas y no se restan entre sí,
+    // así que preguntar por el proceso equivocado devolvería el disponible de otro flujo.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1);
+    expect(ultima?.[1]).toBe(5); // el TipoProceso de costura del catálogo mockeado
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A ARTE se le pregunta por el proceso ELEGIDO (id 6), no por costura', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[1]).toBe(6);
+  });
+
+  it('⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE', async () => {
+    // 🔴 EL CASO QUE ESTA PRUEBA DEFIENDE (bloqueante H9). La clave de caché es
+    // `[…, idOrden, idTipoProceso ?? null]`, así que **el corte y «envío sin proceso elegido»
+    // comparten entrada**: deshabilitar la query NO impide que TanStack sirva el `data` ya cacheado
+    // del corte. Daniel captura un corte, abre «Entrega a arte» —donde el proceso arranca VACÍO, o
+    // sea que es lo primero que ve— y el botón salía ENCENDIDO diciendo «Llenar con lo que se cortó
+    // (1,726 pza)» con la cifra de *lo que falta por cortar*, mientras la nota de al lado decía
+    // «Elige primero el proceso». Botón y nota contradiciéndose, y al picarlo la matriz se llenaba
+    // con la respuesta de OTRA pregunta.
+    //
+    // ⚠️ Por eso el mock devuelve aquí el payload DEL CORTE: es exactamente lo que la caché real
+    // entrega en ese estado. Con el default genérico (`motivo: 'todo-cortado'`) la prueba pasaba
+    // **por la razón equivocada** — un payload que la caché nunca podría servir ahí.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 1726 },
+        ],
+        total: 1726,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+
+    // La query va DESHABILITADA (tercer argumento) mientras no haya proceso…
+    expect(useSugerenciaCaptura.mock.calls.at(-1)?.[2]).toBe(false);
+    // …y el botón respeta ESE gate, no el `motivo` de un payload prestado.
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,726');
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Elige primero el proceso',
+    );
+  });
+
+  it('⭐⭐ H3 · con PRENDAS YA TERMINADAS el atajo se apaga y dice por qué (el tope real es la existencia)', async () => {
+    // Caso real y frecuente: 1,000 cortadas, 400 recibidas de costura. `prendaTerminada` arranca en
+    // `true` y el servidor exige ADEMÁS que el almacén las tenga físicamente
+    // (`traspasarPrendasATransito` → `exigirExistenciaPt`). La sugerencia sólo conoce
+    // `enviado ≤ cortado`, así que anunciar «(1,000 pza)» sería mandar al usuario a un rechazo.
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([]),
+        recibidoCostura: 400,
+        recibido: 400,
+        porRecibir: [],
+        cortadoPorEnviar: [],
+      },
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 1000 },
+        ],
+        total: 1000,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    expect(screen.getByTestId('avance-prenda-terminada')).toBeChecked();
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'salen del almacén de producto terminado',
+    );
+    // Y NO se anuncia un total que el servidor rechazaría.
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,000 pza');
+  });
+
+  it('H3 · al desmarcar "prendas ya terminadas" el atajo vuelve a encenderse', async () => {
+    // La gemela positiva: si el apagado se pasara de listo, el atajo quedaría muerto en toda la
+    // etapa de arte, que es donde más se usa.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: { ...wip([]), recibidoCostura: 10, recibido: 10, porRecibir: [], cortadoPorEnviar: [] },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+
+    await usuario.click(screen.getByTestId('avance-prenda-terminada'));
+    expect(screen.getByTestId('avance-precargar')).toBeEnabled();
+    expect(screen.getByTestId('avance-precargar')).toHaveTextContent('(10 pza)');
+  });
+
+  it('⭐ H4 · la celda que el servidor NO propone queda VACÍA, no con lo que había tecleado', async () => {
+    // Con una sola celda, «mezclar» y «pisar» son indistinguibles. Aquí el servidor propone CH=10 y
+    // NO propone M: si se mezclara, la M tecleada a mano se quedaría y la matriz sumaría 13 mientras
+    // el rótulo prometió «10 pza» — una cifra afirmada y falsa.
+    useOrden.mockReturnValue({
+      data: ordenDosTallas(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 10 },
+        ],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    const celdas = screen.getAllByTestId('avance-matriz-celda');
+    expect(celdas).toHaveLength(2);
+    await usuario.type(celdas[1] as HTMLElement, '3'); // la M, que el servidor NO propone
+
+    await usuario.click(screen.getByTestId('avance-precargar'));
+
+    const tras = screen.getAllByTestId('avance-matriz-celda');
+    expect(tras[0]).toHaveValue(10); // CH ← la propuesta
+    expect(tras[1]).toHaveValue(null); // M ← el campo quedó VACÍO, no en 3 ni en 13
+    // Y el total capturado coincide con lo que el botón prometió.
+    expect(screen.getByTestId('avance-captura')).toHaveTextContent('Total capturado: 10');
+  });
+});
+
+describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima puerta)', () => {
+  /**
+   * 🔴 GUARDA DEL CABLEADO, no de la función. El defecto de la décima puerta nunca vivió en un
+   * helper: vivía en **dos líneas de `ResumenAvance`** que restaban `enviadoCostura − recibidoCostura`
+   * y `enviadoAplicacion − recibidoAplicacion`. Probar `pendientesDesdeWip` demuestra que la regla
+   * está bien escrita; **no** que la tarjeta la use. Reponiendo sólo esas dos restas, la suite
+   * completa del frontend se quedaba VERDE (196 archivos / 1,765 pruebas).
+   *
+   * Es la MISMA forma que el hallazgo B2 en el servidor —*«probaba el fixture, no el servidor»*— y
+   * la tercera vez en esta etapa que este seam produce el mismo defecto. Por eso la aserción es
+   * sobre el RENDER (`avance-resumen`), con `incompletas ≠ 0`.
+   */
+  function wipConIncompletas(): WipOrden {
+    // `pack: ''` = la orden NO se fabrica por tendidos (§Post-F9.10). Toda celda del WIP lo trae
+    // desde que el pack es campo propio; vacío es el caso de siempre y la pantalla lo ignora.
+    const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '' };
+    // 10 a costura y 10 a arte; de cada uno vuelven 8 buenas + 2 incompletas ⇒ pendiente 0 en los
+    // dos. Restar `enviado − recibido` daría 2 en cada bloque: ése es exactamente el defecto.
+    const proceso = (id: number, nombre: string, costura: boolean) => ({
+      idTipoProceso: id,
+      tipoProceso: nombre,
+      codigoProceso: nombre.toLowerCase(),
+      generaEntradaPt: costura,
+      devuelveAPt: false,
+      stockSinOrden: false,
+      celdas: [{ ...celda, cantidad: 0 }],
+      totalPendiente: 0,
+      porMaquilero: [
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          celdas: [{ ...celda, cantidad: 0, incompletas: 2 }],
+          totalPendiente: 0,
+          totalIncompletas: 2,
+          faltantesSaldados: 0,
+          // Todo devuelto (buenas + incompletas): no hay nada que saldar, así que tampoco botón.
+          faltantesSaldables: 0,
+          precioFaltante: null,
+          importeFaltantePropuesto: null,
+        },
+      ],
+    });
+    return {
+      idOrden: 1,
+      folio: 5424,
+      estado: 'capturada',
+      idModelo: 3,
+      codigoModelo: '62182',
+      idCliente: 4,
+      cliente: 'C&A',
+      pedido: 10,
+      cortado: 10,
+      enviado: 20, // 10 costura + 10 arte
+      recibido: 16, // 8 + 8 buenas
+      incompletas: 4, // 2 + 2
+      faltantesSaldados: 0, // sin cierres de orden (V1, fila 0.109)
+      pendientePorRecibir: 0, // 20 − 16 − 4
+      enviadoCostura: 10,
+      recibidoCostura: 8,
+      empacado: 0,
+      entregado: 0,
+      porEntregar: 8,
+      porCortar: [{ ...celda, cantidad: 0 }],
+      cortadoCeldas: [{ ...celda, cantidad: 10 }],
+      cortadoPorEnviar: [],
+      porRecibir: [proceso(5, 'Costura', true), proceso(6, 'Estampado', false)],
+      entregadoCeldas: [],
+    } satisfies WipOrden;
+  }
+
+  it('⭐ con incompletas entregadas las tarjetas PINTAN 0, no el enviado − recibido', () => {
+    useWipOrden.mockReturnValue({ data: wipConIncompletas(), isPending: false });
+    pintar();
+    const resumen = screen.getByTestId('avance-resumen');
+    // Costura: 10 enviadas, 8 buenas, 2 incompletas ⇒ NO le falta nada por recibir.
+    expect(resumen).toHaveTextContent('por recibir 0');
+    expect(resumen).not.toHaveTextContent('por recibir 2');
+    // Arte: mismo caso, en su propia tarjeta (etiqueta + valor van pegados en el textContent).
+    expect(resumen).toHaveTextContent('Falta por recibir0');
+    expect(resumen).not.toHaveTextContent('Falta por recibir2');
+  });
+
+  it('sin incompletas el resumen sigue diciendo lo que falta de verdad (no se cierra de más)', () => {
+    // La MUTACIÓN QUE EXCEDE: si el arreglo pusiera 0 siempre, este caso lo delata. 10 enviadas y
+    // 6 buenas sin incompletas ⇒ faltan 4 en cada bloque, y así tiene que verse.
+    const base = wipConIncompletas();
+    const conFalta = {
+      ...base,
+      recibido: 12,
+      incompletas: 0,
+      faltantesSaldados: 0,
+      pendientePorRecibir: 8,
+      recibidoCostura: 6,
+      porEntregar: 6,
+      porRecibir: base.porRecibir.map((p) => ({
+        ...p,
+        totalPendiente: 4,
+        porMaquilero: p.porMaquilero.map((m) => ({
+          ...m,
+          celdas: m.celdas.map((c) => ({ ...c, cantidad: 4, incompletas: 0 })),
+          totalPendiente: 4,
+          totalIncompletas: 0,
+          faltantesSaldados: 0,
+          faltantesSaldables: 4,
+          precioFaltante: null,
+          importeFaltantePropuesto: null,
+        })),
+      })),
+    } satisfies WipOrden;
+    useWipOrden.mockReturnValue({ data: conFalta, isPending: false });
+    pintar();
+    const resumen = screen.getByTestId('avance-resumen');
+    expect(resumen).toHaveTextContent('por recibir 4');
+    expect(resumen).toHaveTextContent('Falta por recibir4');
+  });
+});
+
+// ── ⭐ EL PACK / TENDIDO EN LA CAPTURA (§Post-F9.10) ────────────────────────────────────────────
+//
+// La orden de estos casos trae DOS tendidos del MISMO color (A y B). Antes de la v0.087 eso no se
+// podía ni representar (la letra iba dentro del nombre del color) y desde la v0.087 se podía en la
+// BASE pero no en NINGUNA pantalla: ni se capturaba ni se pintaba. Aquí se comprueba que la pantalla
+// los trata como dos renglones independientes y que lo capturado viaja con su pack.
+
+/** Orden de UN color × UNA talla con DOS tendidos (packs A y B). */
+function ordenConPacks(): Orden {
+  return {
+    ...orden(77, 'Maquila del Norte'),
+    lineas: [
+      {
+        idColor: 7,
+        color: 'Rojo',
+        pack: 'A',
+        tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 6 }],
+      },
+      {
+        idColor: 7,
+        color: 'Rojo',
+        pack: 'B',
+        tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+      },
+    ],
+    totalPiezas: 10,
+  } as unknown as Orden;
+}
+
+/**
+ * WIP de la orden con packs. `celdasMaquilero` son las del desglose POR MAQUILERO tal como las
+ * emite el servidor: una por tendido y —cuando el maquilero devolvió algo sin decir de cuál— una de
+ * pack VACÍO, que sale NEGATIVA (residuo declarado de la v0.087).
+ */
+function wipConPacks(celdasMaquilero: { pack: string; cantidad: number }[]): WipOrden {
+  const base = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+  const celdaA = { ...base, pack: 'A' };
+  const celdaB = { ...base, pack: 'B' };
+  return {
+    ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 10 }]),
+    porCortar: [
+      { ...celdaA, cantidad: 6 },
+      { ...celdaB, cantidad: 4 },
+    ],
+    cortadoCeldas: [
+      { ...celdaA, cantidad: 6 },
+      { ...celdaB, cantidad: 4 },
+    ],
+    porRecibir: [
+      {
+        idTipoProceso: 5,
+        tipoProceso: 'Costura',
+        codigoProceso: 'costura',
+        generaEntradaPt: true,
+        devuelveAPt: false,
+        stockSinOrden: false,
+        celdas: celdasMaquilero.map((c) => ({ ...base, pack: c.pack, cantidad: c.cantidad })),
+        totalPendiente: celdasMaquilero.reduce((s, c) => s + c.cantidad, 0),
+        porMaquilero: [
+          {
+            idMaquilero: 77,
+            maquilero: 'Maquila del Norte',
+            celdas: celdasMaquilero.map((c) => ({
+              ...base,
+              pack: c.pack,
+              cantidad: c.cantidad,
+              incompletas: 0,
+            })),
+            totalPendiente: celdasMaquilero.reduce((s, c) => s + c.cantidad, 0),
+            totalIncompletas: 0,
+            faltantesSaldados: 0,
+            faltantesSaldables: celdasMaquilero.reduce((s, c) => s + Math.max(0, c.cantidad), 0),
+            precioFaltante: null,
+            importeFaltantePropuesto: null,
+          },
+        ],
+      },
+    ],
+  } satisfies WipOrden;
+}
+
+describe('Captura del avance · EL PACK / TENDIDO (§Post-F9.10)', () => {
+  it('el CORTE pinta un renglón por tendido y manda cada uno con SU pack', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // DOS filas para el MISMO color: sin el pack en la llave serían una sola (y una celda).
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(2);
+    expect(screen.getAllByTestId('avance-matriz-pack').map((p) => p.textContent)).toEqual([
+      'Pack A',
+      'Pack B',
+    ]);
+
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '4');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Sur');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearCorte).toHaveBeenCalledTimes(1);
+    const cuerpo = crearCorte.mock.calls[0]?.[0] as {
+      lineas: { idColor: number; pack: string; tallas: { idTalla: number; cantidad: number }[] }[];
+    };
+    // Dos renglones del mismo color, distinguidos SÓLO por el pack, con lo suyo cada uno.
+    expect(cuerpo.lineas).toEqual([
+      { idColor: 7, pack: 'A', tallas: [{ idTalla: 11, cantidad: 6 }] },
+      { idColor: 7, pack: 'B', tallas: [{ idTalla: 11, cantidad: 4 }] },
+    ]);
+  });
+
+  it('el ENVÍO topa TENDIDO POR TENDIDO: 6 en el pack B (que sólo cortó 4) se bloquea', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    // 6 en el pack B, que sólo tiene 4 cortadas. El TOTAL (6 de 10 cortadas) sí cabría: lo que lo
+    // rechaza es el tope POR TENDIDO, que es el que aplica el servidor (decisión (g)).
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '6');
+    expect(screen.getByTestId('avance-aviso-exceso')).toHaveTextContent('2 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('el RECIBO ofrece capturar los tendidos REVUELTOS, y entonces manda el renglón SIN pack', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    // Enviadas 6 del A y 4 del B; nada devuelto todavía.
+    useWipOrden.mockReturnValue({
+      data: wipConPacks([
+        { pack: 'A', cantidad: 6 },
+        { pack: 'B', cantidad: 4 },
+      ]),
+      isPending: false,
+    });
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+
+    // Sin el interruptor, dos filas (una por tendido).
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(2);
+    // Se teclea ANTES de plegar: al plegar, esa llave (`7:11:A`) deja de tener fila. Si no se
+    // limpiara, seguiría contando en el total y en el tope — un número capturado que ya no se ve.
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    expect(screen.getByTestId('avance-matriz-total-general')).toHaveTextContent('6');
+    await usuario.click(screen.getByTestId('avance-toggle-revueltos'));
+    expect(screen.getByTestId('avance-matriz-total-general')).toHaveTextContent('0');
+    // Con él, UNA sola fila por color y el aviso de lo que eso significa.
+    expect(screen.getAllByTestId('avance-matriz-celda')).toHaveLength(1);
+    expect(screen.getByTestId('avance-nota-revueltos')).toBeInTheDocument();
+
+    await usuario.type(screen.getByLabelText('Rojo, talla CH'), '10');
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearRecibo).toHaveBeenCalledTimes(1);
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      lineas: { idColor: number; pack: string; tallas: { idTalla: number; cantidad: number }[] }[];
+    };
+    // ⭐ Pack VACÍO = «el maquilero los devolvió revueltos»: ese renglón consume del saldo AGREGADO
+    // de todos los tendidos, que es exactamente lo que Daniel pidió que se pudiera capturar.
+    expect(cuerpo.lineas).toEqual([
+      { idColor: 7, pack: '', tallas: [{ idTalla: 11, cantidad: 10 }] },
+    ]);
+  });
+
+  it('la ENTREGA A CLIENTE pliega los tendidos: UNA fila por color (ahí ya no hay pack)', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    // El seguimiento del servidor NO trae pack: la entrega sale del inventario de PT, que se lleva
+    // por modelo×color×talla×orden×almacén y no guarda el tendido.
+    useSeguimientoEntrega.mockReturnValue({
+      isPending: false,
+      data: {
+        idOrden: 1,
+        folioOrden: 5424,
+        idCliente: 4,
+        cliente: 'C&A',
+        idModelo: 3,
+        modelo: '62182',
+        celdas: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idTalla: 11,
+            etiquetaTalla: 'CH',
+            pedido: 10,
+            entregado: 0,
+            faltante: 10,
+            disponible: 10,
+          },
+        ],
+        totalPedido: 10,
+        totalEntregado: 0,
+        totalFaltante: 10,
+      },
+    });
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+
+    // UNA celda, no dos: con los ejes CON pack saldrían dos filas idénticas, ofreciendo la MISMA
+    // existencia dos veces y sin nada en pantalla que las distinguiera.
+    expect(screen.getAllByTestId('avance-entrega-matriz-celda')).toHaveLength(1);
+    expect(screen.queryAllByTestId('avance-entrega-matriz-pack')).toHaveLength(0);
+
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+    await usuario.type(screen.getByTestId('avance-entrega-matriz-celda'), '4');
+    // El tope viene del seguimiento (10 disponibles): sin plegar, la llave `7:11:` no casaría con
+    // ninguna fila y la referencia quedaría en 0 — el guardar saldría bloqueado por un exceso falso.
+    expect(screen.queryByTestId('avance-entrega-aviso-exceso')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearEntrega).toHaveBeenCalledTimes(1);
+    expect(crearEntrega.mock.calls[0]?.[0]).toMatchObject({
+      lineas: [{ idColor: 7, tallas: [{ idTalla: 11, cantidad: 4 }] }],
+    });
+  });
+
+  it('🔴 en una orden SIN packs el aviso NO duplica el exceso (es el MÁXIMO de las dos guardas, no su suma)', async () => {
+    // ⚠️ ESTA PRUEBA VIGILA UNA ARITMÉTICA QUE ESTA ETAPA CAMBIÓ PARA TODAS LAS ÓRDENES, packs o no.
+    // El exceso se calcula ahora con DOS condiciones —(2) por celda/tendido y (1) por color×talla
+    // plegando los tendidos— y se reporta el MAYOR. En una orden SIN packs las dos leen los MISMOS
+    // números (todas las celdas traen pack vacío), así que salen SIEMPRE iguales: sumarlas en vez
+    // de tomar el máximo DUPLICA el número que la pantalla le enseña al usuario, y no lo nota
+    // ninguna de las pruebas del caso CON packs (ahí suma y máximo coinciden por casualidad).
+    // Pendiente del maquilero 77: 6. Se teclean 8 ⇒ el exceso REAL es 2, no 4.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '8');
+
+    const aviso = screen.getByTestId('avance-aviso-exceso');
+    // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena y '2 pieza(s)…' casaría dentro de
+    // '12 pieza(s)…'. El `\b` es lo único que distingue el 2 de un número que lo contiene.
+    expect(aviso).toHaveTextContent(/\b2 pieza\(s\) por encima/);
+    expect(aviso).not.toHaveTextContent('4 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('una orden SIN packs no ofrece el interruptor de "revueltos" (no habría nada que revolver)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    expect(screen.queryByTestId('avance-toggle-revueltos')).not.toBeInTheDocument();
+  });
+
+  it('🔴 el TOTAL se topa aunque cada tendido quepa: lo devuelto sin pack ya bajó el saldo', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    // Enviadas 6 de A y 4 de B (10). El maquilero ya devolvió 3 SIN decir de cuál: el servidor las
+    // pone en el bucket de pack vacío, en NEGATIVO. Saldo por tendido: A 6, B 4. Saldo AGREGADO: 7.
+    useWipOrden.mockReturnValue({
+      data: wipConPacks([
+        { pack: 'A', cantidad: 6 },
+        { pack: 'B', cantidad: 4 },
+        { pack: '', cantidad: -3 },
+      ]),
+      isPending: false,
+    });
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+
+    // 6 + 4 = 10: cada tendido cabe EXACTO en el suyo (no hay exceso por celda), pero el saldo
+    // agregado es 7. Sólo la condición (1) lo ve — la (2) da 0 aquí.
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '6');
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '4');
+    expect(screen.getByTestId('avance-aviso-exceso')).toHaveTextContent('3 pieza(s)');
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+
+    // Y con 7 en total (4 + 3) sí cabe: la guarda no se pasa de estricta.
+    await usuario.clear(screen.getByLabelText('Rojo pack A, talla CH'));
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '4');
+    await usuario.clear(screen.getByLabelText('Rojo pack B, talla CH'));
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '3');
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+  });
+});
+
+describe('⭐ Cerrar la orden con un maquilero (V1, fila 0.109)', () => {
+  /** Elige a un maquilero en la captura del recibo (es lo que enciende el bloque de cierre). */
+  async function elegirMaquilero(
+    usuario: ReturnType<typeof userEvent.setup>,
+    nombre: string,
+  ): Promise<void> {
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText(nombre));
+  }
+
+  it('ofrece cerrar con las piezas SALDABLES del servidor, no con la suma plana', async () => {
+    // 🔴 El caso que rompía: `totalPendiente` = 0 (una celda +5 y otra −5 del histórico migrado) y
+    // 5 piezas realmente saldables. Con la suma plana el botón NO aparecía y esa orden no se podía
+    // cerrar NUNCA — el grueso de «la lista que nunca se vacía».
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 0,
+          celdas: [{ cantidad: 5 }],
+          saldables: 5,
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+
+    const bloque = await screen.findByTestId('cierre-maquila');
+    expect(bloque).toHaveTextContent('le faltan 5 pza(s)');
+    expect(screen.getByTestId('cierre-maquila-abrir')).toBeInTheDocument();
+  });
+
+  it('NO ofrece cerrar a quien no tiene nada saldable (aunque su pendiente plano no sea cero)', async () => {
+    // Al revés: pendiente plano −5 (recibió sin envío, histórico) y CERO saldable. No hay deuda.
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: -5,
+          celdas: [{ cantidad: -5 }],
+          saldables: 0,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+
+    expect(screen.queryByTestId('cierre-maquila-abrir')).not.toBeInTheDocument();
+  });
+
+  it('la confirmación pinta las TRES cifras del servidor (piezas, precio e importe)', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 2, // la suma plana dice 2…
+          celdas: [{ cantidad: 2 }],
+          saldables: 5, // …y lo que se va a saldar (y cobrar) son 5
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+
+    // La pantalla NO multiplica: enseña lo que el servidor va a escribir.
+    expect(await screen.findByTestId('cierre-piezas')).toHaveTextContent('5');
+    expect(screen.getByTestId('cierre-importe')).toHaveTextContent('40');
+    expect(screen.getByTestId('cierre-importe')).not.toHaveTextContent('16');
+  });
+
+  it('al confirmar manda SÓLO la decisión: el QUÉ se salda lo deriva el servidor', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 5,
+          saldables: 5,
+          precio: 8,
+          importe: 40,
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+    await usuario.click(await screen.findByTestId('cierre-confirmar'));
+
+    expect(cerrarOrden).toHaveBeenCalledTimes(1);
+    const [args] = cerrarOrden.mock.calls[0] as [
+      { idOrden: number; cuerpo: Record<string, unknown> },
+    ];
+    expect(args.idOrden).toBe(1);
+    expect(args.cuerpo.idMaquilero).toBe(77);
+    expect(args.cuerpo.idTipoProceso).toBe(5);
+    expect(args.cuerpo.desenlace).toBe('cobrado');
+    // Ninguna cantidad viaja: si la pantalla dijera cuántas piezas se cobran, el servidor estaría
+    // obedeciendo a la vista en vez de a su propio saldo bajo bloqueo (D3).
+    expect(Object.keys(args.cuerpo)).not.toContain('piezas');
+    expect(Object.keys(args.cuerpo)).not.toContain('cantidad');
+  });
+
+  it('PERDONAR exige motivo: sin él, el botón de confirmar queda deshabilitado', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([
+        { idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 5, saldables: 5, precio: 8 },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await elegirMaquilero(usuario, 'Maquila del Norte');
+    await usuario.click(await screen.findByTestId('cierre-maquila-abrir'));
+    await usuario.selectOptions(await screen.findByTestId('cierre-desenlace'), 'perdonado');
+
+    expect(screen.getByTestId('cierre-confirmar')).toBeDisabled();
+    await usuario.type(screen.getByTestId('cierre-motivo'), 'Se le perdona por el retraso de tela');
+    expect(screen.getByTestId('cierre-confirmar')).toBeEnabled();
+  });
+
+  it('lista lo ya cerrado y ofrece DESHACERLO, salvo si el descuento ya se revisó', async () => {
+    useWipOrden.mockReturnValue({
+      data: wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 0, saldables: 0 }]),
+      isPending: false,
+    });
+    useCierresMaquila.mockReturnValue({
+      data: {
+        idOrden: 1,
+        folioOrden: 5424,
+        filas: [
+          {
+            id: 31,
+            idTipoProceso: 5,
+            maquilero: 'Maquila del Norte',
+            piezasFaltantes: 5,
+            desenlace: 'cobrado',
+            importe: 40,
+            fecha: '2026-09-04',
+            idDescuento: 9,
+            descuentoRevisado: false,
+            deshecho: false,
+          },
+          {
+            id: 32,
+            idTipoProceso: 5,
+            maquilero: 'Otra Maquila',
+            piezasFaltantes: 2,
+            desenlace: 'cobrado',
+            importe: 16,
+            fecha: '2026-09-04',
+            idDescuento: 10,
+            descuentoRevisado: true,
+            deshecho: false,
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    const lista = await screen.findByTestId('cierre-maquila-lista');
+    expect(lista).toHaveTextContent('5 pza(s) faltantes');
+    // El que ya se revisó no se puede deshacer desde aquí (ese dinero ya está en el saldo).
+    expect(screen.getByTestId('cierre-maquila-deshacer-31')).toBeEnabled();
+    expect(screen.getByTestId('cierre-maquila-deshacer-32')).toBeDisabled();
   });
 });

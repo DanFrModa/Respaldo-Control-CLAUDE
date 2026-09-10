@@ -259,6 +259,65 @@ describe('Desarrollos (F8-E2)', () => {
       });
     });
 
+    /**
+     * ⭐ V1 «los nombres, en vez de los ids» — `obtenerDesarrollo` y `obtenerProyecto` resuelven
+     * `nombreApagadoPor` en el servidor (`Desarrollo.apagadoPorId` no tiene FK física).
+     *
+     * 🔴 Se asevera en los DOS caminos a propósito: la tarjeta que pinta el dato la sirve el
+     * DETALLE DEL PROYECTO (`aProyectoDetalleSalida`), no `obtenerDesarrollo`. Probar sólo uno
+     * dejaría vivo justo el que se ve. Y si el servidor devolviera `null`, la pantalla NO cae al id:
+     * pinta «Usuario dado de baja» —dejaría por escrito que dieron de baja a quien ahí sigue—.
+     */
+    it('🔴 el desarrollo apagado sale con el NOMBRE de quien lo apagó, por los DOS caminos', async () => {
+      const autor = await cliente.usuario.create({
+        data: {
+          username: 'ana-apagado',
+          nombre: 'Ana Ruiz',
+          email: 'ana-apagado@control.local',
+        },
+      });
+      const idProyecto = await proyectoNuevo();
+      const d = await crearDesarrollo(
+        sesion(PERM_TODOS),
+        idProyecto,
+        { idModelo: modeloA.id },
+        bd(),
+      );
+      const sesionAutor = { ...sesion(PERM_TODOS), id: autor.id };
+      await apagarDesarrollo(sesionAutor, d.id, { motivo: 'Fuera de temporada' }, bd());
+
+      // Camino 1: el detalle del desarrollo.
+      const soloDesarrollo = await obtenerDesarrollo(sesion(PERM_TODOS), d.id, bd());
+      expect(soloDesarrollo.apagadoPorId).toBe(autor.id);
+      expect(soloDesarrollo.nombreApagadoPor).toBe('Ana Ruiz');
+
+      // Camino 2: el detalle del PROYECTO, que es el que alimenta la tarjeta de la pantalla.
+      const proyecto = await obtenerProyecto(sesion(PERM_TODOS), idProyecto, bd());
+      const enProyecto = proyecto.desarrollos.find((x) => x.id === d.id);
+      expect(enProyecto?.nombreApagadoPor).toBe('Ana Ruiz');
+    });
+
+    /** 🔴 D3 — sin autor resoluble el nombre es null, pero el desarrollo apagado SIGUE ahí. */
+    it('un autor desconocido deja el nombre en null pero NO pierde el desarrollo ni su motivo', async () => {
+      const idProyecto = await proyectoNuevo();
+      const d = await crearDesarrollo(
+        sesion(PERM_TODOS),
+        idProyecto,
+        { idModelo: modeloA.id },
+        bd(),
+      );
+      // `sesion()` usa el id 'usuario-prueba', que no existe como fila en la BD.
+      await apagarDesarrollo(sesion(PERM_TODOS), d.id, { motivo: 'sin autor resoluble' }, bd());
+
+      const leido = await obtenerDesarrollo(sesion(PERM_TODOS), d.id, bd());
+      expect(leido.apagadoPorId).toBe('usuario-prueba');
+      expect(leido.nombreApagadoPor).toBeNull();
+      expect(leido.motivoApagado).toBe('sin autor resoluble');
+
+      const proyecto = await obtenerProyecto(sesion(PERM_TODOS), idProyecto, bd());
+      expect(proyecto.desarrollos.find((x) => x.id === d.id)?.nombreApagadoPor).toBeNull();
+    });
+
     it('apagar dos veces → ErrorConflicto; reactivar uno activo → ErrorConflicto', async () => {
       const idProyecto = await proyectoNuevo();
       const d = await crearDesarrollo(

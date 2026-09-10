@@ -34,12 +34,33 @@ export type RondaCuerpo =
 /** Cuerpo de un acuerdo. */
 export type AcuerdoCuerpo =
   paths['/api/listas-precios/lineas/{idLinea}/acuerdos']['post']['requestBody']['content']['application/json'];
-/** Cuerpo del cambio de estado. */
+/** Cuerpo del cambio de estado de la LISTA (el documento). */
 export type CambiarEstadoCuerpo =
   paths['/api/listas-precios/{id}/estado']['patch']['requestBody']['content']['application/json'];
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151): cuerpo del cambio de estado de un RENGLÓN (el modelo dentro de la
+ * lista). Es OTRO eje, no el de arriba: aquél mueve el documento entero.
+ */
+export type CambiarEstadoRenglonCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/estado']['patch']['requestBody']['content']['application/json'];
 /** Resultado de la calculadora de negociación (costo/neto/margen). */
 export type SimulacionNegociacion =
   paths['/api/listas-precios/lineas/{idLinea}/simular']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo del negociador en vivo: el renglón de costos + el precio de la mesa (§Post-F9.138). */
+export type MesaCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['requestBody']['content']['application/json'];
+/**
+ * Un renglón de la mesa: concepto y etiqueta LIBRES (§Post-F9.139: no es una referencia a nada) más
+ * el costo partido en **consumo × precio** — las dos perillas que Daniel mueve por separado
+ * (§Post-F9.153). El producto lo hace el SERVIDOR y vuelve en `SimulacionMesa.renglones`.
+ */
+export type RenglonMesa = MesaCuerpo['renglones'][number];
+/** Cuerpo del GUARDADO de la mesa (§Post-F9.149): el desglose que se queda + su comentario. */
+export type GuardarMesaCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/mesa']['post']['requestBody']['content']['application/json'];
+/** Resultado del negociador en vivo: las dos direcciones (margen del precio + precio del costo). */
+export type SimulacionMesa =
+  paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['responses']['200']['content']['application/json'];
 
 /** Clave raíz de la cache de eventos de negociación. */
 export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
@@ -50,6 +71,9 @@ function claveEventos(idLinea: number): readonly unknown[] {
 
 /** Clave raíz de la cache de la calculadora de negociación (§4.8). */
 export const CLAVE_SIMULACION = ['negociacion-simular'] as const;
+
+/** Clave raíz de la cache del NEGOCIADOR EN VIVO de la mesa (§Post-F9.138). */
+export const CLAVE_MESA = ['negociacion-mesa'] as const;
 
 // ── Funciones del API ──────────────────────────────────────────────────────────
 
@@ -88,6 +112,18 @@ async function cambiarEstado(id: number, cuerpo: CambiarEstadoCuerpo): Promise<L
   return data;
 }
 
+async function cambiarEstadoDeRenglon(
+  idLinea: number,
+  cuerpo: CambiarEstadoRenglonCuerpo,
+): Promise<ListaDetalle> {
+  const { data, error } = await api.PATCH('/api/listas-precios/lineas/{idLinea}/estado', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 async function simular(
   idLinea: number,
   precioObjetivo: number,
@@ -98,6 +134,34 @@ async function simular(
       path: { idLinea },
       query: { precioObjetivo, ...(idPrecosto === undefined ? {} : { idPrecosto }) },
     },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐⭐ El NEGOCIADOR EN VIVO (§Post-F9.138). Es un **POST de sólo lectura**: el renglón de costos es
+ * de largo variable y no cabe en un querystring, pero el servidor no escribe NADA (§Post-F9.139) —
+ * por eso se consume como `useQuery` y no como mutación, y por eso no invalida ninguna cache.
+ */
+async function simularMesa(idLinea: number, cuerpo: MesaCuerpo): Promise<SimulacionMesa> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/simular-mesa', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * ⭐⭐ GUARDA la mesa (§Post-F9.149): el desglose de costos estimados con el que se cerró. **Éste sí
+ * escribe** —es el único de la mesa que lo hace— y por eso es una MUTACIÓN: invalida el hilo de
+ * eventos y la lista, para que la constancia aparezca en el historial sin recargar.
+ */
+async function guardarMesa(idLinea: number, cuerpo: GuardarMesaCuerpo): Promise<ListaDetalle> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/mesa', {
+    params: { path: { idLinea } },
+    body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
   return data;
@@ -132,6 +196,41 @@ export function useSimularNegociacion(
     queryKey: [...CLAVE_SIMULACION, idLinea ?? 0, precioObjetivo, idPrecosto ?? null],
     queryFn: () => simular(idLinea as number, precioObjetivo, idPrecosto),
     enabled: idLinea !== null && habilitado && precioObjetivo > 0,
+  });
+}
+
+/**
+ * ⭐⭐ **El NEGOCIADOR EN VIVO de la mesa** (§Post-F9.138): manda el renglón COMPLETO de costos tal
+ * como está en pantalla —movidos a mano, con estimados que no existen en ningún catálogo— más el
+ * precio que se discute, y recibe **las dos direcciones**: el margen de ese precio y el precio que
+ * ese costo pediría. **La FÓRMULA no se duplica aquí** (A1): margen, cascada de factores y precio
+ * sugerido son del dominio, y de ahí vienen todos los números que se pintan.
+ *
+ * ⭐ **V1-E8w — y ahora sí es CERO aritmética, sin excepciones que declarar.** Hasta la 0.059 la
+ * pantalla hacía una suma local (`totalLocal`) para tapar el hueco mientras el servidor contestaba,
+ * porque a quien NO tiene `listas.aprobar` ni siquiera se le pedía la simulación. Ya no hace falta:
+ * el endpoint **siempre** devuelve `costoSimulado`, los importes por renglón y los subtotales por
+ * concepto (sólo los CINCO campos derivados de los factores salen en null), así que la mesa se pide
+ * para todo el mundo y la pantalla no suma, no multiplica y no agrupa nada. Es más que higiene: con
+ * la tela partida en consumo × precio, una suma local habría tenido que **multiplicar** — y un
+ * producto que decide un precio es aritmética de negocio (A1).
+ *
+ * El llamador pasa el cuerpo YA DEBOUNCED. La clave de cache incluye el renglón serializado, así que
+ * mover un importe pide de nuevo y el margen se mueve solo; `placeholderData` conserva el resultado
+ * anterior mientras llega el nuevo, para que el número **no parpadee** con cada tecla (en la mesa,
+ * un número que desaparece es peor que uno de hace 300 ms).
+ */
+export function useSimularMesa(
+  idLinea: number | null,
+  cuerpo: MesaCuerpo,
+  opciones: { habilitado?: boolean } = {},
+): UseQueryResult<SimulacionMesa, ErrorDeApi> {
+  const { habilitado = true } = opciones;
+  return useQuery({
+    queryKey: [...CLAVE_MESA, idLinea ?? 0, JSON.stringify(cuerpo)],
+    queryFn: () => simularMesa(idLinea as number, cuerpo),
+    enabled: idLinea !== null && habilitado && cuerpo.renglones.length > 0,
+    placeholderData: (anterior) => anterior,
   });
 }
 
@@ -176,6 +275,24 @@ export function useRegistrarAcuerdo(): UseMutationResult<ListaDetalle, ErrorDeAp
   });
 }
 
+/** Argumentos del guardado de la mesa. */
+export interface ArgsGuardarMesa {
+  idLinea: number;
+  cuerpo: GuardarMesaCuerpo;
+}
+
+/**
+ * ⭐⭐ GUARDA la mesa (§Post-F9.149): *«al terminar la negociación guardo la última información que
+ * metí»*. Guardado EXPLÍCITO —nunca automático— que deja la constancia en el hilo del renglón.
+ */
+export function useGuardarMesa(): UseMutationResult<ListaDetalle, ErrorDeApi, ArgsGuardarMesa> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsGuardarMesa) => guardarMesa(idLinea, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
 /** Argumentos del cambio de estado. */
 export interface ArgsCambiarEstado {
   id: number;
@@ -191,6 +308,33 @@ export function useCambiarEstadoLista(): UseMutationResult<
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCambiarEstado) => cambiarEstado(id, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos del cambio de estado de un RENGLÓN. */
+export interface ArgsCambiarEstadoRenglon {
+  idLinea: number;
+  cuerpo: CambiarEstadoRenglonCuerpo;
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — mueve el estado de UN MODELO dentro de la lista: abierto → en
+ * negociación → cerrado → dropeado, y la vuelta (REVIVIR, §Post-F9.155). Permiso `listas.negociar`,
+ * el mismo que mueve el estado de la lista; SIN permiso nuevo.
+ *
+ * Invalida lo mismo que una ronda: el detalle de la lista (el chip y los botones del papel cambian)
+ * **y el hilo de EVENTOS del renglón**, porque cada transición agrega ahí su constancia inmutable.
+ */
+export function useCambiarEstadoRenglon(): UseMutationResult<
+  ListaDetalle,
+  ErrorDeApi,
+  ArgsCambiarEstadoRenglon
+> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsCambiarEstadoRenglon) =>
+      cambiarEstadoDeRenglon(idLinea, cuerpo),
     onSuccess: invalidar,
   });
 }

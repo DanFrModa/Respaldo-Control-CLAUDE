@@ -1,4 +1,6 @@
-import type { EstatusOrdenCompra } from '@/api/tipos';
+import { ShoppingCart } from 'lucide-react';
+
+import type { EstatusOrdenCompra, OcComprometida } from '@/api/tipos';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
 
 /**
@@ -37,6 +39,85 @@ export function EstatusOcBadge({ estatus }: { estatus: EstatusOrdenCompra }): Re
   );
 }
 
+/**
+ * ⭐⭐⭐ **"ESTO YA ESTÁ COMPRADO", DICHO EN UN CHIP** (0.085, §Post-F9.173(a)).
+ *
+ * DANIEL: *"Si ya está comprado, **solo avisa que ya está comprado**… **No se puede cancelar la OC
+ * en automático… eso hay que negociarlo con el proveedor.**"*
+ *
+ * Vive AQUÍ, en las piezas del módulo de Órdenes de Compra, y no en cada pantalla que lo usa: lo
+ * pintan la receta de la orden **y** la bandeja «Recetas por liberar», y las dos tienen que leerse
+ * igual. Reusa {@link ETIQUETA_ESTATUS_OC}, que ya es la única traducción de los estatus de OC —una
+ * segunda tabla de nombres es como acaban diciendo «Recibida parcial» en un lado y otra cosa en el
+ * otro.
+ *
+ * 🔴 **El ESTADO va SIEMPRE junto al folio, y no es adorno**: una OC autorizada se puede
+ * des-autorizar (con el permiso de Dirección); una recibida **no**. Sin el estado, quien lee el chip
+ * no sabe cuál de los dos caminos tiene enfrente.
+ *
+ * ⛔ **En ESTE componente no hay botón de «des-autorizar» — y NO porque no deba existir en ningún
+ * lado.** §Post-F9.68 tiene dos mitades, y la segunda es **enseñar lo que sí se puede usar**: desde
+ * la fila 0.068, a quien tiene `compras.desautorizar` **se le pinta** ese botón, a tres líneas de
+ * aquí, en el bloque del aviso de la receta (`PanelRecetaOrden.tsx:212-231`, en
+ * `AvisoCambioSobreLoComprado`), y abre el diálogo de siempre — no des-autoriza nada solo.
+ *
+ * El chip se queda siendo **sólo el chip** para que las dos pantallas que lo usan lo lean idéntico:
+ * quien quiera ofrecer además el ACTO lo pinta al lado, con su permiso y con su gate de estatus. Un
+ * botón metido aquí dentro se lo comería también la bandeja «Recetas por liberar», que es una lista
+ * de consulta y no un aviso (ver el porqué en `RecetasPorLiberarPagina.tsx`).
+ *
+ * La puerta que sí abre este componente es **la OC misma**, que el comprador sí ve — por eso
+ * `alVer`, y por eso el llamador lo pasa **sólo** si la sesión tiene `compras.ver` (§Post-F9.145(f):
+ * a nadie se le pinta un camino que acabaría en un 403).
+ */
+export function ChipsOcComprometidas({
+  ocs,
+  alVer,
+}: {
+  ocs: readonly OcComprometida[];
+  /** Llevar a las compras de esta orden. Sin él, los chips son informativos (nadie choca con 403). */
+  alVer?: () => void;
+}): React.JSX.Element | null {
+  if (ocs.length === 0) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-1" data-testid="ocs-comprometidas">
+      {ocs.map((o) => {
+        /*
+         * 🔴 `o.recibida` VIENE DEL SERVIDOR; aquí NO se deduce del estatus (hallazgo del reviewer).
+         *
+         * La primera versión escribía `estatus === 'recibida_parcial' || estatus ===
+         * 'recibida_total'` — una **segunda implementación de `algunaRecibida`**, en otro lenguaje,
+         * decidiendo qué camino se le ofrece a una persona. Es el mismo pecado que la 0.085 vino a
+         * borrar al fusionar la consulta de la guarda, a tres archivos de distancia. La regla vive
+         * en el dominio y viaja hecha (mismo patrón que `capturaReparable`, V1-E8h).
+         */
+        const titulo = o.recibida
+          ? `OC #${String(o.folio)} ya recibida: ese material entró al inventario, así que ya no se des-autoriza — el camino es una devolución o un ajuste.`
+          : `OC #${String(o.folio)} ${ETIQUETA_ESTATUS_OC[o.estatus].toLowerCase()}: cancelarla se negocia con el proveedor, y des-autorizarla es del perfil de Dirección.`;
+        const chip = (
+          <ChipEstado tono="warn" title={titulo} data-testid={`oc-comprometida-${String(o.folio)}`}>
+            <ShoppingCart className="size-3" aria-hidden /> Comprado · OC {o.folio} ·{' '}
+            {ETIQUETA_ESTATUS_OC[o.estatus]}
+          </ChipEstado>
+        );
+        return alVer === undefined ? (
+          <span key={o.idOrdenCompra}>{chip}</span>
+        ) : (
+          <button
+            key={o.idOrdenCompra}
+            type="button"
+            className="cursor-pointer"
+            onClick={alVer}
+            title={`${titulo} Clic para ver las compras de esta orden.`}
+          >
+            {chip}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
 /** Formatea una fecha date-only `YYYY-MM-DD` como "13 jun 2026" sin desfase de zona. */
 export function fechaCortaOc(valor: string | null): string {
   if (valor === null) {
@@ -66,6 +147,7 @@ export function descripcionMaterial(linea: {
   tela: string | null;
   telaColor?: string | null;
   avio: string | null;
+  colorAvio?: string | null;
   descripcionLibre: string | null;
 }): string {
   if (linea.tela !== null) {
@@ -73,7 +155,16 @@ export function descripcionMaterial(linea: {
       ? linea.tela
       : `${linea.tela} · ${linea.telaColor}`;
   }
-  return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
+  // ⭐⭐ V1-E8c (§Post-F9.126) — **y el COLOR del avío**, por la misma razón que el de la tela:
+  // desde esta etapa el cierre se compra POR COLOR, así que cuatro renglones del mismo cierre se
+  // leerían idénticos sin él. Daniel lo pidió con estas palabras: *"poner 4 veces el cierre y en la
+  // descripción del avío ponerle el color"*.
+  if (linea.avio !== null) {
+    return linea.colorAvio == null || linea.colorAvio === ''
+      ? linea.avio
+      : `${linea.avio} · ${linea.colorAvio}`;
+  }
+  return linea.descripcionLibre ?? 'Renglón sin material';
 }
 
 /**

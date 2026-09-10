@@ -1,8 +1,13 @@
-import { Ban, Loader2Icon, Search } from 'lucide-react';
+import { Ban, Loader2Icon, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useCancelarMovimientoPt, useKardexPt, useMovimientoPtPorFolio } from '@/api/inventarios';
+import {
+  urlImpresoTraspasoPt,
+  useCancelarMovimientoPt,
+  useKardexPt,
+  useMovimientoPtPorFolio,
+} from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
 import type { MovimientoPt } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -37,8 +42,13 @@ type Modo = 'modelo' | 'folio';
  * KARDEX de producto terminado (F3-E3, doc 04-Inventarios — IPT_Kardex). Dos modos en una pantalla:
  *  • POR MODELO: los movimientos del modelo en orden cronológico con su SALDO CORRIDO.
  *  • POR FOLIO: el detalle de UN movimiento (su matriz color×talla), con botón para CANCELARLO (genera
- *    un inverso auditado — D3) si el usuario tiene `inventario-pt.mover`.
+ *    un inverso auditado — D3) si el usuario tiene `inventario-pt.mover`, y —cuando ese movimiento es
+ *    un TRASPASO vivo— para REIMPRIMIR su hoja (fila 0.100).
  * Pensada para escritorio (densa). `inventario-pt.ver` gobierna el acceso.
+ *
+ * Fila 0.100 — ésta es la SEGUNDA puerta de la hoja del traspaso, y la que la vuelve recuperable: la
+ * primera (`TraspasosPtPagina`) sólo existe en el instante de guardar. Se buscó el folio, se saca el
+ * papel otra vez. Mismo par de puertas que tiene la hoja de tela desde §Post-F9.38.
  */
 export function KardexPtPagina(): React.JSX.Element {
   const [modo, setModo] = useState<Modo>('modelo');
@@ -72,14 +82,35 @@ export function KardexPtPagina(): React.JSX.Element {
   );
 }
 
-/** Kardex por modelo: movimientos cronológicos con saldo corrido (card estándar + tabla densa). */
+/**
+ * Kardex por modelo: movimientos cronológicos con saldo corrido, SIEMPRE de un PERIODO (fila 0.138).
+ *
+ * ⭐ Por qué hay fechas aquí: sin ellas, elegir un modelo con diez años de histórico pedía —y
+ * pintaba— TODOS sus movimientos de un golpe (medido: 25 000 renglones, 8.3 MB en una respuesta).
+ * El filtro lo resuelve el servidor; esta pantalla sólo manda `desde`/`hasta` y **dice qué periodo
+ * está viendo**, porque cuando la lista viene recortada nadie debe creer que está viendo todo. El
+ * «saldo anterior» que encabeza la tabla es lo que hace que la columna Saldo siga siendo verdad
+ * dentro de una ventana: es lo que el artículo traía justo antes del PRIMER RENGLÓN QUE SE VE — que
+ * es el inicio del periodo cuando la lista viene entera, y el punto donde el tope cortó cuando no.
+ */
 function KardexPorModelo(): React.JSX.Element {
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+
   const consulta = useKardexPt(
-    modelo !== undefined ? { idModelo: modelo.id } : undefined,
+    modelo !== undefined
+      ? {
+          idModelo: modelo.id,
+          ...(desde !== '' ? { desde } : {}),
+          ...(hasta !== '' ? { hasta } : {}),
+        }
+      : undefined,
     modelo !== undefined,
   );
-  const renglones = consulta.data?.renglones ?? [];
+  const kardex = consulta.data;
+  const renglones = kardex?.renglones ?? [];
+  const saldosIniciales = kardex?.saldosIniciales ?? [];
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
@@ -99,6 +130,32 @@ function KardexPorModelo(): React.JSX.Element {
             {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
           </span>
         ) : null}
+        {/* El PERIODO (fila 0.138). Vacío = el servidor pone su ventana por omisión, y la línea de
+            abajo dice cuál quedó. */}
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="kardex-desde" className="text-xs text-muted-foreground">
+            Desde
+          </label>
+          <Input
+            id="kardex-desde"
+            type="date"
+            className="h-8 w-36 text-sm"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            data-testid="kardex-desde"
+          />
+          <label htmlFor="kardex-hasta" className="text-xs text-muted-foreground">
+            Hasta
+          </label>
+          <Input
+            id="kardex-hasta"
+            type="date"
+            className="h-8 w-36 text-sm"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+            data-testid="kardex-hasta"
+          />
+        </div>
         {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
         {modelo !== undefined ? (
           <span className="ml-auto text-xs text-faint">
@@ -106,6 +163,44 @@ function KardexPorModelo(): React.JSX.Element {
           </span>
         ) : null}
       </div>
+
+      {/* Qué periodo se está viendo REALMENTE — y si la lista vino cortada. Sin esta línea, una
+          ventana por omisión se leería como «este modelo no tiene más movimientos». */}
+      {modelo !== undefined && kardex !== undefined ? (
+        <p
+          className="border-b px-3 py-1.5 text-xs text-muted-foreground"
+          data-testid="kardex-periodo"
+        >
+          {/* ⚠️ Decía «a hoy» cuando no hay techo, y el techo se deja abierto A PROPÓSITO para que
+              salgan los movimientos con fecha futura (se capturan con la fecha del documento). Con
+              uno fechado el año que viene, la línea decía «a hoy» y la tabla enseñaba ese renglón:
+              la única línea de la pantalla cuyo trabajo es no mentir, mintiendo. */}
+          Periodo: <span className="num text-foreground">{kardex.desde}</span>
+          {kardex.hasta === null ? (
+            <> en adelante (sin fecha de corte: también salen los movimientos con fecha futura)</>
+          ) : (
+            <>
+              {' '}
+              a <span className="num text-foreground">{kardex.hasta}</span>
+            </>
+          )}
+          {/* ⚠️ Y el aviso de la ventana por omisión tiene DOS casos, no uno: con sólo «hasta», la
+              ventana son los 12 meses que TERMINAN ahí — ni son «los últimos 12 meses», ni es
+              verdad que el usuario no puso fechas. */}
+          {kardex.ventanaPorOmision
+            ? kardex.hasta === null
+              ? ' · últimos 12 meses por omisión — pon fechas para ver otro periodo'
+              : ' · son los 12 meses ANTERIORES a esa fecha (no se pidió «desde»)'
+            : ''}
+          {kardex.truncado ? (
+            <span className="ml-1.5 font-medium text-destructive" data-testid="kardex-truncado">
+              · El periodo no cabe: se muestran los {kardex.limite.toLocaleString('es-MX')} más
+              RECIENTES. Lo anterior queda fuera (el saldo sí lo cuenta): acota las fechas para
+              verlo.
+            </span>
+          ) : null}
+        </p>
+      ) : null}
 
       {modelo === undefined ? (
         <p className="p-6 text-sm text-muted-foreground">
@@ -118,7 +213,9 @@ function KardexPorModelo(): React.JSX.Element {
       ) : consulta.isPending ? (
         <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
       ) : renglones.length === 0 ? (
-        <p className="p-6 text-sm text-muted-foreground">Este modelo no tiene movimientos.</p>
+        <p className="p-6 text-sm text-muted-foreground">
+          Este modelo no tiene movimientos en el periodo.
+        </p>
       ) : (
         <div className="overflow-x-auto" data-testid="kardex-tabla">
           <TablaDensa>
@@ -137,6 +234,34 @@ function KardexPorModelo(): React.JSX.Element {
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
+              {/* SALDO ANTERIOR: lo que cada artículo ya traía ANTES del periodo. Va arriba, como
+                  en cualquier kardex de papel, porque es de donde arranca la columna Saldo. */}
+              {saldosIniciales.map((s) => (
+                <TablaDensaFila
+                  key={`ini-${String(s.idColor)}-${String(s.idTalla)}-${String(s.idAlmacen)}-${String(s.idOrden ?? 'sin')}`}
+                  className="bg-primary-soft text-primary-soft-foreground"
+                  data-testid="kardex-saldo-inicial"
+                >
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                  <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
+                  <TablaDensaCelda>{s.almacen}</TablaDensaCelda>
+                  <TablaDensaCelda className="text-muted-foreground">
+                    {s.folioOrden !== null ? `#${String(s.folioOrden)}` : 'Sin orden'}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>{s.color}</TablaDensaCelda>
+                  <TablaDensaCelda>{s.etiquetaTalla}</TablaDensaCelda>
+                  <TablaDensaCelda numerica className="text-muted-foreground">
+                    —
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica className="text-muted-foreground">
+                    —
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica className="font-semibold">
+                    {s.saldo.toLocaleString('es-MX')}
+                  </TablaDensaCelda>
+                </TablaDensaFila>
+              ))}
               {renglones.map((r, i) => (
                 <TablaDensaFila
                   key={`${r.idMovimiento}-${r.idColor}-${r.idTalla}-${i}`}
@@ -296,15 +421,38 @@ function KardexPorFolio(): React.JSX.Element {
                 </p>
               ) : null}
 
-              {puedeMover && !movimiento.cancelado ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setACancelar(movimiento)}
-                  data-testid="kardex-folio-cancelar"
-                >
-                  <Ban className="mr-1.5 size-4" aria-hidden /> Cancelar movimiento
-                </Button>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {/* REIMPRESIÓN de la hoja del traspaso (fila 0.100) — la SEGUNDA puerta, igual que
+                    en telas (`ExistenciasTelasColorPagina`): sin ella el papel sólo existiría en el
+                    instante de guardarlo, y una impresora atascada o una pestaña cerrada lo
+                    perderían para siempre. Se busca el folio aquí y se vuelve a sacar.
+                    Guarda: sólo un TRASPASO tiene esta hoja (un movimiento manual no), y uno
+                    CANCELADO no se reimprime — su papel no debe volver a salir con un bulto. El
+                    backend rechaza los dos casos igual; esto sólo evita ofrecer un botón que
+                    llevaría a un error. `origenTipo` y `cancelado` ya venían en la respuesta del
+                    movimiento por folio: no hace falta tocar el contrato. */}
+                {movimiento.origenTipo === 'traspaso' && !movimiento.cancelado ? (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      window.open(urlImpresoTraspasoPt(movimiento.id), '_blank', 'noopener')
+                    }
+                    data-testid="kardex-folio-imprimir"
+                  >
+                    <Printer className="mr-1.5 size-4" aria-hidden /> Hoja del traspaso
+                  </Button>
+                ) : null}
+
+                {puedeMover && !movimiento.cancelado ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setACancelar(movimiento)}
+                    data-testid="kardex-folio-cancelar"
+                  >
+                    <Ban className="mr-1.5 size-4" aria-hidden /> Cancelar movimiento
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )}
         </CardContent>

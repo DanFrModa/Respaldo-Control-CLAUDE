@@ -25,7 +25,8 @@ import { moneda } from './comun';
 /**
  * ESTADO DE CUENTA DESGLOSADO (F6-E5, ex `EsMa_EdoDesglosado`): el detalle por orden/modelo/cantidad/
  * precio/importe del maquilero, exportable a Excel (botón `ParaCopiar` del viejo) y descargable como
- * PDF (impreso del estado de cuenta, R9). Lectura de cuenta con `esma.ver-pagos`; importes "—" sin
+ * PDF (impreso del estado de cuenta, R9). Debajo de los cargos, si las hubo, las PRENDAS
+ * INCOMPLETAS que entregó (V1-E8k, §Post-F9.136): informativas, sin importe, fuera del saldo. Lectura de cuenta con `esma.ver-pagos`; importes "—" sin
  * `consultas.ver-importes`.
  */
 export function DesglosadoPagina(): React.JSX.Element {
@@ -208,6 +209,58 @@ export function DesglosadoPagina(): React.JSX.Element {
               )}
             </CardContent>
           </Card>
+
+          {/* PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136): FUERA de los cargos, sin importe. Es el
+              mismo bloque que trae el PDF y la hoja del Excel — sale de la misma consulta. */}
+          {(datos?.incompletas.filas.length ?? 0) > 0 ? (
+            <Card data-testid="desg-incompletas">
+              <CardHeader>
+                <CardTitle>Prendas incompletas entregadas</CardTitle>
+                <CardDescription>
+                  Prendas que llegaron sin terminar de coser. Se entregaron, pero <b>no se pagan</b>{' '}
+                  ni entran a inventario: <b>no afectan el saldo</b>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <TablaDensa data-testid="desg-incompletas-tabla">
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Fecha</TablaDensaHead>
+                        <TablaDensaHead>Recibo</TablaDensaHead>
+                        <TablaDensaHead>Orden</TablaDensaHead>
+                        <TablaDensaHead>Modelo</TablaDensaHead>
+                        <TablaDensaHead>Proceso</TablaDensaHead>
+                        <TablaDensaHead numerica>Piezas</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
+                      {(datos?.incompletas.filas ?? []).map((f) => (
+                        <TablaDensaFila key={f.idRecibo} data-testid="desg-incompletas-fila">
+                          <TablaDensaCelda>{f.fecha}</TablaDensaCelda>
+                          <TablaDensaCelda>#{f.folioRecibo}</TablaDensaCelda>
+                          <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            {f.descripcionModelo
+                              ? `${f.codigoModelo} — ${f.descripcionModelo}`
+                              : f.codigoModelo}
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
+                            {f.piezas.toLocaleString('es-MX')}
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
+                      ))}
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
+                </div>
+                <p className="mt-3 text-sm font-medium" data-testid="desg-incompletas-total">
+                  Total de prendas incompletas:{' '}
+                  {(datos?.incompletas.totalPiezas ?? 0).toLocaleString('es-MX')}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       )}
     </div>

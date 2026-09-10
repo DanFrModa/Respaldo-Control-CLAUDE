@@ -1,18 +1,26 @@
 import {
+  AlertTriangleIcon,
+  BanIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeft,
   ChevronRightIcon,
+  ClipboardListIcon,
   FileDown,
   FileText,
   Info,
+  Loader2Icon,
   LockIcon,
+  MapPinIcon,
   MessagesSquareIcon,
   PencilIcon,
   Plus,
+  PlusIcon,
+  TargetIcon,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useDepartamentosCliente } from '@/api/clientes';
@@ -25,14 +33,26 @@ import {
   useAjustarPrecioLinea,
   useAprobarLinea,
   useEliminarLista,
+  useFijarPrecioTarget,
   useQuitarLineaLista,
   useDesgloseCostoLinea,
   useListaPrecios,
   useListasPrecios,
+  useEditarEncabezadoLista,
+  type ListaDetalle,
   type ListaLinea,
   type ListasQuery,
+  type ModeloNuevoCreado,
 } from '@/api/listas-precios';
+import { useCambiarEstadoRenglon } from '@/api/negociacion';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import {
+  destinosDesde,
+  diagnosticarPapel,
+  ETIQUETA_ESTADO_RENGLON,
+  TONO_ESTADO_RENGLON,
+  type EstadoRenglon,
+} from './estados-renglon';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -60,9 +80,14 @@ import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { Historial } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { CotizacionesDeLista } from './CotizacionesDeLista';
+import { DialogoAgregarModelos } from './DialogoAgregarModelos';
 import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
 import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
+import { ModeloNuevoEnMesa } from './ModeloNuevoEnMesa';
+import { PendientesRenglon } from './PendientesRenglon';
+import { puedeIrAPrecosteos, RUTA_PRECOSTEOS } from './puerta-precosteos';
 import { SelectorEstadoLista } from './SelectorEstadoLista';
 
 /** Query de estados (para los chips): ordenados por su `orden`. */
@@ -75,6 +100,21 @@ const QUERY_ESTADOS = {
 } as const;
 
 /** Tono del chip por código de estado (proto `ESTADO_LISTA`); desconocidos en neutro. */
+/**
+ * 🔴 **CUÁNTAS COLUMNAS TIENE LA TABLA DE RENGLONES**, en UN solo sitio.
+ *
+ * Las dos filas que la cruzan enteras —la banda de «Costo viejo» y el cajón de detalle— llevan un
+ * `colSpan`, y `TablaDensaCelda` lo reenvía tal cual al `<td>`. Cuando la fila 0.153 agregó la
+ * columna del precio de la negociación (de 7 a 8), esos dos `colSpan` se quedaron en 7 y **las dos
+ * filas se pintaban una columna cortas**: un defecto que las 2326 pruebas del frontend no vieron
+ * porque todas comprueban el CONTENIDO de las celdas y ninguna el ANCHO de la tabla.
+ *
+ * Por eso el número vive aquí y no repetido en cada `<td>`, y por eso
+ * `ListasPreciosPagina.test.tsx` compara los `<th>` del encabezado contra el `colSpan` REAL en vez
+ * de contra un número escrito a mano: quien agregue la novena columna y no toque esto, se pone rojo.
+ */
+const COLUMNAS_TABLA_RENGLONES = 8;
+
 const TONO_ESTADO_LISTA: Record<string, TonoEstado> = {
   abierta: 'ok',
   autorizada: 'info',
@@ -94,8 +134,45 @@ function BadgeEstadoLista({
   className?: string;
 }): React.JSX.Element {
   return (
-    <ChipEstado tono={TONO_ESTADO_LISTA[codigo] ?? 'neutro'} {...(className ? { className } : {})}>
+    <ChipEstado
+      tono={TONO_ESTADO_LISTA[codigo] ?? 'neutro'}
+      // ⭐ V1-E8x: «En negociación» es el MISMO string en los dos ejes y los dos chips conviven en
+      // esta pantalla. Aquí se dice de cuál es —y el del renglón, además, se pinta con contorno.
+      title={`Estado de la LISTA (el documento): ${nombre}`}
+      {...(className ? { className } : {})}
+    >
       {nombre}
+    </ChipEstado>
+  );
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — CHIP del estado de un **MODELO** dentro de la lista.
+ *
+ * 🔴 Se ve DISTINTO del de la lista a propósito: **contorno, no relleno**. Los dos chips comparten
+ * pantalla y uno de los cuatro nombres —«En negociación»— es idéntico carácter por carácter en los
+ * dos ejes; el color solo no basta para separarlos (y ni siquiera es fiable: el mismo tono aparece
+ * en los dos catálogos). El rótulo de la columna dice «Estado del modelo» y el `title` lo repite
+ * para quien llegue por lector de pantalla.
+ */
+function BadgeEstadoRenglon({ linea }: { linea: ListaLinea }): React.JSX.Element {
+  return (
+    <ChipEstado
+      tono={TONO_ESTADO_RENGLON[linea.estado]}
+      sinPunto
+      className="border border-current/40 bg-transparent"
+      // El `title` dice de qué eje es Y desde cuándo: `estadoEn` es la FIRMA vigente (quién lo dejó
+      // así y cuándo) — el rastro completo del dropeo y del revivir vive en el historial del
+      // renglón, que es donde se lee con autor y texto (§Post-F9.155 punto 3).
+      title={
+        linea.estadoEn === null
+          ? `Estado del MODELO dentro de la lista: ${linea.nombreEstado}`
+          : `Estado del MODELO dentro de la lista: ${linea.nombreEstado} · desde ${formatearFecha(linea.estadoEn)}`
+      }
+      data-testid="chip-estado-renglon"
+      data-estado={linea.estado}
+    >
+      {linea.nombreEstado}
     </ChipEstado>
   );
 }
@@ -114,6 +191,7 @@ function BadgeEstadoLista({
 export function ListasPreciosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('listas.administrar');
+  const navegar = useNavigate();
 
   const [idClienteFiltro, setIdClienteFiltro] = useState('');
   const [idDepartamentoFiltro, setIdDepartamentoFiltro] = useState('');
@@ -135,6 +213,25 @@ export function ListasPreciosPagina(): React.JSX.Element {
 
   const consulta = useListasPrecios(query);
   const listas = consulta.data ?? [];
+
+  /**
+   * 🔴 ¿Hay algún filtro DE SERVIDOR puesto? Sin esto, el vacío MIENTE.
+   *
+   * `listas` ya viene filtrado por `query`, así que filtrar por un cliente que no tiene listas
+   * dejaba el arreglo en cero y la pantalla contestaba *"todavía no hay ninguna lista… ve a congelar
+   * precostos"* — mandando a arreglar algo que no está roto.
+   *
+   * Lo cazó el reviewer de V1-E8f, y duele porque **es el muro de Daniel construido otra vez, tres
+   * pantallas más allá, dentro de la etapa que existe para cerrarlo** (§Post-F9.96: un aviso sólo
+   * cuando de verdad no se puede). *Distinguir "no hay nada" de "no hay nada AQUÍ" es la diferencia
+   * entre orientar y desorientar.*
+   */
+  const hayFiltroDeServidor =
+    idClienteFiltro !== '' || idDepartamentoFiltro !== '' || idEstadoFiltro !== '';
+  // ⭐ V1-E8t: *"no hay NINGUNA lista todavía"* (≠ *"no hay ninguna con este filtro"*). Se calcula
+  // UNA vez porque gobierna DOS cosas —el texto y su puerta a Pre-costeos—, y dos copias de la
+  // misma condición son exactamente cómo un aviso y su botón acaban discrepando.
+  const vacioDeUniverso = listas.length === 0 && !hayFiltroDeServidor;
 
   // Búsqueda local por folio o cliente (el listado no pagina en servidor: es acotado por empresa).
   const [busqueda, setBusqueda] = useState('');
@@ -251,12 +348,30 @@ export function ListasPreciosPagina(): React.JSX.Element {
           ) : consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando listas…</p>
           ) : filtradas.length === 0 ? (
-            <p
-              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+            <div
+              className="m-4 space-y-3 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
               data-testid="lista-precios-vacio"
             >
-              No hay listas de precios que coincidan.
-            </p>
+              <p>
+                {vacioDeUniverso
+                  ? 'Todavía no hay ninguna lista de precios. Una lista se arma con modelos que ya tienen su PRECOSTO CONGELADO: congélalos en Desarrollo › Pre-costeos y vuelve aquí con «Nueva lista».'
+                  : 'No hay listas de precios que coincidan con el filtro.'}
+              </p>
+              {/* ⭐ V1-E8t (§Post-F9.145): el texto NOMBRABA el lugar («Desarrollo › Pre-costeos»)
+                  y dejaba al usuario buscarlo en el menú. La misma puerta que ya tenía el diálogo
+                  de crear lista, con la misma función que la mide (`puerta-precosteos.ts`). */}
+              {vacioDeUniverso && puedeIrAPrecosteos(tienePermiso) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void navegar(RUTA_PRECOSTEOS)}
+                  data-testid="ir-a-precosteos-desde-vacio"
+                >
+                  Ir a Pre-costeos
+                </Button>
+              ) : null}
+            </div>
           ) : (
             <TablaDensa>
               <TablaDensaEncabezado>
@@ -293,10 +408,23 @@ export function ListasPreciosPagina(): React.JSX.Element {
                     </TablaDensaCelda>
                     <TablaDensaCelda numerica>
                       {l.totalRenglones.toLocaleString('es-MX')}
+                      {/* ⭐ V1-E8x: cuántos se cayeron, ahí mismo — si no, «10 modelos / 8
+                          aprobados» parece una lista a medias cuando en realidad ya está lista. */}
+                      {l.renglonesDropeados > 0 ? (
+                        <span
+                          className="ml-1 text-[11px] text-crit"
+                          data-testid="dropeados-listado"
+                        >
+                          (−{l.renglonesDropeados.toLocaleString('es-MX')})
+                        </span>
+                      ) : null}
                     </TablaDensaCelda>
                     <TablaDensaCelda numerica>
+                      {/* ⭐ V1-E8x (§Post-F9.155): aprobados sobre VIGENTES — el mismo par que el
+                          guard del papel evalúa. Contra el total, un dropeado sin firmar dejaba
+                          este conteo clavado en «8/10» aunque el PDF ya pudiera bajarse. */}
                       {l.renglonesAprobados.toLocaleString('es-MX')}/
-                      {l.totalRenglones.toLocaleString('es-MX')}
+                      {(l.totalRenglones - l.renglonesDropeados).toLocaleString('es-MX')}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       <BadgeEstadoLista codigo={l.codigoEstado} nombre={l.nombreEstado} />
@@ -347,8 +475,25 @@ function PaginaLista({
   const puedeAprobar = tienePermiso('listas.aprobar');
   const puedeAdministrar = tienePermiso('listas.administrar');
   const puedeNegociar = tienePermiso('listas.negociar');
+  // ⭐ V1-E8b (§Post-F9.125(a)+(b)): los CUATRO factores —verlos y moverlos— son del dueño. Antes el
+  // panel se pintaba con `consultas.ver-importes` y el botón con `listas.administrar`, los dos
+  // permisos que Desarrollo tiene. El backend ya los manda en `null`; aquí no se pinta el panel, que
+  // es lo que evita cuatro guiones sin explicación.
+  // (b) VERLOS y (a) MOVERLOS son DOS reglas de Daniel, no una. Hoy caen en el mismo permiso, y por
+  // eso se nombran aparte en vez de reusar una sola bandera: si mañana se separan —"que los vea, que
+  // no los mueva"— el cambio es de UNA línea aquí y no una cacería por la pantalla.
+  // ⚠️ Consecuencia declarada: como el botón vive DENTRO del panel, su guarda `puedeMoverFactores`
+  // es hoy inalcanzable-en-falso y NINGUNA prueba puede matarla (lo comprobó una mutación: revertirla
+  // deja la suite en verde). Se conserva porque expresa la regla (a), no por defensa en profundidad.
+  const puedeVerFactores = puedeAprobar;
+  const puedeMoverFactores = puedeAprobar;
   const [borrarListaAbierto, setBorrarListaAbierto] = useState(false);
   const borrarLista = useEliminarLista();
+  // ⭐⭐ V1-E8y (§Post-F9.152) — la mesa ABIERTA: agregar modelos (cotizados o nuevos), el LUGAR de
+  // la cita y la tira del modelo que se acaba de crear y todavía no puede entrar a la lista.
+  const [agregarAbierto, setAgregarAbierto] = useState(false);
+  const [citaAbierta, setCitaAbierta] = useState(false);
+  const [modeloNuevo, setModeloNuevo] = useState<ModeloNuevoCreado | null>(null);
 
   const consulta = useListaPrecios(idLista);
   const [editarFactoresAbierto, setEditarFactoresAbierto] = useState(false);
@@ -387,9 +532,34 @@ function PaginaLista({
     );
   }
 
-  // Σ del pie del card (sobre los renglones ya cargados; el cálculo de precios es del backend).
-  const sumaCosto = lista.lineas.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
-  const sumaPrecio = lista.lineas.reduce(
+  // §Post-F9.125(c): de una lista sin aprobar no sale papel. `aprobado` es un hecho del renglón
+  // (no depende de ver importes), así que el aviso dice lo mismo para todos los que llegan aquí.
+  //
+  // ⭐⭐ V1-E8x (§Post-F9.155): el criterio ya no es «todos los renglones», es «todos los VIGENTES»
+  // — un modelo dropeado nunca se va a aprobar, y exigirle firma dejaba la lista sin papel para
+  // siempre. El diagnóstico entero (quiénes van, quiénes se cayeron, a quién le falta firma) lo
+  // arma `diagnosticarPapel`, que espeja el guard del servidor renglón por renglón.
+  const papel = diagnosticarPapel(lista.lineas);
+  const listaCompletamenteAprobada = papel.puedeSalir;
+  const sinAprobarTexto = papel.motivo ?? '';
+
+  // ⭐ V1-E8d (§Post-F9.127): los renglones cuyo costo congelado quedó VIEJO porque la receta del
+  // modelo se movió después. La FRASE la arma el servidor (`costo-viejo.ts`), aquí sólo se cuentan
+  // para el resumen de arriba — el detalle de cada uno va pegado a SU renglón, que es donde sirve.
+  //
+  // ⭐ V1-E8x: se cuenta sobre los **VIGENTES**, igual que en el diálogo de emitir cotización. Un
+  // dropeado con la receta movida levantaba un aviso sin consecuencia —no va en ningún papel— y,
+  // peor, las dos pantallas decían cosas distintas del mismo hecho. Un solo criterio.
+  //
+  // ⚠️ El aviso PEGADO a su renglón sí se sigue pintando en un dropeado, y es a propósito: ahí es
+  // información local del modelo, y al revivirlo vuelve a importar. Lo que se acota es el RESUMEN,
+  // que habla de lo que afecta al papel.
+  const conCostoViejo = papel.vigentes.filter((ln) => ln.avisoCostoViejo !== null);
+
+  // Σ del pie del card. ⭐ V1-E8x: sobre los VIGENTES — sumar un modelo dropeado inflaría el total
+  // de la oferta con algo que el cliente no va a ver en ningún papel.
+  const sumaCosto = papel.vigentes.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
+  const sumaPrecio = papel.vigentes.reduce(
     (a, ln) => a + (ln.precioAprobado ?? ln.precioCalculado ?? 0),
     0,
   );
@@ -399,11 +569,23 @@ function PaginaLista({
       className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5"
       data-testid="detalle-lista-precios"
     >
-      {/* ── Encabezado (proto: regreso + título con estado + acciones) ──────── */}
+      {/*
+        ── Encabezado (proto: regreso + título con estado + acciones) ────────
+
+        ⭐ V1-E8w — **EL TÍTULO YA NO SE PARTE PALABRA POR PALABRA.** Daniel mandó la foto: «Lista #1
+        · C&A / Dama» bajaba una palabra por renglón y se comía media pantalla. No era el texto: era
+        el acomodo. `flex-1` es `flex: 1 1 0%`, o sea **base cero**, y con base cero este bloque
+        SIEMPRE "cabe" en la línea — así que el `flex-wrap` del `<header>` nunca llegaba a
+        dispararse y, en su lugar, el título se encogía hasta su ancho MÍNIMO (la palabra más larga)
+        para dejarle sitio a los botones. Se arregla dándole una base real (`basis-80`) y dejando que
+        las acciones se vayan al renglón de abajo (`shrink-0` + `basis-full sm:basis-auto`), que es
+        lo que el usuario espera cuando la ventana se angosta. `text-pretty` remata el reparto de
+        palabras cuando el título sí tiene que ocupar dos líneas.
+      */}
       <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 sm:basis-80" data-testid="encabezado-lista">
           {regreso}
-          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight text-pretty">
             Lista #{lista.folio} · {lista.nombreCliente}{' '}
             <span className="font-medium text-muted-foreground">/ {lista.nombreDepartamento}</span>
             <BadgeEstadoLista
@@ -413,7 +595,33 @@ function PaginaLista({
             />
           </h1>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-            {lista.lineas.length} modelos · {formatearFecha(lista.fecha)}
+            {lista.lineas.length} modelos
+            {papel.dropeados.length > 0
+              ? ` (${String(papel.vigentes.length)} vigentes · ${String(papel.dropeados.length)} dropeados)`
+              : ''}{' '}
+            · {formatearFecha(lista.fecha)}
+            {/* ⭐ V1-E8y: DÓNDE fue la cita. Meses después es lo que ayuda a acordarse de qué se
+                habló; por eso va pegado a la fecha y no escondido en un panel. */}
+            {lista.lugar === null || lista.lugar === '' ? null : (
+              <span data-testid="lugar-cita">
+                {' · '}
+                <MapPinIcon className="mr-0.5 inline size-3.5 align-[-2px]" aria-hidden />
+                {lista.lugar}
+              </span>
+            )}
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-1 h-6 px-1.5 text-[11.5px]"
+                onClick={() => setCitaAbierta(true)}
+                data-testid="editar-datos-cita"
+              >
+                <PencilIcon className="size-3" aria-hidden />
+                {lista.lugar === null || lista.lugar === '' ? 'Lugar de la cita' : 'Editar'}
+              </Button>
+            ) : null}
           </p>
           {lista.notas === null || lista.notas === '' ? null : (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -423,11 +631,20 @@ function PaginaLista({
           )}
         </div>
         {verImportes ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex shrink-0 basis-full flex-wrap items-center gap-2 sm:basis-auto"
+            data-testid="acciones-lista"
+          >
+            {/* ⭐ V1-E8b (§Post-F9.125(c)): de una lista sin aprobar NO sale papel — ni borrador.
+                El servidor lo NIEGA (409 nombrando los modelos que faltan); aquí los botones se
+                deshabilitan y se dice por qué, para que no queden dos controles que fallan al
+                pulsarlos (la cicatriz de «esconder, no negar» es la contraria: aquí se niega en el
+                servidor Y se explica en la pantalla). */}
             <Button
               type="button"
               variant="outline"
               size="sm"
+              disabled={!listaCompletamenteAprobada}
               onClick={() => imprimirListaPdf(lista.id)}
               data-testid="descargar-lista-pdf"
             >
@@ -438,6 +655,7 @@ function PaginaLista({
               type="button"
               variant="outline"
               size="sm"
+              disabled={!listaCompletamenteAprobada}
               onClick={() => descargarListaExcel(lista.id)}
               data-testid="descargar-lista-excel"
             >
@@ -459,6 +677,38 @@ function PaginaLista({
                 Borrar lista
               </Button>
             ) : null}
+            {listaCompletamenteAprobada ? null : (
+              <p
+                className="flex w-full items-start gap-1.5 text-[11.5px] text-muted-foreground"
+                data-testid="aviso-sin-aprobar"
+              >
+                <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                <span>
+                  No se puede bajar el PDF ni el Excel: {sinAprobarTexto}
+                  {papel.sinAprobar.length > 0
+                    ? ' sin precio aprobado por el dueño. Un papel con precios que nadie autorizó confunde al cliente.'
+                    : '.'}
+                </span>
+              </p>
+            )}
+            {/* ⭐⭐ V1-E8x (§Post-F9.155): los dropeados NO salen en el papel, y eso se DICE — si
+                no, quien baja el PDF cuenta 8 modelos donde la lista enseña 10 y no sabe por qué. */}
+            {papel.dropeados.length > 0 ? (
+              <p
+                className="flex w-full items-start gap-1.5 text-[11.5px] text-muted-foreground"
+                data-testid="aviso-dropeados"
+              >
+                <BanIcon className="mt-0.5 size-3.5 shrink-0 text-crit" aria-hidden />
+                <span>
+                  {papel.dropeados.length === 1
+                    ? 'Un modelo está DROPEADO y no sale'
+                    : `${String(papel.dropeados.length)} modelos están DROPEADOS y no salen`}{' '}
+                  en el PDF, el Excel ni la cotización:{' '}
+                  {papel.dropeados.map((ln) => ln.codigoModelo).join(', ')}. Revívelos si el cliente
+                  se arrepiente — su historial se conserva.
+                </span>
+              </p>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -470,12 +720,18 @@ function PaginaLista({
         </div>
       ) : null}
 
+      {/* ── Cotizaciones emitidas (V1-E7c): el papel que salió de esta mesa ── */}
+      <CotizacionesDeLista lista={lista} />
+
       {/* ── Panel de factores del cliente (proto .lp-factores) ──────────────── */}
-      {verImportes ? (
+      {/* §Post-F9.125(b): sólo el dueño. Para los demás la sección entera NO se pinta —ni su
+          rótulo—, en vez de dejarla con cuatro guiones o un letrero de permiso adentro
+          (§Post-F9.68, mismo criterio que la ficha del cliente). */}
+      {puedeVerFactores ? (
         <section className="shrink-0 rounded-xl border bg-card px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-[13px] font-semibold">Factores del cliente</h4>
-            {puedeAdministrar ? (
+            {puedeAprobar ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary-soft-foreground">
                 <PencilIcon className="size-3" aria-hidden />
                 se editan por diálogo, queda auditado
@@ -489,14 +745,14 @@ function PaginaLista({
           </div>
           <p className="num mt-1 text-[11.5px] text-muted-foreground">
             Precio = costo ÷ (1 − margen) ÷ (1 − descuentos − regalías − costo ventas), redondeado
-            al alza
+            al alza. <b>Moverlos invalida las aprobaciones</b> de esta lista.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <FactorLectura etiqueta="Margen" valor={lista.margenPct} />
             <FactorLectura etiqueta="Descuentos" valor={lista.descuentosPct} />
             <FactorLectura etiqueta="Regalías" valor={lista.regaliasPct} />
             <FactorLectura etiqueta="Costo de ventas" valor={lista.costoVentasPct} />
-            {puedeAdministrar ? (
+            {puedeMoverFactores ? (
               <Button
                 type="button"
                 variant="outline"
@@ -516,10 +772,35 @@ function PaginaLista({
         </section>
       ) : null}
 
+      {/* ⭐⭐ V1-E8y — el modelo que se acaba de crear en la cita: falta costearlo y agregarlo. */}
+      {modeloNuevo === null ? null : (
+        <ModeloNuevoEnMesa
+          creado={modeloNuevo}
+          idLista={lista.id}
+          alOcultar={() => setModeloNuevo(null)}
+        />
+      )}
+
       {/* ── Card: precios por modelo (aprobación renglón por renglón) ───────── */}
       <div className="flex min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-wrap items-center gap-2.5 border-b px-3.5 py-3">
           <h3 className="text-[13.5px] font-semibold">Precios por modelo</h3>
+          {/* ⭐⭐ V1-E8y (§Post-F9.152): hasta esta versión una lista nacía con sus modelos y NO
+              admitía ni uno más — agregar uno obligaba a borrarla y rehacerla. Va aquí, en el card
+              de los modelos, y no en las acciones del encabezado: aquéllas sólo se pintan a quien
+              ve importes, y agregar un modelo no es ver un precio. */}
+          {puedeAdministrar ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAgregarAbierto(true)}
+              data-testid="abrir-agregar-modelos"
+            >
+              <PlusIcon aria-hidden />
+              Agregar modelos
+            </Button>
+          ) : null}
           {verImportes ? (
             <span className="ml-auto text-[11.5px] text-faint">
               Costo Σ <b className="num text-foreground">{formatearMoneda(sumaCosto)}</b> · Precio Σ{' '}
@@ -527,15 +808,54 @@ function PaginaLista({
             </span>
           ) : null}
         </div>
+        {/* ⭐ V1-E8d (§Post-F9.127) — Daniel: *"Si. Ok. Que me avise."* El resumen dice CUÁNTOS y
+            CUÁLES; el porqué de cada uno va pegado a su renglón. Es un AVISO, no un candado:
+            aprobar y bajar el papel siguen funcionando. */}
+        {conCostoViejo.length > 0 ? (
+          <div
+            className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[11.5px]"
+            role="status"
+            data-testid="aviso-costo-viejo-resumen"
+          >
+            <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+            <span>
+              <b>
+                {conCostoViejo.length === 1
+                  ? 'Un renglón está costeado con una receta vieja'
+                  : `${String(conCostoViejo.length)} renglones están costeados con una receta vieja`}
+              </b>
+              : {conCostoViejo.map((ln) => ln.codigoModelo).join(', ')}. Les cambiaron la receta
+              DESPUÉS de congelarse el costo con el que está calculado su precio. Cada renglón dice
+              abajo qué cambió y cuándo.
+            </span>
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <TablaDensa>
             <TablaDensaEncabezado>
               <TablaDensaFila>
                 <TablaDensaHead>Modelo</TablaDensaHead>
                 <TablaDensaHead numerica>Costo</TablaDensaHead>
+                {/* ⭐ V1-E8w (§Post-F9.150): el TARGET que dio el cliente. Va ANTES del precio
+                    calculado porque es contra lo que se compara, y Aurora lo captura aquí. */}
+                <TablaDensaHead numerica>Target cliente</TablaDensaHead>
                 <TablaDensaHead numerica>Precio calculado</TablaDensaHead>
                 <TablaDensaHead numerica>Precio aprobado</TablaDensaHead>
-                <TablaDensaHead>Estado</TablaDensaHead>
+                {/* ⭐⭐ FILA 0.153 — **el precio que quedó en la negociación, PEGADO al aprobado**
+                    (Daniel: *«o estaría bien poner los dos, mejor… dice precio aprobado, pero
+                    dentro de la negociación quedó otro»*). Van adjuntas a propósito: la confusión
+                    que reportó era no poder comparar dos números que vivían en pantallas distintas.
+                    NO sustituye al aprobado —firmar sigue siendo un acto aparte, del dueño—; lo
+                    acompaña. */}
+                <TablaDensaHead
+                  numerica
+                  title="Último precio registrado en la negociación de este modelo (la última fila de su historial). No es la firma del dueño: aprobar es un acto aparte. Y no siempre lo pactó alguien: mover los factores de la lista también deja aquí el precio recalculado."
+                >
+                  Último precio de la negociación
+                </TablaDensaHead>
+                {/* ⭐ V1-E8x: la columna se NOMBRA («del modelo») porque arriba, en el encabezado
+                    del detalle, vive el chip de la LISTA con nombres que se repiten. */}
+                <TablaDensaHead>Estado del modelo</TablaDensaHead>
                 <TablaDensaHead className="text-right" />
               </TablaDensaFila>
             </TablaDensaEncabezado>
@@ -560,8 +880,9 @@ function PaginaLista({
                 permiso por dentro — la forma interna del sistema no es del
                 usuario. (Este aviso solo lo ve quien SÍ puede aprobar.) */}
             <span>
-              Aprobar/teclear precios y editar factores es facultad del <b>dueño</b>. Queda
-              registrado quién y cuándo.
+              Aprobar/teclear precios y mover los factores es facultad del <b>dueño</b>. Queda
+              registrado quién y cuándo — y <b>mover un factor tumba las aprobaciones</b>, que se
+              vuelven a firmar.
             </span>
           </div>
         ) : null}
@@ -576,6 +897,28 @@ function PaginaLista({
         alCambiarAbierto={setEditarFactoresAbierto}
         lista={lista}
       />
+
+      {/* ⭐⭐ V1-E8y: agregar modelos ya cotizados, o crear uno en plena cita.
+          ⚠️ Se monta SÓLO mientras está abierto: dispara cinco consultas (entre ellas el diagnóstico
+          de candidatos, que crece monótonamente por cliente) y `useProyectos` no admite `enabled`, así
+          que montado siempre las pagaría al abrir CUALQUIER lista. */}
+      {agregarAbierto ? (
+        <DialogoAgregarModelos
+          abierto
+          alCambiarAbierto={setAgregarAbierto}
+          mesa={{
+            id: lista.id,
+            idCliente: lista.idCliente,
+            idClienteDepartamento: lista.idClienteDepartamento,
+            nombreCliente: lista.nombreCliente,
+            nombreDepartamento: lista.nombreDepartamento,
+          }}
+          alCrearModeloNuevo={setModeloNuevo}
+        />
+      ) : null}
+
+      {/* ⭐ V1-E8y: el LUGAR de la cita y las notas (que sólo se podían escribir al crear). */}
+      <DialogoDatosCita abierto={citaAbierta} alCambiarAbierto={setCitaAbierta} lista={lista} />
 
       {/* V1-E4 (punto 4): borrar la lista completa. */}
       <DialogoConfirmacion
@@ -649,9 +992,13 @@ function FilaRenglon({
   const aprobar = useAprobarLinea();
   const quitar = useQuitarLineaLista();
   const [quitarAbierto, setQuitarAbierto] = useState(false);
+  const [targetAbierto, setTargetAbierto] = useState(false);
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
   const [negociacionAbierta, setNegociacionAbierta] = useState(false);
   const [expandido, setExpandido] = useState(false);
+  // ⭐ V1-E8y: los pendientes SIN tachar de este modelo (los tachados no se cuentan: ya no son
+  // pendientes, aunque se conserven).
+  const pendientesAbiertos = linea.pendientes.filter((p) => !p.resuelto).length;
 
   function alAprobar(): void {
     aprobar.mutate(linea.id, {
@@ -662,7 +1009,14 @@ function FilaRenglon({
 
   return (
     <>
-      <TablaDensaFila data-testid="fila-renglon-lista" data-aprobado={linea.aprobado}>
+      <TablaDensaFila
+        data-testid="fila-renglon-lista"
+        data-aprobado={linea.aprobado}
+        data-estado={linea.estado}
+        // ⭐ V1-E8x: un modelo dropeado se APAGA. No se esconde (sigue siendo parte de la
+        // negociación y se puede revivir), pero tiene que leerse como lo que es: fuera del papel.
+        className={linea.estado === 'dropeado' ? 'opacity-60' : undefined}
+      >
         <TablaDensaCelda>
           <div className="flex items-center gap-2">
             {/* lp-exp del proto: botoncito con chevron para el desglose de costo. */}
@@ -681,18 +1035,61 @@ function FilaRenglon({
               )}
             </button>
             <div className="min-w-0">
-              <div className="truncate font-semibold">
+              <div
+                className={
+                  linea.estado === 'dropeado'
+                    ? 'truncate font-semibold line-through decoration-crit/60'
+                    : 'truncate font-semibold'
+                }
+              >
                 {linea.descripcionModelo ?? linea.codigoModelo}
               </div>
               <div className="num truncate text-xs text-muted-foreground">
                 Nuestro {linea.codigoModelo}
                 {linea.numeroCliente === null ? '' : ` · ${linea.numeroCliente}`}
+                {/* ⭐ V1-E8y: cuántos pendientes SIN tachar tiene este modelo. Se enseña en la fila
+                    (no sólo dentro del cajón) porque el pendiente existe para no olvidarse de él:
+                    escondido detrás de un clic no cumple su función. */}
+                {pendientesAbiertos === 0 ? null : (
+                  <span
+                    className="ml-1.5 inline-flex items-center gap-1 rounded-md bg-warn-soft px-1.5 py-px text-[10.5px] font-semibold text-warn"
+                    title={`${String(pendientesAbiertos)} pendiente(s) sin resolver`}
+                    data-testid="chip-pendientes"
+                  >
+                    <ClipboardListIcon className="size-3" aria-hidden />
+                    {pendientesAbiertos}
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </TablaDensaCelda>
         <TablaDensaCelda numerica>
           {verImportes ? formatearMoneda(linea.costoUnit) : '—'}
+        </TablaDensaCelda>
+        {/* ⭐ V1-E8w (§Post-F9.150) — EL TARGET DEL CLIENTE. Lo captura **Aurora al armar la lista**
+            (`listas.administrar`), no el dueño en la mesa; de ahí que el botón cuelgue de ese
+            permiso y no de `listas.aprobar`. Sin target se ve el hueco, que también es un dato
+            ("no nos lo dio"), no un error. INFORMA, NO BLOQUEA. */}
+        <TablaDensaCelda numerica>
+          <div className="flex items-center justify-end gap-1">
+            <span className={linea.tieneTarget ? '' : 'text-faint'} data-testid="target-cliente">
+              {linea.tieneTarget ? (verImportes ? formatearMoneda(linea.precioTarget) : 'Sí') : '—'}
+            </span>
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Capturar el target price que dio el cliente"
+                aria-label={`Target del cliente para ${linea.codigoModelo}`}
+                onClick={() => setTargetAbierto(true)}
+                data-testid="capturar-target"
+              >
+                <TargetIcon className="size-4" aria-hidden />
+              </Button>
+            ) : null}
+          </div>
         </TablaDensaCelda>
         <TablaDensaCelda numerica>
           {verImportes ? formatearMoneda(linea.precioCalculado) : '—'}
@@ -706,12 +1103,52 @@ function FilaRenglon({
             <span className="text-faint">—</span>
           )}
         </TablaDensaCelda>
-        <TablaDensaCelda>
-          {linea.aprobado ? (
-            <ChipEstado tono="ok">Aprobado</ChipEstado>
+        {/* ⭐⭐ FILA 0.153 — el precio que dejó la negociación. Sin negociación **no se inventa
+            nada**: el hueco también dice algo ("a este modelo nadie le ha puesto precio en la
+            mesa"). Sin `consultas.ver-importes` se ve QUE lo hay pero no CUÁNTO, igual que el
+            target del cliente. La fecha va en el `title` porque es lo que resuelve la duda de
+            Daniel cuando los dos números difieren: cuál de los dos es el más reciente. */}
+        <TablaDensaCelda numerica>
+          {linea.tienePrecioNegociado ? (
+            <span
+              className="num"
+              data-testid="precio-negociado"
+              title={
+                linea.precioNegociadoEn === null
+                  ? undefined
+                  : `Registrado en la negociación el ${formatearFecha(linea.precioNegociadoEn)}`
+              }
+            >
+              {verImportes ? formatearMoneda(linea.precioNegociado) : 'Negociado'}
+            </span>
           ) : (
-            <ChipEstado tono="neutro">Pendiente</ChipEstado>
+            <span className="text-faint">—</span>
           )}
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <div className="flex flex-wrap items-center gap-1">
+            {/* ⭐⭐ V1-E8x: PRIMERO el estado del modelo (el eje nuevo, el que Daniel pidió para
+                *«saber los modelos que ya cerre»*), y luego la firma del precio. Son DOS ejes que
+                conviven: un modelo cerrado puede seguir sin firmar, y un dropeado conserva su firma
+                vieja intacta — por eso revivirlo no pierde nada. */}
+            <BadgeEstadoRenglon linea={linea} />
+            {linea.aprobado ? (
+              <ChipEstado tono="ok">Aprobado</ChipEstado>
+            ) : (
+              <ChipEstado tono="neutro">Pendiente</ChipEstado>
+            )}
+            {/* ⭐ V1-E8d: el chip es para BUSCARLO de un vistazo en una lista larga; el QUÉ y el
+                CUÁNDO van en el renglón de abajo, que es lo que de verdad avisa. */}
+            {linea.avisoCostoViejo === null ? null : (
+              <ChipEstado tono="warn" data-testid="chip-costo-viejo">
+                Costo viejo
+              </ChipEstado>
+            )}
+          </div>
+          {/* El selector sólo para quien negocia (el servidor re-verifica, A1). Va PEGADO al chip:
+              Daniel cierra cinco modelos de diez de corrido, y mandarlo a un diálogo por renglón
+              convertiría eso en quince clics. */}
+          {puedeNegociar ? <SelectorEstadoRenglon linea={linea} /> : null}
         </TablaDensaCelda>
         <TablaDensaCelda className="text-right whitespace-nowrap">
           <div className="flex justify-end gap-1">
@@ -771,6 +1208,11 @@ function FilaRenglon({
             alCambiarAbierto={setTecleoAbierto}
             linea={linea}
           />
+          <DialogoPrecioTarget
+            abierto={targetAbierto}
+            alCambiarAbierto={setTargetAbierto}
+            linea={linea}
+          />
           <DialogoNegociacionRenglon
             abierto={negociacionAbierta}
             alCambiarAbierto={setNegociacionAbierta}
@@ -805,14 +1247,215 @@ function FilaRenglon({
           />
         </TablaDensaCelda>
       </TablaDensaFila>
+      {/* ⭐ V1-E8d (§Post-F9.127) — LA FRASE DEL SERVIDOR, ENTERA Y PEGADA A SU RENGLÓN. No se
+          recorta ni se resume aquí: dice QUÉ parte de la receta cambió, CUÁNDO, contra qué versión
+          del precosto, y qué hacer. Un semáforo mudo no avisa de nada. */}
+      {linea.avisoCostoViejo === null ? null : (
+        <TablaDensaFila data-testid="aviso-costo-viejo">
+          <TablaDensaCelda colSpan={COLUMNAS_TABLA_RENGLONES} className="bg-warn-soft">
+            <div className="flex items-start gap-2 text-[11.5px]">
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              <span>
+                <b>Costo viejo — {linea.codigoModelo}.</b> {linea.avisoCostoViejo}
+              </span>
+            </div>
+          </TablaDensaCelda>
+        </TablaDensaFila>
+      )}
       {expandido ? (
         <TablaDensaFila data-testid="desglose-renglon">
-          <TablaDensaCelda colSpan={6} className="bg-muted/30">
+          <TablaDensaCelda colSpan={COLUMNAS_TABLA_RENGLONES} className="bg-muted/30">
             <DesgloseCosto idLinea={linea.id} verImportes={verImportes} />
+            {/* ⭐ V1-E8y (§Post-F9.152) — LA LIBRETA de este modelo, en el mismo cajón que su
+                desglose: en la cita se abre el renglón, se mira el costo y se anota lo que falta. */}
+            <div className="mt-3 border-t pt-3">
+              <PendientesRenglon
+                idLinea={linea.id}
+                codigoModelo={linea.codigoModelo}
+                pendientes={linea.pendientes}
+                puedeEditar={puedeAdministrar}
+              />
+            </div>
           </TablaDensaCelda>
         </TablaDensaFila>
       ) : null}
     </>
+  );
+}
+
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — SELECTOR del estado de UN MODELO dentro de la lista. Daniel:
+ *
+ * > *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y
+ * > los otros ya no los vendo»*
+ *
+ * 🔴 **Va en la fila y dispara al elegir, sin diálogo de confirmación.** Es deliberado: el caso de
+ * uso es cerrar cinco modelos de diez de corrido, y un diálogo por renglón lo volvería quince
+ * clics. Se puede hacer así porque **nada se pierde**: el cambio es REVERSIBLE (revivir conserva
+ * toda la historia, §Post-F9.155) y queda AUDITADO con quién y cuándo, así que un clic de más se
+ * deshace con otro clic y deja constancia de los dos.
+ *
+ * 🔴 Las opciones que ofrece ESPEJAN al servidor: desde un modelo cerrado o dropeado el único
+ * camino es REVIVIR (Abierto / En negociación). El backend lo re-valida; esto sólo evita ofrecer
+ * un movimiento que va a volver como 409.
+ */
+function SelectorEstadoRenglon({ linea }: { linea: ListaLinea }): React.JSX.Element {
+  const cambiar = useCambiarEstadoRenglon();
+  // El destino elegido se guarda en estado (y se limpia al terminar) en vez de dejar el select
+  // clavado en «Mover a…»: un `value` constante hace que la opción elegida NUNCA quede marcada, y
+  // eso confunde a quien lo usa —y a los navegadores automatizados— mientras la mutación viaja.
+  const [destino, setDestino] = useState('');
+  const destinos = destinosDesde(linea.estado);
+
+  function alElegir(elegido: string): void {
+    setDestino(elegido);
+    if (elegido === '') {
+      return;
+    }
+    cambiar.mutate(
+      { idLinea: linea.id, cuerpo: { estado: elegido as EstadoRenglon } },
+      {
+        onSuccess: () => {
+          toast.success(
+            `"${linea.codigoModelo}" quedó en «${ETIQUETA_ESTADO_RENGLON[elegido as EstadoRenglon]}».`,
+          );
+          setDestino('');
+        },
+        onError: (error) => {
+          toast.error(error.message);
+          setDestino('');
+        },
+      },
+    );
+  }
+
+  return (
+    <SelectNativo
+      aria-label={`Estado del modelo ${linea.codigoModelo}`}
+      title="Mover este modelo: abierto · en negociación · cerrado · dropeado"
+      className="mt-1 h-7 w-auto text-[11.5px]"
+      value={destino}
+      disabled={cambiar.isPending}
+      onChange={(e) => alElegir(e.target.value)}
+      data-testid="estado-renglon"
+    >
+      <option value="">Mover a…</option>
+      {destinos.map((destino) => (
+        <option key={destino} value={destino}>
+          {ETIQUETA_ESTADO_RENGLON[destino]}
+        </option>
+      ))}
+    </SelectNativo>
+  );
+}
+
+/**
+ * ⭐ V1-E8y (§Post-F9.152) — LOS DATOS DE LA CITA: el **LUGAR** y las **NOTAS**.
+ *
+ * El lugar es nuevo («oficinas de C&A Santa Fe», «Zoom»): meses después es lo que ayuda a acordarse
+ * de qué se habló en esa junta.
+ *
+ * ⚠️ Las notas **existían desde F8-E4 y no se podían corregir**: el único sitio que las escribía era
+ * el alta de la lista. Se abren aquí junto al lugar porque son el mismo acto —los datos de la
+ * junta—; dejar el campo nuevo editable y el viejo no habría sido la clase de asimetría que nadie
+ * recuerda después.
+ */
+function DialogoDatosCita({
+  abierto,
+  alCambiarAbierto,
+  lista,
+}: {
+  abierto: boolean;
+  alCambiarAbierto: (abierto: boolean) => void;
+  lista: ListaDetalle;
+}): React.JSX.Element {
+  const guardar = useEditarEncabezadoLista();
+  const [lugar, setLugar] = useState(lista.lugar ?? '');
+  const [notas, setNotas] = useState(lista.notas ?? '');
+
+  // Al abrir se re-siembra con lo que hay guardado: si otra pestaña lo movió, no se pisa con lo que
+  // este diálogo tenía en memoria de la vez pasada.
+  useEffect(() => {
+    if (abierto) {
+      setLugar(lista.lugar ?? '');
+      setNotas(lista.notas ?? '');
+    }
+  }, [abierto, lista.lugar, lista.notas]);
+
+  function alGuardar(): void {
+    guardar.mutate(
+      {
+        id: lista.id,
+        // '' → null: vaciar el campo es un acto legítimo (M1), no "no tocar".
+        cuerpo: {
+          lugar: lugar.trim() === '' ? null : lugar.trim(),
+          notas: notas.trim() === '' ? null : notas.trim(),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Datos de la cita guardados.');
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Datos de la cita</DialogTitle>
+          <DialogDescription>
+            Dónde fue la junta y las notas de la lista #{lista.folio}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Field>
+            <FieldLabel htmlFor="cita-lugar">Lugar</FieldLabel>
+            <Input
+              id="cita-lugar"
+              placeholder="Ej. Oficinas de C&A, Santa Fe"
+              value={lugar}
+              disabled={guardar.isPending}
+              onChange={(e) => setLugar(e.target.value)}
+              data-testid="input-lugar-cita"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cita-notas">Notas</FieldLabel>
+            <Input
+              id="cita-notas"
+              placeholder="Ej. Junta de temporada otoño"
+              value={notas}
+              disabled={guardar.isPending}
+              onChange={(e) => setNotas(e.target.value)}
+              data-testid="input-notas-cita"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => alCambiarAbierto(false)}
+            disabled={guardar.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={alGuardar}
+            disabled={guardar.isPending}
+            data-testid="guardar-datos-cita"
+          >
+            {guardar.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -864,6 +1507,106 @@ function DesgloseCosto({
 }
 
 /** Diálogo para teclear el precio aprobado de un renglón. */
+/**
+ * ⭐ V1-E8w (§Post-F9.150) — CAPTURA del **TARGET PRICE del cliente**. Daniel:
+ *
+ * > *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
+ * > negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios… Debe de tener un
+ * > liugar para poner el target que le dio el cliente si es que nos lo dio.»*
+ *
+ * 🔴 Es **de Aurora**, no del dueño: el botón cuelga de `listas.administrar` (la misma puerta con la
+ * que se agrega y se quita un renglón), no de `listas.aprobar`. Y **se puede BORRAR**: *"si es que
+ * nos lo dio"* — un número capturado por error no puede atrapar a nadie, porque un target falso en
+ * la mesa es peor que ninguno.
+ */
+function DialogoPrecioTarget({
+  abierto,
+  alCambiarAbierto,
+  linea,
+}: {
+  abierto: boolean;
+  alCambiarAbierto: (abierto: boolean) => void;
+  linea: ListaLinea;
+}): React.JSX.Element {
+  const fijar = useFijarPrecioTarget();
+  const [valor, setValor] = useState(linea.precioTarget === null ? '' : String(linea.precioTarget));
+
+  function guardar(precioTarget: number | null): void {
+    fijar.mutate(
+      { idLinea: linea.id, cuerpo: { precioTarget } },
+      {
+        onSuccess: () => {
+          toast.success(
+            precioTarget === null
+              ? `Target de "${linea.codigoModelo}" borrado.`
+              : `Target de "${linea.codigoModelo}" guardado.`,
+          );
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Target del cliente — {linea.codigoModelo}</DialogTitle>
+          <DialogDescription>
+            El precio objetivo que <b>nos dio el cliente</b>, si nos lo dio. Aparece en la mesa de
+            negociación como referencia: <b>informa, no bloquea</b> nada.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Field>
+            <FieldLabel htmlFor="target-valor">Target</FieldLabel>
+            <Input
+              id="target-valor"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              autoFocus
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              data-testid="input-target"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          {linea.tieneTarget ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => guardar(null)}
+              disabled={fijar.isPending}
+              data-testid="borrar-target"
+            >
+              Borrar target
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            onClick={() => {
+              const precio = Number(valor);
+              if (!Number.isFinite(precio) || precio <= 0) {
+                toast.error('Captura un target mayor a cero (o bórralo si no lo dieron).');
+                return;
+              }
+              guardar(precio);
+            }}
+            disabled={fijar.isPending}
+            data-testid="guardar-target"
+          >
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DialogoAjustarPrecio({
   abierto,
   alCambiarAbierto,

@@ -48,7 +48,7 @@ async function archivosABase64(
   );
 }
 
-/** Un renglón-pack editable: su letra (o null = sin sufijo) y su corrida por talla. */
+/** Un renglón-pack editable de la previa: su letra (o null = pack único) y su corrida por talla. */
 type RenglonPackEditable = { letra: string | null; tallas: Record<string, number> };
 
 /**
@@ -61,16 +61,28 @@ function tituloColor(base: string): string {
     .replace(/\p{L}[\p{L}'’]*/gu, (p) => p.charAt(0).toUpperCase() + p.slice(1));
 }
 
-/** Compone el color de un renglón-pack para mostrarlo: `{Base} {LETRA}` (o sólo `Base`). */
-function componerColorUI(base: string, letra: string | null): string {
-  const nombre = tituloColor(base);
-  return letra !== null && letra !== '' ? `${nombre} ${letra.toUpperCase()}` : nombre;
+/**
+ * Etiqueta del renglón-pack en la vista previa: "Pack A" (o "Pack único" si la OC trae uno solo).
+ *
+ * ⚠️ §Post-F9.129 — ANTES aquí se componía el nombre del COLOR (`Negro A`), porque el backend creaba
+ * un color de catálogo por pack. Ya no: la OP recibe UN RENGLÓN POR PACK, todos del MISMO color, con
+ * la letra en el campo `pack` (§Post-F9.10). Así que la etiqueta dice lo que la fila ES —un pack—, y
+ * eso ya no es una traducción: cada fila de esta previa acaba siendo una línea de la OP — salvo la
+ * que el usuario deje entera en 0, que se "integra" en otra y no nace, y las que compartan letra,
+ * que se suman en una (`agruparPacksEnRenglones`). El renglón "Total a fabricar · {Color}" de abajo
+ * NO es "el renglón de la OP": es la cifra con la que Daniel coteja el papel.
+ */
+function etiquetaPack(letra: string | null): string {
+  return letra !== null && letra !== '' ? `Pack ${letra.toUpperCase()}` : 'Pack único';
 }
 
 /**
  * Deriva los RENGLONES-PACK editables de un renglón del análisis: un renglón por grupo (si la OC trae ≥2
- * packs, color `{color} {letra}`) o uno solo SIN sufijo (0/1 pack). Espeja `filasDesdePropuesta` del
- * backend para que la propuesta prefilleada coincida con lo que se crea si el usuario no edita.
+ * packs) o uno solo (0/1 pack). Espeja `filasDesdePropuesta` del backend para que la propuesta
+ * prefilleada coincida con lo que se crea si el usuario no edita. Y desde §Post-F9.10 espeja también
+ * lo que se PERSISTE: cada renglón-pack nace como su propia línea de la OP, con su campo `pack` y el
+ * mismo color que las demás — salvo el que quede en 0, que no genera línea, y los que compartan
+ * letra, que se suman en una.
  */
 function filasDesdePreview(r: RenglonPdfPreview): RenglonPackEditable[] {
   if (r.grupos.length >= 2) {
@@ -107,6 +119,67 @@ function totalFila(fila: RenglonPackEditable): number {
 /** Suma de todos los renglones-pack de un PDF (total a fabricar). */
 function totalFilas(filas: RenglonPackEditable[] | undefined): number {
   return (filas ?? []).reduce((s, f) => s + totalFila(f), 0);
+}
+
+// ── ⭐⭐ Fila 0.151 — ¿SIGUE VALIENDO LA NUMERACIÓN QUE TRAJO EL ANÁLISIS? ────────────────
+//
+// Estas tres funciones son PURAS y viven en el módulo, no dentro del componente, porque la MISMA
+// pregunta se hace en TRES sitios —al pintar la casilla, al decidir qué manda el confirm y al
+// re-precargar cuando cambia una liga— y tres copias en línea es exactamente el anti-patrón que
+// este archivo argumenta en sus otros docstrings: coinciden hoy y contestan distinto mañana.
+
+/** El modelo NUESTRO al que apunta hoy un renglón: el elegido a mano, si no el sugerido. */
+function modeloElegido(r: RenglonPdfPreview, ligas: Record<string, number>): number | null {
+  return r.error !== null ? null : (ligas[r.modeloCliente] ?? r.idModeloSugerido ?? null);
+}
+
+/**
+ * ¿Alguna liga manual apunta a un modelo DISTINTO del que sugirió el análisis? Volver a elegir el
+ * mismo modelo no cuenta: el combobox escribe en `ligas` aunque no cambie nada.
+ */
+function hayLigaCambiada(
+  renglones: readonly RenglonPdfPreview[],
+  ligas: Record<string, number>,
+): boolean {
+  return renglones.some((r) => {
+    const manual = ligas[r.modeloCliente];
+    return manual !== undefined && manual !== r.idModeloSugerido;
+  });
+}
+
+/**
+ * 🔴 **¿LA NUMERACIÓN DEL ANÁLISIS SIGUE HABLANDO DE ESTE RENGLÓN?**
+ *
+ * El servidor numera **una sola vez**, al analizar, con la liga APRENDIDA (`idModeloSugerido`) y
+ * mirando **la tanda entera**. Ligar a mano en la vista previa es sólo estado local: no se vuelve
+ * a analizar. Caduca por DOS caminos, y los dos están medidos:
+ *
+ *  1. **El renglón cambió de modelo.** Y como *la primera OC de cada modelo del cliente se liga a
+ *     mano* (la liga se APRENDE al confirmar), no es un caso raro: es el estreno — justo cuando
+ *     NACE el modelo de producción. Sin esto, un renglón sin sugerencia no ofrecía casilla (⇒ el
+ *     número lo elegía el sistema solo, lo que Daniel pidió que dejara de pasar) y uno re-ligado
+ *     llegaba precargado con el nº propuesto para el modelo ANTERIOR, que puede ni ser de su serie.
+ *  2. **Su `reusado` dependía de OTRO renglón de la tanda.** Dos `modeloCliente` distintos pueden
+ *     resolver al mismo (modelo, color): el segundo sale `reusado` apuntando al número que va a
+ *     estrenar el primero. Si el primero se re-liga, el segundo pasa a ser el que hace nacer el
+ *     modelo — y la pantalla seguía enseñando, de sólo lectura, un número que ya no es de nadie.
+ *     Se invalida en cuanto CUALQUIER liga cambia: la pantalla no sabe si el `reusado` viene de la
+ *     tanda o de la base, y equivocarse hacia el lado seguro sólo ofrece una casilla opcional con
+ *     su explicación, mientras que hacia el otro lado se repite la queja de Daniel.
+ */
+function numeracionVigente(
+  r: RenglonPdfPreview,
+  renglones: readonly RenglonPdfPreview[],
+  ligas: Record<string, number>,
+): boolean {
+  const elegido = modeloElegido(r, ligas);
+  if (elegido === null || elegido !== r.idModeloSugerido) return false;
+  return !(r.modeloDeProduccion === 'reusado' && hayLigaCambiada(renglones, ligas));
+}
+
+/** Texto con el que se precarga la casilla de un renglón cuya numeración SÍ está vigente. */
+function propuestaDe(r: RenglonPdfPreview): string {
+  return r.numeroProduccionPropuesto === null ? '' : String(r.numeroProduccionPropuesto);
 }
 
 export function ImportadorPedidoPdf({
@@ -159,10 +232,19 @@ export function ImportadorPedidoPdf({
   // Ligas modelo-del-cliente → nuestro modelo (pre-cargadas con la sugerencia aprendida).
   const [ligas, setLigas] = useState<Record<string, number>>({});
   // Matriz EDITABLE por PDF (índice → RENGLONES-PACK) prefilleada con la propuesta por packs, y el pantone
-  // por PDF. Daniel: cada OC de C&A trae un renglón POR PACK; el sistema PROPONE, el usuario DECIDE celda
+  // por PDF. Daniel: cada OC de C&A trae varios PACKS; el sistema PROPONE, el usuario DECIDE celda
   // por celda y renglón por renglón (para integrar un pack en otro, mueve los números entre renglones).
   const [matrices, setMatrices] = useState<Record<number, RenglonPackEditable[]>>({});
   const [pantones, setPantones] = useState<Record<number, string>>({});
+  /**
+   * ⭐⭐ Fila 0.151 — EL Nº DE PRODUCCIÓN DE CADA OC, TECLEADO POR EL USUARIO.
+   *
+   * DANIEL: *«me generó el pedido y la OP **sin preguntar el número de modelo interno**… quedamos
+   * que ese lo ponía yo, con una **sugerencia previa**»*. Se precarga con el que propone el servidor
+   * (`numeroProduccionPropuesto`) y es editable, igual que en el panel manual «Generar OP». Índice
+   * del PDF → texto del campo (texto, no número: el input se puede vaciar mientras se escribe).
+   */
+  const [numeros, setNumeros] = useState<Record<number, string>>({});
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const busquedaModeloDeb = useDebounce(busquedaModelo.trim(), 250);
 
@@ -226,7 +308,19 @@ export function ImportadorPedidoPdf({
   const renglones = analisis?.renglones ?? [];
   /** Un renglón se importará si tiene liga (sugerida o elegida a mano) y no es un PDF con error. */
   function idModeloDe(r: RenglonPdfPreview): number | null {
-    return r.error !== null ? null : (ligas[r.modeloCliente] ?? r.idModeloSugerido ?? null);
+    return modeloElegido(r, ligas);
+  }
+  /**
+   * ¿Este renglón lleva casilla de nº de producción? Es el MISMO criterio que aplica
+   * {@link NumeroProduccionPdf} al pintar, y vive aquí porque el confirm tiene que mandar el número
+   * exactamente cuando la pantalla lo pidió (dos reglas separadas es como se manda un número que
+   * nadie tecleó, o se calla uno que sí).
+   */
+  function ofreceNumero(r: RenglonPdfPreview | undefined): boolean {
+    if (r === undefined || idModeloDe(r) === null) return false;
+    // Modelo elegido después de analizar: no hay propuesta, pero el usuario SÍ puede escribirlo.
+    if (!numeracionVigente(r, renglones, ligas)) return true;
+    return r.modeloDeProduccion === 'nacido';
   }
   const cuantosImportan = renglones.filter((r) => idModeloDe(r) !== null).length;
   /**
@@ -294,12 +388,17 @@ export function ImportadorPedidoPdf({
             // Prefill de la matriz editable (renglones-pack con la propuesta) y del pantone, por PDF.
             const m: Record<number, RenglonPackEditable[]> = {};
             const p: Record<number, string> = {};
+            // Fila 0.151: el nº propuesto llega precargado por PDF (vacío cuando no aplica o cuando
+            // el servidor no pudo proponer ninguno — serie llena o modelo sin dígitos).
+            const n: Record<number, string> = {};
             res.renglones.forEach((r, i) => {
               m[i] = filasDesdePreview(r);
               p[i] = r.pantone;
+              n[i] = propuestaDe(r);
             });
             setMatrices(m);
             setPantones(p);
+            setNumeros(n);
             setPaso(2);
           },
           onError: (error) => toast.error(error.message),
@@ -329,9 +428,40 @@ export function ImportadorPedidoPdf({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * ⭐ Fila 0.151 — los PDFs que van a HACER NACER un modelo y todavía no tienen un nº de 5 dígitos
+   * tecleado. Es la MISMA regla del panel manual «Generar OP» (`PanelGenerarOP`: sin número válido
+   * no se genera), extendida a una tanda: el número lo confirma el usuario, no el sistema.
+   *
+   * ⚠️ Sólo cuenta `nacido`. En `reusado`/`heredado` el modelo ya tiene su número y el capturado
+   * NO se aplicaría (`obtenerODerivarModeloDeProduccion` lo ignora con aviso), así que ni se ofrece
+   * el campo ni se puede exigir.
+   *
+   * ⚠️ Y sólo cuenta con la numeración VIGENTE ({@link numeracionVigente}). Un renglón ligado a mano
+   * después de analizar SÍ ofrece casilla, pero **no se puede exigir**: el servidor no dijo que de
+   * él vaya a nacer un modelo, y exigir un número para una OC que va a REUSAR el de su color —o que
+   * lo va a HEREDAR de un modelo del Access— obligaría a inventar uno que después se ignora.
+   */
+  const numeroValido = (i: number): boolean => /^\d{5}$/.test((numeros[i] ?? '').trim());
+  const ocSinNumero = renglones
+    .filter(
+      (r, i) =>
+        numeracionVigente(r, renglones, ligas) &&
+        r.modeloDeProduccion === 'nacido' &&
+        !numeroValido(i),
+    )
+    .map((r) => r.numeroOrden);
+
   /** Paso 2 → confirma: crea pedido + OPs + RC + adjuntos. */
   function confirmarImportacion(): void {
     if (idCliente === null) return;
+    if (ocSinNumero.length > 0) {
+      toast.error(
+        `Confirma el nº de producción (5 dígitos) de ${ocSinNumero.length === 1 ? 'la OC' : 'las OC'} ` +
+          `${ocSinNumero.join(', ')}: de ${ocSinNumero.length === 1 ? 'ella' : 'ellas'} nace un modelo nuevo.`,
+      );
+      return;
+    }
     void archivosABase64(archivos).then((archivosB64) => {
       const resoluciones = Object.entries(ligas).map(([modeloCliente, idModelo]) => ({
         modeloCliente,
@@ -346,6 +476,13 @@ export function ImportadorPedidoPdf({
           tallas: Object.entries(fila.tallas).map(([talla, cantidad]) => ({ talla, cantidad })),
         })),
         pantone: (pantones[i] ?? '').trim(),
+        // Fila 0.151: el nº viaja EXACTAMENTE cuando la pantalla ofreció la casilla y trae 5
+        // dígitos ({@link ofreceNumero}). En `reusado`/`heredado` no se ofrece y no se manda:
+        // mandarlo no rompería nada (el dominio lo ignora), pero el aviso de vuelta diría que "no se
+        // usó" un número que nadie tecleó.
+        ...(ofreceNumero(renglones[i]) && numeroValido(i)
+          ? { numeroProduccion: Number((numeros[i] ?? '').trim()) }
+          : {}),
       }));
       confirmar.mutate(
         {
@@ -365,6 +502,14 @@ export function ImportadorPedidoPdf({
               `Pedido ${res.folioPedido}-F importado · ${nOp} OP(s) con su matriz + RC` +
                 (fuera > 0 ? ` · ${fuera} PDF(s) sin ligar quedaron fuera` : ''),
             );
+            // ⭐ Fila 0.151 — los avisos de la numeración NO se tiran. Son la única señal de que un
+            // número tecleado no se aplicó (el color ya tenía modelo entre la previa y el confirm):
+            // callarlos sería exactamente lo que Daniel pidió que dejara de pasar.
+            for (const orden of res.ordenes) {
+              for (const aviso of orden.avisosNumeroProduccion) {
+                toast.warning(`OC ${orden.numeroOrden}: ${aviso}`);
+              }
+            }
             alImportado();
           },
           onError: (error) => toast.error(error.message),
@@ -468,18 +613,36 @@ export function ImportadorPedidoPdf({
                 })
               }
               onPantone={(i, valor) => setPantones((prev) => ({ ...prev, [i]: valor }))}
+              numeros={numeros}
+              onNumero={(i, valor) => setNumeros((prev) => ({ ...prev, [i]: valor }))}
               ligas={ligas}
               idModeloDe={idModeloDe}
               opcionesModelo={opcionesModelo}
               cargandoModelos={modelos.isFetching}
-              onLigar={(modeloCliente, id) =>
-                setLigas((prev) => {
+              onLigar={(modeloCliente, id) => {
+                const siguientesLigas = { ...ligas };
+                if (id === null) delete siguientesLigas[modeloCliente];
+                else siguientesLigas[modeloCliente] = id;
+                setLigas(siguientesLigas);
+                // ⭐ Fila 0.151 — CAMBIAR UNA LIGA TIRA LOS NÚMEROS QUE YA NO VALEN. El nº propuesto
+                // se calculó para el modelo SUGERIDO y mirando la tanda entera; dejarlo precargado
+                // mandaría al confirm un número pensado para otro modelo (o para un reuso que ya no
+                // va a ocurrir). Se re-evalúan TODOS los renglones con el MISMO predicado que usa la
+                // pantalla —no sólo los de este `modeloCliente`—, porque un `reusado` puede depender
+                // de un renglón ajeno. Al volver al modelo sugerido, la propuesta se re-precarga.
+                setNumeros((prev) => {
                   const siguiente = { ...prev };
-                  if (id === null) delete siguiente[modeloCliente];
-                  else siguiente[modeloCliente] = id;
+                  renglones.forEach((r, i) => {
+                    const antes = numeracionVigente(r, renglones, ligas);
+                    const ahora = numeracionVigente(r, renglones, siguientesLigas);
+                    // Sólo se tocan los que CAMBIARON de estado: un número que el usuario tecleó en
+                    // otro renglón no se le borra por ligar éste.
+                    if (antes === ahora) return;
+                    siguiente[i] = ahora ? propuestaDe(r) : '';
+                  });
                   return siguiente;
-                })
-              }
+                });
+              }}
               onBuscarModelo={setBusquedaModelo}
             />
           )}
@@ -659,8 +822,10 @@ function PasoVistaPrevia({
   porcentajeAdicional,
   matrices,
   pantones,
+  numeros,
   onCelda,
   onPantone,
+  onNumero,
   ligas,
   idModeloDe,
   opcionesModelo,
@@ -672,8 +837,11 @@ function PasoVistaPrevia({
   porcentajeAdicional: number;
   matrices: Record<number, RenglonPackEditable[]>;
   pantones: Record<number, string>;
+  /** Fila 0.151 — nº de producción tecleado por PDF (índice → texto del campo). */
+  numeros: Record<number, string>;
   onCelda: (i: number, filaIdx: number, talla: string, cantidad: number) => void;
   onPantone: (i: number, valor: string) => void;
+  onNumero: (i: number, valor: string) => void;
   ligas: Record<string, number>;
   idModeloDe: (r: RenglonPdfPreview) => number | null;
   opcionesModelo: { id: number; nombre: string }[];
@@ -758,8 +926,13 @@ function PasoVistaPrevia({
               indice={i}
               filas={matrices[i] ?? []}
               pantone={pantones[i] ?? ''}
+              numero={numeros[i] ?? ''}
+              // Fila 0.151 — se calcula AQUÍ, con el único predicado del módulo, y baja como dato:
+              // la casilla no vuelve a decidirlo por su cuenta.
+              vigenteNumeracion={numeracionVigente(r, renglones, ligas)}
               onCelda={(filaIdx, talla, cantidad) => onCelda(i, filaIdx, talla, cantidad)}
               onPantone={(valor) => onPantone(i, valor)}
+              onNumero={(valor) => onNumero(i, valor)}
               valorLiga={idModeloDe(r)}
               usaSugerencia={ligas[r.modeloCliente] === undefined && r.idModeloSugerido !== null}
               etiquetaModeloCreado={etiquetaModeloCreado}
@@ -829,14 +1002,17 @@ function PasoVistaPrevia({
   );
 }
 
-/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable POR PACK + pantone. */
+/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable por packs + pantone. */
 function FilaPdf({
   r,
   indice,
   filas,
   pantone,
+  numero,
+  vigenteNumeracion,
   onCelda,
   onPantone,
+  onNumero,
   valorLiga,
   usaSugerencia,
   etiquetaModeloCreado,
@@ -851,8 +1027,13 @@ function FilaPdf({
   indice: number;
   filas: RenglonPackEditable[];
   pantone: string;
+  /** Fila 0.151 — nº de producción tecleado para ESTA OC (texto: el campo se puede vaciar). */
+  numero: string;
+  /** Fila 0.151 — ¿la numeración que trajo el análisis sigue valiendo para este renglón? */
+  vigenteNumeracion: boolean;
   onCelda: (filaIdx: number, talla: string, cantidad: number) => void;
   onPantone: (valor: string) => void;
+  onNumero: (valor: string) => void;
   valorLiga: number | null;
   usaSugerencia: boolean;
   /** Etiqueta del modelo recién creado desde el preview (aún no está en la búsqueda paginada). */
@@ -933,6 +1114,14 @@ function FilaPdf({
             </button>
           ) : null}
         </div>
+        <NumeroProduccionPdf
+          r={r}
+          indice={indice}
+          numero={numero}
+          onNumero={onNumero}
+          idModeloElegido={valorLiga}
+          vigente={vigenteNumeracion}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
@@ -950,6 +1139,15 @@ function FilaPdf({
           <span className="text-muted-foreground">
             Color <b>{tituloColor(r.colorGenerico)}</b>
             {r.colorNuevo ? <span className="text-warn"> (nuevo)</span> : null}
+            {/* 🔴 El color del papel lo absorbió una FUSIÓN: la OP va a nacer en OTRO color. Se
+                marca aquí, junto al nombre, además del aviso de abajo — porque lo que cambia es
+                justo lo que esta línea afirma, y con ello el precio (casa por NOMBRE de color). */}
+            {r.colorFusionadoEn !== null ? (
+              <span className="text-warn" data-testid={`importador-pdf-color-fusionado-${indice}`}>
+                {' '}
+                → <b>{tituloColor(r.colorFusionadoEn)}</b>
+              </span>
+            ) : null}
           </span>
         ) : null}
         {r.tallasNuevas.length > 0 ? (
@@ -977,6 +1175,14 @@ function FilaPdf({
       {abierto ? (
         <div className="space-y-3 border-t px-3 py-3">
           <MatrizPacksEditable r={r} filas={filas} onCelda={onCelda} />
+          {/* La previa es fiel al papel (packs separados) y ahora la OP TAMBIÉN lo es: cada tendido
+              nace como su propio renglón, con un solo color de catálogo (§Post-F9.10). Se dice con
+              todas sus letras porque es lo que cambia respecto de lo que la pantalla decía antes. */}
+          <p className="text-[11px] text-muted-foreground" data-testid="importador-pdf-nota-packs">
+            La OP lleva <b>un renglón por pack</b>, todos del <b>mismo color</b>: el tendido viaja
+            al corte y a la entrega a maquila. El desglose SKU se guarda con la orden para el
+            empaque.
+          </p>
           <label className="flex items-center gap-2 text-[11px]">
             <span className="font-medium text-muted-foreground">PANTONE del color</span>
             <Input
@@ -1008,10 +1214,206 @@ function FilaPdf({
 }
 
 /**
+ * ⭐⭐ **EL Nº DE PRODUCCIÓN DE ESTA OC — LO PONE EL USUARIO** (fila 0.151).
+ *
+ * DANIEL, después de importar un PDF y encontrarse la OP ya hecha: *«me generó el pedido y la OP
+ * **sin preguntar el número de modelo interno**… **quedamos que ese lo ponía yo, con una sugerencia
+ * previa**. Ya está hecho el pedido y la OP. ¿Qué pasa si no importé bien algo?… No me gustó que
+ * todo sea completamente automático antes de poder verificar.»*
+ *
+ * Es el MISMO trato que el panel manual «Generar OP» (`PanelGenerarOP`): llega precargado con el
+ * siguiente libre y se puede cambiar antes de confirmar.
+ *
+ * 🔴 **EL CAMPO SÓLO SE OFRECE CUANDO DE VERDAD VA A NACER UN MODELO** (`modeloDeProduccion ===
+ * 'nacido'`). En `reusado` (ese color ya tiene su modelo, o lo hace nacer otro PDF de la misma
+ * tanda) y en `heredado` (el modelo ligado ya es de producción), el número es del MODELO y
+ * `obtenerODerivarModeloDeProduccion` **descarta** el capturado: ofrecer ahí una casilla sería
+ * prometer algo que la capa de abajo tira. En esos casos se enseña, de sólo lectura, con qué modelo
+ * va a quedar la OP.
+ *
+ * ⚠️ **Y no se promete exclusividad.** La propuesta se calcula sin el candado del par y sin escribir
+ * nada, así que entre la vista previa y el confirm alguien puede llevarse ese número; ahí el
+ * servidor BLOQUEA con su mensaje. Por eso el pie dice «se confirma al generar», no «reservado».
+ *
+ * 🔴 **TERCER ESTADO: LA NUMERACIÓN DEL ANÁLISIS YA NO VALE PARA ESTE RENGLÓN** (`vigente ===
+ * false`, ver {@link numeracionVigente}). El desenlace y la propuesta los calculó el servidor para
+ * `idModeloSugerido` y mirando la tanda entera; ligar en la vista previa no vuelve a analizar. Como
+ * **la primera OC de cada modelo del cliente se liga siempre a mano** (la liga se APRENDE al
+ * confirmar), ése es justo el estreno de un modelo — y sin este estado el campo no se ofrecía y el
+ * número volvía a elegirlo el sistema solo. Aquí se ofrece **vacío y opcional**: no hay propuesta
+ * que dar (el nº libre lo sabe el servidor, y para una tanda de cuatro colores del mismo modelo hay
+ * que apartar cuatro), pero el usuario puede escribirlo.
+ *
+ * ⚠️ **Y su pie NO puede prometer que el número se va a usar.** El combobox de la liga busca con
+ * `origen: 'todos'`, así que **elegir a mano un modelo de PRODUCCIÓN del Access es un camino
+ * normal**: ahí el desenlace es `heredado` y no se asigna nada, igual que si el color ya tuviera su
+ * modelo (`reusado`). Decir *«lo asigna el sistema al generar»* a secas contradice la razón misma
+ * por la que el campo es opcional aquí —que el servidor NO dijo que de este renglón vaya a nacer un
+ * modelo—, y el usuario se enteraría después de generar, por un `toast`. El pie enumera los dos
+ * desenlaces posibles.
+ */
+function NumeroProduccionPdf({
+  r,
+  indice,
+  numero,
+  onNumero,
+  idModeloElegido,
+  vigente,
+}: {
+  r: RenglonPdfPreview;
+  indice: number;
+  numero: string;
+  onNumero: (valor: string) => void;
+  /** Modelo NUESTRO al que apunta hoy el renglón (sugerido o elegido a mano); null = sin liga. */
+  idModeloElegido: number | null;
+  /**
+   * ¿La numeración que trajo el análisis sigue valiendo para este renglón? Lo decide
+   * {@link numeracionVigente} y baja como DATO: la casilla no vuelve a calcularlo por su cuenta
+   * (tres copias del mismo predicado coinciden hoy y contestan distinto mañana).
+   */
+  vigente: boolean;
+}): React.JSX.Element | null {
+  if (idModeloElegido === null) {
+    return null;
+  }
+
+  // Lo que dice el análisis ya no habla de este renglón (ver el encabezado).
+  if (!vigente) {
+    return (
+      <CampoNumeroProduccion
+        indice={indice}
+        numero={numero}
+        onNumero={onNumero}
+        etiqueta="Nº de producción"
+        // Vacío es válido: aquí el número es opcional (ver el encabezado).
+        exigido={false}
+        pie={
+          'Elegiste este modelo después de analizar, así que el sistema todavía no puede ' +
+          'proponerte un número. Si de esta OC nace un modelo nuevo se usa el que escribas ' +
+          '(5 dígitos), o el que asigne el sistema si lo dejas vacío; si ese color ya tiene ' +
+          'modelo —o el que elegiste ya es de producción—, la OP usa el número de ESE modelo y ' +
+          'esto no se aplica.'
+        }
+      />
+    );
+  }
+
+  if (r.modeloDeProduccion === null) {
+    return null;
+  }
+
+  if (r.modeloDeProduccion !== 'nacido') {
+    return (
+      <div className="w-full sm:w-48" data-testid={`importador-pdf-numero-reuso-${indice}`}>
+        <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+          Nº de producción
+        </span>
+        <p className="num text-sm font-medium">
+          {r.numeroProduccionModelo === null ? '—' : `#${r.numeroProduccionModelo}`}
+        </p>
+        {/* El motivo lo redacta el SERVIDOR (`avisosNumeroProduccion`), que es el único que sabe
+            si el modelo ya existía o lo hace nacer otro PDF de esta misma tanda. La frase de
+            respaldo cubre `heredado`, que no trae aviso porque no hay nada que advertir. */}
+        {r.avisosNumeroProduccion.length > 0 ? (
+          r.avisosNumeroProduccion.map((aviso) => (
+            <p key={aviso} className="mt-0.5 text-[10.5px] text-muted-foreground">
+              {aviso}
+            </p>
+          ))
+        ) : (
+          <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+            El modelo ligado ya es de producción: la OP lo hereda tal cual.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <CampoNumeroProduccion
+      indice={indice}
+      numero={numero}
+      onNumero={onNumero}
+      etiqueta="Nº de producción (nace)"
+      exigido
+      pie="De esta OC nace el modelo de producción de este color. Se confirma al generar."
+      avisos={r.avisosNumeroProduccion}
+    />
+  );
+}
+
+/**
+ * La CASILLA del nº de producción, compartida por los dos estados que la ofrecen (fila 0.151): el
+ * `nacido` con propuesta —donde el número es obligatorio— y el modelo elegido a mano después de
+ * analizar —donde es opcional porque nadie pudo proponerlo—. Un solo input para los dos: dos copias
+ * es como se empiezan a separar el `maxLength`, el filtro de dígitos o el `data-testid` con el que
+ * la prueba lo encuentra.
+ */
+function CampoNumeroProduccion({
+  indice,
+  numero,
+  onNumero,
+  etiqueta,
+  exigido,
+  pie,
+  avisos = [],
+}: {
+  indice: number;
+  numero: string;
+  onNumero: (valor: string) => void;
+  etiqueta: string;
+  /** `true` = vacío es un error (el confirm lo frena); `false` = vacío significa "que lo elija el sistema". */
+  exigido: boolean;
+  pie: string;
+  avisos?: readonly string[];
+}): React.JSX.Element {
+  const texto = numero.trim();
+  const valido = /^\d{5}$/.test(texto);
+  return (
+    <div className="w-full sm:w-48">
+      <label
+        className="mb-1 block text-[11px] font-medium text-muted-foreground"
+        htmlFor={`numero-produccion-pdf-${indice}`}
+      >
+        {etiqueta}
+      </label>
+      <Input
+        id={`numero-produccion-pdf-${indice}`}
+        value={numero}
+        onChange={(e) => onNumero(e.target.value.replace(/\D/g, ''))}
+        inputMode="numeric"
+        maxLength={5}
+        placeholder="5 dígitos"
+        className="mono h-8 w-28"
+        aria-invalid={exigido ? !valido : texto !== '' && !valido}
+        data-testid={`importador-pdf-numero-${indice}`}
+      />
+      <p className="mt-0.5 text-[10.5px] text-muted-foreground">{pie}</p>
+      {avisos.map((aviso) => (
+        <p
+          key={aviso}
+          className="mt-0.5 text-[10.5px] text-warn"
+          data-testid={`importador-pdf-aviso-numero-${indice}`}
+        >
+          {aviso}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Matriz EDITABLE POR PACK: una fila "Cliente pidió" (solo lectura, agregada) + una fila EDITABLE por pack
- * (`{color} {letra}`) con inputs por talla y su total, más el total general. Cada OC de C&A trae un renglón
- * POR PACK; para "integrar" un pack en otro el usuario mueve los números entre renglones (vaciar un pack =
- * ponerlo en 0 → no genera línea en la OP).
+ * —cada una es una línea de la OP (§Post-F9.10), salvo la que quede entera en 0, que no genera
+ * línea, y las que compartan letra, que se suman en una— con inputs por talla y su total, y abajo
+ * el renglón "Total a fabricar · {Color}", que suma los tendidos para cotejar contra el papel.
+ *
+ * ⭐ §Post-F9.10 — CADA PACK ES UN RENGLÓN DE LA OP, y todos del MISMO color ("Negro", no
+ * "Negro A"/"Negro B", que es lo que §Post-F9.129 quitó). Los packs se editan por separado porque
+ * así viene el papel de C&A y así lo coteja Daniel, y ahora la OP se les parece: cada uno con su
+ * corrida y su tendido en el campo `pack`. El renglón de totales sigue abajo porque es la cifra que
+ * el usuario compara contra el papel, no porque la OP vaya a llevar una sola fila. Para "integrar"
+ * un pack en otro el usuario mueve los números entre renglones: el que quede en 0 no genera renglón.
  */
 function MatrizPacksEditable({
   r,
@@ -1055,8 +1457,8 @@ function MatrizPacksEditable({
           </tr>
           {filas.map((fila, fi) => (
             <tr key={fila.letra ?? `fila-${fi}`}>
-              <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
-                {componerColorUI(colorBase, fila.letra)}
+              <td className="px-1.5 py-1 font-medium whitespace-nowrap text-muted-foreground">
+                {etiquetaPack(fila.letra)}
               </td>
               {columnas.map((talla) => (
                 <td key={talla} className="px-1 py-1 text-center">
@@ -1068,7 +1470,7 @@ function MatrizPacksEditable({
                       onCelda(fi, talla, Math.max(0, Math.round(Number(e.target.value) || 0)))
                     }
                     className="num h-7 w-14 rounded border bg-background px-1 text-center tabular-nums"
-                    aria-label={`A fabricar ${componerColorUI(colorBase, fila.letra)} talla ${talla}`}
+                    aria-label={`A fabricar ${etiquetaPack(fila.letra)} talla ${talla}`}
                     data-testid={`importador-pdf-celda-${fi}-${talla}`}
                   />
                 </td>
@@ -1079,7 +1481,11 @@ function MatrizPacksEditable({
             </tr>
           ))}
           <tr className="border-t">
-            <td className="px-1.5 py-1 font-medium whitespace-nowrap">A fabricar</td>
+            {/* El TOTAL del color: la suma de los tendidos. Ya no es "el renglón de la OP" —la OP
+                lleva uno por pack (§Post-F9.10)—, es la cifra contra la que se coteja el papel. */}
+            <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
+              Total a fabricar{colorBase !== '' ? ` · ${tituloColor(colorBase)}` : ''}
+            </td>
             {columnas.map((talla) => (
               <td key={talla} className="num px-1.5 py-1 text-center text-muted-foreground">
                 {filas.reduce((s, f) => s + (f.tallas[talla] ?? 0), 0).toLocaleString('es-MX')}

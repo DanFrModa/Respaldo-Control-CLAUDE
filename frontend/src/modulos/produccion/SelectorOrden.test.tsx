@@ -11,9 +11,10 @@ import { SelectorOrden } from './SelectorOrden';
  * REGRESIÓN QUE NO DEBE VOLVER (26-jul-2026): este selector es la puerta de entrada de SIETE
  * pantallas de operación (corte, envío a maquila, recibo, entrega a cliente, salida de tela, nota
  * de salida de tela y alta de auditoría). Filtraba `estado: 'completa'`; cuando ese estado pasó a
- * ser AUTOMÁTICO (tallas + avíos), las órdenes de modelos sin receta de avíos —muy comunes en lo
- * migrado de Access— DESAPARECÍAN de los siete buscadores y la orden no se podía operar. Aquí se
- * fija que el filtro sea "todas menos canceladas" y que una orden `capturada` SÍ se pueda elegir.
+ * ser AUTOMÁTICO (hoy: tallas + receta liberada, y arte si aplica), las órdenes a las que les
+ * faltaba cualquiera de esos requisitos —muy comunes en lo migrado de Access, que llegó sin
+ * receta— DESAPARECÍAN de los siete buscadores y la orden no se podía operar. Aquí se fija que el
+ * filtro sea "todas menos canceladas" y que una orden `capturada` SÍ se pueda elegir.
  */
 
 const useOrdenesMock = vi.fn<(query: Record<string, unknown>) => Record<string, unknown>>();
@@ -21,7 +22,7 @@ vi.mock('@/api/ordenes', () => ({
   useOrdenes: (query: Record<string, unknown>) => useOrdenesMock(query),
 }));
 
-/** Orden INCOMPLETA (su modelo no tiene receta de avíos) — el caso que se rompía. */
+/** Orden INCOMPLETA (`capturada`: le falta algún requisito) — el caso que se rompía. */
 const ordenCapturada = {
   id: 9,
   folio: 5424,

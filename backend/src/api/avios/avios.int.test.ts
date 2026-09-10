@@ -251,6 +251,66 @@ describe('API de avíos (F1-E3, R1)', () => {
     });
   });
 
+  describe('⭐⭐ 0.158 — la marca «se compra sin tomar en cuenta el color»', () => {
+    it('viaja de punta a punta: default false, se prende por PATCH y se puede apagar', async () => {
+      const cookie = await cookieAdmin();
+      // 1) El default es FALSE: un avío que nadie marcó se sigue comprando por color.
+      const alta = await app.inject({
+        method: 'POST',
+        url: '/api/avios',
+        headers: { cookie },
+        payload: { clave: 'ETI-LAV', descripcion: 'Etiqueta de lavado' },
+      });
+      expect(alta.statusCode).toBe(201);
+      const creado = alta.json<{ id: number; seCompraSinColor: boolean }>();
+      expect(creado.seCompraSinColor).toBe(false);
+
+      // 2) Se prende desde la pantalla (PATCH parcial) y la salida lo dice.
+      const prender = await app.inject({
+        method: 'PATCH',
+        url: `/api/avios/${String(creado.id)}`,
+        headers: { cookie },
+        payload: { seCompraSinColor: true },
+      });
+      expect(prender.statusCode).toBe(200);
+      expect(prender.json<{ seCompraSinColor: boolean }>().seCompraSinColor).toBe(true);
+
+      // 3) Y se puede apagar. 🔴 Si la bandera se tratara como "omitir = no tocar" mal implementada
+      // (o si sólo se propagara el `true`), este último paso devolvería `true` y sería imposible
+      // deshacer la marca desde la UI.
+      const apagar = await app.inject({
+        method: 'PATCH',
+        url: `/api/avios/${String(creado.id)}`,
+        headers: { cookie },
+        payload: { seCompraSinColor: false },
+      });
+      expect(apagar.json<{ seCompraSinColor: boolean }>().seCompraSinColor).toBe(false);
+
+      // 4) Y el GET —lo que la pantalla lee al abrir— coincide con lo que el PATCH contestó.
+      const leido = await app.inject({
+        method: 'GET',
+        url: `/api/avios/${String(creado.id)}`,
+        headers: { cookie },
+      });
+      expect(leido.json<{ seCompraSinColor: boolean }>().seCompraSinColor).toBe(false);
+    });
+
+    it('se puede dar de alta YA marcado (no obliga a un segundo paso)', async () => {
+      const cookie = await cookieAdmin();
+      const alta = await app.inject({
+        method: 'POST',
+        url: '/api/avios',
+        headers: { cookie },
+        payload: {
+          clave: 'ETI-COMP',
+          descripcion: 'Etiqueta de composición',
+          seCompraSinColor: true,
+        },
+      });
+      expect(alta.json<{ seCompraSinColor: boolean }>().seCompraSinColor).toBe(true);
+    });
+  });
+
   describe('filtros', () => {
     it('filtra por esGenerico (R4) y busca por clave/descripción', async () => {
       const cookie = await cookieAdmin();

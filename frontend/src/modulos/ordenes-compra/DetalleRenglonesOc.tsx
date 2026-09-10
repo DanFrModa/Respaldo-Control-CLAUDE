@@ -68,6 +68,22 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
                               : ` a ${formatearMoneda(linea.precioComplemento)}`)}
                       </span>
                     ) : null}
+                    {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA, pegado a su renglón.
+                      Daniel: *"al hacer la OC no me aparece cantidad por medida… sólo veo un solo
+                      renglón"*. Va aquí y no en una tabla aparte porque **es del renglón**: la
+                      medida no se recibe por separado, sólo se le dice al proveedor. Vacío = este
+                      avío no se pide por medida. */}
+                    {linea.medidas.length > 0 ? (
+                      <span
+                        className="block text-xs text-muted-foreground"
+                        data-testid="medidas-detalle-oc"
+                      >
+                        Por medida:{' '}
+                        {linea.medidas
+                          .map((m) => `${m.etiqueta}: ${m.cantidad.toLocaleString('es-MX')}`)
+                          .join(' · ')}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-2 py-1.5">
                     <ChipEstado tono={linea.idTela !== null ? 'ok' : 'neutro'} sinPunto>

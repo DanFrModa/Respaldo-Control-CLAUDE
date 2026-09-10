@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { formatearFecha } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -103,7 +104,9 @@ export function CosteoOrdenPagina(): React.JSX.Element {
   const [otros, setOtros] = useState('');
   const [descOtros, setDescOtros] = useState('');
   const [observaciones, setObservaciones] = useState('');
-  const [base, setBase] = useState<BaseProrrateo>('cortado');
+  // 0.061: el default es `recibido` (§Post-F9.154(b)) — las faltantes se le cobran al maquilero y
+  // las incompletas son merma; primeras y segundas sí se venden.
+  const [base, setBase] = useState<BaseProrrateo>('recibido');
 
   // Sincroniza el formulario con el costo cargado. Si aún no se ha costeado, el valor propuesto para
   // tela/avíos es el REAL de compras cuando la orden tiene compras (Daniel), y el teórico si no.
@@ -119,7 +122,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
     setOtros(String(g?.otros ?? ''));
     setDescOtros(g?.descOtros ?? '');
     setObservaciones(g?.observaciones ?? '');
-    setBase(g?.baseProrrateo ?? 'cortado');
+    setBase(g?.baseProrrateo ?? 'recibido');
   }, [data]);
 
   function elegir(id: number): void {
@@ -157,16 +160,38 @@ export function CosteoOrdenPagina(): React.JSX.Element {
     setAviosCost(String(avios ?? ''));
   }
 
+  // ⭐ 0.061: con la orden CERRADA el costo está CONGELADO. Se muestra el DIVISOR y el unitario que
+  // devuelve el SERVIDOR (los del cierre), no la vista previa de lo que se teclea — porque ya no se
+  // puede teclear. El backend rechaza la captura igual; esto sólo evita ofrecer campos que van a
+  // rebotar.
+  const ordenCerrada = data?.ordenCerrada === true;
+  // Las piezas del divisor. ⚠️ Con la orden cerrada NO se re-derivan de las cantidades vivas: si
+  // llegara otro recibo, el número de piezas junto al unitario cambiaría mientras el importe no
+  // —y la pantalla estaría diciendo dos cosas incompatibles a la vez—.
   const cantBase =
     data === undefined
       ? 0
-      : base === 'cortado'
-        ? data.cantidades.cortado
-        : base === 'recibido'
-          ? data.cantidades.recibido
-          : data.cantidades.vendido;
+      : ordenCerrada
+        ? data.unitario.cantidadBase
+        : base === 'cortado'
+          ? data.cantidades.cortado
+          : base === 'recibido'
+            ? data.cantidades.recibido
+            : data.cantidades.vendido;
   const totalPreview = num(telaCost) + num(procesosCost) + num(aviosCost) + num(otros);
   const unitPreview = cantBase > 0 ? totalPreview / cantBase : null;
+  // ⭐ Un SOLO booleano para todo lo que se puede capturar (0.061 le sumó la orden cerrada). Antes
+  // cada campo repetía `!puedeCapturar || data.noCostear`, y agregar una tercera razón habría sido
+  // siete oportunidades de olvidar una. El backend decide igual (A1): esto es la cortesía de no
+  // ofrecer un campo que va a rebotar.
+  const capturaBloqueada = !puedeCapturar || data?.noCostear === true || ordenCerrada;
+  const congeladoEn = data?.unitario.congeladoEn ?? null;
+  // ⭐ 0.061: cuando NO hay unitario, la frase la redacta el SERVIDOR (`textoSinUnitario`), no esta
+  // pantalla: así la lista de costos y la ficha dicen exactamente lo mismo.
+  const sinUnitario =
+    (ordenCerrada ? data?.unitario.costoUnitario : unitPreview) === null
+      ? (data?.unitario.textoSinUnitario ?? null)
+      : null;
 
   return (
     <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="costeo-orden">
@@ -248,6 +273,20 @@ export function CosteoOrdenPagina(): React.JSX.Element {
               </p>
             )}
 
+            {/* ⭐ 0.061: la orden CERRADA es de solo lectura y su costo está congelado. Se avisa
+                arriba del todo para que nadie teclee y se entere al guardar. */}
+            {ordenCerrada && (
+              <p
+                className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm"
+                role="status"
+                data-testid="costeo-orden-cerrada"
+              >
+                <AlertTriangle className="size-4" aria-hidden />
+                Esta orden está <b>CERRADA</b>: su costo quedó congelado y no se puede capturar.
+                Para cambiarlo hay que reabrirla desde la ficha de la orden (queda auditado).
+              </p>
+            )}
+
             <div className="overflow-x-auto">
               <TablaDensa>
                 <TablaDensaEncabezado>
@@ -273,7 +312,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                         step="0.01"
                         value={telaCost}
                         onChange={(e) => setTelaCost(e.target.value)}
-                        disabled={!puedeCapturar || data.noCostear}
+                        disabled={capturaBloqueada}
                         className="ml-auto w-32 text-right"
                         data-testid="costeo-tela"
                       />
@@ -293,7 +332,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                         step="0.01"
                         value={procesosCost}
                         onChange={(e) => setProcesosCost(e.target.value)}
-                        disabled={!puedeCapturar || data.noCostear}
+                        disabled={capturaBloqueada}
                         className="ml-auto w-32 text-right"
                         data-testid="costeo-procesos"
                       />
@@ -313,7 +352,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                         step="0.01"
                         value={aviosCost}
                         onChange={(e) => setAviosCost(e.target.value)}
-                        disabled={!puedeCapturar || data.noCostear}
+                        disabled={capturaBloqueada}
                         className="ml-auto w-32 text-right"
                         data-testid="costeo-avios"
                       />
@@ -327,7 +366,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                           value={descOtros}
                           onChange={(e) => setDescOtros(e.target.value)}
                           placeholder="Descripción"
-                          disabled={!puedeCapturar || data.noCostear}
+                          disabled={capturaBloqueada}
                           className="w-56"
                           data-testid="costeo-desc-otros"
                         />
@@ -345,7 +384,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                         step="0.01"
                         value={otros}
                         onChange={(e) => setOtros(e.target.value)}
-                        disabled={!puedeCapturar || data.noCostear}
+                        disabled={capturaBloqueada}
                         className="ml-auto w-32 text-right"
                         data-testid="costeo-otros"
                       />
@@ -376,7 +415,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                 <ShoppingCart className="size-4" aria-hidden />
                 Ver de dónde sale el real
               </Button>
-              {puedeCapturar && !data.noCostear && (
+              {!capturaBloqueada && (
                 <>
                   <Button
                     type="button"
@@ -426,7 +465,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                   id="costeo-base"
                   value={base}
                   onChange={(e) => setBase(e.target.value as BaseProrrateo)}
-                  disabled={!puedeCapturar || data.noCostear}
+                  disabled={capturaBloqueada}
                   data-testid="costeo-base"
                 >
                   <option value="cortado">{etiquetaBase('cortado')}</option>
@@ -437,8 +476,16 @@ export function CosteoOrdenPagina(): React.JSX.Element {
               <div className="pb-2 text-sm">
                 <span className="text-muted-foreground">Costo unitario ({cantBase} pzas): </span>
                 <span className="text-lg font-semibold" data-testid="costeo-unitario">
-                  {moneda(unitPreview)}
+                  {/* 0.061: cerrada ⇒ el número CONGELADO del servidor; abierta ⇒ la vista previa
+                      de lo que se está tecleando. Y si no hay unitario, la frase del servidor. */}
+                  {sinUnitario ?? moneda(ordenCerrada ? data.unitario.costoUnitario : unitPreview)}
                 </span>
+                {congeladoEn !== null && (
+                  <p className="text-xs text-muted-foreground" data-testid="costeo-congelado">
+                    Congelado al cerrar la orden el {formatearFecha(congeladoEn)}. Para recalcularlo
+                    hay que reabrirla.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -448,7 +495,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                 id="costeo-obs"
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                disabled={!puedeCapturar || data.noCostear}
+                disabled={capturaBloqueada}
                 data-testid="costeo-obs"
               />
             </Field>
@@ -457,7 +504,7 @@ export function CosteoOrdenPagina(): React.JSX.Element {
               <Button
                 type="button"
                 onClick={alGuardar}
-                disabled={data.noCostear || guardar.isPending}
+                disabled={capturaBloqueada || guardar.isPending}
                 data-testid="costeo-guardar"
               >
                 {guardar.isPending ? 'Guardando…' : 'Guardar costo'}

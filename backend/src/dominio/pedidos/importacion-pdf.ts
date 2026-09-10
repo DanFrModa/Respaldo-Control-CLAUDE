@@ -56,9 +56,21 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { normalizarNombreColor } from '../catalogos/colores.js';
+import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
+import {
+  claveColor,
+  marcarColorDelPapel,
+  resolverColoresDelPapel,
+  type ResolucionColorPapel,
+} from './color-del-papel.js';
+import {
+  resolverNumerosDeProduccion,
+  type DesenlaceNumeroPdf,
+  type RenglonParaNumerar,
+} from './numero-produccion-pdf.js';
+import { agruparPacksEnRenglones } from './packs-cya.js';
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
   cargarOcYaImportadas,
@@ -222,7 +234,26 @@ async function procesarArchivos(
 
 /**
  * Resuelve el color por nombre (insensible a mayúsculas) o lo CREA (D14c: colores abiertos capturados en
- * la OP). Si existe pero está desactivado, lo REACTIVA (la matriz exige color activo). Devuelve el id.
+ * la OP). Devuelve el id, que se AMARRA a la matriz color×talla de la OP.
+ *
+ * 🔴 **NO RESUCITA UN COLOR ABSORBIDO POR UNA FUSIÓN: lo REDIRIGE al canónico** (§Post-F9.143). Antes
+ * reactivaba a ciegas cualquier color apagado, y eso era el mismo defecto que §Post-F9.122(a) cerró en
+ * departamentos… sólo que **peor por dos vueltas de tuerca**, porque aquí el id **se usa**:
+ *   1. el color revivido volvía a la matriz de la OP ⇒ **acumulaba referencias nuevas**;
+ *   2. y `fusionarColores` **se niega a fusionar un origen con usos** (§Post-F9.129) ⇒ la siguiente OC
+ *      de C&A no sólo deshacía la limpieza de Daniel: la dejaba **IRREPETIBLE**.
+ * Ahora la fusión deja RASTRO (`Color.idFusionadoEn`) y {@link colorCanonico} lo sigue: la orden queda
+ * amarrada al color BUENO, que es lo que la fusión quiso decir ("«Negro A» en realidad es «Negro»").
+ *
+ * ⚠️ **Por qué NO se copió literal la medicina de departamentos** (*"reúsalo pero no lo reactives"*):
+ * allá el resolver devuelve `void` y tira el resultado, así que devolver uno apagado no le duele a
+ * nadie. Aquí el id entra a la matriz y `sincronizarMatriz` **rechaza un color inactivo** ⇒ devolver el
+ * apagado tumbaría la importación entera. Y crear otro tampoco es opción: `Color.nombre` es **único
+ * global**, así que el `create` chocaría (P2002) o habría que inventarle un nombre distinto — o sea,
+ * fabricar de vuelta el duplicado que la fusión acababa de quitar.
+ *
+ * Un color apagado **sin** rastro de fusión (lo apagó su dueño a mano) SÍ se reactiva, como siempre:
+ * ahí no hay ninguna fusión que deshacer, y la matriz exige color activo. Queda en bitácora (A7).
  */
 async function resolverOCrearColor(
   tx: Tx,
@@ -232,16 +263,47 @@ async function resolverOCrearColor(
   const nombre = normalizarNombreColor(nombreCrudo === '' ? 'SIN COLOR' : nombreCrudo);
   const existente = await tx.color.findFirst({
     where: { nombre: { equals: nombre, mode: 'insensitive' } },
-    select: { id: true, activo: true },
+    // `orderBy` NO es decoración: si el catálogo trae dos variantes de mayúsculas del mismo nombre
+    // ("Blanco" y "BLANCO"), sin orden gana la que devuelva el scan — y desde V1-E8s esa lotería
+    // decide entre REDIRIGIR y REUSAR. Se fija la más vieja, que es la misma cura (y el mismo
+    // razonamiento) que ya documenta el importador de Excel.
+    orderBy: { id: 'asc' },
+    select: { id: true },
   });
   if (existente !== null) {
-    if (!existente.activo) {
-      await tx.color.update({
-        where: { id: existente.id },
-        data: { activo: true, ...datosModificacion(sesion) },
+    // Si lo absorbió una fusión, la cadena termina en el canónico; si no, es él mismo.
+    const canonico = await colorCanonico(tx, existente.id);
+    if (canonico.id !== existente.id) {
+      // 🔴 EL DESVÍO SE ANOTA SIEMPRE (hallazgo H2 de la revisión). El caso normal —canónico ya
+      // activo, que es el 100 % de una fusión recién hecha— no toca ningún `activo`, así que si esta
+      // bitácora viviera dentro del `if` de abajo el desvío pasaría en SILENCIO: el papel diría
+      // «Blanco», la OP diría «Blanco Óptico», y no habría dónde enterarse de por qué. Va en el color
+      // ABSORBIDO (`existente.id`), que es el nombre que trae el papel y por el que alguien va a
+      // preguntar.
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Color',
+        idEntidad: existente.id,
+        accion: 'OTRO',
+        datos: {
+          operacion: 'redirigido-por-fusion',
+          a: { id: canonico.id, nombre: canonico.nombre },
+          origen: 'importacion-pdf',
+        },
       });
     }
-    return existente.id;
+    if (!canonico.activo) {
+      await tx.color.update({
+        where: { id: canonico.id },
+        data: { activo: true, ...datosModificacion(sesion) },
+      });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Color',
+        idEntidad: canonico.id,
+        accion: 'MODIFICAR',
+        datos: { operacion: 'reactivar', nombre: canonico.nombre, origen: 'importacion-pdf' },
+      });
+    }
+    return canonico.id;
   }
   const creado = await tx.color.create({ data: { nombre, ...datosCreacion(sesion) } });
   await registrarBitacora(tx, sesion, {
@@ -256,6 +318,14 @@ async function resolverOCrearColor(
 /**
  * Resuelve la talla por etiqueta (insensible a mayúsculas) o la CREA. `orden` de despliegue = el número
  * inicial de la etiqueta si lo hay (C&A "5-6" → 5), para que las tallas de niño queden ordenadas.
+ *
+ * ⭐ **SÍ reactiva una talla apagada, y aquí eso está bien** (medición de V1-E8s, §Post-F9.143): el
+ * catálogo de TALLAS **no tiene fusión** —`fusionar…` sólo existe para colores y para departamentos de
+ * cliente—, así que una talla apagada la apagó su dueño y reactivarla no deshace ninguna limpieza. Y la
+ * matriz color×talla **exige talla activa**, así que no reactivarla tumbaría el import. Lo que sí
+ * faltaba era **decirlo**: la reactivación ahora deja bitácora (A7), como el alta.
+ * 🔴 Si algún día se le construye fusión a las tallas, ESTE resolver es la puerta a cerrar: hay que
+ * darle su rastro `idFusionadoEn` y redirigir al canónico, exactamente como {@link resolverOCrearColor}.
  */
 async function resolverOCrearTalla(
   tx: Tx,
@@ -272,6 +342,12 @@ async function resolverOCrearTalla(
       await tx.talla.update({
         where: { id: existente.id },
         data: { activo: true, ...datosModificacion(sesion) },
+      });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Talla',
+        idEntidad: existente.id,
+        accion: 'MODIFICAR',
+        datos: { operacion: 'reactivar', etiqueta, origen: 'importacion-pdf' },
       });
     }
     return existente.id;
@@ -293,7 +369,32 @@ async function resolverOCrearTalla(
   return creada.id;
 }
 
-/** Resuelve (o crea) un departamento del cliente por nombre (insensible a mayúsculas). Idempotente. */
+/**
+ * Resuelve (o crea) un departamento del cliente por nombre (insensible a mayúsculas). Idempotente.
+ *
+ * 🔴 **NO REACTIVA uno desactivado** (§Post-F9.122(a)). Antes sí lo hacía, y eso **deshacía la
+ * FUSIÓN de departamentos en silencio**: Daniel junta «2-HOMBRE» en «Caballeros» —el absorbido queda
+ * apagado, que es como esta fusión lo retira (borrado suave, D3)— y la siguiente OC de C&A que
+ * trajera otra vez el texto «2-HOMBRE» lo **resucitaba**, devolviendo el catálogo revuelto que la
+ * limpieza acababa de arreglar. La limpieza no puede durar menos que la siguiente importación.
+ *
+ * Y no se pierde nada por no reactivarlo: este resolver devuelve `void` — el departamento **no se
+ * amarra a la orden** (la orden no tiene FK a departamento; la División viaja como REFERENCIA de
+ * texto, D7). Su único trabajo es que el catálogo del cliente exista para armar listas después. Un
+ * departamento apagado sigue existiendo, así que tampoco se crea un duplicado.
+ *
+ * ⚠️ Esto NO es la pieza (b) de §Post-F9.122 (*"que el importador pregunte y aprenda"*), que sigue
+ * pendiente: hoy un texto nuevo se sigue dando de alta a ciegas. Es sólo la guarda mínima para que la
+ * fusión de la pieza (a) no se deshaga sola.
+ *
+ * 🔗 **La GEMELA está en {@link resolverOCrearColor}** (V1-E8s, §Post-F9.143), y a propósito **NO
+ * comparte código con ésta**: el criterio de las dos es distinto porque el problema lo es. Aquí basta
+ * *"reúsalo tal como está"* porque el resultado se tira; allá el id **se amarra a la matriz de la OP**,
+ * así que devolver uno apagado tumbaría la importación ⇒ la fusión de colores dejó un **rastro**
+ * (`Color.idFusionadoEn`) y ese resolver **redirige al canónico**. Compartir una función entre las dos
+ * sería un resumen que miente sobre una de ellas. Lo que sí es común, y lo dice cada una, es la REGLA:
+ * *una limpieza de catálogo no puede durar menos que la siguiente importación.*
+ */
 async function resolverOCrearDepartamento(
   tx: Tx,
   sesion: SesionUsuario,
@@ -302,16 +403,10 @@ async function resolverOCrearDepartamento(
 ): Promise<void> {
   const existente = await tx.clienteDepartamento.findFirst({
     where: { idCliente, nombre: { equals: nombre, mode: 'insensitive' } },
-    select: { id: true, activo: true },
+    select: { id: true },
   });
   if (existente !== null) {
-    if (!existente.activo) {
-      await tx.clienteDepartamento.update({
-        where: { id: existente.id },
-        data: { activo: true, ...datosModificacion(sesion) },
-      });
-    }
-    return;
+    return; // existe (activo o apagado): se reusa TAL COMO ESTÁ
   }
   const creado = await tx.clienteDepartamento.create({
     data: { idCliente, nombre, ...datosCreacion(sesion) },
@@ -332,6 +427,11 @@ async function resolverOCrearDepartamento(
 /**
  * Resuelve (o crea) un campo de referencia del cliente (D7) por etiqueta (insensible a mayúsculas) y
  * devuelve su id. Si existe desactivado, lo REACTIVA (se va a usar). Idempotente por etiqueta.
+ *
+ * ⭐ **La reactivación aquí también está bien** (misma medición que en {@link resolverOCrearTalla}):
+ * `ClienteCampo` **no tiene fusión** —sólo la tienen colores y departamentos de cliente—, así que no
+ * hay limpieza que deshacer; y el valor de la referencia (D7) necesita su campo vivo para guardarse.
+ * Lo que faltaba era la bitácora (A7), que ahora sí queda.
  */
 async function resolverOCrearCampo(
   tx: Tx,
@@ -348,6 +448,17 @@ async function resolverOCrearCampo(
       await tx.clienteCampo.update({
         where: { id: existente.id },
         data: { activo: true, ...datosModificacion(sesion) },
+      });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Cliente',
+        idEntidad: idCliente,
+        accion: 'MODIFICAR',
+        datos: {
+          campo: 'reactivar',
+          idCampo: existente.id,
+          etiqueta,
+          origen: 'importacion-pdf',
+        },
       });
     }
     return existente.id;
@@ -426,6 +537,35 @@ async function cargarLigasAprendidas(
   return mapa;
 }
 
+/**
+ * La liga que la vista previa SUGIERE para un modelo del cliente: la aprendida, y **sólo si su
+ * modelo sigue activo** (sugerir uno descontinuado haría reventar la tx al confirmar).
+ *
+ * 🔑 Es una función y no dos líneas repetidas porque la pregunta se hace en DOS sitios de la misma
+ * pasada —al numerar la tanda y al armar cada renglón— y dos copias de la regla es como empiezan a
+ * contestar distinto: bastaría con que una mirara `activo` y la otra no para que la previa numerara
+ * un modelo que después no va a sugerir.
+ */
+function ligaSugerida(
+  ligas: ReadonlyMap<string, LigaAprendida>,
+  modeloCliente: string,
+): LigaAprendida | null {
+  const aprendida = ligas.get(claveModeloCliente(modeloCliente)) ?? null;
+  return aprendida !== null && aprendida.activo ? aprendida : null;
+}
+
+/**
+ * En qué color va a acabar la OP, como ID: el canónico si una fusión lo desvía, el mismo si no, y
+ * `null` cuando el color todavía no existe (se crea al confirmar) — que es justo el caso en el que
+ * NO puede haber un modelo de producción previo para ese color.
+ */
+function idColorResuelto(resolucion: ResolucionColorPapel | undefined): number | null {
+  if (resolucion === undefined || resolucion.estado === 'nuevo') {
+    return null;
+  }
+  return resolucion.estado === 'fusionado' ? resolucion.canonico.id : resolucion.id;
+}
+
 /** Config pdf-cya VIGENTE del cliente (campos variables + % adicional); defaults si no hay plantilla. */
 async function leerConfigPlantillaPdf(
   bd: ReturnType<typeof clienteLectura>,
@@ -447,9 +587,21 @@ async function leerConfigPlantillaPdf(
 // ── Operación: analizar / vista previa ───────────────────────────────────────
 
 /**
- * Analiza los PDFs del cliente y arma la VISTA PREVIA (un renglón por PDF): campos parseados, liga de
- * modelo SUGERIDA (aprendida), qué color/tallas NO existen aún (se crearán) y las advertencias de
- * cuadre. Sólo LEE. Requiere `pedidos.administrar`; los importes van gated por `pedidos.importes`.
+ * Analiza los PDFs del cliente y arma la VISTA PREVIA (un renglón por PDF). Sólo LEE. Requiere
+ * `pedidos.administrar`; los importes van gated por `pedidos.importes`.
+ *
+ * Cada renglón lleva: los campos parseados del papel; la liga de modelo SUGERIDA (aprendida, y sólo
+ * si el modelo sigue activo); la propuesta de SOBRE-PEDIDO por packs con el % adicional; si esa OC
+ * del cliente YA parió su OP (V1-E4, que además no se re-importa); y **qué le va a pasar al color y
+ * a las tallas del papel al confirmar**.
+ *
+ * 🔴 Lo del color es más que "existe / no existe". Son TRES respuestas distintas y la previa las
+ * distingue (`color-del-papel.ts`), porque confundir dos cualesquiera miente:
+ *   • no existe            → `colorNuevo`: se va a crear con el nombre del papel;
+ *   • existe               → nada que decir (aunque esté apagado a mano: se reactiva y ahí se queda);
+ *   • lo absorbió una FUSIÓN → `colorFusionadoEn` + advertencia `color-fusionado`: la OP nace en
+ *     OTRO color, con OTRO nombre — y como el precio casa POR NOMBRE, el precosto puede no cuadrar
+ *     con el papel del cliente. Antes esto sólo constaba en la bitácora, DESPUÉS de confirmar.
  */
 export async function analizarImportacionPdf(
   sesion: SesionUsuario,
@@ -472,10 +624,18 @@ export async function analizarImportacionPdf(
   const etiquetasTalla = new Set<string>();
   for (const p of procesados) {
     if (p.parseado === null) continue;
-    if (p.parseado.colorGenerico !== '') nombresColor.add(p.parseado.colorGenerico);
+    // ⚠️ El papel SIN color genérico igual acaba en un color: el confirm resuelve-o-crea
+    // `SIN COLOR` (ver `resolverOCrearColor`). Se pregunta también por ése —y no sólo por los
+    // nombres del papel— porque de ese id depende saber si el color YA tiene modelo de producción
+    // (fila 0.151). No cambia lo que ve `marcarColorDelPapel`, que sigue preguntando por el nombre
+    // del papel: `claveColor('')` nunca casa con la de `SIN COLOR`.
+    nombresColor.add(p.parseado.colorGenerico === '' ? 'SIN COLOR' : p.parseado.colorGenerico);
     for (const t of p.parseado.tallas) etiquetasTalla.add(t.talla);
   }
-  const coloresExistentes = await catalogoColoresPorNombre(cliente, [...nombresColor]);
+  // ⭐ No basta con saber si el color EXISTE: hay que saber si una fusión lo va a DESVIAR a otro
+  // color (y a otro precio) al confirmar. Lo resuelve `color-del-papel.ts` con la misma caminata
+  // que usa el confirm.
+  const coloresDelPapel = await resolverColoresDelPapel(cliente, [...nombresColor]);
   const tallasExistentes = await catalogoTallasPorEtiqueta(cliente, [...etiquetasTalla]);
 
   // Defensa V1-E4 (punto 1): ¿alguno de estos papeles YA parió su OP? Se resuelve ANTES de armar
@@ -494,6 +654,30 @@ export async function analizarImportacionPdf(
     ),
   );
 
+  /**
+   * ⭐ Fila 0.151 — el Nº DE PRODUCCIÓN de cada OC, calculado para TODA la tanda de golpe y ANTES de
+   * escribir nada (`numero-produccion-pdf.ts`): qué le va a pasar al modelo de este PDF y con qué
+   * número, para que la pantalla llegue con el campo precargado y sólo lo ofrezca cuando de verdad
+   * va a nacer un modelo. Los PDFs que NO se van a importar (ilegibles, sin liga, OC repetida) no
+   * gastan número: entran con `idModelo: null`.
+   */
+  const numeracion = await resolverNumerosDeProduccion(
+    cliente,
+    procesados.map((p, i) => {
+      const r = p.parseado;
+      if (r === null || (duplicados[i] ?? null) !== null) {
+        return { idModelo: null, idColor: null, claveColor: '' };
+      }
+      const sugerida = ligaSugerida(ligas, r.modeloCliente);
+      const nombre = r.colorGenerico === '' ? 'SIN COLOR' : r.colorGenerico;
+      return {
+        idModelo: sugerida?.idModelo ?? null,
+        idColor: idColorResuelto(coloresDelPapel.get(claveColor(nombre))),
+        claveColor: claveColor(nombre),
+      } satisfies RenglonParaNumerar;
+    }),
+  );
+
   const renglones: RenglonPdfPreview[] = procesados.map((p, i) => {
     if (p.parseado === null) {
       return renglonError(p.nombreArchivo, p.error ?? 'No se pudo leer el PDF.');
@@ -503,7 +687,13 @@ export async function analizarImportacionPdf(
     const aprendida = ligas.get(claveModeloCliente(r.modeloCliente)) ?? null;
     // Sólo se SUGIERE una liga a un modelo ACTIVO: sugerir uno descontinuado haría reventar la tx al
     // confirmar. Si la liga aprendida apunta a un inactivo, el renglón llega SIN sugerencia + advertencia.
-    const sugerida = aprendida !== null && aprendida.activo ? aprendida : null;
+    const sugerida = ligaSugerida(ligas, r.modeloCliente);
+    const numero: DesenlaceNumeroPdf = numeracion[i] ?? {
+      modeloDeProduccion: null,
+      numeroProduccionPropuesto: null,
+      numeroProduccionModelo: null,
+      avisos: [],
+    };
     const advertencias: AdvertenciaPdf[] = r.advertencias.map((a) => ({
       tipo: a.tipo,
       mensaje: a.mensaje,
@@ -517,9 +707,16 @@ export async function analizarImportacionPdf(
     if (duplicado !== null) {
       advertencias.push({ tipo: 'duplicado', mensaje: mensajeDuplicado(duplicado, r.numeroOrden) });
     }
-    const colorNuevo =
-      r.colorGenerico !== '' &&
-      !coloresExistentes.has(normalizarNombreColor(r.colorGenerico).toLowerCase());
+    // 🔴 El desvío por fusión se DICE aquí, en la previa, y no sólo en la bitácora de después de
+    // confirmar: cambia el nombre del color de la OP y con él el precio que se le casa (casa por
+    // NOMBRE). Marca, campo y aviso los decide `marcarColorDelPapel`, en un solo sitio.
+    const marcaColor = marcarColorDelPapel(
+      r.colorGenerico,
+      coloresDelPapel.get(claveColor(r.colorGenerico)),
+    );
+    if (marcaColor.advertencia !== null) {
+      advertencias.push(marcaColor.advertencia);
+    }
     const tallasNuevas = r.tallas
       .map((t) => t.talla)
       .filter((etq) => !tallasExistentes.has(etq.trim().toLowerCase()));
@@ -557,9 +754,14 @@ export async function analizarImportacionPdf(
       idModeloSugerido: sugerida?.idModelo ?? null,
       codigoModeloSugerido: sugerida?.codigo ?? null,
       descripcionModeloSugerido: sugerida?.descripcion ?? null,
-      colorNuevo,
+      colorNuevo: marcaColor.colorNuevo,
+      colorFusionadoEn: marcaColor.colorFusionadoEn,
       tallasNuevas: [...new Set(tallasNuevas)],
       advertencias,
+      modeloDeProduccion: numero.modeloDeProduccion,
+      numeroProduccionPropuesto: numero.numeroProduccionPropuesto,
+      numeroProduccionModelo: numero.numeroProduccionModelo,
+      avisosNumeroProduccion: numero.avisos,
       yaImportado:
         duplicado !== null &&
         duplicado.origen === 'importado' &&
@@ -613,23 +815,15 @@ function renglonError(nombreArchivo: string, error: string): RenglonPdfPreview {
     codigoModeloSugerido: null,
     descripcionModeloSugerido: null,
     colorNuevo: false,
+    colorFusionadoEn: null,
     tallasNuevas: [],
     advertencias: [{ tipo: 'parseo', mensaje: error }],
+    modeloDeProduccion: null,
+    numeroProduccionPropuesto: null,
+    numeroProduccionModelo: null,
+    avisosNumeroProduccion: [],
     yaImportado: null,
   };
-}
-
-/** Set de nombres de color existentes (normalizados) del subconjunto dado. */
-async function catalogoColoresPorNombre(
-  bd: ReturnType<typeof clienteLectura>,
-  nombres: string[],
-): Promise<Set<string>> {
-  if (nombres.length === 0) return new Set();
-  const colores = await bd.color.findMany({
-    where: { nombre: { in: nombres.map((n) => normalizarNombreColor(n)), mode: 'insensitive' } },
-    select: { nombre: true },
-  });
-  return new Set(colores.map((c) => normalizarNombreColor(c.nombre).toLowerCase()));
 }
 
 /** Set de etiquetas de talla existentes (minúsculas) del subconjunto dado. */
@@ -647,7 +841,16 @@ async function catalogoTallasPorEtiqueta(
 
 // ── Operación: confirmar la importación ──────────────────────────────────────
 
-/** Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = sin sufijo) y su corrida por talla. */
+/**
+ * Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = un solo pack) y su corrida por talla.
+ *
+ * Es la unidad de EDICIÓN de la vista previa y, desde §Post-F9.10, también la que se PERSISTE: cada
+ * uno acaba en su propio `OrdenLinea` con su campo `pack` (`agruparPacksEnRenglones`), todos del
+ * MISMO color — la letra no viaja al nombre del color (eso lo quitó §Post-F9.129). Con TRES matices,
+ * los tres deliberados: un renglón que quede entero en 0 no genera línea (así se "integra" un pack en
+ * otro); dos renglones con la MISMA letra se suman en uno (dos líneas de esa llave abortarían la
+ * importación); y una OC de un solo pack nace con `letra: null` ⇒ pack vacío, o sea SIN pack.
+ */
 interface RenglonMatrizEditada {
   letra: string | null;
   tallas: { talla: string; cantidad: number }[];
@@ -659,12 +862,19 @@ interface PdfAImportar {
   r: RenglonPdfCyaParseado;
   idModelo: number;
   /**
-   * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack, `{color} {letra}`); si no
-   * viene, se derivan de la propuesta por packs. Cada OC de C&A trae un renglón por pack (convención).
+   * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack); si no viene, se derivan
+   * de la propuesta por packs. Cada renglón-pack se persiste como SU PROPIA línea de la OP, con su
+   * campo `pack` y el mismo color que las demás (§Post-F9.10) — salvo el que quede en 0, que no
+   * genera línea, y los que compartan letra, que se suman en una. Ver {@link RenglonMatrizEditada}.
    */
   matrizEditada: RenglonMatrizEditada[] | null;
-  /** Pantone editado/prefilleado del color de la OP; null = sin pantone. */
+  /** Pantone editado/prefilleado del color de la OP (uno por OC); null = sin pantone. */
   pantone: string | null;
+  /**
+   * ⭐ Fila 0.151 — nº de producción CONFIRMADO por el usuario para el modelo que nazca de ESTA OC
+   * (`undefined` = acepta el que proponga el sistema). Se IGNORA —con aviso— si el modelo no nace.
+   */
+  numeroProduccion: number | undefined;
   subido: {
     bucket: string;
     key: string;
@@ -810,7 +1020,17 @@ export async function confirmarImportacionPdf(
         : r.pantone !== ''
           ? r.pantone
           : null;
-    aImportar.push({ nombreArchivo: p.nombreArchivo, r, idModelo, matrizEditada, pantone, subido });
+    aImportar.push({
+      nombreArchivo: p.nombreArchivo,
+      r,
+      idModelo,
+      matrizEditada,
+      pantone,
+      // Fila 0.151: el nº que el usuario confirmó en la vista previa para ESTE PDF. Zod ya lo validó
+      // (5 dígitos); `salidaAProduccion` lo vuelve a validar y el dominio decide si aplica.
+      numeroProduccion: ajuste?.numeroProduccion,
+      subido,
+    });
   }
 
   if (aImportar.length === 0) {
@@ -882,6 +1102,7 @@ export async function confirmarImportacionPdf(
         porcentajeAdicional: pct,
         matrizEditada: item.matrizEditada,
         pantone: item.pantone,
+        numeroProduccion: item.numeroProduccion,
         idCliente: datos.idCliente,
         subido: item.subido,
       });
@@ -961,18 +1182,27 @@ function tituloColor(base: string): string {
 }
 
 /**
- * Compone el color de un renglón-pack: `{Base} {LETRA}` (o sólo `Base` si no hay letra). El nombre del
- * color va en Título y la letra del pack SIEMPRE en MAYÚSCULA (A, B, C…), como los pide Daniel.
+ * El color de los renglones de la OP: el color genérico de la OC, en Título. Es UNO para todos los
+ * tendidos. La LETRA DEL PACK NO ENTRA (§Post-F9.129): antes se componía `{Base} {LETRA}` (`Negro A`,
+ * `Negro B`) y eso fabricaba un color de catálogo por pack, que partía en dos las compras de una misma
+ * orden aguas abajo (explosión/MRP, OC, inventario). Desde §Post-F9.10 el tendido vive en el campo
+ * `pack` del renglón, y el desglose SKU completo sigue en `Orden.packsCliente`.
  */
-function componerColor(base: string, letra: string | null): string {
-  const nombre = tituloColor(base);
-  return letra !== null && letra.trim() !== '' ? `${nombre} ${letra.trim().toUpperCase()}` : nombre;
+function colorDeLaOrden(base: string): string {
+  return tituloColor(base);
 }
 
 /**
  * Deriva los RENGLONES-PACK de la matriz cuando el usuario NO editó la vista previa: un renglón por grupo
- * (color `{color} {letra}`) si la OC trae ≥2 packs; un solo renglón SIN sufijo si trae 0 o 1 pack (la
- * convención histórica de los pedidos de un solo pack). Las cantidades ya vienen con el sobre-pedido.
+ * si la OC trae ≥2 packs; un solo renglón SIN pack si trae 0 o 1. Las cantidades ya vienen con el
+ * sobre-pedido. Estos renglones son la unidad de EDICIÓN de la vista previa (el usuario mueve números
+ * entre packs) y, desde §Post-F9.10, también la unidad que se PERSISTE: cada uno acaba en su propio
+ * `OrdenLinea` con su `pack` (`agruparPacksEnRenglones`).
+ *
+ * 🔑 UNA OC CON UN SOLO PACK NACE SIN PACK, y no es un descuido: la letra sólo distingue algo cuando
+ * hay algo de qué distinguirla. Esa OC produce exactamente la misma orden que antes de §Post-F9.10,
+ * y ni el corte ni el envío piden un dato que no aporta nada. (Cuántas OCs caen de cada lado NO se
+ * ha medido: la única OC real del repo, la 620884, trae TRES packs.)
  */
 function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEditada[] {
   if (propuesta.grupos.length >= 2) {
@@ -990,9 +1220,10 @@ function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEdit
 }
 
 /**
- * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz, UN renglón por pack),
- * departamento y campos de referencia (D7), crea el renglón, la OP (reusa `salidaAProduccion` → RC), sella
- * el nº de orden C&A y la composición en la OP, y adjunta el PDF (ya subido) a la orden. Devuelve la traza.
+ * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz de UN SOLO color con un
+ * renglón POR TENDIDO — §Post-F9.129 + §Post-F9.10), departamento y campos de referencia (D7), crea el
+ * renglón, la OP (reusa `salidaAProduccion` → RC), sella el nº de orden C&A y la composición en la OP,
+ * y adjunta el PDF (ya subido) a la orden. Devuelve la traza.
  */
 async function crearOrdenDesdePdf(
   tx: Tx,
@@ -1008,40 +1239,58 @@ async function crearOrdenDesdePdf(
     matrizEditada: RenglonMatrizEditada[] | null;
     /** Pantone del color de la OP (editado/prefilleado), o null. */
     pantone: string | null;
+    /** Nº de producción confirmado por el usuario para el modelo que nazca de esta OC (0.151). */
+    numeroProduccion: number | undefined;
     subido: PdfAImportar['subido'];
   },
 ): Promise<Omit<OrdenPdfImportada, 'nombreArchivo' | 'modeloCliente'>> {
   const { r } = args;
 
-  // FABRICAR: UN renglón de matriz POR PACK (convención C&A `{color} {letra}`). Si el usuario EDITÓ la
-  // matriz en la vista previa mandan SUS renglones-pack; si no, se derivan de la PROPUESTA de sobre-pedido
-  // por packs (petición Daniel: el % se aplica al nº de packs, no talla por talla, y NO cambia la
-  // ESTRUCTURA de renglones — sólo las cantidades). El renglón del pedido conserva la cantidad ORIGINAL.
+  // FABRICAR: los renglones-PACK del papel (o los que el usuario EDITÓ en la vista previa). Si no editó,
+  // se derivan de la PROPUESTA de sobre-pedido por packs (petición Daniel: el % se aplica al nº de packs,
+  // no talla por talla, y NO cambia la ESTRUCTURA de renglones — sólo las cantidades). El renglón del
+  // pedido conserva la cantidad ORIGINAL.
   const propuesta = propuestaDe(r, args.porcentajeAdicional);
   const filas = args.matrizEditada ?? filasDesdePropuesta(propuesta);
   const totalCliente = r.tallas.reduce((s, t) => s + Math.max(0, t.piezas), 0);
 
-  // Un color (abierto, D14c) POR renglón-pack: `{colorGenerico} {letra}` (sin sufijo si es un solo pack).
-  // El pantone viaja EN cada línea del color; `sincronizarMatriz` lo sella en el `OrdenLinea`. Un renglón
-  // sin tallas con piezas (p. ej. un pack que el usuario vació al integrarlo en otro) no genera línea.
+  // ⭐ §Post-F9.10 — UN COLOR, UN RENGLÓN POR TENDIDO. Cada renglón-pack se persiste como su propio
+  // `OrdenLinea` con su campo `pack`, sobre el MISMO color del catálogo. Es la ÚNICA puerta por la que
+  // la matriz de un PDF llega a la OP, así que los dos caminos (propuesta automática Y matriz editada
+  // por el usuario) quedan cubiertos por igual.
+  //
+  // 🔴 LO QUE ESTO SUSTITUYE, para que nadie lo reintroduzca: hasta la v0.087 los packs se FUNDÍAN en
+  // una sola corrida y el tendido sólo sobrevivía en el jsonb `Orden.packsCliente`. Eso mataba el pack
+  // justo donde Daniel pidió que viajara —el corte y la entrega a maquila—. Antes de §Post-F9.129 el
+  // remedio había sido peor: la letra iba DENTRO del nombre del color (`Negro A`/`Negro B`), fabricando
+  // un color de catálogo por pack y partiendo en dos las compras de una misma orden. Hoy no hace falta
+  // elegir: UN solo `Color` y el tendido en su propio campo. `packsCliente` se sigue guardando abajo,
+  // porque trae la tabla SKU completa (base del futuro módulo de EMPAQUE), que no cabe en la matriz.
+  //
+  // PANTONE: es UNO por OC (`args.pantone` — la OC trae un color genérico y un pantone; el ajuste de la
+  // vista previa también es por PDF, no por pack), así que va IGUAL en todos los renglones: no hay dos
+  // pantones que desempatar. `sincronizarMatriz` lo sella en cada `OrdenLinea`.
+  //
+  // El color (abierto, D14c) sólo se resuelve-o-crea si de verdad quedó algún renglón: una OC que el
+  // usuario vació entera no debe dejar un color nuevo huérfano en el catálogo. Y se resuelve UNA vez,
+  // fuera del bucle: los N tendidos son del MISMO color.
+  const renglones = agruparPacksEnRenglones(filas);
   const matriz: {
     idColor: number;
+    pack: string;
     tallas: { idTalla: number; cantidad: number }[];
     pantone: string | null;
   }[] = [];
-  for (const fila of filas) {
-    const idColor = await resolverOCrearColor(
-      tx,
-      sesion,
-      componerColor(r.colorGenerico, fila.letra),
-    );
-    const tallas: { idTalla: number; cantidad: number }[] = [];
-    for (const t of fila.tallas) {
-      if (t.cantidad <= 0) continue;
-      const idTalla = await resolverOCrearTalla(tx, sesion, t.talla.trim());
-      tallas.push({ idTalla, cantidad: t.cantidad });
+  if (renglones.length > 0) {
+    const idColor = await resolverOCrearColor(tx, sesion, colorDeLaOrden(r.colorGenerico));
+    for (const renglon of renglones) {
+      const tallas: { idTalla: number; cantidad: number }[] = [];
+      for (const t of renglon.tallas) {
+        const idTalla = await resolverOCrearTalla(tx, sesion, t.talla);
+        tallas.push({ idTalla, cantidad: t.cantidad });
+      }
+      matriz.push({ idColor, pack: renglon.pack, tallas, pantone: args.pantone });
     }
-    if (tallas.length > 0) matriz.push({ idColor, tallas, pantone: args.pantone });
   }
   const totalFabricar = matriz.reduce(
     (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
@@ -1082,6 +1331,12 @@ async function crearOrdenDesdePdf(
       lineas: matriz,
       referencias,
       ...(r.fechaEntrega !== null ? { fechaEntrega: r.fechaEntrega } : {}),
+      // ⭐ Fila 0.151 (DANIEL: *«quedamos que ese lo ponía yo, con una sugerencia previa»*): el nº de
+      // producción que el usuario CONFIRMÓ en la vista previa viaja hasta el nacimiento del modelo.
+      // Sin esta línea el importador llamaba a la MISMA función que el panel manual «Generar OP»
+      // pero sin el campo, así que el número lo elegía el sistema y nadie lo veía hasta después.
+      // Omitirlo = aceptar el que proponga el sistema (conducta anterior, intacta).
+      ...(args.numeroProduccion === undefined ? {} : { numeroProduccion: args.numeroProduccion }),
     },
     { tx },
   );
@@ -1132,6 +1387,11 @@ async function crearOrdenDesdePdf(
     numeroOrden: r.numeroOrden,
     totalPiezas: totalFabricar,
     adjuntado: true,
+    // Fila 0.151 — qué pasó DE VERDAD con el modelo, y los avisos de la numeración. Son la ÚNICA
+    // señal de que un número tecleado NO se aplicó (porque el color ya tenía modelo): hasta ahora
+    // `salidaAProduccion` los devolvía y este importador los tiraba a la basura.
+    modeloDeProduccion: salida.modeloDeProduccion,
+    avisosNumeroProduccion: salida.avisosNumeroProduccion,
   };
 }
 

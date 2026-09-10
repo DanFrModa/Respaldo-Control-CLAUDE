@@ -25,8 +25,9 @@ Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Mo
 > de la fase activa. Este archivo manda en **las REGLAS** (§6, §7 y las trampas de §8), que sí están
 > al día — y son innegociables.
 >
-> ⚠️ **Bloqueo abierto:** no se pueden **subir fotos** en `prueba` (configuración de Cloudflare R2,
-> no código — las cuatro trampas están en `docs/hoja-de-ruta/F1-etapas.md:222`).
+> ✅ **Subir fotos en `prueba`: DESBLOQUEADO (25-ago-2026, confirmado por Daniel).** Era
+> configuración de Cloudflare R2, no código — tal como decía el diagnóstico. Si algún día vuelve a
+> fallar, las trampas de R2 siguen documentadas en `docs/hoja-de-ruta/F1-etapas.md:222`.
 
 **Estado actual _(HISTÓRICO, junio-2026 — ver el recuadro de arriba)_: CONTROL v2 — F0 ✅, F1 ✅ (desplegadas en `prueba` de Railway) y F2 (Pedidos + Órdenes) ✅ COMPLETA (17-jun-2026, verificada por Gabriel; reviewer APROBADO; pendiente solo su commit + deploy a `prueba`).** Las 8 etapas de F1 (catálogos sencillos y estructurados, proveedor enriquecido R15, materiales, modelos con BOM y fotos R2, galería + códigos de barra EAN-13/DUN-14 con impreso PDF R9, y el ETL de migración de datos reales) quedaron construidas, verificadas por Gabriel y en `prueba`. **F3 (Producción / WIP) ✅ COMPLETA (6/6, 20-jun-2026; pendiente verificación de Gabriel en `prueba`) — F3-E1 ✅ (17-jun-2026, verificada por Gabriel; 2 reviewers APROBARON): motor kardex genérico + modelo de datos de toda F3 + CRUD 'Tipos de proceso'. F3-E2 ✅ (18-jun-2026; reviewer independiente APROBADO; pendiente verificación de Gabriel en `prueba`): corte + envío a maquila unificado (M+A por TipoProceso) — dominio→API→UI + 2 PDFs + historial/cancelación; SIN migración ni permisos nuevos (los `produccion.*` ya estaban de E1); decisiones (f) sobre-corte libre / (g) sobre-envío estricto en `DECISIONES.md`. F3-E3 ✅ (19-jun-2026; reviewer independiente APROBADO; pendiente verificación de Gabriel en `prueba`): inventario PT operable (primer uso real del motor kardex) — movimientos manuales, traspasos entre almacenes, existencias y kardex (dominio→API→UI, 6 endpoints, 4 pantallas teal con existencias responsive); salidas/pata-origen del traspaso validan no-negativo por suma directa bajo lock (nunca la vista); cancelación = movimiento inverso auditado (NUNCA edita/borra, D3); SIN migración ni permisos nuevos, pero +2 tipos de movimiento al seed (`transferencia-salida`/`entrada`) → el deploy a `prueba` requiere `SEED_ON_START=true`. **F3-E4** ✅ (recibo de maquila ⭐, PR #58: transacción WIP + kardex PT condicionado por `generaEntradaPt` + cargo EsMa) · **F3-E5** ✅ (entrega a cliente + tablero WIP + existencias de maquilero, cierre del ciclo) · **F3-E6** ✅ (ETL de cierre: histórico de producción/IPT cargado por lotes vía dominio modo-migración; decisión (c) histórico PT "sin desglose" con sentinela; recibos en variante SIN efectos derivados anti-doble-conteo; reporte de cuadre; SIN migración/permisos/seed → el ETL se corre a mano post-deploy). **F4 (Compras/MRP), F5 (Ruta Crítica ⭐), F6 (Calidad + EsMa) y F7 (Costos/EDR + Indicadores) ✅ COMPLETAS** (22-jun → 3-jul-2026; el detalle vive en `HOJA-DE-RUTA.md` y sus fichas, no aquí). **F8 (Desarrollo, Cotización y Listas de Precios) ✅ COMPLETA (6/6, 6-jul-2026;** fase nueva D13/R16–R20/módulo 15; con su inserción **Finanzas pasó a F9** y **Migración+Go-live a F10** — plan **F0–F10, 11 fases**; ficha en `docs/hoja-de-ruta/F8-etapas.md`).** Después de F8 corrió el REDISEÑO COMPLETO del frontend (R1–R9, 7–10 jul-2026, ✅ CERRADO** — track propio en `docs/rediseno/PLAN-IMPLEMENTACION.md`): toda la UI al estándar del **prototipo de Daniel** (tabla-first, tokens verdes, riel oscuro, verificada FOTO contra FOTO contra el HTML), y de ahí nacieron el **importador de pedido del cliente** (R8, versión Excel; **+variante PDF plantilla C&A el 12-jul-2026, reglas dictadas por DANIEL en vivo** — sobre-pedido por packs 7%, referencia = nº de orden de la OC, SKUs guardados para el futuro módulo de empaque, pantone por color de la OP; ver `DECISIONES.md §Post-F9.2` + nota R8.1 del track del rediseño), el **catálogo de Auditores** (+R21 flujo del auditor, pendiente de diseño de Daniel), el **Resumen operativo** (`GET /api/resumen`), KPIs de agregación en servidor por módulo y las decisiones **D14/D15**. **F9 · Finanzas ✅ COMPLETA (6/6, construida el 10-jul-2026** con las decisiones D15 cerradas de antemano; ficha `docs/hoja-de-ruta/F9-etapas.md`; módulo documentado en `docs/modulos/finanzas.md`): motor de cuenta corriente de terceros (ADR-0017) + CxP con fold EsMa + importación de CFDI 4.0 de proveedores y ventas + reportes fiscales del contador + aging configurable + ETL de apertura **LISTO SIN CORRER** (espera el corte de SINUBE de Daniel, D15c). ⚠️ El deploy de F9 a `prueba` requiere `SEED_ON_START=true` (permisos `terceros.*`/`cxp.*`/`cxc.*`) y capturar el RFC de FR Moda en Administración › Empresas. De los remates post-F9: el **cierre visual de Finanzas** ✅ quedó verificado foto-contra-foto (PR #123: subtítulo CxC + TODO EsMa migrado a TablaDensa) y los **emisores de eventos RC** ✅ construidos (11-jul: `compraTela`/`surtidoAvios`/`auditoriaCorte` + tabla `HitoOrden` para revisión OP/fit/tono/avíos/empaque/arte → catálogo ~18 automáticos como el proto; defaults en `DECISIONES.md §Post-F9.1`; SIN permisos nuevos, solo migraciones automáticas). Los **hubs** quedaron sobrios (los 7 con degradado pasaron al patrón de Inventarios, `bg-primary-soft`), la **pantalla Ventas** ya es real (facturación por modelo sobre el EDR consolidado, permiso `edr.ver`; era el último placeholder desactualizado — solo queda `/documental`, legítimo) y los **filtros del Centro de Órdenes** quedaron en una línea (mes de entrega como select + conteo sin brinco). **Sigue: F10 (Migración + Go-live) como siguiente fase** (pendientes que esperan insumos: ETL de apertura de F9 ← corte SINUBE de Daniel; R21 flujo del auditor ← diseño de Daniel; fotos masivas ← carpeta física). **Nota: los códigos de barra fueron RETIRADOS del todo en F2-E5** (decisión de Gabriel, ya no se usan): se eliminó el generador EAN-13/DUN-14 de F1-E5 con su impreso/UI y las columnas `upc` (`Orden.upc`, `Empresa.upc`). El **detalle por etapa** (qué entregó cada una, decisiones, trampas y notas de cierre) vive en **`HOJA-DE-RUTA.md`** y las fichas de **`docs/hoja-de-ruta/`** — este archivo ya NO lo duplica. La UI está en el estándar visual del **prototipo del rediseño** (tabla-first + tokens VERDES + riel oscuro colapsable + cajones de detalle; el teal viejo quedó retirado) — la spec visual es `docs/rediseno/prototipo.html` + `docs/rediseno/REDISENO-FRONTEND.md` §4. **Pendiente explícito de F1 (no bloquea F2):** el ETL de **fotos masivas** quedó listo y probado, pero falta la **carpeta física de fotos** (`S:\...\FotosMod` + bordados); se corre cuando Gabriel la consiga.
 
@@ -37,7 +38,7 @@ Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Mo
 **Arquitectura (decidida por Gabriel — ver `PLANMAESTRO.md` §1-3):**
 - **Backend y frontend SEPARADOS**, en carpetas `backend/` y `frontend/`. **NO es monorepo** (sin workspaces; cada carpeta autónoma con su `package.json` y `npm`).
 - **Todo dockerizado** — `docker compose up` levanta el sistema completo. Prioridad: **portabilidad** (si Railway se cae, se levanta en cualquier lado sin reescribir).
-- **Backend** = API REST: Node 22 + TypeScript + **Fastify** + Zod → genera **OpenAPI** (el "contrato"/menú). Prisma 7 + PostgreSQL 17. **better-auth** + RBAC. Archivos en **Cloudflare R2**.
+- **Backend** = API REST: Node 22 + TypeScript + **Fastify** + Zod → genera **OpenAPI** (el "contrato"/menú). Prisma 7 + PostgreSQL 18 (el gestionado de Railway; local y CI corren 17). **better-auth** + RBAC. Archivos en **Cloudflare R2**.
 - **Frontend** = SPA: **Vite + React** + Tailwind + shadcn/ui, servido por **nginx** (sirve estáticos + reverse-proxy `/api` → backend). Su cliente del API se **genera desde el OpenAPI** del backend.
 - **Comunicación**: REST. El **OpenAPI es lo único compartido** entre los dos servicios (tipado de punta a punta sin acoplarlos).
 - **Railway**: 3 servicios (frontend público; backend y Postgres **privados** por red interna). Archivos en **R2**.
@@ -145,6 +146,122 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
+> ## 🔴 REGLA 0 — NO TE FRENES ESPERANDO RESPUESTAS (DANIEL, 30-ago-2026, §Post-F9.157)
+>
+> **Mientras haya algo que hacer, se hace.** Textual de Daniel:
+>
+> > *«mientras haya algo que hacer, no frenes por las respuestas. **No estoy pegado a Claude 24 horas.**
+> > Necesito que avances mientras puedas hacer algo y después te doy mis respuestas.»*
+>
+> **Qué significa en la práctica, sin margen de interpretación:**
+> 1. **Preguntar NO es parar.** Se deja la pregunta puesta —con su default propuesto— **y se sigue con lo
+>    siguiente que no dependa de ella**. Cuando la respuesta llegue, se retoma.
+> 2. **Antes de decir «espero respuesta», hay que haber agotado lo que NO depende de ella.** Casi siempre
+>    hay: otra versión del programa entera, la medición de la que sigue, una deuda del §4, documentación.
+>    Una etapa bloqueada **no bloquea el programa**: se salta y se sigue (precedente: la **0.061** se
+>    aparcó y se pasó a la **0.062** sin perder un minuto).
+> 3. **Sólo se para de verdad** cuando *todo* lo pendiente depende de esa respuesta, o cuando avanzar sin
+>    ella arriesgaría trabajo que habría que tirar. En ese caso **se dice con esas palabras** —*«estoy
+>    detenido esperando esto»*— y se explica qué se intentó antes.
+> 4. **Las preguntas se juntan.** Si hay tres decisiones abiertas de un bloque, van **las tres de una vez**
+>    con su default (regla de §6), no de a gotas.
+>
+> ⚠️ **Cómo nació:** el 30-ago el lead terminó una versión, contestó una pregunta y **se quedó quieto**
+> sin nada corriendo, teniendo por delante una versión completamente decidida y lista para arrancar.
+> Daniel lo detectó preguntando *«¿estás trabajando?»*. **No estaba bloqueado: estaba parado.** La regla
+> existe para que esa distinción nunca vuelva a confundirse.
+
+> ## 🔴 REGLA 0-B — LOS DATOS DE HOY SON BASURA: EL SISTEMA MIRA HACIA ADELANTE (DANIEL, 30-ago-2026, §Post-F9.163)
+>
+> ## ⏳⏳ ESTA REGLA CADUCA — SÓLO VALE ANTES DE PRODUCCIÓN
+>
+> **Daniel, textual:** *«cabe aclarar que todo esto que comenté de la información vieja **es válido
+> mientras no hayamos ido a producción**. Después de que estemos en producción, habrá que medir qué
+> hacemos con información que hayamos hecho dentro del sistema y si luego se cambia algo… habrá que ver
+> cómo manejarlo.»*
+>
+> 🔑 **EL DISPARADOR ES CONCRETO Y VERIFICABLE: el día que la versión se rebautice `1.000`** (el hito del
+> arranque, ver `HISTORIAL-DE-VERSIONES.md` §«Cómo se numeran»), **esta regla DEJA DE APLICAR**. Mientras
+> el número siga empezando con `0.`, aplica entera.
+>
+> **Por qué caduca:** hoy los datos de `prueba` son basura porque **nadie operó el negocio con ellos**. En
+> producción serán **el negocio**: órdenes reales, compras reales, precios que se le cobraron a un
+> cliente. Ahí **no se puede tirar y volver a capturar**, y cada cambio de regla obliga a preguntarse qué
+> pasa con lo ya hecho — que es exactamente lo que hoy está prohibido gastar.
+>
+> ⚠️ **Si lees esto y la versión ya empieza con `1.`: PARA.** No apliques nada de lo de abajo, y **pregunta
+> a Daniel la política nueva** — él dijo que ese día *«revisamos esta regla desde el principio»*.
+>
+> ✅ **Y si la versión todavía empieza con `0.`: no hay nada que preparar.** *«Ahorita no te preocupes por
+> eso»* — la política de producción **no se diseña por adelantado**, ni se deja código «listo por si
+> acaso». Se decide el día que toque, con el sistema a la vista.
+>
+> **Textual de Daniel:**
+>
+> > *«Estamos trabajando en la versión de prueba… toda la información que haya ahí **no es importante, es
+> > basura. La vamos a limpiar.** Deja de preocuparte por información que ya tenga la receta, o en general
+> > información que ya esté. Todo lo que vamos haciendo nuevo está bien que aplique **sólo a los nuevos
+> > modelos** que vayamos a meter. Te veo muy preocupado por que los datos que ya tienen alguna cosa
+> > quieras hacer algo para poder revertir las cosas que tienen. Piensa que todo lo que vamos a usar de
+> > manera correcta es **información nueva**. No te preocupes incluso por la información que vamos a
+> > importar de Access. **Todo el sistema debe estar enfocado sólo en nueva información**, no en ver cómo
+> > arreglamos la que ya se hizo de una manera diferente. **Dejemos de perder recursos en cosas viejas.**»*
+>
+> **Qué se DEJA de hacer, desde ya:**
+> 1. **No se auditan los datos existentes** de `prueba` buscando los que quedaron mal por un defecto. Se
+>    limpian, no se reparan. Nada de consultas de rescate ni de informes de daño sobre datos de prueba.
+> 2. **No se construyen backfills, reparaciones ni migraciones de datos** para dejar coherente lo ya
+>    cargado, salvo que Daniel lo pida por su nombre.
+> 3. **Una función nueva no tiene que ser retrocompatible con los datos viejos.** Si sólo funciona bien
+>    para lo que se capture de aquí en adelante, **está bien** y no hace falta declararlo como límite.
+> 4. **Lo migrado de Access no manda sobre el diseño.** Hay mucho que ya no aplica; no se dobla una
+>    función nueva para que le cuadre al histórico.
+>
+> ⚠️ **DÓNDE ESTÁ LA FRONTERA — esta regla habla de DATOS, no de REGLAS.** Lo que NO cambia ni un ápice:
+> - **D3 sigue intacto:** lo guardado es inmutable, cancelar es un movimiento inverso auditado, nunca se
+>   edita ni se borra para corregir. *Eso gobierna cómo el sistema trata los datos NUEVOS*, y es justo lo
+>   que hace que la información nueva sí valga.
+> - **Las guardas de entrada, la auditoría, las transacciones y el RBAC** siguen exactamente igual.
+> - **No es permiso para romper cosas que hoy funcionan** ni para saltarse pruebas: es permiso para **no
+>   gastar en reparar el pasado**.
+>
+> **Y el matiz sobre ACCESS, que Daniel precisó aparte:** *«si vamos a jalar los datos de Access… pero
+> asumo que todo lo que se hizo en Access viene de una versión con muchas menos funcionalidades y **la
+> información va a venir incompleta. Eso lo tengo completamente asumido**»*.
+> ⇒ **El histórico SÍ se importa, y llega con huecos A PROPÓSITO.** Un registro migrado al que le falten
+> campos **NO es un defecto**: es lo esperado, porque el sistema viejo no tenía ese concepto.
+> 🔑 **La línea fina: TOLERAR ≠ COMPENSAR.** Una función nueva debe **no romperse** cuando el dato viejo
+> falta, pero **NO debe doblarse para rellenarlo**: nada de inventar valores, de pantallas para
+> «completar el histórico», ni de bloquear una función porque el histórico no la puede alimentar. Si una
+> capacidad nueva sólo aplica a lo que se capture de ahora en adelante, **eso está bien y no hay que
+> avisarlo como carencia**.
+>
+> ---
+> ### 🔑 CÓMO SE APLICA, SIN PENSARLO (Daniel, 30-ago: *«que en nuevos chats no se detenga a ver cómo resuelve el tema de los datos viejos»*)
+>
+> **La única pregunta que hay que hacerse es: «¿esto funciona bien cuando el dato NO está?»**
+> No *«¿cómo arreglo los que ya están mal?»*. Esa segunda pregunta **no se hace nunca**. Daniel:
+> *«sólo hay que ver cómo guardamos y hacemos compatible todo lo que no tenga datos. Y punto. Sin más.»*
+>
+> | Si te encuentras con… | Qué haces | Qué NO haces |
+> |---|---|---|
+> | Un campo nuevo y filas existentes sin él | `NULL` o un `DEFAULT` en la migración, y **sigues** | Backfill, script de relleno, «reparar» las filas |
+> | Un registro migrado de Access sin el dato que tu función necesita | Que la función **no truene**: vacío, `—`, o simplemente no aplica | Inventar el valor, pedirlo en pantalla, bloquear la función |
+> | Un defecto que ya dejó datos mal en `prueba` | Arreglas **la entrada** para que no se repita. **Punto final** | Auditar la BD, consultas de rescate, informes de daño, migración correctiva |
+> | Una función nueva que sólo tiene sentido para lo que se capture desde hoy | **Está bien.** La construyes así y **ni lo mencionas** | Advertirlo como carencia, diseñar una variante para el histórico |
+> | Una regla nueva que el histórico no cumple | La regla aplica **de hoy en adelante** | Validar el histórico contra ella, marcarlo como inconsistente |
+>
+> ⛔ **PROHIBIDO GASTAR EN:** backfills · scripts de reparación · auditorías de datos existentes · consultas
+> de rescate · pantallas para «completar» el histórico · variantes de una función «para los datos viejos» ·
+> advertencias de que algo «sólo aplica a lo nuevo».
+>
+> 🚫 **Y prohibido PREGUNTARLE a Daniel qué hacer con datos ya existentes.** Ya está contestado, para
+> siempre, aquí: **se limpian; no se arreglan.** Preguntarlo otra vez es exactamente lo que esta regla
+> vino a impedir.
+>
+> 📌 **En una línea:** *lo viejo se tira, no se arregla; lo que falta se tolera; y lo nuevo se hace bien
+> desde el primer día.*
+
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
 2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** → **Gabriel verifica EN VIVO en Railway** (no en local) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel.** El flujo correcto al terminar una etapa:
    1. El lead y los agentes codean en el working tree (sin comitear nada).
@@ -153,14 +270,71 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
    4. El lead le **PREGUNTA a Gabriel si abrir el PR a `prueba`**. Con su OK → se abre el PR; Railway despliega `prueba`.
    5. **Gabriel verifica en vivo en el servidor de `prueba` de Railway** (NO corriendo docker local). Si aprueba → PR de `prueba` → `main`.
    *(Incidente 13-jun-2026: un push automático mandó E1B-backend a `prueba` sin permiso — no repetir.)*
+
+   > ## 🔴 ANTES DE MERGEAR CUALQUIER PR: VERIFICAR QUE NINGUNA OTRA SESIÓN LO ESTÉ REVISANDO (GABRIEL, 3-sep-2026)
+   >
+   > **Textual:** *«antes de mergear cualquier PR, verifica que ninguna otra sesión lo esté revisando. Anoche
+   > se publicaron datos personales porque una sesión mergeó lo que otra ya había marcado como “no mergear”.»*
+   >
+   > ⚠️ **Cómo nació — el incidente del 3-sep-2026.** Dos sesiones trabajaban el mismo repo a la vez. Una abrió
+   > el PR #287 (cinco Excel reales del dueño, presentados como «limpios de datos sensibles»). La otra los
+   > **midió abriendo el XML**, encontró **77 nombres completos de personas físicas pegados al monto que cobra
+   > cada una** más los autores en los metadatos, **no lo mergeó** y lo dejó escrito. La primera sesión **mergeó
+   > su propio PR de todas formas**, y esos datos entraron a `prueba` — en un repositorio **público**, donde lo
+   > que entra queda en el historial para siempre. El pendiente de remediación vive en la fila **0.123**.
+   >
+   > 🔑 **La lección exacta: el aviso EXISTÍA y nadie lo leyó antes de mergear.** El fallo no fue de detección
+   > —la revisión funcionó y encontró el problema— sino de **coordinación**: el veredicto vivía en el chat de
+   > una sesión, invisible para la otra. *Un hallazgo que no está donde se toma la decisión es un hallazgo que
+   > no existe.*
+   >
+   > **Qué hacer, siempre, antes de mergear:**
+   > 1. **Leer los comentarios y las revisiones DEL PR.** Si hay un «no mergear», **para** y averigua por qué,
+   >    aunque el CI esté verde y aunque te lo hayan pedido.
+   > 2. **Listar las sesiones activas del repo** (`list_sessions`) y mirar su estado. **Qué cuenta como «otra
+   >    sesión revisando ese PR»** (criterio verificable): una sesión cuya rama actual sea la rama *head* del
+   >    PR, o cuyo título o estado nombre el número del PR. Si la hay, **no lo toques**. Si `list_sessions` no
+   >    existe (sesiones locales), **el paso 1 es el autoritativo** y éste es complementario. ⚠️ **No la despiertes** con un mensaje si alguien la apagó a propósito: eso
+   >    la resucita. La evidencia del listado y del PR basta.
+   > 3. **Verificar JUSTO ANTES de mergear**, no una hora antes: entre una comprobación y el merge, otra sesión
+   >    pudo haber empezado.
+   >
+   > ⭐ **Y el corolario, que es la otra mitad del arreglo:** cuando TÚ marques un PR como «no mergear», **déjalo
+   > como comentario EN EL PR**, no sólo en el chat con Gabriel o con Daniel. El día del incidente el «no lo
+   > mergees» vivía en una conversación que la otra sesión no podía ver. Un marcador en el PR lo ve cualquiera
+   > que vaya a mergearlo — que es exactamente quien tiene que verlo.
 3. **Equipo mínimo por tarea: 1 coder + 1 reviewer independiente.** Nada se integra sin el visto bueno del reviewer (tiene la última palabra) y el CI en verde. **El orquestador (lead) NO escribe código de producción**: coordina, decide arquitectura, revisa y reporta a Gabriel.
    - **UN DEFECTO CONOCIDO NO ES "MENOR" (innegociable — regla de Gabriel, 5-jul-2026).** Todo hallazgo de un reviewer se **arregla en la misma ronda de corrección**. Está PROHIBIDO archivarlo como "menor", "aceptado", "improbable" o "no lo alcanza el seed de hoy": los seeds, roles y permisos cambian (ya hay cicatrices de CI por eso) y conocer el defecto lo vuelve responsabilidad, no nota al pie. Antes de siquiera pensar en no arreglar algo, **re-evaluar su severidad REAL** (¿toca una invariante A1–A9 / D#?) — a veces lo etiquetado "menor" es en realidad una violación de una invariante central (caso F8-E3: un "write-skew aceptado" era en realidad una violación de la inmutabilidad D3). Si de verdad NO se arregla, se dice con la **razón de diseño explícita** y se anota como deuda en `HOJA-DE-RUTA.md` §4 — jamás se calla con un "es menor".
 4. **ECONOMÍA DE TOKENS (innegociable — el costo se dispara fácil; toda sesión la cumple):**
    - **Mancuarna coder+reviewer con AGENTES NORMALES (`Agent`), NO con teams.** El coder construye y deja el diff en el working tree; el reviewer independiente **lee el diff del disco** (no se le vuelca todo) y dicta veredicto; los ciclos de corrección se continúan con `SendMessage` al MISMO coder (contexto intacto, no se relanza desde cero). Los teams (`TeamCreate`) se reservan SOLO para etapas con piezas verdaderamente paralelas e independientes (la ficha de la etapa lo dice); por defecto, agentes normales.
    - **UN SOLO CODER A LA VEZ SOBRE EL WORKING TREE (cicatriz del 13-ago-2026).** El árbol de trabajo es **compartido y único**: dos coders en paralelo lo pisan aunque toquen módulos distintos, porque los **archivos GENERADOS** (`backend/openapi.json`, `frontend/openapi.json`, `frontend/src/api/esquema.gen.ts`) los reescriben **los dos**. Pasó así: con el precosteo terminado y esperando revisión, se lanzó el coder de compras sobre el mismo árbol; el reviewer certificó los generados a mitad de camino y **su certificación quedó inválida** (de 261 líneas de delta pasaron a 525, mezclando ambos cambios), y el diff del PR se llenó de trabajo ajeno a medias —incluido un archivo borrado—. **La regla:** el siguiente coder no arranca hasta que el anterior esté **comiteado** (o su trabajo revertido). Si de verdad hay que solapar, cada uno va en su **worktree de git** aparte, nunca en el mismo. Los agentes de **solo lectura** (analistas, reviewers) sí pueden correr en paralelo con un coder, pero al reviewer hay que **avisarle** que el árbol se está moviendo.
+   - **🔴 EL SCRATCHPAD ES COMPARTIDO ENTRE SESIONES: NUNCA pongas ahí la CONFIGURACIÓN de una corrida (cicatriz del 7-sep-2026).** Dos sesiones trabajaban a la vez en worktrees distintos; una escribió su config de vitest (el `globalSetup` que publica la URL de su Postgres) en el scratchpad, **la otra la sobrescribió con la suya**, y la primera corrió su suite de integración **contra el árbol de la otra**: `RUN v4.1.8 /tmp/wt-guarda/backend` — **139 pruebas EN VERDE sin haber tocado un solo archivo suyo**. Sólo se cazó porque alguien leyó la cabecera `RUN v… <ruta>`. ⚠️ **Un verde contra el árbol equivocado es peor que un rojo**: certifica trabajo que nadie midió. **La regla:** los archivos de configuración de una corrida van en un directorio **propio del worktree** (`/tmp/wt-<lo-que-sea>-cfg/`), nunca en el scratchpad, y **el reporte del agente incluye la cabecera `RUN v… <ruta>` de cada corrida** para que se vea qué se midió. El scratchpad sigue bien para notas, estado y respaldos —cosas que se leen—, no para cosas que un proceso **ejecuta**.
+   ⚠️ **Y el directorio propio del worktree TAMPOCO basta si dos agentes trabajan la misma fila (cicatriz del 8-sep-2026).** El reviewer y el coder de la 0.156 usaron los dos `/tmp/wt-complemento-cfg/`: el reviewer dejó ahí su config apuntando a su Postgres (55441), lo apagó al terminar, y la primera corrida del coder midió **contra una base muerta** — 15 pruebas en rojo con `Can't reach database server at 127.0.0.1:55441`, que no tenían nada que ver con su código. **Es el mismo modo de fallo, un nivel más adentro: lo compartido no es sólo el scratchpad, es cualquier ruta que dos agentes deduzcan igual.** ⇒ **el nombre del archivo de configuración lleva el puerto o el rol** (`vitest.coder-55445.config.ts`, `setup-db-coder-55445.mjs`), nunca un nombre genérico que el otro vaya a escribir también.
+   - **⚠️ Y la máquina también se comparte: `npm run lint` del backend puede morir por memoria** (`Killed`/`EXIT=137`, o `heap out of memory`/`EXIT=134`) cuando hay otra sesión compitiendo — eslint pide ~6.7 GB aquí. **No es un defecto del código**: súbele `NODE_OPTIONS=--max-old-space-size=10240` y dilo en el reporte. El CI, que corre solo, sigue siendo el juez.
    - **A cada agente se le pasa SOLO su pedazo.** El lead extrae de `docs/hoja-de-ruta/F#-etapas.md` el alcance de ESA etapa/sub-pieza y se lo da en el prompt. Los agentes NO cargan el plan completo ni las 7 fichas de etapa ni `Documentacion_MJD/` entera — solo lo que su tarea necesita.
    - **NUNCA leer archivos generados completos.** `backend/openapi.json` y `frontend/openapi.json` (~100k tokens c/u) y `frontend/src/api/esquema.gen.ts` (~74k) son GENERADOS: se **regeneran con su comando**, no se leen ni se vuelcan al chat enteros. Si hay que mirar algo puntual, `Grep` del fragmento — jamás `Read` del archivo completo. Lo mismo con cualquier dump grande (logs de tests, CSV de `Respaldo CLAUDE/`, lockfiles): mirar el pedazo, no todo.
    - **Sesiones acotadas.** Cerrar y arrancar chat nuevo al terminar una etapa sale más barato que arrastrar una conversación larguísima (cada turno reprocesa todo).
+5. **🔴 CADA FILA NUEVA NACE DICIENDO SI ENTRA EN V1 O NO (regla de Daniel, 7-sep-2026).** Textual:
+
+   > *«Desde que te ponga las cosas y generen una línea, **definamos (con recomendación tuya y aprobación mía) si entra o no en V1**.»*
+   >
+   > *«Ha de haber muchas cosas que no son indispensables y **están gastando tiempo**.»*
+
+   **Cómo se aplica, sin excepción:** en el mismo mensaje en que se le dice a Daniel que algo se
+   convirtió en fila, va **la recomendación del lead** —`bloquea el arranque` · `duele pero se aguanta`
+   · `puede esperar a después de arrancar`— **con su razón en una línea**, y él confirma o corrige. La
+   respuesta se anota **en la propia fila**, no sólo en el chat.
+
+   **El criterio, para que la recomendación no sea un gusto personal:**
+   - **Bloquea** = sin eso no se puede operar el día a día, **o** el sistema da información equivocada
+     que lleva a decisiones equivocadas (dinero, compras, precios), **o** lo exige la ley/el contador.
+   - **Duele pero se aguanta** = hay rodeo manual conocido. Se hace si sobra tiempo antes de arrancar.
+   - **Puede esperar** = comodidad, estética, o un caso raro.
+
+   ⚠️ **Y lo que NO puede decidir el lead solo:** cuando la clasificación depende de **con qué
+   frecuencia pasa en el negocio** (¿cuántos modelos llevan dos colores? ¿cada cuánto se venden
+   segundas?), **eso se pregunta, no se supone** — es justo el tipo de dato que sólo Daniel tiene.
+
 5. **HISTORIAL DE VERSIONES (regla de Daniel, 19-ago-2026):** **cada vez que se actualiza `prueba` se
    sube la versión** y se agrega su entrada en **`HISTORIAL-DE-VERSIONES.md`** (raíz). Numeración
    **`0.xxx`** correlativa **mientras nada esté en producción** (el cero lo dice a simple vista); al
@@ -174,6 +348,10 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 7. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
 8. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
 9. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
+
+   > ⭐ **PERO las `.int.test.ts` SÍ se pueden medir en local — sin Docker (reviewer de la 0.111, 4-sep-2026).** «Nada de Docker» **no** quiere decir «nada de Postgres»: un cluster levantado con `initdb` + `pg_ctl` en un puerto suelto (p. ej. 55432), con `npx prisma migrate deploy` encima y un `globalSetup` propio que sólo publica la URL, corre el proyecto de integración entero. Los archivos de configuración viven **fuera del repo** (en el scratchpad) y el cluster se **apaga y se borra** al terminar.
+   >
+   > **Por qué importa:** «las de integración las juzga el CI» venía costando ciclos enteros. El mismo día, dos filas llegaron al CI en rojo por pruebas que nadie había corrido (la 0.128 con nueve, la 0.111 con cuatro —tres de ellas regresiones de pruebas que sí pasaban en `prueba`—), y las dos se habrían cazado en minutos. En una fila cuya garantía **es** el cruce contra la base de datos (un agregado SQL contra su gemelo en TypeScript, un kardex, una transacción), medirlo antes de subir deja de ser un lujo. El CI sigue siendo **el juez**; esto es para no llegar a él en rojo.
 
 ---
 
@@ -196,11 +374,16 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 | **F5 · Ruta Crítica ⭐** (E1–E7) | ✅ **COMPLETA (7/7)** (23-jun-2026; pend. verif. Gabriel en `prueba`) — el módulo MÁS importante (D10/D11): **motor de workflow/CPM configurable** (procesos como datos + DAG + roles N:M + checklists, E1; plantillas + reglas de duración + calendario laboral, E2; ruta viva + pg-boss + generación, E3; **CPM backward-pass** + captura + semáforo, E4, ADR-0012/0013), **pantallas** de operación (Programar RC, Bandeja, RC por orden, badge) + impreso PDF del plan (E5), **auto-avance por eventos de F3/F4** (consumidor del outbox; parciales/evento-pisa-manual/cancelación-des-completa, decisiones d/e/f, E6), y **E7 cierre**: **concentrado planeado-vs-real** (agregación SQL en servidor, NUNCA pivote en cliente) + export Excel (exceljs, decisión h) + **ETL completo del módulo** (catálogos/plantillas/54 ProcesoDefRol/UsuarioRol/181 RC históricas con capturadoPor-capturadoEn para D11) con `cuadre-f5`. E7 SIN migración/permisos/seed (reusa `rc.ruta-ver`); el ETL se corre a mano post-deploy. **Deja abierto:** D8 (auditoría-como-proceso → F6), KPIs D11 → F7, notificaciones push/correo → F7. **Dependencia con F10 (go-live):** `UsuarioRol` de los 23 usuarios reales queda pendiente hasta que F10 migre usuarios (el ETL idempotente los materializa al re-correrse). Módulo en `docs/modulos/ruta-critica.md` | CIERRE por etapa en `docs/hoja-de-ruta/F5-etapas.md` |
 
 **Trampas/recordatorios que aplican a TODA etapa futura (no perder):**
-- **Despliegue:** el backend de `prueba` necesita `SEED_ON_START=true` para sembrar permisos/roles nuevos al arrancar (seed idempotente; NO resetea el password del admin). Sin eso, los menús nuevos no aparecen en `prueba`.
+- **Despliegue — ✅ `SEED_ON_START=true` YA ESTÁ PUESTO EN `prueba`, DE FORMA PERMANENTE (Gabriel, 4-sep-2026).** El backend siembra permisos/roles/catálogos nuevos en cada arranque (seed **idempotente**; NO resetea el password del admin). ⇒ **Ya NO hay que pedirle a Gabriel que lo active** al cerrar una fila que agrega permisos o semillas: se aplica solo en el siguiente despliegue. Lo que SÍ se sigue diciendo en la nota de cierre y en el historial es **qué** siembra la fila (permiso nuevo, tipo de movimiento, catálogo), porque eso explica por qué aparece un menú o una opción que antes no estaba. ⚠️ Lo que el seed **no** hace es capturar datos del negocio: si una fila necesita que alguien marque una casilla o llene un campo (p. ej. marcar «Empaque» en los talleres que empacan), eso sigue siendo un paso manual y va dicho aparte.
 - **Arranque resiliente a la BD (hotfix 23-jun):** el backend conecta a Postgres por la red privada interna de Railway (`postgres.railway.internal`), que tarda unos segundos en levantar al arrancar el contenedor → antes cada deploy desde GitHub crasheaba con `P1001 Can't reach database server` en `prisma migrate deploy` (entrypoint con `set -e`) → bucle hasta `CRASHED`. Ahora `docker-entrypoint.sh` **reintenta** `migrate deploy`/seed con espera (configurable por `DB_WAIT_MAX_INTENTOS`=30 / `DB_WAIT_ESPERA_SEG`=3 ≈ 90 s; si la BD nunca responde, SÍ aborta con exit≠0) y se quitó el `preDeployCommand` duplicado de `railway.json`. Además `publicarPendientes` (relay del outbox, `comun/cola-eventos.ts`) ya **nunca propaga rechazos** y `servidor.ts` tiene handlers globales `unhandledRejection`/`uncaughtException` (loguean y siguen). **No re-romper:** no volver a poner `set -e` sin reintento, ni re-duplicar el migrate en `preDeployCommand`. Rotar la contraseña de Postgres provoca un bache breve pero **se auto-recupera** (no requiere redeploy manual).
 - **⚠️ VALIDAR SIEMPRE CON LOS `npm run` DEL PROYECTO, NUNCA con comandos sueltos (cicatriz del 14-ago-2026).** El typecheck del **frontend** es `npm run typecheck` = **`tsc -b --noEmit`**. Un `npx tsc --noEmit` pelón **NO recorre los proyectos referenciados** y sale **limpio con errores reales adentro** — o sea, da un falso verde. Pasó así: el lead validó con el comando suelto, reportó "typecheck limpio" en el commit y al usuario, y el reviewer independiente encontró que `npm run typecheck` estaba en **rojo** (y `npm run lint` también, con 1 error, que el lead tampoco vio). El defecto oculto rompía el botón «quitar foto» en producción. **Los comandos correctos, los dos lados:** `npm run test:unit` (backend; **nunca** `npx vitest run` pelón → dispara testcontainers) · `npm run typecheck` · `npm run lint` · `npm run format:check` · `npm run openapi` (backend) / `npm run gen:api` (frontend). **Y el corolario:** el **CI es el único juez** — una validación local sirve para ir rápido, pero nada cuenta como verificado hasta que pasan los 4 trabajos de GitHub Actions.
+- **⚠️ UN LOCALIZADOR LAXO CONVIERTE UNA PRUEBA EN ADORNO — y avisa fallando por el motivo equivocado (cicatriz del 7-sep-2026).** El e2e `ruta-critica.spec.ts:89` cerraba con `expect(page.getByText(/ciclo/i)).toBeVisible()` para comprobar que el backend **rechaza un ciclo**… pero el **subtítulo de la propia pantalla** (`DependenciasPagina.tsx:97`, *«…No se admiten ciclos.»*) se pinta **siempre, desde que carga**, mucho antes de pulsar guardar ⇒ **la aserción se cumplía con el subtítulo** y habría seguido en verde aunque el backend dejara de rechazar nada. 🔑 **Y así se destapó, que es lo interesante:** cuando el toast llegaba a tiempo, el locator resolvía a **DOS** elementos y Playwright reventaba por *strict mode* — o sea que **en verde no medía nada y en rojo no era culpa del código**. Salió en un PR de **sólo dos `.md`**, que no puede romper e2e; el PR gemelo del mismo base estaba **verde entero**, y esa asimetría fue la pista. **La regla:** el texto que se asserta va **completo y único** (aquí, el mensaje del toast entero), nunca una palabra suelta que la pantalla ya contiene por su cuenta. ⚠️ **Y su corolario, del mismo rato:** `cmd | tail; echo $?` devuelve el estado de **`tail`**, no el del comando — el typecheck del backend estaba **rojo** con un `EXIT=0` en pantalla. Captura el estado **sin pipe** (`cmd > log 2>&1; echo $?`). ✅ **Lo bueno: comprobar que una validación mira lo que crees es una mutación de 30 segundos** — meter un error de tipo a propósito en el archivo y ver que `npm run typecheck` se pone rojo señalándolo.
+- **🔴 ANTES DE CITAR UNA SECCIÓN O UNA FILA, COMPRUEBA QUE EXISTE **EN LA RAMA QUE VA A SALIR** — tres veces en una noche (7-sep-2026).** Pasó con **§Post-F9.204**, con **§Post-F9.207** y con la **fila 0.162**: se escribió *«ver §X»* o *«queda para la fila Y»* y **la sección o la fila no existía**. La tercera es la que enseña el matiz que faltaba: la 0.162 **sí estaba escrita**… **en otra rama sin mergear**, así que quien leyera `prueba` encontraba una referencia colgante. ⇒ **No basta con que exista en tu árbol: tiene que existir en la rama a la que apuntas.** La comprobación es de un comando —`grep -c "Post-F9.NNN" <archivo>` y `git show origin/prueba:<archivo> | grep -c ...`— y **el verificador de documentos NO la hace** (sólo cruza números de versión y el contador de filas). ⚠️ **El daño no es cosmético:** una referencia colgante manda a alguien a buscar una decisión que no puede leer, y en un repo cuya ley es *«el porqué vive en `DECISIONES.md`»* eso equivale a que la decisión no exista. 📌 **Y su gemelo, del mismo día:** un reviewer estuvo a punto de rechazar por una cita que **sí** existía —la traía un merge que su worktree no tenía—. **Cruza contra `origin/prueba`, no contra tu copia**, en las dos direcciones.
+- **⚠️ UN DATO REPETIDO EN N SITIOS NECESITA UN CRUCE MECÁNICO, NO N LECTURAS (cicatriz del 3-sep-2026).** El ojo confirma el sitio que está mirando y da por buenos los demás. Pasó así: el conteo de una fuga de datos («dos nombres, un archivo») se corrigió en tres sitios y sobrevivió **tres rondas** en el cuarto —el título de la entrada del historial, la línea más visible— hasta que existió un script que extrajera las cifras de los cuatro sitios y las comparara. Y en la ronda siguiente, un hecho falso («`modalidadFacturacion` vino de Finanzas» — vino de EsMa F6-E4) se copió a dos archivos sin medirlo, con la migración que lo desmentía a un `ls` de distancia. **La regla:** si una cifra o un hecho aparece en más de un archivo, la verificación es un cruce programático (el contador de filas de `HOJA-DE-RUTA.md` ya se recalcula así), y un hecho de código se comprueba contra el código antes de escribirlo en prosa.
+- **⚠️ EL AVISO QUE IMPORTA ES EL QUE ESTÁ PEGADO A LA COSA, no el que vive en el documento correcto (misma cicatriz).** Se corrigieron cuatro afirmaciones falsas en `DECISIONES.md` sobre unos archivos con datos personales, y se dejó la quinta: el `README.md` **dentro de la carpeta de los archivos**, que juraba que estaban «SIN datos sensibles» y mandaba a abrirlos. Nadie lee `DECISIONES.md` antes de abrir una carpeta; lee el README que tiene al lado. **La regla:** al corregir un hecho, buscar primero dónde lo va a leer quien actúe — el README junto al archivo, el cuerpo del PR, el comentario del código — y corregir ahí antes que en el documento maestro.
 - **Correr el ETL:** SIEMPRE `npx tsx --env-file=.env migracion/<script>.ts` desde `backend/` — **NUNCA `npm run etl:*`** (esos no cargan `.env` → truena con "no DATABASE_URL" aunque sí exista; los `npm run` no llevan `--env-file` a propósito, para no romper el CI). Ejemplo real (Gabriel, 19-jun): `npx tsx --env-file=.env migracion/etl-pedidos-ordenes.ts`. Ver `backend/migracion/README.md`.
 - **ETL por LOTES, no 1×1 (Gabriel, 19-jun):** los scripts de ETL deben escribir a la BD **por lotes** (`createMany`/chunks/transacciones agrupadas), **NUNCA registro por registro** en un loop (uno por uno tarda muchísimo). Aplicarlo desde el inicio en F3-E6/F10 y al tocar los ETL ya hechos; mantener idempotencia y modo migración vía dominio, pero sin perder el rendimiento por lotes.
+- **⏱️ CUÁNTO TARDA EL CI, Y QUE SON CUATRO TRABAJOS — medido el 7-sep-2026, para no volver a equivocarse en las dos direcciones.** El CI son **CUATRO** jobs: `backend` · `frontend` · **`e2e`** · **`imagenes-docker`**, y **los dos últimos ARRANCAN SÓLO CUANDO LOS DOS PRIMEROS PASAN** ⇒ mientras backend/frontend corren, `get_check_runs` **devuelve sólo 2** y parece que el CI ya casi está. **Contar CUATRO antes de decidir mergear**; con dos en verde el CI va por la mitad. **Duración TOTAL medida** (las 6 corridas de `prueba` v0.117→v0.122): **39, 40, 45, 45, 46 y 48 min** — o sea **~40-50 min**, con `backend` llevándose casi todo (~38 min él solo) y `e2e` ~8. ⇒ **no sospechar de atasco antes de ~1h15**, y aun entonces comparar contra este baseline antes de relanzar nada. ⚠️ **Cicatriz doble de esa noche:** primero se puso un umbral de sospecha de 45 min **inventado, sin medir** —**por debajo de la mediana**: aplicarlo habría matado una corrida sana y costado otros 45 min—; y después se estuvo a punto de mergear con sólo 2 jobs en verde porque los otros dos aún no existían en la lista. **Las dos son la misma falta: dar por buena una expectativa que nunca se comprobó.** 🔑 **Y el corolario operativo:** una corrida cuesta ~45 min, así que **NO comitear en una rama con CI en vuelo** salvo que el commit sea el arreglo de un fallo — un push cancela la corrida y la reinicia desde cero, incluidos los jobs que ya habían pasado.
 - **CI e2e: ✅ RESUELTO (22/23-jun, F5-E4, merges #72/#73).** El job **e2e** estuvo rojo crónico en `prueba` por fallos pre-existentes; quedó **VERDE** (corrida del #73: `e2e/backend/frontend/imagenes-docker` en verde). Lo arregló, dentro de F5-E4: `dd0d62c` (los 6 e2e crónicos — helper `crearColorYTalla` para la matriz color×talla que el seed no siembra, `login.spec` con piso ≥18 + módulos clave en vez de conteo exacto, `bordados.spec` navega a `/catalogos` antes de la galería, `DialogContent` con `max-h`+overflow); `6e2c307` (selector de color en Movimientos/Traspasos PT); el **rate-limit de login resuelto EN CÓDIGO** (`AUTH_LOGIN_RATE_MAX` env-configurable en `backend/src/auth/config.ts` default 20 → prod intacta; `1000` en `docker-compose.yml` para e2e/local; el limiter sigue encendido, solo cambia el cap); y los flaky de backend hechos deterministas (`2411c57` ETL comentarios, `ad51921`+#72 ETL telas). **Lecciones (no re-romper):** toda etapa que agrega módulo/sub-vista al menú ajusta las aserciones de `login.spec`; los specs que capturan en matriz siembran una talla primero; los tests que leen "el primero" llevan `orderBy` determinista.
 - **Marilyn Fitness = FR Moda** (misma empresa renombrada; NO crear 2ª empresa). Catálogos F1 = GLOBALES (A9 / ADR-0007). `schema.prisma` único (ADR-0008).
 - **Pendiente manual de Gabriel:** cambiar el password de `admin` (seed `Control.2026!`). *(Cloudflare R2 ya quedó montado en `prueba`: las fotos de bordados y modelos suben y se descargan OK.)*
@@ -208,4 +391,4 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 **Estándar visual (ya aplicado):** UI "lista + detalle" + tema **teal** + menú colapsable (propuesta 3, `docs/diseno/propuestas-colores.html`).
 
-**Versiones verificadas (jun-2026):** Fastify 5.8 · @fastify/swagger 9.7 · fastify-type-provider-zod 6.1 · Vite 8.0 · React 19.2 · react-router-dom 7.17 · openapi-typescript 7.13 · openapi-fetch 0.17 · Prisma 7.8 · better-auth 1.6 · Zod 4.4 · Tailwind 4.3 · TanStack Query 5.101 / Table 8.21 · Vitest 4.1 · Playwright 1.60 · pino 10 · pg-boss 12 · @react-pdf/renderer 4. PostgreSQL 17, Node 22.
+**Versiones verificadas (jun-2026):** Fastify 5.8 · @fastify/swagger 9.7 · fastify-type-provider-zod 6.1 · Vite 8.0 · React 19.2 · react-router-dom 7.17 · openapi-typescript 7.13 · openapi-fetch 0.17 · Prisma 7.8 · better-auth 1.6 · Zod 4.4 · Tailwind 4.3 · TanStack Query 5.101 / Table 8.21 · Vitest 4.1 · Playwright 1.60 · pino 10 · pg-boss 12 · @react-pdf/renderer 4. PostgreSQL 18 en Railway (local/CI 17), Node 22. **El cliente `pg_dump` de la imagen va ATADO a la major del servidor** — ver `backend/Dockerfile`.

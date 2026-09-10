@@ -343,7 +343,7 @@ describe('Catálogo Avíos (F1-E3, R1 — global ADR-0007)', () => {
       expect(obtenido.proveedores).toHaveLength(2);
     });
 
-    it('listarProveedoresDeAvio trae el precio por proveedor (R1)', async () => {
+    it('listarProveedoresDeAvio trae el precio por proveedor', async () => {
       const sesion = sesionAdmin();
       const avio = await crearAvio(
         sesion,
@@ -354,29 +354,29 @@ describe('Catálogo Avíos (F1-E3, R1 — global ADR-0007)', () => {
       expect(proveedores).toHaveLength(1);
       expect(Number(proveedores[0]?.precio)).toBe(7);
       expect(proveedores[0]?.proveedor.nombre).toBe('Botones SA');
-      // Sin factor de conversión, el precio por unidad de consumo es el mismo (1:1).
-      expect(proveedores[0]?.precioUnidadConsumo).toBe(7);
     });
 
-    it('listarProveedoresDeAvio normaliza el precio por el FACTOR de conversión (R1)', async () => {
+    // ⭐⭐ §Post-F9.97 — el precio del proveedor YA está por unidad de consumo y el selector de
+    // amarre de la receta lo enseña tal cual. La columna muerta del factor se ceba a propósito (por
+    // escritura directa: el contrato nunca la expuso) para exigir que NADIE la vuelva a leer.
+    it('listarProveedoresDeAvio NO convierte: la columna muerta del factor se ignora', async () => {
       const sesion = sesionAdmin();
       const avio = await crearAvio(
         sesion,
         {
           clave: 'ROLLO',
-          descripcion: 'Elástico por rollo',
+          descripcion: 'Elástico',
           proveedores: [{ idProveedor: provA, precio: 500 }],
         },
         bd(),
       );
-      // 500 el rollo, 50 metros por rollo → 10 por metro (la unidad del BOM). El factor no se
-      // captura por el contrato de alta: se fija directo (como en el resto de los tests de R1).
       await cliente.avioProveedor.update({
         where: { idAvio_idProveedor: { idAvio: avio.id, idProveedor: provA } },
         data: { factorConversion: 50 },
       });
       const proveedores = await listarProveedoresDeAvio(sesion, avio.id, bd());
-      expect(proveedores[0]?.precioUnidadConsumo).toBe(10);
+      // Con el factor vivo esto habría dado 10 (500 ÷ 50).
+      expect(Number(proveedores[0]?.precio)).toBe(500);
     });
 
     it('un id inexistente → ErrorNoEncontrado', async () => {

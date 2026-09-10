@@ -558,6 +558,14 @@ describe('⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no e
         expect(nombreOrigen).not.toBe(nombreDestino); // por si acaso: jamás se tocó el origen
       }
     },
-    180_000,
+    // ⏱️ 300s, subido desde 180 el 27-ago-2026 porque el CI la tumbó por TIEMPO, no por fallo: hace
+    // un ciclo completo (volcado → cifrar → descifrar → restaurar en OTRA base → comprobar el dato)
+    // y venía rozando su límite — la ficha de V1-E6c ya lo tenía anotado como deuda.
+    //
+    // 🔴 Subir un tope NO es arreglar nada, y por eso queda dicho: si vuelve a caerse con 300s, el
+    // ciclo se está haciendo LENTO de verdad y hay que medir por qué, no darle más aire. Y NO se
+    // salta ni se apaga: es la única prueba que sostiene que un respaldo se puede RESTAURAR — y
+    // *un respaldo que no se sabe restaurar no es un respaldo*, como dice su propio título.
+    300_000,
   );
 });

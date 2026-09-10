@@ -104,179 +104,782 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Roles predefinidos (absorben los niveles del sistema viejo — doc 00 §2, A4)
+// 3. Perfiles predefinidos — CADA UNO DECLARA LO QUE TIENE (A4)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Resta claves de un conjunto base (cascada de niveles: menor nivel ⊃ mayor nivel). */
-function sin(base: readonly ClavePermiso[], ...quitar: ClavePermiso[]): ClavePermiso[] {
-  return base.filter((clave) => !quitar.includes(clave));
-}
+/**
+ * ⛔ AQUÍ YA NO HAY CASCADA, Y ES A PROPÓSITO (DANIEL, 3-sep-2026).
+ *
+ * Hasta hoy los perfiles se derivaban por RESTA encadenada (`sin(todos, …)` → directivo →
+ * gerencial → … → secretarial). Daniel lo mandó quitar con el argumento de quien ya lo vivió:
+ *
+ * > *«Los permisos por cascada no son funcionales. Así lo hice en la primera versión que hice en
+ * > Access, y luego lo modifiqué por **permisos concretos**… puede haber alguien que tenga el
+ * > permiso A pero no el B, y otra persona que tenga el B pero no el A. Si se hace por cascada nos
+ * > vamos a tener que conformar con que **algunas personas accedan a cosas que no deberían**.»*
+ *
+ * 🔑 **El defecto que esto cierra: era un guardián AL REVÉS — el silencio OTORGABA.** Un permiso
+ * nuevo se agregaba al catálogo de `src/contrato`, entraba a `todos` y, si nadie se acordaba de
+ * restárselo a alguien, **bajaba solo hasta Secretarial**. Así aterrizó `esma.cargo-validar` en un
+ * perfil clerical sin que nadie lo decidiera (y así se quedó hasta la fila 0.128, que se lo quitó a
+ * los cinco perfiles operativos porque *«la validación sólo la doy yo»*). Con la forma de SUMA, un
+ * permiso nuevo **no nace en NADIE** hasta que se le nombra dueño aquí, y
+ * `reparto-de-permisos.test.ts` truena si se queda sin dueño (o si aquí queda una clave fantasma
+ * que el catálogo ya no tiene).
+ *
+ * ⚠️ El MOTOR nunca fue cascada y no se tocó: `RolPermiso`/`UsuarioRol` son N:M y los permisos
+ * efectivos son la UNIÓN de los roles del usuario (`comun/permisos.ts`). La cascada vivía sólo en
+ * este archivo, al REPARTIR. Por eso este cambio no lleva migración ni permisos nuevos.
+ *
+ * ## Cómo se edita esto
+ *
+ * Cada perfil es una lista literal ordenada alfabéticamente (que es tanto como decir agrupada por
+ * módulo, porque la clave es `modulo.accion`). Se le agrega o se le quita **a ese perfil y a nadie
+ * más**: dos perfiles pueden cruzarse sin contenerse, que es justo lo que Daniel pidió. Añadir un
+ * permiso al catálogo obliga a decidir aquí quién lo tiene — o a listarlo en
+ * {@link SOLO_ADMINISTRADOR} con su razón.
+ *
+ * ## ⚠️ Lo que estas seis listas SON hoy, y lo que TODAVÍA NO son
+ *
+ * Nacieron siendo **exactamente** el reparto que producía la cascada el 3-sep-2026, transcrito: el
+ * cambio de aquel día fue de FORMA, no de contenido (lo fija la prueba de EQUIVALENCIA). Eso quiere
+ * decir que siguen arrastrando lo que la cascada regalaba: **76 de los 122 permisos no se le
+ * restaban a nadie**, así que `Secretarial` conserva hoy cosas tan gordas como `compras.autorizar`,
+ * `pedidos.modificar`, `notas.cancelar`, `inventario-pt.mover`, `telas.ver-totales` o
+ * `calidad.modificar-auditorias`. **Recortarlas en bloque no era trabajo de aquel cambio**: Daniel
+ * decidió armar los perfiles concretos AL FINAL, con los puestos reales de sus 23 usuarios. Esta
+ * forma es la que hace que ese recorte sea posible sin efectos colaterales.
+ *
+ * ✂️ **PRIMER RECORTE REAL (fila 0.128, 4-sep-2026): VALIDAR ES DE DANIEL.** *«La entrada la da la
+ * persona responsable de recibos o de producción. Pero la validación sólo la doy yo»*
+ * (§Post-F9.192(1)). Los dos permisos de validar —`esma.cargo-validar` (fijar cantidad y precio
+ * reales del cargo) y `esma.revisar` (autorizar la partida para que entre al saldo)— quedan sólo en
+ * el administrador y en `Directivo`. Se los quitó a `Gerencial`, `Ventas`, `Logistica`, `Asistente`
+ * y `Secretarial`, que es donde la cascada los había dejado sin que nadie lo decidiera. La lista
+ * `RETIRADOS_DESDE_LA_FOTO` de `reparto-de-permisos.test.ts` lo deja escrito renglón por renglón.
+ *
+ * ⚠️ **Y esto se APLICA SOLO en `prueba` con `SEED_ON_START=true`**, sin migración de datos:
+ * {@link sembrarRoles} SINCRONIZA los 9 roles de sistema (borra lo que sobra), no sólo agrega.
+ */
 
 /**
- * MAPEO NIVELES → ROLES (aproximación inicial — SE VALIDA CON DANIEL, ver README).
+ * Claves que **ningún perfil** otorga: sólo las llevan `Administrador` y
+ * `AdministracionDireccion` (niveles 1 y 20 del sistema viejo, que tenían el sistema entero).
  *
- * En el sistema viejo convivían dos ejes (doc 10 §4): el NIVEL (filtraba menú y campos
- * sensibles) y los ACCESOS por usuario (`UsuAccesos`, independientes del nivel). Aquí se
- * fusionan en roles: cada rol parte de "todo lo del nivel superior" (cascada del doc 00
- * §2) menos lo que ese nivel tenía explícitamente prohibido. Donde la restricción vieja
- * era SOLO de menú (no un acceso de la tabla `Accesos`), el conjunto no cambia y la
- * diferencia se aplicará como visibilidad de menú en la fase del módulo correspondiente.
+ * No es una lista de descarte: es la **atribución explícita** de esas claves. Está aquí —y no
+ * simplemente ausente de los perfiles— para que la prueba de atribución pueda distinguir
+ * «decidimos que es sólo del administrador, y por esto» de «a nadie se le ocurrió repartirlo». La
+ * `razon` es obligatoria por el tipo, no por convención.
  */
-function definirRoles(): {
+export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }[] = [
+  // ── Administración del propio sistema (en el viejo, botón exclusivo de nivel ≤20, doc 00 §3.1) ──
+  {
+    clave: 'usuarios.administrar',
+    razon: 'Dar de alta gente y repartir roles es gobierno del sistema (llave anti-lockout).',
+  },
+  {
+    clave: 'roles.administrar',
+    razon: 'Decidir qué otorga cada rol es gobierno del sistema (llave anti-lockout).',
+  },
+  {
+    clave: 'empresas.administrar',
+    razon: 'La empresa y su configuración son los cimientos multi-empresa (A9).',
+  },
+  // ── Catálogos MAESTROS: el `.ver` lo lleva casi todo perfil; el alta, no (F1-E1, ADR-0007) ──
+  { clave: 'almacenes.administrar', razon: 'Catálogo maestro: el `.ver` sí baja, el alta no.' },
+  {
+    clave: 'proveedores.administrar',
+    razon: 'Catálogo maestro; además absorbió maquileros y cortadores (D12/R15).',
+  },
+  { clave: 'temporadas.administrar', razon: 'Catálogo maestro (ADR-0007).' },
+  { clave: 'etiquetas-marca.administrar', razon: 'Catálogo maestro (ADR-0007).' },
+  { clave: 'colores.administrar', razon: 'Catálogo maestro (ADR-0007).' },
+  { clave: 'tallas.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
+  { clave: 'clientes.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
+  { clave: 'telas.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
+  { clave: 'avios.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
+  { clave: 'tipos-proceso.administrar', razon: 'Catálogo maestro de producción (F3-E1).' },
+  {
+    clave: 'calidad.administrar-catalogo',
+    razon: 'Defectos, tipos de producto y planes AQL son catálogo maestro (F6-E1).',
+  },
+  {
+    clave: 'concepto-costo.administrar',
+    razon: 'Catálogo de configuración de costeo (F8-E1, R19).',
+  },
+  { clave: 'estado-lista.administrar', razon: 'Catálogo de configuración de listas (F8-E1, R20).' },
+  {
+    clave: 'rc.catalogo-administrar',
+    razon:
+      'Procesos, plantillas, reglas y calendario de la Ruta Crítica: mueve la planeación entera ' +
+      '(fix de pentest — antes se colaba a roles clericales).',
+  },
+  // ── Finanzas: capturar/cancelar dinero y la vista fiscal (F9, D12/D15) ──
+  {
+    clave: 'terceros.administrar',
+    razon: 'Capturar y cancelar movimientos de cuenta corriente mueve saldos reales (F9-E1).',
+  },
+  { clave: 'terceros.fiscal', razon: 'La vista fiscal es material del contador (F9-E1).' },
+  {
+    clave: 'cxp.administrar',
+    razon: 'Capturar y cancelar cuentas por pagar mueve dinero (F9-E2).',
+  },
+  {
+    clave: 'cxc.administrar',
+    razon: 'Capturar y cancelar cuentas por cobrar e importar CFDI de venta (F9-E4).',
+  },
+  {
+    clave: 'conceptos-pago.administrar',
+    razon:
+      'Catálogo maestro (ADR-0007): dar de alta un concepto de pago es dar de alta A DÓNDE puede ' +
+      'salir dinero fuera del padrón de proveedores (fila 0.125).',
+  },
+  {
+    clave: 'pagos.corrida-armar',
+    razon:
+      'Daniel la pidió para él (§Post-F9.189(g)): armar la corrida es decidir a quién se le paga y ' +
+      'cuánto. *«Yo voy decidiendo los montos a pagar de cada uno. Manualmente.»* Ver la relación ' +
+      'sí se reparte (`pagos.corrida-ver`); armarla no.',
+  },
+  // ── ⭐ La salida de material que NO va a una orden (fila 0.104) ──
+  {
+    clave: 'salida-material.registrar',
+    razon:
+      'Daniel la pidió para él y con esas palabras (§Post-F9.193 resp. 12, 3-sep-2026): *"sí debe ' +
+      'existir una salida por otro medio que sólo ajuste de inventario… siempre autorizada sólo ' +
+      'por mí. Nadie más"*. Sacar tela o avíos SIN orden (devolución al proveedor, venta de ' +
+      'material que ya no se usa) es la única salida de material que no deja rastro en ninguna OP, ' +
+      'así que NO puede ir con el `inventario-telas.mover`/`inventario-avios.mover` que hoy lleva ' +
+      'medio organigrama. Gobierna también CANCELARLAS: el inverso devuelve el material al ' +
+      'inventario, o sea deshace la misma decisión.',
+  },
+  // ── La marcha atrás de la firma de compra ──
+  {
+    clave: 'compras.desautorizar',
+    razon:
+      'Daniel la pidió para su perfil (§Post-F9.79): *"es indispensable tener un botón para ' +
+      'desautorizar las órdenes, que solo yo tenga acceso"*. Autorizar sí se reparte; ' +
+      'des-autorizar no.',
+  },
+];
+
+/**
+ * Los dos perfiles que llevan el catálogo COMPLETO (niveles 1 y 20 del sistema viejo). Se nombran
+ * aparte porque la prueba de atribución tiene que EXCLUIRLOS: si contara sus permisos, la unión
+ * sería siempre el catálogo entero y la prueba no podría fallar nunca.
+ */
+export const PERFILES_ACCESO_TOTAL = ['Administrador', 'AdministracionDireccion'] as const;
+
+/**
+ * **Directivo** (nivel 30 del viejo) — dirige el negocio, no administra el sistema.
+ *
+ * Tiene todo salvo {@link SOLO_ADMINISTRADOR}: consulta los catálogos (`*.ver`) pero no los
+ * administra, y no toca usuarios, roles ni empresas.
+ */
+const DIRECTIVO: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'conceptos-pago.ver',
+  'consultas.ver-importes',
+  'costos.capturar',
+  'costos.ver',
+  'cxc.ver',
+  'cxp.ver',
+  'desarrollo.administrar',
+  'desarrollo.precostear',
+  'desarrollo.ver',
+  'edr.capturar',
+  'edr.ver',
+  'esma.cargo-validar',
+  'esma.modificar',
+  'esma.revisar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'indicadores.ver',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.administrar',
+  'listas.aprobar',
+  'listas.negociar',
+  'listas.ver',
+  'modelos.administrar',
+  'modelos.aprobar-receta',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.administrar',
+  'ordenes.cancelar',
+  // ⭐ 0.061: cerrar la orden CONGELA su costo ⇒ va al círculo que ya cierra dinero. `Administrador`
+  // y `AdministracionDireccion` lo toman solos ([...CLAVES_PERMISO]); aquí se le da al `Directivo`.
+  // Default del lead — Daniel confirma.
+  'ordenes.cerrar',
+  'ordenes.habilitacion',
+  'ordenes.modificar',
+  'ordenes.precio-maquila',
+  'ordenes.ver',
+  'ordenes.ver-costos',
+  'ordenes.ver-precio-real-maquila',
+  'pagos.corrida-ver',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.importes',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'precostos.consultar',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'terceros.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * **Gerencial** (nivel 40) — gerencia sin el RESULTADO del negocio.
+ *
+ * La línea que trazó Daniel (§Post-F9.123): ve **EL PLAN** (lo que va a costar), no **EL
+ * RESULTADO** (cómo terminamos). Por eso conserva `precostos.consultar`, `consultas.ver-importes`,
+ * `modelos.administrar` y `modelos.aprobar-receta` —Aurora lleva Desarrollo entero— y NO lleva
+ * `costos.*`, `edr.*` ni `ordenes.ver-costos`.
+ *
+ * ⚠️ Y el precio sigue siendo del dueño: lleva `listas.negociar` (arma y manda la cotización) pero
+ * NO `listas.aprobar` (F8-E4 (h)), que desde V1-E8b es además la reja de los cuatro factores
+ * —margen, descuentos, regalías, costo de ventas— (§Post-F9.125). Aprobar la RECETA y aprobar el
+ * PRECIO son permisos distintos a propósito (§Post-F9.110 (b)): si se juntaran por descuido, Aurora
+ * acabaría aprobando precios sin que nadie lo hubiera decidido.
+ */
+const GERENCIAL: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'conceptos-pago.ver',
+  'consultas.ver-importes',
+  'cxc.ver',
+  'cxp.ver',
+  'desarrollo.administrar',
+  'desarrollo.precostear',
+  'desarrollo.ver',
+  'esma.modificar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'indicadores.ver',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.administrar',
+  'listas.negociar',
+  'listas.ver',
+  'modelos.administrar',
+  'modelos.aprobar-receta',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.administrar',
+  'ordenes.cancelar',
+  'ordenes.habilitacion',
+  'ordenes.modificar',
+  'ordenes.precio-maquila',
+  'ordenes.ver',
+  'ordenes.ver-precio-real-maquila',
+  'pagos.corrida-ver',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.importes',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'precostos.consultar',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'terceros.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * **Ventas** (nivel 45) — vende sin ver el dinero de la casa.
+ *
+ * Captura pedidos, pero sin importes (`pedidos.importes`, `consultas.ver-importes`), sin los
+ * tableros directivos (`indicadores.ver`) y sin la cuenta corriente ni las carteras
+ * (`terceros.ver`, `cxp.ver`, `cxc.ver`, F9). Tampoco administra ni aprueba modelos: eso es trabajo
+ * de Desarrollo y se queda en Gerencial (§Post-F9.123 y §Post-F9.110 (b)).
+ */
+const VENTAS: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'desarrollo.administrar',
+  'desarrollo.precostear',
+  'desarrollo.ver',
+  'esma.modificar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.administrar',
+  'listas.ver',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.administrar',
+  'ordenes.cancelar',
+  'ordenes.habilitacion',
+  'ordenes.modificar',
+  'ordenes.precio-maquila',
+  'ordenes.ver',
+  'ordenes.ver-precio-real-maquila',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'precostos.consultar',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * **Logística** (nivel 47) — mueve mercancía; no crea ni modifica órdenes ni ve el pre-costo.
+ *
+ * Conserva `ordenes.ver` (consulta) pero no `ordenes.administrar`/`.modificar`/`.cancelar` ni los
+ * precios de maquila. La pre-venta (armar proyectos, precostear, administrar listas) es de
+ * Directivo/Gerencial/Ventas: aquí sólo queda la CONSULTA (`desarrollo.ver`, `listas.ver`).
+ */
+const LOGISTICA: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'desarrollo.ver',
+  'esma.modificar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.ver',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.habilitacion',
+  'ordenes.ver',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * **Asistente** (nivel 50) — asistente de dirección.
+ *
+ * Hoy su lista es idéntica a la de Logística (la única diferencia del viejo era el MENÚ de
+ * catálogos de la RC, que nunca fue un acceso granular). Se escribe COMPLETA, y no como copia de
+ * Logística, precisamente para que se le pueda quitar o dar algo sin arrastrar al otro perfil.
+ */
+const ASISTENTE: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'desarrollo.ver',
+  'esma.modificar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.ver',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.habilitacion',
+  'ordenes.ver',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * **Secretarial** (nivel 60) — captura.
+ *
+ * Hoy su lista es idéntica a la de Asistente (la restricción vieja —no modificar el precio de
+ * maquila— ya se pierde en Logística). ⚠️ Es el perfil donde más se nota la herencia de la
+ * cascada: conserva `compras.autorizar`, `pedidos.modificar`, `notas.cancelar`,
+ * `inventario-pt.mover`, `telas.ver-totales` y `calidad.modificar-auditorias` porque **nadie se los
+ * restó nunca**, no porque alguien lo decidiera. Cuando Daniel arme los perfiles por puesto real,
+ * éste es el primero que hay que mirar.
+ *
+ * ✂️ Ya perdió `esma.cargo-validar` (fila 0.128): validar los cargos de maquila es de Daniel, no de
+ * un perfil clerical. Era el ejemplo con el que se explicaba el defecto de la cascada — y el
+ * primero en corregirse.
+ */
+const SECRETARIAL: readonly ClavePermiso[] = [
+  'admin.ver-bitacora',
+  'almacenes.ver',
+  'avios.ver',
+  'calidad.actualizar-auditorias',
+  'calidad.generar-auditorias',
+  'calidad.modificar-auditorias',
+  'calidad.ver',
+  'clientes.modificar',
+  'clientes.ver',
+  'colores.ver',
+  'compras.administrar',
+  'compras.autorizar',
+  'compras.cancelar',
+  'compras.recibir',
+  'compras.ver',
+  'concepto-costo.ver',
+  'desarrollo.ver',
+  'esma.modificar',
+  'esma.ver-pagos',
+  'estado-lista.ver',
+  'etiquetas-marca.ver',
+  'etiquetas.modificar',
+  'indicadores.almacen-productividad',
+  'indicadores.ciclicos-alta',
+  'indicadores.ciclicos-consulta',
+  'indicadores.ciclicos-conteo',
+  'indicadores.fecha-libre',
+  'indicadores.ip-confiabilidad',
+  'indicadores.ip-muestrarios',
+  'indicadores.ip-productividad',
+  'inventario-avios.mover',
+  'inventario-avios.ver',
+  'inventario-pt.mover',
+  'inventario-pt.ver',
+  'inventario-telas.mover',
+  'inventario-telas.ver',
+  'ipt.cantidades-negativas',
+  'ipt.clasificar-modelos',
+  'ipt.consultar-existencias',
+  'ipt.fecha-libre',
+  'ipt.modificar-movimientos',
+  'listas.ver',
+  'modelos.ver',
+  'notas.administrar',
+  'notas.cancelar',
+  'notas.ver',
+  'ordenes.habilitacion',
+  'ordenes.ver',
+  'pedidos-reales.administrar',
+  'pedidos.administrar',
+  'pedidos.modificar',
+  'pedidos.modificar-reales',
+  'pedidos.ver',
+  'produccion.cancelar',
+  'produccion.corte',
+  'produccion.corte-salidas',
+  'produccion.empaque',
+  'produccion.entradas-maquila',
+  'produccion.entrega',
+  'produccion.envio',
+  'produccion.recibo',
+  'produccion.wip-ver',
+  'proveedores.modificar',
+  'proveedores.ver',
+  'rc.capturar',
+  'rc.catalogo-ver',
+  'rc.fecha-libre-cumplimiento',
+  'rc.fechas-retraso',
+  'rc.programar',
+  'rc.ruta-ver',
+  'rc.ver-botones',
+  'tallas.ver',
+  'telas.ver',
+  'telas.ver-totales',
+  'temporadas.ver',
+  'tipos-proceso.ver',
+];
+
+/**
+ * Los 9 perfiles de sistema (`esSistema: true`) que absorben los niveles del viejo (doc 00 §2, A4).
+ *
+ * ⚠️ `sembrarRoles` los **re-sincroniza** en cada arranque con `SEED_ON_START=true`: lo que se
+ * palomee a mano en la pantalla de Roles sobre uno de estos 9 se pierde en el siguiente deploy
+ * (salvo las llaves de gobierno, que el seed nunca revoca — ver `sembrarRoles`). La pantalla lo
+ * avisa; para un permiso permanente hay que crear un perfil propio.
+ */
+export function definirRoles(): {
   nombre: string;
   descripcion: string;
   permisos: ClavePermiso[];
 }[] {
-  // Todo el catálogo (38 del sistema viejo + administración nueva de v2).
-  const todos: readonly ClavePermiso[] = CLAVES_PERMISO;
-
-  // Nivel 30 — Directivo: pierde la administración del sistema (en el viejo, el botón
-  // Administración era exclusivo de nivel ≤ 20, doc 00 §3.1). Conserva el `.ver` de los
-  // catálogos (consulta), pero NO su `.administrar`: administrar catálogos maestros
-  // (igual que almacenes/usuarios/roles/empresas) queda solo para Administrador y
-  // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
-  // los catálogos junto con los de administración del sistema. Los catálogos
-  // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) y los de MATERIALES de F1-E3
-  // (telas/avios) siguen el MISMO reparto.
-  const directivo = sin(
-    todos,
-    'usuarios.administrar',
-    'roles.administrar',
-    'almacenes.administrar',
-    'empresas.administrar',
-    'proveedores.administrar',
-    'temporadas.administrar',
-    'etiquetas-marca.administrar',
-    'colores.administrar',
-    // F1-E2 — catálogos estructurados. NOTA: maquileros/cortadores se fusionaron en
-    // proveedores (D12/R15) → cubiertos por `proveedores.administrar` de arriba.
-    'tallas.administrar',
-    'clientes.administrar',
-    // F1-E3 — catálogos de materiales.
-    'telas.administrar',
-    'avios.administrar',
-    // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
-    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
-    'modelos.administrar',
-    // F3-E1 — tipos de proceso (Módulo 4, catálogo): administrar solo Administrador y
-    // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
-    // permisos operativos de producción/inventario cascadean (siguen en el conjunto).
-    'tipos-proceso.administrar',
-    // F6-E1 — catálogo de Calidad (defectos/tipos de producto/planes AQL): administrar solo
-    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos). El
-    // `calidad.ver` y la consulta de bitácora cascadean (siguen en el conjunto del directivo).
-    'calidad.administrar-catalogo',
-    // F8-E1 — catálogos de configuración de Desarrollo/Cotización (conceptos de costo R19,
-    // estados de lista R20): administrar solo Administrador y AdministracionDireccion (mismo
-    // reparto que el resto de catálogos). El `.ver` y los permisos de desarrollo/listas cascadean.
-    'concepto-costo.administrar',
-    'estado-lista.administrar',
-    // F5 — catálogo de Ruta Crítica (procesos/plantillas/reglas/calendario laboral): administrar
-    // solo Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos
-    // maestros). `rc.catalogo-ver` y el motor de RC cascadean. (Fix de pentest: antes se colaba a
-    // roles clericales.)
-    'rc.catalogo-administrar',
-    // F9-E1 — cuenta corriente de terceros (Finanzas, D12/D15): CAPTURAR/CANCELAR movimientos
-    // (`terceros.administrar`) y la VISTA FISCAL (`terceros.fiscal`) quedan solo para Administrador
-    // y AdministracionDireccion (mismo reparto que los catálogos maestros y por prudencia
-    // financiera; sé conservador como el fix de pentest de los `*.administrar`). El `terceros.ver`
-    // NO se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo), como EsMa.
-    'terceros.administrar',
-    'terceros.fiscal',
-    // F9-E2 — CxP: capturar/cancelar movimientos (`cxp.administrar`) queda solo para Administrador y
-    // AdministracionDireccion (mismo reparto que `terceros.administrar`). El `cxp.ver` NO se corta aquí:
-    // baja hasta Gerencial (se corta en Ventas, ver abajo).
-    'cxp.administrar',
-    // F9-E4 — CxC: capturar/cancelar movimientos e importar CFDI de venta (`cxc.administrar`) queda solo
-    // para Administrador y AdministracionDireccion (mismo reparto que `cxp.administrar`). El `cxc.ver` NO
-    // se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo).
-    'cxc.administrar',
-    // ⭐ V1-E3y (§Post-F9.79) — DES-AUTORIZAR una OC es la marcha atrás de la firma de compra, y
-    // Daniel la pidió para SU perfil: *"es indispensable tener un botón para desautorizar las
-    // órdenes, que solo yo tenga acceso"*. Se corta desde Directivo hacia abajo, así que queda solo
-    // en Administrador y AdministracionDireccion (mismo reparto que `terceros.administrar`). El
-    // `compras.autorizar` normal NO se toca: autorizar sigue cascadeando como siempre.
-    'compras.desautorizar',
-  );
-
-  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
-  // botón legado de costos de la orden (`ordenes.ver-costos`), el módulo de Costos (`costos.ver`/
-  // `costos.capturar`, menú 6, F7-E1) Y el Estado de Resultados (`edr.ver`/`edr.capturar`, menú 6.2,
-  // F7-E2). Conserva el PRE-COSTO (`precostos.consultar`, nivel ≤45).
-  const gerencial = sin(
-    directivo,
-    'ordenes.ver-costos',
-    'costos.ver',
-    'costos.capturar',
-    'edr.ver',
-    'edr.capturar',
-    // F8-E4 — aprobar precios de lista es del DUEÑO (Administrador/AdministracionDireccion/
-    // Directivo, decisión (h)): Gerencial NO aprueba. Conserva ver/administrar/negociar de listas
-    // y todo desarrollo.*.
-    'listas.aprobar',
-  );
-
-  // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
-  // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,
-  // doc 02-Pedidos §3). Ventas SÍ captura pedidos (alta/edición), solo no ve los importes.
-  // Los TABLEROS directivos de indicadores (F7-E3, `indicadores.ver`) son de DIRECCIÓN/GERENCIA →
-  // se cortan aquí (los conservan Administrador, AdministracionDireccion, Directivo y Gerencial).
-  const ventas = sin(
-    gerencial,
-    'consultas.ver-importes',
-    'pedidos.importes',
-    'indicadores.ver',
-    // F8-E5 — negociar/mover estados de lista es del dueño y el gerente comercial (decisión (h)):
-    // Ventas NO negocia. Conserva desarrollo.* (pre-venta) y listas.ver/.administrar.
-    'listas.negociar',
-    // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
-    // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
-    // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.
-    'terceros.ver',
-    // F9-E2 — CxP: `cxp.ver` (bandeja por pagar + estado de cuenta) es información FINANCIERA; se
-    // corta en Ventas hacia abajo, igual que `terceros.ver`.
-    'cxp.ver',
-    // F9-E4 — CxC: `cxc.ver` (bandeja por cobrar + estado de cuenta) es información FINANCIERA; se
-    // corta en Ventas hacia abajo, igual que `cxp.ver`.
-    'cxc.ver',
-  );
-
-  // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
-  // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no
-  // crear/modificar órdenes" se traduce además a quitar el CRUD nuevo de la orden
-  // (`ordenes.administrar`/`.cancelar`); conserva `ordenes.ver` (consulta).
-  const logistica = sin(
-    ventas,
-    'ordenes.modificar',
-    'ordenes.precio-maquila',
-    'ordenes.ver-precio-real-maquila',
-    'ordenes.administrar',
-    'ordenes.cancelar',
-    // Nivel 47 y abajo ya no acceden al pre-costo (era ≤45): Directivo/Gerencial/Ventas sí.
-    'precostos.consultar',
-    // F8 — Desarrollo/Cotización (D13): armar proyectos/desarrollos, precostear y administrar
-    // listas de precios es trabajo de PRE-VENTA (Directivo/Gerencial/Ventas). De Logística hacia
-    // abajo se corta administrar/precostear (mismo precedente que `precostos.consultar`, ≤45).
-    // `desarrollo.ver` y `listas.ver` NO se cortan: la CONSULTA cascadea amplia (hasta Secretarial).
-    'desarrollo.administrar',
-    'desarrollo.precostear',
-    'listas.administrar',
-  );
-
-  // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC
-  // (no existe como acceso granular) → mismo conjunto que Logística por ahora.
-  const asistente = [...logistica];
-
-  // Nivel 60 — Secretarial: "no puede modificar el precio de maquila" — ya quitado desde
-  // Logística → mismo conjunto que Asistente por ahora.
-  const secretarial = [...asistente];
-
   return [
     {
       nombre: 'Administrador',
       // Nivel 1 (Daniel): todo, incluida la administración del sistema.
       descripcion: 'Acceso total al sistema (absorbe el nivel 1 del sistema viejo)',
-      permisos: [...todos],
+      permisos: [...CLAVES_PERMISO],
     },
     {
       nombre: 'AdministracionDireccion',
@@ -284,37 +887,37 @@ function definirRoles(): {
       // era una capacidad de Access, no de la aplicación; en v2 no existe como permiso.
       descripcion:
         'Administración y dirección: todo el sistema (absorbe el nivel 20 del sistema viejo)',
-      permisos: [...todos],
+      permisos: [...CLAVES_PERMISO],
     },
     {
       nombre: 'Directivo',
       descripcion: 'Dirección del negocio sin administración del sistema (absorbe el nivel 30)',
-      permisos: directivo,
+      permisos: [...DIRECTIVO],
     },
     {
       nombre: 'Gerencial',
       descripcion: 'Gerencia sin acceso a costos (absorbe el nivel 40)',
-      permisos: gerencial,
+      permisos: [...GERENCIAL],
     },
     {
       nombre: 'Ventas',
       descripcion: 'Ventas sin importes totales ni costos (absorbe el nivel 45)',
-      permisos: ventas,
+      permisos: [...VENTAS],
     },
     {
       nombre: 'Logistica',
       descripcion: 'Logística sin importes y sin modificar órdenes (absorbe el nivel 47)',
-      permisos: logistica,
+      permisos: [...LOGISTICA],
     },
     {
       nombre: 'Asistente',
       descripcion: 'Asistente de dirección (absorbe el nivel 50)',
-      permisos: asistente,
+      permisos: [...ASISTENTE],
     },
     {
       nombre: 'Secretarial',
       descripcion: 'Captura secretarial (absorbe el nivel 60)',
-      permisos: secretarial,
+      permisos: [...SECRETARIAL],
     },
     {
       nombre: 'Basico',
@@ -386,6 +989,10 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
+  // ⭐ 0.114 — Daniel: *«y una maquila de empaque también»*. El empacador es un proveedor de
+  // servicio como el cortador: se le carga desde la orden y sale en el estado de cuenta de maquila.
+  // Rol NUEVO: `prueba` necesita `SEED_ON_START=true` para que aparezca (el upsert es idempotente).
+  { codigo: 'empaque', nombre: 'Empaque' },
   // Nombres como los pide Daniel (§Post-F9.54 punto 1, 16-ago-2026): *"Yo cambiaría el nombre a
   // Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como Telas y Avíos, le
   // quitaría el «Vende»."* Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
@@ -592,6 +1199,11 @@ const TIPOS_MOVIMIENTO_BASE: {
   { codigo: 'salida-composturas', nombre: 'Salida a Composturas', direccion: 'salida' },
   { codigo: 'otras-salidas', nombre: 'Otras Salidas', direccion: 'salida' },
   { codigo: 'otras-entradas', nombre: 'Otras Entradas', direccion: 'entrada' },
+  // ⭐ 0.061 (§Post-F9.154(a), DANIEL): la prenda INCOMPLETA sale sola del almacén de TRÁNSITO al
+  // registrar el recibo. Hasta hoy se quedaba ahí para siempre (nadie la iba a devolver) y sólo
+  // salía con un movimiento manual que nadie hacía. NO se inventaría en ningún lado: es merma.
+  // Lo mueve `dominio/produccion/transito.ts::darSalidaMermaIncompletas`, nunca a mano.
+  { codigo: 'merma-incompletas', nombre: 'Merma por prendas incompletas', direccion: 'salida' },
 ];
 
 /** `IPT_TiposMov.TipoEnSa` → dirección de v2 (1=entrada, 2=salida, 3=traspaso). */
@@ -711,17 +1323,60 @@ const TIPOS_MOVIMIENTO_F7: {
   { codigo: 'ajuste-ciclico-salida', nombre: 'Ajuste por Cíclico (Salida)', direccion: 'salida' },
 ];
 
+/**
+ * ⭐ Tipos de movimiento NUEVOS de la fila **0.104** — LA SALIDA QUE NO ES POR OP.
+ *
+ * DANIEL (§Post-F9.193 resp. 12): *«debería de haber manera de sacar por ejemplo una devolución, o
+ * una venta de avíos que ya no se usen… que no sea mediante la descarga o aplicación a una OP…
+ * Lo mismo en telas»*.
+ *
+ * 🔑 **Por qué DEDICADOS y no un `ajuste-salida` con el motivo en prosa:** el kardex es la ventana
+ * por la que se pregunta «¿a dónde se fue esta tela?», y ahí sólo se ve el NOMBRE del tipo. Con el
+ * ajuste genérico, una devolución y una venta quedarían indistinguibles entre sí y revueltas con
+ * las correcciones de conteo. Mismo criterio (y mismas palabras) con que F7-E5 estrenó
+ * `ajuste-ciclico-*`. El tercer concepto de la fila —«otra causa»— NO estrena tipo: reusa el
+ * `otras-salidas` que ya venía en los 19 canónicos del sistema viejo.
+ *
+ * Entran por SEED (no por migración) y sirven a las DOS dimensiones (tela y avío).
+ */
+const TIPOS_MOVIMIENTO_SALIDA_SIN_ORDEN: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  { codigo: 'devolucion-proveedor', nombre: 'Devolución a Proveedor', direccion: 'salida' },
+  { codigo: 'venta-material', nombre: 'Venta de Material', direccion: 'salida' },
+];
+
+/**
+ * TODOS los tipos de movimiento que el seed siembra: los 19 canónicos del CSV viejo + los 2 de
+ * F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex de telas y avíos) + los 2 de F7-E5 (ajuste
+ * por cíclico) + los 2 de la fila 0.104 (salida sin orden).
+ *
+ * 🔴 **Está EXPORTADA para que se pueda cruzar a máquina con lo que el dominio EXIGE.** Un flujo
+ * que resuelve su tipo por `codigo` y no lo encuentra sembrado nace muerto en `prueba`, y el
+ * defecto no lo caza ninguna prueba de dominio: la cicatriz del proyecto es una fila rechazada
+ * **por el despliegue, no por el código**, porque la siembra no creaba algo que la guarda pedía.
+ * `dominio/inventarios/salida-sin-orden.test.ts` compara esta lista contra
+ * `CODIGO_TIPO_MOV_POR_CONCEPTO` y truena si falta uno.
+ */
+export const TIPOS_MOVIMIENTO_A_SEMBRAR: readonly {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  ...TIPOS_MOVIMIENTO_BASE,
+  ...TIPOS_MOVIMIENTO_V2,
+  ...TIPOS_MOVIMIENTO_F4,
+  ...TIPOS_MOVIMIENTO_F7,
+  ...TIPOS_MOVIMIENTO_SALIDA_SIN_ORDEN,
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
-  // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
-  // de telas y avíos) + los 2 de F7-E5 (ajuste por cíclico). Idempotente: el `update: {}` no pisa
-  // nombre/dirección/activo si ya existen (pudieron editarse en producción).
-  for (const tipo of [
-    ...TIPOS_MOVIMIENTO_BASE,
-    ...TIPOS_MOVIMIENTO_V2,
-    ...TIPOS_MOVIMIENTO_F4,
-    ...TIPOS_MOVIMIENTO_F7,
-  ]) {
+  // Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen (pudieron editarse
+  // en producción).
+  for (const tipo of TIPOS_MOVIMIENTO_A_SEMBRAR) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
       update: {},
@@ -788,6 +1443,52 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3f-bis. Los almacenes ÚNICOS de AVÍOS (fila 0.137) y de TELAS (fila 0.099)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Nombre con el que NACE el almacén único de avíos (fila 0.137). Renombrable desde el catálogo. */
+const ALMACEN_AVIOS_BASE = 'Almacén de avíos';
+/** Nombre con el que NACE el almacén único de telas (fila 0.099). Renombrable desde el catálogo. */
+const ALMACEN_TELAS_BASE = 'Almacén de telas';
+
+/**
+ * Siembra **UN** almacén GLOBAL del tipo dado, si el catálogo no tiene ya ninguno de ese tipo.
+ *
+ * ⚠️ **POR QUÉ EXISTEN ESTOS DOS SEEDS.** Desde la fila 0.137 el dominio exige que el tipo del
+ * almacén case con el del artículo que se mueve (`comun/almacenes.ts` → `exigirAlmacenDelTipo`), y
+ * el catálogo base **no tenía ninguno** ni de AVIO ni de TELA: el seed sembraba tres de producto
+ * terminado y el ETL de Access mapea los almacenes viejos a PT y TELA — o sea que los avíos no
+ * tenían dónde caer nunca, y las telas sólo si alguien corría el ETL. Sin esta siembra, los flujos
+ * de avíos (ajuste, traspaso, recepción de compra, notas de salida) y el **inventario cíclico de
+ * telas** —la pantalla del ARRANQUE— rechazan contra cualquier almacén del catálogo, o directamente
+ * no tienen ninguno que ofrecer.
+ *
+ * ⭐ **LA LLAVE DE IDEMPOTENCIA ES EL TIPO, NO EL NOMBRE** (decisión del lead en la revisión de la
+ * fila 0.099, `DECISIONES.md` §Post-F9.202). Antes se buscaba por `(nombre, tipo, global)`, y eso
+ * convertía un renombre en un duplicado silencioso: el catálogo **permite renombrar** un almacén (y
+ * el historial de versiones se lo dice a Daniel), el `@@unique (idEmpresa, nombre)` **no atrapa los
+ * NULL** de los globales, y `SEED_ON_START=true` está **permanente** en `prueba` ⇒ el siguiente
+ * arranque habría creado un SEGUNDO almacén global del mismo tipo, partiendo el inventario en dos
+ * — el daño exacto que la fila 0.137 vino a evitar. Preguntando por el TIPO, renombrar es inocuo.
+ *
+ * Lo que este seed NO hace: no toca el almacén que ya exista (ni su nombre, ni su estado), y no
+ * cuenta los de EMPRESA — un almacén global es el piso del catálogo, no un almacén de nadie.
+ */
+async function sembrarAlmacenUnicoGlobal(
+  prisma: PrismaClient,
+  tipo: 'AVIO' | 'TELA',
+  nombre: string,
+): Promise<void> {
+  const existente = await prisma.almacen.findFirst({
+    where: { tipo, idEmpresa: null },
+    select: { id: true },
+  });
+  if (existente === null) {
+    await prisma.almacen.create({ data: { nombre, tipo, idEmpresa: null } });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3g. Reactivos del checklist de FICHAS CONFIABLES (F7-E4) — los 8 fijos del viejo
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -842,6 +1543,12 @@ const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fij
   // precosto crea su renglón fijo auto (`lineaCorte`). REQUIERE re-seed en `prueba` (SEED_ON_START):
   // sin este concepto, `generarPrecosto` truena ("falta el concepto de costo base corte").
   { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+  // ⭐ V1-E8w (§Post-F9.153): EMPAQUE, la TERCERA ancla fija junto a maquila y corte. Daniel:
+  // *"nos falto meter el costo del empaque. Es un campo adicional…. como si fuera corte"*. El
+  // precosto crea su renglón fijo auto (`lineaEmpaque`) con el default de `ConfiguracionEmpresa`.
+  // REQUIERE re-seed en `prueba` (SEED_ON_START): sin este concepto, `generarPrecosto` truena
+  // ("falta el concepto de costo base empaque"), igual que pasó con `corte`.
+  { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
 ];
 
 async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
@@ -1074,6 +1781,13 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarGeneros(prisma);
   await sembrarTiposMovimiento(prisma);
   await sembrarAlmacenesPt(prisma);
+  // Fila 0.137: el almacén de AVÍOS base. Sin él, el guard de tipo dejaría los cuatro flujos de
+  // avíos sin un solo almacén válido que elegir (el viejo no tenía almacenes de avíos).
+  await sembrarAlmacenUnicoGlobal(prisma, 'AVIO', ALMACEN_AVIOS_BASE);
+  // Fila 0.099: el almacén de TELAS base, por la misma razón — el seed no sembraba ninguno de tipo
+  // TELA (sólo el ETL los creaba) y el cíclico de telas, que es la pantalla del ARRANQUE, se
+  // quedaba sin almacén que elegir.
+  await sembrarAlmacenUnicoGlobal(prisma, 'TELA', ALMACEN_TELAS_BASE);
   // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
   // filas configurables (A6). Idempotente por clave.
   await sembrarReactivosFicha(prisma);

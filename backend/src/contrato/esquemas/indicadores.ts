@@ -206,12 +206,27 @@ const esquemaWipTotales = z.object({
   pedido: z.number().int().describe('Σ pedido.'),
   cortado: z.number().int().describe('Σ cortado.'),
   enviado: z.number().int().describe('Σ enviado a maquila.'),
-  recibido: z.number().int().describe('Σ recibido de maquila.'),
+  recibido: z.number().int().describe('Σ recibido de maquila (BUENO: primeras + segundas).'),
+  incompletas: z
+    .number()
+    .int()
+    .describe('Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron.'),
   recibidoCostura: z.number().int().describe('Σ recibido de procesos que meten a PT.'),
   entregado: z.number().int().describe('Σ entregado a cliente.'),
   porCortar: z.number().int().describe('Σ (pedido − cortado).'),
   cortadoPorEnviar: z.number().int().describe('Σ (cortado − enviado).'),
-  porRecibir: z.number().int().describe('Σ (enviado − recibido).'),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca ' +
+        'volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del ' +
+        'pendiente por recibir, igual que las incompletas.',
+    ),
+  porRecibir: z
+    .number()
+    .int()
+    .describe('Σ (enviado − recibido − incompletas − faltantes saldados), V1-E8v + fila 0.109.'),
   porEntregar: z.number().int().describe('Σ (recibido costura − entregado).'),
 });
 
@@ -226,12 +241,27 @@ const esquemaWipFila = z.object({
   pedido: z.number().int().describe('Pedido.'),
   cortado: z.number().int().describe('Cortado.'),
   enviado: z.number().int().describe('Enviado.'),
-  recibido: z.number().int().describe('Recibido.'),
+  recibido: z.number().int().describe('Recibido BUENO (primeras + segundas).'),
+  incompletas: z
+    .number()
+    .int()
+    .describe('Prendas INCOMPLETAS entregadas (V1-E8v): restan del pendiente, no del inventario.'),
   recibidoCostura: z.number().int().describe('Recibido de costura (mete a PT).'),
   entregado: z.number().int().describe('Entregado a cliente.'),
   porCortar: z.number().int().describe('pedido − cortado.'),
   cortadoPorEnviar: z.number().int().describe('cortado − enviado.'),
-  porRecibir: z.number().int().describe('enviado − recibido.'),
+  faltantesSaldados: z
+    .number()
+    .int()
+    .describe(
+      'Piezas FALTANTES ya SALDADAS al cerrar la orden con sus maquileros (V1, fila 0.109): nunca ' +
+        'volvieron y ya se decidió que no vuelven (se cobraron o se perdonaron). Restan del ' +
+        'pendiente por recibir, igual que las incompletas.',
+    ),
+  porRecibir: z
+    .number()
+    .int()
+    .describe('enviado − recibido − incompletas − faltantes saldados (V1-E8v + fila 0.109).'),
   porEntregar: z.number().int().describe('recibido costura − entregado.'),
 });
 
@@ -258,7 +288,12 @@ export const esquemaRefrescoEncolado = z
   .object({
     encolado: z
       .boolean()
-      .describe('true si se encoló el refresco (false si el motor está inactivo).'),
+      .describe(
+        'true si este disparo creó un job de refresco. false NO es un error: ocurre si el motor ' +
+          'de jobs está inactivo, y también —lo normal— si ya había un refresco esperando y éste ' +
+          'se unió a él (se dedupó). En ambos casos el refresco llega igual; sólo no lo encoló ' +
+          'esta llamada.',
+      ),
   })
   .describe('Resultado de encolar el refresco de KPIs.');
 

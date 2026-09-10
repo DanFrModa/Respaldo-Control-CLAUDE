@@ -24,6 +24,13 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
     await page.getByTestId('nuevo-modelo').click();
     await page.getByRole('dialog').getByLabel('Código').fill(codigoModelo);
+    // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+    // dos dígitos con los que el sistema arma el nº de producción del modelo.
+    await page
+      .getByRole('dialog')
+      .getByLabel('Tipo de producto')
+      .selectOption({ label: 'Pantalón' });
+    await page.getByRole('dialog').getByLabel('Género').selectOption({ label: 'Caballero' });
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
@@ -44,6 +51,8 @@ test.describe('Inventario PT operable (F3-E3)', () => {
       await agregarTalla.selectOption({ index: 1 });
     }
     await page.getByTestId('mov-matriz-celda').first().fill('30');
+    // Fila 0.100 — el MOTIVO es obligatorio: sin él el botón de guardar sigue deshabilitado.
+    await page.getByTestId('mov-motivo').fill('Inventario inicial de la prueba');
     await page.getByTestId('mov-guardar').click();
     await expect(page.getByText(/Movimiento #\d+ guardado/)).toBeVisible();
 
@@ -61,8 +70,16 @@ test.describe('Inventario PT operable (F3-E3)', () => {
       await agregarTallaT.selectOption({ index: 1 });
     }
     await page.getByTestId('traspaso-matriz-celda').first().fill('10');
+    // Fila 0.100 — el MOTIVO es obligatorio también en el traspaso.
+    await page.getByTestId('traspaso-motivo').fill('Reacomodo de la prueba');
     await page.getByTestId('traspaso-guardar').click();
     await expect(page.getByText(/Traspaso guardado/)).toBeVisible();
+
+    // Fila 0.100 — al guardar, la pantalla ofrece la HOJA del traspaso (PDF server-side) con el
+    // folio que el traspaso YA tiene. Aquí se comprueba que el papel EXISTE y se puede pedir; que
+    // diga lo correcto lo miden los tests del impreso (unit + integración).
+    await expect(page.getByTestId('traspaso-pt-guardado')).toBeVisible();
+    await expect(page.getByTestId('traspaso-pt-imprimir')).toBeVisible();
 
     // ── EXISTENCIAS: verifica que el modelo aparezca con existencia ─────────────
     await page.goto('/inventarios/existencias');
@@ -83,5 +100,8 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     // La tabla del kardex aparece con renglones (entrada + las dos patas del traspaso).
     await expect(page.getByTestId('kardex-tabla')).toBeVisible();
     await expect(page.getByText(/Inventario Inicial/).first()).toBeVisible();
+    // Fila 0.138 — el kardex es SIEMPRE de un periodo (aquí, el de por omisión): la pantalla dice
+    // cuál. Sin esta línea, una lista corta se leería como «no hay más movimientos».
+    await expect(page.getByTestId('kardex-periodo')).toBeVisible();
   });
 });

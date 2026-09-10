@@ -113,6 +113,14 @@ export async function crearCargoEsMaMigrado(
 // para pagos, `RevisionPendienteP`; abonos/descuentos no lo traían → `revisado`, ya conciliados) y
 // `conFactura = null`. Siguen A2 (transacción) + A7 (bitácora, `operacion: 'migracion'`).
 // Idempotencia: el loader resuelve "ya existe" por su `MapeoMigracion` ANTES de llamar.
+//
+// ⚠️ POR QUÉ ESTE ARCHIVO **NO** EXIGE `esma.revisar` (fila 0.128), aunque escriba `revisado`
+// directo: es MODO MIGRACIÓN. No hay acto de negocio que autorizar — el movimiento **ya venía
+// revisado del sistema viejo**, y aquí sólo se transcribe ese hecho. Ninguna de estas funciones
+// está expuesta por el API: viven detrás de los loaders de `backend/migracion/`, que Gabriel corre
+// a mano contra la base, fuera de toda sesión de usuario (por eso tampoco verifican permisos las
+// demás funciones de este archivo). El día que un ETL se pueda disparar desde una pantalla, esto
+// deja de ser cierto y el permiso hay que exigirlo aquí.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Un movimiento plano EsMa histórico (abono/descuento/pago) a migrar. */
@@ -143,7 +151,7 @@ function datosMovimientoMigrado(
   idMaquilero: number;
   monto: number;
   fecha: Date;
-  conFactura: null;
+  conFactura: null; // segmento: no particiona (es el TIPO del valor que se escribe, no un filtro)
   estadoRevision: EstadoRevisionEsMa;
   observaciones: string | null;
   creadoPorId: string;
@@ -155,7 +163,9 @@ function datosMovimientoMigrado(
     monto: entrada.monto,
     fecha: entrada.fecha,
     // El viejo no tenía el flag de facturación: el movimiento migrado nace SIN definir (decisión h).
-    conFactura: null,
+    // Esto ESCRIBE el «sin definir» — es el origen de los NULL que el segmento «sin factura» tiene
+    // que incluir, no un filtro que los deje fuera.
+    conFactura: null, // segmento: no particiona (escribe el valor, no filtra)
     estadoRevision: entrada.estadoRevision,
     observaciones: entrada.observaciones ?? null,
     creadoPorId: sesion.id,

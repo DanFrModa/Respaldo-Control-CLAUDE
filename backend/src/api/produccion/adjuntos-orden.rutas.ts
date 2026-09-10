@@ -71,6 +71,7 @@ function aAdjuntoSalida(adjunto: AdjuntoOrdenConUrl): z.infer<typeof esquemaOrde
     tamanoBytes: adjunto.tamanoBytes,
     urlDescarga: adjunto.urlDescarga,
     subidoPorId: adjunto.subidoPorId,
+    nombreSubidoPor: adjunto.nombreSubidoPor,
     creadoEn: adjunto.creadoEn.toISOString(),
   };
 }

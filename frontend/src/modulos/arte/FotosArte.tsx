@@ -29,12 +29,30 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export function FotosArte({
   arte,
+  idModelo,
   deshabilitado = false,
 }: {
   arte: Arte;
+  /**
+   * ⭐⭐ V1-E9b pieza B — EL MODELO DE **LA PANTALLA**, no `arte.idModelo`. Va como prop explícita
+   * y esto es lo único que la hace correcta.
+   *
+   * 🔴 Antes se usaba `arte.idModelo`, y sobre un modelo HIJO del linaje 1:N eso es **el padre**:
+   * la ficha del hijo trae su arte INJERTADO del desarrollo (`leerArtesModelo` resuelve), así que
+   * cada renglón viene con el `idModelo` del padre. Subir o quitar una foto desde la pantalla del
+   * hijo habría llamado a los endpoints con el id del PADRE ⇒ `exigirRecetaPropia` **no dispara**
+   * (el padre sí es dueño de su receta) ⇒ se escribe la receta del desarrollo desde la pantalla de
+   * un solo color, en silencio y para los cuatro. El bloqueo del servidor es correcto; lo que
+   * fallaba era el id que le llegaba.
+   *
+   * ⚠️ Hoy es inalcanzable —no hay puerta que cree hijos, y el editor de receta ya cierra sus
+   * botones sobre uno—, pero era una trampa cargada: se cierra aquí para que no espere a que
+   * alguien la pise.
+   */
+  idModelo: number;
   deshabilitado?: boolean;
 }): React.JSX.Element {
-  const consulta = useFotosArte(arte.idModelo, arte.id);
+  const consulta = useFotosArte(idModelo, arte.id);
   const subir = useSubirFotoArte();
   const quitar = useQuitarFotoArte();
   /** Foto abierta en el visor ampliado (lightbox), o `null` si está cerrado. */
@@ -42,7 +60,7 @@ export function FotosArte({
 
   function alElegirArchivo(archivo: File): void {
     subir.mutate(
-      { idModelo: arte.idModelo, idArte: arte.id, archivo },
+      { idModelo, idArte: arte.id, archivo },
       {
         onSuccess: () => toast.success('Foto agregada.'),
         onError: (error) => toast.error(error.message),
@@ -52,7 +70,7 @@ export function FotosArte({
 
   function alQuitar(foto: ArteFoto): void {
     quitar.mutate(
-      { idModelo: arte.idModelo, idArte: arte.id, idFoto: foto.idFoto },
+      { idModelo, idArte: arte.id, idFoto: foto.idFoto },
       {
         onSuccess: () => toast.success('Foto eliminada.'),
         onError: (error) => toast.error(error.message),

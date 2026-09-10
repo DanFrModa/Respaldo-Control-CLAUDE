@@ -59,12 +59,45 @@ function bdParaCrear(): ContextoBd {
         precio: new Prisma.Decimal('50.00'),
         entregadoParcialV1: null,
         cantFaltanteV1: null,
-        modelo: { codigo: '501', descripcion: 'Playera' },
+        idDesarrollo: null,
+        // V1-E3: el renglón apunta a un modelo de DESARROLLO → su nº es null para siempre.
+        modelo: { codigo: 'CYA-26-71-009', descripcion: 'Playera', numeroProduccion: null },
       },
     ],
   };
 
+  /**
+   * ⭐⭐ V1-E3 — las OPs VIVAS del renglón 11, para el agregado de `numerosProduccion`.
+   *
+   * 🔴 **El doble FILTRA por los ids que le piden** (no devuelve la lista fija pase lo que pase):
+   * si el dominio dejara de pasar los renglones de la página —o pasara otros— este stub devolvería
+   * `[]` y la prueba se pondría ROJA. Un doble que ignora su argumento habría dejado pasar el
+   * cableado roto en verde.
+   *
+   * Las tres filas cubren de una vez las tres reglas: **desordenadas** (71002 antes que 71001),
+   * con un **resurtido** del mismo modelo (que NO debe repetir su número) y con una OP de un modelo
+   * **SIN número** (el histórico `M-18`, que no puede meter un `null` en un `number[]`).
+   */
+  const opsVivasPorLinea = new Map([
+    [
+      11,
+      [
+        { idPedidoLinea: 11, modelo: { numeroProduccion: 71_002 } },
+        { idPedidoLinea: 11, modelo: { numeroProduccion: 71_001 } },
+        { idPedidoLinea: 11, modelo: { numeroProduccion: 71_002 } },
+        { idPedidoLinea: 11, modelo: { numeroProduccion: null } },
+      ],
+    ],
+  ]);
+
   const tx = {
+    orden: {
+      findMany: vi.fn((args: { where: { idPedidoLinea: { in: number[] } } }) =>
+        Promise.resolve(
+          args.where.idPedidoLinea.in.flatMap((id) => opsVivasPorLinea.get(id) ?? []),
+        ),
+      ),
+    },
     cliente: { findUnique: vi.fn(() => Promise.resolve({ activo: true, nombre: 'Liverpool' })) },
     modelo: {
       findMany: vi.fn(() => Promise.resolve([{ id: 9, activo: true, codigo: '501' }])),
@@ -163,5 +196,41 @@ describe('dominio Pedidos (F2-E1) — ocultamiento de importes server-side (doc 
     expect(salida.totalImporte).toBeNull();
     // Las piezas SÍ se ven aunque no pueda ver importes.
     expect(salida.totalPiezas).toBe(10);
+  });
+});
+
+/**
+ * ⭐⭐ V1-E3 (§Post-F9.172(b)) — **el nº de 5 dígitos que el detalle del pedido había perdido.**
+ *
+ * Hasta V1-E3 el renglón lo enseñaba por accidente (pintaba `codigoModelo`, que *era* el de
+ * producción porque generar la OP transformaba el modelo). Hoy el desarrollo NO se transforma:
+ * `numeroProduccion` del renglón es null para siempre y los números están en los modelos POR COLOR
+ * de sus OPs. La vista del MES ya los traía; el detalle no, y ésta es la mitad que faltaba.
+ */
+describe('⭐⭐ Pedidos — nº de producción por color en el detalle (V1-E3)', () => {
+  const entrada = { idCliente: 3, lineas: [{ idModelo: 9, cantidadPedida: 10, precio: 50 }] };
+
+  it('agrega los nº de las OPs vivas: ordenados, SIN repetir y sin colar un null', async () => {
+    const salida = await crearPedido(sesionAdmin(), entrada, bdParaCrear(), archivosStub);
+
+    // El renglón sigue siendo del DESARROLLO, que no tiene número…
+    expect(salida.lineas[0]?.codigoModelo).toBe('CYA-26-71-009');
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
+    // …y lo que se enseña son los de sus modelos por color. El 71002 venía repetido (resurtido) y
+    // primero; la OP del modelo sin número (`M-18`) no aporta un `null` al `number[]` del contrato.
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([71_001, 71_002]);
+  });
+
+  it('🔴 LA GEMELA — un renglón SIN OPs vivas sale VACÍO, no con un hueco ni un cero', async () => {
+    const bd = bdParaCrear();
+    // Mismo camino, misma proyección; lo único que cambia es que no hay ninguna OP que agregar.
+    (bd.tx as unknown as { orden: { findMany: ReturnType<typeof vi.fn> } }).orden.findMany = vi.fn(
+      () => Promise.resolve([]),
+    );
+
+    const salida = await crearPedido(sesionAdmin(), entrada, bd, archivosStub);
+
+    expect(salida.lineas[0]?.numerosProduccion).toEqual([]);
+    expect(salida.lineas[0]?.numeroProduccion).toBeNull();
   });
 });

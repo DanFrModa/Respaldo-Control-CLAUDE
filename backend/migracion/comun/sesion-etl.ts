@@ -39,5 +39,8 @@ export function sesionEtl(idEmpresaActiva = 1): SesionUsuario {
     idEmpresaActiva,
     nombreEmpresaActiva: 'FR Moda',
     permisos: new Set<ClavePermiso>(CLAVES_PERMISO),
+    // Fila 0.145: el ETL NO corrige nada. Corregir es un acto de una PERSONA con su bandera; una
+    // sesión de sistema no la tiene, y así el ETL no puede colarse por esa puerta.
+    puedeCorregirSinFactura: false,
   };
 }

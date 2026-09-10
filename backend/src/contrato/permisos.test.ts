@@ -74,6 +74,10 @@ describe('catálogo de permisos', () => {
       // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.
       'concepto-costo.administrar',
       'concepto-costo.ver',
+      // Conceptos de pago que NO son proveedores (fila 0.125, §Post-F9.189(c)): nómina por fuera,
+      // servicios, caja chica. Catálogo maestro propio; `administrar` es admin-only.
+      'conceptos-pago.administrar',
+      'conceptos-pago.ver',
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
@@ -91,8 +95,12 @@ describe('catálogo de permisos', () => {
       'edr.capturar',
       'edr.ver',
       'empresas.administrar',
-      // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
+      // EsMa: los DOS permisos de validar (F3-E4 + fila 0.128). `esma.cargo-validar` fija la
+      // cantidad y el precio reales del cargo que propuso el recibo; `esma.revisar` autoriza una
+      // partida capturada para que entre al saldo. Daniel, §Post-F9.192(1): *«es un permiso para
+      // meter lo recibido y otro para validarlo»*.
       'esma.cargo-validar',
+      'esma.revisar',
       // Desarrollo/Cotización (Módulo 15, F8-E1): estados de lista (R20), catálogo config admin-only.
       'estado-lista.administrar',
       'estado-lista.ver',
@@ -114,17 +122,26 @@ describe('catálogo de permisos', () => {
       'listas.aprobar',
       'listas.negociar',
       'listas.ver',
-      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
+      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos + aprobar la receta creando
+      // la versión con sufijo (V1-E7b).
       'modelos.administrar',
+      'modelos.aprobar-receta',
       'modelos.ver',
       // Notas de salida (Módulo 5, F4-E5, R4/R9): ver/administrar/cancelar (nuevos de v2).
       'notas.administrar',
       'notas.cancelar',
       'notas.ver',
       // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
+      // ⭐ `ordenes.cerrar` es de la fila 0.061 (§Post-F9.154(c)): CERRAR la orden (solo lectura +
+      // costo unitario CONGELADO) y REABRIRLA, las dos con el mismo permiso.
       'ordenes.administrar',
       'ordenes.cancelar',
+      'ordenes.cerrar',
       'ordenes.ver',
+      // La corrida semanal de pagos (fila 0.113, §Post-F9.189(g)): armarla/cerrarla/ejecutarla es
+      // de Daniel; verla es de finanzas (sólo lectura).
+      'pagos.corrida-armar',
+      'pagos.corrida-ver',
       // Pedidos (Módulo PEDIDOS, F2-E1): ver/administrar/importes + pedidos reales.
       'pedidos-reales.administrar',
       'pedidos.administrar',
@@ -135,6 +152,8 @@ describe('catálogo de permisos', () => {
       // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
       'produccion.cancelar',
       'produccion.corte',
+      // El EMPAQUE (0.114): servicio sobre la orden, hermano del corte.
+      'produccion.empaque',
       'produccion.entrega',
       'produccion.envio',
       'produccion.recibo',
@@ -150,6 +169,10 @@ describe('catálogo de permisos', () => {
       'rc.programar',
       'rc.ruta-ver',
       'roles.administrar',
+      // ⭐ La salida de material que NO va a una orden (fila 0.104, §Post-F9.193 resp. 12):
+      // devolución al proveedor / venta de material que ya no se usa. Módulo propio, permiso
+      // propio, y sólo del administrador (Daniel: «siempre autorizada sólo por mí. Nadie más»).
+      'salida-material.registrar',
       'tallas.administrar',
       'tallas.ver',
       // Catálogos de materiales (F1-E3): telas unificadas (D5) + categorías + colores.

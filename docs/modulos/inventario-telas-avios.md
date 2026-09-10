@@ -23,13 +23,89 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   opcional buscable), `factura`, `fecha`, FK Restrict a `TelaColor`. **Una entrada crea UNA partida
   POR RENGLÓN** — una factura con dos lotes del mismo color se captura en un documento con dos
   renglones → dos partidas con folios consecutivos.
-- **`MovimientoDetTela`** ganó 3 columnas nullable: `idTelaColor`, `idPartida` (solo entradas) y
+- **`MovimientoDetTela`** ganó 3 columnas nullable: `idTelaColor`, `idPartida` (entradas y, desde la
+  fila 0.142, las dos patas del traspaso) y
   `cantidadComplemento` (NULL = la tela no lleva; con complemento se guarda 0 explícito; `cantidad` =
   cuerpo y admite 0 → compra de solo cardigan). Las filas del flujo Lote quedan con las 3 en NULL.
-- **Las SALIDAS no escogen partida**: el consumo empareja por **TELA+COLOR** (decisión de Daniel);
-  la pantalla de salida a orden avisa **"riesgo de tono" SIN bloquear** (§Post-F9.11 punto 2).
-  `registrarSalidaTelaColorAOrden` es la vía nueva del consumo (traza `origenId=idOrden`); el
+- **Las SALIDAS A ORDEN no escogen partida**: el consumo empareja por **TELA+COLOR** (decisión de
+  Daniel); la pantalla de salida a orden avisa **"riesgo de tono" SIN bloquear** (§Post-F9.11 punto
+  2). `registrarSalidaTelaColorAOrden` es la vía nueva del consumo (traza `origenId=idOrden`); el
   contrato de salida/traspaso **no acepta** `loteProveedor` (solo la entrada lo lleva).
+- ⭐⭐ **PERO EL TRASPASO SÍ CONSERVA EL LOTE (fila 0.142 — Daniel §Post-F9.201 punto 1).** Hasta la
+  0.141 las dos patas del traspaso se escribían con `idPartida = NULL` («no son entradas de
+  compra»), y eso dejaba al **almacén del cortador** —alimentado casi sólo por traspasos, y donde
+  arranca la pantalla de salida de tela— **sin saber nunca de qué lotes era su tela**: el aviso de
+  riesgo de tono no podía entregar ninguna de las dos mitades que Daniel pidió (*«sólo cuando hay
+  más de una partida»* y *«con la lista a la vista»*). Ahora:
+  - **Se captura igual** (color + cantidad, sin pantalla nueva): el dominio reparte **FIFO por folio
+    de partida** contra el **saldo por lote del origen** (`repartirPorPartidaFifo`, función pura) y
+    expande la captura a **un renglón de kardex por lote**. El motor pasa el MISMO arreglo a las dos
+    patas ⇒ la salida descuenta del lote en el origen y la entrada lo nombra en el destino. **No se
+    tocó `comun/kardex.ts`**: el motor ya escribía `idPartida` y ya compartía las líneas.
+  - **Cuerpo y complemento se reparten POR SEPARADO** (son dos existencias independientes, y hay
+    partidas de sólo cardigan) y se juntan **por partida** en el renglón.
+  - **El reparto se calcula DENTRO de la transacción y DESPUÉS del lock** de no-negativo
+    (`pg_advisory_xact_lock` por empresa+almacén+color). Fuera del lock, dos traspasos simultáneos
+    repartirían el mismo lote dos veces en silencio.
+  - **Lo que ningún lote explica viaja SIN lote (`NULL`), sin error**: la tela traspasada ANTES de
+    esta fila se queda sin nombre y **no se repara** (REGLA 0-B: aditivo, sin backfill, sin
+    migración). ⭐ **Las otras TRES puertas que meten tela sin lote, medidas una por una:** el
+    **ajuste de ENTRADA del conteo cíclico** (`indicadores/ciclico/tela.ts` — no crea partida a
+    propósito: una hoja de conteo no tiene factura ni lote del proveedor), la **cancelación de una
+    salida que tampoco llevaba lote**, cuyo inverso copia el `idPartida` NULL del original, y **un
+    traspaso de HOY cuyo origen tampoco pueda nombrarla** —incluido el remanente que deja el tope
+    del reparto—, porque la tela sin nombre **se propaga** de almacén en almacén: el traspaso no
+    inventa lotes. *(Esta cuarta faltaba cuando el mapa se declaraba «completo»; la cazó el reviewer
+    en la 3ª vuelta.)* 📌 **«Medidas» quiere decir que cada una tiene su prueba de integración,
+    y dos de ellas se escribieron en la 4ª vuelta justo porque la palabra estaba de más**: el ajuste
+    del cíclico en `indicadores/inventario-ciclico.int.test.ts` (*«el ajuste de ENTRADA de TELA no
+    crea partida»*) y la **cancelación de una salida sin lote** en
+    `inventarios/partidas-telas.int.test.ts` (hasta entonces era un corolario razonado del caso que
+    sí estaba medido: cancelar una ENTRADA, que sí lleva partida); la **propagación** ya estaba en ese mismo
+    archivo (*«la tela que ningún lote explica viaja SIN lote»*), y **la tela vieja** en
+    `inventarios/previa-salida-tela-orden.int.test.ts` (*«la tela vieja, traspasada ANTES de la 0.142»*). 🔴 **NO es una puerta el «sobrante» de un conteo por color**, aunque esta doc
+    lo dijo: sobrante = *contado < sistema* = **salida**, y una salida baja la existencia; el
+    faltante, que sí es entrada, **crea partida**.
+  - **La hoja del traspaso sale desglosada por lote** (número del proveedor + folio de partida; «—»
+    cuando no hay).
+- 🔻 **CONSECUENCIA QUE HAY QUE SABER: el saldo por lote NUNCA cuadra del todo en un almacén que
+  consume.** **Ninguna salida nombra lote salvo la pata del traspaso** — ni la salida a orden, ni la
+  salida sin orden, ni la pata de sobrante del conteo, ni el ajuste de salida, ni el del cíclico —,
+  así que ninguna se lo descuenta: el saldo de un lote se queda **por encima** de lo que de verdad
+  hay. En la práctica, el aviso de tono puede **listar un lote que la producción ya se llevó** y su
+  `sinNombrar` puede quedarse corto. Es el precio explícito de que el consumo empareje por color, y
+  está medido en la integración.
+- 🔴🔴 **Y ese saldo inflado tuvo un efecto GRAVE en el traspaso, cazado en la ronda de corrección:
+  podía escribir el LOTE EQUIVOCADO.** Medido: entran 500 de `L-VIEJO` → se surten 500 a una orden
+  (no nombra lote, así que su saldo sigue diciendo 500) → entran 300 de `L-NUEVO`, que es lo único
+  que hay → se traspasan al cortador. El FIFO se llevaba **`L-VIEJO`**, el destino quedaba en
+  `sin-riesgo` y **la hoja impresa salía con un lote que no era**. Eso es *peor* que el estado previo
+  a la fila: cambia un «no sé» honesto por una afirmación falsa dicha con confianza.
+  - **Mitigación construida** (`repartirPorPartidaFifo`): antes de repartir se le quita a los lotes
+    el déficit `Σ saldos − existencia real`, **del folio más viejo al más nuevo** (misma hipótesis
+    FIFO del reparto) y **por componente**. La existencia sale de la lectura **bajo lock** que hace
+    `validarNoNegativoTelaColor`, que por eso ahora la devuelve en vez de tirarla.
+  - **Lo que aporta, medido — y es sobre QUÉ lote, no sobre cuánta tela:** que el lote escogido sea
+    **uno que la existencia pueda respaldar**, cuando el desajuste viene sólo de consumo no apuntado
+    (el caso normal de la bodega). Lo que no alcance viaja **sin lote**.
+    ⚠️ **Lo que NO aporta, aunque una versión anterior de esta doc lo presumía «medido»:** que *«no se
+    nombre más tela de la que hay»*. Eso **ya lo daba la validación de no-negativo** (rechaza la
+    captura si pasa de la existencia) ⇒ era cierto con tope y sin él, y su prueba pasaba con el tope
+    borrado. **En una línea: el tope no cambia CUÁNTA tela se nombra, cambia CUÁL lote.**
+  - 🔻🔻 **Lo que NO garantiza — y la primera versión de esta doc lo prometía de más, hasta que una
+    prueba lo desmintió:** *«nunca nombra un lote que ya no tiene nada»* **es FALSO cuando además ha
+    entrado tela SIN lote.** El desajuste `Σ saldos − existencia` mezcla **dos causas de signo
+    contrario que la Σ no puede separar**: el consumo no nombrado (el lote reclama de MÁS) y la
+    entrada sin lote (reclama de MENOS). Se cancelan entre sí. Medido: 500 de `L-FANTASMA`
+    consumidos por una salida a orden + 200 entrados sin lote ⇒ el tope sólo ve 300 de desajuste y
+    le deja al fantasma 200 kg que no son suyos. **El caso del reviewer sí queda curado** (ahí no hay
+    tela sin lote y el déficit coincide exactamente con lo del fantasma).
+  - 🔻 **Y tampoco cura la raíz:** con varios lotes vivos y consumo parcial, el nombre puede ser el
+    del lote de al lado. Todo esto es P3, y está pendiente de que **Daniel lo vea** antes de
+    ratificar P2/P3 (`DECISIONES.md §Post-F9.206`, recuadro final).
+  - ⚠️ **El mismo tope NO se aplica al aviso de tono**, a propósito: ahí sobrar-listar es inofensivo
+    (alguien mira el anaquel de más) y esconder sería callar un aviso real. En el papel del traspaso
+    es al revés: sobre-nombrar **es** la mentira. Misma cifra, dos usos, dos criterios.
 - **Vistas**: `existencia_tela_color` (Σ de AMBOS componentes con signo por tela×color×almacén,
   solo filas con `id_tela_color IS NOT NULL`); la vieja `existencia_tela` fue REEMPLAZADA con el
   filtro espejo `id_tela_color IS NULL` para que el flujo nuevo **no contamine** el legado (misma
@@ -39,9 +115,15 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **Dominio** `backend/src/dominio/inventarios/partidas-telas.ts`: `ajustarInventarioTelaColor`
   (puerta del **arranque desde cero** — conteo físico; la entrada crea las partidas en la misma tx,
   folio de partida SIEMPRE antes del de movimiento), `registrarSalidaTelaColorAOrden`,
-  `traspasarTelaColor`, `cancelarMovimientoTelaColor` (inverso auditado que copia las 3 dimensiones
-  nuevas), `consultarExistenciasTelaColor` (agrupado TELA PADRE→colores→almacenes),
-  `kardexTelaColor` (saldo corrido doble, filtro por partida), `listarPartidasTela`.
+  `traspasarTelaColor` (⭐ reparte el lote FIFO, fila 0.142), `cancelarMovimientoTelaColor` (inverso
+  auditado que copia las 3 dimensiones nuevas), `consultarExistenciasTelaColor` (agrupado TELA
+  PADRE→colores→almacenes), `kardexTelaColor` (saldo corrido doble, filtro por partida),
+  `listarPartidasTela`, y **`saldosPorPartidaTela`** — la Σ neta por lote en un almacén (entradas −
+  salidas que lo nombran), **un solo sitio** para los dos consumidores que la necesitan: el reparto
+  del traspaso y el aviso de riesgo de tono. **No filtra las canceladas a propósito**: el inverso
+  copia `idPartida`, así que el par se neutraliza solo; filtrarlas restaría dos veces.
+  ⚠️ **Cancelar UNA sola pata del traspaso está prohibido** por el motor: la marcha atrás es un
+  **traspaso inverso**, que vuelve a repartir FIFO contra el saldo del que ahora es el origen.
   Permisos REUSADOS `inventario-telas.ver/.mover` (cero seed).
 - **Pantallas**: Existencias de telas (padre desplegable → colores con columnas cuerpo/complemento,
   pantone, unidad; **doble clic o botón** en el color → cajón con su kardex, cancelar-inverso y
@@ -53,9 +135,12 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
 - **El inventario arranca DESDE CERO** (conteo físico, decisión §Post-F9.11 punto 5): no se migran
   existencias del `Lote` legado ni del sistema viejo. Los consumos históricos 2025-2026 entrarán
   como datos de orden SIN tocar existencias (etapa posterior del track).
-- **La entrada por factura LIGADA a su orden de compra (§Post-F9.14, 7-ago-2026):**
-  `EntradaTelaLinea.idOrdenCompraLinea` (nullable, **por renglón**: una factura puede surtir dos OCs
-  y traer tela suelta). Al CONFIRMAR, `confirmarEntradaTela` llama a
+- **La entrada por factura LIGADA a su orden de compra (§Post-F9.14, 7-ago-2026; OBLIGATORIA desde
+  §Post-F9.159(a), 30-ago-2026):** `EntradaTelaLinea.idOrdenCompraLinea` (**por renglón**: una
+  factura puede surtir dos OCs en el mismo documento). Aquí decía *"y traer tela suelta"*: esa vía
+  **se cerró** —Daniel: *«sin OC no podemos recibir tela»*— y el dominio la rechaza en su embudo
+  (`exigirRenglonesConOrdenDeCompra`). La columna sigue `nullable` **sólo** por los documentos
+  anteriores a la decisión, que se siguen leyendo (D3 + REGLA 0-B). Al CONFIRMAR, `confirmarEntradaTela` llama a
   `registrarRecepcionesDesdeEntradaTela` (`dominio/compras/recepciones.ts`) y escribe una
   `RecepcionCompra` por OC surtida —con `id_entrada_tela` como traza— reusando la partida y el
   movimiento ya creados: la tela entra UNA vez al kardex y suma UNA vez a lo recibido. La OC pasa
@@ -94,9 +179,11 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   movimientos bajo `pg_advisory_xact_lock`, NUNCA la vista** (D3). Existe `existenciaAvioTotalEmpresa`
   (Σ pura de lectura, sin lock/guard) para la PLANEACIÓN del MRP — distinto de la existencia bajo
   lock que valida salidas.
-- `backend/src/comun/conversion.ts` — motor presentación→unidad de consumo (R1): cantidad ×factor,
-  precio ÷factor, con invariante de valuación. Factor en
-  `AvioProveedor.factorConversion`→`Avio.factorConversion`→1:1. Las **telas se manejan 1:1** (el
+- ⚰️ **`backend/src/comun/conversion.ts` YA NO EXISTE** (borrado en V1-E8a, §Post-F9.97). Era el motor
+  presentación→unidad de consumo: cantidad ×factor, precio ÷factor. **La regla de hoy: todo va en
+  unidad de CONSUMO —metro, pieza, kilo— de punta a punta**, así que no hay nada que convertir. La
+  presentación (rollo, caja) es texto informativo, no una unidad del sistema. Las **telas se manejan
+  1:1** (el
   factor vive en avíos).
 - **Vistas** `existencia_tela` / `existencia_avio` (Σ por tela×lote×almacén / avío×almacén) — solo
   para CONSULTA; nunca tablas editables.
@@ -112,6 +199,59 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   edita/borra), `consultarExistencias` / `kardex`.
 - `migracion.ts` (F4-E6) — helpers modo migración: `crearMovimientoTelaMigrado`,
   `crearTraspasoTelaMigrado`, `asegurarLoteLegacyTela` (vía el motor de kardex; A1/A2/A3/A7).
+- `cancelacion-comun.ts` (fila 0.099) — ⚠️ **lo que NO se cancela desde aquí**: un movimiento nacido
+  del **ajuste de un inventario cíclico** (`origenTipo = ajuste-ciclico`). La hoja de conteo quedó
+  `cerrado` y `cancelarInventarioCiclico` rechaza justo ese estado, así que revertir el movimiento
+  dejaría al kardex contando una historia distinta de la que cuenta la hoja. El rechazo vive una
+  sola vez y lo aplican **las tres** puertas (`telas.ts`, `partidas-telas.ts`, `avios.ts`) — la misma
+  puerta trasera que cerró la 0.104. Si el conteo estuvo mal, se corrige con un **movimiento manual
+  NUEVO** (compatible con D3). El cíclico se documenta en `docs/modulos/indicadores.md`.
+
+## ⭐ La salida que NO es por OP — devolución y venta (fila 0.104, 5-sep-2026)
+
+**Daniel** (2-sep): *«el 99 % sale por medio de una OP pero deberíamos tener la opción de sacar
+alguna venta o cualquier otra cosa»*; y al cerrarlo (§Post-F9.193 resp. 12): *«sacar por ejemplo una
+**devolución**, o una **venta de avíos que ya no se usen**… que no sea mediante la descarga o
+aplicación a una OP. Esto **autorizado siempre por mí**. Lo mismo en telas»*.
+
+Hasta esta fila, de telas y avíos sólo se podía sacar material **por orden**, **por nota** o con un
+**ajuste** de conteo. Ahora hay una cuarta puerta, y **sólo ajusta inventario**: no genera nota de
+crédito, no toca CxP ni la facturación (*«por ahora que toque sólo inventarios»*). A qué proveedor se
+le devolvió o a quién se le vendió viaja en el **motivo obligatorio**, no en una FK.
+
+- **Dominio:** `salida-sin-orden.ts` (las DECISIONES: permiso y concepto→tipo de movimiento) +
+  `registrarSalidaTelaColorSinOrden` en `partidas-telas.ts` y `registrarSalidaAvioSinOrden` en
+  `avios.ts` (la orquestación, que reusa el MISMO no-negativo bajo lock de las demás salidas — D3).
+- **Permiso PROPIO `salida-material.registrar`** (módulo propio `salida-material`), en
+  `SOLO_ADMINISTRADOR`: lo llevan sólo `Administrador` y `AdministracionDireccion`. NO se reusó
+  `inventario-telas.mover`/`inventario-avios.mover`, que hoy bajan hasta `Secretarial`. **El mismo
+  permiso gobierna la CANCELACIÓN** de estas salidas (el inverso devuelve el material al inventario,
+  o sea deshace la decisión) **por las TRES puertas que pueden alcanzarlas**: la del flujo por color
+  (`partidas-telas.ts`), la de avíos (`avios.ts`) y la LEGADA por lote (`telas.ts`), que acepta
+  cualquier movimiento con renglones de tela — incluidos los del flujo por color. Las demás
+  cancelaciones siguen con su `.mover` de siempre.
+- **El concepto elige un tipo de movimiento DEDICADO** (mismo criterio que `ajuste-ciclico-*` de
+  F7-E5: que el kardex sepa distinguir): `devolucion-proveedor` → *Devolución a Proveedor*,
+  `venta` → *Venta de Material* (los dos NUEVOS, entran por **seed**), `otro` → *Otras Salidas* (uno
+  de los 19 canónicos del sistema viejo; no estrena tipo para un caso que nadie ha nombrado).
+- **Traza:** `origenTipo = salida-sin-orden`, sin `origenId` (no hay entidad detrás). Es lo que
+  permite exigir la llave del dueño al cancelar.
+- **API:** `POST /inventarios/telas/color/salidas-sin-orden` y `POST /inventarios/avios/salidas-sin-orden`.
+- **Pantalla:** «Salida de material sin orden» (`/inventarios/salida-sin-orden`), con las dos
+  dimensiones en pestañas. Cuelga del grupo Inventarios, **no** de «Telas» ni de «Avíos»: sirve a las
+  dos, y la decisión de Daniel fue una sola.
+- **En producto terminado NO se construyó la salida** —la pantalla de movimientos de PT ya ofrece
+  `venta-mostrador` y `otras-salidas` desde el sistema viejo, y su gemela con precio y cliente es la
+  fila **0.130**—, **pero esa pantalla SÍ cambió**: los dos rótulos nuevos son de catálogo GLOBAL y
+  se colaron a su desplegable, ofreciéndole a cualquiera con `inventario-pt.mover` el rótulo que
+  Daniel se reservó. Ahora **están reservados**: el dominio los rechaza en los **CUATRO** escritores
+  genéricos (ajuste de tela por color, ajuste LEGADO de tela por lote, ajuste de avíos y movimiento
+  manual de PT) y el API los marca con `capturaManual: false` para que ninguna pantalla los ofrezca. Sólo los escriben las dos
+  funciones de esta fila, que los resuelven por código.
+  🔑 **Por qué era obligatorio:** un tipo dedicado es, implícitamente, una afirmación sobre QUIÉN lo
+  escribió. Si cualquiera puede estampar «Venta de Material», el rótulo no clasifica mejor —
+  clasifica igual de mal y con más confianza, porque quien lea el kardex creerá que esa salida la
+  autorizó el dueño.
 
 ## Lotes (D5)
 

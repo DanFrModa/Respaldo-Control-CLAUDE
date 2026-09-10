@@ -39,6 +39,8 @@
  * MISMO `Archivo` — el objeto de R2 no se puede duplicar desde una migración SQL y `archivos.key`
  * es único. Lo mismo hace «copiar arte de otro modelo». Por eso, al quitar una foto, el `Archivo`
  * solo se borra cuando NINGUNA otra foto de arte lo referencia (`borrarArchivoSiQuedoHuerfano`).
+ * Cuando SÍ se borra, su objeto de R2 se borra también —tras el commit y best-effort (0.081a)—; si
+ * lo comparte otro arte, el objeto NO se toca (borrarlo dejaría a ese arte apuntando a la nada).
  */
 import {
   esquemaArteCopiarCuerpo,
@@ -50,7 +52,11 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
+import {
+  eliminarObjetosBestEffort,
+  servicioArchivos,
+  type ServicioArchivos,
+} from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
@@ -65,6 +71,8 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
+import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Carpeta R2 de las fotos del arte (la key real se ordena por id, no por nombre, A5). */
 const CARPETA_FOTOS = 'modelo-arte';
@@ -236,8 +244,11 @@ function aDetalle(f: FilaArte): ModeloArteDetalle {
  * ficha del modelo (`leerBom`), el impreso de la orden y los listados.
  */
 export async function leerArtesModelo(tx: Tx, idModelo: number): Promise<ModeloArteDetalle[]> {
+  // ⭐ V1-E9b — LA RECETA COMPARTIDA: el arte de un modelo de producción derivado es el de su
+  // modelo de DESARROLLO (tercera lectura canónica, misma razón que en `leerTelasBom`).
+  const idReceta = await resolverIdRecetaDeModelo(tx, idModelo);
   const filas = await tx.modeloArte.findMany({
-    where: { idModelo },
+    where: { idModelo: idReceta },
     select: SELECT_ARTE,
     orderBy: [...ORDEN_ARTES],
   });
@@ -292,11 +303,6 @@ async function exigirTipoArteValido(tx: Tx, idTipoArte: number): Promise<void> {
   if (!tipo.esArte) {
     throw new ErrorValidacion(`El proceso "${tipo.nombre}" no está marcado como tipo de arte.`);
   }
-}
-
-/** Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su arte. */
-async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
 }
 
 /** Siguiente posición libre del arte de un modelo (los nuevos entran AL FINAL). */
@@ -378,6 +384,10 @@ export async function crearArte(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — el arte de un HIJO del linaje 1:N es el de su desarrollo: agregarle uno
+    // aquí crearía un renglón que su propia ficha NO enseña (ella lee la del padre) y que ninguna
+    // pantalla podría volver a encontrar. Se edita en el modelo de desarrollo.
+    await exigirRecetaPropia(tx, idModelo);
     await exigirTipoArteValido(tx, datos.idTipoArte);
     if (datos.idProveedor !== undefined) {
       await exigirProveedorValido(tx, datos.idProveedor);
@@ -400,7 +410,7 @@ export async function crearArte(
       select: SELECT_ARTE,
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
     // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
     await registrarBitacora(tx, sesion, {
@@ -445,6 +455,10 @@ export async function actualizarArte(
   const datos = validarEntrada(esquemaArteEditar, entrada);
 
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — ANTES de `exigirArte`, y el orden es el mensaje: sobre un hijo el arte no
+    // le pertenece (vive en el padre) y la respuesta era un 404 sobre un renglón que la ficha ACABA
+    // de listar. Primero se dice de quién es la receta.
+    await exigirRecetaPropia(tx, idModelo);
     const actual = await exigirArte(tx, idModelo, datos.id);
 
     const cambios: Prisma.ModeloArteUpdateInput = { ...datosModificacion(sesion) };
@@ -495,7 +509,7 @@ export async function actualizarArte(
       data: cambios,
       select: SELECT_ARTE,
     });
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: arte.id,
@@ -512,28 +526,41 @@ export async function actualizarArte(
  * se quita como se quita una tela o un avío (el borrado suave del catálogo viejo ya no aplica).
  * Queda constancia en la bitácora con TODO lo que decía el renglón (D3: nada se borra en
  * silencio). Sus FOTOS se van con él (Cascade) y sus `Archivo` se borran con el mismo cuidado que
- * en `quitarFotoArte`: solo si ningún otro arte los comparte. La traza del precosto se pone en
- * NULL sola (SetNull): el precio usado ya vive en `PrecostoLinea.precioUnit`.
+ * en `quitarFotoArte`: solo si ningún otro arte los comparte. Los OBJETOS de R2 de los que sí se
+ * borraron se eliminan TRAS el commit, en modo BEST-EFFORT (0.081a). La traza del precosto se pone
+ * en NULL sola (SetNull): el precio usado ya vive en `PrecostoLinea.precioUnit`.
+ *
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR (sin pasar un `bd.tx` ya abierto): el borrado físico corre
+ * DESPUÉS del commit — ver {@link eliminarObjetosBestEffort}.
  */
 export async function eliminarArte(
   sesion: SesionUsuario,
   idModelo: number,
   idArte: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // Las keys de R2 de los `Archivo` que la tx REALMENTE borró (los compartidos no vienen).
+  const keysR2 = await enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — antes del 404 de `exigirArte`, misma razón que en `actualizarArte`.
+    await exigirRecetaPropia(tx, idModelo);
     const actual = await exigirArte(tx, idModelo, idArte);
 
     // Los renglones de foto se van por Cascade; los `Archivo` hay que evaluarlos DESPUÉS (si
     // quedan sin dueño). Se guardan antes de borrar porque el borrado se los lleva.
-    const archivos = actual.fotos.map((f) => f.idArchivo);
+    const idsArchivo = actual.fotos.map((f) => f.idArchivo);
     await tx.modeloArte.delete({ where: { id: idArte } });
-    for (const idArchivo of new Set(archivos)) {
-      await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+    const keys: string[] = [];
+    for (const idArchivo of new Set(idsArchivo)) {
+      const key = await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
+      if (key !== null) {
+        keys.push(key);
+      }
     }
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // No hay acción `ELIMINAR` en el enum de bitácora (A7) y el arte no tiene borrado suave: se
     // registra como MODIFICAR con `operacion: 'quitar'` y TODO lo que decía el renglón
     // ({@link datosArteParaBitacora} — descripción, posición, orden y las FOTOS incluidas), para
@@ -544,7 +571,15 @@ export async function eliminarArte(
       accion: 'MODIFICAR',
       datos: { operacion: 'quitar', idModelo, ...datosArteParaBitacora(actual) },
     });
+
+    return keys;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keysR2,
+    `las fotos del arte ${String(idArte)} del modelo ${String(idModelo)}`,
+  );
 }
 
 /**
@@ -574,6 +609,9 @@ export async function marcarArtePrincipal(
     // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_ARTE}::int, ${idModelo}::int)`;
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — un hijo no tiene arte propio: el reordenamiento no le toca. Sin esto la
+    // respuesta era un 404 «Arte del modelo» porque su lista sale vacía.
+    await exigirRecetaPropia(tx, idModelo);
 
     // MISMO orden que la lectura: de ahí sale el orden relativo que se conserva.
     const actuales = await tx.modeloArte.findMany({
@@ -596,7 +634,7 @@ export async function marcarArtePrincipal(
           data: { orden: cambio.orden, ...datosModificacion(sesion) },
         });
       }
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -630,6 +668,9 @@ export async function copiarArteDeOtroModelo(
 
   return enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
+    // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (misma razón que en
+    // `crearArte`: el renglón caería en un modelo cuya ficha enseña la receta de otro).
+    await exigirRecetaPropia(tx, idModelo);
     const origen = await tx.modeloArte.findUnique({
       where: { id: datos.idArteOrigen },
       select: SELECT_ARTE,
@@ -637,7 +678,13 @@ export async function copiarArteDeOtroModelo(
     if (origen === null) {
       throw new ErrorNoEncontrado('Arte del modelo', datos.idArteOrigen);
     }
-    if (origen.idModelo === idModelo) {
+    // ⭐ V1-E9b pieza B — el GEMELO MENOR de la guarda origen≠destino de `copiarBom`, y aquí queda
+    // cerrado: la comparación es contra el modelo de la RECETA del destino, no contra el destino
+    // literal. Copiarse un arte de su PROPIO padre dejaría un renglón duplicado e invisible (la
+    // ficha lee la del padre y la copia viviría en el hijo). Se resuelve el destino en vez de
+    // apoyarse en `exigirRecetaPropia` de arriba: así la guarda dice la verdad por sí sola, aunque
+    // algún día se mueva la otra.
+    if (origen.idModelo === (await resolverIdRecetaDeModelo(tx, idModelo))) {
       throw new ErrorValidacion('Ese arte ya es de este modelo: elige el arte de otro modelo.');
     }
 
@@ -663,7 +710,7 @@ export async function copiarArteDeOtroModelo(
       select: SELECT_ARTE,
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
     // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
     await registrarBitacora(tx, sesion, {
@@ -786,8 +833,17 @@ export interface FotoArteConUrl {
 /**
  * Borra el registro `Archivo` SOLO si ya nadie lo usa. Es la contrapartida de que varios artes
  * puedan COMPARTIR foto (migración de los artes duplicados + «copiar arte de otro modelo»):
- * borrarlo a ciegas dejaría a los demás artes sin su imagen. El objeto en R2 se queda (deuda ya
- * documentada en `comun/archivos.ts`: no hay DeleteObject).
+ * borrarlo a ciegas dejaría a los demás artes sin su imagen.
+ *
+ * ⭐ **Devuelve la key de R2 del archivo que borró, o `null` si no borró nada** (porque otro arte
+ * sigue usándolo, o porque otro camino ya lo había borrado). No borra el objeto de R2 aquí: corre
+ * DENTRO de la transacción, y el `DeleteObject` tiene que ir DESPUÉS del commit (si no, un rollback
+ * dejaría el objeto borrado con su fila viva). Cada llamador junta las keys que le devuelve y las
+ * pasa a {@link eliminarObjetosBestEffort} una vez cerrada la transacción — 0.081a.
+ *
+ * 🔴 El `null` NO es decorativo: es lo que impide borrar de R2 la foto que OTRO arte sigue
+ * enseñando. Devolver la key incondicionalmente sería exactamente la carrera nº 1 de abajo, pero
+ * consumada en el bucket y sin vuelta atrás.
  *
  * Se EXPORTA porque el arte se borra desde DOS caminos: {@link eliminarArte} y «copiar receta con
  * reemplazo» (`bom-modelo.ts`), que barre el arte del destino y debe cuidar sus fotos igual.
@@ -812,17 +868,25 @@ export interface FotoArteConUrl {
  * no devuelve fila, el `Archivo` ya lo borró otro camino y aquí no hay nada que hacer (evita un
  * P2025 → 500 por borrar dos veces).
  */
-export async function borrarArchivoSiQuedoHuerfano(tx: Tx, idArchivo: string): Promise<void> {
+export async function borrarArchivoSiQuedoHuerfano(
+  tx: Tx,
+  idArchivo: string,
+): Promise<string | null> {
+  // La `key` viaja con el candado: es el único momento en que la fila está garantizada viva y
+  // bloqueada, y sin ella el llamador no sabría qué objeto de R2 borrar tras el commit.
   const bloqueado = await tx.$queryRaw<
-    { id: string }[]
-  >`SELECT "id" FROM "archivos" WHERE "id" = ${idArchivo} FOR UPDATE`;
-  if (bloqueado.length === 0) {
-    return; // ya no existe: otro camino lo borró y su fila está commiteada
+    { id: string; key: string }[]
+  >`SELECT "id", "key" FROM "archivos" WHERE "id" = ${idArchivo} FOR UPDATE`;
+  const fila = bloqueado[0];
+  if (fila === undefined) {
+    return null; // ya no existe: otro camino lo borró y su fila está commiteada
   }
   const enUso = await tx.modeloArteFoto.count({ where: { idArchivo } });
-  if (enUso === 0) {
-    await tx.archivo.delete({ where: { id: idArchivo } });
+  if (enUso > 0) {
+    return null; // otro arte lo sigue enseñando: NI la fila NI el objeto se tocan
   }
+  await tx.archivo.delete({ where: { id: idArchivo } });
+  return fila.key;
 }
 
 /**
@@ -855,6 +919,11 @@ export async function solicitarSubidaFotoArte(
   const datos = validarEntrada(esquemaArteFotoCrear, entrada);
 
   return enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — LA ASIMETRÍA QUE DEJÓ LA PIEZA A, cerrada: `listarFotosArte` resuelve (la
+    // ficha del hijo LISTA las fotos heredadas), así que sin esto sus botones daban 404 sobre un
+    // renglón recién pintado. La foto ES el arte que el bordador va a hacer: se sube en el modelo
+    // de desarrollo, donde el arte vive.
+    await exigirRecetaPropia(tx, idModelo);
     await exigirArte(tx, idModelo, idArte);
 
     const ultima = await tx.modeloArteFoto.aggregate({
@@ -878,7 +947,7 @@ export async function solicitarSubidaFotoArte(
       },
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
@@ -909,8 +978,12 @@ export async function listarFotosArte(
 ): Promise<FotoArteConUrl[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
+  // ⭐ V1-E9b — el arte que la ficha del hijo enseña es el del PADRE, así que la pertenencia (A9
+  // del sub-recurso) se comprueba contra el modelo de la RECETA. Sin esto, abrir las fotos de un
+  // arte heredado daría 404 sobre un renglón que la pantalla acaba de listar.
+  const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
   const arte = await cliente.modeloArte.findFirst({
-    where: { id: idArte, idModelo },
+    where: { id: idArte, idModelo: idReceta },
     select: {
       id: true,
       fotos: {
@@ -953,6 +1026,10 @@ export async function listarFotosArte(
  * `Archivo` **si ninguna otra foto de arte lo comparte**. Requiere `modelos.administrar`. Si la
  * foto no pertenece a ese arte (o el arte no es de ese modelo) → `ErrorNoEncontrado`.
  *
+ * Si el `Archivo` se llegó a borrar (nadie más lo comparte), su OBJETO de R2 se borra TRAS el
+ * commit en modo BEST-EFFORT (0.081a). Si OTRO arte sigue usando la foto, el objeto NO se toca.
+ * ⚠️ Llamar SIEMPRE a NIVEL SUPERIOR — ver {@link eliminarObjetosBestEffort}.
+ *
  * El `idFoto` identifica exactamente la foto a quitar, así que ya no hace falta el acotamiento por
  * `idArchivo` que necesitaba la foto única (V1-E3d): la LIMPIEZA del flujo presigned del frontend
  * borra por el `idFoto` que su propia subida creó y nunca puede tocar la de otro usuario.
@@ -963,9 +1040,15 @@ export async function quitarFotoArte(
   idArte: number,
   idFoto: number,
   bd?: ContextoBd,
+  archivos?: ServicioArchivos,
 ): Promise<void> {
   verificarPermiso(sesion, 'modelos.administrar');
-  return enTransaccion(async (tx) => {
+
+  // `null` si la foto la COMPARTE otro arte: entonces el objeto de R2 NO se toca.
+  const keyR2 = await enTransaccion(async (tx) => {
+    // ⭐ V1-E9b pieza B — la otra mitad de la asimetría de `solicitarSubidaFotoArte`: el botón
+    // «quitar» de una foto HEREDADA daba 404. Ahora dice de quién es la receta.
+    await exigirRecetaPropia(tx, idModelo);
     // Un solo `findFirst` amarra las tres pertenencias (modelo → arte → foto): A9 del sub-recurso.
     const foto = await tx.modeloArteFoto.findFirst({
       where: { id: idFoto, idModeloArte: idArte, arte: { idModelo } },
@@ -976,14 +1059,22 @@ export async function quitarFotoArte(
     }
 
     await tx.modeloArteFoto.delete({ where: { id: foto.id } });
-    await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
+    const key = await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
       accion: 'MODIFICAR',
       datos: { idModelo, foto: 'quitar', idFoto, archivo: foto.idArchivo },
     });
+
+    return key;
   }, bd);
+
+  await eliminarObjetosBestEffort(
+    archivos,
+    keyR2 === null ? [] : [keyR2],
+    `la foto ${String(idFoto)} del arte ${String(idArte)}`,
+  );
 }

@@ -13,11 +13,13 @@ import type {
   CorteCrear,
   CorteSemanal,
   CorteSemanalQuery,
+  EmpaqueCrear,
   EnvioCrear,
   Etapa,
   EtapaCancelar,
   EtapasOrden,
   PendientesOrden,
+  SugerenciaCaptura,
 } from './tipos';
 
 /**
@@ -34,6 +36,14 @@ export const CLAVE_ETAPAS = ['produccion-etapas'] as const;
 
 async function crearCorte(cuerpo: CorteCrear): Promise<Etapa> {
   const { data, error } = await api.POST('/api/produccion/cortes', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function crearEmpaque(cuerpo: EmpaqueCrear): Promise<Etapa> {
+  const { data, error } = await api.POST('/api/produccion/empaques', { body: cuerpo });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -59,6 +69,17 @@ async function cancelarCorte(id: number, cuerpo: EtapaCancelar): Promise<Etapa> 
   return data;
 }
 
+async function cancelarEmpaque(id: number, cuerpo: EtapaCancelar): Promise<Etapa> {
+  const { data, error } = await api.POST('/api/produccion/empaques/{id}/cancelar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 async function cancelarEnvio(id: number, cuerpo: EtapaCancelar): Promise<Etapa> {
   const { data, error } = await api.POST('/api/produccion/envios/{id}/cancelar', {
     params: { path: { id } },
@@ -73,6 +94,27 @@ async function cancelarEnvio(id: number, cuerpo: EtapaCancelar): Promise<Etapa> 
 async function listarPendientes(idOrden: number): Promise<PendientesOrden> {
   const { data, error } = await api.GET('/api/produccion/ordenes/{id}/pendientes', {
     params: { path: { id: idOrden } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Qué precargar en la captura (V1-E8i). `idTipoProceso` = base ENVÍO a ese proceso; sin él, base
+ * CORTE. El CÁLCULO es del servidor (A1): aquí no se resta nada — «cuánto se puede enviar todavía»
+ * es la regla (g) y vive en el dominio.
+ */
+async function obtenerSugerenciaCaptura(
+  idOrden: number,
+  idTipoProceso: number | undefined,
+): Promise<SugerenciaCaptura> {
+  const { data, error } = await api.GET('/api/produccion/ordenes/{id}/sugerencia-captura', {
+    params: {
+      path: { id: idOrden },
+      query: idTipoProceso === undefined ? {} : { idTipoProceso },
+    },
   });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -117,6 +159,27 @@ export function usePendientesOrden(
 }
 
 /**
+ * Qué precargar en la captura de una etapa (V1-E8i): lo que falta por cortar, o lo cortado que
+ * falta por enviar a un proceso. `habilitado` corta la query (p. ej. en el recibo, que no precarga).
+ */
+export function useSugerenciaCaptura(
+  idOrden: number | undefined,
+  idTipoProceso: number | undefined,
+  habilitado = true,
+): UseQueryResult<SugerenciaCaptura, ErrorDeApi> {
+  return useQuery({
+    // ⚠️ H9 — la BASE va en la clave (`'corte'`, no `null`). Con `?? null`, la sugerencia del CORTE y
+    // la del «envío sin proceso elegido» compartían entrada de caché, y una query deshabilitada
+    // SIGUE sirviendo el `data` guardado: el botón del envío se encendía con la cifra del corte. El
+    // candado de verdad es el gate de la pantalla (`consultaSugerencia` en `AvanceProduccion`); esto
+    // es la red de abajo, para que las dos preguntas no compartan entrada NUNCA.
+    queryKey: [...CLAVE_ETAPAS, 'sugerencia-captura', idOrden, idTipoProceso ?? 'corte'],
+    queryFn: () => obtenerSugerenciaCaptura(idOrden as number, idTipoProceso),
+    enabled: habilitado && idOrden !== undefined,
+  });
+}
+
+/**
  * Historial de etapas (cortes/envíos, vivos y cancelados) de una orden. `habilitado` corta la
  * query; `incluirRecibos` suma los recibos de maquila (Avance de producción, R2).
  */
@@ -153,6 +216,18 @@ export function useCrearCorte(): UseMutationResult<Etapa, ErrorDeApi, CorteCrear
   });
 }
 
+/**
+ * Registra un EMPAQUE (0.114) e invalida los pendientes. El empaque es un servicio sobre la orden
+ * —no toca inventario y su cantidad es propia—, pero para la caché es una etapa más de la orden.
+ */
+export function useCrearEmpaque(): UseMutationResult<Etapa, ErrorDeApi, EmpaqueCrear> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: crearEmpaque,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
+  });
+}
+
 /** Registra un envío a maquila e invalida los pendientes. */
 export function useCrearEnvio(): UseMutationResult<Etapa, ErrorDeApi, EnvioCrear> {
   const queryClient = useQueryClient();
@@ -173,6 +248,15 @@ export function useCancelarCorte(): UseMutationResult<Etapa, ErrorDeApi, ArgsCan
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarEtapa) => cancelarCorte(id, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
+  });
+}
+
+/** Cancela (suave) un empaque e invalida los pendientes (0.114). */
+export function useCancelarEmpaque(): UseMutationResult<Etapa, ErrorDeApi, ArgsCancelarEtapa> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCancelarEtapa) => cancelarEmpaque(id, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS }),
   });
 }

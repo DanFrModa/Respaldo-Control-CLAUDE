@@ -25,25 +25,42 @@ corazón es la **matriz color × talla** (renglones de color, cada uno con canti
   modelo/cliente/empresa derivan del renglón→pedido. **ESTADO AUTOMÁTICO** (no editable): lo decide
   `requisitos-orden.ts` (ver abajo); `cancelada` por `cancelarOrden`. El **mapeo de las 34 columnas
   v1→v2** vive en el TSDoc de este archivo (contrato del ETL).
-- `requisitos-orden.ts` (26-jul-2026) — **la regla del estado `completa`, ÚNICA fuente**. Función
-  PURA `requisitosOrden({renglonesMatriz, aviosProduccion, artesModelo, llevaArte})` → `{tallas,
-  avios, arte, completa, faltantes}` con la regla que eligió Daniel: **tallas + avíos, y arte si aplica**
-  (matriz con ≥1 renglón · el modelo tiene ≥1 `ModeloAvio paraProduccion` · el arte según la bandera
-  **`Modelo.llevaArte`**, default `true`, `DECISIONES.md §Post-F9.4`): `llevaArte=false` →
-  `'no-aplica'`; `llevaArte=true` con arte en el BOM → `true`; `llevaArte=true` SIN arte → **`false`
-  = falta** (la orden no se completa). `cambiosEstadoPorRequisitos` traduce la
+- `requisitos-orden.ts` (26-jul-2026; segundo requisito re-fundado en V1-E3d, §Post-F9.43) — **la
+  regla del estado `completa`, ÚNICA fuente**. Función PURA
+  `requisitosOrden({renglonesMatriz, recetaLiberada, artesOrden, llevaArte})` → `{tallas, receta,
+  arte, completa, faltantes}` con la regla vigente: **tallas + receta liberada, y arte si aplica**
+  (matriz con ≥1 renglón · **la receta congelada de ESA orden está liberada POR COMPLETO**
+  —`Orden.recetaLiberadaEn`, derivado de "no queda ningún renglón vivo sin firmar"— · el arte según
+  la bandera **`Modelo.llevaArte`**, default `true`, `DECISIONES.md §Post-F9.4`): `llevaArte=false` →
+  `'no-aplica'`; `llevaArte=true` con arte **en la receta de la ORDEN** → `true`; `llevaArte=true`
+  SIN arte → **`false` = falta** (la orden no se completa).
+  ⚠️ El segundo requisito **ya NO mira el modelo**: era *"¿el MODELO tiene avíos `paraProduccion`?"*,
+  que daba la misma respuesta para dos órdenes distintas del mismo modelo. Consecuencia buscada:
+  **editar el BOM de un modelo ya no alcanza hacia atrás a sus órdenes**.
+  ⚠️ Y **ninguna orden CAPTURADA A MANO nace `completa`**: `copiarRecetaDelModelo` no escribe
+  `liberadoEn` (la deja en NULL), así que `Orden.recetaLiberadaEn` nunca se pone en el alta y el
+  requisito `receta` sale siempre en falso. La **excepción es el ETL**: `crearOrdenMigrada` escribe
+  el `estado` explícito de Access —que puede ser `completa`— y libera la receta migrada **sólo si la
+  orden no está cancelada y su receta no quedó vacía**. Como **2 de cada 3 modelos del viejo no
+  tienen BOM**, muchas órdenes históricas nacen `completa` **SIN cumplir la regla** — **por eso
+  `realinear-estado-ordenes.ts` es paso obligatorio al cerrar la carga** (ver «Histórico»).
+  `cambiosEstadoPorRequisitos` traduce la
   regla al par (`estado`, `fechaCompletada`): `fechaCompletada` **se sella una vez y nunca se borra**
   (paridad `Ordenes.FechaDet`, es un sello histórico del que el estado NO se deriva) y **`cancelada`
   siempre gana**. `recalcularEstadoOrden` / `recalcularEstadoOrdenesDeModelo` la aplican **dentro de
   la transacción del llamador** (A2).
-  - **COMPLETAR** se permite desde cualquier disparo: alta (`crearOrden`), guardar/copiar matriz y
-    cambios del BOM del modelo.
+  - **COMPLETAR** ocurre al guardar/copiar la **matriz de la orden**, al **liberar su receta**
+    (`receta-orden.ts`) y al desmarcar **"lleva arte"** en el modelo. El **alta** (`crearOrden`)
+    recalcula pero nunca puede completar (la receta recién copiada no está firmada), y los **cambios
+    del BOM del modelo ya no disparan nada**.
   - **DES-COMPLETAR es la excepción** (acotado tras revisión, 26-jul-2026): solo al editar la
     **matriz de ESA orden** y solo si la orden **no tiene actividad de producción viva** (≥1
     `EtapaMovimiento` sin cancelar). Motivo: el estado no puede sacar de los tableros a una orden en
     curso ni degradar el histórico por una edición de catálogo.
-  - **Los cambios de CATÁLOGO del modelo SOLO COMPLETAN** (`reemplazarAviosBom` /
-    `reemplazarBordadosBom` / `copiarBom` y desmarcar `llevaArte` en `actualizarModelo`). Si tras el cambio ni una orden con matriz podría completarse, sale sin tocar la
+  - **El ÚNICO cambio de catálogo que todavía toca órdenes es la casilla `llevaArte`**
+    (`actualizarModelo` → `recalcularEstadoOrdenesDeModelo(..., 'lleva-arte')`, su único llamador
+    real), y **SOLO COMPLETA**. Editar el BOM (`reemplazarAviosBom` / `reemplazarBordadosBom` /
+    `copiarBom`) **ya no recalcula ninguna orden** desde V1-E3d. Si tras el cambio ni una orden con matriz podría completarse, sale sin tocar la
     base; si sí, actualiza **solo las `capturada` de ese modelo que ya tienen matriz**
     (`lineas: { some: {} }`, sin traer ids a memoria salvo para la bitácora), en **lotes de 500** y
     con **bitácora POR ORDEN** (A7, `registrarBitacoraLote`).

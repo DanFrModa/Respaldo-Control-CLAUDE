@@ -67,14 +67,37 @@ Se adopta **pg-boss 12** como motor de jobs en segundo plano, sobre el **mismo P
 introduce otro broker; `docker compose up` y Railway no necesitan infra extra. Es una instancia
 **separada** de la del relay de eventos (cada una con su ciclo de vida), pero comparten Postgres.
 
-Clave del diseño: **serialización por recurso vía `singletonKey`**. Cada job se encola con
-`singletonKey = "<cola>:<idRecurso>"` (p. ej. `rc-recalcular-ruta:42`). pg-boss garantiza que, para
-una `singletonKey` dada, **a lo sumo un job está pendiente/activo**: un segundo `send` con la misma
-clave mientras hay uno encolado se **descarta** (dedup). Así, varios eventos seguidos sobre la misma
-orden (recibo, ajuste, otro recibo) **colapsan en un único recálculo** (el último gana) en vez de
-pisarse o acumular trabajo redundante. El worker consume **uno a la vez** (`localConcurrency: 1`,
-`batchSize: 1`), coherente con la serialización. La función `claveSerializacion(cola, idRecurso)` es
-**pura** y testeable sin BD; el transporte real se prueba en integración/Railway.
+Clave del diseño: **serialización por recurso vía `singletonKey` + la POLÍTICA de la cola**. Cada
+job se encola con `singletonKey = "<cola>:<idRecurso>"` (p. ej. `rc-recalcular-ruta:42`), y la cola
+declara `policy: 'stately'` en `POLITICA_POR_COLA`.
+
+> ⚠️ **Corrección (0.080b).** Este ADR decía que *«pg-boss garantiza que, para una `singletonKey`
+> dada, a lo sumo un job está pendiente/activo; un segundo `send` se descarta»*. **Eso era falso y,
+> además, describe justo lo que se decidió NO hacer.** Falso porque `singletonKey` **sola no
+> restringe nada**: en una cola con la política por defecto (`standard`) pg-boss guarda la clave y
+> acepta todos los `send` —los índices únicos sobre `(name, singleton_key)` sólo existen para
+> `short`/`singleton`/`stately`/`exclusive`/`key_strict_fifo`—, y las colas se creaban sin política.
+> Y describe otra decisión porque «≤1 entre `created`/`retry`/`active`, el resto se descarta» es la
+> política **`exclusive`**, que se rechazó a propósito: descartaría el disparo que llega **mientras**
+> se recalcula esa orden, y ese cambio se perdería hasta el siguiente evento.
+
+Lo que rige hoy, medido contra pg-boss 12.20: con **`stately`** (índice `job_i3`, único sobre
+`(name, state, singleton_key)` para `state <= 'active'`) hay **≤1 job por estado y clave**, o sea
+**≤1 corriendo + ≤1 esperando**. Varios disparos seguidos sobre la misma orden mientras nada corre
+**colapsan en uno** (el 2.º `send` devuelve `null`); uno que llega **con un recálculo activo sí se
+encola** y corre después, así que el cambio no se pierde (el handler relee la BD: gana el último).
+Órdenes distintas nunca se estorban.
+
+**La política no se puede cambiar en caliente:** `createQueue` sobre una cola existente hace
+`ON CONFLICT DO NOTHING` (ignora la opción **en silencio**) y `updateQueue` lanza. La única vía es
+borrar y recrear la cola —lo hace `conciliarPoliticasColas` al arrancar, sólo cuando lo guardado no
+coincide con lo declarado, y dejando constancia en el log de que se perdieron los jobs encolados.
+
+El worker consume **uno a la vez en su proceso** (`localConcurrency: 1`, `batchSize: 1`); lo que vale
+**entre instancias** es la política, que la impone la base. La función `claveSerializacion(cola,
+idRecurso)` es **pura** y testeable sin BD; sin BD se fija además la política declarada y que pg-boss
+la respalde con su índice (leyéndolo de `getConstructionPlans()`). El transporte real —que dos `send`
+devuelvan id y `null`— se prueba en integración/Railway.
 
 **Guarda por entorno:** el motor arranca solo si `JOBS_ACTIVOS !== 'false'` y solo desde el entry
 point (`servidor.ts`), no en `app.ts` — así los tests con `app.inject()` no requieren pg-boss vivo.

@@ -866,7 +866,7 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
   `src/dominio/produccion/requisitos-orden.ts` (la regla, ÚNICA fuente) ·
   `src/comun/png.ts` (lectura del IHDR) · `src/api/cache-documentos.ts` (hook `no-store`).
 - **Backend (modificados):** `src/dominio/produccion/ordenes.ts` (los 3 puntos usan la regla) ·
-  `src/dominio/modelos/bom-modelo.ts` (capturar avíos/arte COMPLETA las órdenes del modelo, en la
+  `src/dominio/modelos/bom-modelo.ts` (capturar avíos/arte COMPLETA las órdenes del modelo — ⚠️ **ya no: V1-E3d retiró esa llamada**, hoy el único disparo por catálogo es desmarcar «lleva arte»; corregido el 2-sep-2026, v0.088— en la
   misma transacción; nunca las degrada) · `src/dominio/produccion/centro-comando.ts` (`faltantes`) ·
   `src/comun/auditoria.ts` (`registrarBitacoraLote`, para dejar bitácora por orden) ·
   `src/dominio/produccion/consultas.ts` (las incompletas ya suman piezas) ·
@@ -1759,9 +1759,13 @@ En *Inventarios › Telas › Entradas*, al capturar la factura, cada renglón t
 - Solo aparecen las órdenes **abiertas de ese proveedor**, y de cada una solo los renglones **de la
   misma tela** que estás capturando (así no se puede ligar una felpa contra una orden de otra tela).
 - Cada opción dice cuánto falta: *"OC 1007 · faltan 60 kg"*.
-- Se puede dejar en **"Sin orden de compra"**: la tela suelta sigue siendo un caso válido.
-- Como la liga es **por renglón**, una misma factura puede surtir **dos órdenes distintas** y traer
-  además tela suelta — que es como facturan los proveedores.
+- ~~Se puede dejar en **"Sin orden de compra"**: la tela suelta sigue siendo un caso válido.~~
+  🔴 **YA NO (versión 0.078, §Post-F9.159(a)):** Daniel cerró esa vía —*«sin OC no podemos recibir
+  tela. ¿De quién recibiríamos sin OC?»*—, así que **cada renglón tiene que venir de una orden de
+  compra**. Si intentas capturar uno suelto, el botón no se enciende y la pantalla te dice qué
+  falta.
+- Como la liga es **por renglón**, una misma factura puede surtir **dos órdenes distintas** en el
+  mismo documento — que es como facturan los proveedores.
 
 ### Qué pasa al confirmar la factura
 
@@ -1831,8 +1835,11 @@ llegó puede no ser exactamente lo pedido.
 **Se quitó el campo "Renglón de OC"** que había que buscar en una lista: ya no hace falta, la liga
 viene de la orden.
 
-La captura **desde el menú** (*Inventarios › Telas › Entradas › nueva*) sigue existiendo para la
-**tela suelta**, la que no viene de una orden de compra. Ahí no aparece el panel.
+La captura **desde el menú** (*Inventarios › Telas › Entradas › nueva*) sigue existiendo, pero
+~~para la **tela suelta**, la que no viene de una orden de compra. Ahí no aparece el panel~~ —
+🔴 **cambió en la versión 0.078 (§Post-F9.159(a)):** como ya no hay tela suelta, ahí **sí aparece
+el panel**. Eliges el proveedor y la pantalla te enseña todo lo que tiene pendiente de recibir en
+sus órdenes abiertas, para que captures desde ahí.
 
 ### Lo que NO cambió
 
@@ -2170,7 +2177,7 @@ hace falta `SEED_ON_START`.
 > todo tipo de proveedores (maquila, arte, avíos, servicios, telas, etc). Para los que no, todo se
 > tiene que meter manual."* — Daniel
 
-La casilla ya existía en el alta del proveedor (**"¿Emite factura (CFDI)?"**). Ahora **manda**.
+⚠️ **Actualizado en la 0.124:** aquella casilla del alta (*"¿Emite factura (CFDI)?"*) **desapareció** —contestaba lo mismo que la modalidad y podían decir cosas distintas—. Quien manda ahora, aquí y en todo el sistema, es la pregunta única **"¿Cómo factura?"** de la ficha del proveedor: *solo con factura* / *solo sin factura* / *de las dos formas*. Lo que sigue diciendo esta página vale igual; donde diga "no factura", léase **"solo sin factura"**.
 
 ### Cuando eliges un proveedor que NO factura
 

@@ -34,6 +34,10 @@ import { Prisma } from '../../datos/index.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  filtroOrdenesVivasDeLineas,
+  numerosProduccionPorLinea,
+} from './ordenes-vivas-del-renglon.js';
 
 /**
  * Parámetros EN DOMINIO (tipos nativos; la ruta coacciona la querystring — mismo patrón que
@@ -169,10 +173,21 @@ export async function pedidosPorMes(
     idsLineaPagina.length === 0
       ? []
       : await cliente.orden.findMany({
-          where: { idPedidoLinea: { in: idsLineaPagina }, estado: { not: 'cancelada' } },
+          where: filtroOrdenesVivasDeLineas(idsLineaPagina),
           orderBy: { folio: 'asc' },
-          select: { id: true, folio: true, idPedidoLinea: true },
+          select: {
+            id: true,
+            folio: true,
+            idPedidoLinea: true,
+            // ⭐ V1-E3: el nº de producción del modelo DE LA ORDEN. Va por `include` sobre la
+            // consulta que YA se hacía por lote de renglones — sin consulta nueva y sin N+1.
+            modelo: { select: { numeroProduccion: true } },
+          },
         });
+  // ⭐⭐ V1-E3 — los nº por color, con la regla COMPARTIDA con el detalle del pedido
+  // (`ordenes-vivas-del-renglon.ts`). Se calcula sobre el mismo lote que ya se trajo: sin consulta
+  // nueva. Antes se acumulaba a mano dentro del bucle de abajo, con la regla escrita dos veces.
+  const numerosPorLinea = numerosProduccionPorLinea(ordenesVivas);
   const idsOrdenPagina = ordenesVivas.map((o) => o.id);
   const cortes =
     idsOrdenPagina.length === 0
@@ -225,6 +240,15 @@ export async function pedidosPorMes(
                    FROM pedido_linea WHERE id_pedido = ANY(${idsTodos})`,
       ),
       cliente.$queryRaw<{ ordenes: number; cortado: number }[]>(
+        // ⚠️⚠️ **TERCERA codificación de «VIVA», y la única que sigue suelta.** El
+        // `o.estado <> 'cancelada'` de aquí abajo tiene que decir **lo mismo** que
+        // `filtroOrdenesVivasDeLineas` (`ordenes-vivas-del-renglon.ts`), que es de donde salen los
+        // renglones de ESTA MISMA pantalla. Si cambias una y no la otra, los TOTALES de la tira
+        // discrepan de las filas que tienen debajo ("3 órdenes" arriba, 2 abajo).
+        //
+        // 🔑 Se dejó a mano a propósito —el módulo explica las tres razones medidas—, y este
+        // comentario **nombra la función** para que `grep filtroOrdenesVivasDeLineas` saque las
+        // TRES codificaciones de un tirón. No lo quites sin llevarte el ancla a otro sitio.
         Prisma.sql`SELECT COUNT(DISTINCT o.id)::int AS ordenes,
                           COALESCE(SUM(d.cantidad), 0)::int AS cortado
                    FROM pedido_linea pl
@@ -268,6 +292,8 @@ export async function pedidosPorMes(
         idDesarrollo: linea.idDesarrollo,
         numeroCliente: linea.desarrollo?.numeroCliente ?? null,
         numeroProduccion: linea.modelo.numeroProduccion,
+        // Ya vienen sin repetir y en orden ascendente de la regla compartida (ver arriba).
+        numerosProduccion: numerosPorLinea.get(linea.id) ?? [],
         cantidad: linea.cantidadPedida,
         precio: puedeVerImportes ? precio : null,
         importe: puedeVerImportes ? importe : null,

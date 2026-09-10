@@ -20,6 +20,8 @@
  *   `PUT  /ordenes/:id/materiales/proveedor` — ⭐ V1-E3m: asigna (o quita) el proveedor de UN material.
  *   `PUT  /materiales/proveedor-en-bloque`  — ⭐ V1-E3x: el MISMO proveedor a VARIOS renglones en un
  *                                            solo acto (§Post-F9.88). Todo o nada; nunca el catálogo.
+ *   `PUT  /explosion/dado-por-cubierto`    — ⭐⭐ V1-E8e: «con esto queda cubierto» / «volver a
+ *                                            pedirlo» sobre unos renglones (§Post-F9.99).
  *   `PUT  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: amarra (o quita) el color de tela de un color.
  *   `PUT  /telas-colores/:idTelaColor/precio` — ⭐⭐ V1-E3u(b): corrige el precio del color y ACTUALIZA
  *                                            el catálogo (auditado, A7).
@@ -52,6 +54,8 @@ import {
   esquemaAsignarColorTelaCuerpo,
   esquemaFijarPrecioColorCuerpo,
   esquemaFijarPrecioColorSalida,
+  esquemaDarPorCubiertoCuerpo,
+  esquemaDarPorCubiertoSalida,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -67,6 +71,7 @@ import {
   asignarProveedorDeMaterial,
   asignarProveedorDeMaterialEnBloque,
 } from '../../dominio/compras/proveedor-de-orden.js';
+import { darPorCubierto } from '../../dominio/compras/dado-por-cubierto.js';
 import {
   asignarColorDeTela,
   coloresDeTelaDeOrden,
@@ -252,6 +257,32 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return asignarProveedorDeMaterialEnBloque(sesion, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO» / «VOLVER A PEDIRLO», desde el renglón de
+  // la explosión. Daniel: *"compré 480 en lugar de 481… y me sigue poniendo que me falta comprar 1
+  // kilo… no voy a hacer otra OC por 1 kilo"*. Es la SEGUNDA puerta de la decisión (la primera se
+  // pregunta en la revisión previa, en el mismo acto de bajar la cantidad); ésta existe para los
+  // faltantes **que ya se escaparon**, como el que originó la queja.
+  //
+  // PUT porque es idempotente: darlo por cubierto dos veces deja lo mismo (la segunda vez ya no
+  // falta nada que cubrir). `compras.administrar`, el MISMO permiso que genera las OC — quien
+  // compra es quien puede decir qué NO se compra. NO crea permisos nuevos.
+  app.route({
+    method: 'PUT',
+    url: '/explosion/dado-por-cubierto',
+    preHandler: app.conPermiso('compras.administrar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Dar por cubierto (o volver a pedir) el faltante de unos renglones (§Post-F9.99)',
+      security: SEGURIDAD_SESION,
+      body: esquemaDarPorCubiertoCuerpo,
+      response: { 200: esquemaDarPorCubiertoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return darPorCubierto(sesion, request.body);
     },
   });
 

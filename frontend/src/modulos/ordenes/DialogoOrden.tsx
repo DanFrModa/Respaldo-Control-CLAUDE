@@ -3,6 +3,8 @@ import {
   Calendar,
   Factory,
   Grid3x3,
+  Lock,
+  LockOpen,
   ListChecks,
   Loader2Icon,
   MessageSquare,
@@ -30,6 +32,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { AdjuntosOrden } from './AdjuntosOrden';
 import { DialogoCancelarOrden } from './DialogoCancelarOrden';
+import { DialogoCerrarOrden } from './DialogoCerrarOrden';
 import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
 import { EditorEncabezadoOrden } from './EditorEncabezadoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
@@ -60,13 +63,18 @@ function fechaCorta(valor: string | null): string {
 /** Texto + variante del badge de estado DERIVADO de la orden. */
 function badgeEstado(estado: EstadoOrden): {
   texto: string;
-  variante: 'default' | 'secondary' | 'destructive';
+  variante: 'default' | 'secondary' | 'destructive' | 'outline';
 } {
   if (estado === 'completa') {
     return { texto: 'Completa', variante: 'default' };
   }
   if (estado === 'cancelada') {
     return { texto: 'Cancelada', variante: 'destructive' };
+  }
+  if (estado === 'cerrada') {
+    // 0.061: la orden terminó su vida administrativa y su costo quedó CONGELADO. `outline` la
+    // distingue de la cancelada (que es un fracaso) sin gritar: cerrar es el final NORMAL.
+    return { texto: 'Cerrada', variante: 'outline' };
   }
   return { texto: 'Capturada', variante: 'secondary' };
 }
@@ -142,6 +150,8 @@ export function DialogoOrden({
   const navigate = useNavigate();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
+  // ⭐ 0.061: cerrar la orden congela su costo y cierra la captura ⇒ permiso propio.
+  const puedeCerrar = tienePermiso('ordenes.cerrar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
   // Hitos de la orden (post-F9): capturar/cancelar exige `rc.capturar` (es un avance de RC).
@@ -158,9 +168,12 @@ export function DialogoOrden({
   // Diálogos hijos (Radix): se montan SOLO al abrirse, así no consultan el API mientras cerrados.
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
+  // 0.061: `null` = ningún diálogo de cierre abierto; si no, en qué dirección va.
+  const [aCerrar, setACerrar] = useState<'cerrar' | 'reabrir' | null>(null);
 
   // Guardado único de las secciones con captura + guardia de cierre con cambios sin guardar.
-  const { valorContexto, hayCambios, guardando, guardarTodo } = useRegistroGuardadoOrden(idOrden);
+  const { valorContexto, hayCambios, impedimento, guardando, guardarTodo } =
+    useRegistroGuardadoOrden(idOrden);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
 
   /** Guarda todo lo pendiente; devuelve si quedó todo guardado. */
@@ -187,7 +200,13 @@ export function DialogoOrden({
   // copiar/confirmar salida) está abierto: su propio Esc lo cierra (Radix) y si este listener
   // también corriera, tiraría el panel entero.
   useEffect(() => {
-    if (!abierto || aCancelar !== null || aCopiarMatriz !== null || confirmarSalida) {
+    if (
+      !abierto ||
+      aCancelar !== null ||
+      aCopiarMatriz !== null ||
+      aCerrar !== null ||
+      confirmarSalida
+    ) {
       return;
     }
     function alTeclear(evento: KeyboardEvent): void {
@@ -197,14 +216,18 @@ export function DialogoOrden({
     }
     window.addEventListener('keydown', alTeclear);
     return () => window.removeEventListener('keydown', alTeclear);
-  }, [abierto, intentarCerrar, aCancelar, aCopiarMatriz, confirmarSalida]);
+  }, [abierto, intentarCerrar, aCancelar, aCopiarMatriz, aCerrar, confirmarSalida]);
 
   if (!abierto || idOrden === null) {
     return null;
   }
 
-  // El pie con el botón único sólo aparece donde hay algo que guardar (con permiso y no cancelada).
-  const puedeGuardar = orden !== undefined && puedeAdministrar && orden.estado !== 'cancelada';
+  // El pie con el botón único sólo aparece donde hay algo que guardar (con permiso, no cancelada y
+  // —0.061— no CERRADA: la orden cerrada es de solo lectura; el backend lo rechaza igual, esto sólo
+  // evita ofrecer un botón que va a rebotar).
+  const estaCerrada = orden !== undefined && orden.cerradaEn !== null;
+  const puedeGuardar =
+    orden !== undefined && puedeAdministrar && orden.estado !== 'cancelada' && !estaCerrada;
 
   return (
     <div
@@ -239,8 +262,23 @@ export function DialogoOrden({
               )}
             </p>
           </div>
-          {/* Cancelar = desactivar (suave) de la orden; exige `ordenes.cancelar`. */}
-          {orden !== undefined && puedeCancelar && orden.estado !== 'cancelada' ? (
+          {/* ⭐ 0.061: Cerrar / Reabrir la orden. Cerrar CONGELA su costo y cierra la captura; la
+              confirmación lo dice. Exige `ordenes.cerrar`; el backend re-decide (A1). Una orden
+              CANCELADA no se cierra (no hay nada que cerrar). */}
+          {orden !== undefined && puedeCerrar && orden.estado !== 'cancelada' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setACerrar(estaCerrada ? 'reabrir' : 'cerrar')}
+              data-testid={estaCerrada ? 'reabrir-orden' : 'cerrar-orden'}
+            >
+              {estaCerrada ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
+              {estaCerrada ? 'Reabrir' : 'Cerrar'}
+            </Button>
+          ) : null}
+          {/* Cancelar = desactivar (suave) de la orden; exige `ordenes.cancelar`. Una orden CERRADA
+              tampoco se cancela: primero hay que reabrirla (0.061). */}
+          {orden !== undefined && puedeCancelar && orden.estado !== 'cancelada' && !estaCerrada ? (
             <Button
               variant="destructive"
               size="sm"
@@ -300,8 +338,21 @@ export function DialogoOrden({
             className="flex shrink-0 items-center justify-end gap-3 border-t px-4 py-3"
             data-testid="pie-orden"
           >
-            <p className="mr-auto text-xs text-muted-foreground" data-testid="aviso-cambios-orden">
-              {hayCambios ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.'}
+            {/* El impedimento MANDA sobre el "hay cambios": si algo capturado no se puede mandar,
+                lo que el usuario necesita leer aquí es POR QUÉ el botón está apagado — no que tiene
+                cambios (eso ya lo sabe). Lo capturado sigue vivo y el guardia de cierre sigue
+                preguntando (§Post-F9.10). */}
+            <p
+              className={
+                impedimento !== null
+                  ? 'mr-auto text-xs text-destructive'
+                  : 'mr-auto text-xs text-muted-foreground'
+              }
+              data-testid="aviso-cambios-orden"
+              {...(impedimento !== null ? { role: 'alert' } : {})}
+            >
+              {impedimento ??
+                (hayCambios ? 'Tienes cambios sin guardar.' : 'Sin cambios pendientes.')}
             </p>
             <Button
               type="button"
@@ -316,7 +367,7 @@ export function DialogoOrden({
               type="button"
               size="sm"
               onClick={() => void guardar()}
-              disabled={!hayCambios || guardando}
+              disabled={!hayCambios || guardando || impedimento !== null}
               data-testid="guardar-orden"
             >
               {guardando ? (
@@ -351,6 +402,17 @@ export function DialogoOrden({
         }}
         orden={aCancelar ?? undefined}
       />
+      {/* ⭐ 0.061: cerrar / reabrir la orden (congela y descongela su costo). */}
+      <DialogoCerrarOrden
+        abierto={aCerrar !== null}
+        alCambiarAbierto={(abiertoNuevo) => {
+          if (!abiertoNuevo) {
+            setACerrar(null);
+          }
+        }}
+        orden={orden}
+        modo={aCerrar ?? 'cerrar'}
+      />
 
       {/* Guardia de cierre con cambios sin guardar (Daniel 24-jul-2026). */}
       <DialogoConfirmacion
@@ -361,7 +423,15 @@ export function DialogoOrden({
           }
         }}
         titulo="Cambios sin guardar"
-        descripcion="Tienes cambios sin guardar en esta orden. ¿Quieres guardarlos antes de salir?"
+        descripcion={
+          // 🔴 EL PIE NO ES EL ÚNICO CAMINO AL GUARDADO: "Guardar y salir" entra por aquí, y ese
+          // botón no lo apaga el impedimento. Quien PARA la captura inválida es la sección misma
+          // (su `preparar` devuelve `null`, contrato de `PrepararGuardado`); lo que falta es que el
+          // usuario sepa POR QUÉ, porque este diálogo tapa el aviso en línea de la matriz. Por eso
+          // el motivo se dice aquí, en lugar del texto genérico (§Post-F9.10).
+          impedimento ??
+          'Tienes cambios sin guardar en esta orden. ¿Quieres guardarlos antes de salir?'
+        }
         textoCancelar="Cancelar"
         accionSecundaria={{
           texto: 'Salir sin guardar',
@@ -440,7 +510,19 @@ function DetalleOrden({
           </p>
         ) : null}
 
-        <FotosModeloOrden idModelo={orden.idModelo} codigoModelo={orden.codigoModelo} />
+        {/* ⭐ §Post-F9.169(b) — la tira lleva `idOrden` PARA QUE ESTE DIÁLOGO RESPETE LO QUE LA OP
+            QUITÓ. Sin él, `useFotosOcultasOrden` iba `enabled:false` y la foto ocultada en el Centro
+            de Órdenes REAPARECÍA aquí, en la MISMA orden, un clic después — y el usuario no tenía
+            forma de saber por qué.
+
+            ⚠️ NO se pasa `puedeAdministrar` (default `false`) y es a propósito: aquí las fotos sólo
+            se MIRAN. Quitarlas de la OP y traerlas de vuelta se hace en el Centro de Órdenes, así
+            que ni el tile «+», ni la papelera, ni los botones de quitar/traer se encienden. */}
+        <FotosModeloOrden
+          idModelo={orden.idModelo}
+          codigoModelo={orden.codigoModelo}
+          idOrden={orden.id}
+        />
 
         {/* Ruta Crítica (F5-E5): consultar / programar la ruta de ESTA orden. La acción real la
             re-verifica el backend (A1); aquí solo se muestran los accesos según permiso. */}

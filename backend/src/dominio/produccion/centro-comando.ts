@@ -14,7 +14,8 @@
  *    empresa no existe para esta sesión).
  *
  * Sin N+1: por página se hacen consultas AGREGADAS por lote de ids (Σ ordenada, Σ cortada, envíos
- * vivos, OC de tela) — número FIJO de viajes por página, nunca un await por fila.
+ * vivos, OC de tela y —fila 0.068 (a)— cómo va cada OP frente a sus HERMANAS) — número FIJO de
+ * viajes por página, nunca un await por fila.
  *
  * Semántica de las columnas derivadas (fiel al proto + doc 03-Produccion):
  *  • `cantCortada` = Σ de `EtapaMovimientoDet` de cortes VIVOS (canceladas fuera, F3-E2).
@@ -44,7 +45,13 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
+
 import { totalesPorOrden } from './consultas.js';
+// ⭐⭐ fila 0.068 (a) — el aviso de la OP que se desvía del grupo. La comparación es UNA sola y vive
+// en su módulo (A1): esta pantalla no compara nada, sólo pide el agregado de su página.
+import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
+import { condicionSinonimosDepartamento } from './ordenes.js';
 import { requisitosOrden } from './requisitos-orden.js';
 
 /**
@@ -82,8 +89,17 @@ const CONDICION_OC_TELA = {
  * Búsqueda libre del centro: folio OP (si es entero), código de modelo o pedido del cliente
  * (CUALQUIER valor de `OrdenReferencia`, D7). Deliberadamente SIN nombre de cliente (el proto
  * busca "OP, modelo o pedido del cliente"; para el cliente está su select).
+ *
+ * 🔴 **NO reusa `armarBusqueda` a propósito** (el criterio es otro: aquí el nombre de cliente NO
+ * entra), pero **sí entiende los mismos SINÓNIMOS de departamento** (§Post-F9.172(a)): el defecto
+ * que se arregla vive en `OrdenReferencia.valor`, y esta función lee esa misma columna. Cubrir un
+ * embudo y no el otro habría dejado el Centro de Órdenes —la pantalla que más se usa— sin el
+ * arreglo. Los sinónimos llegan YA resueltos (una vez por consulta, nunca por fila).
  */
-function busquedaCentro(busqueda: string | undefined): Prisma.OrdenWhereInput {
+function busquedaCentro(
+  busqueda: string | undefined,
+  sinonimosDepartamento: readonly string[],
+): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -91,6 +107,10 @@ function busquedaCentro(busqueda: string | undefined): Prisma.OrdenWhereInput {
     { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
     { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
   ];
+  const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
+  if (porSinonimo !== null) {
+    or.push(porSinonimo);
+  }
   if (/^\d+$/.test(busqueda)) {
     try {
       or.push({ folio: BigInt(busqueda) });
@@ -178,7 +198,10 @@ export async function centroComandoOrdenes(
   if (filtros.ocTela !== undefined) {
     condiciones.push(filtros.ocTela === 'con' ? CONDICION_OC_TELA : { NOT: CONDICION_OC_TELA });
   }
-  const busqueda = busquedaCentro(filtros.busqueda);
+  const busqueda = busquedaCentro(
+    filtros.busqueda,
+    await sinonimosDeDepartamentos(filtros.busqueda, bd),
+  );
   if (busqueda.OR !== undefined) {
     condiciones.push(busqueda);
   }
@@ -235,7 +258,7 @@ export async function centroComandoOrdenes(
   const ids = filas.map((f) => f.id);
 
   // Agregados POR LOTE de la página (número fijo de viajes; jamás un await por fila).
-  const [ordenadas, cortes, envios, lineasOcTela] = await Promise.all([
+  const [ordenadas, cortes, envios, lineasOcTela, frenteAlGrupo] = await Promise.all([
     totalesPorOrden(cliente, ids),
     ids.length === 0
       ? Promise.resolve([])
@@ -270,6 +293,25 @@ export async function centroComandoOrdenes(
             ordenCompra: { select: { numCompra: true } },
           },
         }),
+    /*
+     * ⭐⭐ fila 0.068 (a) — **CÓMO VA CADA OP DE ESTA PÁGINA FRENTE A SUS HERMANAS.**
+     *
+     * 🔴 **De GRUPO, no de a una.** La comparación necesita las N hermanas juntas; pedirla orden por
+     * orden costaría N×N. Por eso se le pasa la página ENTERA y el módulo resuelve los linajes de
+     * golpe.
+     *
+     * ⚠️ **Lo fijo es el NÚMERO de consultas (cinco), no el VOLUMEN.** Las filas que traen crecen
+     * con el tamaño de las familias de la página: en el peor caso, las recetas congeladas de todas
+     * las OP no canceladas de esos modelos. Decir que «no crece con el tamaño de las familias»
+     * sería falso — y el que más lo paga no es esta pantalla, sino la receta de la OP: allí las
+     * cinco corren **dentro de la transacción de escritura** de cada mutación (`enRecetaEditable`),
+     * aunque sobre UN solo linaje.
+     *
+     * ⚠️ Devuelve un `Map` por `idOrden` y aquí se lee por `fila.id` — que es lo único que impide el
+     * fallo clásico del lote: **darle a una orden el aviso de OTRA**. Una orden que no esté en el
+     * mapa (cancelada) se pinta con `sinHermanas()`, nunca con lo de su vecina.
+     */
+    frenteAlGrupoDeOrdenes(cliente, ids, sesion.idEmpresaActiva),
   ]);
 
   // Σ cortado por orden.
@@ -361,6 +403,8 @@ export async function centroComandoOrdenes(
               artesOrden: fila._count.recetaArtes,
               llevaArte: fila.modelo.llevaArte,
             }).faltantes,
+      // ⭐⭐ fila 0.068 (a): el aviso de esta OP frente a sus hermanas, POR ID (nunca por posición).
+      frenteAlGrupo: frenteAlGrupo.get(fila.id) ?? sinHermanas(),
     };
   });
 

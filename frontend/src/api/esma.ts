@@ -14,7 +14,10 @@ import type {
   CargoEsMaValidar,
   CargosEsMa,
   CargosEsMaQuery,
+  CorreccionSinFactura,
+  EsMaConceptoCorregible,
   EsMaConceptoRevisable,
+  EsMaCorreccion,
   EsMaConciliacion,
   EsMaConciliacionQuery,
   EsMaDesglosado,
@@ -365,7 +368,7 @@ export function useDesglosado(
   });
 }
 
-/** Saldos de todos los maquileros con saldo ≠ 0 (drill-down). */
+/** Saldos de los maquileros con saldo ≠ 0 —o con algo por revisar— (drill-down). */
 export function useSaldosTodos(
   query: EsMaSaldosTodosQuery = {},
 ): UseQueryResult<EsMaSaldosTodos, ErrorDeApi> {
@@ -420,6 +423,52 @@ export function useRevisarMovimiento(): UseMutationResult<EsMaRevision, ErrorDeA
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ concepto, id }: ArgsRevisar) => revisarPartida(concepto, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_CUENTA_ESMA }),
+  });
+}
+
+// ── Corrección de un movimiento SIN FACTURA (fila 0.145) ─────────────────────
+
+async function corregirPartida(
+  concepto: EsMaConceptoCorregible,
+  id: number,
+  cuerpo: CorreccionSinFactura,
+): Promise<EsMaCorreccion> {
+  const { data, error } = await api.POST('/api/esma/movimientos/{concepto}/{id}/corregir', {
+    params: { path: { concepto, id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Argumentos de la corrección de un movimiento de EsMa. */
+export interface ArgsCorregirEsMa {
+  concepto: EsMaConceptoCorregible;
+  id: number;
+  cuerpo: CorreccionSinFactura;
+}
+
+/**
+ * ⭐ Corrige un movimiento SIN FACTURA de un maquilero (fila 0.145): por dentro anula el viejo y
+ * captura el bueno, en una transacción. Invalida la cuenta entera (saldo, estado de cuenta y
+ * listas), porque el renglón cambia de id.
+ *
+ * Quién puede: sólo quien tenga la bandera `Usuario.puedeCorregirSinFactura`, que no es un permiso.
+ * La pantalla no lo adivina: cada renglón del estado de cuenta trae su `corregible` calculado por
+ * el servidor.
+ */
+export function useCorregirMovimientoEsMa(): UseMutationResult<
+  EsMaCorreccion,
+  ErrorDeApi,
+  ArgsCorregirEsMa
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ concepto, id, cuerpo }: ArgsCorregirEsMa) =>
+      corregirPartida(concepto, id, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_CUENTA_ESMA }),
   });
 }

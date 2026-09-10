@@ -21,6 +21,9 @@ import type {
   ProveedorContactoCrear,
   ProveedorContactoEditar,
   ProveedorCrear,
+  ProveedorCuentaPago,
+  ProveedorCuentaPagoCrear,
+  ProveedorCuentaPagoEditar,
   ProveedorEditar,
   ProveedoresPagina,
   ProveedoresQuery,
@@ -540,6 +543,116 @@ export function useActualizarContactoProveedor(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, idContacto, cuerpo }: ArgsActualizarContacto) =>
       actualizarContactoProveedor(id, idContacto, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
+  });
+}
+
+// ── Cuentas / destinos de pago del proveedor (0.112) ─────────────────────────
+//
+// El BENEFICIARIO casi nunca es el proveedor y un proveedor tiene VARIAS cuentas: una default y las
+// demas como HISTORIAL reutilizable. Las activas viajan en la ficha del proveedor; el historial se
+// pide aparte con `incluirInactivas`.
+
+/** Clave de cache del HISTORIAL de cuentas de UN proveedor (las activas van en la ficha). */
+function claveCuentasPago(idProveedor: number): readonly unknown[] {
+  return [...CLAVE_PROVEEDORES, 'cuentas-pago', idProveedor];
+}
+
+/** Lista TODAS las cuentas del proveedor, retiradas incluidas (`GET .../cuentas-pago`). */
+async function listarCuentasPago(idProveedor: number): Promise<ProveedorCuentaPago[]> {
+  const { data, error } = await api.GET('/api/proveedores/{id}/cuentas-pago', {
+    // El querystring viaja como texto ("true"/"false"): el backend lo parsea con `z.stringbool()`.
+    params: { path: { id: idProveedor }, query: { incluirInactivas: 'true' } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/**
+ * Lista TODAS las cuentas del proveedor (activas + retiradas). Es la FUENTE del editor, no un extra:
+ * las activas de la ficha del proveedor son una foto del momento en que se abrio el dialogo, y
+ * mezclarlas con esta consulta hacia que una cuenta recien retirada se pintara a la vez como activa
+ * y como retirada. Las mutaciones de cuentas invalidan `CLAVE_PROVEEDORES`, que cubre esta clave.
+ */
+export function useCuentasPagoProveedor(
+  idProveedor: number | undefined,
+): UseQueryResult<ProveedorCuentaPago[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveCuentasPago(idProveedor ?? 0),
+    queryFn: () => listarCuentasPago(idProveedor as number),
+    enabled: idProveedor !== undefined,
+  });
+}
+
+/** Agrega una cuenta de pago (`POST /api/proveedores/{id}/cuentas-pago`). */
+async function crearCuentaPagoProveedor(
+  id: number,
+  cuerpo: ProveedorCuentaPagoCrear,
+): Promise<ProveedorCuentaPago> {
+  const { data, error } = await api.POST('/api/proveedores/{id}/cuentas-pago', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Edita, marca por omision (`esDefault`) o RETIRA (`activo: false`) una cuenta de pago. */
+async function actualizarCuentaPagoProveedor(
+  id: number,
+  idCuenta: number,
+  cuerpo: ProveedorCuentaPagoEditar,
+): Promise<ProveedorCuentaPago> {
+  const { data, error } = await api.PATCH('/api/proveedores/{id}/cuentas-pago/{idCuenta}', {
+    params: { path: { id, idCuenta } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Argumentos de la mutacion de alta de cuenta de pago. */
+export interface ArgsCrearCuentaPago {
+  id: number;
+  cuerpo: ProveedorCuentaPagoCrear;
+}
+
+/** Agrega una cuenta de pago e invalida la lista (las cuentas activas viajan en la ficha). */
+export function useCrearCuentaPagoProveedor(): UseMutationResult<
+  ProveedorCuentaPago,
+  ErrorDeApi,
+  ArgsCrearCuentaPago
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCrearCuentaPago) => crearCuentaPagoProveedor(id, cuerpo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
+  });
+}
+
+/** Argumentos de la mutacion de edicion/promocion/retiro de cuenta de pago. */
+export interface ArgsActualizarCuentaPago {
+  id: number;
+  idCuenta: number;
+  cuerpo: ProveedorCuentaPagoEditar;
+}
+
+/** Edita, promueve o retira una cuenta e invalida la lista (y con ella el historial). */
+export function useActualizarCuentaPagoProveedor(): UseMutationResult<
+  ProveedorCuentaPago,
+  ErrorDeApi,
+  ArgsActualizarCuentaPago
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, idCuenta, cuerpo }: ArgsActualizarCuentaPago) =>
+      actualizarCuentaPagoProveedor(id, idCuenta, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
   });
 }

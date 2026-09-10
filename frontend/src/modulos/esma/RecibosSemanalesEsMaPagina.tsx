@@ -15,7 +15,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 import { SelectorMaquilero, type TipoMaquilero } from './SelectorMaquilero';
-import { moneda } from './comun';
+import { moneda, TIPOS_IDA_Y_VUELTA } from './comun';
 
 /** Formatea un entero con separadores de miles (es-MX). */
 function fmt(n: number): string {
@@ -27,6 +27,9 @@ function fmt(n: number): string {
  * maquilero/modelo, valuados al precio pactado. Filtros: rango de fechas + maquilero (opcional). A
  * diferencia de la consulta de producción, aquí SÍ hay importes (visibles solo con
  * `consultas.ver-importes`). Lectura de cuenta con `esma.ver-pagos`.
+ *
+ * ⚠️ 0.114 — el filtro de tipo va acotado a los servicios de IDA Y VUELTA: esta pantalla lee
+ * RECIBOS, y el corte y el empaque no tienen (ver el comentario junto al selector).
  */
 export function RecibosSemanalesEsMaPagina(): React.JSX.Element {
   const [tipo, setTipo] = useState<TipoMaquilero>('');
@@ -65,6 +68,12 @@ export function RecibosSemanalesEsMaPagina(): React.JSX.Element {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* 🔴 0.114 — SÓLO los tipos de IDA Y VUELTA. Este reporte se arma leyendo los RECIBOS
+                de maquila (`esma/semanales.ts` filtra `tipo: recibo_maquila`), y el corte y el
+                empaque NO generan recibos: son servicios sobre la orden, *«no van y vienen»*.
+                Ofrecerlos aquí devolvía siempre un reporte vacío sin decir por qué. Las otras dos
+                pantallas que usan este selector (estado de cuenta y desglosado) SÍ los ofrecen:
+                ésas leen CARGOS, y los de corte/empaque son justo lo que la 0.114 hizo visible. */}
             <SelectorMaquilero
               tipo={tipo}
               onCambioTipo={(t) => {
@@ -74,6 +83,7 @@ export function RecibosSemanalesEsMaPagina(): React.JSX.Element {
               idMaquilero={idMaquilero}
               onCambioMaquilero={setIdMaquilero}
               idPrefijo="recsem"
+              tipos={TIPOS_IDA_Y_VUELTA}
             />
             <Field>
               <FieldLabel htmlFor="recsem-desde">Desde</FieldLabel>

@@ -29,12 +29,13 @@ describe('resolverSegmentoCxp — la modalidad del proveedor manda', () => {
     expect(() => resolverSegmentoCxp('pago', 'ambos', undefined)).toThrow(ErrorValidacion);
   });
 
-  it('sin modalidad definida (proveedor migrado) respeta lo que se mandó; si no, sin factura', () => {
-    expect(resolverSegmentoCxp('pago', null, true)).toBe(true);
-    expect(resolverSegmentoCxp('pago', null, false)).toBe(false);
-    // Es el comportamiento que CxP ya tenía (el esquema traía `.default(false)`): no cambia
-    // ningún saldo existente.
-    expect(resolverSegmentoCxp('pago', null, undefined)).toBe(false);
+  it('⭐ sin modalidad definida NO se captura: lanza, se mande lo que se mande (fila 0.110)', () => {
+    // Antes: `null` respetaba lo enviado y, sin nada enviado, el movimiento nacía SIN factura en
+    // silencio. Eso metía el pago por el camino de "la relación que Daniel define" sin que nadie
+    // lo hubiera decidido — el defecto que esta fila viene a cerrar (§Post-F9.186(a)).
+    expect(() => resolverSegmentoCxp('pago', null, undefined)).toThrow(ErrorValidacion);
+    expect(() => resolverSegmentoCxp('pago', null, true)).toThrow(ErrorValidacion);
+    expect(() => resolverSegmentoCxp('pago', null, false)).toThrow(ErrorValidacion);
   });
 });
 
@@ -42,7 +43,10 @@ describe('resolverSegmentoCxp — el ORIGEN manda sobre la modalidad', () => {
   it('⭐ una entrada sin factura NUNCA es fiscal, ni con un proveedor que siempre factura', () => {
     expect(resolverSegmentoCxp('entrada_sin_factura', 'solo_con', undefined)).toBe(false);
     expect(resolverSegmentoCxp('entrada_sin_factura', 'ambos', undefined)).toBe(false);
+    // El origen decide ANTES que la modalidad: una entrada sin factura sigue pasando aunque el
+    // proveedor todavía no tenga modalidad — no hay nada que clasificar, ya está clasificado.
     expect(resolverSegmentoCxp('entrada_sin_factura', null, false)).toBe(false);
+    expect(resolverSegmentoCxp('entrada_sin_factura', null, undefined)).toBe(false);
   });
 
   it('y si se pide marcarla como fiscal, se RECHAZA (no se corrige en silencio, D3)', () => {
@@ -55,6 +59,8 @@ describe('resolverSegmentoCxp — el ORIGEN manda sobre la modalidad', () => {
     for (const origen of ['nota_credito', 'pago', 'abono', 'descuento'] as const) {
       expect(resolverSegmentoCxp(origen, 'solo_con', undefined)).toBe(true);
       expect(() => resolverSegmentoCxp(origen, 'ambos', undefined)).toThrow(ErrorValidacion);
+      // …y por el proveedor sin clasificar: ninguno de los orígenes normales lo deja pasar.
+      expect(() => resolverSegmentoCxp(origen, null, undefined)).toThrow(ErrorValidacion);
     }
   });
 });

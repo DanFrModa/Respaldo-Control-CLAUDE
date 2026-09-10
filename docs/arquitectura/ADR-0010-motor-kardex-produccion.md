@@ -127,7 +127,9 @@ proceso o en cola.
 ### 7. Liga recibo↔envío AGREGADA por orden+proceso, con liga opcional (decisión reversible)
 
 El WIP cuadra por **agregado orden+proceso**: "enviado" = Σ envíos de esa orden+proceso, "recibido"
-= Σ recibos de esa orden+proceso, "por recibir" = enviado − recibido. NO se exige amarrar cada
+= Σ recibos BUENOS de esa orden+proceso, "por recibir" = enviado − recibido − **incompletas**
+(V1-E8v / §Post-F9.147: la prenda incompleta ya volvió del taller, así que cierra el pendiente aunque
+no se inventaríe ni se pague). NO se exige amarrar cada
 recibo a un envío específico (decisión (d), DECISIONES.md). Para no cerrar la puerta, `EtapaMovimiento`
 lleva `idEtapaEnvio Int?` (autorreferencia nullable): en un recibo PUEDE apuntar al envío que recibe,
 pero hoy queda NULL y las consultas no dependen de él. **Por qué reversible sin migración destructiva:**

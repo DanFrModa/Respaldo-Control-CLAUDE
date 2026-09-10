@@ -1,4 +1,4 @@
-import { AlertTriangle, Maximize2, Search } from 'lucide-react';
+import { AlertTriangle, Lock, Maximize2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
+// ⭐⭐⭐ 0.085 (§Post-F9.173(a)): el MISMO chip que pinta la receta de la orden, para que «ya está
+// comprado» se lea idéntico en los dos sitios (y con la única traducción de los estatus de OC).
+import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
+import { useSesion } from '@/sesion/useSesion';
 
 /**
  * BANDEJA «RECETAS POR LIBERAR» — V1-E3h (§Post-F9.72). DANIEL, 19-ago-2026: *"está buenísima"*.
@@ -52,6 +56,26 @@ import { useDebounce } from '@/lib/useDebounce';
  */
 export function RecetasPorLiberarPagina(): React.JSX.Element {
   const navigate = useNavigate();
+  /*
+   * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA PUERTA QUE SÍ SE LE PUEDE PINTAR AL COMPRADOR.
+   *
+   * Los chips de «ya está comprado» llevan a las compras de esta orden **sólo** con `compras.ver`.
+   * Sin ese permiso informan igual, pero no se pinta un camino que acabaría en 403 (§Post-F9.68).
+   * ⛔ **Desde aquí NO se ofrece des-autorizar la OC — pero OJO CON LA RAZÓN, porque ya no es «ese
+   * botón no se pinta nunca».** §Post-F9.68 tiene DOS mitades: esconder lo que no se puede usar **y
+   * enseñar lo que sí**. Desde la fila 0.068, quien tiene `compras.desautorizar` **SÍ lo ve**, en la
+   * receta de la orden (`PanelRecetaOrden.tsx:212-231`, en `AvisoCambioSobreLoComprado`). Y ojo
+   * también con esto: **Dirección abre esta bandeja igual que el comprador** —`desarrollo.ver`
+   * cascadea—, así que «aquí sólo entra el comprador» tampoco sería cierto.
+   *
+   * 🔴 **Lo que gobierna aquí es OTRA COSA: esta pantalla no da un AVISO, da una COLUMNA
+   * informativa.** §Post-F9.145 (*el aviso que pide un acto, lleva a hacerlo*) habla de AVISOS —de
+   * un bloque que salta porque acabas de hacer algo—, y esto es una lista que se consulta. La puerta
+   * permanente de Dirección para des-autorizar es la pantalla de **Órdenes de compra**. Por eso se
+   * queda como está: **por lo que ESTA pantalla es**, no porque el acto sea de nadie.
+   */
+  const { tienePermiso } = useSesion();
+  const puedeVerCompras = tienePermiso('compras.ver');
   // ⭐ V1-E3j: el destino de la fila es la RECETA de la orden, gobernada por `desarrollo.ver` — el
   // mismo permiso que abre esta bandeja, así que el camino nunca es un enlace muerto (§Post-F9.68).
   // Antes apuntaba al panel de la OP y por eso pedía `ordenes.ver`.
@@ -75,6 +99,11 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
     void navigate(`/produccion/ordenes/${String(idOrden)}/receta`);
   }
 
+  /** ⭐ 0.085: a «Compras por orden», con la orden ya elegida (el deep-link que esa pantalla lee). */
+  function verCompras(idOrden: number): void {
+    void navigate('/compras/por-orden', { state: { idOrden } });
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
@@ -86,7 +115,11 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
             <p className="text-[12.5px] text-muted-foreground">
               Órdenes cuya receta espera la firma de Desarrollo. Sin firmar, ese material no se
               compra. «Ver la receta» abre la orden completa: ahí se revisa y se firma renglón por
-              renglón, que es la única forma de liberar.
+              renglón, que es la única forma de liberar. Aquí salen también, arriba y marcadas{' '}
+              <strong>En corrección</strong>, las recetas que alguien reabrió: ésas tienen la compra
+              de toda su orden congelada hasta que se cierren. La columna{' '}
+              <strong>Ya comprado</strong> dice cuáles ya tienen orden de compra firmada con un
+              proveedor: si eso cambió, hay que negociarlo con él —el sistema no lo cancela solo—.
             </p>
           </div>
         </div>
@@ -155,6 +188,12 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                   <TablaDensaHead>Cliente</TablaDensaHead>
                   <TablaDensaHead>Entrega</TablaDensaHead>
                   <TablaDensaHead>Falta liberar</TablaDensaHead>
+                  {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — LA COLUMNA QUE HACE QUE EL AVISO LLEGUE.
+                      El 409 de la puerta de compra sólo lo lee quien INTENTA gastar, y quien ya
+                      compró no va a volver a intentarlo: ese camino no puede alcanzarlo nunca.
+                      Esta bandeja sí, porque la abre con `desarrollo.ver` y ya lista solas las
+                      órdenes que le importan. */}
+                  <TablaDensaHead>Ya comprado</TablaDensaHead>
                   <TablaDensaHead className="w-40" />
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -177,6 +216,23 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                     <TablaDensaCelda>
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-sm">{textoFalta(f)}</span>
+                        {/* ⭐⭐ V1-E8z (§Post-F9.165 punto 7) — EL DISTINTIVO SIN EL CUAL LA ETAPA NO
+                            SIRVE. Reabrir sólo marca (no desfirma), así que estas órdenes NO tienen
+                            renglones pendientes: sin este chip la fila se leería como una más, y
+                            sin la fila la orden quedaría con la compra congelada e invisible. */}
+                        {f.abiertaEn !== null ? (
+                          <ChipEstado
+                            tono="crit"
+                            data-testid="rpl-en-correccion"
+                            title={
+                              f.abiertaMotivo === null
+                                ? 'La compra de esta orden está congelada hasta que se cierre la receta'
+                                : `Motivo: ${f.abiertaMotivo}`
+                            }
+                          >
+                            <Lock className="size-3" aria-hidden /> En corrección · compra congelada
+                          </ChipEstado>
+                        ) : null}
                         {/* ⭐ La marca que Daniel pidió: aquí YA hay dinero esperando la firma. */}
                         {f.conOrdenCompra ? (
                           <ChipEstado tono="crit" data-testid="rpl-frena-dinero">
@@ -184,6 +240,16 @@ export function RecetasPorLiberarPagina(): React.JSX.Element {
                           </ChipEstado>
                         ) : null}
                       </span>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda data-testid="rpl-ya-comprado">
+                      {f.ocsComprometidas.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <ChipsOcComprometidas
+                          ocs={f.ocsComprometidas}
+                          {...(puedeVerCompras ? { alVer: () => verCompras(f.idOrden) } : {})}
+                        />
+                      )}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       <span className="flex flex-wrap justify-end gap-1.5">
@@ -257,5 +323,9 @@ export function textoFalta(f: {
   if (f.telas > 0) partes.push(`${f.telas} ${f.telas === 1 ? 'tela' : 'telas'}`);
   if (f.avios > 0) partes.push(`${f.avios} ${f.avios === 1 ? 'avío' : 'avíos'}`);
   if (f.artes > 0) partes.push(`${f.artes} ${f.artes === 1 ? 'arte' : 'artes'}`);
-  return partes.length === 0 ? `${f.porLiberar} renglones` : partes.join(', ');
+  if (partes.length > 0) return partes.join(', ');
+  // ⭐⭐ V1-E8z: desde esta etapa una fila puede NO tener nada pendiente de firma — es una receta
+  // REABIERTA, que entra a la bandeja por el candado y no por los renglones. Decir «0 renglones»
+  // sería un número inútil justo donde el chip «En corrección» ya dice lo que pasa.
+  return f.porLiberar === 0 ? 'Nada por firmar: falta cerrarla' : `${f.porLiberar} renglones`;
 }

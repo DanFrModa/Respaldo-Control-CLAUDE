@@ -29,7 +29,7 @@ Dos aplicaciones autónomas (`backend/` y `frontend/`), cada una con su propio `
 | Framework HTTP | **Fastify 5.8** | Servidor REST rápido, probado en producción, ecosistema sólido |
 | Contrato/API | **OpenAPI 3.1** vía `fastify-type-provider-zod 6.1` + `@fastify/swagger 9.7` | El "menú" del backend se **genera desde el código** (los mismos Zod que validan), nunca se escribe a mano ni se desactualiza; navegable como página web |
 | Validación | **Zod 4.4** | Una sola definición de cada regla de captura; alimenta validación **y** OpenAPI |
-| Base de datos | **PostgreSQL 17** | Transacciones, integridad referencial, secuencias (A2/A3/A8) |
+| Base de datos | **PostgreSQL 18** (Railway; local/CI 17) | Transacciones, integridad referencial, secuencias (A2/A3/A8) |
 | ORM | **Prisma 7.8** (driver adapter `@prisma/adapter-pg`) + SQL crudo para reportes/KPIs pesados | Migraciones versionadas, esquema como código |
 | Auth | **better-auth 1.6** (integración oficial Fastify) + RBAC propio en BD | Reemplaza los 2 sistemas de seguridad actuales (A4); passwords con hash (scrypt de `better-auth/crypto`) |
 | Archivos | **Cloudflare R2** vía `@aws-sdk/client-s3 3.1` (API S3, presigned URLs) | Fotos de modelos, adjuntos R6, fichas R5; cero costo de egreso; elimina rutas `S:\` (A5) |
@@ -78,7 +78,7 @@ flowchart LR
     subgraph Railway [Proyecto Railway — CONTROL v2]
         direction LR
         FE[Servicio: frontend<br/>nginx + estáticos<br/>PÚBLICO] -- "/api (red privada)<br/>backend.railway.internal" --> BE[Servicio: backend<br/>Fastify<br/>PRIVADO]
-        BE -- "DATABASE_URL (red privada)" --> PG[(Servicio: Postgres 17<br/>PRIVADO + respaldos)]
+        BE -- "DATABASE_URL (red privada)" --> PG[(Servicio: Postgres 18<br/>PRIVADO + respaldos)]
     end
     GH[GitHub<br/>push a rama] -->|auto-deploy| FE
     GH -->|auto-deploy| BE

@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { sembrar } from '../../prisma/seed.js';
+import { definirRoles, PERFILES_ACCESO_TOTAL, sembrar } from '../../prisma/seed.js';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO } from '../contrato/index.js';
 import { limpiarBaseDatos } from '../pruebas/contexto.js';
 import { crearClientePrisma, type PrismaClient } from './index.js';
@@ -92,13 +92,17 @@ describe('seed de fundación', () => {
   it('siembra los roles de proveedor base (F1-E1B, R15) de forma idempotente', async () => {
     const roles = await prisma.rolProveedor.findMany({ select: { codigo: true } });
     const codigos = roles.map((r) => r.codigo).sort();
-    // Fusión de terceros (D12/R15): el seed siembra 9 roles de servicio. `estampado` y
+    // Fusión de terceros (D12/R15): el seed siembra 10 roles de servicio. `estampado` y
     // `aplicacion` se sembraron por separado (el viejo `estampado-aplicacion` ya NO se
     // siembra; en BD fresca de CI no existe, así que no va en la lista esperada).
+    // fila 0.114: entró `empaque` — Daniel: *«y una maquila de empaque también»*. La lista se
+    // mantiene ESCRITA A MANO a propósito (no se compara contra la constante del seed): así,
+    // agregar un rol obliga a decirlo aquí en vez de que la prueba se auto-apruebe sola.
     expect(codigos).toEqual(
       [
         'maquila-costura',
         'corte',
+        'empaque',
         'estampado',
         'bordado',
         'lavado',
@@ -108,6 +112,142 @@ describe('seed de fundación', () => {
         'otros-servicios',
       ].sort(),
     );
+  });
+
+  /**
+   * Fila 0.137 — el guard `exigirAlmacenDelTipo` exige que el almacén sea del tipo del artículo, y
+   * los avíos se mueven en cuatro flujos (ajuste, traspaso, recepción de compra y notas de salida).
+   * El catálogo NO tenía ni un almacén de tipo AVIO —el viejo no los tenía y por eso ni el seed ni
+   * el ETL creaban uno—, así que sin esta siembra esos cuatro flujos rechazarían siempre.
+   *
+   * Ojo con la idempotencia: el almacén es GLOBAL (`idEmpresa = null`) y el `@@unique` de almacenes
+   * es `(idEmpresa, nombre)`, que en Postgres NO atrapa los NULL. Si el seed no verificara a mano
+   * antes de crear, la segunda corrida dejaría DOS y el dominio no sabría de cuál sacar.
+   */
+  it('siembra UN almacén global de AVÍOS y no lo duplica al re-sembrar (fila 0.137)', async () => {
+    // `sembrar` ya corrió DOS veces en el primer test de este describe.
+    const avios = await prisma.almacen.findMany({ where: { tipo: 'AVIO' } });
+    expect(avios).toHaveLength(1);
+    expect(avios[0]).toMatchObject({
+      nombre: 'Almacén de avíos',
+      tipo: 'AVIO',
+      idEmpresa: null,
+      activo: true,
+      esTransitoProceso: false,
+    });
+
+    // Una tercera corrida tampoco lo duplica (idempotencia explícita, no heredada del test 1).
+    await sembrar(prisma);
+    expect(await prisma.almacen.count({ where: { tipo: 'AVIO' } })).toBe(1);
+    // Y los de PT siguen siendo los 3 de siempre (el bloque nuevo no tocó el existente).
+    expect(await prisma.almacen.count({ where: { tipo: 'PT' } })).toBe(3);
+  });
+
+  /**
+   * Fila 0.099 — el gemelo de telas, y por la MISMA razón: el seed sembraba tres almacenes de
+   * producto terminado y uno de avíos, y **ni uno de tipo TELA**. Los de telas nacían SÓLO del ETL
+   * de Access, que es opcional ⇒ en una base sembrada sin ETL, el guard de tipo de la 0.137 dejaba
+   * a los flujos de tela sin un solo almacén válido, y el **inventario cíclico de telas** —la
+   * pantalla del ARRANQUE, con la que se carga el inventario el día uno— sin ninguno que ofrecer
+   * en el alta. Esta fila declara esa siembra PRECONDICIÓN de la pantalla, así que se prueba.
+   */
+  it('siembra UN almacén global de TELAS y no lo duplica al re-sembrar (fila 0.099)', async () => {
+    // `sembrar` ya corrió varias veces en los tests anteriores de este describe.
+    const telas = await prisma.almacen.findMany({ where: { tipo: 'TELA' } });
+    expect(telas).toHaveLength(1);
+    expect(telas[0]).toMatchObject({
+      nombre: 'Almacén de telas',
+      tipo: 'TELA',
+      idEmpresa: null,
+      activo: true,
+      esTransitoProceso: false,
+    });
+
+    // Otra corrida tampoco lo duplica (idempotencia explícita, no heredada de los tests de arriba).
+    await sembrar(prisma);
+    expect(await prisma.almacen.count({ where: { tipo: 'TELA' } })).toBe(1);
+    // Y no se llevó por delante a los vecinos: 3 de PT y 1 de avíos.
+    expect(await prisma.almacen.count({ where: { tipo: 'PT' } })).toBe(3);
+    expect(await prisma.almacen.count({ where: { tipo: 'AVIO' } })).toBe(1);
+  });
+
+  /**
+   * ⭐ Fila 0.099 (revisión) — **la llave de idempotencia es el TIPO, no el NOMBRE**
+   * (`DECISIONES.md` §Post-F9.202).
+   *
+   * El daño que esto impide es concreto: el catálogo **permite renombrar** un almacén y el historial
+   * de versiones se lo dice a Daniel con esas palabras; el `@@unique (idEmpresa, nombre)` **no
+   * atrapa los NULL** de los almacenes globales; y `SEED_ON_START=true` está **permanente** en
+   * `prueba`. Con la llave vieja —buscar por nombre— el primer despliegue después de un renombre
+   * habría creado un SEGUNDO almacén global del mismo tipo: dos «telas» en el desplegable y el
+   * inventario partido en dos, que es exactamente lo que la fila 0.137 vino a evitar.
+   */
+  it('⭐ renombrar el almacén global NO lo duplica al re-sembrar: la llave es el TIPO', async () => {
+    const antesTela = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'TELA', idEmpresa: null },
+    });
+    const antesAvio = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'AVIO', idEmpresa: null },
+    });
+
+    // Daniel lo renombra desde Administración › Almacenes (cosa permitida y anunciada).
+    await prisma.almacen.update({
+      where: { id: antesTela.id },
+      data: { nombre: 'Bodega de telas Naucalpan' },
+    });
+    await prisma.almacen.update({
+      where: { id: antesAvio.id },
+      data: { nombre: 'Bodega de avíos Naucalpan' },
+    });
+
+    await sembrar(prisma);
+
+    // Sigue habiendo UNO de cada tipo, y es EL MISMO de antes con su nombre nuevo intacto: el seed
+    // ni duplica ni le devuelve el nombre de fábrica a un almacén que alguien renombró a propósito.
+    const telas = await prisma.almacen.findMany({ where: { tipo: 'TELA' } });
+    const avios = await prisma.almacen.findMany({ where: { tipo: 'AVIO' } });
+    expect(telas).toHaveLength(1);
+    expect(avios).toHaveLength(1);
+    expect(telas[0]).toMatchObject({ id: antesTela.id, nombre: 'Bodega de telas Naucalpan' });
+    expect(avios[0]).toMatchObject({ id: antesAvio.id, nombre: 'Bodega de avíos Naucalpan' });
+  });
+
+  /**
+   * ⭐ Fila 0.099 (revisión, 2ª vuelta) — **la llave mira SÓLO los almacenes GLOBALES**, y esta
+   * prueba fija esa mitad: la cláusula `idEmpresa: null` de {@link sembrarAlmacenUnicoGlobal}.
+   *
+   * Sin ella —buscando por `{ tipo }` a secas— un almacén de TELA **de una empresa** contaría como
+   * "ya hay uno", y el seed dejaría de sembrar el GLOBAL. El global es el **piso del catálogo**: lo
+   * que garantiza que cualquier empresa tenga a dónde mover telas aunque nadie le haya dado de alta
+   * los suyos. Un almacén de empresa no puede hacer ese papel, porque para las demás empresas no
+   * existe (A9).
+   *
+   * El escenario es el único en el que la cláusula se nota: **hay uno de empresa y NO hay global**.
+   * Por eso se borra el global antes de re-sembrar — si se dejara puesto, el seed lo encontraría de
+   * todas formas y la prueba no distinguiría nada. La cláusula es del helper COMPARTIDO, así que
+   * probarla en telas la cubre también para avíos.
+   */
+  it('⭐ un almacén de EMPRESA no cuenta como el global: el seed lo siembra igual', async () => {
+    const empresa = await prisma.empresa.findFirstOrThrow({ select: { id: true } });
+    const global = await prisma.almacen.findFirstOrThrow({
+      where: { tipo: 'TELA', idEmpresa: null },
+      select: { id: true },
+    });
+    await prisma.almacen.delete({ where: { id: global.id } });
+    const deEmpresa = await prisma.almacen.create({
+      data: { nombre: 'Telas de FR Moda', tipo: 'TELA', idEmpresa: empresa.id },
+    });
+    expect(await prisma.almacen.count({ where: { tipo: 'TELA', idEmpresa: null } })).toBe(0);
+
+    await sembrar(prisma);
+
+    // El global vuelve a nacer, con su nombre de fábrica…
+    const globales = await prisma.almacen.findMany({ where: { tipo: 'TELA', idEmpresa: null } });
+    expect(globales).toHaveLength(1);
+    expect(globales[0]).toMatchObject({ nombre: 'Almacén de telas', activo: true });
+    // …y el de la empresa queda intacto: el seed no lo confundió con el suyo ni lo tocó.
+    const trasSeed = await prisma.almacen.findUniqueOrThrow({ where: { id: deEmpresa.id } });
+    expect(trasSeed).toMatchObject({ nombre: 'Telas de FR Moda', idEmpresa: empresa.id });
   });
 
   it('siembra los 8 géneros base (F1-E4) de forma idempotente', async () => {
@@ -150,25 +290,128 @@ describe('seed de fundación', () => {
     expect(rolAdmin._count.permisos).toBe(CATALOGO_PERMISOS.length);
   });
 
-  it('la cascada de roles respeta el orden de niveles del sistema viejo (doc 00 §2)', async () => {
-    const roles = await prisma.rol.findMany({
-      include: { _count: { select: { permisos: true } } },
+  // ⛔ AQUÍ ESTABA «la cascada de roles respeta el orden de niveles del sistema viejo», que exigía
+  // `logistica < ventas < gerencial < directivo < admin` y `Asistente === Logistica ===
+  // Secretarial`, por CONTEO. Se sustituye el 3-sep-2026, y no por gusto: **ese anidamiento es
+  // exactamente la invariante que Daniel abolió** al mandar quitar los permisos por cascada
+  // (*"puede haber alguien que tenga el permiso A pero no el B, y otra persona que tenga el B pero
+  // no el A"*). Pasaba sólo porque los conjuntos siguen anidados HOY; el día que se armen los
+  // perfiles con los puestos reales de los 23 usuarios, esta prueba se habría puesto roja **por
+  // tener razón**, y el arreglo obvio —relajarla— habría dejado el seed sin prueba de integración.
+  //
+  // Lo que va en su lugar es más fuerte y no opina sobre la FORMA del reparto: que el seed escriba
+  // en la base EXACTAMENTE lo que dice `definirRoles()`, rol por rol y clave por clave. Si mañana
+  // Ventas y Logística se cruzan sin contenerse, esto sigue valiendo.
+  it('cada rol de sistema queda en la BD con EXACTAMENTE lo que dice definirRoles()', async () => {
+    const definicion = definirRoles();
+    const filas = await prisma.rol.findMany({
+      where: { nombre: { in: definicion.map((rol) => rol.nombre) } },
+      select: {
+        nombre: true,
+        esSistema: true,
+        permisos: { select: { permiso: { select: { clave: true } } } },
+      },
     });
-    const cuenta = new Map(roles.map((r) => [r.nombre, r._count.permisos]));
-    const admin = cuenta.get('Administrador') ?? -1;
-    const directivo = cuenta.get('Directivo') ?? -1;
-    const gerencial = cuenta.get('Gerencial') ?? -1;
-    const ventas = cuenta.get('Ventas') ?? -1;
-    const logistica = cuenta.get('Logistica') ?? -1;
 
-    expect(cuenta.get('AdministracionDireccion')).toBe(admin);
-    expect(directivo).toBeLessThan(admin);
-    expect(gerencial).toBeLessThan(directivo);
-    expect(ventas).toBeLessThan(gerencial);
-    expect(logistica).toBeLessThan(ventas);
-    expect(cuenta.get('Asistente')).toBe(logistica);
-    expect(cuenta.get('Secretarial')).toBe(logistica);
-    expect(cuenta.get('Basico')).toBe(0);
+    expect(filas, 'faltan roles de sistema en la BD').toHaveLength(definicion.length);
+    const porNombre = new Map(filas.map((fila) => [fila.nombre, fila]));
+    for (const rol of definicion) {
+      const fila = porNombre.get(rol.nombre);
+      expect(fila, `no se sembró el rol ${rol.nombre}`).toBeDefined();
+      expect(fila?.esSistema, `${rol.nombre} tiene que quedar marcado como de sistema`).toBe(true);
+      // Igualdad EXACTA, y se puede: este archivo arranca de `limpiarBaseDatos`, así que no hay
+      // rastro previo. (`sembrarRoles` tiene una excepción documentada —nunca REVOCA las claves de
+      // gobierno—, pero eso sólo puede dejar de MÁS lo que alguien hubiera otorgado antes, y aquí
+      // no hubo antes. Si algún día esto falla con `usuarios.administrar`/`roles.administrar` de
+      // sobra en un rol, es esa excepción, no un defecto.)
+      const enBd = (fila?.permisos ?? []).map((rp) => rp.permiso.clave).sort();
+      expect(enBd, `${rol.nombre}: la BD no coincide con definirRoles()`).toEqual(
+        [...rol.permisos].sort(),
+      );
+    }
+  });
+
+  /**
+   * ⭐ FILA 0.128 — **LA PREGUNTA QUE DECIDE SI HACE FALTA UNA MIGRACIÓN DE DATOS.**
+   *
+   * Daniel mandó quitarle a los perfiles operativos el permiso de validar cargos de maquila
+   * (§Post-F9.192(1): *«la validación sólo la doy yo»*). Quitarlo del seed sólo sirve si el seed
+   * **REVOCA**; si nada más agregara, `prueba` se quedaría con la liga vieja para siempre y el
+   * recorte necesitaría un `DELETE` a mano en una migración.
+   *
+   * Aquí se mide justo eso, con el caso peor: se le vuelve a PONER la liga a mano al rol (como la
+   * tiene hoy `prueba`, sembrada por la versión anterior) y se re-siembra. La liga tiene que
+   * desaparecer sola. Es lo que hace que `SEED_ON_START=true` baste como plan de despliegue.
+   *
+   * ⚠️ Sin esta prueba, `seed.int.test.ts` no lo cubría: su comprobación de roles arranca de
+   * `limpiarBaseDatos`, así que nunca hay una liga previa que sobre — y la excepción documentada de
+   * `sembrarRoles` (nunca revoca las claves de GOBIERNO) demuestra que "revocar o no" es una
+   * decisión real del código, no un accidente.
+   */
+  it('⭐ REVOCA lo que sobra: una liga rol-permiso puesta a mano desaparece al re-sembrar', async () => {
+    const gerencial = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Gerencial' },
+      select: { id: true },
+    });
+    const validar = await prisma.permiso.findUniqueOrThrow({
+      where: { clave: 'esma.cargo-validar' },
+      select: { id: true },
+    });
+
+    // Estado de partida: el rol NO lo tiene (el reparto de la 0.128 se lo quitó)…
+    const antes = await prisma.rolPermiso.count({
+      where: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    expect(antes, 'Gerencial ya no debe validar cargos de maquila (fila 0.128)').toBe(0);
+
+    // …se le pone a mano, como está hoy en la base de `prueba`, y se re-siembra.
+    await prisma.rolPermiso.create({
+      data: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    await sembrar(prisma);
+
+    const despues = await prisma.rolPermiso.count({
+      where: { idRol: gerencial.id, idPermiso: validar.id },
+    });
+    expect(
+      despues,
+      'el seed SINCRONIZA los roles de sistema: lo que ya no está en definirRoles() se borra',
+    ).toBe(0);
+  });
+
+  it('⭐ …y la contraparte: el permiso NUEVO de validar sí aterriza en el círculo del dueño', async () => {
+    // `esma.revisar` (fila 0.128) nace en esta versión: si el seed no lo sembrara, la pantalla se
+    // quedaría sin nadie que pueda autorizar partidas y el estado de cuenta se congelaría.
+    const conElPermiso = await prisma.rol.findMany({
+      where: { permisos: { some: { permiso: { clave: 'esma.revisar' } } } },
+      select: { nombre: true },
+    });
+    expect(conElPermiso.map((r) => r.nombre).sort()).toEqual([
+      'AdministracionDireccion',
+      'Administrador',
+      'Directivo',
+    ]);
+  });
+
+  it('los dos perfiles de acceso total llevan el catálogo COMPLETO, y Basico va en cero', async () => {
+    // Los extremos, dichos aparte: son los dos que un reparto mal editado rompe primero, y ninguno
+    // de los dos depende de que los perfiles de en medio estén anidados.
+    const roles = await prisma.rol.findMany({
+      where: { nombre: { in: [...PERFILES_ACCESO_TOTAL, 'Basico'] } },
+      select: { nombre: true, permisos: { select: { permiso: { select: { clave: true } } } } },
+    });
+    const porNombre = new Map(roles.map((fila) => [fila.nombre, fila]));
+
+    for (const nombre of PERFILES_ACCESO_TOTAL) {
+      const claves = (porNombre.get(nombre)?.permisos ?? []).map((rp) => rp.permiso.clave).sort();
+      expect(claves, `${nombre} tiene que llevar el catálogo completo`).toEqual(
+        [...CLAVES_PERMISO].sort(),
+      );
+    }
+    expect(
+      porNombre.get('Basico')?.permisos ?? ['(falta el rol Basico)'],
+      'Basico existe para NO tener permisos',
+    ).toEqual([]);
   });
 });
 
