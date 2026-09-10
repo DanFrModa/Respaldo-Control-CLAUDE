@@ -432,7 +432,9 @@ export async function darSalidaMermaIncompletas(
 export async function revertirMovimientosDeHecho(
   sesion: SesionUsuario,
   tx: Tx,
-  datos: { origenTipo: OrigenMovimiento; origenId: string },
+  // `motivo` (fila 0.180): el porqué que escribió quien cancela el HECHO (el recibo, el envío) y
+  // que el motor deja en las `observaciones` de cada inverso, para que el kardex lo enseñe.
+  datos: { origenTipo: OrigenMovimiento; origenId: string; motivo: string },
 ): Promise<number> {
   const movimientos = await tx.movimiento.findMany({
     where: {
@@ -482,7 +484,7 @@ export async function revertirMovimientosDeHecho(
       }
     }
     const inverso = await tipoInverso(esEntrada ? COD_ERROR_ENTRADA : COD_ERROR_SALIDA);
-    await cancelarMovimientoPtMotor(sesion, mov.id, inverso.id, { tx });
+    await cancelarMovimientoPtMotor(sesion, mov.id, inverso.id, datos.motivo, { tx });
     revertidos += 1;
   }
   return revertidos;

@@ -184,6 +184,13 @@ function KardexPorModelo(): React.JSX.Element {
                 <TablaDensaHead numerica>Entrada</TablaDensaHead>
                 <TablaDensaHead numerica>Salida</TablaDensaHead>
                 <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                {/* ⭐ FILA 0.180 — la columna que faltaba. El backend YA devolvía `observaciones`
+                    en cada renglón del kardex (el motivo del movimiento, fila 0.100, y desde la
+                    0.180 también el de la CANCELACIÓN), pero esta tabla no la pintaba: de las
+                    CUATRO superficies de kardex (PT, tela, avío y tela×color) era la única sin
+                    ella. Mismo formato que las otras: `truncate` con el texto entero en el
+                    `title`. */}
+                <TablaDensaHead>Observaciones</TablaDensaHead>
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
@@ -213,6 +220,9 @@ function KardexPorModelo(): React.JSX.Element {
                   <TablaDensaCelda numerica className="font-semibold">
                     {s.saldo.toLocaleString('es-MX')}
                   </TablaDensaCelda>
+                  {/* El saldo anterior no es un movimiento: no tiene observaciones. La celda va
+                      igual para que las columnas no se recorran. */}
+                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
                 </TablaDensaFila>
               ))}
               {renglones.map((r, i) => (
@@ -248,6 +258,13 @@ function KardexPorModelo(): React.JSX.Element {
                   </TablaDensaCelda>
                   <TablaDensaCelda numerica className="font-semibold">
                     {r.saldo.toLocaleString('es-MX')}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda
+                    className="max-w-xs truncate"
+                    title={r.observaciones ?? undefined}
+                    data-testid="kardex-pt-obs"
+                  >
+                    {r.observaciones ?? '—'}
                   </TablaDensaCelda>
                 </TablaDensaFila>
               ))}

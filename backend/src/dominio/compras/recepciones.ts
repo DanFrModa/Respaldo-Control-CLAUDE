@@ -1307,7 +1307,9 @@ export async function reversarRecepcion(
     // Por cada movimiento de entrada que generó la recepción, su INVERSO auditado (D3).
     for (const linea of recepcion.lineas) {
       if (linea.idMovimiento !== null) {
-        await cancelarMovimientoMaterial(sesion, linea.idMovimiento, tipoInverso.id, { tx });
+        await cancelarMovimientoMaterial(sesion, linea.idMovimiento, tipoInverso.id, datos.motivo, {
+          tx,
+        });
       }
     }
 

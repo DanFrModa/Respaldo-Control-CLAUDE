@@ -49,6 +49,7 @@ import {
   cancelarMovimientoPt as cancelarMovimientoPtManual,
   registrarMovimientoPt,
 } from '../inventarios/movimientos-pt.js';
+import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -716,6 +717,81 @@ describe('Cancelaciones (D3: inverso auditado, jamás edición)', () => {
 
     expect(await existencia(almPrimeras)).toBe(0);
     expect(await existencia(almTransito)).toBe(10);
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // FILA 0.180 — EL MOTIVO CRUZA `revertirMovimientosDeHecho`, EN SUS DOS LLAMADORES
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 Es el ÚNICO de los nueve caminos con un SALTO INTERMEDIO: ni `cancelarEtapaMovimiento` ni
+  // `cancelarReciboMaquila` llaman al motor: los dos pasan por el helper de `transito.ts`, que
+  // reenvía `datos.motivo`. Se midió que sin estas pruebas el reenvío no lo cruzaba NADIE:
+  // cambiando `datos.motivo` por un literal dentro del helper, los siete archivos de integración
+  // de estos flujos daban 195 pruebas EN VERDE. O sea, el kardex podía escribir un motivo
+  // inventado en la cancelación de un recibo y nadie se enteraba.
+  //
+  // Cada llamador va en SU prueba y con SU motivo (distinto del otro): así, un literal fijo en el
+  // helper mata las dos, y ninguna se apoya en lo que midió la otra.
+  describe('el MOTIVO de la cancelación llega al kardex (fila 0.180)', () => {
+    it('⭐ cancelar el ENVÍO: el motivo queda en LAS DOS patas del traspaso al tránsito', async () => {
+      await cortar100();
+      await meterAPt(almPrimeras, 10);
+      const envio = await enviarAEstampado(10, {
+        prendaTerminada: true,
+        idAlmacenOrigen: almPrimeras.id,
+      });
+
+      // Con espacios de sobra a propósito: se guarda RECORTADO.
+      await cancelarEtapaMovimiento(
+        sesion(),
+        envio.id,
+        { motivo: '   el envío se capturó con el maquilero equivocado   ' },
+        bd(),
+      );
+
+      // El envío movió DOS movimientos (salida del almacén + entrada al tránsito) ⇒ dos inversos,
+      // y el motivo tiene que estar en los dos: el helper los recorre en un bucle.
+      await esperarMotivoEnLosInversos(
+        cliente,
+        'el envío se capturó con el maquilero equivocado',
+        2,
+      );
+      // Y la garantía VIEJA sigue en pie: las prendas volvieron a su almacén.
+      expect(await existencia(almPrimeras)).toBe(10);
+      expect(await existencia(almTransito)).toBe(0);
+    });
+
+    it('⭐ cancelar el RECIBO: el motivo queda en el inverso del regreso al tránsito', async () => {
+      await cortar100();
+      await meterAPt(almPrimeras, 10);
+      await enviarAEstampado(10, { prendaTerminada: true, idAlmacenOrigen: almPrimeras.id });
+      const recibo = await registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoEstampado.id,
+          idMaquilero: estampador.id,
+          fecha: '2026-08-18',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      );
+
+      // MOTIVO DISTINTO al de la prueba de arriba: un literal fijo en el helper no puede pasar las
+      // dos, y un motivo cruzado entre llamadores tampoco.
+      await cancelarReciboMaquila(
+        sesion(),
+        recibo.id,
+        { motivo: 'el estampador devolvió otra orden' },
+        bd(),
+      );
+
+      // El recibo de un envío de prenda TERMINADA vuelve por las dos patas del traspaso de
+      // regreso ⇒ dos inversos, los dos con el motivo.
+      await esperarMotivoEnLosInversos(cliente, 'el estampador devolvió otra orden', 2);
+      expect(await existencia(almPrimeras)).toBe(0);
+      expect(await existencia(almTransito)).toBe(10);
+    });
   });
 
   it('cancelar un recibo cuyas prendas YA salieron del almacén no deja el inventario en negativo', async () => {

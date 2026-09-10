@@ -19,6 +19,7 @@ import type {
   TelaColor,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { autorizarOC, cancelarOC, crearOC, resumenOC } from './ordenes-compra.js';
 import {
@@ -417,6 +418,11 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
     );
     expect(reversada.reversada).toBe(true);
     expect(reversada.motivoReverso).toBe('llegó dañada');
+
+    // ⭐ FILA 0.180 — y el motivo llega al KARDEX, no sólo al documento. La línea de arriba mira
+    // `RecepcionCompra.motivoReverso`, que es OTRO campo de OTRA tabla: daría verde aunque el
+    // renglón del inverso se quedara en blanco. Esto mide la columna que el usuario lee.
+    await esperarMotivoEnLosInversos(cliente, 'llegó dañada', 1);
 
     // Existencia de nuevo en 0 (entrada + su inverso se neutralizan), pero los DOS movimientos
     // siguen existiendo (D3): nada se borra.

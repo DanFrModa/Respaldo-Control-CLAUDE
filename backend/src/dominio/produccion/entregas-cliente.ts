@@ -535,7 +535,7 @@ export async function cancelarEntregaCliente(
     const tipoInverso = await tipoPorCodigo(tx, COD_ERROR_SALIDA);
     for (const mov of movimientos) {
       if (mov.anuladoPor.length > 0) continue; // ya estaba anulado (defensivo)
-      await cancelarMovimientoPtMotor(sesion, mov.id, tipoInverso.id, { tx });
+      await cancelarMovimientoPtMotor(sesion, mov.id, tipoInverso.id, datos.motivo, { tx });
     }
 
     // Cancelación suave de la entrega (WIP).
