@@ -26,6 +26,7 @@ import type {
 } from '../../datos/index.js';
 import { ErrorConflicto } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import {
@@ -377,6 +378,9 @@ describe('Cancelación de entregas (F3-E5)', () => {
     await meterAInventario(10);
     const entrega = await entregar(5);
     await cancelarEntregaCliente(sesion(), entrega.id, { motivo: 'error de captura' }, bd());
+    // ⭐ FILA 0.180 — el motivo del usuario queda escrito en el inverso, que es lo que se lee en
+    // el kardex de PT (no sólo en `EtapaMovimiento.motivoCancelacion`).
+    await esperarMotivoEnLosInversos(cliente, 'error de captura', 1);
     await expect(
       cancelarEntregaCliente(sesion(), entrega.id, { motivo: 'reintento' }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);

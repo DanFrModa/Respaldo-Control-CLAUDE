@@ -1196,6 +1196,7 @@ export async function cancelarReciboMaquila(
     const movimientosRevertidos = await revertirMovimientosDeHecho(sesion, tx, {
       origenTipo: ORIGEN.reciboMaquila,
       origenId: String(idRecibo),
+      motivo: datos.motivo,
     });
 
     // (c) Cancela el cargo EsMa (esté propuesto o validado-con-permiso).

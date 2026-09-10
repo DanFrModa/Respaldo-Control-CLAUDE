@@ -713,6 +713,44 @@ describe('cancelación = inverso auditado (D3, NUNCA edita/borra)', () => {
     expect(inverso.detallesTela[0]?.idPartida).toBeNull();
     expect(Number(inverso.detallesTela[0]?.cantidad ?? -1)).toBe(60);
   });
+  // ⭐ FILA 0.180 — LA CUARTA SUPERFICIE: el kardex POR COLOR. Es una rama distinta del motor (la
+  // puerta `cancelarMovimientoTelaColor`), así que se mide aparte de tela/avío y de PT: si alguien
+  // borrara el `observaciones:` sólo de la rama de material, esta prueba también tiene que morir.
+  it('⭐ el MOTIVO de la cancelación se lee en el kardex por color (fila 0.180)', async () => {
+    const mov = await entrarColor(colorMarino.id, 100, 40, { loteProveedor: 'L-9' });
+    // Con espacios de sobra a propósito: se guarda RECORTADO.
+    await cancelarMovimientoTelaColor(
+      sesion(),
+      mov.id,
+      { motivo: '   la factura venía de otro proveedor   ' },
+      bd(),
+    );
+
+    const original = await cliente.movimiento.findUniqueOrThrow({ where: { id: mov.id } });
+    const esperado = `Cancelación del folio ${original.folio.toString()}: la factura venía de otro proveedor`;
+
+    // 1) En la columna que pinta la pantalla…
+    const kardex = await kardexTelaColor(
+      sesion(),
+      { idTelaColor: colorMarino.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
+    const renglonInverso = kardex.renglones.find((r) => r.observaciones === esperado);
+    expect(renglonInverso).toBeDefined();
+
+    // 2) …y el original conserva EL SUYO: no se mezclan (d).
+    expect(original.observaciones).not.toBe(esperado);
+
+    // 3) El motivo NO se repite en el renglón `OTRO` del dominio: vive en el `CANCELAR` del motor.
+    const canonico = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Movimiento', idEntidad: String(mov.id), accion: 'CANCELAR' },
+    });
+    expect(canonico.datos).toMatchObject({ motivo: 'la factura venía de otro proveedor' });
+    const puerta = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Movimiento', idEntidad: String(mov.id), accion: 'OTRO' },
+    });
+    expect(puerta.datos).toEqual({ dimension: 'tela-color' });
+  });
 });
 
 describe('existencias agrupadas y kardex de dos componentes', () => {

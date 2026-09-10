@@ -669,6 +669,151 @@ describe('el MOTIVO del traspaso de avío queda en LAS DOS patas (fila 0.172)', 
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// FILA 0.180 — EL MOTIVO DE LA CANCELACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// Se le exige al usuario un motivo OBLIGATORIO para cancelar y hasta la 0.180 ese motivo sólo
+// llegaba a la bitácora: el renglón del inverso decía «—» en el kardex, justo donde alguien había
+// escrito la explicación. Aquí se miden las DOS dimensiones que comparten el motor
+// `cancelarMovimientoMaterial` (tela y avío). La de PT vive en `comun/kardex.int.test.ts` y la de
+// tela×color en `partidas-telas.int.test.ts`: el motor es UNO y las tres tienen que decir lo mismo.
+describe('el MOTIVO de la CANCELACIÓN queda escrito en el inverso (fila 0.180)', () => {
+  it('⭐ TELA: el inverso lleva «Cancelación del folio N: motivo» y el saldo se neutraliza', async () => {
+    const idLote = await entrarLote(100, 40);
+    const salida = await ajustarInventarioTela(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: idTipoAjusteSalida,
+        idAlmacen: almA.id,
+        fecha: '2026-06-21',
+        motivo: 'salida a producción',
+        lineas: [{ idTela: telaFelpa.id, idLote, cantidad: 30 }],
+      },
+      bd(),
+    );
+    // Con espacios de sobra a propósito: se guarda RECORTADO.
+    await cancelarMovimientoTela(
+      sesion(PERM_TELAS),
+      salida.id,
+      { motivo: '   la tela nunca salió del almacén   ' },
+      bd(),
+    );
+
+    // Se lee de la BASE, que es la columna que pinta el kardex — no del objeto del dominio.
+    const original = await cliente.movimiento.findUniqueOrThrow({ where: { id: salida.id } });
+    const inverso = await cliente.movimiento.findFirstOrThrow({
+      where: { idMovimientoInverso: salida.id },
+    });
+    expect(inverso.observaciones).toBe(
+      `Cancelación del folio ${original.folio.toString()}: la tela nunca salió del almacén`,
+    );
+    // (d) El inverso NO hereda las observaciones del original: cada uno lleva SU motivo.
+    expect(original.observaciones).toBe('salida a producción');
+    expect(inverso.observaciones).not.toBe(original.observaciones);
+
+    // La garantía VIEJA sigue en pie: el par se neutraliza (salieron 30, volvieron 30).
+    const exis = await consultarExistenciasTela(sesion(PERM_TELAS), { idTela: telaFelpa.id }, bd());
+    expect(exis.filas[0]?.existencia).toBe(100);
+
+    // (e) Y la bitácora canónica del acto lleva el motivo (A7).
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Movimiento', idEntidad: String(salida.id), accion: 'CANCELAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      dimension: 'tela',
+      motivo: 'la tela nunca salió del almacén',
+    });
+  });
+
+  it('⭐ AVÍO: el inverso lleva el mismo texto (la rama GEMELA, medida aparte)', async () => {
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 500 }],
+      },
+      bd(),
+    );
+    const salida = await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteSalida,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-21',
+        motivo: 'consumo de la orden 900',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 200 }],
+      },
+      bd(),
+    );
+    await cancelarMovimientoAvio(
+      sesion(PERM_AVIOS),
+      salida.id,
+      { motivo: 'se capturó en el avío equivocado' },
+      bd(),
+    );
+
+    const original = await cliente.movimiento.findUniqueOrThrow({ where: { id: salida.id } });
+    const inverso = await cliente.movimiento.findFirstOrThrow({
+      where: { idMovimientoInverso: salida.id },
+    });
+    expect(inverso.observaciones).toBe(
+      `Cancelación del folio ${original.folio.toString()}: se capturó en el avío equivocado`,
+    );
+    expect(original.observaciones).toBe('consumo de la orden 900');
+
+    const exis = await consultarExistenciasAvio(
+      sesion(PERM_AVIOS),
+      { idAvio: avioCierre.id },
+      bd(),
+    );
+    expect(exis.filas[0]?.existencia).toBe(500);
+
+    const bitacora = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Movimiento', idEntidad: String(salida.id), accion: 'CANCELAR' },
+    });
+    expect(bitacora.datos).toMatchObject({
+      dimension: 'avio',
+      motivo: 'se capturó en el avío equivocado',
+    });
+  });
+
+  it('⭐ y el KARDEX de tela lo devuelve: es donde el usuario lo va a leer', async () => {
+    const idLote = await entrarLote(80, 20);
+    const salida = await ajustarInventarioTela(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: idTipoAjusteSalida,
+        idAlmacen: almA.id,
+        fecha: '2026-06-21',
+        motivo: 'merma',
+        lineas: [{ idTela: telaFelpa.id, idLote, cantidad: 10 }],
+      },
+      bd(),
+    );
+    await cancelarMovimientoTela(
+      sesion(PERM_TELAS),
+      salida.id,
+      { motivo: 'no hubo tal merma' },
+      bd(),
+    );
+    const original = await cliente.movimiento.findUniqueOrThrow({ where: { id: salida.id } });
+    const kardex = await kardexTela(
+      sesion(PERM_TELAS),
+      { idTela: telaFelpa.id, desde: PERIODO_COMPLETO },
+      bd(),
+    );
+    const renglonDelInverso = kardex.renglones.find(
+      (r) => r.observaciones !== null && r.observaciones.startsWith('Cancelación del folio'),
+    );
+    expect(renglonDelInverso?.observaciones).toBe(
+      `Cancelación del folio ${original.folio.toString()}: no hubo tal merma`,
+    );
+  });
+});
+
 describe('Telas — ajuste con lote NULL (clave del kardex 0, IS NOT DISTINCT FROM)', () => {
   it('(8b) un ajuste de entrada SIN lote (idLote NULL) suma y la existencia lo refleja', async () => {
     // Entrada directa de tela sin lote (línea con idLote nulo): el motor acepta idLote NULL y la

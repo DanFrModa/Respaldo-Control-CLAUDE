@@ -1289,6 +1289,7 @@ export async function cancelarEtapaMovimiento(
         await revertirMovimientosDeHecho(sesion, tx, {
           origenTipo: ORIGEN.envioMaquila,
           origenId: String(idEtapa),
+          motivo: datos.motivo,
         });
       }
     }

@@ -1557,12 +1557,17 @@ export async function cancelarMovimientoTelaColor(
         ? COD_AJUSTE_SALIDA
         : COD_AJUSTE_ENTRADA;
     const tipoInverso = await tipoPorCodigo(tx, codigoInverso);
-    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, { tx });
+    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, datos.motivo, { tx });
+    // Fila 0.180 — este renglón SÍ se queda (a diferencia de los de `telas.ts`/`avios.ts`, que se
+    // retiraron por redundantes): dice por cuál PUERTA se canceló, y eso el motor no lo puede
+    // saber. Un movimiento del flujo por color trae detalle de TELA, así que el motor escribe
+    // `dimension: 'tela'` tanto si se canceló desde aquí como desde la puerta legada por lote.
+    // El motivo YA no se repite aquí: vive en el renglón `CANCELAR` del motor, que es el canónico.
     await registrarBitacora(tx, sesion, {
       entidad: 'Movimiento',
       idEntidad: idMovimiento,
       accion: 'OTRO',
-      datos: { motivoCancelacion: datos.motivo, dimension: 'tela-color' },
+      datos: { dimension: 'tela-color' },
     });
   }, bd);
 

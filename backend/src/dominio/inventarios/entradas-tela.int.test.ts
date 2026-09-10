@@ -38,6 +38,7 @@ import type {
   TelaColor,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearOC, autorizarOC } from '../compras/ordenes-compra.js';
 import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
@@ -666,6 +667,9 @@ describe('Entrada de tela (B1) — cancelación = inverso auditado (D3/A7)', () 
     );
     expect(cancelada.estatus).toBe('cancelada');
     expect(cancelada.motivoCancelacion).toBe('la factura venía mal');
+    // ⭐ FILA 0.180 — y también en el KARDEX: la línea de arriba mira
+    // `EntradaTela.motivoCancelacion` (otro campo, otra tabla) y no vería un inverso en blanco.
+    await esperarMotivoEnLosInversos(cliente, 'la factura venía mal', 1);
 
     // El par entrada + inverso se neutraliza POR COLOR (ambos componentes) y los DOS movimientos
     // siguen vivos (D3).

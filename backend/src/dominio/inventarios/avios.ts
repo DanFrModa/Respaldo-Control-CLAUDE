@@ -33,7 +33,6 @@ import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
-import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   bloquearAvio,
@@ -516,13 +515,11 @@ export async function cancelarMovimientoAvio(
         ? COD_AJUSTE_SALIDA
         : COD_AJUSTE_ENTRADA;
     const tipoInverso = await tipoPorCodigo(tx, codigoInverso);
-    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, { tx });
-    await registrarBitacora(tx, sesion, {
-      entidad: 'Movimiento',
-      idEntidad: idMovimiento,
-      accion: 'OTRO',
-      datos: { motivoCancelacion: datos.motivo, dimension: 'avio' },
-    });
+    // Fila 0.180: el motor recibe el MOTIVO (lo escribe en las `observaciones` del inverso y en
+    // su renglón `CANCELAR`). El renglón `OTRO` que había aquí se retiró: decía exactamente lo
+    // mismo que el del motor —misma entidad, mismo id, `dimension: 'avio'` incluido—, y sólo
+    // existía porque el motivo no tenía dónde vivir.
+    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, datos.motivo, { tx });
   }, bd);
 
   return obtenerMovimientoAvio(idMovimiento, idEmpresa, verImportes, bd);

@@ -55,7 +55,6 @@ import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
-import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarFechaCapturable } from '../../comun/fecha-capturable.js';
 import {
@@ -656,17 +655,12 @@ export async function cancelarMovimientoPt(
         : COD_ERROR_SALIDA;
     const tipoInverso = await tipoPorCodigo(tx, codigoInverso);
 
-    // El motor crea el inverso y lo enlaza; lanza ErrorConflicto si ya estaba anulado.
-    await cancelarMovimientoPtMotor(sesion, idMovimiento, tipoInverso.id, { tx });
-
-    // El motor ya registra el CANCELAR, pero sin el motivo; lo dejamos en la bitácora (A7) para no
-    // perderlo (el motor no acepta motivo y no se toca el núcleo).
-    await registrarBitacora(tx, sesion, {
-      entidad: 'Movimiento',
-      idEntidad: idMovimiento,
-      accion: 'OTRO',
-      datos: { motivoCancelacion: datos.motivo },
-    });
+    // El motor crea el inverso y lo enlaza; lanza ErrorConflicto si ya estaba anulado. Desde la
+    // fila 0.180 recibe el MOTIVO: lo escribe en las `observaciones` del inverso (para que se lea
+    // en el kardex) y en su propio renglón de bitácora `CANCELAR`. Aquí ya NO se registra un
+    // renglón `OTRO` aparte: era el parche de cuando el motor no aceptaba motivo, y ahora sería
+    // el mismo dato dos veces sobre la misma entidad.
+    await cancelarMovimientoPtMotor(sesion, idMovimiento, tipoInverso.id, datos.motivo, { tx });
   }, bd);
 
   // Devuelve el ORIGINAL ya marcado como cancelado (su `anuladoPor` ahora trae al inverso).
