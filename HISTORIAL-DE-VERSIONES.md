@@ -71,6 +71,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.142 · 10-sep-2026 · **en prueba** — **Ya existe una lista de qué hacer el día del arranque**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Saber qué falta de verdad para arrancar, y en qué orden.** Nace `docs/ARRANQUE.md`, medido
+  contra el código de hoy y no contra los planes. **El veredicto: el arranque está a días de trabajo
+  técnico, no a semanas** — la migración ya está construida (16 cargadores y 9 reportes de cuadre) y
+  su instructivo del día del corte ya estaba escrito.
+- **Y por primera vez existe junta la lista de pasos del día del arranque**, con quién hace cada uno
+  y de qué depende. Hasta hoy estaba desperdigada por cuatro documentos, y el orden importa.
+
+### Qué cambió y puede sorprender
+
+- **Tres documentos que decían cosas distintas ahora llevan aviso en su primera línea.** Uno de julio
+  daba por pendientes cosas que ya estaban hechas —seguirlo significaba **rehacer trabajo**—; otro de
+  agosto tiene el calendario vencido pero **su criterio sigue siendo el bueno** (arrancar con tres
+  usuarios y sin Finanzas); y la ficha de la fase de arranque marcaba siete etapas pendientes cuando
+  casi todo está construido.
+- **Dos cosas que se creían pendientes ya no lo son, y conviene saberlo:** no hay conteo físico de
+  inventario (lo cancelaste tú) y la Ruta Crítica sale de esta primera versión (también decisión
+  tuya). Eran los dos mayores consumidores de tiempo del arranque.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Sigue faltando el número del salto de folios**, y es irreversible una vez arrancado.
+- **Dos tropiezos del día del corte quedaron evitados por escrito:** el instructivo mandaba a buscar
+  los datos del sistema viejo donde ya no están, y le faltaba uno de los reportes de comprobación.
+- **Esta versión no cambia ni una línea de programa.** Es sólo documentación — pero es la que evita
+  llegar al día del arranque siguiendo una lista de hace un mes.
+
+---
+
 ## 0.141 · 10-sep-2026 · **en prueba** — **El precio que tecleas en una compra ya no se va al material equivocado**
 
 ### Qué se puede hacer ahora que antes no

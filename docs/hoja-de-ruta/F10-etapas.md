@@ -1,5 +1,24 @@
 # F10 — Migración + Go-live · desglose en etapas
 
+> ## 🔴 ESTA FICHA ESTÁ DESACTUALIZADA (escrita el 11-ago-2026). Ve a [`../ARRANQUE.md`](../ARRANQUE.md)
+>
+> **Sus 7 etapas siguen marcadas ⬜ y eso ya no es cierto.** Medido el 10-sep-2026 contra el
+> repositorio: entre **E2** y **E3** hay ~**90 %** construido —**16 cargadores y 9 reportes de
+> cuadre**— y **existe el instructivo del día del corte con los comandos en orden**
+> (`backend/migracion/README.md:34-80`), que es en la práctica lo que E1/E2/E3 pedían construir.
+>
+> **Y hay etapas enteras que ya no hacen falta, porque el problema se resolvió de otra forma:**
+> - **E4 (frontera de 10 años):** sustituida por «sólo 2025-2026 vivo, el resto como archivo plano»
+>   (`backend/migracion/comun/ventana.ts:8-11`), que **ya tiene cargador y pantalla**.
+> - **El conteo físico de inventario:** lo canceló Daniel (`DECISIONES.md:1586-1611`) — se arranca en
+>   cero y se carga la tela conforme se usa. *Era el mayor consumidor de tiempo humano del arranque.*
+> - **La Ruta Crítica entera sale de V1** (§Post-F9.226(a)) ⇒ su ETL no se corre el día uno.
+>
+> ⚠️ **Lo que esta ficha describe y NO se construyó —pantalla de migración, orquestador, extractor en
+> Python— se resolvió corriendo los comandos a mano, y no hace falta para arrancar.**
+>
+> Se conserva por su detalle de diseño. **La lista operativa es `ARRANQUE.md`.**
+
 > Parte de la hoja de ruta viva ([`HOJA-DE-RUTA.md`](../../HOJA-DE-RUTA.md), raíz del repo).
 > Una sesión nueva lee `CLAUDE.md` → `PLANMAESTRO.md` → `HOJA-DE-RUTA.md` → la ficha de la fase activa.
 >
@@ -72,7 +91,7 @@ Daniel, 11-ago-2026: _"Las bases de datos de Control no están actualizadas. Cua
 - CLAUDE.md §4 (encoding latin-1, CSV con saltos embebidos, access-parser)
 - Documentacion_MJD/10-Modelo-Datos-y-Usuarios.md §1 (los 4 .mdb y sus tablas; contraseña en producción)
 - DECISIONES.md D0 (transformar, no copiar) y D9 (Promoda excluido); MEJORAS A2, A7; REQUISITOS-NUEVOS.md R9 (tablas de impresión que no migran)
-- docs/modulos/patron-crud.md (patrón de pantalla para la consola); docs/ESTADO-DESPLIEGUE.md y docs/GUIA-RAILWAY-R2.md (R2 para el transporte)
+- docs/modulos/patron-crud.md (patrón de pantalla para la consola); docs/GUIA-RAILWAY-R2.md (R2 para el transporte) ⚠️ *(aquí se citaba `docs/ESTADO-DESPLIEGUE.md`, que **nunca ha existido** — lo denunció `DIAGNOSTICO-FLUJO-COMPLETO.md:264` y seguía sin corregirse)*
 
 ---
 
@@ -315,7 +334,7 @@ Daniel, 11-ago-2026: _"Las bases de datos de Control no están actualizadas. Cua
 - Documentacion_MJD/01-Modelos.md §4 (convención de fotos <modelo>.jpg / <modelo>-P.jpg)
 - MEJORAS A4 (RBAC único), A5 (archivos por tabla, no por convención), A7
 - docs/arquitectura/ADR-0003-better-auth.md y ADR-0004-hash-scrypt.md
-- docs/ESTADO-DESPLIEGUE.md (R2 debe estar montado ANTES de esta etapa — pendiente operativo de F0)
+- ⚠️ *(aquí se citaba `docs/ESTADO-DESPLIEGUE.md`, que **nunca ha existido**.)* R2 debe estar montado ANTES de esta etapa — **y ya lo está** desde el 25-ago-2026 (`CLAUDE.md` §1)
 
 ---
 
