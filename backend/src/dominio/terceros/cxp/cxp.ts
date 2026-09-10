@@ -269,7 +269,14 @@ interface FilaAgregadoCxp {
  * de «está al corriente» son indistinguibles al leerlos, así que quien pintara la columna diría «al
  * corriente» de alguien a quien nadie midió. Por eso el número no es un campo opcional sino **otro
  * tipo** ({@link FilaNetaConDias}), que sólo devuelve la función que de verdad lo calcula: pedirlo
- * sin haberlo pedido no compila. Quien mañana quiera una cartera sin días —un export, un KPI— la
+ * sin haberlo pedido no compila.
+ *
+ * ⚠️ **Y el límite exacto de esa barrera, medido por el reviewer de la 0.186 (no se presenta como
+ * absoluta porque no lo es):** el tipo frena el ACCIDENTE —devolver la bandeja a la cartera sin días
+ * pone el typecheck en rojo justo en la línea que pinta la columna—, pero **escribir
+ * `diasVencidos: null` a mano SÍ compila**. Lo que tapa ese hueco es la otra capa: ese burlado tumba
+ * las dos pruebas de `bandeja-segmento.test.ts`. **Tipo contra el descuido, pruebas contra la
+ * «optimización» deliberada.** Quien mañana quiera una cartera sin días —un export, un KPI— la
  * tiene aquí, y el compilador le impedirá enseñar una edad que nadie midió.
  */
 export interface FilaNeta extends CubetasAging {
