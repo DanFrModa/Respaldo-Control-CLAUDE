@@ -215,7 +215,7 @@ Estrategia de migración del histórico. Decisión de Gabriel, 2026-06-20. Detal
 Reglas de Órdenes de Compra, recepción, explosión MRP, notas de salida y migración de la fase. Cerradas con **Daniel** (dueño / experto del negocio), relayed por Gabriel, 2026-06-20. Detalle operativo en la ficha `docs/hoja-de-ruta/F4-etapas.md`.
 
 #### (a) — Edición de una OC autorizada: bloqueada salvo admin + "Duplicar a nueva OC" (E2)
-- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. El **administrador SÍ puede editarla**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.
+- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. La **puede editar quien tenga el permiso `compras.editar-autorizada`**, ⚠️ **(actualizado el 11-sep-2026, fila 0.120: hasta entonces esto decía «el administrador», porque la facultad colgaba de `roles.administrar` — el interruptor que esa fila desmontó)**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.
 - **Por qué:** preserva el rastro de auditoría (no se reescriben a la ligera documentos ya autorizados) y resuelve la necesidad real de "cambiar un detallito sin rehacer".
 - **Aplica en:** F4-E2.
 
@@ -15526,5 +15526,50 @@ y sigue bloqueando.**
 
 - **Aplica en:** versión **0.146**, filas **0.143**, **0.117**, **0.189**, **0.163**, **0.120**.
   **Fecha:** 2026-09-11.
+
+---
+
+#### (Post-F9.230) — SE DESMONTA EL INTERRUPTOR DE «ES ADMIN»: CUATRO LLAVES PARA CINCO FACULTADES
+
+**Qué se decidió.** `roles.administrar` deja de ser el **marcador de «es admin»** del sistema. Las
+cinco facultades que colgaban de él pasan a permisos propios: **`rc.capturar-cualquiera`** (capturar
+un proceso de RC del que ninguno de mis roles es responsable — y que también gobierna el badge «tú»),
+**`rc.bandeja-completa`** (ver en la bandeja las tareas de todos), **`compras.editar-autorizada`**
+(editar una OC ya autorizada **sin quitarle el sello**) y **`tipos-proceso.marcar-entrada-pt`** (fijar
+si recibir de un proceso mete prenda al kardex de PT).
+
+**Por qué, con las palabras de Daniel.** Es literalmente su queja de 2026-09-03: *«puede haber alguien
+que tenga el permiso A pero no el B, y otra persona el B pero no el A»*. Aquí **A implicaba B, C, D y
+E**, y no se veía desde ninguna pantalla.
+
+**Y el orden, que él fijó:** *«el arreglo de código va ANTES del reparto — mientras los cinco poderes
+cuelguen de `roles.administrar` no habrá cinco interruptores que mover, y su reparto sería una
+ilusión»*. ⇒ esta fila **construye los interruptores**; **los perfiles concretos los arma Daniel al
+arrancar**, que es su decisión de §Post-F9.187(c), repetida en §Post-F9.218(c) y otra vez el
+11-sep-2026 (§Post-F9.229(e)).
+
+> ### 🔑 CUATRO LLAVES PARA CINCO SITIOS: por qué una se comparte, y por qué las otras NO
+>
+> La ficha advertía que *«meterlos bajo uno solo repetiría el defecto con otro nombre»*. Se leyeron los
+> cinco antes de tocar nada y **no son la misma facultad**:
+> - **`rc.capturar-cualquiera` cubre dos sitios** porque el segundo (`esResponsableActual`, el badge
+>   «tú») **no es una facultad**: es *la respuesta a la misma pregunta* que contesta el guardia de
+>   captura. Si divergieran, el sistema **mentiría en una de las dos direcciones** — badge sin captura
+>   ⇒ 403 al pulsar; captura sin badge ⇒ puede y nadie se lo dice. Verificado por el reviewer: su
+>   único consumidor es el tinte de fila y el badge, **sin ningún gate colgando**.
+> - **`rc.bandeja-completa` NO se plegó** a la anterior: colapsaría **ver** con **capturar**, que es
+>   justo el caso de Daniel — *un coordinador que persigue sin capturar*.
+> - **`compras.editar-autorizada` NO cabe en `compras.desautorizar`**: aquélla **quita** el sello y
+>   deja rastro evidente; ésta modifica lo firmado **dejándolo firmado** — el camino más callado.
+> - Plegarlas a `rc.programar` o `compras.administrar` habría abierto la puerta a **medio
+>   organigrama**: medido contra el seed, **los seis perfiles operativos** las llevan.
+
+**Equivalencia hacia atrás, medida contra una base sembrada de verdad** (no por construcción): las
+cuatro claves quedan en `AdministracionDireccion, Administrador` — **exactamente los mismos perfiles
+que `roles.administrar`**. Quien hoy puede, sigue pudiendo. **Sin migración.** `SEED_ON_START` ya es
+permanente en `prueba` ⇒ aparecen solas en el siguiente despliegue, con **cuatro casillas nuevas** en
+la pantalla de Roles.
+
+- **Aplica en:** versión **0.147**, fila **0.120**. **Fecha:** 2026-09-11.
 
 ---

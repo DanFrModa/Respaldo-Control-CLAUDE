@@ -12388,8 +12388,10 @@ el proceso siga listado.*
 - el ETL le hereda a cada OC migrada **el estatus que traía de Access**
   (`migracion/loaders/ordenes-compra.ts:212`, `estatusOCMigrada`: **`cancelada` > `autorizada` >
   `borrador`**, en ese orden — ⚠️ **no "nacen autorizada"**, como esta ficha llegó a afirmar), y
-- `actualizarOC` **bloquea al no-admin** sobre una OC autorizada (`ordenes-compra.ts:957-960`:
-  *"solo un administrador puede modificarla"*).
+- `actualizarOC` **bloquea a quien no tenga `compras.editar-autorizada`** sobre una OC autorizada.
+  ⚠️ **Actualizado el 11-sep-2026 (fila 0.120):** antes decía *«bloquea al no-admin»* y citaba
+  textualmente *"solo un administrador puede modificarla"* — **ese mensaje ya no existe** (hoy nombra
+  la facultad), y las líneas que citaba están desplazadas.
 
 O sea que a un comprador sin `roles.administrar` se le ofrecía **una salida cerrada**: daba la vuelta
 completa para toparse con otro "no". ⚠️ **Es EXACTAMENTE el defecto que un reviewer ya cazó en este

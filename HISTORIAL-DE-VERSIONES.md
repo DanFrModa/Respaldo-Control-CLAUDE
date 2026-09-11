@@ -71,6 +71,35 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.147 · 11-sep-2026 · **en prueba** — **Dar «administrar roles» ya no regala cuatro poderes de propina**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Repartir por separado cinco cosas que antes venían todas juntas.** Hasta hoy, darle a alguien
+  «administrar roles» le concedía **de pasada** capturar cualquier proceso de Ruta Crítica, ver la
+  bandeja completa de todos, **editar una orden de compra ya autorizada** y tocar la casilla que
+  decide si recibir de un proceso mete prenda al inventario. Y nada de eso se veía en ninguna pantalla.
+- **Ahora son cuatro casillas separadas** en la pantalla de Roles, cada una con su nombre.
+
+### Qué cambió y puede sorprender
+
+- **Hoy no cambia nada de lo que se puede hacer.** Quien era administrador sigue pudiendo exactamente
+  lo mismo: se comprobó sembrando una base y comparando perfil por perfil.
+- **Lo que cambia es el día del reparto:** habrá cinco interruptores que mover en vez de uno solo que
+  lo daba todo. Sin esto, repartir permisos habría sido una ilusión.
+- **Un mensaje cambió de texto.** Al intentar duplicar una orden de compra ya autorizada, el sistema
+  decía «esa captura la tiene que hacer un administrador». Ahora nombra el permiso, porque después de
+  este cambio **puede hacerla alguien que no es administrador** — que es justamente el propósito.
+
+### Qué sigue pendiente o roto
+
+- **Para configurar quién es responsable de un proceso de Ruta Crítica todavía hace falta poder
+  administrar TODOS los permisos del sistema.** Es la misma queja al revés y queda anotado aparte.
+- **Los perfiles concretos siguen sin armarse**, y así estaba decidido: se arman al arrancar, con los
+  puestos reales.
+
+---
+
 ## 0.146 · 11-sep-2026 · **en prueba** — **La pantalla de existencias ya no se trae el inventario entero**
 
 ### Qué se puede hacer ahora que antes no
