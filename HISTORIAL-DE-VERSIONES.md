@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.145 · 10-sep-2026 · **en prueba** — **Ya no te vuelve a pedir que compres lo que ya compraste**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Cerrar un faltante «con esto queda cubierto» y que se quede cerrado**, aunque después el
+  renglón cambie de forma. Antes, si marcabas un color, comprabas y dabas por cerrado el resto — y
+  más tarde alguien marcaba ese avío como «se compra sin importar el color», o le quitaba el amarre
+  de color a la tela— **esas marcas se quedaban sin dueño y el faltante reaparecía**. El sistema te
+  volvía a pedir comprar algo que ya estaba resuelto.
+- **Tu caso del kilo, entre los medidos:** 481 kilos pedidos, se compran 480 y perdonas el kilo que
+  falta. Si después se le quita el amarre de color a esa tela, **el kilo resucitaba**. Ya no.
+- **Y las tres pantallas dicen el mismo número.** La explosión de materiales, la revisión previa
+  antes de generar la orden de compra y el propio botón de cerrar el faltante: antes podían decir
+  40 en una y 50 en otra sobre exactamente lo mismo.
+
+### Qué cambió y puede sorprender
+
+- **El botón de «volver a pedirlo» ahora sí reabre esos faltantes.** Antes, en el caso de arriba,
+  la pantalla decía «cubierto» pero el botón para reabrirlo no hacía nada: quedaba cerrado sin
+  manera de deshacerlo.
+- **Lo que NO cambia, a propósito:** si la marca la hiciste **sin** color y el material se abre en
+  colores después, la marca se suelta y **el faltante reaparece a la vista**, para que lo cierres
+  otra vez con un clic. Se eligió así porque cerrar «cubierto» desde la explosión cierra *todo* el
+  pendiente de ese renglón, y repartirlo entre los colores nuevos podría dejarlos en cero y hacerte
+  **comprar de menos sin que nadie se entere**. Un faltante visible de más es preferible a una
+  compra que no se hace.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Al fusionar dos colores del catálogo, una marca puede quedar contada pero imposible de
+  deshacer** — el botón de reabrir se queda mudo. **No lo introduce esta versión** (ya estaba), y
+  queda anotado con número propio. Depende de con qué frecuencia se fusionan colores, que es dato
+  del negocio.
+- **El tablero de «qué tengo / qué falta» sigue sin mirar lo dado por cubierto.** Es anterior a esta
+  versión y no se tocó.
+
+---
+
 ## 0.144 · 10-sep-2026 · **en prueba** — **El motivo que escribes al cancelar ya se puede leer**
 
 ### Qué se puede hacer ahora que antes no
