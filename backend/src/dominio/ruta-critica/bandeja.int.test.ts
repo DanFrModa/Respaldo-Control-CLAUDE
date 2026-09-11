@@ -207,16 +207,16 @@ describe('consultarBandeja — "mis tareas"', () => {
     expect(sinPermiso.datos).toHaveLength(0);
   });
 
-  it('el admin (roles.administrar) ve todas las tareas activas sin filtro de rol', async () => {
+  it('con `rc.bandeja-completa` se ven todas las tareas activas sin filtro de rol', async () => {
     const idOrden = await crearOrdenConRc();
     const proc = await crearProcesoDef('corte');
     const idRuta = await crearRenglon(idOrden, proc, { secuencia: 0, estado: 'activo' });
     // Sin roles responsables definidos.
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    const pagina = await consultarBandeja(admin, {}, bd(), hoy);
+    const pagina = await consultarBandeja(conBandejaCompleta, {}, bd(), hoy);
     expect(pagina.datos.map((t) => t.idRutaOrden)).toEqual([idRuta]);
   });
 
@@ -236,11 +236,11 @@ describe('consultarBandeja — "mis tareas"', () => {
     const proc = await crearProcesoDef('corte');
     await crearRenglon(ordenOtra.id, proc, { secuencia: 0, estado: 'activo' });
 
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa, // empresa por defecto del test, NO `otra`.
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    expect((await consultarBandeja(admin, {}, bd(), hoy)).datos).toHaveLength(0);
+    expect((await consultarBandeja(conBandejaCompleta, {}, bd(), hoy)).datos).toHaveLength(0);
   });
 
   it('filtra por busquedaCliente e idOrden', async () => {
@@ -249,15 +249,20 @@ describe('consultarBandeja — "mis tareas"', () => {
     const proc = await crearProcesoDef('corte');
     const r1 = await crearRenglon(idOrden1, proc, { secuencia: 0, estado: 'activo' });
     const r2 = await crearRenglon(idOrden2, proc, { secuencia: 0, estado: 'activo' });
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
 
-    const porCliente = await consultarBandeja(admin, { busquedaCliente: 'aurora' }, bd(), hoy);
+    const porCliente = await consultarBandeja(
+      conBandejaCompleta,
+      { busquedaCliente: 'aurora' },
+      bd(),
+      hoy,
+    );
     expect(porCliente.datos.map((t) => t.idRutaOrden)).toEqual([r1]);
 
-    const porOrden = await consultarBandeja(admin, { idOrden: idOrden2 }, bd(), hoy);
+    const porOrden = await consultarBandeja(conBandejaCompleta, { idOrden: idOrden2 }, bd(), hoy);
     expect(porOrden.datos.map((t) => t.idRutaOrden)).toEqual([r2]);
   });
 
@@ -275,11 +280,11 @@ describe('consultarBandeja — "mis tareas"', () => {
       estado: 'activo',
       fechaPlaneadaVigente: '2026-06-10', // vencido → atrasado
     });
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    const pagina = await consultarBandeja(admin, {}, bd(), hoy);
+    const pagina = await consultarBandeja(conBandejaCompleta, {}, bd(), hoy);
     expect(pagina.datos[0]?.idRutaOrden).toBe(rAtrasado);
     expect(pagina.datos[1]?.idRutaOrden).toBe(rAtiempo);
     expect(pagina.datos[0]?.semaforo).toBe('atrasado');
@@ -309,11 +314,11 @@ describe('contarAlertas', () => {
       fechaPlaneadaVigente: '2026-07-15', // aTiempo (no cuenta)
     });
 
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    const conteo = await contarAlertas(admin, bd(), hoy);
+    const conteo = await contarAlertas(conBandejaCompleta, bd(), hoy);
     expect(conteo).toEqual({ atrasados: 1, enRiesgo: 1 });
   });
 });
@@ -408,11 +413,11 @@ describe('Mis pendientes (R4): deUsuario, resumen y responsables', () => {
       estado: 'activo',
       fechaPlaneadaVigente: '2026-06-20', // 2 días antes de "hoy" → vencida
     });
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    const pagina = await consultarBandeja(admin, {}, bd(), hoy);
+    const pagina = await consultarBandeja(conBandejaCompleta, {}, bd(), hoy);
     expect(pagina.datos).toHaveLength(1);
     const tarea = pagina.datos[0]!;
     expect(tarea.urgencia).toBe('vencida');
@@ -449,11 +454,11 @@ describe('Mis pendientes (R4): deUsuario, resumen y responsables', () => {
       fechaPlaneadaVigente: '2026-07-02',
     });
 
-    const admin = sesionDePrueba({
+    const conBandejaCompleta = sesionDePrueba({
       idEmpresaActiva: idEmpresa,
-      permisos: ['rc.ruta-ver', 'roles.administrar'],
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
     });
-    const resumen = await resumenPendientes(admin, {}, bd(), hoy);
+    const resumen = await resumenPendientes(conBandejaCompleta, {}, bd(), hoy);
     expect(resumen.total).toBe(4);
     expect(resumen.vencidas).toBe(1);
     expect(resumen.paraHoy).toBe(1);

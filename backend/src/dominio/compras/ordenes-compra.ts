@@ -13,7 +13,8 @@
  *  • A3/A9 — el folio `numCompra` sale de la secuencia atómica `"orden-compra"` POR EMPRESA
  *    (`siguienteFolio`); NUNCA `Max()+1`. El folio es por empresa de la sesión activa.
  *  • A4 — permisos verificados aquí (defensa en profundidad): `compras.ver`/`.administrar`/
- *    `.cancelar`/`.autorizar`. La edición de una OC autorizada exige admin (`roles.administrar`).
+ *    `.cancelar`/`.autorizar`. Editar una OC YA autorizada exige su llave propia,
+ *    `compras.editar-autorizada` (fila 0.120).
  *  • A7 — auditoría uniforme: `creadoPorId`/`modificadoPorId` + `Bitacora` en la misma tx (la OC
  *    es entidad crítica: alta, edición, autorización, cancelación y duplicado quedan registrados).
  *  • A9 — todo se filtra/sella por `idEmpresa` de la sesión activa (una OC de otra empresa, para
@@ -23,9 +24,9 @@
  *    se mueve kardex (la recepción que afecta inventario de telas/avíos llega en E3).
  *
  * DECISIONES DE NEGOCIO (DECISIONES.md §"Decisiones de diseño F4"):
- *  • (a) Una OC AUTORIZADA (o más allá) queda BLOQUEADA para el usuario normal; el ADMIN
- *    (`roles.administrar`, marcador de admin del proyecto, igual que `generaEntradaPt` en
- *    F3-E1) sí la edita, registrando cada cambio en Bitácora. `duplicarOC` (para todos) copia la
+ *  • (a) Una OC AUTORIZADA (o más allá) queda BLOQUEADA salvo con `compras.editar-autorizada`
+ *    (llave propia desde la fila 0.120; antes se preguntaba por `roles.administrar` «como marcador
+ *    de admin»), registrando cada cambio en Bitácora. `duplicarOC` (para todos) copia la
  *    OC a una nueva en `borrador` para ajustar sin recapturar; la copia sigue su propio ciclo.
  *  • (c) Sin Excel: el renglón que lo requiera lleva matriz talla×color NATIVA; la suma de la
  *    matriz = la `cantidad` del renglón (se valida). Renglones que no la usen = cantidad simple.
@@ -265,12 +266,24 @@ async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void>
 }
 
 /**
- * ¿La sesión es ADMIN? Se usa `roles.administrar` como marcador de "administrador total" del
- * proyecto (mismo criterio que la bandera `generaEntradaPt` de tipos-proceso en F3-E1). Solo el
- * admin puede editar una OC ya autorizada (decisión (a)).
+ * ¿La sesión puede editar una OC que YA salió de borrador (autorizada o recibida)? Decisión (a).
+ *
+ * ⭐ POR QUÉ TIENE LLAVE PROPIA (fila 0.120). Hasta la 0.120 esto preguntaba por
+ * `roles.administrar` «como marcador de administrador total»: dar «administrar roles y permisos»
+ * regalaba de pasada la capacidad de tocar el contenido de una compra ya firmada, sin que nadie lo
+ * decidiera y sin que se viera en ninguna pantalla. Es la queja de Daniel con nombre y apellido
+ * (3-sep-2026): tener el permiso A implicaba tener el B.
+ *
+ * Y no se pliega a ninguno de los permisos de compras que ya existían:
+ *  • `compras.administrar` edita BORRADORES y lo lleva medio organigrama; si esto colgara de ahí,
+ *    la puerta de la decisión (a) quedaría abierta de par en par.
+ *  • `compras.desautorizar` es la marcha atrás que Daniel reservó para sí (§Post-F9.79). Es su
+ *    hermana, no la misma: aquélla QUITA el sello (y deja rastro evidente: la OC vuelve a
+ *    borrador); ésta modifica lo firmado DEJÁNDOLO firmado, que es el camino más callado. Se puede
+ *    querer dar una sin la otra en las dos direcciones.
  */
-function esAdmin(sesion: SesionUsuario): boolean {
-  return tienePermiso(sesion, 'roles.administrar');
+function puedeEditarOcAutorizada(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'compras.editar-autorizada');
 }
 
 /**
@@ -1039,8 +1052,8 @@ export async function crearOC(
 
 /**
  * Actualiza una OC (encabezado + reemplazo opcional del SET de líneas) en UNA transacción (A2).
- * REGLA (decisión (a)): si la OC está `autorizada`/`recibida_*` y la sesión NO es admin
- * (`roles.administrar`) → `ErrorConflicto` (la OC autorizada se bloquea para el usuario normal). En
+ * REGLA (decisión (a)): si la OC está `autorizada`/`recibida_*` y la sesión NO tiene
+ * `compras.editar-autorizada` → `ErrorConflicto` (la OC firmada se bloquea para quien no la tenga). En
  * `borrador`/`pendiente_autorizacion` cualquiera con `compras.administrar` edita. La OC cancelada
  * no se edita. Si `lineas` viene, REEMPLAZA todo el set (borra y recrea) y re-deriva las ligas
  * N:N. Bitácora MODIFICAR. Permiso `compras.administrar`.
@@ -1059,10 +1072,10 @@ export async function actualizarOC(
     if (actual.estatus === 'cancelada') {
       throw new ErrorConflicto('La orden de compra está cancelada; no se puede modificar.');
     }
-    if (!ESTATUS_EDITABLES_NORMAL.includes(actual.estatus) && !esAdmin(sesion)) {
-      // Decisión (a): autorizada/recibida_* solo la edita el admin.
+    if (!ESTATUS_EDITABLES_NORMAL.includes(actual.estatus) && !puedeEditarOcAutorizada(sesion)) {
+      // Decisión (a): autorizada/recibida_* sólo la edita quien tiene `compras.editar-autorizada`.
       throw new ErrorConflicto(
-        'La orden de compra ya está autorizada; solo un administrador puede modificarla.',
+        'La orden de compra ya está autorizada; no tienes permiso para modificarla.',
       );
     }
 
@@ -1135,8 +1148,13 @@ export async function actualizarOC(
       datos: {
         encabezado: true,
         lineas: datos.lineas?.length,
-        ...(esAdmin(sesion) && !ESTATUS_EDITABLES_NORMAL.includes(actual.estatus)
-          ? { edicionAdminSobreAutorizada: true }
+        // Marca de que ESTA edición cayó sobre una OC ya firmada (A7: la bitácora tiene que poder
+        // distinguirla de corregir un borrador). Se llamaba `edicionAdminSobreAutorizada`: se
+        // renombró en la fila 0.120 porque ya no hay «admin» que la haga, sino quien tenga
+        // `compras.editar-autorizada`. Medido antes de renombrar: NADIE lee esta clave (ni el
+        // backend, ni el front, ni la migración), así que el cambio no rompe a ningún consumidor.
+        ...(puedeEditarOcAutorizada(sesion) && !ESTATUS_EDITABLES_NORMAL.includes(actual.estatus)
+          ? { edicionSobreOcAutorizada: true }
           : {}),
       },
     });
@@ -1400,32 +1418,34 @@ export async function cancelarOC(
  * 🔴 **Y POR ESO EL MENSAJE MIRA EL ESTATUS.** El camino que ofrece —*captúrasela al original*— está
  * CERRADO para buena parte de las que lo necesitan: el ETL les hereda el estatus que traían del
  * sistema viejo —`cancelada` > `autorizada` > `borrador`, ver `estatusOCMigrada` en el loader—, y
- * sobre una OC que ya no está en {@link ESTATUS_EDITABLES_NORMAL} sólo un administrador puede
- * editar. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del volcado no están aquí.)
+ * sobre una OC que ya no está en {@link ESTATUS_EDITABLES_NORMAL} sólo puede editar quien tenga
+ * `compras.editar-autorizada`. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del
+ * volcado no están aquí.)
  * Mandar al comprador por una puerta cerrada es **peor** que no ofrecerle ninguna: da la vuelta
  * completa para toparse con otro "no", y el sistema acaba echándole la culpa de algo que no lo dejó
- * hacer. Cuando el original ya no es editable, el mensaje lo dice: esa captura la hace un
- * administrador.
+ * hacer. Cuando el original ya no es editable, el mensaje lo dice — nombrando la FACULTAD y no un
+ * rol (fila 0.120), porque la llave puede llevarla alguien que no administra nada más.
  *
  * 🔴🔴 **Y HAY UN TERCER CASO, QUE ESTA FUNCIÓN LLEGÓ A MENTIR (hallazgo del reviewer, V1-E4f).**
- * La `cancelada` NO la edita nadie —**tampoco un administrador**—: en `actualizarOC` la línea
+ * La `cancelada` NO la edita nadie —**tampoco quien tenga `compras.editar-autorizada`**—: en
+ * `actualizarOC` la línea
  * *"La orden de compra está cancelada; no se puede modificar"* rechaza ANTES de mirar quién eres, y
- * `cancelada` es terminal (el dominio no des-cancela). Prometerle ahí un administrador manda al
+ * `cancelada` es terminal (el dominio no des-cancela). Prometerle ahí a alguien que pueda manda al
  * comprador por la MISMA puerta cerrada que este mensaje existe para evitar — y no es teórico: el
  * ETL produce canceladas en su PRIMERA rama y les escribe `fechaEntrega: null` con el CSV en blanco,
  * y `duplicarOC` no tiene guarda de estatus, así que *"rehacer esa compra que se canceló"* es un
  * flujo legítimo.
  *
  * ⚠️ **La RAÍZ del defecto, escrita para que no se repita:** en `actualizarOC` el predicado
- * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo un admin edita"* **ÚNICAMENTE
+ * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo con la llave se edita"* **ÚNICAMENTE
  * porque la línea de arriba ya sacó `cancelada` del camino**. Aquí se copió el predicado **sin la
  * guarda que lo hacía cierto**: no eran dos listas parecidas, era la MISMA lista despojada de su
  * guarda. Por eso `cancelada` se mira **primero y aparte**, igual que allá.
  *
- * ⚠️ **A propósito se mira el ESTATUS y no la sesión** (nada de `esAdmin` aquí): con el estatus
- * basta para decir la verdad, y así la función sigue siendo pura y sin base de datos. Que un
- * administrador lea "la tiene que hacer un administrador" es inofensivo; que un comprador NO lo lea
- * es el callejón sin salida.
+ * ⚠️ **A propósito se mira el ESTATUS y no la sesión** (no se consulta `puedeEditarOcAutorizada`
+ * aquí): con el estatus basta para decir la verdad, y así la función sigue siendo pura y sin base de
+ * datos. Que quien SÍ tiene la llave lea "la tiene que hacer alguien con permiso para editar
+ * órdenes ya autorizadas" es inofensivo; que un comprador NO lo lea es el callejón sin salida.
  *
  * Pura y exportada para que una prueba unitaria pueda verla sin base de datos.
  */
@@ -1445,13 +1465,18 @@ export function motivoNoDuplicarOc(origen: {
       'capturar. Levanta la compra en Compras › Nueva orden de compra, con su fecha de entrega.'
     );
   }
-  const loEditaUnAdmin = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
+  // 🔴 Fila 0.120: el mensaje nombra la FACULTAD, no un rol. Decía «la tiene que hacer un
+  // administrador», y desde que editar una OC firmada tiene llave propia eso es falso —y falso
+  // justo en el escenario para el que se hizo la fila: que la llave la lleve alguien que NO es
+  // administrador. Mandar al comprador a buscar «un administrador» sería mandarlo a la persona
+  // equivocada.
+  const pideLaLlaveDeEditarFirmada = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
   return (
     falta +
     'Captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla.' +
-    (loEditaUnAdmin
+    (pideLaLlaveDeEditarFirmada
       ? ` Como esta orden ya no está en captura (${origen.estatus}), esa captura la tiene que ` +
-        `hacer un administrador.`
+        `hacer alguien con permiso para editar órdenes de compra ya autorizadas.`
       : '')
   );
 }

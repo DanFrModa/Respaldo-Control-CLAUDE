@@ -74,7 +74,11 @@ del plan y el **ETL del histórico**.
   `/concentrado/excel`). Permiso verificado server-side en cada ruta; OpenAPI regenerado + cliente
   del frontend sincronizado. Permisos: `rc.catalogo-ver`/`.administrar`, `rc.programar`,
   `rc.ruta-ver`, `rc.capturar` (el concentrado **reusa `rc.ruta-ver`**, no agrega permiso) + los 18
-  roles funcionales de E1.
+  roles funcionales de E1. ⭐ **Fila 0.120:** los dos atajos que se saltaban el filtro de
+  responsabilidad —capturar un proceso que no es de mis roles, y ver la bandeja completa— dejaron de
+  colgar de `roles.administrar` y tienen llave propia: **`rc.capturar-cualquiera`** y
+  **`rc.bandeja-completa`**. Son DOS porque ver todo y capturar por otros son facultades separables;
+  el badge «tú» de la ruta por orden sigue a la PRIMERA (es la misma pregunta que la captura).
 - **Frontend** `frontend/src/modulos/ruta-critica/` — catálogo de procesos (DAG, roles, checklists),
   plantillas, reglas de duración, configuración (calendario), **Programar RC**, **Bandeja de tareas**
   (PC+móvil, captura Hoy/Ayer, checklist), **RC por orden** (timeline planeado-vs-real + quién

@@ -15,9 +15,10 @@
  *    REVIERTE (con rastro en bitácora).
  *
  * VALIDACIÓN de captura (server-side, A4): además del permiso `rc.capturar`, quien captura debe tener
- * ALGUNO de sus roles entre los roles RESPONSABLES del proceso (`ProcesoDefRol`, N:M). El admin
- * (`roles.administrar`) puede capturar cualquier proceso (mismo criterio de "marcador admin" que
- * `generaEntradaPt` en tipos-proceso / la edición de OC autorizada en compras). Y desde la fila
+ * ALGUNO de sus roles entre los roles RESPONSABLES del proceso (`ProcesoDefRol`, N:M). Saltarse ese
+ * filtro —capturar cualquier proceso— pide la llave `rc.capturar-cualquiera`, que se exige ADEMÁS de
+ * `rc.capturar` (fila 0.120; hasta entonces bastaba con `roles.administrar`, que la regalaba a quien
+ * administrara roles). Y desde la fila
  * 0.175, la FECHA que se captura pasa además por su propia ventana — ver
  * {@link DIAS_VENTANA_CAPTURA_RC}: hasta entonces `fechaReal` entraba del cliente sin filtro alguno,
  * siendo la base del KPI de puntualidad (D11).
@@ -107,9 +108,10 @@ async function bloquearCapturasDeOrden(tx: Tx, idEmpresa: number, idOrden: numbe
 }
 
 /**
- * Verifica que `sesion` pueda CAPTURAR el proceso `idRutaOrden`: tiene `rc.capturar` Y (es admin O
- * alguno de sus roles está entre los roles responsables del `ProcesoDef` del renglón). Lanza
- * `ErrorPermiso` si no. Devuelve el renglón de ruta cargado (para no re-consultarlo).
+ * Verifica que `sesion` pueda CAPTURAR el proceso `idRutaOrden`: tiene `rc.capturar` Y (tiene
+ * `rc.capturar-cualquiera` O alguno de sus roles está entre los roles responsables del `ProcesoDef`
+ * del renglón). Lanza `ErrorPermiso` si no. Devuelve el renglón de ruta cargado (para no
+ * re-consultarlo).
  */
 interface RenglonCaptura {
   id: number;
@@ -158,8 +160,17 @@ async function exigirCapturaProceso(
     origenCaptura: fila.origenCaptura,
   };
 
-  // Admin (roles.administrar) captura cualquier proceso (marcador de admin, A4).
-  if (sesion.permisos.has('roles.administrar')) {
+  // ⭐ LA LLAVE QUE SE SALTA EL FILTRO DE RESPONSABILIDAD (fila 0.120).
+  //
+  // Hasta la 0.120 esto preguntaba por `roles.administrar`: dar «administrar roles y permisos» a
+  // alguien le regalaba, sin que nadie lo decidiera y sin que se viera en ninguna pantalla, la
+  // capacidad de capturar el avance de CUALQUIER proceso de la Ruta Crítica. Es exactamente lo que
+  // Daniel mandó quitar el 3-sep-2026 (*«puede haber alguien que tenga el permiso A pero no el B»*):
+  // tener A implicaba B. Ahora B tiene nombre propio y se da —o no— por separado.
+  //
+  // Ojo con lo que NO es: esto no sustituye a `rc.capturar`. Se exigen los DOS (arriba `rc.capturar`,
+  // aquí el salto del filtro); quien tenga sólo éste no captura nada.
+  if (sesion.permisos.has('rc.capturar-cualquiera')) {
     return renglon;
   }
 
@@ -170,7 +181,8 @@ async function exigirCapturaProceso(
   });
   if (responsables.length === 0) {
     throw new ErrorPermiso(
-      'El proceso no tiene roles responsables definidos; solo un administrador puede capturarlo.',
+      'El proceso no tiene roles responsables definidos; sólo quien puede capturar cualquier ' +
+        'proceso de la Ruta Crítica puede capturarlo.',
     );
   }
   const idsResponsables = new Set(responsables.map((r) => r.idRol));
@@ -223,7 +235,7 @@ async function activarSucesoresListos(tx: Tx, idRutaCompletado: number): Promise
  * Marca un proceso de la ruta como CUMPLIDO. Captura `fechaReal` (default hoy), quién/cuándo,
  * `origenCaptura = 'manual'`, `estado = 'completado'`; activa sucesores listos; si es el último
  * proceso, cierra la RC de la orden. Transaccional (A2), auditado (A7). Exige `rc.capturar` + rol
- * responsable (o admin).
+ * responsable (o `rc.capturar-cualquiera`).
  *
  * La fecha pasa por {@link verificarFechaCumplimientoRc} ANTES de abrir la transacción — mismo
  * orden que el inventario de PT (`registrarMovimientoPt`): una fecha fuera de la ventana se rechaza
@@ -293,7 +305,7 @@ export async function completarProceso(
  * REVIERTE el cumplimiento de un proceso (desmarcar): limpia `fechaReal`/captura, recalcula su
  * estado (activo si todos sus antecesores están completados, si no pendiente) y REABRE la RC si era
  * el proceso terminal que la cerró. Deja rastro en `Bitacora` (A7). Exige `rc.capturar` + rol
- * responsable (o admin).
+ * responsable (o `rc.capturar-cualquiera`).
  */
 export async function revertirProceso(
   sesion: SesionUsuario,
@@ -395,7 +407,8 @@ export async function activarProcesosListos(tx: Tx, idOrden: number): Promise<nu
  * ítems hechos, AUTO-COMPLETA el proceso padre con `origenCaptura='evento'` (lo completó el sistema,
  * no una captura manual de fecha — igual que la duración-0 de E3). Si al desmarcar un ítem el proceso
  * estaba AUTO-completado por checklist (origenCaptura !== 'manual'), lo REVIERTE; una completación
- * MANUAL NO se pisa. Transaccional (A2), auditado (A7). Exige `rc.capturar` + rol responsable (o admin).
+ * MANUAL NO se pisa. Transaccional (A2), auditado (A7). Exige `rc.capturar` + rol
+ * responsable (o `rc.capturar-cualquiera`).
  *
  * @param sesion       quién captura.
  * @param idChecklist  ítem de `RutaOrdenChecklist`.

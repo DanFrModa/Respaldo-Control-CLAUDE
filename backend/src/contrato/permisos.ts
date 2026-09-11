@@ -122,7 +122,8 @@ export const MODULOS_PERMISO = {
   // La capa previa al pedido: proyectos de desarrollo por Cliente+Departamento, precosteo
   // persistido/amarrado y listas de precios con aprobación/negociación. Los catálogos de
   // configuración de la fase (conceptos de costo R19, estados de lista R20) tienen su propio
-  // módulo (patrón `tipos-proceso`: catálogo con bandera admin-only server-side).
+  // módulo (patrón `tipos-proceso`: catálogo cuya bandera sensible lleva permiso propio, exigido
+  // server-side — ver `tipos-proceso.marcar-entrada-pt`).
   'concepto-costo': 'Conceptos de costo',
   'estado-lista': 'Estados de lista de precios',
   desarrollo: 'Desarrollo y cotización',
@@ -352,8 +353,9 @@ export const CATALOGO_PERMISOS = [
   // Permisos NUEVOS de v2 (F4-E2, A4): el CRUD de la orden de compra. `ver` (consulta),
   // `administrar` (alta/edición/duplicado) y `cancelar` (cancelación suave con motivo). La
   // autorización tiene su permiso propio LEGADO (`compras.autorizar`, arriba). La edición de una
-  // OC YA autorizada queda reservada al admin (decisión (a)): el dominio usa `roles.administrar`
-  // como marcador de admin (mismo criterio que `generaEntradaPt` de tipos-proceso, F3-E1).
+  // OC YA autorizada tiene su PROPIA llave (decisión (a)): `compras.editar-autorizada`, aquí
+  // abajo. Hasta la fila 0.120 el dominio preguntaba por `roles.administrar` «como marcador de
+  // admin», de modo que administrar roles la regalaba de pasada; ya no.
   {
     clave: 'compras.ver',
     modulo: 'compras',
@@ -381,6 +383,19 @@ export const CATALOGO_PERMISOS = [
     modulo: 'compras',
     descripcion:
       'Des-autorizar una orden de compra ya autorizada (quita el sello, con motivo; nunca una OC recibida)',
+  },
+  // ⭐ Permiso NUEVO de v2 (fila 0.120): EDITAR una OC que ya pasó de `borrador`/
+  // `pendiente_autorizacion` — o sea, tocar el contenido de una compra YA FIRMADA (o incluso ya
+  // recibida) sin quitarle el sello. Hasta la 0.120 esto colgaba de `roles.administrar`, así que
+  // se regalaba con «administrar roles». Es hermano de `compras.desautorizar` y la otra mitad de
+  // la misma decisión: aquél DESHACE la firma, éste modifica lo firmado dejándolo firmado, que es
+  // el camino más callado de los dos. Va aparte de `compras.administrar` (que edita borradores y
+  // lo tiene medio organigrama) justo por eso.
+  {
+    clave: 'compras.editar-autorizada',
+    modulo: 'compras',
+    descripcion:
+      'Editar una orden de compra YA autorizada o recibida (sin quitarle el sello) — queda marcado en la bitácora (fila 0.120)',
   },
   // Permiso NUEVO de v2 (F4-E3, A4): RECIBIR material contra una OC autorizada (recepción que
   // crea el lote de tela y mueve el kardex de telas/avíos) y REVERSAR una recepción (inverso
@@ -608,12 +623,36 @@ export const CATALOGO_PERMISOS = [
   // OPERATIVO (producción/IP lo usa día a día); en el seed lo llevan los mismos perfiles que
   // `rc.programar`/`produccion.*` — todos menos `Basico`.
   // Además, el dominio exige que ALGUNO de los roles del usuario sea responsable del proceso
-  // (`ProcesoDefRol`, N:M); el admin (`roles.administrar`) captura cualquier proceso.
+  // (`ProcesoDefRol`, N:M); saltarse ese filtro tiene su propia llave (`rc.capturar-cualquiera`).
   {
     clave: 'rc.capturar',
     modulo: 'rc',
     descripcion:
       'Capturar (o revertir) el cumplimiento de los procesos de la Ruta Crítica de una orden y su checklist (F5-E4)',
+  },
+  // ⭐ INTERRUPTORES QUE ANTES COLGABAN DE `roles.administrar` (fila 0.120) ────────────────────
+  //
+  // Hasta la 0.120, CINCO facultades de negocio preguntaban por `roles.administrar` como si fuera
+  // un «modo dios». Dar «administrar roles» concedía de pasada capturar cualquier proceso de la
+  // RC, ver la bandeja entera, editar una OC firmada y mover la bandera de PT — y no se veía
+  // desde ninguna pantalla. Es literalmente lo que Daniel mandó quitar del seed el 3-sep-2026:
+  // *«puede haber alguien que tenga el permiso A pero no el B, y otra persona el B pero no el A»*.
+  // Ahora cada facultad tiene su llave, y el reparto por puesto puede darlas por separado.
+  //
+  // Las DOS de la RC son facultades DISTINTAS y se reparten por separado a propósito: un
+  // coordinador puede necesitar VER todo para perseguir a la gente sin poder CAPTURAR nada, y
+  // quien captura por otros no necesariamente quiere la bandeja de todos como pantalla de inicio.
+  {
+    clave: 'rc.capturar-cualquiera',
+    modulo: 'rc',
+    descripcion:
+      'Capturar el avance de CUALQUIER proceso de la Ruta Crítica, aunque ninguno de mis roles sea responsable de él (fila 0.120)',
+  },
+  {
+    clave: 'rc.bandeja-completa',
+    modulo: 'rc',
+    descripcion:
+      'Ver en la bandeja de la Ruta Crítica las tareas de TODOS los procesos, no sólo las de mis roles (fila 0.120)',
   },
 
   // ── Control de calidad ───────────────────────────────────────────────────────
@@ -999,7 +1038,8 @@ export const CATALOGO_PERMISOS = [
   // Permisos NUEVOS de v2 (A4). El esquema y motor nacen en F3-E1; los flujos que cada permiso
   // gobierna se construyen en E2 (corte/envío), E4 (recibo/cargo) y E5 (entrega/WIP). El catálogo
   // de tipos de proceso (F3-E1) tiene su `ver`/`administrar` como cualquier catálogo; la bandera
-  // `generaEntradaPt` es EDITABLE solo por admin (se exige `roles.administrar`, ver dominio).
+  // `generaEntradaPt` tiene su PROPIA llave, `tipos-proceso.marcar-entrada-pt` (aquí abajo):
+  // hasta la fila 0.120 se exigía `roles.administrar`, o sea que se regalaba con administrar roles.
   {
     clave: 'tipos-proceso.ver',
     modulo: 'tipos-proceso',
@@ -1009,7 +1049,17 @@ export const CATALOGO_PERMISOS = [
     clave: 'tipos-proceso.administrar',
     modulo: 'tipos-proceso',
     descripcion:
-      'Administrar el catálogo de tipos de proceso (alta, edición, desactivación). La bandera "genera entrada a PT" solo la edita un administrador',
+      'Administrar el catálogo de tipos de proceso (alta, edición, desactivación). La bandera "genera entrada a PT" tiene permiso propio',
+  },
+  // ⭐ Permiso NUEVO de v2 (fila 0.120): la bandera `generaEntradaPt` de un tipo de proceso decide
+  // si RECIBIR de ese proceso mete prenda al inventario de producto terminado (F3-E4). Moverla
+  // cambia lo que el kardex de PT cuenta, así que no es «editar un catálogo»: es tocar el
+  // inventario desde la configuración. Hasta la 0.120 colgaba de `roles.administrar`.
+  {
+    clave: 'tipos-proceso.marcar-entrada-pt',
+    modulo: 'tipos-proceso',
+    descripcion:
+      'Fijar la bandera "genera entrada a producto terminado" de un tipo de proceso (decide si recibir de ese proceso mueve el kardex de PT) (fila 0.120)',
   },
   {
     clave: 'produccion.corte',

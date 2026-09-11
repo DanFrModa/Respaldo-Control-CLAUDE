@@ -58,9 +58,16 @@ antecesores — "la pelota pasa de mano en mano"). `revertirProceso` desmarca y 
 El checklist auto-completa el proceso al marcar todos sus ítems y lo revierte al desmarcar uno.
 
 **Autorización (A4):** además de `rc.capturar`, quien captura debe tener **alguno de sus roles** entre
-los roles RESPONSABLES del proceso (`ProcesoDefRol`, N:M). El admin (`roles.administrar`) captura
-cualquier proceso (mismo "marcador admin" que `generaEntradaPt` o la edición de OC autorizada). El
+los roles RESPONSABLES del proceso (`ProcesoDefRol`, N:M). El
 recálculo NO se re-encola al capturar: el cumplimiento no cambia las duraciones.
+
+> 🔴 **CORREGIDO POR LA FILA 0.120 (11-sep-2026).** Este párrafo decía que *«el admin
+> (`roles.administrar`) captura cualquier proceso (mismo "marcador admin" que `generaEntradaPt` o la
+> edición de OC autorizada)»*, y **ya no es cierto**: ése era precisamente el defecto. Saltarse el
+> filtro de responsabilidad tiene ahora **llave propia, `rc.capturar-cualquiera`**, y los otros dos
+> «marcadores admin» que el párrafo citaba también (`tipos-proceso.marcar-entrada-pt` y
+> `compras.editar-autorizada`). El reparto no cambió —las tres siguen sólo en Administrador y
+> Administración/Dirección—, pero ahora se pueden dar por separado.
 
 ### 4. Semáforo de riesgo y barrido recurrente
 

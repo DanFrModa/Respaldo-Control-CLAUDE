@@ -69,6 +69,9 @@ describe('catálogo de permisos', () => {
       'compras.cancelar',
       // V1-E3y (§Post-F9.79): des-autorizar una OC — la marcha atrás de la firma de compra.
       'compras.desautorizar',
+      // ⭐ Fila 0.120: editar una OC YA firmada dejó de colgar de `roles.administrar` y tiene
+      // llave propia (hermana de `compras.desautorizar`, que DESHACE la firma).
+      'compras.editar-autorizada',
       'compras.recibir',
       'compras.ver',
       // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.
@@ -163,7 +166,12 @@ describe('catálogo de permisos', () => {
       // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1): ver/administrar (nuevos de v2;
       // los `rc.*` LEGADO del MOTOR tienen origen). Motor de la ruta viva (F5-E3): programar/ruta-ver.
       // Captura del cumplimiento (F5-E4): rc.capturar.
+      // ⭐ Fila 0.120: los dos atajos de la RC que colgaban de `roles.administrar` —capturar
+      // cualquier proceso y ver la bandeja entera— estrenaron llave, y son DOS porque ver todo y
+      // capturar por otros son facultades separables.
+      'rc.bandeja-completa',
       'rc.capturar',
+      'rc.capturar-cualquiera',
       'rc.catalogo-administrar',
       'rc.catalogo-ver',
       'rc.programar',
@@ -186,6 +194,9 @@ describe('catálogo de permisos', () => {
       'terceros.ver',
       // Tipos de proceso de maquila (Módulo 4, F3-E1): catálogo CRUD (nuevos de v2).
       'tipos-proceso.administrar',
+      // ⭐ Fila 0.120: la bandera `generaEntradaPt` (mete prenda al kardex de PT) dejó de colgar
+      // de `roles.administrar`.
+      'tipos-proceso.marcar-entrada-pt',
       'tipos-proceso.ver',
       'usuarios.administrar',
     ]);

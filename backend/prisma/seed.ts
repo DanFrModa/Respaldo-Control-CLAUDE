@@ -253,6 +253,45 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       'medio organigrama. Gobierna también CANCELARLAS: el inverso devuelve el material al ' +
       'inventario, o sea deshace la misma decisión.',
   },
+  // ── ⭐⭐ LOS CINCO PODERES QUE COLGABAN DE `roles.administrar` (fila 0.120) ──
+  //
+  // Hasta la 0.120 cinco facultades de negocio preguntaban por `roles.administrar` como marcador
+  // de «es admin». Ahora cada una tiene su llave; van AQUÍ —y no en un perfil— porque la fila se
+  // comprometió a **conservar el comportamiento de hoy**: quien podía, sigue pudiendo. Y quien
+  // podía era exactamente el que tenía `roles.administrar`, que es esta misma lista
+  // (`Administrador` + `AdministracionDireccion`, los dos de acceso total).
+  //
+  // 🔑 Que estén las cuatro aquí NO las vuelve la misma cosa: son cuatro renglones separados
+  // precisamente para que Daniel pueda dar una y no las otras cuando arme los perfiles por puesto.
+  // Antes eso era imposible —eran un solo interruptor con otro nombre—; ahora es quitar una línea.
+  {
+    clave: 'rc.capturar-cualquiera',
+    razon:
+      'Saltarse el filtro de responsabilidad de la Ruta Crítica (capturar el avance de un proceso ' +
+      'que NO es de mis roles). Hereda el reparto que tenía colgado de `roles.administrar` hasta ' +
+      'la fila 0.120; se reparte por puesto cuando Daniel arme los perfiles reales.',
+  },
+  {
+    clave: 'rc.bandeja-completa',
+    razon:
+      'Ver la bandeja de la Ruta Crítica SIN filtro de responsabilidad (las tareas de todos, por ' +
+      'defecto). Es facultad de supervisión y va aparte de `rc.capturar-cualquiera`: se puede ' +
+      'querer ver todo sin poder capturar nada. Hereda el reparto de `roles.administrar` (0.120).',
+  },
+  {
+    clave: 'compras.editar-autorizada',
+    razon:
+      'Modificar una orden de compra YA firmada sin quitarle el sello. Es la hermana callada de ' +
+      '`compras.desautorizar` —que Daniel reservó para sí (§Post-F9.79)— y por eso vive en el ' +
+      'mismo sitio. Hereda el reparto que tenía bajo `roles.administrar` hasta la fila 0.120.',
+  },
+  {
+    clave: 'tipos-proceso.marcar-entrada-pt',
+    razon:
+      'Mover la bandera que decide si RECIBIR de un tipo de proceso mete prenda al inventario de ' +
+      'producto terminado: es tocar el kardex desde la configuración, no editar un catálogo. ' +
+      'Hereda el reparto que tenía bajo `roles.administrar` hasta la fila 0.120.',
+  },
   // ── La marcha atrás de la firma de compra ──
   {
     clave: 'compras.desautorizar',

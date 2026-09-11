@@ -6,7 +6,8 @@
  *    (el motor de E4 mantiene 'activo' = sin `fechaReal` y con TODOS sus antecesores completados) de
  *    órdenes con la RC activa, de la EMPRESA activa (A9). Por defecto, solo los procesos de los que el
  *    usuario es RESPONSABLE (intersección de sus roles con `ProcesoDefRol`, N:M — la MISMA regla que la
- *    captura en `cumplimiento.ts`); el admin (`roles.administrar`) ve todo. Con `todas=true` (y permiso
+ *    captura en `cumplimiento.ts`); con `rc.bandeja-completa` se ve todo (fila 0.120: antes ese
+ *    atajo colgaba de `roles.administrar`). Con `todas=true` (y permiso
  *    de supervisión `rc.programar`) muestra TODAS las tareas activas de la empresa, no solo las suyas.
  *  • `contarAlertas` — resume MIS tareas activas (misma definición, SIN `todas`) en
  *    `{ atrasados, enRiesgo }` para el badge del header.
@@ -181,21 +182,35 @@ function aTareaSalida(fila: TareaConRelaciones, hoy: Date): BandejaTareaSalida {
 /**
  * Ids de los `ProcesoDef` de los que `sesion` es RESPONSABLE: procesos cuyo `ProcesoDefRol` cruza con
  * alguno de los roles del usuario (vía `UsuarioRol`). Misma intersección N:M que `exigirCapturaProceso`
- * (cumplimiento.ts). Devuelve `null` si el usuario es ADMIN (`roles.administrar`): ve todos los
- * procesos, sin filtro por responsabilidad.
+ * (cumplimiento.ts). Devuelve `null` —sin filtro por responsabilidad, o sea la bandeja entera— si el
+ * usuario tiene `rc.bandeja-completa`.
+ *
+ * ⭐ POR QUÉ ES UN PERMISO PROPIO Y NO EL DE OTRO (fila 0.120).
+ *
+ * Hasta la 0.120 esto preguntaba por `roles.administrar`: administrar roles regalaba, de pasada y
+ * sin que se viera en ninguna pantalla, la bandeja completa de la Ruta Crítica. Al darle nombre
+ * había dos tentaciones, y las dos estaban mal:
+ *
+ *  • Reusar `rc.programar` (que ya gobierna el `todas=true` y el «pendientes de X» de más abajo).
+ *    Cambiaría el comportamiento de todos: `rc.programar` lo lleva casi todo perfil, así que la
+ *    bandeja «mis tareas» dejaría de ser «mis tareas» para medio organigrama. Lo que este permiso
+ *    concede es que la bandeja venga completa **por defecto**, sin pedir el flag.
+ *  • Reusar `rc.capturar-cualquiera` (el gemelo de cumplimiento.ts). Son facultades distintas: un
+ *    coordinador puede necesitar VER todo para perseguir a la gente sin poder CAPTURAR nada, y al
+ *    revés. Meter las dos bajo una sola clave sería repetir el defecto con otro nombre.
  */
 async function procesosResponsablesDe(
   cliente: ReturnType<typeof clienteLectura>,
   sesion: SesionUsuario,
 ): Promise<number[] | null> {
-  if (sesion.permisos.has('roles.administrar')) return null; // admin: sin filtro.
+  if (sesion.permisos.has('rc.bandeja-completa')) return null; // sin filtro: la bandeja entera.
   return procesosResponsablesDeUsuario(cliente, sesion.id);
 }
 
 /**
  * Ids de los `ProcesoDef` de los que el usuario `idUsuario` es RESPONSABLE por sus roles (la misma
- * intersección N:M), SIN el atajo de admin: al supervisar "pendientes de X" (R4) se muestra lo que
- * los ROLES de X cubren, no un "todo" implícito.
+ * intersección N:M), SIN el atajo de `rc.bandeja-completa`: al supervisar "pendientes de X" (R4) se
+ * muestra lo que los ROLES de X cubren, no un "todo" implícito.
  */
 async function procesosResponsablesDeUsuario(
   cliente: ReturnType<typeof clienteLectura>,
@@ -287,8 +302,8 @@ export async function consultarBandeja(
     verificarPermiso(sesion, 'rc.programar');
   }
 
-  // Procesos responsables: del usuario SUPERVISADO (por sus roles, sin atajo de admin) o del que
-  // consulta (null = admin → todos). Con `verTodas`, no filtra.
+  // Procesos responsables: del usuario SUPERVISADO (por sus roles, sin atajo) o del que consulta
+  // (null = tiene `rc.bandeja-completa` → todos). Con `verTodas`, no filtra.
   const idsResponsable = deOtro
     ? await procesosResponsablesDeUsuario(cliente, filtros.deUsuario ?? '')
     : verTodas
@@ -300,7 +315,7 @@ export async function consultarBandeja(
   let idsProcesoEfectivos: number[] | null = idsResponsable;
   if (filtros.idProcesoDef !== undefined) {
     if (idsResponsable === null) {
-      idsProcesoEfectivos = [filtros.idProcesoDef]; // admin/todas: solo ese proceso.
+      idsProcesoEfectivos = [filtros.idProcesoDef]; // bandeja completa/todas: solo ese proceso.
     } else {
       idsProcesoEfectivos = idsResponsable.includes(filtros.idProcesoDef)
         ? [filtros.idProcesoDef]

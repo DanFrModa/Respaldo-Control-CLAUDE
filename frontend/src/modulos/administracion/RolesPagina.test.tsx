@@ -227,7 +227,8 @@ describe('<RolesPagina>', () => {
     // `usuarios.administrar` ni `roles.administrar` (guard anti-lockout del seed). El escenario
     // que el propio seed documenta —darle «administrar roles» a Gerencial desde ESTA pantalla— se
     // queda para siempre; un aviso que dijera «todo se borra» mentiría justo ahí, y sobre el
-    // permiso que además hace de marcador de «es admin» en la Ruta Crítica.
+    // permiso de gobierno del RBAC. (Hasta la fila 0.120 hacía además de marcador de «es admin»
+    // en la Ruta Crítica, en compras y en tipos de proceso; ya no: cada facultad tiene su llave.)
     expect(aviso).toHaveTextContent(/salvo administrar usuarios y administrar roles/);
     expect(aviso).toHaveTextContent(/nunca retira/);
     // Y NO se bloquea la edición: guardar sigue disponible (el backend lo permite, A1).

@@ -9,9 +9,10 @@
  *
  * Piezas del patrón (igual que Almacenes):
  *  1. Permiso primero (`tipos-proceso.ver` para leer, `.administrar` para mutar; A4).
- *  2. **`generaEntradaPt` solo lo edita un ADMIN** (decisión (e)): el servicio descarta cualquier
- *     valor de esa bandera si la sesión no es admin (`roles.administrar`, marcador de los roles de
- *     administración total). La pantalla ya la deshabilita; el servidor es la autoridad (§9.2).
+ *  2. **`generaEntradaPt` lleva llave PROPIA** (decisión (e)): el servicio descarta cualquier valor
+ *     de esa bandera si la sesión no tiene `tipos-proceso.marcar-entrada-pt` (fila 0.120; hasta
+ *     entonces se exigía `roles.administrar`, que la regalaba a quien administrara roles). La
+ *     pantalla ya la deshabilita; el servidor es la autoridad (§9.2).
  *  3. Zod compartido de `src/contrato`. 4. Todo en UNA transacción (A2) con auditoría + Bitácora
  *     (A7). 5. Borrado SUAVE (`activo`). 6. Errores de dominio por código. 7. Listado paginado.
  */
@@ -112,13 +113,22 @@ async function unoConRolProveedor(tx: Tx, tipo: TipoProceso): Promise<TipoProces
 }
 
 /**
- * ¿La sesión puede editar la bandera `generaEntradaPt`? (decisión (e)). Solo los roles de
- * administración total la tocan; se usa `roles.administrar` como marcador de "admin" (es el
- * permiso que solo tienen Administrador/AdministracionDireccion en el seed). Aísla la regla en un
- * solo lugar para que el reviewer la encuentre.
+ * ¿La sesión puede editar la bandera `generaEntradaPt`? (decisión (e)).
+ *
+ * ⭐ POR QUÉ TIENE LLAVE PROPIA (fila 0.120). Hasta la 0.120 esto preguntaba por
+ * `roles.administrar` «como marcador de admin»: dar «administrar roles y permisos» regalaba de
+ * pasada la bandera, sin que nadie lo decidiera y sin que se viera desde ninguna pantalla — la
+ * queja de Daniel del 3-sep-2026, tener A implicaba tener B.
+ *
+ * Y no se pliega a `tipos-proceso.administrar` (el permiso del catálogo, que se exige aparte y por
+ * encima de éste), porque no es lo mismo: código, nombre y activo son texto de catálogo, mientras
+ * que `generaEntradaPt` decide si RECIBIR de ese tipo de proceso mete prenda al kardex de producto
+ * terminado (F3-E4). Moverla no edita un catálogo: cambia lo que el inventario cuenta, desde la
+ * configuración y sin pasar por ninguna pantalla de inventario. Por eso fue siempre admin-only y
+ * por eso conserva su propia puerta.
  */
 function puedeEditarGeneraEntradaPt(sesion: SesionUsuario): boolean {
-  return tienePermiso(sesion, 'roles.administrar');
+  return tienePermiso(sesion, 'tipos-proceso.marcar-entrada-pt');
 }
 
 /** Unicidad del código (insensible a mayúsculas). La carrera residual la cubre el unique de BD. */
@@ -149,8 +159,9 @@ async function exigirTipoProceso(tx: Tx, id: number): Promise<TipoProceso> {
 }
 
 /**
- * Crea un tipo de proceso. `generaEntradaPt` solo se respeta si la sesión es admin (decisión (e));
- * para no-admins se ignora y queda en `false` (default seguro). `esArte`/`usaPuntadas` (V1-E3f)
+ * Crea un tipo de proceso. `generaEntradaPt` solo se respeta si la sesión tiene
+ * `tipos-proceso.marcar-entrada-pt` (decisión (e)); si no, se ignora y queda en `false` (default
+ * seguro). `esArte`/`usaPuntadas` (V1-E3f)
  * las fija cualquiera que administre el catálogo: no mueven inventario, solo deciden qué se
  * ofrece en la lista de tipos de arte. Permiso `tipos-proceso.administrar`.
  */
@@ -161,7 +172,7 @@ export async function crearTipoProceso(
 ): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   const datos = validarEntrada(esquemaTipoProcesoCrear, entrada);
-  // Solo un admin puede fijar la bandera; si no, se queda en el default seguro (false).
+  // Sin `tipos-proceso.marcar-entrada-pt` la bandera se queda en el default seguro (false).
   const generaEntradaPt =
     datos.generaEntradaPt !== undefined && puedeEditarGeneraEntradaPt(sesion)
       ? datos.generaEntradaPt
@@ -206,8 +217,8 @@ export async function crearTipoProceso(
 
 /**
  * Actualiza un tipo de proceso (código/nombre/`generaEntradaPt`/`activo`). `generaEntradaPt` solo
- * cambia si la sesión es admin (decisión (e)); para no-admins se ignora silenciosamente (la
- * pantalla ya lo deshabilita). Bitácora `MODIFICAR`/`DESACTIVAR` según lo que pasó (A7).
+ * cambia si la sesión tiene `tipos-proceso.marcar-entrada-pt` (decisión (e)); si no, se ignora
+ * silenciosamente (la pantalla ya lo deshabilita). Bitácora `MODIFICAR`/`DESACTIVAR` según lo que pasó (A7).
  */
 export async function actualizarTipoProceso(
   sesion: SesionUsuario,
@@ -216,7 +227,7 @@ export async function actualizarTipoProceso(
 ): Promise<TipoProcesoDetalle> {
   verificarPermiso(sesion, 'tipos-proceso.administrar');
   const datos = validarEntrada(esquemaTipoProcesoEditar, entrada);
-  const esAdmin = puedeEditarGeneraEntradaPt(sesion);
+  const puedeBandera = puedeEditarGeneraEntradaPt(sesion);
 
   try {
     return await enTransaccion(async (tx) => {
@@ -224,12 +235,12 @@ export async function actualizarTipoProceso(
 
       const cambiaCodigo = datos.codigo !== undefined && datos.codigo !== actual.codigo;
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
-      // La bandera solo cambia si vino, es admin y difiere de la actual.
+      // La bandera solo cambia si vino, hay permiso para tocarla y difiere de la actual.
       const cambiaBandera =
         datos.generaEntradaPt !== undefined &&
-        esAdmin &&
+        puedeBandera &&
         datos.generaEntradaPt !== actual.generaEntradaPt;
-      // V1-E3f: `esArte`/`usaPuntadas` NO son admin-only (ver {@link crearTipoProceso}).
+      // V1-E3f: `esArte`/`usaPuntadas` NO piden la llave de la bandera (ver {@link crearTipoProceso}).
       const cambiaEsArte = datos.esArte !== undefined && datos.esArte !== actual.esArte;
       const cambiaPuntadas =
         datos.usaPuntadas !== undefined && datos.usaPuntadas !== actual.usaPuntadas;

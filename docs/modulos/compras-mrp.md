@@ -21,7 +21,9 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     `Max()+1`). Estatus como **enum** (`borrador` / `pendiente_autorizacion` / `autorizada` /
     `recibida_parcial` / `recibida_total` / `cancelada`). Autorización exige el permiso
     `compras.autorizar` (ex-acceso #8) y registra usuario+fecha en `Bitacora` (A7). OC autorizada
-    **bloqueada** salvo admin (decisión **(a)**) + "Duplicar a nueva OC". El `Totales` viejo NO se
+    **bloqueada** salvo con el permiso **`compras.editar-autorizada`** (decisión **(a)**; hasta la
+    fila 0.120 esto se resolvía preguntando por `roles.administrar`, o sea que administrar roles
+    regalaba la capacidad de tocar una compra ya firmada) + "Duplicar a nueva OC". El `Totales` viejo NO se
     almacena: es derivado de las líneas.
   - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`.
     - ⚠️ **Desde §Post-F9.14 (7-ago-2026) la TELA no se recibe por aquí:** `recibirCompra` rechaza

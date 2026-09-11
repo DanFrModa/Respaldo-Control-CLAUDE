@@ -27,18 +27,21 @@ const POR_PAGINA = 10;
  * Pantalla de Tipos de proceso (Módulo Producción, F3-E1) — re-vestida R9 a TABLA-FIRST (proto
  * `vCat`): tabla densa con el proceso, su código, «genera entrada a PT» (badge) y su estado, con
  * acciones inline. La bandera **`generaEntradaPt`** (decisión (e)) se MUESTRA a todos pero solo la
- * EDITA un administrador (el diálogo deshabilita el control para los demás; el backend es la
- * autoridad, A1/§9.2).
+ * EDITA quien tenga `tipos-proceso.marcar-entrada-pt` (el diálogo deshabilita el control para los
+ * demás; el backend es la autoridad, A1/§9.2).
  *
  * FIDELIDAD vs proto: el proto pinta una columna "Categoría" (Maquila M / Aplicación A), pero el
  * backend de v2 no guarda esa categoría en `TipoProceso` (solo código/nombre/generaEntradaPt) → se
  * omite (hueco reportado). `tipos-proceso.ver` gobierna el acceso; `tipos-proceso.administrar` las
- * acciones; `roles.administrar` (marcador de admin) habilita editar la bandera.
+ * acciones; `tipos-proceso.marcar-entrada-pt` habilita editar la bandera (llave propia desde la
+ * fila 0.120 — antes preguntaba por `roles.administrar`, que la regalaba de pasada).
  */
 export function TiposProcesoPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('tipos-proceso.administrar');
-  const puedeEditarBandera = tienePermiso('roles.administrar');
+  // Debe coincidir EXACTAMENTE con lo que exige el dominio (`produccion/tipos-proceso.ts`): si la
+  // pantalla pregunta por otra clave, el interruptor existe pero nadie lo alcanza.
+  const puedeEditarBandera = tienePermiso('tipos-proceso.marcar-entrada-pt');
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);

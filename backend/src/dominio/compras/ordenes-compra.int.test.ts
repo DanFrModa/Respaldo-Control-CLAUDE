@@ -32,7 +32,8 @@ import {
  * Integración del dominio de Órdenes de COMPRA (F4-E2) contra el Postgres efímero (testcontainers).
  * Cubre lo que SOLO la base valida: folio por empresa consecutivo (A3/A9), total derivado por suma,
  * matriz talla×color suma=cantidad (decisión c), XOR catálogo/libre, autorización (permiso propio +
- * bloqueo de edición para no-admin / permitida para admin, decisión a), cancelación suave con
+ * bloqueo de edición sin `compras.editar-autorizada` / permitida con ella, decisión a),
+ * cancelación suave con
  * rastro, y duplicado a un borrador nuevo. NO corre en local (usa Docker): el CI.
  */
 
@@ -314,7 +315,7 @@ describe('OC (F4-E2) — validación de líneas (XOR + matriz, decisión c)', ()
 });
 
 describe('OC (F4-E2) — autorización (decisión a)', () => {
-  it('autorizar exige compras.autorizar y bloquea la edición del no-admin', async () => {
+  it('autorizar exige compras.autorizar y bloquea la edición sin `compras.editar-autorizada`', async () => {
     const oc = await crearOC(
       sesion(PERM_ADMIN_OC),
       { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
@@ -330,21 +331,21 @@ describe('OC (F4-E2) — autorización (decisión a)', () => {
     expect(autorizada.fechaAutorizado).not.toBeNull();
     expect(autorizada.idUsuAutorizado).not.toBeNull();
 
-    // un no-admin (sin roles.administrar) ya NO la puede editar
+    // sin `compras.editar-autorizada` ya NO la puede editar (fila 0.120)
     await expect(
       actualizarOC(sesion(PERM_ADMIN_OC), oc.id, { observaciones: 'cambio' }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
-  it('el ADMIN (roles.administrar) sí edita una OC autorizada', async () => {
+  it('con `compras.editar-autorizada` sí se edita una OC autorizada', async () => {
     const oc = await crearOC(
       sesion(PERM_ADMIN_OC),
       { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
       bd(),
     );
     await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
-    const admin = sesion([...PERM_ADMIN_OC, 'roles.administrar']);
-    const editada = await actualizarOC(admin, oc.id, { observaciones: 'ajuste admin' }, bd());
+    const conLlave = sesion([...PERM_ADMIN_OC, 'compras.editar-autorizada']);
+    const editada = await actualizarOC(conLlave, oc.id, { observaciones: 'ajuste admin' }, bd());
     expect(editada.observaciones).toBe('ajuste admin');
   });
 

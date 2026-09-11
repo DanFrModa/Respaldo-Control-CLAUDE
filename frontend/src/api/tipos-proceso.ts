@@ -20,8 +20,8 @@ import type {
 /**
  * Capa de datos de Tipos de proceso (F3-E1) — mismo ESTÁNDAR que Almacenes: llama al cliente
  * tipado del OpenAPI, normaliza (`data`/`ErrorDeApi`) y expone hooks de TanStack Query. CERO
- * lógica de negocio (A1): la autorización (incluida la regla de que solo un admin edita
- * `generaEntradaPt`) vive en el backend.
+ * lógica de negocio (A1): la autorización (incluida la regla de que `generaEntradaPt` pide
+ * `tipos-proceso.marcar-entrada-pt`, fila 0.120) vive en el backend.
  */
 
 /** Clave raíz de la caché de tipos de proceso. */

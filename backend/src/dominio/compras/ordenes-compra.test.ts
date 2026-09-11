@@ -106,28 +106,40 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
   /**
    * 🔴🔴 **EL CALLEJÓN SIN SALIDA.** El ETL le hereda a cada OC migrada el estatus que traía del
    * sistema viejo —`estatusOCMigrada`: **`cancelada` > `autorizada` > `borrador`**, en ese orden—,
-   * y sobre una OC fuera de `ESTATUS_EDITABLES_NORMAL` `actualizarOC` sólo deja editar al **admin**.
+   * y sobre una OC fuera de `ESTATUS_EDITABLES_NORMAL` `actualizarOC` sólo deja editar a quien
+   * tenga **`compras.editar-autorizada`** (fila 0.120; antes decía «al admin»).
    * O sea que el consejo *"captúrasela primero"* está CERRADO justo para las que lo necesitan: sin
    * esta frase, el comprador da la vuelta completa para toparse con otro "no" — el sistema
    * echándole la culpa de algo que él no podía hacer. Un mensaje que ofrece una salida cerrada es
    * PEOR que uno que no ofrece ninguna.
    */
-  it('🔴🔴 si el original ya NO es editable, dice que esa captura la hace un ADMINISTRADOR', () => {
+  it('🔴🔴 si el original ya NO es editable, nombra la FACULTAD que hace falta (no «un admin»)', () => {
     for (const estatus of ['autorizada', 'recibida_parcial', 'recibida_total']) {
       const motivo = motivoNoDuplicarOc({ fechaEntrega: null, estatus });
       // Sigue diciendo qué falta y qué hacer…
       expect(motivo).toMatch(/vuelve a duplicarla/i);
       // …y además, QUIÉN puede hacerlo (con el estatus que cerró la puerta, para que se entienda).
-      expect(motivo).toMatch(/administrador/i);
+      //
+      // ⭐ Fila 0.120: se assertea la FRASE COMPLETA, no la palabra suelta. Antes esto era
+      // `toMatch(/administrador/i)` — y esa laxitud es justo la que dejó el hecho falso fijado por
+      // una prueba: la frase decía «la tiene que hacer un administrador», que dejó de ser verdad al
+      // darle llave propia a editar una OC firmada, y el `toMatch` habría seguido en verde con
+      // cualquier mención de la palabra (cicatriz del 7-sep-2026).
+      expect(motivo).toContain(
+        'esa captura la tiene que hacer alguien con permiso para editar órdenes de compra ya autorizadas.',
+      );
+      // Y NO manda a buscar a un administrador: la llave puede llevarla quien no administra nada.
+      expect(motivo).not.toMatch(/administrador/i);
       expect(motivo).toContain(estatus);
     }
   });
 
   /**
-   * 🔴🔴 **Y LA CANCELADA NO LA EDITA NADIE — TAMPOCO UN ADMINISTRADOR** (hallazgo del reviewer).
+   * 🔴🔴 **Y LA CANCELADA NO LA EDITA NADIE — TAMPOCO CON `compras.editar-autorizada`** (hallazgo
+   * del reviewer).
    * `actualizarOC` rechaza la cancelada **antes** de mirar quién eres (*"La orden de compra está
    * cancelada; no se puede modificar"*) y `cancelada` es terminal: el dominio no des-cancela. Así
-   * que prometer ahí un administrador es **mentir**, y manda al comprador por la misma puerta
+   * que prometer ahí a alguien que pueda es **mentir**, y manda al comprador por la misma puerta
    * cerrada que este mensaje existe para evitar.
    *
    * ⚠️ **No es teórico:** `estatusOCMigrada` deja `cancelada` en su PRIMERA rama y el ETL escribe
@@ -137,17 +149,19 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
    *
    * ⚠️ **La raíz:** este archivo copió de `actualizarOC` el predicado
    * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` **sin la guarda de la línea de arriba**, que es la
-   * única razón por la que allá significa *"sólo un admin"*. La misma lista, despojada de su guarda.
+   * única razón por la que allá significa *"sólo con la llave"*. La misma lista, despojada de su
+   * guarda.
    */
-  it('🔴🔴 la CANCELADA no promete administrador: manda a capturar la orden nueva a mano', () => {
+  it('🔴🔴 la CANCELADA no promete a nadie que pueda: manda a capturar la orden nueva a mano', () => {
     const motivo = motivoNoDuplicarOc({ fechaEntrega: null, estatus: 'cancelada' });
     expect(motivo).not.toBeNull();
     // Sigue diciendo QUÉ falta…
     expect(motivo).toContain('fecha de entrega');
     // …dice por qué esta vez no hay nada que corregir en el original…
     expect(motivo).toMatch(/cancelada/i);
-    // …🔴 y NO promete un administrador (a ésta no la edita nadie) ni manda a «Editar» y volver a
-    // duplicar: los dos caminos están cerrados.
+    // …🔴 y NO promete que alguien con permiso pueda (a ésta no la edita NADIE) ni manda a
+    // «Editar» y volver a duplicar: los dos caminos están cerrados.
+    expect(motivo).not.toContain('la tiene que hacer alguien con permiso');
     expect(motivo).not.toMatch(/administrador/i);
     expect(motivo).not.toMatch(/vuelve a duplicarla/i);
     // La salida que SÍ existe: levantar la compra a mano.
@@ -155,10 +169,10 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
   });
 
   /** Y en `pendiente_autorizacion` tampoco sobra la mención: ahí el comprador todavía puede. */
-  it('en pendiente_autorizacion NO se menciona al administrador (el comprador puede)', () => {
-    expect(
-      motivoNoDuplicarOc({ fechaEntrega: null, estatus: 'pendiente_autorizacion' }),
-    ).not.toMatch(/administrador/i);
+  it('en pendiente_autorizacion NO se menciona ninguna llave extra (el comprador puede)', () => {
+    const motivo = motivoNoDuplicarOc({ fechaEntrega: null, estatus: 'pendiente_autorizacion' });
+    expect(motivo).not.toContain('la tiene que hacer alguien con permiso');
+    expect(motivo).not.toMatch(/administrador/i);
   });
 });
 

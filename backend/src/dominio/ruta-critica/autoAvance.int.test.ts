@@ -63,7 +63,7 @@ const PERM_TODOS: ClavePermiso[] = [
   // Fila 0.175: la captura manual de más abajo fecha un día concreto de 2026, fuera de la ventana.
   'rc.fecha-libre-cumplimiento',
   'rc.ruta-ver',
-  'roles.administrar',
+  'rc.capturar-cualquiera',
 ];
 
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TODOS });

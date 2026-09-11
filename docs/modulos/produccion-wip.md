@@ -30,7 +30,9 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
 ## Servicios de dominio
 
 - `produccion/tipos-proceso.ts` (F3-E1) — CRUD del catálogo de tipos de proceso (admin-only;
-  `generaEntradaPt` marca los que meten a PT — solo costura).
+  `generaEntradaPt` marca los que meten a PT — solo costura; moverla pide
+  **`tipos-proceso.marcar-entrada-pt`**, llave propia desde la fila 0.120: antes colgaba de
+  `roles.administrar`).
 - `produccion/etapas.ts` (F3-E2) — **corte** + **envío a maquila** unificado (M+A por `TipoProceso`).
   Decisiones (DECISIONES.md): **(f) sobre-corte LIBRE** (`registrarCorte` no topa por pedido; tolerancia
   configurable), **(g) sobre-envío ESTRICTO** (`registrarEnvioMaquila` bloquea si `enviado > cortado`

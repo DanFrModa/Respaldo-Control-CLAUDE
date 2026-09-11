@@ -6,7 +6,7 @@
  *  • completarProceso: captura fechaReal + activa sucesores listos (N antecesores) + cierra la RC en
  *    el último proceso; revertirProceso reabre la RC.
  *  • intersección de roles N:M (ProcesoDefRol): un usuario con rol responsable SÍ captura; sin rol NO;
- *    el admin (roles.administrar) captura cualquier proceso.
+ *    con `rc.capturar-cualquiera` se captura cualquier proceso (fila 0.120).
  *  • checklist: completar todos los ítems auto-completa el proceso; desmarcar lo revierte.
  *  • barrido de riesgo: actualiza Orden.enRiesgo (incl. orden sin ruta con fechaEntregaRC).
  */
@@ -167,7 +167,7 @@ describe('recalcularRutaOrden (CPM)', () => {
 });
 
 describe('completarProceso + roles N:M (ProcesoDefRol)', () => {
-  it('un usuario con rol responsable captura; sin rol no; admin siempre', async () => {
+  it('un usuario con rol responsable captura; sin rol no; con `rc.capturar-cualquiera` siempre', async () => {
     const idOrden = await crearOrdenConRc('2026-06-29');
     const proc = await crearProcesoDef('corte');
     const idRuta = await crearRenglon(idOrden, proc, {
@@ -235,10 +235,10 @@ describe('completarProceso + roles N:M (ProcesoDefRol)', () => {
       secuencia: 0,
       estado: 'activo',
     });
-    // Sesión ADMIN (captura cualquier proceso) pero con empresa activa AJENA a la orden.
+    // Sesión con `rc.capturar-cualquiera` (captura cualquier proceso) pero con empresa AJENA.
     const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
     const ajena = sesionDePrueba({
-      permisos: ['rc.capturar', 'roles.administrar'],
+      permisos: ['rc.capturar', 'rc.capturar-cualquiera'],
       idEmpresaActiva: otra.id,
     });
     await expect(completarProceso(ajena, idRuta, undefined, bd())).rejects.toBeInstanceOf(
@@ -266,28 +266,30 @@ describe('completarProceso + roles N:M (ProcesoDefRol)', () => {
     await ligar(rc, ra);
     await ligar(rc, rb); // c depende de a Y b.
 
-    const admin = sesionDePrueba({ permisos: ['rc.capturar', 'roles.administrar'] });
+    const conCapturaCualquiera = sesionDePrueba({
+      permisos: ['rc.capturar', 'rc.capturar-cualquiera'],
+    });
 
     // Completar solo a: c NO se activa todavía (falta b).
-    await completarProceso(admin, ra, undefined, bd());
+    await completarProceso(conCapturaCualquiera, ra, undefined, bd());
     expect((await cliente.rutaOrden.findUniqueOrThrow({ where: { id: rc } })).estado).toBe(
       'pendiente',
     );
 
     // Completar b: ahora c se activa.
-    await completarProceso(admin, rb, undefined, bd());
+    await completarProceso(conCapturaCualquiera, rb, undefined, bd());
     expect((await cliente.rutaOrden.findUniqueOrThrow({ where: { id: rc } })).estado).toBe(
       'activo',
     );
 
     // Completar c (último): cierra la RC.
-    await completarProceso(admin, rc, undefined, bd());
+    await completarProceso(conCapturaCualquiera, rc, undefined, bd());
     expect((await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } })).rcActiva).toBe(
       false,
     );
 
     // Revertir c: reabre la RC.
-    await revertirProceso(admin, rc, bd());
+    await revertirProceso(conCapturaCualquiera, rc, bd());
     expect((await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } })).rcActiva).toBe(true);
     expect((await cliente.rutaOrden.findUniqueOrThrow({ where: { id: rc } })).estado).toBe(
       'activo',
@@ -310,9 +312,11 @@ describe('checklist', () => {
     const i2 = await cliente.rutaOrdenChecklist.create({
       data: { idRutaOrden: idRuta, descripcion: 'punto 2', orden: 1 },
     });
-    const admin = sesionDePrueba({ permisos: ['rc.capturar', 'roles.administrar'] });
+    const conCapturaCualquiera = sesionDePrueba({
+      permisos: ['rc.capturar', 'rc.capturar-cualquiera'],
+    });
 
-    await marcarChecklistItem(admin, i1.id, true, bd());
+    await marcarChecklistItem(conCapturaCualquiera, i1.id, true, bd());
     expect((await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } })).estado).toBe(
       'activo',
     );
@@ -326,7 +330,7 @@ describe('checklist', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-10T01:00:00.000Z')); // = 9-sep 19:00 en México
     try {
-      await marcarChecklistItem(admin, i2.id, true, bd());
+      await marcarChecklistItem(conCapturaCualquiera, i2.id, true, bd());
     } finally {
       vi.useRealTimers();
     }
@@ -339,7 +343,7 @@ describe('checklist', () => {
     expect(fila.origenCaptura).toBe('evento'); // lo completó el sistema, no captura manual.
 
     // Desmarcar un ítem revierte el cumplimiento (porque fue AUTO-completado).
-    await marcarChecklistItem(admin, i2.id, false, bd());
+    await marcarChecklistItem(conCapturaCualquiera, i2.id, false, bd());
     const fila2 = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
     expect(fila2.estado).not.toBe('completado');
     expect(fila2.fechaReal).toBeNull();
@@ -358,18 +362,18 @@ describe('checklist', () => {
     });
     // `rc.fecha-libre-cumplimiento` a propósito (fila 0.175): la fecha concreta de abajo está
     // fuera de la ventana de captura, y aquí lo que se mide es el `origenCaptura`, no la ventana.
-    const admin = sesionDePrueba({
-      permisos: ['rc.capturar', 'roles.administrar', 'rc.fecha-libre-cumplimiento'],
+    const conCapturaCualquiera = sesionDePrueba({
+      permisos: ['rc.capturar', 'rc.capturar-cualquiera', 'rc.fecha-libre-cumplimiento'],
     });
 
     // Completa MANUALMENTE el proceso con una fecha concreta.
-    await completarProceso(admin, idRuta, new Date('2026-06-15T00:00:00Z'), bd());
+    await completarProceso(conCapturaCualquiera, idRuta, new Date('2026-06-15T00:00:00Z'), bd());
     const tras = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
     expect(tras.origenCaptura).toBe('manual');
 
     // Marcar y luego DESMARCAR el ítem de checklist NO debe revertir la completación manual.
-    await marcarChecklistItem(admin, i1.id, true, bd());
-    await marcarChecklistItem(admin, i1.id, false, bd());
+    await marcarChecklistItem(conCapturaCualquiera, i1.id, true, bd());
+    await marcarChecklistItem(conCapturaCualquiera, i1.id, false, bd());
     const final = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
     expect(final.estado).toBe('completado');
     expect(final.fechaReal?.toISOString().slice(0, 10)).toBe('2026-06-15'); // fecha manual intacta.

@@ -438,8 +438,17 @@ function EditorPermisos({
               `prisma/seed.ts` → `deleteMany … notIn: [...idsPermisos, ...idsGobierno]`). O sea que
               el escenario que el propio seed describe —darle «administrar roles» a Gerencial desde
               ESTA pantalla— se queda para SIEMPRE. Un aviso que dijera «todo se borra» mentiría
-              justo en los dos permisos que más pesan (y `roles.administrar` es además el marcador
-              de «es admin» de la Ruta Crítica). */}
+              justo en los dos permisos que más pesan.
+
+              ✅ Y lo que ESTE aviso decía hasta la fila 0.120 —que `roles.administrar` es «además
+              el marcador de es-admin de la Ruta Crítica»— YA NO ES CIERTO, y era importante que
+              dejara de serlo justo aquí, que es la pantalla donde se reparten los permisos: dar
+              «administrar roles» ya NO concede de pasada capturar cualquier proceso de la RC
+              (`rc.capturar-cualquiera`), ver la bandeja entera (`rc.bandeja-completa`), editar una
+              OC ya firmada (`compras.editar-autorizada`) ni mover la bandera de entrada a PT
+              (`tipos-proceso.marcar-entrada-pt`). Cada una es una casilla propia de esta misma
+              lista y se da —o no— por separado. `roles.administrar` gobierna hoy SÓLO la
+              administración de roles. */}
           {rol.esSistema ? (
             <p
               // `bg-warn-soft` + texto normal es el patrón de aviso del rediseño (ChipEstado,

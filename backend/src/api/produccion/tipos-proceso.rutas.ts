@@ -1,7 +1,7 @@
 /**
  * Rutas REST de Tipos de proceso (F3-E1; CRUD patrón Almacenes). Handlers delgados (A1):
  * validan (Zod compartido), autorizan (`conPermiso`, A4) y delegan al dominio
- * `dominio/produccion/tipos-proceso`. La regla de "solo admin edita `generaEntradaPt`" vive en
+ * `dominio/produccion/tipos-proceso`. La regla de "`generaEntradaPt` pide `tipos-proceso.marcar-entrada-pt`" (fila 0.120) vive en
  * el dominio (no aquí): la ruta solo pasa la sesión y el cuerpo.
  */
 import { z } from 'zod';
