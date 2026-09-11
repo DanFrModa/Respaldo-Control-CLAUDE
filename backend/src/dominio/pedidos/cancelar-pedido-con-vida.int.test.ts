@@ -530,7 +530,7 @@ describe('⭐⭐ 0.150 — lo DESHECHO y lo DERIVADO no bloquean', () => {
       const inverso = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
         where: { codigo: 'error-entrada' },
       });
-      await cancelarMovimientoPtMotor(s(), idMovimiento, inverso.id, bd());
+      await cancelarMovimientoPtMotor(s(), idMovimiento, inverso.id, 'se deshizo', bd());
       // Se MIDE la trampa, no se supone: quedan DOS renglones con esta orden.
       const renglones = await cliente.movimientoDetPt.count({ where: { idOrden } });
       expect(renglones).toBe(2);
@@ -543,7 +543,7 @@ describe('⭐⭐ 0.150 — lo DESHECHO y lo DERIVADO no bloquean', () => {
       const inverso = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
         where: { codigo: 'error-salida' },
       });
-      await cancelarMovimientoMaterial(s(), idMovimiento, inverso.id, bd());
+      await cancelarMovimientoMaterial(s(), idMovimiento, inverso.id, 'se deshizo', bd());
       // El ORIGINAL sigue ahí, con su `origenTipo`/`origenId` intactos: sólo el enlace al inverso
       // lo distingue de uno vivo.
       const vivos = await cliente.movimiento.count({

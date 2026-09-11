@@ -311,6 +311,38 @@ describe('KardexPtPagina · modo por modelo — el PERIODO (fila 0.138)', () => 
   });
 
   /**
+   * ⭐ FILA 0.180 — LA COLUMNA QUE FALTABA. El backend YA mandaba `observaciones` en cada renglón
+   * del kardex de PT (el motivo del movimiento, y desde esta fila también el de la CANCELACIÓN),
+   * pero esta tabla era la ÚNICA de las cuatro superficies de kardex que no lo pintaba: tela, avío
+   * y tela×color ya tenían su columna. Sin ella, el motivo que el sistema OBLIGA a escribir para
+   * cancelar seguía invisible aquí por más que el backend lo guardara.
+   */
+  it('⭐ pinta el MOTIVO del movimiento en su columna, y «—» cuando no hay (fila 0.180)', async () => {
+    const base = (respuesta().renglones as Record<string, unknown>[])[0];
+    useKardexMock.mockReturnValue({
+      data: respuesta({
+        renglones: [
+          { ...base, observaciones: 'Cancelación del folio 10: se capturó dos veces' },
+          { ...base, idMovimiento: 2, folio: 11, observaciones: null },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    const celdas = screen.getAllByTestId('kardex-pt-obs');
+    expect(celdas).toHaveLength(2);
+    expect(celdas[0]).toHaveTextContent('Cancelación del folio 10: se capturó dos veces');
+    // El texto completo va en el `title`: la columna trunca, pero no esconde.
+    expect(celdas[0]).toHaveAttribute('title', 'Cancelación del folio 10: se capturó dos veces');
+    // Sin motivo, el guion — nunca una celda en blanco.
+    expect(celdas[1]).toHaveTextContent('—');
+  });
+
+  /**
    * ⭐ CON SÓLO «HASTA», la ventana son los 12 meses que TERMINAN ahí. Decir «últimos 12 meses por
    * omisión — pon fechas» era doblemente falso: ni son los últimos doce, ni el usuario dejó de
    * poner fechas (puso una).
@@ -396,5 +428,82 @@ describe('KardexPtPagina · modo por modelo — el PERIODO (fila 0.138)', () => 
     expect(fila).toHaveTextContent('Saldo anterior');
     expect(fila).toHaveTextContent('30');
     expect(fila).toHaveTextContent('Rojo');
+  });
+
+  /**
+   * 🔴 LAS COLUMNAS DEL CUERPO CUADRAN CON EL ENCABEZADO — la CUARTA tabla de la familia.
+   *
+   * La prueba de arriba mide la celda de Observaciones del RENGLÓN DE DATOS y nada más. Pero cada
+   * columna nueva se edita en TRES sitios de esta tabla: el `th` del encabezado, la celda del
+   * renglón de datos y la celda del renglón «Saldo anterior». Se comprobó mutando: borrar la celda
+   * del saldo anterior, o borrar el `th`, dejaba la suite ENTERA en verde (218 archivos / 2397
+   * pruebas). Y no es cosmético — quitarle una celda a esa fila no deja un hueco: le RECORRE toda
+   * la fila una columna a la izquierda, así que el número de «Saldo» acaba impreso bajo el
+   * encabezado «Observaciones». Eso es dar información equivocada, no fealdad.
+   *
+   * Es la cicatriz literal de la fila 0.176 (rechazada en primera ronda por medir cuatro de nueve
+   * sitios); su corrección dejó este mismo helper LOCAL en cada tabla de la familia
+   * (`ExistenciasTelasColorPagina.test.tsx`), y esta tabla llegó sin él.
+   *
+   * ⚠️ Se mide con `saldosIniciales` POBLADO a propósito: el fixture por omisión de este archivo
+   * lo trae vacío, la fila del saldo anterior NO se pinta y la guarda pasaría EN VACÍO — que es
+   * justo la trampa que la 0.176 dejó documentada. Por eso el helper exige el número de filas.
+   */
+  describe('las columnas del cuerpo cuadran con el encabezado', () => {
+    /** `th` del encabezado y `td` de cada `tr` del cuerpo. Contar sólo el encabezado no basta. */
+    function esperarColumnasCuadradas(tabla: HTMLElement, filasEsperadas: number): void {
+      const encabezados = tabla.querySelectorAll('thead th').length;
+      const porFila = [...tabla.querySelectorAll('tbody tr')].map(
+        (tr) => tr.querySelectorAll('td').length,
+      );
+      // Sin filas la comprobación sería vacua (verde sin medir nada): se exige que las haya.
+      expect(porFila).toHaveLength(filasEsperadas);
+      expect(encabezados).toBeGreaterThan(0);
+      expect(porFila).toEqual(porFila.map(() => encabezados));
+    }
+
+    const saldoAnterior = {
+      idColor: 7,
+      color: 'Rojo',
+      idTalla: 11,
+      etiquetaTalla: 'CH',
+      idAlmacen: 3,
+      almacen: 'Primeras',
+      idOrden: null,
+      folioOrden: null,
+      saldo: 30,
+    };
+
+    it('⭐ «Saldo anterior» y el renglón de datos tienen las MISMAS columnas que el `thead`', async () => {
+      useKardexMock.mockReturnValue({
+        data: respuesta({ saldosIniciales: [saldoAnterior] }),
+        isPending: false,
+        isError: false,
+      });
+      const usuario = userEvent.setup();
+      renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+
+      // 2 filas: el «Saldo anterior» + el único renglón del fixture. Esta tabla no tiene columnas
+      // condicionales (ni de acciones ni de permiso), así que una sola variante la cubre entera.
+      esperarColumnasCuadradas(screen.getByTestId('kardex-tabla'), 2);
+    });
+
+    it('⭐ y siguen cuadrando con VARIOS saldos anteriores y varios renglones', async () => {
+      const base = (respuesta().renglones as Record<string, unknown>[])[0];
+      useKardexMock.mockReturnValue({
+        data: respuesta({
+          saldosIniciales: [saldoAnterior, { ...saldoAnterior, idTalla: 12, etiquetaTalla: 'M' }],
+          renglones: [base, { ...base, idMovimiento: 2, folio: 11, observaciones: 'otra cosa' }],
+        }),
+        isPending: false,
+        isError: false,
+      });
+      const usuario = userEvent.setup();
+      renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+
+      esperarColumnasCuadradas(screen.getByTestId('kardex-tabla'), 4);
+    });
   });
 });

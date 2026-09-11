@@ -903,7 +903,13 @@ export async function cancelarNotaSalida(
       const tipoInverso = await tipoPorCodigo(tx, COD_AJUSTE_ENTRADA);
       for (const l of nota.lineas) {
         if (l.idMovimientoAvio !== null) {
-          await cancelarMovimientoMaterial(sesion, l.idMovimientoAvio, tipoInverso.id, { tx });
+          await cancelarMovimientoMaterial(
+            sesion,
+            l.idMovimientoAvio,
+            tipoInverso.id,
+            datos.motivo,
+            { tx },
+          );
           invertidos += 1;
         }
       }

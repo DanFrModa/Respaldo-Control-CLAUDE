@@ -1219,7 +1219,13 @@ export async function cancelarEntradaTela(
 
     if (documento.estatus === EstatusEntradaTela.confirmada && documento.idMovimiento !== null) {
       const tipoInverso = await tipoPorCodigo(tx, COD_AJUSTE_SALIDA);
-      await cancelarMovimientoMaterial(sesion, documento.idMovimiento, tipoInverso.id, { tx });
+      await cancelarMovimientoMaterial(
+        sesion,
+        documento.idMovimiento,
+        tipoInverso.id,
+        datos.motivo,
+        { tx },
+      );
       // §Post-F9.14: y las OCs que había surtido vuelven a quedar pendientes de recibir.
       await reversarRecepcionesDeEntradaTela(
         tx,
