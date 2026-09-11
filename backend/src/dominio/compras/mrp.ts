@@ -222,8 +222,8 @@ import {
 // perseguir. Vive en su propio módulo (y en su propia tabla) porque el snapshot se reescribe entero
 // en cada explosión y una bandera ahí se borraría sola.
 import {
-  cubiertoDe,
   dadoPorCubierto,
+  repartirCubiertoPorColor,
   repartoDadoPorCubierto,
   type CubiertoPorOrden,
 } from './dado-por-cubierto.js';
@@ -1698,6 +1698,13 @@ function proyectarRenglones(
     const enOcPorFila = new Map<number, number>();
     /** ⭐ V1-E3u: cuánto del `enOc` de cada fila viene de una OC que NO dice el color. */
     const ambiguoPorFila = new Map<number, number>();
+    /**
+     * ⭐⭐ fila 0.162: y lo DADO POR CUBIERTO, repartido con la misma foto de hermanos. Buscar la
+     * marca por igualdad exacta dejaba en el piso las de un color que ningún renglón de hoy
+     * reclama —el avío que se acaba de marcar «se compra sin color», la tela a la que le quitaron
+     * el amarre— y el faltante que alguien ya había cerrado volvía a pedirse.
+     */
+    const cubiertoPorFila = new Map<number, number>();
     const porMaterialOrden = new Map<string, typeof e.filas>();
     for (const f of e.filas) {
       const clave = claveMaterial(f.fila);
@@ -1714,9 +1721,15 @@ function proyectarRenglones(
         })),
         comprometido.get(e.orden.id)?.get(clave),
       );
+      // ⭐⭐ fila 0.162: el OTRO sumando del mismo criterio, con la misma regla y la misma guarda.
+      const repartidoCubierto = repartirCubiertoPorColor(
+        grupo.map((f) => ({ idColor: colorDelRenglon(f.fila) })),
+        cubierto.get(e.orden.id)?.get(clave),
+      );
       grupo.forEach((f, i) => {
         enOcPorFila.set(f.fila.id, repartido[i]?.enOc ?? 0);
         ambiguoPorFila.set(f.fila.id, repartido[i]?.desdeAcervoSinColor ?? 0);
+        cubiertoPorFila.set(f.fila.id, repartidoCubierto[i] ?? 0);
       });
     }
 
@@ -1742,9 +1755,11 @@ function proyectarRenglones(
       const enOcAmbiguo = ambiguoPorFila.get(fila.id) ?? 0;
       // ⭐⭐ V1-E8e (§Post-F9.99) — lo que alguien DIO POR CUBIERTO de este renglón. No sale del
       // snapshot (que se acaba de reescribir entero unas líneas más arriba) sino de su propia
-      // tabla, indexada por *(orden, material, color)* — la MISMA identidad con la que netea el
-      // color. Por eso sobrevive a volver a explotar, que es toda la gracia.
-      const cubiertoFila = cubiertoDe(cubierto, e.orden.id, fila);
+      // tabla, guardada por *(orden, material, color)*. Por eso sobrevive a volver a explotar, que
+      // es toda la gracia. ⭐⭐ fila 0.162: se REPARTE arriba (viendo a todos los hermanos del
+      // material) en vez de buscarse por igualdad exacta — las marcas de un color que ningún
+      // renglón de hoy reclama se caían al piso y el faltante volvía a pedirse.
+      const cubiertoFila = cubiertoPorFila.get(fila.id) ?? 0;
       // ⭐⭐ EL CRITERIO, UNO SOLO (§Post-F9.99): comprometido + dado por cubierto ≥ requerido.
       const pendiente = pendienteDeComprar(aComprar, enOc, cubiertoFila);
       const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
@@ -2863,6 +2878,8 @@ async function planearCompra(
   const enOcPorFila = new Map<number, number>();
   /** ⭐ V1-E3u: la parte de ese `enOc` que el sistema ELIGIÓ atribuirle (acervo sin color). */
   const ambiguoPorFila = new Map<number, number>();
+  /** ⭐⭐ fila 0.162: y lo dado por cubierto, repartido con la MISMA foto de hermanos. */
+  const cubiertoPorFila = new Map<number, number>();
   {
     const porOrdenMaterial = new Map<string, typeof filas>();
     for (const f of filas) {
@@ -2882,9 +2899,16 @@ async function planearCompra(
         })),
         comprometido.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
       );
+      // ⭐⭐ fila 0.162: la previa y la explosión tienen que decir el MISMO número, así que las dos
+      // reparten lo cubierto con la misma función pura (y la misma guarda del renglón sin color).
+      const repartidoCubierto = repartirCubiertoPorColor(
+        grupo.map((f) => ({ idColor: colorDelRenglon(f) })),
+        cubierto.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
+      );
       grupo.forEach((f, i) => {
         enOcPorFila.set(f.id, repartido[i]?.enOc ?? 0);
         ambiguoPorFila.set(f.id, repartido[i]?.desdeAcervoSinColor ?? 0);
+        cubiertoPorFila.set(f.id, repartidoCubierto[i] ?? 0);
       });
     }
   }
@@ -2892,9 +2916,10 @@ async function planearCompra(
   const requerimientos: RequerimientoParaPlan[] = filas.map((f) => {
     const aComprar = Number(f.cantidadAComprar);
     const enOc = enOcPorFila.get(f.id) ?? 0;
-    // ⭐⭐ V1-E8e (§Post-F9.99): la marca se busca por *(orden, material, color)* — la misma
-    // identidad con la que se guardó, resuelta por la misma función (`claveMaterialColor`).
-    const cubiertoFila = cubiertoDe(cubierto, f.idOrden, f);
+    // ⭐⭐ V1-E8e (§Post-F9.99): la marca se guardó por *(orden, material, color)*, y desde la
+    // ⭐⭐ fila 0.162 se REPARTE en vez de buscarse por igualdad exacta — si no, las marcas de un
+    // color que ningún renglón de hoy reclama se caen al piso y el faltante vuelve a pedirse.
+    const cubiertoFila = cubiertoPorFila.get(f.id) ?? 0;
     return {
       id: f.id,
       idOrden: f.idOrden,

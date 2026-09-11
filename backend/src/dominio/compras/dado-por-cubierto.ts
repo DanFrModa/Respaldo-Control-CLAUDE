@@ -42,9 +42,17 @@
  *
  * ⚠️ **Y el COLOR está en esa identidad porque el neteo razona con él.** Desde V1-E3u (telas,
  * §Post-F9.89) y V1-E8c (avíos, §Post-F9.126) un renglón de explosión ES *(material, color)*: la
- * clave que usan el neteo y la agrupación es {@link claveMaterialColor}, y ésta cuelga de LA MISMA.
+ * clave que usan el neteo y la agrupación es `claveMaterialColor`, y ésta cuelga de LA MISMA.
  * Una marca por material a secas cubriría el cierre rojo y seguiría pidiendo los otros tres — o
  * peor, los taparía todos.
+ *
+ * ⭐⭐ **fila 0.162 — LO QUE SE GUARDA NO CAMBIA; LO QUE CAMBIA ES CÓMO SE BUSCA.** El acto sigue
+ * naciendo con su *(orden, material, color)* exacto. Lo que esta fila corrige es que el renglón
+ * **puede cambiar de forma después** (se marca «se compra sin tomar en cuenta el color» en el avío,
+ * se quita el amarre de color de la tela) y entonces la búsqueda por igualdad exacta dejaba las
+ * marcas de color **sin dueño**: el faltante que alguien ya había cerrado volvía a perseguirlo.
+ * El reparto vive en {@link repartirCubiertoPorColor}, con la misma regla —y la misma guarda— que
+ * la fila 0.158 le dio al otro sumando del criterio.
  *
  * ⚠️ **Es un LIBRO de actos, no un estado que se pisa** (D3, el criterio del kardex): cada acto
  * INSERTA un renglón y lo cubierto es la **Σ de los vivos**. *"Volver a pedirlo"* sella
@@ -85,8 +93,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import {
   canonizarColorPrenda,
-  claveMaterialColor,
   comprometidoEnOc,
+  elSinColorSeLlevaLasHuerfanas,
   pendienteDeComprar,
   repartirComprometidoPorColor,
   colorDelRenglon,
@@ -95,12 +103,21 @@ import {
 import { redondearCantidadCompra, seGuardaComoAlgo } from './reparto-ordenes.js';
 
 /**
- * Lo dado por cubierto de un conjunto de órdenes: `idOrden → (claveMaterialColor → cantidad)`.
+ * Lo dado por cubierto de un conjunto de órdenes:
+ * `idOrden → (claveMaterial → (color del renglón → cantidad))`.
  *
  * La cantidad es la **Σ de los actos VIVOS** (los cancelados no cuentan, D3), a la escala de
  * `RequerimientoOrden.cantidadAComprar` (4 decimales) — la misma en la que se decidió.
+ *
+ * ⭐⭐ **fila 0.162 — POR QUÉ EL COLOR ES UNA CUBETA Y YA NO PARTE DE LA LLAVE.** Hasta esta fila el
+ * mapa iba indexado por `claveMaterialColor` (`avio-9|3`) y cada renglón buscaba su marca por
+ * IGUALDAD EXACTA. Eso deja **caer al piso** las marcas de un color que ningún renglón de la
+ * explosión de hoy reclama —el mismo hueco que la fila 0.158 cerró en el otro sumando del criterio
+ * ({@link ComprometidoMaterial.porColor})—, y el faltante que alguien ya había dado por cubierto
+ * vuelve a perseguirlo. La forma es ahora la MISMA que la de lo comprometido, a propósito: los dos
+ * sumandos de {@link pendienteDeComprar} se reparten con la misma regla y se leen igual.
  */
-export type CubiertoPorOrden = Map<number, Map<string, number>>;
+export type CubiertoPorOrden = Map<number, Map<string, Map<number | null, number>>>;
 
 /**
  * ⭐ LA función de lectura: cuánto se dio por cubierto, por orden y por renglón *(material, color)*.
@@ -142,26 +159,111 @@ export async function dadoPorCubierto(
   const filas = await canonizarColorPrenda(crudas, bd);
 
   for (const f of filas) {
-    const porClave = resultado.get(f.idOrden) ?? new Map<string, number>();
-    const clave = claveMaterialColor(f);
-    porClave.set(clave, (porClave.get(clave) ?? 0) + Number(f.cantidad));
-    resultado.set(f.idOrden, porClave);
+    const porMaterial = resultado.get(f.idOrden) ?? new Map<string, Map<number | null, number>>();
+    const clave = claveMaterial(f);
+    const porColor = porMaterial.get(clave) ?? new Map<number | null, number>();
+    // ⭐⭐ fila 0.162: la cubeta es el COLOR DEL RENGLÓN —de tela en las telas, de prenda en los
+    // avíos—, resuelto por la MISMA función que usan el neteo y la agrupación (`colorDelRenglon`).
+    // La suma NO se redondea: la marca vive a la escala del snapshot (4 decimales), y recortarla
+    // aquí a la de la OC tiraría precisión de una decisión que se tomó con ese número.
+    const color = colorDelRenglon(f);
+    porColor.set(color, (porColor.get(color) ?? 0) + Number(f.cantidad));
+    porMaterial.set(clave, porColor);
+    resultado.set(f.idOrden, porMaterial);
   }
   return resultado;
 }
 
-/** Lo dado por cubierto de UN renglón en UNA orden (0 si nadie decidió nada). */
-export function cubiertoDe(
-  mapa: CubiertoPorOrden,
-  idOrden: number,
-  renglon: {
-    idTela: number | null;
-    idAvio: number | null;
-    idTelaColor: number | null;
-    idColorPrenda: number | null;
-  },
-): number {
-  return mapa.get(idOrden)?.get(claveMaterialColor(renglon)) ?? 0;
+/** Un renglón de requerimiento visto desde el reparto de lo cubierto: sólo su color. */
+export interface FilaParaCubierto {
+  /**
+   * El COLOR del renglón, ya resuelto con `colorDelRenglon`: de tela si es tela, de prenda si es
+   * avío. `null` = el renglón no dice de qué color (la tela sin tono capturado, o el avío marcado
+   * «se compra sin tomar en cuenta el color»).
+   */
+  idColor: number | null;
+}
+
+/**
+ * ⭐⭐ **A QUÉ RENGLÓN LE CUBRE CADA MARCA, AHORA QUE EL RENGLÓN PUEDE CAMBIAR DE FORMA**
+ * (fila 0.162) — función PURA. Es la gemela de `repartirComprometidoPorColor`, para el OTRO sumando
+ * del mismo criterio ({@link pendienteDeComprar}).
+ *
+ * ── EL DEFECTO QUE CIERRA ────────────────────────────────────────────────────────────────────────
+ *
+ * La marca se guarda por *(orden, material, color)* y hasta esta fila se buscaba por igualdad
+ * exacta. Pero **el color del renglón puede cambiar después de que alguien decidió**: se marca «se
+ * compra sin tomar en cuenta el color» en un avío que ya tenía renglones por color (fila 0.158), o
+ * se quita el amarre de color de una tela. En ese instante la explosión emite UN renglón sin color
+ * y las marcas de Rojo/Azul/Negro **se quedan sin dueño**: nadie las encuentra y el faltante que
+ * alguien ya había cerrado vuelve a pedirse. Es §Post-F9.99 deshecho por una casilla de catálogo.
+ *
+ * ── LA REGLA ─────────────────────────────────────────────────────────────────────────────────────
+ *
+ *  1. **Cada renglón se lleva lo de SU cubeta** (la de su color; el sin color, la de `null`). Es
+ *     exactamente lo que hacía la búsqueda exacta, y sigue siendo lo único que de verdad le toca.
+ *  2. **Las cubetas CON color que ningún renglón reclama van al renglón sin color, pero SÓLO si ese
+ *     renglón es el ÚNICO del material** ({@link elSinColorSeLlevaLasHuerfanas}).
+ *
+ * 🔴 **Y POR QUÉ ESE «SÓLO SI» NO ES OPCIONAL** — es el mismo hallazgo del reviewer que sostiene la
+ * regla 3 de `repartirComprometidoPorColor`, y aplica IGUAL aquí. La tentación es decir *«el renglón
+ * sin color pide TODO el material de la orden, así que le tocan todas las marcas»*: cierto en un
+ * avío colapsado (`OrdenAvio.@@unique([idOrden, idAvio])` ⇒ un solo renglón por orden) y **falso en
+ * una tela**, donde los colores sin amarre caen en el grupo `sin` **junto a** los que sí lo tienen,
+ * así que una misma tela emite a la vez renglones con color y uno sin color — y ese renglón sin
+ * color es **una PARTE de la orden, no toda**. Acreditarle una marca que se decidió sobre OTRO tono
+ * le baja el faltante sin que nadie lo haya dicho, y **ese material no se compra nunca**.
+ * Una sobre-compra visible (la marca se queda en el piso, el faltante reaparece y el comprador
+ * vuelve a cerrarlo con un clic) es mejor negocio que una **sub-compra silenciosa que para la
+ * producción**.
+ *
+ * ── 🔴 LO QUE ESTA FUNCIÓN **NO** HACE, Y NO ES OLVIDO ────────────────────────────────────────────
+ *
+ * **La cubeta SIN color NO se reparte entre los renglones CON color.** `repartirComprometidoPorColor`
+ * sí lo hace con su acervo sin color, y la diferencia tiene una razón medible: aquel reparto existe
+ * para rescatar **el acervo de OC anterior al color** (las ~7,978 OC del Access; **554** tras el
+ * corte de `ETL_DESDE`, `DECISIONES.md` §Post-F9.24) — un corpus heredado que, sin repartir,
+ * haría re-comprar todo lo que se compró en la era anterior. `RequerimientoCubierto` **no tiene era
+ * anterior**: nació (migración `20260827180000_con_esto_queda_cubierto`) ya con `id_tela_color` e
+ * `id_color_prenda`, y explícitamente **SIN backfill**. Una marca sin color existe sólo porque su
+ * renglón no tenía color al decidirla; que después el renglón se parta en colores no es un dato
+ * viejo que rescatar, sino un cambio de la pregunta.
+ *
+ * ⚠️ **Y NO es que repartirla esté descartado: es que NO está decidido.** Hay una tercera salida
+ * que no se eligió aquí — repartirla como hace `repartirComprometidoPorColor` con su acervo:
+ * **topada por lo que cada renglón necesita** y **confesando la elección**, como su
+ * `desdeAcervoSinColor`. Lo que impide elegirla sin preguntar es el TAMAÑO que puede tener la
+ * marca: «dar por cubierto» desde la explosión cierra **todo el pendiente del renglón**, así que
+ * una marca sin color puede valer un kilo suelto —repartirlo sería inocuo— o **la orden entera**,
+ * y entonces dejaría a todos los colores nuevos en cero. **Dónde está esa raya es una decisión de
+ * NEGOCIO** (§Post-F9.99 es de Daniel), no un hueco de búsqueda. Mientras nadie la trace, la marca
+ * se queda en el piso y el faltante reaparece **visible** — el lado que se recupera con un clic.
+ *
+ * @returns lo cubierto de CADA fila, en el MISMO orden en que llegaron.
+ */
+export function repartirCubiertoPorColor(
+  filas: readonly FilaParaCubierto[],
+  porColor: ReadonlyMap<number | null, number> | undefined,
+): number[] {
+  if (filas.length === 0) return [];
+  if (porColor === undefined) return filas.map(() => 0);
+
+  // Regla 1. El sin color arranca en 0 y recibe su cubeta abajo: con dos renglones sin color del
+  // mismo material (que la explosión no emite hoy, pero el tipo permite) darles la cubeta a los dos
+  // la contaría DOBLE. Es la misma precaución que toma `repartirComprometidoPorColor`.
+  const propio = filas.map((f) => (f.idColor === null ? 0 : (porColor.get(f.idColor) ?? 0)));
+
+  const indiceSinColor = filas.findIndex((f) => f.idColor === null);
+  if (indiceSinColor < 0) return propio;
+
+  let huerfano = 0;
+  if (elSinColorSeLlevaLasHuerfanas(filas)) {
+    for (const [idColor, cantidad] of porColor) {
+      if (idColor !== null) huerfano += cantidad;
+    }
+  }
+  propio[indiceSinColor] = (propio[indiceSinColor] ?? 0) + (porColor.get(null) ?? 0) + huerfano;
+  return propio;
 }
 
 // ── ⭐⭐ EL REPARTO POR OP DE LO QUE SE DA POR CUBIERTO (desde la revisión previa) ────────────────
@@ -292,6 +394,15 @@ export async function darPorCubierto(
      * daríamos por cubierto **cero** y el comprador se quedaría con su faltante y sin aviso.
      */
     const enOcPorFila = new Map<number, number>();
+    /** ⭐⭐ fila 0.162 — lo cubierto de cada fila, con el reparto que ve a todos sus hermanos. */
+    const cubiertoPorFila = new Map<number, number>();
+    /**
+     * ⭐⭐ fila 0.162 — los renglones SIN color que se llevan las marcas huérfanas de su material
+     * ({@link elSinColorSeLlevaLasHuerfanas}). «Volver a pedirlo» tiene que poder SOLTAR justo esas:
+     * si la lectura las absorbe y el deshacer no, el comprador ve *«cubierto: 10»* y el botón no
+     * hace nada — el faltante queda cerrado sin manera de reabrirlo.
+     */
+    const absorbeHuerfanas = new Set<number>();
     {
       // 🔴 Se leen TODOS los renglones de esas órdenes, no sólo los nombrados: los hermanos que el
       // comprador no marcó siguen siendo parte del reparto del acervo sin color.
@@ -318,6 +429,7 @@ export async function darPorCubierto(
       for (const grupo of porOrdenMaterial.values()) {
         const cabeza = grupo[0];
         if (cabeza === undefined) continue;
+        const colores = grupo.map((f) => ({ idColor: colorDelRenglon(f) }));
         const repartido = repartirComprometidoPorColor(
           grupo.map((f) => ({
             idColor: colorDelRenglon(f),
@@ -325,9 +437,22 @@ export async function darPorCubierto(
           })),
           comprometido.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
         );
+        // ⭐⭐ fila 0.162: lo cubierto se reparte con la MISMA foto de hermanos y la misma regla que
+        // lo comprometido — son los dos sumandos del mismo criterio y no pueden ver cosas distintas.
+        const repartidoCubierto = repartirCubiertoPorColor(
+          colores,
+          cubierto.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
+        );
         grupo.forEach((f, i) => {
           enOcPorFila.set(f.id, repartido[i]?.enOc ?? 0);
+          cubiertoPorFila.set(f.id, repartidoCubierto[i] ?? 0);
         });
+        if (elSinColorSeLlevaLasHuerfanas(colores)) {
+          // El MISMO renglón que la lectura elige (`findIndex` allá, `find` aquí: los dos, el
+          // primero sin color). Si divergieran, se leería sobre uno y se cancelaría sobre otro.
+          const sinColor = grupo.find((f) => colorDelRenglon(f) === null);
+          if (sinColor !== undefined) absorbeHuerfanas.add(sinColor.id);
+        }
       }
     }
 
@@ -342,7 +467,7 @@ export async function darPorCubierto(
 
     for (const f of filas) {
       const enOc = enOcPorFila.get(f.id) ?? 0;
-      const yaCubierto = cubiertoDe(cubierto, f.idOrden, f);
+      const yaCubierto = cubiertoPorFila.get(f.id) ?? 0;
       if (datos.cubierto) {
         const pendiente = pendienteDeComprar(Number(f.cantidadAComprar), enOc, yaCubierto);
         // Nada que cubrir = nada que escribir. Es lo que vuelve idempotente a la operación, y
@@ -376,13 +501,21 @@ export async function darPorCubierto(
         continue;
       }
       // ── VOLVER A PEDIRLO: cancelación SUAVE de los actos vivos de ESE renglón (D3) ──
+      //
+      // ⭐⭐ **fila 0.162 — LO QUE LA LECTURA ABSORBE, EL DESHACER LO SUELTA.** Cuando este renglón
+      // es el ÚNICO del material y no dice color, `repartirCubiertoPorColor` le atribuyó también
+      // las marcas de colores que ya nadie reclama; entonces «volver a pedirlo» tiene que cancelar
+      // TODAS las del material —con color o sin él— o el comprador vería *«cubierto: 10»* y el
+      // botón se quedaría mudo, con el faltante cerrado y sin manera de reabrirlo. En cualquier
+      // otro caso se cancela sólo lo de SU color exacto: soltar la marca de otro tono sería
+      // reabrir un faltante que su dueño no pidió reabrir.
+      const soloSuColor = !absorbeHuerfanas.has(f.id);
       const vivos = await tx.requerimientoCubierto.findMany({
         where: {
           idOrden: f.idOrden,
           idTela: f.idTela,
           idAvio: f.idAvio,
-          idTelaColor: f.idTelaColor,
-          idColorPrenda: f.idColorPrenda,
+          ...(soloSuColor ? { idTelaColor: f.idTelaColor, idColorPrenda: f.idColorPrenda } : {}),
           canceladoEn: null,
         },
         select: { id: true, cantidad: true },
