@@ -10,7 +10,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { repartirComprometidoPorColor, type ComprometidoMaterial } from './comprometido-en-oc.js';
+import {
+  elSinColorSeLlevaLasHuerfanas,
+  repartirComprometidoPorColor,
+  type ComprometidoMaterial,
+} from './comprometido-en-oc.js';
 
 /** Arma un `ComprometidoMaterial` con las cubetas por color indicadas (`null` = acervo sin color). */
 function comprometido(porColor: Record<string, number>): ComprometidoMaterial {
@@ -287,5 +291,23 @@ describe('⭐⭐ 0.158 — LAS CUBETAS HUÉRFANAS (el avío que se marca «sin c
     // Negro (15) está huérfano y se queda sin repartir: cada quien con lo suyo, 20 sin dueño.
     expect(reparto.map((r) => r.enOc)).toEqual([30, 50]);
     expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([0, 0]);
+  });
+});
+
+/**
+ * ⭐⭐ **LA GUARDA, UNA SOLA** (fila 0.158; sacada a función compartida en la ⭐⭐ fila 0.162).
+ *
+ * La misma regla gobierna TRES caminos —lo comprometido en OC, lo dado por cubierto
+ * (`repartirCubiertoPorColor`) y **deshacer** (`darPorCubierto` con `cubierto: false`)—, y en
+ * `darPorCubierto` los dos primeros reciben **el mismo grupo de hermanos**: con dos copias podrían
+ * contestar distinto sobre las mismas filas. Estas aserciones fijan la copia única.
+ */
+describe('elSinColorSeLlevaLasHuerfanas — la guarda que comparten los tres caminos', () => {
+  it('sólo cuando el renglón sin color es el ÚNICO del material', () => {
+    expect(elSinColorSeLlevaLasHuerfanas([{ idColor: null }])).toBe(true);
+    expect(elSinColorSeLlevaLasHuerfanas([{ idColor: null }, { idColor: 7 }])).toBe(false);
+    expect(elSinColorSeLlevaLasHuerfanas([{ idColor: 7 }])).toBe(false);
+    // Sin renglones no hay nadie que absorba (y `every` sobre vacío diría que sí).
+    expect(elSinColorSeLlevaLasHuerfanas([])).toBe(false);
   });
 });

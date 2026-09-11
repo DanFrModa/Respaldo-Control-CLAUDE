@@ -11,9 +11,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { pendienteDeComprar } from './comprometido-en-oc.js';
+import { claveMaterial, pendienteDeComprar } from './comprometido-en-oc.js';
 import {
-  cubiertoDe,
+  repartirCubiertoPorColor,
   repartoDadoPorCubierto,
   type CubiertoPorOrden,
   type LineaParaCubrir,
@@ -48,43 +48,108 @@ describe('pendienteDeComprar — UN criterio: comprometido + dado por cubierto �
   });
 });
 
-describe('cubiertoDe — la marca se busca por *(orden, material, COLOR)*', () => {
-  /** Mapa como el que devuelve `dadoPorCubierto`: `idOrden → (claveMaterialColor → cantidad)`. */
+describe('repartirCubiertoPorColor — a qué renglón le cubre cada marca', () => {
+  /**
+   * Mapa como el que devuelve `dadoPorCubierto`:
+   * `idOrden → (claveMaterial → (color del renglón → cantidad))`.
+   *
+   * El avío 3 tiene cerrado un pedazo del Rojo (7) y otro del Azul (9); la tela 1, un pedazo de un
+   * renglón que no dice color.
+   */
   const mapa: CubiertoPorOrden = new Map([
     [
       50,
-      new Map([
-        ['avio-3|7', 4],
-        ['avio-3|9', 11],
-        ['tela-1|sin', 1],
+      new Map<string, Map<number | null, number>>([
+        [
+          'avio-3',
+          new Map<number | null, number>([
+            [7, 4],
+            [9, 11],
+          ]),
+        ],
+        ['tela-1', new Map<number | null, number>([[null, 1]])],
       ]),
     ],
   ]);
 
-  it('⭐ el cierre ROJO cubierto NO cubre al azul (el color está en la identidad)', () => {
-    const cierre = { idTela: null, idAvio: 3, idTelaColor: null, idColorPrenda: 7 };
-    const cierreAzul = { idTela: null, idAvio: 3, idTelaColor: null, idColorPrenda: 9 };
-    expect(cubiertoDe(mapa, 50, cierre)).toBe(4);
-    expect(cubiertoDe(mapa, 50, cierreAzul)).toBe(11);
+  /** Las cubetas de UN material en UNA orden, como las lee el dominio. */
+  const cubetas = (
+    idOrden: number,
+    material: { idTela: number | null; idAvio: number | null },
+  ): ReadonlyMap<number | null, number> | undefined =>
+    mapa.get(idOrden)?.get(claveMaterial(material));
+
+  const AVIO_3 = { idTela: null, idAvio: 3 };
+  const TELA_1 = { idTela: 1, idAvio: null };
+
+  it('⭐ el cierre ROJO cubierto NO cubre al azul (el color sigue mandando)', () => {
+    expect(repartirCubiertoPorColor([{ idColor: 7 }, { idColor: 9 }], cubetas(50, AVIO_3))).toEqual(
+      [4, 11],
+    );
   });
 
   it('un color que nadie cubrió da 0 — y una orden distinta también', () => {
-    const cierreVerde = { idTela: null, idAvio: 3, idTelaColor: null, idColorPrenda: 12 };
-    expect(cubiertoDe(mapa, 50, cierreVerde)).toBe(0);
-    const cierre = { idTela: null, idAvio: 3, idTelaColor: null, idColorPrenda: 7 };
-    expect(cubiertoDe(mapa, 51, cierre)).toBe(0);
+    expect(repartirCubiertoPorColor([{ idColor: 12 }], cubetas(50, AVIO_3))).toEqual([0]);
+    expect(repartirCubiertoPorColor([{ idColor: 7 }], cubetas(51, AVIO_3))).toEqual([0]);
   });
 
   it('la TELA usa su propio color, y el renglón SIN color tiene su propia cubeta', () => {
-    const felpaSinColor = { idTela: 1, idAvio: null, idTelaColor: null, idColorPrenda: null };
-    const felpaMarino = { idTela: 1, idAvio: null, idTelaColor: 4, idColorPrenda: null };
-    expect(cubiertoDe(mapa, 50, felpaSinColor)).toBe(1);
-    expect(cubiertoDe(mapa, 50, felpaMarino)).toBe(0);
+    expect(repartirCubiertoPorColor([{ idColor: null }], cubetas(50, TELA_1))).toEqual([1]);
+    // Un renglón de color Marino (4) no se lleva lo que se cerró sin decir color.
+    expect(repartirCubiertoPorColor([{ idColor: 4 }], cubetas(50, TELA_1))).toEqual([0]);
   });
 
   it('la tela 3 y el avío 3 son materiales DISTINTOS: no se confunden por el número', () => {
-    const tela3 = { idTela: 3, idAvio: null, idTelaColor: 7, idColorPrenda: null };
-    expect(cubiertoDe(mapa, 50, tela3)).toBe(0);
+    expect(
+      repartirCubiertoPorColor([{ idColor: 7 }], cubetas(50, { idTela: 3, idAvio: null })),
+    ).toEqual([0]);
+  });
+
+  it('sin marcas del material, todos los renglones salen en cero', () => {
+    expect(repartirCubiertoPorColor([{ idColor: 7 }, { idColor: null }], undefined)).toEqual([
+      0, 0,
+    ]);
+    expect(repartirCubiertoPorColor([], cubetas(50, AVIO_3))).toEqual([]);
+  });
+
+  describe('⭐⭐ fila 0.162 — LAS MARCAS HUÉRFANAS (el renglón que cambió de forma)', () => {
+    /**
+     * Alguien cerró un pedazo del Rojo y otro del Azul; después se marcó «se compra sin tomar en
+     * cuenta el color» en el avío y la explosión pasó a emitir UN solo renglón sin color. Buscando
+     * por igualdad exacta las dos marcas se caían al piso y el faltante volvía a perseguirse.
+     */
+    it('⭐ el renglón SIN color ÚNICO se lleva las marcas de colores que nadie reclama', () => {
+      // 🔴 El valor que la pone roja: 0 — las dos marcas perdidas y el faltante resucitado.
+      expect(repartirCubiertoPorColor([{ idColor: null }], cubetas(50, AVIO_3))).toEqual([15]);
+    });
+
+    it('⭐ suma su propia cubeta Y las huérfanas, sin contarlas dos veces', () => {
+      const conLasDos = new Map<number | null, number>([
+        [null, 2],
+        [7, 4],
+      ]);
+      expect(repartirCubiertoPorColor([{ idColor: null }], conLasDos)).toEqual([6]);
+    });
+
+    it('🔴 LA GUARDA: con un hermano CON color, la huérfana NO se absorbe', () => {
+      // Una tela mixta: un renglón Rojo (7) y otro sin color (los tonos que nadie capturó). La
+      // marca del Azul (9) quedó sin dueño — y darle al renglón sin color 11 kg que se cerraron
+      // sobre OTRO tono le bajaría el faltante sin que nadie lo haya dicho: ese material dejaría
+      // de comprarse. 🔴 El valor que la pone roja: [11, 4] (la huérfana absorbida).
+      expect(
+        repartirCubiertoPorColor([{ idColor: null }, { idColor: 7 }], cubetas(50, AVIO_3)),
+      ).toEqual([0, 4]);
+    });
+
+    it('🔴 la cubeta SIN color NO se reparte entre los colores (no hay era anterior que rescatar)', () => {
+      // El gemelo del acervo sin color de `repartirComprometidoPorColor` NO existe aquí a
+      // propósito: `RequerimientoCubierto` nació ya con color y sin backfill, y una marca sin
+      // color puede valer la orden entera — repartirla dejaría a todos los colores en cero.
+      const soloSinColor = new Map<number | null, number>([[null, 10]]);
+      expect(repartirCubiertoPorColor([{ idColor: 7 }, { idColor: 9 }], soloSinColor)).toEqual([
+        0, 0,
+      ]);
+    });
   });
 });
 

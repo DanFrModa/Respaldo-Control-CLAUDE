@@ -15428,3 +15428,46 @@ chica y medible — no se hizo de rebote.
 - **Aplica en:** versión **0.144**, fila **0.180**. **Fecha:** 2026-09-10.
 
 ---
+
+#### (Post-F9.228) — LAS MARCAS DE «CON ESTO QUEDA CUBIERTO» SOBREVIVEN A QUE EL RENGLÓN PIERDA SU COLOR
+
+**Qué se decidió (A).** Cuando un renglón de requerimiento **pierde** su color —el avío se marca «se
+compra sin tomar en cuenta el color», o la tela pierde su amarre— las marcas de «dado por cubierto»
+que se hicieron **bajo un color** se le atribuyen a ese renglón, **pero SÓLO si es el único renglón
+de ese material en la orden**.
+
+**Por qué no inventa semántica.** Cuando el renglón sin color es el único del material, su cantidad a
+comprar **es el requerido completo del material en esa orden** (medido: renglón colapsado = 100 = 60
+Rojo + 40 Azul). Las marcas de Rojo son un subconjunto de ese mismo requerido: acreditárselas es
+aritmética, no criterio. Y es **la misma regla** que la fila 0.158 ya aprobó para el otro sumando del
+neteo; los dos alimentan **un solo** criterio (`pendienteDeComprar`), así que **que difirieran sería
+la verdadera invención**. El reviewer comparó las dos guardas sobre **90 arreglos** de 1 a 4
+renglones: **cero diferencias**. La guarda quedó **unificada en un solo sitio**.
+
+> ⚠️ **El «SÓLO SI» no es opcional, y la razón es de la 0.158:** la tentación es decir *«el renglón
+> sin color pide TODO el material, así que le tocan todas las líneas»*. **Eso es cierto en un avío
+> colapsado y FALSO en una tela**, donde los tonos conviven.
+
+**Qué NO se decidió (B) — queda abierta para Daniel, con default.** Qué debe significar una marca
+hecha **SIN** color cuando el material **gana** colores después. **Default aplicado: no cambiar
+nada** — la marca se suelta, el faltante reaparece **visible** y el comprador vuelve a cerrarlo con
+un clic.
+
+**La razón, y su límite honesto.** Cerrar «cubierto» desde la explosión cierra **todo** el pendiente
+del renglón, así que una marca sin color puede valer la orden entera; repartirla dejaría a todos los
+colores nuevos en cero — **sub-compra silenciosa**, que es el peor de los dos errores. ⚠️ **Pero
+existe una tercera opción que no es absurda y que tiene precedente en la casa** (la señaló el
+reviewer): repartir la cubeta sin color **topada por lo que cada renglón necesita**, marcando lo
+elegido — exactamente lo que `repartirComprometidoPorColor` ya hace con su acervo y su bandera
+`desdeAcervoSinColor`. En el caso realista (se perdonó 1 kg sobre un renglón de 481 y luego se
+capturan los tonos) ese reparto conserva el total y sólo adivina el tono. ⇒ **(B) es pregunta
+abierta, no argumento cerrado.**
+
+**Por qué (B) no urge:** `RequerimientoCubierto` **no tiene era anterior** — nació con color y
+**sin backfill** (`20260827180000_con_esto_queda_cubierto/migration.sql` lo dice literal). No hay
+corpus histórico que rescatar, a diferencia de las ~7,978 OC anteriores al color que motivaron el
+reparto del otro sumando.
+
+- **Aplica en:** versión **0.145**, fila **0.162**. **Fecha:** 2026-09-10.
+
+---
