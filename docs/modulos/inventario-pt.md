@@ -226,9 +226,23 @@ más pesado del punto 1 y anotar, de `GET /api/inventarios/pt/kardex`, **tamaño
 **Criterio:** por omisión debería quedar **por debajo de ~400 KB y ~1 s**. Si el caso «diez años a mano»
 con `limite=5000` pasa de **~2 MB o ~3 s**, conviene bajar el techo de 5 000.
 
-**3 · ⭐ EXISTENCIAS, que esta fila NO tocó y puede ser fila propia.** `consultarExistenciasPt` lee la
-vista `existencia_pt` con su propio SQL crudo y **no tiene tope ni paginación**: sin filtro de modelo
-devuelve la vista entera.
+**3 · ⭐ EXISTENCIAS — ✅ YA TIENE TOPE (fila 0.143).** Hasta la 0.143, `consultarExistenciasPt` leía la
+vista `existencia_pt` con su propio SQL crudo **sin tope ni paginación**: sin filtro de modelo devolvía
+la vista entera. Hoy devuelve como mucho **1 000 renglones** (techo duro 5 000, parámetro `limite`) y la
+respuesta trae `totalFilas`/`truncado` para que la pantalla lo diga. ⚠️ **Ojo, son DOS números según
+la pantalla:** Existencias corre con el default de **1 000** (es un informe), y las dos pantallas de
+**captura** (Movimientos y Traspasos) piden el techo de **5 000** porque necesitan la lista completa de
+órdenes del modelo, no una ventana. El SQL de abajo sigue sirviendo para dimensionar el universo real
+de `prueba`.
+
+> 📏 **Medido con 60 000 renglones sembrados** (el orden de magnitud de la medición de arriba): la
+> carga útil pasa de **10 498 KB a 198 KB** — **53× menos** (el reviewer de la fila lo repitió en otra
+> máquina: **47×**, mismo orden). ⚠️ **La mejora es de PESO, no de tiempo de base de datos:**
+> `existencia_pt` es una vista agregada y hay que calcularla entera igual — ningún índice lo evita.
+> **Los milisegundos NO se citan porque no reproducen:** las dos mediciones coinciden en que el tope
+> no empeora el tiempo con 60 000 renglones (219→167 ms en una máquina, 1 733→430 ms en otra) y
+> discrepan del todo en las cifras. Si algún día molestara el tiempo de la consulta, la respuesta
+> sería una vista materializada, no un tope más chico.
 
 ```sql
 SELECT count(*) AS filas_vista FROM existencia_pt;
@@ -244,9 +258,12 @@ Luego, en `/inventarios/existencias` **sin elegir modelo**, anotar tamaño y tie
 > (sintética, no `prueba`): `existencia_pt` devolvió **56 860 filas en 614 ms**, sin tope ni paginación,
 > en una sola respuesta. Confirma la forma del problema; falta el número de `prueba` para dimensionarlo.
 
-**Criterio:** por encima de **~5 000 filas** (o ~1 MB / ~2 s) esa pantalla necesita su propia fila. El
-rango de fechas **no aplica ahí** —una existencia no tiene fecha—: lo que aplicaría es paginación o exigir
-modelo/almacén, y eso es un cambio de contrato que esta fila no hizo.
+**Criterio (el que justificó la fila 0.143):** por encima de **~5 000 filas** (o ~1 MB / ~2 s) esa
+pantalla necesitaba su propia fila. El rango de fechas **no aplica ahí** —una existencia no tiene fecha—,
+así que la 0.143 aplicó la otra mitad del mecanismo de la 0.138: **tope duro + aviso honesto**. Lo que ese
+número de `prueba` decide hoy ya no es *si* hace falta el tope, sino **si 1 000 es el valor bueno**: si el
+inventario real cabe de sobra, nadie verá nunca el aviso; si lo pasa por mucho, se sube (el techo es
+5 000) o se plantea paginar de verdad — ver «Decisiones de diseño».
 
 > **`IPT_Revision` (recuadre del viejo) NO se construye.** Con kardex puro no hay saldo materializado que
 > "recuadrar"; cualquier ajuste es un movimiento de ajuste o un inverso auditado.
@@ -272,6 +289,41 @@ trae `origenTipo`, y añadírselo sería un cambio de contrato que esta fila no 
 entra por folio.
 
 ## Decisiones de diseño
+
+- **⭐ EL TOPE DE EXISTENCIAS, y por dónde corta (fila 0.143).** `GET /inventarios/pt/existencias` ya no
+  puede devolver la vista entera: hay un tope (`limite`, 1 000 por omisión, techo duro 5 000) y la
+  respuesta declara `totalFilas`, `limite` y `truncado`. Tres decisiones que conviene no re-discutir a
+  ciegas:
+  1. **Corta por CANTIDAD, no por el orden en que se lee.** El kardex de la 0.138 podía cortar «por la
+     cola» porque su orden —el folio— *es* su importancia. Una existencia no tiene tiempo, y cortar por
+     código de modelo escondería *«todos los modelos de la M en adelante»*. Se ordena por
+     `abs(existencia) DESC` —en valor absoluto **a propósito**: una existencia negativa es una anomalía
+     que hay que ver, y un `DESC` a secas las manda a todas justo a la zona que el tope se lleva—, y la
+     lista se **entrega** en el orden de presentación de siempre.
+  2. **Los totales son del UNIVERSO.** `totalExistencia` y `totalFilas` salen de funciones de ventana en
+     la misma consulta (se evalúan antes del `LIMIT`), no de sumar en JS lo que llegó. `porColorTalla`
+     tampoco se topa: es un agregado, y la matriz del cajón de Modelos sigue siendo exacta.
+  3. **NO hay paginador, y es una decisión.** El orden por el que se corta no es un orden por el que un
+     humano navegue; la herramienta para llegar al resto es el filtro, y el aviso lo dice con esas
+     palabras. ⚠️ Queda dicho el límite, **con los dos números que de verdad rigen**: en Existencias
+     el corte es a **1 000** (su default), así que ahí un modelo con más de 1 000 renglones ya no se ve
+     completo ni filtrando; en las pantallas de captura, que piden el techo, el límite empieza en
+     **5 000**. Ese residuo pediría paginar de verdad — o mejor, el agregado del punto 4.
+  4. **🔴 El `abs()` del corte deja los CEROS al final, y eso apuntaba a una pantalla concreta** (visto
+     en la revisión de la fila). Un renglón en cero tiene `abs = 0` ⇒ es el PRIMERO que el tope
+     descarta — medido: con 80 renglones y sitio para 40, de los 16 en cero sobrevivieron **0**. El
+     modo **ENTRADA** de Movimientos PT pide `incluirCeros` justamente para ofrecer los buckets de
+     orden que quedaron en cero al irse a estampado, así que el tope apuntaba a lo único que ese modo
+     existe para enseñar; y el daño no es cosmético: el operador captura como «sin orden» y el bucket
+     PT-por-orden (F6-E2) queda mal en un módulo **D3**, donde no se edita ni se borra. **Cura:** las
+     dos pantallas de captura piden el techo (`frontend/src/modulos/inventarios/tope-existencias.ts`).
+     ⚠️ Reordenar para que ganen los ceros NO era la cura: quien pierde entonces es un bucket con
+     saldo, con el mismo efecto. **La cura de fondo —fila propia, no ésta— es que el desplegable de
+     órdenes salga de un agregado en SERVIDOR** en vez de deducirse en el navegador de una lista de
+     renglones.
+  ⏳ **Pendiente de Daniel:** la ficha ofrecía (a) exigir un filtro antes de consultar o (b) topar con
+  aviso. Se construyó **(b)** (el default propuesto), porque (a) le quita la vista de «todo el almacén» a
+  quien hoy la usa.
 
 - **Motivo OBLIGATORIO al mover PT a mano (fila 0.100, §Post-F9.193 decisión 3).** El movimiento manual y
   el traspaso exigen `motivo` (3–500 caracteres) — *"hoy se mueven mil piezas sin una palabra"* (Daniel).

@@ -7,11 +7,15 @@ import type { Modelo } from '@/api/modelos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { hoy } from './fecha-captura-pt';
+import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
 import { TraspasosPtPagina } from './TraspasosPtPagina';
 
 const crearMutate = vi.fn();
 // §Post-F9.40 — las existencias del ORIGEN alimentan el selector de orden; configurable por test.
-const useExistenciasPtMock = vi.fn<() => Record<string, unknown>>();
+// Reenvía los ARGUMENTOS (fila 0.143): la prueba del techo mide con qué `limite` se pide, y un
+// mock que los tira dejaba esa garantía sin forma de comprobarse.
+const useExistenciasPtMock =
+  vi.fn<(query?: Record<string, unknown>, habilitado?: boolean) => Record<string, unknown>>();
 vi.mock('@/api/inventarios', async (importarOriginal) => {
   // Solo se sustituyen los hooks (los que tocan la red). `urlImpresoTraspasoPt` se toma DEL MÓDULO
   // REAL: re-escribir aquí su literal haría que esta prueba afirmara su propio texto y no el del
@@ -20,7 +24,8 @@ vi.mock('@/api/inventarios', async (importarOriginal) => {
   const real = await importarOriginal<typeof ApiInventarios>();
   return {
     useCrearTraspasoPt: () => ({ mutate: crearMutate, isPending: false }),
-    useExistenciasPt: () => useExistenciasPtMock(),
+    useExistenciasPt: (query: Record<string, unknown>, habilitado?: boolean) =>
+      useExistenciasPtMock(query, habilitado),
     urlImpresoTraspasoPt: real.urlImpresoTraspasoPt,
   };
 });
@@ -183,6 +188,61 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
     expect(screen.queryByTestId('traspaso-aviso-excede')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ FILA 0.143 — ESTA PANTALLA TAMBIÉN SE ENTERA DE QUE LA LISTA VINO CORTADA.
+   *
+   * El desplegable de órdenes y el «disponible» se arman con las FILAS de existencias, y desde la
+   * 0.143 esas filas vienen topadas. Si el tope alcanzara, faltaría un bucket del desplegable y el
+   * operador leería «esa orden no tiene piezas» donde en realidad dice «no cupo». El servidor sigue
+   * validando el saldo bajo bloqueo (D3), así que no se cuela un traspaso indebido — pero sí se
+   * engañaría al que lo captura.
+   */
+  describe('el TOPE de existencias (fila 0.143)', () => {
+    it('⭐ pide el TECHO del contrato, no el `limite` por omisión', async () => {
+      // Aquí los renglones no se pintan: de ellos salen el desplegable de órdenes y el
+      // «disponible». Con el default (1 000, pensado para todo el almacén) un modelo con muchas
+      // órdenes×colores×tallas perdería buckets en silencio. Ver `tope-existencias.ts`.
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue(EXISTENCIAS_CON_ORDEN);
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      const consultas = useExistenciasPtMock.mock.calls.map(([q]) => q);
+      expect(consultas.length).toBeGreaterThan(0);
+      // TODAS las consultas, no «alguna»: una sola sin techo ya deja el desplegable corto.
+      for (const q of consultas) expect(q?.limite).toBe(TOPE_EXISTENCIAS_PT);
+    });
+
+    it('⭐ avisa cuando la lista de existencias vino recortada', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        ...EXISTENCIAS_CON_ORDEN,
+        data: { ...EXISTENCIAS_CON_ORDEN.data, truncado: true, totalFilas: 4321, limite: 1000 },
+      });
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      const aviso = screen.getByTestId('traspaso-truncado');
+      expect(aviso).toHaveTextContent('4,321');
+      expect(aviso).toHaveTextContent(/lista de órdenes/);
+    });
+
+    it('y NO avisa cuando cupo todo (el aviso tiene que significar algo)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        ...EXISTENCIAS_CON_ORDEN,
+        data: { ...EXISTENCIAS_CON_ORDEN.data, truncado: false, totalFilas: 2, limite: 1000 },
+      });
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.queryByTestId('traspaso-truncado')).not.toBeInTheDocument();
+    });
   });
 
   // ── Fila 0.100: motivo obligatorio + hoja del traspaso (§Post-F9.193) ───────

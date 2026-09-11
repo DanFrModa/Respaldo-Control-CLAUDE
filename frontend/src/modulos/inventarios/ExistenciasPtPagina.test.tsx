@@ -1,33 +1,43 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExistenciasPt } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ExistenciasPtPagina } from './ExistenciasPtPagina';
 
-const existencias: ExistenciasPt = {
-  filas: [
-    {
-      idModelo: 1,
-      modelo: 'A-100',
-      idColor: 7,
-      color: 'Rojo',
-      idTalla: 11,
-      etiquetaTalla: 'CH',
-      ordenTalla: 1,
-      idAlmacen: 3,
-      almacen: 'Primeras',
-      idOrden: 9,
-      folioOrden: 42,
-      existencia: 30,
-    },
-  ],
-  totalExistencia: 30,
+const filaBase: ExistenciasPt['filas'][number] = {
+  idModelo: 1,
+  modelo: 'A-100',
+  idColor: 7,
+  color: 'Rojo',
+  idTalla: 11,
+  etiquetaTalla: 'CH',
+  ordenTalla: 1,
+  idAlmacen: 3,
+  almacen: 'Primeras',
+  idOrden: 9,
+  folioOrden: 42,
+  existencia: 30,
 };
 
+/** Respuesta de existencias con el encabezado de recorte que declara el contrato (fila 0.143). */
+function respuesta(sobrescribir: Partial<ExistenciasPt> = {}): ExistenciasPt {
+  const filas = sobrescribir.filas ?? [filaBase];
+  return {
+    filas,
+    totalExistencia: 30,
+    totalFilas: filas.length,
+    limite: 1000,
+    truncado: false,
+    ...sobrescribir,
+  };
+}
+
+const useExistenciasMock = vi.fn();
+
 vi.mock('@/api/inventarios', () => ({
-  useExistenciasPt: () => ({ data: existencias, isPending: false, isError: false, error: null }),
+  useExistenciasPt: (...args: unknown[]) => useExistenciasMock(...args) as unknown,
 }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/tallas', () => ({ useTallas: () => ({ data: { datos: [] } }) }));
@@ -35,6 +45,15 @@ vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }
 vi.mock('@/api/modelos', () => ({
   useModelos: () => ({ data: { datos: [] }, isPending: false, isError: false }),
 }));
+
+beforeEach(() => {
+  useExistenciasMock.mockReturnValue({
+    data: respuesta(),
+    isPending: false,
+    isError: false,
+    error: null,
+  });
+});
 
 describe('ExistenciasPtPagina (F3-E3)', () => {
   it('muestra la fila de existencia y el total (tabla de escritorio + tarjetas móvil)', () => {
@@ -53,5 +72,66 @@ describe('ExistenciasPtPagina (F3-E3)', () => {
     expect(screen.getAllByText('30').length).toBeGreaterThan(0);
     // PT por orden (F6-E2): la fila muestra a qué orden pertenecen las prendas.
     expect(screen.getAllByText('Orden #42').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ⭐ FILA 0.143 — QUE LA PANTALLA NO SE CREA QUE VE TODO EL INVENTARIO.
+ *
+ * El recorte lo hace el servidor; a esta pantalla le toca **decirlo**. No es adorno: sin el aviso,
+ * una lista de 1 000 renglones se lee como «el almacén tiene 1 000 renglones» — y el problema de
+ * peso se habría cambiado por uno de VERDAD, que es peor.
+ */
+describe('ExistenciasPtPagina · el TOPE (fila 0.143)', () => {
+  const sesion = () => estadoSesionDePrueba(['inventario-pt.ver']);
+
+  /** Deja la pantalla como si el servidor hubiera cortado la lista. */
+  function conRecorte(): void {
+    useExistenciasMock.mockReturnValue({
+      data: respuesta({ truncado: true, limite: 1000, totalFilas: 56_860 }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+  }
+
+  it('⭐ si la lista vino CORTADA lo dice, con las DOS cifras y qué hacer', () => {
+    conRecorte();
+    renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
+
+    const aviso = screen.getByTestId('exist-truncado');
+    // Cuántos se enseñan y cuántos hay: sin la segunda cifra el aviso no dice nada útil.
+    expect(aviso).toHaveTextContent('56,860');
+    // Y qué hacer para llegar al resto (el filtro es la herramienta, no un paginador).
+    expect(aviso).toHaveTextContent(/[Ff]iltra/);
+    // ⚠️ Y NO puede leerse como «esto es todo»: el aviso dice que NO caben todos.
+    expect(aviso).toHaveTextContent(/No caben todos/);
+  });
+
+  it('⭐ el conteo de la barra cuenta el UNIVERSO, no lo que cupo', () => {
+    conRecorte();
+    renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
+
+    // «1 de 56,860», nunca «1 renglones» a secas: ese número suelto es la mentira que se evita.
+    expect(screen.getByTestId('exist-conteo')).toHaveTextContent('1 de 56,860 renglones');
+  });
+
+  it('⭐ el KPI «Renglones» también cuenta el universo (es el número que se lee de un vistazo)', () => {
+    conRecorte();
+    renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
+
+    // El pie de la tarjeta de KPIs dice cuántos se listan de verdad (texto único en la pantalla).
+    expect(screen.getByText(/se listan 1$/)).toBeInTheDocument();
+    // Y el universo se pinta en los TRES sitios que antes decían `filas.length`: el valor del KPI,
+    // el aviso de recorte y la barra de totales. Un conteo exacto caza que alguno se quede atrás.
+    expect(screen.getAllByText('56,860')).toHaveLength(3);
+  });
+
+  it('sin corte no hay aviso, y el conteo es una sola cifra (el aviso tiene que significar algo)', () => {
+    renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
+
+    expect(screen.queryByTestId('exist-truncado')).not.toBeInTheDocument();
+    expect(screen.getByTestId('exist-conteo')).toHaveTextContent('1 renglones');
+    expect(screen.getByTestId('exist-conteo')).not.toHaveTextContent(/ de /);
   });
 });
