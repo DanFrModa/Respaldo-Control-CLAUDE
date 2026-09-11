@@ -15368,3 +15368,106 @@ cambia en `normalizarPack` y aplica a todo.
 - **Aplica en:** versión **0.091**, ficha `V1-E9w`. **Fecha:** 2026-09-02.
 
 ---
+
+#### (Post-F9.227) — EL MOTIVO DE UNA CANCELACIÓN SE GUARDA EN EL MOVIMIENTO INVERSO, Y SU RENGLÓN DE AUDITORÍA SE UNIFICA
+
+**Qué se decidió.** Al cancelar un movimiento de inventario, el motivo que escribe el usuario deja de
+ir sólo a la bitácora y se guarda **en las `observaciones` del movimiento inverso**, con el texto
+`Cancelación del folio N: <motivo>`. En consecuencia, el renglón de auditoría se **unifica** en la
+acción canónica `CANCELAR` del motor de kardex, y se **retiran** los tres renglones `OTRO` que
+escribían por su cuenta `movimientos-pt.ts`, `telas.ts` y `avios.ts`.
+
+**Por qué.** Es la tesis de la fila 0.176 aplicada al acto que más la necesita: *pedir una explicación
+obligatoria que después nadie puede consultar es la forma más rápida de que la explicación se vuelva
+basura*. Cancelar es el único movimiento que deshace otro (D3: nunca se edita ni se borra), así que es
+justo donde el «por qué» tiene más valor — y era donde el kardex enseñaba `—`.
+
+**El prefijo no es adorno, y se decidió midiendo.** El renglón del inverso **no tiene ninguna otra
+columna que apunte al original**: `esquemaKardexPtRenglon` no expone `origenTipo`, `origenId` ni
+`idMovimientoInverso`, y el chip «Cancelado» se pinta sobre el **original**, no sobre el inverso. Sin
+el prefijo se leería un motivo huérfano. El texto entero va en el `title` de las cuatro superficies,
+porque *un motivo ilegible por truncado es el mismo defecto con otra ropa*.
+
+**Motivo vacío ⇒ se escribe sólo el prefijo, nunca la cadena vacía.** Las pantallas pintan
+`observaciones ?? '—'`, y `''` **no** es `null`: saldría como celda en blanco, que se lee como
+«alguien escribió nada» — peor que el guion. Hoy ninguna puerta REST lo permite (`.trim().min(3)`),
+pero el motor es librería del núcleo y no puede apoyarse en sus llamadores.
+
+> ## ⚠️ SOBRE RETIRAR RENGLONES DE AUDITORÍA (A7) — POR QUÉ NO SE PIERDE NADA
+>
+> **Borrar auditoría es irreversible, así que esto se verificó campo por campo antes de hacerlo**, y
+> el reviewer independiente lo reprodujo. El renglón `OTRO` retirado y el `CANCELAR` del motor son la
+> **misma transacción, entidad, id y usuario**:
+>
+> | campo | `OTRO` retirado | `CANCELAR` del motor |
+> |---|---|---|
+> | `entidad` / `idEntidad` | `'Movimiento'` / id del original | **idéntico** |
+> | `accion` | `OTRO` | `CANCELAR` — **la canónica** |
+> | motivo | `motivoCancelacion` | `motivo` |
+> | `dimension` | fijo por puerta | **derivado del dato** (`detallesTela.length > 0`) |
+> | — | *(no lo tenía)* | **+ `folioInverso` + `idMovimientoInverso`** |
+>
+> - **El `dimension` derivado no puede diferir del que estaba escrito a mano**, porque las puertas ya
+>   exigen `detallesTela/Avio.length > 0` **antes** de llamar al motor.
+> - **Nadie lee esos renglones**: los únicos lectores de `Bitacora` en todo el repo devuelven `datos`
+>   como JSON tal cual o consultan otra entidad. Cero ETL, cero e2e.
+> - **El de `partidas-telas.ts` se CONSERVA**, y por una razón medible: `'tela-color'` es la única
+>   información que el motor **no puede ver** (un movimiento del flujo por color trae detalle de tela,
+>   así que el motor escribiría `'tela'` en los dos casos).
+>
+> ⇒ **El cambio es un superconjunto: menos renglones, la acción canónica, y dos campos nuevos.** Es
+> neto **positivo** para A7, no una pérdida.
+
+**Y una diferencia conocida que se declara en vez de callarse:** `cuenta-terceros.ts` (Finanzas) **ya
+escribía** el motivo en su inverso desde antes — o sea que **el kardex era el rezagado**, no al revés.
+Lo escribe **sin prefijo**, y eso también es correcto allá: ese inverso lleva `refTipo: 'cancelacion'`
++ `refId`, así que **tiene ancla propia** y no queda huérfano. El prefijo se gana su sitio en el
+kardex precisamente porque ahí esa ancla no existe. Unificar las dos voces sería una fila propia,
+chica y medible — no se hizo de rebote.
+
+- **Aplica en:** versión **0.144**, fila **0.180**. **Fecha:** 2026-09-10.
+
+---
+
+#### (Post-F9.228) — LAS MARCAS DE «CON ESTO QUEDA CUBIERTO» SOBREVIVEN A QUE EL RENGLÓN PIERDA SU COLOR
+
+**Qué se decidió (A).** Cuando un renglón de requerimiento **pierde** su color —el avío se marca «se
+compra sin tomar en cuenta el color», o la tela pierde su amarre— las marcas de «dado por cubierto»
+que se hicieron **bajo un color** se le atribuyen a ese renglón, **pero SÓLO si es el único renglón
+de ese material en la orden**.
+
+**Por qué no inventa semántica.** Cuando el renglón sin color es el único del material, su cantidad a
+comprar **es el requerido completo del material en esa orden** (medido: renglón colapsado = 100 = 60
+Rojo + 40 Azul). Las marcas de Rojo son un subconjunto de ese mismo requerido: acreditárselas es
+aritmética, no criterio. Y es **la misma regla** que la fila 0.158 ya aprobó para el otro sumando del
+neteo; los dos alimentan **un solo** criterio (`pendienteDeComprar`), así que **que difirieran sería
+la verdadera invención**. El reviewer comparó las dos guardas sobre **90 arreglos** de 1 a 4
+renglones: **cero diferencias**. La guarda quedó **unificada en un solo sitio**.
+
+> ⚠️ **El «SÓLO SI» no es opcional, y la razón es de la 0.158:** la tentación es decir *«el renglón
+> sin color pide TODO el material, así que le tocan todas las líneas»*. **Eso es cierto en un avío
+> colapsado y FALSO en una tela**, donde los tonos conviven.
+
+**Qué NO se decidió (B) — queda abierta para Daniel, con default.** Qué debe significar una marca
+hecha **SIN** color cuando el material **gana** colores después. **Default aplicado: no cambiar
+nada** — la marca se suelta, el faltante reaparece **visible** y el comprador vuelve a cerrarlo con
+un clic.
+
+**La razón, y su límite honesto.** Cerrar «cubierto» desde la explosión cierra **todo** el pendiente
+del renglón, así que una marca sin color puede valer la orden entera; repartirla dejaría a todos los
+colores nuevos en cero — **sub-compra silenciosa**, que es el peor de los dos errores. ⚠️ **Pero
+existe una tercera opción que no es absurda y que tiene precedente en la casa** (la señaló el
+reviewer): repartir la cubeta sin color **topada por lo que cada renglón necesita**, marcando lo
+elegido — exactamente lo que `repartirComprometidoPorColor` ya hace con su acervo y su bandera
+`desdeAcervoSinColor`. En el caso realista (se perdonó 1 kg sobre un renglón de 481 y luego se
+capturan los tonos) ese reparto conserva el total y sólo adivina el tono. ⇒ **(B) es pregunta
+abierta, no argumento cerrado.**
+
+**Por qué (B) no urge:** `RequerimientoCubierto` **no tiene era anterior** — nació con color y
+**sin backfill** (`20260827180000_con_esto_queda_cubierto/migration.sql` lo dice literal). No hay
+corpus histórico que rescatar, a diferencia de las ~7,978 OC anteriores al color que motivaron el
+reparto del otro sumando.
+
+- **Aplica en:** versión **0.145**, fila **0.162**. **Fecha:** 2026-09-10.
+
+---

@@ -387,6 +387,35 @@ export interface FilaParaNeteo {
 }
 
 /**
+ * ⭐⭐ **¿EL RENGLÓN SIN COLOR SE LLEVA LO HUÉRFANO? — LA GUARDA, EN UN SOLO SITIO**
+ * (fila 0.158; sacada a función compartida en la ⭐⭐ fila 0.162).
+ *
+ * `true` sólo cuando el renglón sin color es el **ÚNICO** del material en esa orden: ningún hermano
+ * lleva color. *Huérfano* = lo que SÍ dice un color, pero un color que ningún renglón de la
+ * explosión de hoy reclama.
+ *
+ * 🔴 **Vive AQUÍ, suelta, porque es UNA regla de negocio que gobierna TRES caminos** — y una regla
+ * escrita tres veces es una regla que en la primera corrección se escribe distinta (la misma razón
+ * por la que `claveMaterialColor` se mudó a este módulo):
+ *  • {@link repartirComprometidoPorColor} — lo ya comprometido en una OC;
+ *  • `repartirCubiertoPorColor` (`dado-por-cubierto.ts`) — lo que alguien dio por cubierto, el otro
+ *    sumando de {@link pendienteDeComprar};
+ *  • `darPorCubierto` con `cubierto: false` — **deshacer**, que tiene que SOLTAR exactamente las
+ *    marcas que la lectura atribuyó, o el comprador vería *«cubierto: 10»* y el botón no haría nada.
+ *
+ * ⚠️ En `darPorCubierto` los dos repartos reciben **el mismo grupo de hermanos**: con dos copias de
+ * la regla, ahí mismo podrían contestar cosas distintas sobre las mismas filas.
+ *
+ * El porqué del «sólo si» —el hallazgo del reviewer del 7-sep— está escrito completo en
+ * {@link repartirComprometidoPorColor}, que es donde nació.
+ */
+export function elSinColorSeLlevaLasHuerfanas(
+  filas: readonly { idColor: number | null }[],
+): boolean {
+  return filas.length > 0 && filas.every((f) => f.idColor === null);
+}
+
+/**
  * ⭐⭐ **A QUÉ RENGLÓN LE CUBRE CADA LÍNEA DE OC, AHORA QUE HAY COLORES** (V1-E3u, §Post-F9.89) —
  * función PURA.
  *
@@ -403,7 +432,9 @@ export interface FilaParaNeteo {
  *     orden en que vienen**, cada uno hasta lo que necesita, y **el último absorbe el remanente**.
  *  3. ⭐⭐ **fila 0.158 — las cubetas CON color que NINGÚN renglón reclama van al renglón sin color,
  *     pero SÓLO si ese renglón es el ÚNICO del material** (ningún hermano lleva color). Antes se
- *     caían al piso y la explosión volvía a ofrecer lo ya comprado.
+ *     caían al piso y la explosión volvía a ofrecer lo ya comprado. La condición vive en
+ *     {@link elSinColorSeLlevaLasHuerfanas}, compartida con el otro sumando del criterio desde la
+ *     ⭐⭐ fila 0.162.
  *
  * 🔴 **Y POR QUÉ ESE "SÓLO SI" NO ES OPCIONAL** (hallazgo del reviewer, 7-sep-2026). La tentación
  * es decir *"el renglón sin color pide TODO el material de la orden, así que le tocan todas las
@@ -475,7 +506,9 @@ export function repartirComprometidoPorColor(
      * `enOc: 0 / pendiente: 100` con las 100 piezas ya pedidas en una OC viva, y la segunda
      * generación volvía a ofrecerlas. Es §Post-F9.85 resucitado por otra puerta.
      *
-     * 🔴 **PERO SÓLO CUANDO NADIE MÁS LLEVA COLOR** (`conRenglon.size === 0`). Con hermanos de
+     * 🔴 **PERO SÓLO CUANDO NADIE MÁS LLEVA COLOR** ({@link elSinColorSeLlevaLasHuerfanas} — la
+     * MISMA función que usa el otro sumando del criterio, para que no puedan contestar distinto
+     * sobre las mismas filas). Con hermanos de
      * color en la mesa —el caso normal de una tela a la que le faltan tonos por capturar— el
      * renglón sin color es **una PARTE de la orden, no toda**, y acreditarle una línea que la OC
      * pidió de otro tono le baja el faltante a cero: **ese material ya no se compra nunca**. Ver el
@@ -488,12 +521,8 @@ export function repartirComprometidoPorColor(
      * absorción NO sirve —el número seguiría neteando y el material seguiría sin comprarse—; sólo
      * avisaría del daño.
      */
-    const conRenglon = new Set<number>();
-    for (const f of filas) {
-      if (f.idColor !== null) conRenglon.add(f.idColor);
-    }
     let huerfano = 0;
-    if (conRenglon.size === 0) {
+    if (elSinColorSeLlevaLasHuerfanas(filas)) {
       for (const [idColor, cubeta] of comprometido.porColor) {
         if (idColor !== null) huerfano += cubeta.enOc;
       }

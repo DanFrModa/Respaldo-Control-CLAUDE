@@ -468,20 +468,54 @@ export async function registrarTraspasoPt(
 }
 
 /**
+ * Texto que queda escrito en las `observaciones` del movimiento INVERSO de una cancelación
+ * (fila 0.180). Al usuario se le exige un motivo OBLIGATORIO para cancelar, y hasta esta fila ese
+ * motivo sólo llegaba a la bitácora: en el kardex el renglón del inverso decía «—» justo donde
+ * alguien había escrito la explicación — en el ÚNICO movimiento que deshace a otro, que es el que
+ * más la necesita.
+ *
+ * ⭐ POR QUÉ LLEVA PREFIJO CON EL FOLIO DEL ORIGINAL, y no el motivo pelón: quien lee está mirando
+ * una LISTA de movimientos, y el renglón del inverso no tiene ninguna otra columna que diga a cuál
+ * deshace (folio, fecha, tipo, almacén, cantidades y saldo son SUYOS; el chip «Cancelado» se pinta
+ * en el ORIGINAL, no aquí). Sin el prefijo se leería un motivo huérfano — «me equivoqué» sin decir
+ * en qué. Es el mismo giro que ya usaba `cancelarEntradaTela` («Cancelación de la entrada de tela
+ * N: …»). Cuesta ~28 caracteres de la columna, que va `truncate` con el texto completo en el
+ * `title`: se paga con ancho lo que se gana en poder leer el renglón solo.
+ *
+ * ⭐ MOTIVO VACÍO: se escribe SÓLO el prefijo, JAMÁS una cadena vacía. Las pantallas pintan
+ * `observaciones ?? '—'`, así que un `''` NO cae en el guion: sale una celda en blanco que se lee
+ * como «alguien escribió nada», peor que no haber escrito. Hoy todas las puertas REST exigen
+ * motivo (`.trim().min(1)` o `.min(3)`), pero el motor es una librería del núcleo y no puede
+ * apoyarse en la validación de sus llamadores.
+ */
+function textoCancelacion(folioOriginal: bigint, motivo: string): string {
+  const limpio = motivo.trim();
+  const prefijo = `Cancelación del folio ${folioOriginal.toString()}`;
+  return limpio === '' ? prefijo : `${prefijo}: ${limpio}`;
+}
+
+/**
  * CANCELA un movimiento de PT generando su INVERSO auditado (D3/A7): NUNCA se edita ni se borra el
  * original. El inverso copia el detalle del original con un tipo de movimiento de dirección OPUESTA
  * (lo provee el llamador: el dominio sabe qué tipo "Error de Entrada/Salida"/inverso usar) y queda
  * enlazado al original por `idMovimientoInverso`. Un movimiento ya anulado no se puede volver a
  * anular (`ErrorConflicto`).
  *
+ * El MOTIVO que el usuario escribió queda en las `observaciones` del inverso (fila 0.180), no sólo
+ * en la bitácora: es lo que se lee en el kardex. Va como parámetro OBLIGATORIO —y antes de `bd`— a
+ * propósito: así el compilador obliga a visitar a todos los llamadores y ninguno puede cancelar «en
+ * silencio». Ver {@link textoCancelacion} para qué texto exacto se escribe.
+ *
  * @param idMovimiento   movimiento original a anular.
  * @param idTipoMovInverso tipo de movimiento (dirección opuesta) para el inverso.
+ * @param motivo         por qué se cancela (lo escribió el usuario); se guarda en el inverso.
  * @returns el movimiento INVERSO creado.
  */
 export async function cancelarMovimientoPt(
   sesion: SesionUsuario,
   idMovimiento: number,
   idTipoMovInverso: number,
+  motivo: string,
   bd?: ContextoBd,
 ): Promise<Movimiento> {
   return enTransaccion(async (tx) => {
@@ -525,6 +559,10 @@ export async function cancelarMovimientoPt(
         origenId: String(original.id),
         idUsuario: sesion.id,
         idMovimientoInverso: original.id,
+        // ⭐ FILA 0.180 — el motivo de LA CANCELACIÓN, no el del original. Se escribe explícito
+        // (nada de copiar `original.observaciones`): el original ya lleva el suyo, y mezclarlos
+        // haría que el inverso dijera por qué se hizo el movimiento que viene a deshacer.
+        observaciones: textoCancelacion(original.folio, motivo),
         detallesPt: {
           create: original.detallesPt.map((det) => ({
             idModelo: det.idModelo,
@@ -548,7 +586,14 @@ export async function cancelarMovimientoPt(
       entidad: 'Movimiento',
       idEntidad: original.id,
       accion: 'CANCELAR',
-      datos: { folioInverso: folio.toString(), idMovimientoInverso: inverso.id },
+      // El MOTIVO va aquí, en el renglón canónico del acto (A7): una línea de auditoría que dice
+      // «se canceló» sin decir por qué es el mismo defecto un piso más abajo. Antes lo escribía el
+      // dominio en un renglón `OTRO` aparte, sólo porque el motor no lo aceptaba (fila 0.180).
+      datos: {
+        folioInverso: folio.toString(),
+        idMovimientoInverso: inverso.id,
+        motivo: motivo.trim(),
+      },
     });
 
     return inverso;
@@ -1266,14 +1311,21 @@ export async function registrarTraspasoAvio(
  * se vuelve a anular (`ErrorConflicto`). Es el equivalente para tela/avío de
  * {@link cancelarMovimientoPt}: detecta la dimensión por cuál detalle trae el original.
  *
+ * El MOTIVO que el usuario escribió queda en las `observaciones` del inverso (fila 0.180), igual
+ * que en {@link cancelarMovimientoPt} y con el MISMO texto ({@link textoCancelacion}): las tres
+ * dimensiones se leen en pantallas hermanas y no pueden decir cosas distintas. Es obligatorio y va
+ * antes de `bd` para que el compilador obligue a visitar a todos los llamadores.
+ *
  * @param idMovimiento     movimiento original a anular (debe ser de tela o avío).
  * @param idTipoMovInverso tipo de movimiento (dirección opuesta) para el inverso.
+ * @param motivo           por qué se cancela (lo escribió el usuario); se guarda en el inverso.
  * @returns el movimiento INVERSO creado.
  */
 export async function cancelarMovimientoMaterial(
   sesion: SesionUsuario,
   idMovimiento: number,
   idTipoMovInverso: number,
+  motivo: string,
   bd?: ContextoBd,
 ): Promise<Movimiento> {
   return enTransaccion(async (tx) => {
@@ -1336,6 +1388,8 @@ export async function cancelarMovimientoMaterial(
         origenId: String(original.id),
         idUsuario: sesion.id,
         idMovimientoInverso: original.id,
+        // ⭐ FILA 0.180 — el motivo de LA CANCELACIÓN, no el del original (que conserva el suyo).
+        observaciones: textoCancelacion(original.folio, motivo),
         ...(esTela
           ? {
               detallesTela: {
@@ -1374,10 +1428,13 @@ export async function cancelarMovimientoMaterial(
       entidad: 'Movimiento',
       idEntidad: original.id,
       accion: 'CANCELAR',
+      // El MOTIVO va aquí, en el renglón canónico del acto (A7) — ver la nota gemela en
+      // `cancelarMovimientoPt`.
       datos: {
         dimension: esTela ? 'tela' : 'avio',
         folioInverso: folio.toString(),
         idMovimientoInverso: inverso.id,
+        motivo: motivo.trim(),
       },
     });
 

@@ -624,13 +624,9 @@ export async function cancelarMovimientoTela(
         ? COD_AJUSTE_SALIDA
         : COD_AJUSTE_ENTRADA;
     const tipoInverso = await tipoPorCodigo(tx, codigoInverso);
-    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, { tx });
-    await registrarBitacora(tx, sesion, {
-      entidad: 'Movimiento',
-      idEntidad: idMovimiento,
-      accion: 'OTRO',
-      datos: { motivoCancelacion: datos.motivo, dimension: 'tela' },
-    });
+    // Fila 0.180: el motor recibe el MOTIVO. El renglón `OTRO` que había aquí se retiró por
+    // redundante: el del motor ya trae `dimension: 'tela'` y ahora también el motivo.
+    await cancelarMovimientoMaterial(sesion, idMovimiento, tipoInverso.id, datos.motivo, { tx });
   }, bd);
 
   return obtenerMovimientoTela(idMovimiento, idEmpresa, verImportes, bd);

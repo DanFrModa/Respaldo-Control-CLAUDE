@@ -71,6 +71,74 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.145 · 10-sep-2026 · **en prueba** — **Ya no te vuelve a pedir que compres lo que ya compraste**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Cerrar un faltante «con esto queda cubierto» y que se quede cerrado**, aunque después el
+  renglón cambie de forma. Antes, si marcabas un color, comprabas y dabas por cerrado el resto — y
+  más tarde alguien marcaba ese avío como «se compra sin importar el color», o le quitaba el amarre
+  de color a la tela— **esas marcas se quedaban sin dueño y el faltante reaparecía**. El sistema te
+  volvía a pedir comprar algo que ya estaba resuelto.
+- **Tu caso del kilo, entre los medidos:** 481 kilos pedidos, se compran 480 y perdonas el kilo que
+  falta. Si después se le quita el amarre de color a esa tela, **el kilo resucitaba**. Ya no.
+- **Y las tres pantallas dicen el mismo número.** La explosión de materiales, la revisión previa
+  antes de generar la orden de compra y el propio botón de cerrar el faltante: antes podían decir
+  40 en una y 50 en otra sobre exactamente lo mismo.
+
+### Qué cambió y puede sorprender
+
+- **El botón de «volver a pedirlo» ahora sí reabre esos faltantes.** Antes, en el caso de arriba,
+  la pantalla decía «cubierto» pero el botón para reabrirlo no hacía nada: quedaba cerrado sin
+  manera de deshacerlo.
+- **Lo que NO cambia, a propósito:** si la marca la hiciste **sin** color y el material se abre en
+  colores después, la marca se suelta y **el faltante reaparece a la vista**, para que lo cierres
+  otra vez con un clic. Se eligió así porque cerrar «cubierto» desde la explosión cierra *todo* el
+  pendiente de ese renglón, y repartirlo entre los colores nuevos podría dejarlos en cero y hacerte
+  **comprar de menos sin que nadie se entere**. Un faltante visible de más es preferible a una
+  compra que no se hace.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Al fusionar dos colores del catálogo, una marca puede quedar contada pero imposible de
+  deshacer** — el botón de reabrir se queda mudo. **No lo introduce esta versión** (ya estaba), y
+  queda anotado con número propio. Depende de con qué frecuencia se fusionan colores, que es dato
+  del negocio.
+- **El tablero de «qué tengo / qué falta» sigue sin mirar lo dado por cubierto.** Es anterior a esta
+  versión y no se tocó.
+
+---
+
+## 0.144 · 10-sep-2026 · **en prueba** — **El motivo que escribes al cancelar ya se puede leer**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver POR QUÉ se canceló un movimiento, en el propio renglón del kardex.** Hasta hoy el sistema te
+  obligaba a escribir un motivo para cancelar… y después no lo enseñaba en ninguna parte: el renglón
+  de la cancelación decía `—`. Ahora dice *«Cancelación del folio 1234: se capturó dos veces»*.
+- **Y aplica a las tres cosas que se mueven**: producto terminado, telas y avíos. Cancelar es el único
+  movimiento que deshace otro, así que es justo donde más falta hacía la explicación.
+- **La pantalla de kardex de producto terminado estrena la columna de observaciones.** No la tenía: el
+  servidor le mandaba el dato desde hace tiempo **y la pantalla lo tiraba**.
+
+### Qué cambió y puede sorprender
+
+- **El motivo aparece con el número del movimiento que se está deshaciendo delante.** No es adorno: en
+  ese renglón no hay ninguna otra columna que diga a cuál cancela, así que sin el número se leería una
+  explicación suelta sin saber de qué. Si el texto es largo, pasando el ratón por encima se lee entero.
+- **Las cancelaciones viejas seguirán diciendo `—`.** Sólo se guarda el motivo de las que se hagan de
+  aquí en adelante; no se va a rellenar hacia atrás.
+- **En el registro de auditoría, la cancelación deja ahora una sola línea en vez de dos.** La que queda
+  es la buena: dice lo mismo que las dos de antes **y además** el folio del movimiento inverso.
+
+### Qué sigue pendiente o roto
+
+- **Finanzas ya lo hacía bien desde antes** — al cancelar un movimiento de cuenta corriente sí guardaba
+  el motivo donde se lee. Lo escribe con un formato ligeramente distinto (sin el número delante, porque
+  allá el renglón sí tiene de dónde agarrarse). Queda como diferencia conocida, no como defecto.
+
+---
+
 ## 0.143 · 10-sep-2026 · **en prueba** — **El día que arranques, los folios pueden empezar en el número que tú digas**
 
 ### Qué se puede hacer ahora que antes no

@@ -22,6 +22,7 @@ import type {
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { cancelarMovimientoTela, registrarSalidaTelaAOrden } from '../inventarios/telas.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   actualizarNotaSalida,
@@ -440,6 +441,9 @@ describe('Notas de salida (F4-E5) — cancelar reversa los AVÍOS (D3)', () => {
     );
     expect(cancelada.estatus).toBe('cancelada');
     expect(cancelada.motivoCancelacion).toBe('Se canceló el envío');
+    // ⭐ FILA 0.180 — y el KARDEX de avíos lo enseña. La línea de arriba mira
+    // `NotaSalida.motivoCancelacion` (otro campo, otra tabla): pasaría igual con el inverso vacío.
+    await esperarMotivoEnLosInversos(cliente, 'Se canceló el envío', 1);
     // La existencia regresa al original; el inverso es un movimiento NUEVO (nada se borra, D3).
     expect(await existenciaAvio(avioBoton.id)).toBe(200);
     const movs = await cliente.movimiento.count({

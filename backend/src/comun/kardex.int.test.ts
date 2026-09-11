@@ -13,6 +13,7 @@ import type {
   Color,
   Empresa,
   Modelo,
+  Movimiento,
   PrismaClient,
   Talla,
   TipoMovimientoInventario,
@@ -349,7 +350,13 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
       );
       expect(await existenciaVista(almPrimeras.id)).toBe(8);
 
-      const inverso = await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, bd());
+      const inverso = await cancelarMovimientoPt(
+        sesion(),
+        original.id,
+        salidaCliente.id,
+        'me equivoqué de almacén',
+        bd(),
+      );
       expect(inverso.idMovimientoInverso).toBe(original.id);
       expect(inverso.origenTipo).toBe(ORIGEN.cancelacion);
       expect(await existenciaVista(almPrimeras.id)).toBe(0); // entrada 8 − salida 8 = 0
@@ -374,9 +381,9 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
         },
         bd(),
       );
-      await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, bd());
+      await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, 'primera', bd());
       await expect(
-        cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, bd()),
+        cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, 'segunda', bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
     });
 
@@ -395,8 +402,86 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
       );
       // Original entrada → inverso DEBE ser salida; pasar otra entrada es ErrorValidacion.
       await expect(
-        cancelarMovimientoPt(sesion(), original.id, traspasoEntrada.id, bd()),
+        cancelarMovimientoPt(sesion(), original.id, traspasoEntrada.id, 'dirección mala', bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // FILA 0.180 — EL MOTIVO DE LA CANCELACIÓN, en la dimensión PT
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // El motor es UNO para las tres dimensiones: la rama GEMELA (tela/avío, `cancelarMovimientoMaterial`)
+  // se mide en `dominio/inventarios/materiales.int.test.ts`, y la de tela×color en
+  // `partidas-telas.int.test.ts`. Cada una aparte, a propósito: una sola prueba dejaría a las otras
+  // sin red aunque el diff toque las dos líneas iguales.
+  describe('el MOTIVO de la cancelación queda en el inverso (fila 0.180)', () => {
+    async function entradaDe8(observaciones?: string): Promise<Movimiento> {
+      return registrarMovimientoPt(
+        sesion(),
+        {
+          idEmpresa: empresa.id,
+          idTipoMov: entradaInicial.id,
+          idAlmacen: almPrimeras.id,
+          fecha: new Date(),
+          origenTipo: ORIGEN.movimientoManual,
+          lineas: [{ idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaM.id, cantidad: 8 }],
+          ...(observaciones === undefined ? {} : { observaciones }),
+        },
+        bd(),
+      );
+    }
+
+    it('⭐ PT: escribe «Cancelación del folio N: motivo» y NO copia las del original', async () => {
+      const original = await entradaDe8('entrada del recibo del lunes');
+      // Con espacios de sobra a propósito: se guarda RECORTADO.
+      const inverso = await cancelarMovimientoPt(
+        sesion(),
+        original.id,
+        salidaCliente.id,
+        '   se capturó dos veces   ',
+        bd(),
+      );
+
+      const enBase = await cliente.movimiento.findUniqueOrThrow({ where: { id: inverso.id } });
+      expect(enBase.observaciones).toBe(
+        `Cancelación del folio ${original.folio.toString()}: se capturó dos veces`,
+      );
+
+      // (d) El ORIGINAL conserva LAS SUYAS: son dos motivos distintos y no se mezclan.
+      const originalEnBase = await cliente.movimiento.findUniqueOrThrow({
+        where: { id: original.id },
+      });
+      expect(originalEnBase.observaciones).toBe('entrada del recibo del lunes');
+
+      // La garantía VIEJA sigue viva: el inverso neutraliza el saldo.
+      expect(await existenciaVista(almPrimeras.id)).toBe(0);
+    });
+
+    it('⭐ motivo VACÍO: se escribe sólo el prefijo, NUNCA una cadena vacía', async () => {
+      // Hoy ninguna puerta REST deja pasar un motivo vacío (`.trim().min(1|3)`), pero el motor es
+      // una librería del núcleo: si algún llamador futuro lo hiciera, un `''` saldría en pantalla
+      // como una celda EN BLANCO (las pantallas pintan `observaciones ?? '—'`, y `''` no es null),
+      // o sea «alguien escribió nada» — peor que el guion.
+      const original = await entradaDe8();
+      const inverso = await cancelarMovimientoPt(
+        sesion(),
+        original.id,
+        salidaCliente.id,
+        '    ',
+        bd(),
+      );
+      const enBase = await cliente.movimiento.findUniqueOrThrow({ where: { id: inverso.id } });
+      expect(enBase.observaciones).toBe(`Cancelación del folio ${original.folio.toString()}`);
+      expect(enBase.observaciones).not.toBe('');
+    });
+
+    it('(e) la bitácora CANCELAR del motor lleva el motivo (A7)', async () => {
+      const original = await entradaDe8();
+      await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, 'orden equivocada', bd());
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Movimiento', idEntidad: String(original.id), accion: 'CANCELAR' },
+      });
+      expect(bitacora.datos).toMatchObject({ motivo: 'orden equivocada' });
     });
   });
 
@@ -480,7 +565,7 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
         bd(),
       );
       // El inverso (salida) neutraliza la entrada: entrada 6 − salida 6 = 0.
-      await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, bd());
+      await cancelarMovimientoPt(sesion(), original.id, salidaCliente.id, 'se contó doble', bd());
 
       const directo = await enTransaccion(async (tx) => {
         await bloquearArticuloPt(

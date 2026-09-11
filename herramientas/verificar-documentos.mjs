@@ -130,7 +130,15 @@ if (resumen === null) {
 // compensan dejan el conteo perfecto y la lista mintiendo.
 const listasDelResumen = [
   { simbolo: '⏸️', patron: /\*\*\d+ ⏸️ aparcadas a fase 2\*\* \(([^)]*)\)/, nombre: 'aparcadas' },
-  { simbolo: '⬜', patron: /\*\*\d+ ⬜ por hacer en la V1\*\* \(([^)]*)\)/, nombre: 'por hacer' },
+  // El rótulo dejó de decir «en la V1» el 10-sep-2026: la columna de ESTADO (⬜) y la de
+  // CLASIFICACIÓN (⏸️ post-V1) son ejes distintos, y ocho filas ⬜ están aparcadas a post-V1 en su
+  // propia ficha — llamarlas «por hacer en la V1» contaba de más. El sufijo se acepta opcional para
+  // no romper ramas en vuelo que todavía lo traigan.
+  {
+    simbolo: '⬜',
+    patron: /\*\*\d+ ⬜ por hacer(?: en la V1)?\*\* \(([^)]*)\)/,
+    nombre: 'por hacer',
+  },
 ];
 for (const { simbolo, patron, nombre } of listasDelResumen) {
   const hallada = hoja.match(patron);
