@@ -193,7 +193,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     expect(screen.queryByTestId('autorizar-oc')).not.toBeInTheDocument();
   });
 
-  it('una OC autorizada NO ofrece Editar a un no-admin (sí "Ver")', () => {
+  it('una OC autorizada NO ofrece Editar sin `compras.editar-autorizada` (sí "Ver")', () => {
     paginaConUna('autorizada');
     renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
@@ -204,10 +204,17 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     expect(within(detalle).getByTestId('ver-oc')).toBeInTheDocument();
   });
 
-  it('un ADMIN (roles.administrar) SÍ ve "Editar" en una OC autorizada', () => {
+  // ⭐ Fila 0.120: la llave es `compras.editar-autorizada`, no el viejo marcador de admin. La
+  // pantalla TIENE que preguntar por la misma que el dominio: si se desfasan, o el botón promete
+  // algo que se come un 409, o se lo esconde justo a quien sí puede.
+  it('con `compras.editar-autorizada` SÍ se ve "Editar" en una OC autorizada', () => {
     paginaConUna('autorizada');
     renderConProveedores(<OrdenesCompraPagina />, {
-      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'roles.administrar']),
+      sesion: estadoSesionDePrueba([
+        'compras.ver',
+        'compras.administrar',
+        'compras.editar-autorizada',
+      ]),
     });
     fireEvent.click(screen.getByTestId('fila-oc'));
     const detalle = screen.getByTestId('detalle-oc');

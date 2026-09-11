@@ -119,6 +119,7 @@
                           "compras.administrar",
                           "compras.cancelar",
                           "compras.desautorizar",
+                          "compras.editar-autorizada",
                           "compras.recibir",
                           "produccion.corte-salidas",
                           "produccion.entradas-maquila",
@@ -138,6 +139,8 @@
                           "rc.programar",
                           "rc.ruta-ver",
                           "rc.capturar",
+                          "rc.capturar-cualquiera",
+                          "rc.bandeja-completa",
                           "calidad.generar-auditorias",
                           "calidad.modificar-auditorias",
                           "calidad.actualizar-auditorias",
@@ -185,6 +188,7 @@
                           "modelos.aprobar-receta",
                           "tipos-proceso.ver",
                           "tipos-proceso.administrar",
+                          "tipos-proceso.marcar-entrada-pt",
                           "produccion.corte",
                           "produccion.empaque",
                           "produccion.envio",
@@ -120245,7 +120249,7 @@
                     "maxLength": 100
                   },
                   "generaEntradaPt": {
-                    "description": "¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.",
+                    "description": "¿El recibo de este proceso mete a inventario PT? Solo lo fija quien tenga el permiso \"tipos-proceso.marcar-entrada-pt\".",
                     "type": "boolean"
                   },
                   "esArte": {
@@ -120821,7 +120825,7 @@
                     "maxLength": 100
                   },
                   "generaEntradaPt": {
-                    "description": "¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.",
+                    "description": "¿El recibo de este proceso mete a inventario PT? Solo lo fija quien tenga el permiso \"tipos-proceso.marcar-entrada-pt\".",
                     "type": "boolean"
                   },
                   "esArte": {
@@ -198721,7 +198725,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",
@@ -199460,7 +199464,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",
@@ -200108,7 +200112,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",
@@ -200783,7 +200787,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",
@@ -201633,7 +201637,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",
@@ -202304,7 +202308,7 @@
                           },
                           "esResponsableActual": {
                             "type": "boolean",
-                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                            "description": "¿Quien consulta es responsable de este proceso, por sus roles o por el permiso \"rc.capturar-cualquiera\"? — badge \"tú\" (R4)."
                           },
                           "duracionDias": {
                             "type": "integer",

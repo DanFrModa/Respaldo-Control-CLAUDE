@@ -111,7 +111,7 @@ export interface RutaOrdenProcesoDto {
   tipoEvento: TipoEventoRc;
   /** Nombres de los ROLES responsables del proceso (N:M sobre el RBAC, R4). */
   rolesResponsables: string[];
-  /** ¿Quien CONSULTA es responsable de este proceso (o admin)? — para el badge "tú" (R4). */
+  /** ¿Es responsable de este proceso (por sus roles, o por `rc.capturar-cualquiera`)? — badge "tú". */
   esResponsableActual: boolean;
   duracionDias: number;
   acumuladoDias: number | null;
@@ -206,14 +206,27 @@ const SELECT_ORDEN_RC = {
 
 /**
  * Roles del usuario que consulta, para el `esResponsableActual` por proceso (badge "tú", R4).
- * `'admin'` (roles.administrar) = responsable de todo — mismo criterio que la captura
- * (`exigirCapturaProceso`) y la bandeja.
+ * `'todos'` = responsable de todo, sin mirar roles.
+ *
+ * ⭐ POR QUÉ ESTE SITIO COMPARTE PERMISO CON LA CAPTURA, Y NO ES COMODIDAD (fila 0.120).
+ *
+ * Hasta la 0.120 esto preguntaba por `roles.administrar`, igual que los otros cuatro sitios que la
+ * fila desmontó. Al repartirlos, éste es el único que NO estrenó llave propia, y la razón es que
+ * `esResponsableActual` no es una facultad: es la RESPUESTA A LA MISMA PREGUNTA que contesta
+ * `exigirCapturaProceso` (cumplimiento.ts) — *«¿este proceso me toca a mí?»*—, pintada como el
+ * badge "tú". Si las dos respuestas pudieran divergir, el sistema mentiría en una de las dos
+ * direcciones: badge sin captura ⇒ el usuario pulsa y se come un 403; captura sin badge ⇒ puede
+ * capturarlo y la pantalla nunca se lo dice. Ninguna de las dos es una facultad que alguien
+ * quisiera repartir, así que la clave tiene que ser LA MISMA: `rc.capturar-cualquiera`.
+ *
+ * (La bandeja, en cambio, sí estrenó la suya —`rc.bandeja-completa`—: ver todo y capturar todo sí
+ * son facultades separables. Ver el comentario de `procesosResponsablesDe` en bandeja.ts.)
  */
 async function idsRolesDeSesion(
   cliente: ReturnType<typeof clienteLectura>,
   sesion: SesionUsuario,
-): Promise<'admin' | ReadonlySet<number>> {
-  if (sesion.permisos.has('roles.administrar')) return 'admin';
+): Promise<'todos' | ReadonlySet<number>> {
+  if (sesion.permisos.has('rc.capturar-cualquiera')) return 'todos';
   const filas = await cliente.usuarioRol.findMany({
     where: { idUsuario: sesion.id },
     select: { idRol: true },
@@ -1075,7 +1088,7 @@ function armarDto(
   },
   filas: RutaConRelaciones[],
   nombresPorId: ReadonlyMap<string, string>,
-  rolesSesion: 'admin' | ReadonlySet<number> = new Set<number>(),
+  rolesSesion: 'todos' | ReadonlySet<number> = new Set<number>(),
   motivoSinRuta: string | null = null,
 ): RutaOrdenDto {
   // idProcesoDef por id de RutaOrden, para traducir las aristas a idProcesoDef.
@@ -1131,7 +1144,7 @@ function armarDto(
       tipoEvento: f.procesoDef.tipoEvento,
       rolesResponsables: f.procesoDef.roles.map((r) => r.rol.nombre),
       esResponsableActual:
-        rolesSesion === 'admin' || f.procesoDef.roles.some((r) => rolesSesion.has(r.idRol)),
+        rolesSesion === 'todos' || f.procesoDef.roles.some((r) => rolesSesion.has(r.idRol)),
       duracionDias: f.duracionDias,
       acumuladoDias: f.acumuladoDias,
       fechaPlaneadaOriginal: f.fechaPlaneadaOriginal,

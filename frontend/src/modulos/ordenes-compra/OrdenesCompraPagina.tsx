@@ -125,10 +125,12 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   // ⭐ V1-E3y (§Post-F9.79): la llave de DESFIRMAR es propia y distinta de la de firmar — Daniel la
   // pidió para su perfil. Se esconde sin ella, pero quien decide de verdad es el servidor (A1/A4).
   const puedeDesautorizar = tienePermiso('compras.desautorizar');
-  // El backend permite editar una OC autorizada SOLO a admin (`roles.administrar`), igual que el
-  // precedente del proyecto (TiposProcesoPagina). Debe coincidir con el permiso del backend para no
-  // ofrecer un "Editar" que se coma un 409.
-  const esAdmin = tienePermiso('roles.administrar');
+  // ⭐ Editar una OC YA firmada tiene llave propia desde la fila 0.120 (`compras.editar-autorizada`).
+  // Antes preguntaba por `roles.administrar`, que es lo que la fila vino a desmontar: administrar
+  // roles regalaba esta capacidad de pasada. Debe coincidir EXACTAMENTE con el permiso que exige el
+  // dominio (`ordenes-compra.ts`), o el botón ofrece algo que se come un 409 — o lo esconde a quien
+  // sí puede, que es la mitad que más duele: el interruptor existiría y nadie lo alcanzaría.
+  const puedeEditarAutorizada = tienePermiso('compras.editar-autorizada');
   // §Post-F9.15: dar entrada a la tela es capturar su factura → permiso de inventario de telas.
   const puedeMoverTelas = tienePermiso('inventario-telas.mover');
 
@@ -247,7 +249,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
     return null;
   }
 
-  /** ¿La OC se puede editar desde la UI? (el backend re-decide; admin puede tocar autorizadas). */
+  /** ¿Se puede editar desde la UI? (el backend re-decide; `compras.editar-autorizada` toca las firmadas). */
   function puedeEditar(oc: OrdenCompra): boolean {
     if (!puedeAdministrar || oc.estatus === 'cancelada') {
       return false;
@@ -256,7 +258,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       oc.estatus !== 'recibida_parcial' &&
       oc.estatus !== 'recibida_total'
       ? true
-      : esAdmin;
+      : puedeEditarAutorizada;
   }
 
   const datos = consulta.data;

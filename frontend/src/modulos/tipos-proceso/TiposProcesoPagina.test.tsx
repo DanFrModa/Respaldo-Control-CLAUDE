@@ -125,15 +125,16 @@ describe('<TiposProcesoPagina>', () => {
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
   });
 
-  it('un ADMIN puede editar la bandera generaEntradaPt en el diálogo', async () => {
+  it('con `tipos-proceso.marcar-entrada-pt` se edita la bandera en el diálogo', async () => {
     const usuario = userEvent.setup();
     useTiposProceso.mockReturnValue(consultaConDatos([tipoProceso(1, 'costura', 'Costura', true)]));
     renderConProveedores(<TiposProcesoPagina />, {
-      // roles.administrar = marcador de admin → puede tocar la bandera.
+      // ⭐ Fila 0.120: la bandera tiene llave propia. Antes esto pedía `roles.administrar`, o sea
+      // que se la regalaba a quien administrara roles. Debe coincidir con lo que exige el dominio.
       sesion: estadoSesionDePrueba([
         'tipos-proceso.ver',
         'tipos-proceso.administrar',
-        'roles.administrar',
+        'tipos-proceso.marcar-entrada-pt',
       ]),
     });
 
@@ -142,7 +143,7 @@ describe('<TiposProcesoPagina>', () => {
     expect(within(dialogo).getByTestId('tp-genera-entrada')).toBeEnabled();
   });
 
-  it('un GESTOR (no admin) ve la bandera DESHABILITADA y el aviso', async () => {
+  it('SIN `tipos-proceso.marcar-entrada-pt` la bandera va DESHABILITADA y con aviso', async () => {
     const usuario = userEvent.setup();
     useTiposProceso.mockReturnValue(consultaConDatos([tipoProceso(1, 'costura', 'Costura', true)]));
     renderConProveedores(<TiposProcesoPagina />, {
@@ -152,7 +153,13 @@ describe('<TiposProcesoPagina>', () => {
     await usuario.click(screen.getByTestId('nuevo-tipo-proceso'));
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByTestId('tp-genera-entrada')).toBeDisabled();
-    expect(within(dialogo).getByText(/Solo un administrador puede cambiar/i)).toBeInTheDocument();
+    // Texto COMPLETO y único a propósito (cicatriz del 7-sep-2026): una palabra suelta como
+    // «permiso» la pinta la pantalla por su cuenta y la aserción pasaría sin medir nada.
+    expect(
+      within(dialogo).getByText(
+        'No tienes permiso para cambiar si el proceso mete prenda a inventario PT.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('pide confirmación antes de desactivar y llama a la mutación al confirmar', async () => {

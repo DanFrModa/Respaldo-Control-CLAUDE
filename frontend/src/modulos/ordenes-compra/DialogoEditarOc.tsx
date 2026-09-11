@@ -63,7 +63,7 @@ const AYUDA_POR_ROL: Record<string, string> = {
  * Diálogo de CAPTURA / EDICIÓN de una orden de compra (F4-E2). Si recibe `oc`, edita; si no, da de
  * alta. Encabezado (proveedor, fecha de entrega OBLIGATORIA, dirección de entrega del CATÁLOGO,
  * observaciones, correspondeA — la fecha de emisión la pone el servidor, §Post-F9.18) + renglones (editor
- * con matriz). Una OC autorizada (y usuario no admin) va en `soloLectura` (el backend igual bloquea,
+ * con matriz). Una OC autorizada, sin `compras.editar-autorizada`, va en `soloLectura` (el backend igual bloquea,
  * A1). Acciones de escritura gobernadas por `compras.administrar` (la pantalla oculta el botón que
  * abre el diálogo); el backend es la autoridad.
  */
@@ -78,7 +78,7 @@ export function DialogoEditarOc({
   alCambiarAbierto: (abierto: boolean) => void;
   /** OC a editar; `undefined` = alta de un borrador nuevo. */
   oc?: OrdenCompra | undefined;
-  /** Bloquea toda edición (OC autorizada sin ser admin); el backend re-valida. */
+  /** Bloquea toda edición (OC autorizada sin `compras.editar-autorizada`); el backend re-valida. */
   soloLectura?: boolean;
   /** Callback con el id de la OC guardada (para enfocarla en la lista). */
   alGuardada: (id: number) => void;

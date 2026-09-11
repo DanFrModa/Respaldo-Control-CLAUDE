@@ -563,6 +563,44 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'Gobierna también la CANCELACIÓN de estas salidas: el inverso devuelve el material al ' +
       'inventario, o sea deshace la misma decisión.',
   },
+  // ── ⭐⭐ Los cinco poderes que colgaban de `roles.administrar` (fila 0.120) ─────────────────
+  {
+    clave: 'rc.capturar-cualquiera',
+    razon:
+      'SÓLO el administrador y Administración/Dirección (va también en SOLO_ADMINISTRADOR del ' +
+      'seed). No es una decisión nueva: hasta la fila 0.120 esta facultad —capturar el avance de ' +
+      'un proceso de la Ruta Crítica del que NINGUNO de mis roles es responsable— venía pegada a ' +
+      '`roles.administrar`, que sólo tienen esos dos. La fila le dio nombre propio SIN mover a ' +
+      'nadie de sitio, precisamente para que el reparto por puesto del arranque pueda dárselo a ' +
+      'un coordinador sin regalarle además la administración del sistema.',
+  },
+  {
+    clave: 'rc.bandeja-completa',
+    razon:
+      'SÓLO el administrador y Administración/Dirección (va también en SOLO_ADMINISTRADOR): es ' +
+      'el reparto que tenía bajo `roles.administrar` hasta la fila 0.120, conservado tal cual. Va ' +
+      'SEPARADA de `rc.capturar-cualquiera` a propósito: ver la bandeja de todos es supervisión y ' +
+      'capturar por otros es operación — se puede querer dar una sin la otra, en las dos ' +
+      'direcciones, que es exactamente lo que Daniel pidió el 3-sep-2026.',
+  },
+  {
+    clave: 'compras.editar-autorizada',
+    razon:
+      'SÓLO el administrador y Administración/Dirección (va también en SOLO_ADMINISTRADOR): el ' +
+      'reparto que tenía bajo `roles.administrar` hasta la fila 0.120. NO baja a quien lleva ' +
+      '`compras.administrar` (medio organigrama): aquél edita BORRADORES, éste modifica una ' +
+      'compra YA firmada dejándola firmada. Es la hermana callada de `compras.desautorizar`, que ' +
+      'Daniel reservó para sí (§Post-F9.79), y por eso vive en el mismo sitio.',
+  },
+  {
+    clave: 'tipos-proceso.marcar-entrada-pt',
+    razon:
+      'SÓLO el administrador y Administración/Dirección (va también en SOLO_ADMINISTRADOR): el ' +
+      'reparto que tenía bajo `roles.administrar` hasta la fila 0.120. NO baja a quien lleva ' +
+      '`tipos-proceso.administrar`: código y nombre son texto de catálogo, pero esta bandera ' +
+      'decide si RECIBIR de ese proceso mete prenda al kardex de producto terminado — es tocar ' +
+      'el inventario desde la configuración.',
+  },
   // ── ⭐⭐ Cerrar la orden y CONGELAR su costo (fila 0.061), §Post-F9.154(c) ──────────────────
   {
     clave: 'ordenes.cerrar',
@@ -620,5 +658,66 @@ describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', ()
     expect(claves.length, 'hay claves repetidas en NUEVOS_DESDE_LA_FOTO').toBe(
       new Set(claves).size,
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. LA FILA 0.120 — que desarmar el interruptor de admin no moviera a nadie
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ Las cuatro llaves que la fila 0.120 sacó de debajo de `roles.administrar`.
+ *
+ * Hasta esa fila, CINCO facultades de negocio (capturar cualquier proceso de la RC, salir como
+ * responsable de todo, ver la bandeja completa, editar una OC ya firmada y mover la bandera que
+ * mete prenda a PT) preguntaban por `roles.administrar` como si fuera un «modo dios». La fila las
+ * separó en llaves propias. El compromiso era **no mover a nadie de sitio**: quien podía, sigue
+ * pudiendo — ni uno más, ni uno menos.
+ *
+ * Esta batería lo MIDE contra el seed en vez de darlo por bueno «por construcción». Es barata y
+ * caza el error más probable de un cambio así: dejarse una clave fuera del reparto, o metérsela a
+ * un perfil de más al copiar y pegar.
+ */
+const LLAVES_DE_LA_0120: readonly ClavePermiso[] = [
+  'rc.capturar-cualquiera',
+  'rc.bandeja-completa',
+  'compras.editar-autorizada',
+  'tipos-proceso.marcar-entrada-pt',
+];
+
+/** Nombres de los perfiles del seed que otorgan `clave` (los dos de acceso total incluidos). */
+function perfilesQueOtorgan(clave: ClavePermiso): string[] {
+  return definirRoles()
+    .filter((rol) => (rol.permisos as string[]).includes(clave))
+    .map((rol) => rol.nombre)
+    .sort();
+}
+
+describe('🔌 fila 0.120: los cinco interruptores que colgaban de `roles.administrar`', () => {
+  it('⭐ cada llave nueva la tienen EXACTAMENTE los mismos perfiles que `roles.administrar`', () => {
+    const referencia = perfilesQueOtorgan('roles.administrar');
+    // Sanidad: si un día `roles.administrar` deja de existir o se reparte, la comparación de abajo
+    // dejaría de significar nada en silencio.
+    expect(referencia, 'la referencia no puede estar vacía').not.toEqual([]);
+
+    for (const clave of LLAVES_DE_LA_0120) {
+      expect(
+        perfilesQueOtorgan(clave),
+        `${clave} no la tienen los mismos perfiles que \`roles.administrar\`. La fila 0.120 se ` +
+          `comprometió a NO mover a nadie de sitio: quien podía hacer esto cuando colgaba del ` +
+          `marcador de admin, tiene que poder seguir haciéndolo.`,
+      ).toEqual(referencia);
+    }
+  });
+
+  it('…y son CUATRO renglones separados, no un interruptor con otro nombre', () => {
+    // El riesgo real de esta fila era sustituir `roles.administrar` por una sola clave nueva
+    // («admin.todo») y llamarlo arreglo. Que sean cuatro entradas distintas del catálogo es lo que
+    // hace posible dar una y no las otras cuando Daniel arme los perfiles por puesto real.
+    const catalogo = new Set<string>(CLAVES_PERMISO);
+    for (const clave of LLAVES_DE_LA_0120) {
+      expect(catalogo.has(clave), `${clave} no está en el catálogo de src/contrato`).toBe(true);
+    }
+    expect(new Set(LLAVES_DE_LA_0120).size).toBe(4);
   });
 });

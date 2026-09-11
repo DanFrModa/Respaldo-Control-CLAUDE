@@ -690,7 +690,10 @@ describe('⭐⭐ 0.150 — la RUTA CRÍTICA generada de verdad (rechazo, defecto
     'rc.programar',
     'rc.capturar',
     'rc.fecha-libre-cumplimiento',
-    'roles.administrar',
+    // Fila 0.120: saltarse el filtro de responsabilidad de la RC dejó de colgar de
+    // `roles.administrar` y tiene llave propia. Aquí se captura sobre procesos cuyos roles
+    // responsables no son los de esta sesión, así que hace falta.
+    'rc.capturar-cualquiera',
   ];
   const sesionRc = (): SesionUsuario =>
     sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_RC });

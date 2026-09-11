@@ -761,8 +761,9 @@ export type DatosConfiguracionEmpresa = z.infer<typeof esquemaConfiguracionEmpre
 
 /**
  * Captura del formulario de tipo de proceso (F3-E1; alta y edicion comparten forma).
- * `generaEntradaPt` (decision (e)): solo un admin puede tocarla — la pantalla DESHABILITA el
- * control para no-admin y el backend descarta cualquier valor que venga sin permiso.
+ * `generaEntradaPt` (decision (e)): la toca quien tenga `tipos-proceso.marcar-entrada-pt` (llave
+ * propia desde la fila 0.120) — la pantalla DESHABILITA el control para los demas y el backend
+ * descarta cualquier valor que venga sin permiso.
  */
 export const esquemaTipoProcesoFormulario = z.object({
   codigo: z

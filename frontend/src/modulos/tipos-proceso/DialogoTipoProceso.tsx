@@ -30,9 +30,10 @@ import { Input } from '@/components/ui/input';
  * (PATCH); si no, da de alta (POST). El error del servidor (validación, conflicto de código,
  * permiso) se muestra como toast en español.
  *
- * La bandera **`generaEntradaPt`** (decisión (e)) solo la edita un ADMIN: si `puedeEditarBandera`
- * es falso, el control se DESHABILITA y se explica por qué. El backend es la autoridad (descarta
- * la bandera para no-admin aunque la UI fallara), A1/§9.2.
+ * La bandera **`generaEntradaPt`** (decisión (e)) solo la edita quien tenga
+ * `tipos-proceso.marcar-entrada-pt` (llave propia desde la fila 0.120): si `puedeEditarBandera` es
+ * falso, el control se DESHABILITA y se explica por qué. El backend es la autoridad (descarta la
+ * bandera si falta el permiso, aunque la UI fallara), A1/§9.2.
  */
 export function DialogoTipoProceso({
   abierto,
@@ -44,7 +45,7 @@ export function DialogoTipoProceso({
   alCambiarAbierto: (abierto: boolean) => void;
   /** Tipo a editar; `undefined` -> alta. */
   tipo: TipoProceso | undefined;
-  /** ¿La sesión es admin y puede tocar `generaEntradaPt`? */
+  /** ¿La sesión tiene `tipos-proceso.marcar-entrada-pt` y puede tocar `generaEntradaPt`? */
   puedeEditarBandera: boolean;
 }): React.JSX.Element {
   const esEdicion = tipo !== undefined;
@@ -86,10 +87,11 @@ export function DialogoTipoProceso({
   }, [abierto, tipo, formulario]);
 
   const enviar = formulario.handleSubmit((datos) => {
-    // Si NO es admin, no se manda `generaEntradaPt` (el backend igual lo descartaría): se respeta
-    // el valor que ya tenía el registro y no se intenta cambiarlo desde una sesión sin permiso.
-    // `esArte`/`usaPuntadas` NO son admin-only (V1-E3f): no mueven inventario, solo deciden qué
-    // se ofrece en la lista de tipos de arte. Las manda cualquiera que administre el catálogo.
+    // Sin `tipos-proceso.marcar-entrada-pt` no se manda `generaEntradaPt` (el backend igual lo
+    // descartaría): se respeta el valor que ya tenía el registro y no se intenta cambiarlo desde
+    // una sesión sin permiso. `esArte`/`usaPuntadas` NO llevan esa llave (V1-E3f): no mueven
+    // inventario, solo deciden qué se ofrece en la lista de tipos de arte. Las manda cualquiera
+    // que administre el catálogo.
     const cuerpo = puedeEditarBandera
       ? datos
       : {
@@ -168,7 +170,7 @@ export function DialogoTipoProceso({
               <FieldError errors={[errors.nombre]} />
             </Field>
 
-            {/* Bandera generaEntradaPt — editable SOLO por admin (decisión (e)). */}
+            {/* Bandera generaEntradaPt — pide `tipos-proceso.marcar-entrada-pt` (decisión (e)). */}
             <Field orientation="horizontal">
               <input
                 id="tp-genera-entrada"
@@ -184,7 +186,7 @@ export function DialogoTipoProceso({
             </Field>
             {!puedeEditarBandera ? (
               <p className="-mt-2 text-xs text-muted-foreground">
-                Solo un administrador puede cambiar si el proceso mete prenda a inventario PT.
+                No tienes permiso para cambiar si el proceso mete prenda a inventario PT.
               </p>
             ) : null}
 

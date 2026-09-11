@@ -1249,7 +1249,7 @@ model TipoProceso {
   /// de Maquila' contra 3 del tipo 3 'Entrada de Aplicación'). Default `false` (lo
   /// SEGURO: un proceso nuevo no mete a PT salvo que se marque). El seed de F3-E1 pone
   /// `true` solo en costura. Cambiar el valor luego es DATO (UI de admin, F3-E1 Fase 2),
-  /// NO migración. Editable solo por admin (A4).
+  /// NO migración. La edita sólo quien tenga `tipos-proceso.marcar-entrada-pt` (A4; fila 0.120).
   generaEntradaPt Boolean @default(false) @map("genera_entrada_pt")
 
   /// ⭐ ¿Este proceso se puede usar como TIPO DE ARTE? (V1-E3f, §Post-F9.58/.59 — Daniel:
@@ -5512,7 +5512,8 @@ model MovimientoTercero {
 // E2 captura/autoriza/cancela/duplica la OC; E3 conectará la RECEPCIÓN al kardex de
 // telas/avíos (aquí NO se mueve inventario todavía, D3). Decisiones cerradas con el
 // dueño (DECISIONES.md §"Decisiones de diseño F4"):
-//  • (a) Una OC AUTORIZADA queda bloqueada para el usuario normal (el admin sí la edita,
+//  • (a) Una OC AUTORIZADA queda bloqueada salvo con `compras.editar-autorizada` (fila 0.120; antes
+//    bastaba `roles.administrar`) —quien la tenga sí la edita,
 //    cada cambio a Bitácora). "Duplicar a nueva OC" (todos) copia a un `borrador` nuevo.
 //  • (c) Se ELIMINA el Excel: el renglón que lo requiera lleva matriz talla×color NATIVA
 //    (análoga a OrdenLineaTalla de F2); la suma de la matriz = cantidad del renglón.

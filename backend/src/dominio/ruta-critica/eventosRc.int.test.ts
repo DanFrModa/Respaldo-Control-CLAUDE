@@ -68,7 +68,7 @@ const PERM_TODOS: ClavePermiso[] = [
   'inventario-avios.mover',
   'rc.capturar',
   'rc.ruta-ver',
-  'roles.administrar',
+  'rc.capturar-cualquiera',
 ];
 
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TODOS });

@@ -263,7 +263,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // decisión (e)). Folio por empresa (A3/A9); cancelación suave con reverso de avíos (D3).
   await app.register(rutasNotasSalida, { prefix: '/api' });
   // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
-  // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
+  // generaEntradaPt gobernada por `tipos-proceso.marcar-entrada-pt`, fila 0.120) y GET
+  // solo-lectura de tipos de movimiento de
   // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)
   // llegan en E2–E5.
   await app.register(rutasTiposProceso, { prefix: '/api' });

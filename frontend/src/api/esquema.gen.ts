@@ -104,6 +104,7 @@ export interface paths {
                 | 'compras.administrar'
                 | 'compras.cancelar'
                 | 'compras.desautorizar'
+                | 'compras.editar-autorizada'
                 | 'compras.recibir'
                 | 'produccion.corte-salidas'
                 | 'produccion.entradas-maquila'
@@ -123,6 +124,8 @@ export interface paths {
                 | 'rc.programar'
                 | 'rc.ruta-ver'
                 | 'rc.capturar'
+                | 'rc.capturar-cualquiera'
+                | 'rc.bandeja-completa'
                 | 'calidad.generar-auditorias'
                 | 'calidad.modificar-auditorias'
                 | 'calidad.actualizar-auditorias'
@@ -170,6 +173,7 @@ export interface paths {
                 | 'modelos.aprobar-receta'
                 | 'tipos-proceso.ver'
                 | 'tipos-proceso.administrar'
+                | 'tipos-proceso.marcar-entrada-pt'
                 | 'produccion.corte'
                 | 'produccion.empaque'
                 | 'produccion.envio'
@@ -46070,7 +46074,7 @@ export interface paths {
           'application/json': {
             codigo: string;
             nombre: string;
-            /** @description ¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo. */
+            /** @description ¿El recibo de este proceso mete a inventario PT? Solo lo fija quien tenga el permiso "tipos-proceso.marcar-entrada-pt". */
             generaEntradaPt?: boolean;
             /** @description ¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único). */
             esArte?: boolean;
@@ -46505,7 +46509,7 @@ export interface paths {
           'application/json': {
             codigo?: string;
             nombre?: string;
-            /** @description ¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo. */
+            /** @description ¿El recibo de este proceso mete a inventario PT? Solo lo fija quien tenga el permiso "tipos-proceso.marcar-entrada-pt". */
             generaEntradaPt?: boolean;
             /** @description ¿Se ofrece como TIPO DE ARTE del modelo/orden? (V1-E3f, catálogo único). */
             esArte?: boolean;
@@ -78508,7 +78512,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
@@ -78737,7 +78741,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
@@ -78985,7 +78989,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
@@ -79223,7 +79227,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
@@ -79576,7 +79580,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
@@ -79815,7 +79819,7 @@ export interface paths {
                   | 'empaque';
                 /** @description Nombres de los roles responsables del proceso (N:M, R4). */
                 rolesResponsables: string[];
-                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                /** @description ¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4). */
                 esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;

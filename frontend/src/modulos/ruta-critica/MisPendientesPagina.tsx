@@ -79,8 +79,9 @@ export function MisPendientesPagina(): React.JSX.Element {
   const responsables = useResponsablesRc({ habilitado: esSupervisor });
   const deUsuario = indiceUsuario === null ? undefined : responsables.data?.[indiceUsuario]?.id;
 
-  // Búsqueda por cliente EN SERVIDOR (parámetro existente de la bandeja): sin ella, un admin —
-  // que ve TODO — puede tener a su orden fuera del tope de la página (la bandeja vieja la tenía
+  // Búsqueda por cliente EN SERVIDOR (parámetro existente de la bandeja): sin ella, quien tenga
+  // `rc.bandeja-completa` —que ve TODO— puede tener a su orden fuera del tope de la página
+  // (la bandeja vieja la tenía
   // y Mis pendientes la había perdido). Los KPIs siguen siendo el total a cargo (sin filtrar).
   const [textoCliente, setTextoCliente] = useState('');
   const busquedaCliente = useDebounce(textoCliente.trim(), 300);
@@ -192,8 +193,8 @@ export function MisPendientesPagina(): React.JSX.Element {
               />
             </div>
             <span className="text-xs text-muted-foreground">
-              — cada quien ve solo los suyos; como admin puedes revisar los de cualquiera. Una
-              persona puede ser responsable de <b>varios procesos</b>.
+              — cada quien ve solo los suyos; con permiso de supervisión puedes revisar los de
+              cualquiera. Una persona puede ser responsable de <b>varios procesos</b>.
             </span>
           </div>
         ) : null}

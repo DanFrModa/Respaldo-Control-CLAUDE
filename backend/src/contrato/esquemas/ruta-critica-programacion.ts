@@ -211,7 +211,9 @@ export const esquemaRutaProcesoSalida = z
       .describe('Nombres de los roles responsables del proceso (N:M, R4).'),
     esResponsableActual: z
       .boolean()
-      .describe('¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4).'),
+      .describe(
+        '¿Quien consulta es responsable de este proceso, por sus roles o por el permiso "rc.capturar-cualquiera"? — badge "tú" (R4).',
+      ),
     duracionDias: z.number().int().describe('Duración estimada del proceso (días).'),
     acumuladoDias: z.number().int().nullable().describe('Días acumulados (lo llena el CPM, E4).'),
     fechaPlaneadaOriginal: z.iso.datetime().nullable().describe('Planeada original (CPM, E4).'),

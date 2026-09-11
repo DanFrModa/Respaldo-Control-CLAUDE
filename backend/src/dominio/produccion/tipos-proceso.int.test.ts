@@ -1,7 +1,7 @@
 /**
  * Tests de integración del CRUD de Tipos de proceso (F3-E1). Postgres efímero (testcontainers).
- * Cubre el patrón CRUD + la regla de la bandera `generaEntradaPt` editable SOLO por admin
- * (decisión (e)): un `tipos-proceso.administrar` SIN `roles.administrar` no puede tocarla.
+ * Cubre el patrón CRUD + la regla de la bandera `generaEntradaPt` (decisión (e)): un
+ * `tipos-proceso.administrar` SIN `tipos-proceso.marcar-entrada-pt` no puede tocarla (fila 0.120).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -25,12 +25,12 @@ import {
 
 let cliente: PrismaClient;
 
-/** Admin total: tiene `roles.administrar` → puede editar `generaEntradaPt`. */
+/** Tiene la llave de la bandera (`tipos-proceso.marcar-entrada-pt`) → puede editar `generaEntradaPt`. */
 const sesionAdmin = () =>
   sesionDePrueba({
-    permisos: ['tipos-proceso.ver', 'tipos-proceso.administrar', 'roles.administrar'],
+    permisos: ['tipos-proceso.ver', 'tipos-proceso.administrar', 'tipos-proceso.marcar-entrada-pt'],
   });
-/** Administra el catálogo pero NO es admin total → NO puede tocar `generaEntradaPt`. */
+/** Administra el catálogo pero SIN la llave de la bandera → NO puede tocar `generaEntradaPt`. */
 const sesionGestor = () =>
   sesionDePrueba({ permisos: ['tipos-proceso.ver', 'tipos-proceso.administrar'] });
 
@@ -77,7 +77,7 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
       });
     });
 
-    it('un ADMIN sí puede crear con generaEntradaPt=true (decisión (e))', async () => {
+    it('con `tipos-proceso.marcar-entrada-pt` sí se crea con generaEntradaPt=true (decisión (e))', async () => {
       const tipo = await crearTipoProceso(
         sesionAdmin(),
         { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
@@ -86,13 +86,13 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
       expect(tipo.generaEntradaPt).toBe(true);
     });
 
-    it('un GESTOR (no admin) NO puede fijar generaEntradaPt: queda en false', async () => {
+    it('SIN la llave de la bandera NO se puede fijar generaEntradaPt: queda en false', async () => {
       const tipo = await crearTipoProceso(
         sesionGestor(),
         { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
         bd(),
       );
-      expect(tipo.generaEntradaPt).toBe(false); // el servidor descarta la bandera para no-admin
+      expect(tipo.generaEntradaPt).toBe(false); // el servidor la descarta sin la llave
     });
 
     it('rechaza código duplicado → ErrorConflicto', async () => {
@@ -129,10 +129,10 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
         bd(),
       );
       expect(actualizado.nombre).toBe('Costura premium');
-      expect(actualizado.generaEntradaPt).toBe(true); // la bandera NO cambió (no es admin)
+      expect(actualizado.generaEntradaPt).toBe(true); // la bandera NO cambió (falta la llave)
     });
 
-    it('un ADMIN sí cambia la bandera y queda en bitácora', async () => {
+    it('con `tipos-proceso.marcar-entrada-pt` sí cambia la bandera y queda en bitácora', async () => {
       const tipo = await crearTipoProceso(
         sesionAdmin(),
         { codigo: 'estampado', nombre: 'Estampado' },
@@ -211,7 +211,8 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
  * V1-E3f (§Post-F9.58) — este catálogo es AHORA también el de TIPOS DE ARTE (Daniel: *"De acuerdo.
  * Y un solo catálogo."*). Lo que se cuida aquí:
  *  • el filtro `soloArte` (lo que ve la pantalla de captura del arte);
- *  • que `esArte`/`usaPuntadas` las pueda fijar quien administra el catálogo, SIN ser admin total
+ *  • que `esArte`/`usaPuntadas` las pueda fijar quien administra el catálogo, SIN la llave de la
+ *    bandera (`tipos-proceso.marcar-entrada-pt`)
  *    (a diferencia de `generaEntradaPt`, que sí mueve inventario);
  *  • el `codigoRolProveedor` que ACOTA el selector de proveedores del arte — y su degradado con
  *    gracia cuando no hay rol homónimo (§Post-F9.54, principio del "proceso raro").
@@ -233,13 +234,14 @@ describe('catálogo ÚNICO: proceso y arte (V1-E3f)', () => {
     expect(soloArte.datos[0]?.usaPuntadas).toBe(true);
   });
 
-  it('un GESTOR (sin admin total) SÍ puede fijar y cambiar esArte/usaPuntadas', async () => {
+  it('SIN la llave de la bandera SÍ se fijan y cambian esArte/usaPuntadas', async () => {
     const creado = await crearTipoProceso(
       sesionGestor(),
       { codigo: 'embosado', nombre: 'Embosado', esArte: true, usaPuntadas: false },
       bd(),
     );
-    // A diferencia de `generaEntradaPt`, que el servidor le descarta por no ser admin total.
+    // A diferencia de `generaEntradaPt`, que el servidor le descarta por faltarle
+    // `tipos-proceso.marcar-entrada-pt`.
     expect(creado).toMatchObject({ esArte: true, usaPuntadas: false, generaEntradaPt: false });
 
     const editado = await actualizarTipoProceso(

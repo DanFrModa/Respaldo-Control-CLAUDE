@@ -6,14 +6,16 @@ import { z } from 'zod';
  * `TipoProceso` existía desde F1-E2 (solo sembrado); F3-E1 le da CRUD y le agrega la bandera
  * `generaEntradaPt` (decisión (e), DECISIONES.md): qué proceso deja prenda terminada y por tanto
  * si su RECIBO mete a inventario PT (costura sí; estampado/bordado/lavado no). Esa bandera la
- * EDITA solo un administrador (lo decide y reaplica el servicio de dominio, A4); el resto del
- * catálogo lo administra quien tenga `tipos-proceso.administrar`.
+ * EDITA quien tenga `tipos-proceso.marcar-entrada-pt` (llave propia desde la fila 0.120, que la
+ * sacó de debajo de `roles.administrar`; lo decide y reaplica el servicio de dominio, A4); el
+ * resto del catálogo lo administra quien tenga `tipos-proceso.administrar`.
  *
  * ⭐ V1-E3f (§Post-F9.58/.59): este catálogo es AHORA TAMBIÉN el de TIPOS DE ARTE — Daniel:
  * *"De acuerdo. Y un solo catálogo."*. Dos banderas nuevas: `esArte` (¿se ofrece como tipo de
  * arte?) y `usaPuntadas` (¿su arte lleva puntadas?, §Post-F9.52 punto 6). Las edita quien
- * administra el catálogo (a diferencia de `generaEntradaPt`, que sigue siendo admin-only: esa
- * mueve inventario, éstas solo deciden qué se ofrece en una lista).
+ * administra el catálogo (a diferencia de `generaEntradaPt`, que desde la fila 0.120 pide su
+ * llave propia `tipos-proceso.marcar-entrada-pt`: esa mueve inventario, éstas solo deciden qué se
+ * ofrece en una lista).
  *
  * Una sola definición de reglas para UI y servidor (alimenta el OpenAPI).
  */
@@ -30,8 +32,8 @@ const codigoTipoProceso = z
 
 /**
  * Alta de tipo de proceso. `generaEntradaPt` es OPCIONAL en la entrada (default `false` en el
- * dominio/BD, lo SEGURO): si el usuario no es admin, el servidor IGNORA cualquier valor que venga
- * y deja el default; solo un admin puede fijarlo (A4).
+ * dominio/BD, lo SEGURO): si a la sesión le falta `tipos-proceso.marcar-entrada-pt`, el servidor
+ * IGNORA cualquier valor que venga y deja el default (A4).
  */
 export const esquemaTipoProcesoCrear = z.object({
   codigo: codigoTipoProceso,
@@ -43,7 +45,9 @@ export const esquemaTipoProcesoCrear = z.object({
   generaEntradaPt: z
     .boolean({ error: 'Debe ser verdadero o falso' })
     .optional()
-    .describe('¿El recibo de este proceso mete a inventario PT? Solo un admin puede fijarlo.'),
+    .describe(
+      '¿El recibo de este proceso mete a inventario PT? Solo lo fija quien tenga el permiso "tipos-proceso.marcar-entrada-pt".',
+    ),
   esArte: z
     .boolean({ error: 'Debe ser verdadero o falso' })
     .optional()
@@ -59,8 +63,8 @@ export type DatosTipoProcesoCrear = z.infer<typeof esquemaTipoProcesoCrear>;
 
 /**
  * Edición parcial de tipo de proceso + `activo` para el borrado suave. `id` va en el cuerpo del
- * servicio (las rutas lo toman de la URL). `generaEntradaPt` solo lo aplica un admin (el servidor
- * lo descarta para no-admins).
+ * servicio (las rutas lo toman de la URL). `generaEntradaPt` solo lo aplica quien tenga
+ * `tipos-proceso.marcar-entrada-pt` (el servidor lo descarta a quien no la tenga; fila 0.120).
  */
 export const esquemaTipoProcesoEditar = esquemaTipoProcesoCrear.partial().extend({
   id: z

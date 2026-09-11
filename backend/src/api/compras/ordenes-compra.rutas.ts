@@ -11,7 +11,8 @@
  *
  * Endpoints: `GET /ordenes-compra` (listado/filtros), `GET /ordenes-compra/:id`,
  * `GET /ordenes-compra/:id/impreso` (PDF binario), `POST /ordenes-compra` (crear borrador),
- * `PATCH /ordenes-compra/:id` (encabezado + líneas; el dominio aplica la regla admin/autorizada),
+ * `PATCH /ordenes-compra/:id` (encabezado + líneas; el dominio exige `compras.editar-autorizada`
+ * si la OC ya salió de borrador, fila 0.120),
  * `POST /ordenes-compra/:id/autorizar`, `POST /ordenes-compra/:id/desautorizar` (motivo obligatorio),
  * `POST /ordenes-compra/:id/cancelar` (motivo obligatorio),
  * `POST /ordenes-compra/:id/duplicar`. El impreso es binario (`application/pdf`); el frontend solo
@@ -186,7 +187,8 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
     },
   });
 
-  // Actualizar encabezado + líneas (el dominio aplica la regla admin/autorizada, decisión (a)).
+  // Actualizar encabezado + líneas (si la OC ya está firmada el dominio exige
+  // `compras.editar-autorizada`, decisión (a) — fila 0.120).
   app.route({
     method: 'PATCH',
     url: '/ordenes-compra/:id',

@@ -53,8 +53,12 @@ referencia fuera del módulo en todo el dominio es una lectura del tablero de in
 2. Esos procesos **vencen solos** (CPM hacia atrás desde la entrega). Si nadie captura, todo queda
    "vencido".
 3. Al **admin** le aparecen TODAS: `procesosResponsablesDe` devuelve `null` (sin filtro) si tienes
-   `roles.administrar` (`bandeja.ts:183-192`). **Daniel, que es admin, vería cientos de "vencidas"
+   la llave de la bandeja completa. **Daniel, que es admin, vería cientos de "vencidas"
    ajenas**, más la campana roja en cada pantalla.
+   > 🔴 **Actualizado por la fila 0.120 (11-sep-2026):** el `null` ya NO lo dispara
+   > `roles.administrar` sino **`rc.bandeja-completa`**, una llave propia. El síntoma descrito sigue
+   > siendo real (quien la tenga verá todo), pero ahora **se le puede quitar sin quitarle la
+   > administración del sistema** — que es una de las salidas que este diagnóstico pedía.
 
 **Salidas posibles:** quitar `rc.ruta-ver` de los roles de v1 —apaga menú, campana y pantalla de un
 golpe, porque todo cuelga de ese permiso— o dejar solo los ~18 procesos que se marcan solos.
