@@ -54,7 +54,10 @@
          linea de resumen y el numero de version en sus cuatro sitios.
        - `src/ventana-fecha-pt.test.ts` lee frontend/openapi.json para exigir que la
          ventana de fecha que acota el selector de PT (fila 0.171) sea la MISMA que
-         el backend anuncia — el numero vive en cuatro sitios y es provisional. */
+         el backend anuncia — el numero vive en cuatro sitios y es provisional.
+       - `src/tope-existencias-pt.test.ts` lee frontend/openapi.json para exigir que el
+         `limite` que piden las pantallas de captura de PT (fila 0.143) sea el techo
+         REAL publicado: si se separan, cada carga seria un 400. */
   "exclude": [
     "src/documentos.test.ts",
     "src/version.test.ts",
@@ -62,6 +65,7 @@
     "src/cabeceras-seguridad-nginx.test.ts",
     "src/abreviatura-e2e.test.ts",
     "src/selector-proveedor-unico.test.ts",
-    "src/ventana-fecha-pt.test.ts"
+    "src/ventana-fecha-pt.test.ts",
+    "src/tope-existencias-pt.test.ts"
   ]
 }

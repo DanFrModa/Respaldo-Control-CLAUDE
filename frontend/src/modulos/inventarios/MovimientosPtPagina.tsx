@@ -18,9 +18,11 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
 import { SelectorOrdenPt } from './SelectorOrdenPt';
+import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
 import {
   SIN_ORDEN,
   aIdOrden,
@@ -124,6 +126,9 @@ export function MovimientosPtPagina(): React.JSX.Element {
     {
       idModelo: modelo?.id ?? 0,
       ...(idAlmacen === '' ? {} : { idAlmacen: Number(idAlmacen) }),
+      // Fila 0.143 — el TECHO, no el default: aquí los renglones no se pintan, se usan para saber
+      // qué órdenes ofrecer. Un renglón que no llega se lee como «esa orden no tiene piezas».
+      limite: TOPE_EXISTENCIAS_PT,
     },
     hayArticulo && !esEntrada,
   );
@@ -132,7 +137,12 @@ export function MovimientosPtPagina(): React.JSX.Element {
   // almacén distinto del que salieron y no por eso pierden su orden. Query aparte (clave propia)
   // para que ningún dato de un modo se pinte en el otro mientras se recarga.
   const existenciasEntrada = useExistenciasPt(
-    { idModelo: modelo?.id ?? 0, incluirCeros: 'true' },
+    // ⭐ Fila 0.143 — ÉSTE es el modo que obliga al techo. Pide `incluirCeros` a propósito, y el
+    // corte del servidor ordena por `abs(existencia)` ⇒ los renglones en CERO son los ÚLTIMOS, o
+    // sea los PRIMEROS que el tope descarta (medido: con sitio para 40 de 80, sobrevivieron 0 de
+    // los 16 en cero). Con el default, la lista de órdenes se quedaba sin justo lo que este modo
+    // existe para ofrecer. Ver `tope-existencias.ts`.
+    { idModelo: modelo?.id ?? 0, incluirCeros: 'true', limite: TOPE_EXISTENCIAS_PT },
     hayModelo && esEntrada,
   );
   const existencias = esEntrada ? existenciasEntrada : existenciasSalida;
@@ -338,6 +348,18 @@ export function MovimientosPtPagina(): React.JSX.Element {
                   testid="mov-orden"
                 />
               </div>
+              {/* ⭐ Fila 0.143 — esta pantalla arma la lista de órdenes con las FILAS de existencias,
+                  y desde la 0.143 esas filas vienen topadas. Con un modelo de muchas órdenes×
+                  colores×tallas×almacenes el tope puede alcanzarse, y entonces faltaría un bucket
+                  del desplegable SIN QUE NADIE SE ENTERE: el operador leería «esa orden no tiene
+                  piezas» donde en realidad dice «no cupo». Por eso se avisa aquí también. */}
+              <AvisoExistenciasRecortadas
+                idBase="mov"
+                datos={existencias.data}
+                mostrados={existencias.data?.filas.length ?? 0}
+                consejo="Si no aparece la orden que buscas, no significa que no tenga piezas: la lista se quedó corta — repórtalo."
+                className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              />
 
               <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">
                 <Field data-invalid={!motivoOk}>

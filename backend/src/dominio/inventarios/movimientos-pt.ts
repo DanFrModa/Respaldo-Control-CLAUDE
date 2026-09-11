@@ -688,11 +688,63 @@ async function tipoPorCodigoId(
 // ── Consultas de SOLO LECTURA ──────────────────────────────────────────────────────────────────
 
 /**
+ * ⭐ EL TOPE DE LAS EXISTENCIAS (fila 0.143) — renglones que devuelve la consulta si nadie pide otro.
+ *
+ * **El defecto que cura:** `consultarExistenciasPt` tenía TODOS sus filtros opcionales y ningún
+ * `LIMIT`, así que abrir Inventario › Existencias sin elegir modelo pedía **la vista entera en una
+ * sola respuesta** (el reviewer de la 0.138 midió 56 860 filas contra una base sintética).
+ *
+ * 📏 **Medido con 60 000 renglones de existencia sembrados** (el orden de magnitud de aquella
+ * medición): la carga útil de la respuesta pasa de **10 498 KB a 198 KB**, o sea **53 veces menos**
+ * (el reviewer de la fila lo repitió en otra máquina y midió **47×** — mismo orden). **Ésa es la
+ * mejora, y es la que reproduce en cualquier sitio.**
+ *
+ * ⚠️ **De dónde NO sale.** `existencia_pt` es una vista AGREGADA (`GROUP BY` sobre
+ * `movimiento_det_pt`): hay que calcularla entera **en los dos casos**, y ningún índice puede
+ * evitarlo (`EXPLAIN`: `HashAggregate` sobre un `Seq Scan`, y el `LIMIT` sólo añade un `top-N
+ * heapsort`). Lo que el tope ahorra es serializar, transferir, guardar en memoria y pintar decenas
+ * de miles de objetos. **Los tiempos concretos NO se citan aquí a propósito: no reproducen.** Las
+ * dos mediciones de esta fila coinciden en que el tope **no empeora** el tiempo con 60 000
+ * renglones (219→167 ms en una máquina, 1 733→430 ms en otra) y discrepan por completo en las
+ * cifras y en el caso pequeño; una versión anterior de este comentario dedujo de UNA sola muestra
+ * un mecanismo («el sort del corte lo hace un pelo más caro») que la segunda máquina no observa.
+ * Si algún día la queja fuera el TIEMPO de la consulta y no el peso, la respuesta sería otra —una
+ * vista materializada—, no un tope más chico.
+ *
+ * 🔑 **Es el hermano de la 0.138, pero NO se cura igual.** El kardex se acotó por FECHAS (periodo +
+ * ventana por omisión, `periodo-kardex.ts`); **una existencia no tiene fecha**: es un saldo, no un
+ * suceso. No hay periodo que recortar, así que aquí sólo queda la otra mitad del mecanismo de la
+ * 0.138 — el TOPE DURO con aviso honesto —, y por eso se copian su forma y sus nombres (`limite` de
+ * entrada, `limite`/`truncado` en la respuesta) en vez de inventar un quinto patrón.
+ *
+ * 📏 **Por qué 1 000 / 5 000, los MISMOS números del kardex.** Un renglón de existencia es más ligero
+ * que uno de kardex (12 campos contra 20) y lo pinta la misma tabla densa de la misma pantalla, así
+ * que el techo que aguanta el navegador es el mismo o mayor: usar otro número obligaría a explicar
+ * una diferencia que no existe. Un solo par de números para todo el módulo de inventarios.
+ *
+ * ⚠️ **Y por qué NO se usa `esquemaPaginacion` (el paginado estándar del proyecto).** Su tope es
+ * **100 por página**, y la matriz de UN SOLO modelo (color×talla×orden×almacén) pasa de 100
+ * renglones con facilidad: paginar de 100 en 100 convertiría la consulta normal —la que hoy sale de
+ * un tirón— en seis peticiones. El tope alto con aviso deja intacta la consulta normal y sólo acota
+ * la patológica.
+ */
+export const RENGLONES_EXISTENCIAS_PT_POR_OMISION = 1000;
+
+/** Tope DURO de renglones de existencias: ni pidiéndolo se pasa de aquí. */
+export const TOPE_RENGLONES_EXISTENCIAS_PT = 5000;
+
+/**
  * Forma de DOMINIO de los filtros de existencias (ya coaccionados): la ruta REST coacciona el
  * querystring con el esquema del contrato (stringbool/coerce) y entrega banderas/números; este
  * esquema re-valida la forma de dominio (igual patrón que `esquemaListarTiposMovimiento`).
+ *
+ * ⚠️ **Se EXPORTA para que el contrato pueda compararse contra él** (`contrato/esquemas/
+ * tope-existencias-honesto.test.ts`): el tope vive dos veces —como `.max()` literal en el
+ * querystring publicado y como {@link TOPE_RENGLONES_EXISTENCIAS_PT} aquí— y una prueba mecánica
+ * cruza los dos. Comparar contra un intermediario «equivalente» sería un guardián ciego (cicatriz
+ * de `contrato/esquemas/paginacion-honesta.test.ts`).
  */
-const esquemaConsultaExistenciasPt = z.object({
+export const esquemaConsultaExistenciasPt = z.object({
   idModelo: z.number().int().positive().optional(),
   idColor: z.number().int().positive().optional(),
   idTalla: z.number().int().positive().optional(),
@@ -701,6 +753,13 @@ const esquemaConsultaExistenciasPt = z.object({
   incluirCeros: z.boolean().default(false),
   /** Con 'color-talla' la respuesta incluye el rollup `porColorTalla` (exige `idModelo`). */
   agrupar: z.enum(['color-talla']).optional(),
+  /** Tope de renglones. El DEFAULT vive aquí (A1), no en el contrato. */
+  limite: z
+    .number()
+    .int()
+    .min(1)
+    .max(TOPE_RENGLONES_EXISTENCIAS_PT)
+    .default(RENGLONES_EXISTENCIAS_PT_POR_OMISION),
 });
 
 // ── El PERIODO del kardex (fila 0.138, generalizado en la 0.173) ─────────────────────────────────
@@ -750,7 +809,73 @@ export type ParametrosExistenciasPt = z.input<typeof esquemaConsultaExistenciasP
  * (aquí SÍ se usa la vista — es una CONSULTA, ADR-0010 §3) por `$queryRaw`, filtrada por la empresa
  * activa (A9) y opcionalmente por modelo/color/talla/almacén. JOIN para traer nombres legibles. Por
  * defecto OMITE las filas con existencia 0 (parámetro `incluirCeros` para verlas). Devuelve las filas
- * + el total general. Permiso `inventario-pt.ver` (A4).
+ * + los totales del UNIVERSO + si hubo corte. Permiso `inventario-pt.ver` (A4).
+ *
+ * ⭐ FILA 0.143 — EL TOPE, Y POR QUÉ LOS TOTALES SIGUEN SIENDO VERDAD.
+ *
+ * Antes no había `LIMIT`: sin modelo y sin almacén esto devolvía la vista completa. Ahora se
+ * devuelven como mucho {@link TOPE_RENGLONES_EXISTENCIAS_PT} renglones y la respuesta DICE cuántos
+ * hay en total y si cortó — ver el porqué del número en {@link RENGLONES_EXISTENCIAS_PT_POR_OMISION}.
+ *
+ * ⭐⭐ **EL CORTE SE LLEVA LO PEQUEÑO, NO «EL FINAL DEL ALFABETO».** El kardex podía recortar por la
+ * cola porque su orden (el folio) *es* su importancia: uno abre un kardex a ver lo último. Una
+ * existencia no tiene tiempo, y cortar por el orden de PRESENTACIÓN (código de modelo) escondería
+ * *«todos los modelos de la M en adelante»* — un criterio que no significa nada para quien mira
+ * inventario. Aquí el corte se decide por **cantidad**: si sólo caben N renglones, los que importan
+ * son **donde está la mercancía**.
+ *
+ * Y se ordena por **`abs(existencia)`, no por `existencia`**, a propósito: una existencia NEGATIVA
+ * es una anomalía que alguien tiene que ver, y un `DESC` a secas las manda a todas al final —
+ * justo a la zona que el tope se lleva. Esconder anomalías detrás de un aviso de recorte sería el
+ * mismo defecto con otra ropa.
+ *
+ * 🔴 **PERO EL MISMO `abs()` TIENE UN SESGO QUE HAY QUE CONOCER ANTES DE LLAMAR A ESTA FUNCIÓN: los
+ * renglones en CERO quedan, por construcción, los ÚLTIMOS — o sea, los PRIMEROS que el tope
+ * descarta.** Medido: con 80 renglones en el universo, 16 de ellos en cero y sitio para 40,
+ * sobrevivieron **0** de los 16. ⇒ **quien pida `incluirCeros` porque los ceros le importan NO
+ * puede quedarse con el `limite` por omisión** (es el caso del modo ENTRADA de Movimientos PT, que
+ * pide los buckets de orden que quedaron en cero al irse a estampado: la pantalla pide el techo,
+ * ver `frontend/src/modulos/inventarios/tope-existencias.ts`). Lo fija
+ * `movimientos-pt.int.test.ts` para que un quinto consumidor no lo redescubra a golpes.
+ *
+ * ⚠️ Y que nadie «arregle» esto reordenando para que los ceros ganen: quien perdería entonces es un
+ * renglón CON saldo, y para un desplegable de órdenes eso hace exactamente el mismo daño. El
+ * consumidor que necesita la lista COMPLETA no necesita un mejor recorte: necesita no recortar.
+ *
+ * 🔑 **El corte se decide por cantidad pero la lista se ENTREGA en el orden de siempre** (modelo,
+ * color, talla, almacén, orden): la consulta interna elige QUÉ renglones caben y la externa los
+ * acomoda para leerlos. Así la pantalla se ve exactamente igual que antes cuando no hay corte, y el
+ * desempate del `LIMIT` va por la llave completa de la vista (los cinco ids, que son su `GROUP BY`)
+ * para que **dos llamadas idénticas devuelvan siempre los mismos renglones**.
+ *
+ * 📐 **Los totales se miden sobre el UNIVERSO, con funciones de ventana en la MISMA consulta.**
+ * `count(*) OVER ()` y `sum(existencia) OVER ()` se evalúan ANTES del `ORDER BY`/`LIMIT`, así que
+ * cada renglón devuelto trae el conteo y la suma de **todo lo que casa con el `WHERE`**. Es la
+ * diferencia entre *«hay 56 860 renglones, te enseño 1 000»* y una pantalla que dice 1 000 y se
+ * queda tan tranquila. Sumar en JS lo que llegó daría el total DEL PEDAZO — un número creíble y
+ * falso. Y viene de la misma consulta (no de un `count` aparte) para que el `WHERE` sea el mismo
+ * **por construcción**, no por parecido.
+ *
+ * ⚠️ **Lo que el tope NO toca: `porColorTalla`.** Ese rollup lo agrega SQL (`GROUP BY`) sobre el
+ * universo entero, así que la matriz del cajón de Modelos sigue siendo exacta aunque `filas` venga
+ * recortada. Su cardinalidad tampoco necesita tope: exige `idModelo` y es la rejilla color×talla de
+ * UN modelo (decenas de celdas, no decenas de miles).
+ *
+ * 🚫 **No hay `pagina`, y es una decisión, no un olvido.** El orden por el que se corta —cantidad—
+ * no es un orden por el que un humano navegue: «la página 7 de las existencias ordenadas por
+ * piezas» no le sirve a nadie. La herramienta para llegar al resto es el FILTRO (modelo, almacén,
+ * color, talla), que es lo que el operador usa de todas formas, y el aviso de la pantalla lo dice
+ * con esas palabras. A cambio queda esto dicho en voz alta, **con los dos números que de verdad
+ * rigen, que no son el mismo**: la pantalla de Existencias corta en
+ * {@link RENGLONES_EXISTENCIAS_PT_POR_OMISION} (su default, porque es un informe y nadie lee más),
+ * así que **ahí un modelo con más de 1 000 renglones ya no se ve completo ni filtrando**; las dos
+ * pantallas de CAPTURA piden el techo de {@link TOPE_RENGLONES_EXISTENCIAS_PT} porque necesitan la
+ * lista completa, y su límite empieza ahí. Ese residuo pediría paginar de verdad —o mejor, un
+ * agregado en servidor para el desplegable de órdenes—, y hoy no existe.
+ *
+ * ⚠️ Una versión anterior de este comentario declaraba el residuo sólo en 5 000 **sin que ninguna
+ * pantalla pidiera 5 000**: subestimaba la exposición real por 5×, y era justo la frase con la que
+ * la fila se defiende de no paginar.
  */
 export async function consultarExistenciasPt(
   sesion: SesionUsuario,
@@ -799,35 +924,60 @@ export async function consultarExistenciasPt(
       idOrden: number | null;
       folioOrden: bigint | null;
       existencia: bigint;
+      /** Renglones del UNIVERSO del filtro (window: se cuenta antes del LIMIT). */
+      totalFilas: bigint;
+      /** Σ existencia del UNIVERSO del filtro (window: se suma antes del LIMIT). */
+      totalUniverso: bigint;
     }[]
   >(Prisma.sql`
-    SELECT
-      e."id_modelo"   AS "idModelo",
-      mo."codigo"     AS "modelo",
-      e."id_color"    AS "idColor",
-      c."nombre"      AS "color",
-      e."id_talla"    AS "idTalla",
-      t."etiqueta"    AS "etiquetaTalla",
-      t."orden"       AS "ordenTalla",
-      e."id_almacen"  AS "idAlmacen",
-      a."nombre"      AS "almacen",
-      e."id_orden"    AS "idOrden",
-      o."folio"       AS "folioOrden",
-      e."existencia"  AS "existencia"
-    FROM "existencia_pt" e
-    JOIN "modelos"   mo ON mo."id" = e."id_modelo"
-    JOIN "colores"   c  ON c."id"  = e."id_color"
-    JOIN "tallas"    t  ON t."id"  = e."id_talla"
-    JOIN "almacenes" a  ON a."id"  = e."id_almacen"
-    LEFT JOIN "ordenes" o ON o."id" = e."id_orden"
-    WHERE ${where}
-    ORDER BY mo."codigo" ASC, c."nombre" ASC, t."orden" ASC, a."nombre" ASC, o."folio" ASC NULLS FIRST
+    SELECT * FROM (
+      SELECT
+        e."id_modelo"   AS "idModelo",
+        mo."codigo"     AS "modelo",
+        e."id_color"    AS "idColor",
+        c."nombre"      AS "color",
+        e."id_talla"    AS "idTalla",
+        t."etiqueta"    AS "etiquetaTalla",
+        t."orden"       AS "ordenTalla",
+        e."id_almacen"  AS "idAlmacen",
+        a."nombre"      AS "almacen",
+        e."id_orden"    AS "idOrden",
+        o."folio"       AS "folioOrden",
+        e."existencia"  AS "existencia",
+        -- Los totales son del UNIVERSO: las funciones de ventana se evalúan ANTES del LIMIT.
+        COUNT(*) OVER ()                        AS "totalFilas",
+        (SUM(e."existencia") OVER ())::bigint   AS "totalUniverso"
+      FROM "existencia_pt" e
+      JOIN "modelos"   mo ON mo."id" = e."id_modelo"
+      JOIN "colores"   c  ON c."id"  = e."id_color"
+      JOIN "tallas"    t  ON t."id"  = e."id_talla"
+      JOIN "almacenes" a  ON a."id"  = e."id_almacen"
+      LEFT JOIN "ordenes" o ON o."id" = e."id_orden"
+      WHERE ${where}
+      -- QUÉ renglones caben: los de más piezas (en más o en menos). El desempate por la llave
+      -- completa de la vista hace el corte DETERMINISTA (dos llamadas iguales, mismos renglones).
+      ORDER BY abs(e."existencia") DESC,
+               e."id_modelo" ASC, e."id_color" ASC, e."id_talla" ASC,
+               e."id_almacen" ASC, e."id_orden" ASC NULLS FIRST
+      LIMIT ${filtros.limite}
+    ) pagina
+    -- CÓMO se leen: el orden de presentación de siempre (el de antes de la fila 0.143).
+    ORDER BY pagina."modelo" ASC, pagina."color" ASC, pagina."ordenTalla" ASC,
+             pagina."almacen" ASC, pagina."folioOrden" ASC NULLS FIRST
   `);
 
-  let totalExistencia = 0;
+  // Del UNIVERSO, no del pedazo. Sin renglones no hay ventana que leer: el filtro no casó con nada,
+  // así que los dos totales son cero de verdad (el `LIMIT` es ≥ 1, no puede vaciar una página sola).
+  const totalFilas = filas.length === 0 ? 0 : Number(filas[0]?.totalFilas ?? 0);
+  const totalExistencia = filas.length === 0 ? 0 : Number(filas[0]?.totalUniverso ?? 0);
+  const encabezado = {
+    totalFilas,
+    limite: filtros.limite,
+    truncado: totalFilas > filas.length,
+  };
+
   const filasSalida = filas.map((f) => {
     const existencia = Number(f.existencia);
-    totalExistencia += existencia;
     return {
       idModelo: f.idModelo,
       modelo: f.modelo,
@@ -845,12 +995,17 @@ export async function consultarExistenciasPt(
   });
 
   if (filtros.agrupar !== 'color-talla') {
-    return { filas: filasSalida, totalExistencia };
+    return { filas: filasSalida, totalExistencia, ...encabezado };
   }
 
   // Rollup color×talla (rediseño R9, matriz del cajón de Modelos): la MISMA `WHERE` del listado,
   // agrupada en SERVIDOR (A1) — la existencia de cada celda ya viene sumada a través de
   // almacenes/órdenes; el cliente solo pinta (no pivota).
+  //
+  // ⚠️ SIN `LIMIT`, y a propósito (fila 0.143): esto NO es la lista recortada, es un agregado del
+  // universo entero. Si se le pusiera el tope, la matriz del cajón empezaría a mentir en cuanto
+  // `filas` viniera cortada. Su tamaño está acotado por otro lado: `agrupar=color-talla` exige
+  // `idModelo`, así que son las celdas color×talla de UN modelo.
   const celdas = await cliente.$queryRaw<
     {
       idColor: number;
@@ -879,6 +1034,7 @@ export async function consultarExistenciasPt(
   return {
     filas: filasSalida,
     totalExistencia,
+    ...encabezado,
     porColorTalla: celdas.map((c) => ({
       idColor: c.idColor,
       color: c.color,

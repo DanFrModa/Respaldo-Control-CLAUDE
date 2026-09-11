@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ClavePermiso } from '@/api/tipos';
+import type { ClavePermiso, ExistenciasPt } from '@/api/tipos';
 import type { Modelo, ModeloFicha, ModelosPagina as TipoPagina } from '@/api/modelos';
 import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -89,7 +89,17 @@ vi.mock('@/api/modelos', () => ({
 
 // Existencias PT del cajón (matriz color×talla): mock con rollup vacío por defecto; los tests
 // de la matriz lo sobreescriben. La página lo consulta SOLO con `inventario-pt.ver`.
-const useExistenciasPtMock = vi.fn<(query: unknown, habilitado?: boolean) => unknown>(() => ({
+//
+// ⚠️ Fila 0.143 — el `data` va TIPADO como `ExistenciasPt`. Con el mock devolviendo `unknown`, una
+// respuesta a la que le faltaran campos del contrato (`totalFilas`, `limite`, `truncado`) pasaba el
+// typecheck: la prueba afirmaba una respuesta que la API ya no puede producir. Tipado, la próxima
+// divergencia la caza `tsc` en vez de un lector atento.
+const useExistenciasPtMock = vi.fn<
+  (
+    query: unknown,
+    habilitado?: boolean,
+  ) => { data: ExistenciasPt | undefined; isPending: boolean; isError: boolean }
+>(() => ({
   data: undefined,
   isPending: false,
   isError: false,
@@ -375,6 +385,12 @@ describe('<ModelosPagina>', () => {
       data: {
         filas: [],
         totalExistencia: 55,
+        // Los tres del encabezado de recorte (fila 0.143). Aquí NO hay recorte, y es lo correcto:
+        // el cajón sólo lee `porColorTalla`/`totalExistencia`, que son agregados del universo y a
+        // los que el tope no afecta — por eso esta pantalla es inmune y no lleva aviso.
+        totalFilas: 0,
+        limite: 1000,
+        truncado: false,
         porColorTalla: [
           {
             idColor: 1,

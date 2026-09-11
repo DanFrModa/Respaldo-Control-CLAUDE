@@ -15471,3 +15471,60 @@ reparto del otro sumando.
 - **Aplica en:** versión **0.145**, fila **0.162**. **Fecha:** 2026-09-10.
 
 ---
+
+#### (Post-F9.229) — LAS RESPUESTAS DE DANIEL DEL 11-SEP-2026: la factura del maquilero, la forma del inventario y el precio del cárdigan
+
+**(a) Contra qué se coteja la factura del maquilero.** Textual: *«nosotros le damos un documento para
+que genere su factura. Ese documento sale de **la entrada de maquila que capturamos**. Contra ese
+documento se debe de cotejar la factura.»*
+
+🔴 **Corrige el default del lead**, que proponía cotejar contra *la corrida semanal*. ⇒ la fila **0.117**
+tiene por fin su especificación: el documento nace del **recibo de maquila**, se le entrega al maquilero,
+y su factura se coteja **contra ese documento**. Eso confirma además el camino que la **0.118** ya
+apuntaba: *dejar de comparar dos documentos nacidos por separado y cotejar el que nosotros emitimos
+contra su copia*.
+
+**(b) La forma real del inventario de un modelo.** Textual: *«un modelo muy grande podría tener unas
+8 tallas con unos 3 colores. En inventario de primeras y segundas. Chance uno más de tránsito.»*
+⇒ **8 × 3 × 3 ≈ 72 renglones por ORDEN.** Con eso, el tope por omisión de 1 000 se alcanza a las **~14
+órdenes** del mismo modelo y el techo de 5 000 a las **~69** (verificado por el reviewer).
+
+🔑 **Ese dato REENCUADRÓ la fila 0.143 y la volvió más urgente, no menos:** *«un modelo producido quince
+veces YA perdía buckets del desplegable»* — no era un caso remoto, es la vida normal de un modelo de
+catálogo. Y destapó que un comentario del código afirmaba *«5 colores»* como dato del negocio: **el
+coder lo había inventado**; se sustituyó por el de Daniel, atribuido.
+⏳ **Queda abierta la única dimensión que falta:** cuántas órdenes acumula un modelo a lo largo de su
+vida — es la que decide si las ~69 del techo bastan.
+
+**(c) Con qué frecuencia se fusionan colores.** Textual: *«hoy no creo que mucho»* ⇒ la fila **0.189**
+se clasifica **🔶 duele pero se aguanta**. 📌 **Y su pregunta de vuelta —«¿te refieres a PT, o avíos, o
+telas?»— se contestó midiendo:** el defecto vive en **compras**, en las marcas de «dado por cubierto»,
+y afecta a **telas Y avíos** (la cancelación filtra por las dos columnas de color, las dos en crudo).
+**Producto terminado NO está afectado por ese defecto.**
+
+**(d) El precio del cárdigan.** Textual: *«¿Estás tomando el mismo precio de la tela? Sí debería de
+tener su propio precio.»*
+🔴 **La respuesta medida es que hoy no toma el de la tela: no toma NINGUNO.** Capturado como tela
+suelta se costea bien; viviendo **dentro** de su felpa como complemento, el módulo de costos no lo
+menciona ni una vez ⇒ vale cero, y de ese precosto sale el precio que se cotiza al cliente.
+📌 **Y que deba tener precio propio ya estaba decidido por él**: el campo `TelaColor.precioComplemento`
+existe y su comentario cita su frase — *«el cardigan es otro precio que la tela»*. Lo que falta no es
+el campo: es **de dónde lo toma el precosto**, porque ese precio es **por color** y la receta del
+modelo todavía no sabe de qué color será.
+⏳ **Propuesta del lead, pendiente de su confirmación:** que el cárdigan copie **la misma cascada que
+ya usa el cuerpo** — precio del amarre con el proveedor y, si no lo tiene, un **precio sugerido a nivel
+tela, sin color**. El costo real seguiría usando el del color concreto. No inventa una regla nueva:
+repite la que existe.
+
+**(e) Los permisos.** Textual: *«cuando vayamos a salir definimos los permisos por usuario»*.
+⚠️ **Ya estaba contestado el 3-sep (§Post-F9.187(c)) y repetido el 7-sep (§Post-F9.218(c)); ésta es la
+TERCERA vez que se le pregunta.** Se registra para que no haya una cuarta. 🔴 **Y el lead sacó de ello
+una conclusión FALSA que corrigió en el chat:** dijo que la fila **0.120 dejaba de bloquear**, cuando la
+propia ficha dice lo contrario — *«el arreglo de código va ANTES del reparto; mientras los cinco poderes
+cuelguen de `roles.administrar` no habrá cinco interruptores que mover»*. **0.120 es código, es del lead,
+y sigue bloqueando.**
+
+- **Aplica en:** versión **0.146**, filas **0.143**, **0.117**, **0.189**, **0.163**, **0.120**.
+  **Fecha:** 2026-09-11.
+
+---

@@ -294,6 +294,19 @@ export type TraspasoPtSalida = z.infer<typeof esquemaTraspasoPtSalida>;
 
 // ── Consulta de existencias ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Tope DURO de renglones de existencias que la API ANUNCIA (fila 0.143).
+ *
+ * ⚠️ Vive DOS veces en el repo: este `.max(...)` (lo que la API dice aceptar) y
+ * `TOPE_RENGLONES_EXISTENCIAS_PT` en el dominio (lo que de verdad acepta). Si alguien mueve uno y no
+ * el otro, **el OpenAPI queda falso en silencio**: anuncia un tope que el servicio contesta con un
+ * 400, o —peor— esconde uno más alto que sí funciona. Lo cruza mecánicamente
+ * `contrato/esquemas/tope-existencias-honesto.test.ts`, que descubre el tope de los dos lados por
+ * búsqueda binaria en vez de copiar el número. La capa de contrato NO importa del dominio (es la
+ * frontera), y por eso el cruce es una prueba y no un import.
+ */
+const TOPE_RENGLONES_EXISTENCIAS_PUBLICADO = 5000;
+
 /** Filtros de la consulta de existencias (querystring). */
 export const esquemaExistenciasPtQuery = z
   .object({
@@ -319,8 +332,22 @@ export const esquemaExistenciasPtQuery = z
           'modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, ' +
           'para la matriz del cajón). Requiere `idModelo`.',
       ),
+    limite: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(TOPE_RENGLONES_EXISTENCIAS_PUBLICADO)
+      .optional()
+      .describe(
+        `Tope de renglones a devolver (1-${String(TOPE_RENGLONES_EXISTENCIAS_PUBLICADO)}). Si se ` +
+          'omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`), ' +
+          'cuántos renglones hay en total (`totalFilas`) y si hubo corte (`truncado`).',
+      ),
   })
-  .describe('Filtros de la consulta de existencias de PT.');
+  .describe(
+    'Filtros de la consulta de existencias de PT. La consulta NUNCA devuelve la vista entera: ' +
+      'hay un tope de renglones y la respuesta dice si cortó.',
+  );
 
 /** Parámetros de la consulta de existencias ya coaccionados. */
 export type ExistenciasPtQuery = z.infer<typeof esquemaExistenciasPtQuery>;
@@ -374,17 +401,44 @@ const esquemaExistenciaPtCelda = z.object({
 /** Una celda del rollup color×talla tal como la devuelve la API. */
 export type ExistenciaPtCelda = z.infer<typeof esquemaExistenciaPtCelda>;
 
-/** Respuesta de la consulta de existencias (filas + total general derivado). */
+/** Respuesta de la consulta de existencias (página de filas + totales del universo + si cortó). */
 export const esquemaExistenciasPtLista = z
   .object({
-    filas: z.array(esquemaExistenciaPtFila).describe('Existencias por modelo×color×talla×almacén.'),
-    totalExistencia: z.number().int().describe('Suma de la existencia de todas las filas.'),
+    filas: z
+      .array(esquemaExistenciaPtFila)
+      .describe(
+        'Existencias por modelo×color×talla×almacén. Es como mucho `limite` renglones: cuando ' +
+          '`truncado` es true, los devueltos son los de MAYOR existencia en valor absoluto (los ' +
+          'de más piezas y los negativos), ordenados para leerse por modelo/color/talla/almacén.',
+      ),
+    totalExistencia: z
+      .number()
+      .int()
+      .describe(
+        'Suma de la existencia de TODOS los renglones del filtro (del universo completo, NO sólo ' +
+          'de los devueltos): sigue siendo verdad aunque `truncado` sea true.',
+      ),
+    totalFilas: z
+      .number()
+      .int()
+      .describe(
+        'Cuántos renglones cumplen el filtro en total. Si es mayor que `filas.length`, la lista ' +
+          'viene cortada (y `truncado` lo dice).',
+      ),
+    limite: z.number().int().describe('Tope de renglones que se aplicó.'),
+    truncado: z
+      .boolean()
+      .describe(
+        'true si el filtro tiene MÁS renglones de los que caben en `limite`. La pantalla debe ' +
+          'decirlo: los totales son del universo, pero la lista no lo es.',
+      ),
     porColorTalla: z
       .array(esquemaExistenciaPtCelda)
       .optional()
       .describe(
         'Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada ' +
-          'en servidor a través de almacenes/órdenes.',
+          'en servidor a través de almacenes/órdenes. NO le afecta `limite`: es un agregado del ' +
+          'universo completo, así que la matriz es exacta aunque `filas` venga cortada.',
       ),
   })
   .describe('Existencias de producto terminado (consulta de solo lectura, D3).');
