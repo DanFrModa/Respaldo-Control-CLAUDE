@@ -7,6 +7,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 
 import { hoy } from './fecha-captura-pt';
 import { MovimientosPtPagina } from './MovimientosPtPagina';
+import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const crearMutate = vi.fn();
@@ -379,9 +380,15 @@ describe('MovimientosPtPagina (F3-E3)', () => {
 
     // La query encendida (2º argumento `true`) tiene que ser la de entrada: con `incluirCeros` y
     // sin `idAlmacen` (las piezas pueden regresar a otro almacén sin perder su orden).
+    // El `toEqual` va con la forma EXACTA a propósito —así un filtro que se cuele se ve—, y por eso
+    // el `limite` de la fila 0.143 tiene que estar escrito aquí: es parte de la consulta.
     const encendidas = useExistenciasPtMock.mock.calls.filter(([, habilitado]) => habilitado);
     const ultima = encendidas.at(-1);
-    expect(ultima?.[0]).toEqual({ idModelo: 1, incluirCeros: 'true' });
+    expect(ultima?.[0]).toEqual({
+      idModelo: 1,
+      incluirCeros: 'true',
+      limite: TOPE_EXISTENCIAS_PT,
+    });
   });
 
   it('manda el idOrden elegido en cada renglón (sale del bucket de esa orden)', async () => {
@@ -441,6 +448,90 @@ describe('MovimientosPtPagina (F3-E3)', () => {
   });
 
   // ── Fila 0.100: motivo obligatorio al meter o sacar PT a mano (§Post-F9.193) ─
+  /**
+   * ⭐ FILA 0.143 — ESTA PANTALLA TAMBIÉN SE ENTERA DE QUE LA LISTA VINO CORTADA.
+   *
+   * El desplegable de órdenes se arma con las FILAS de existencias, y desde la 0.143 esas filas
+   * vienen topadas. Si el tope alcanzara, faltaría un bucket y el operador leería «esa orden no
+   * tiene piezas» donde en realidad dice «no cupo». Silencioso sería justo el defecto que la fila
+   * vino a matar, sólo que una pantalla más allá.
+   */
+  describe('el TOPE de existencias (fila 0.143)', () => {
+    /**
+     * ⭐⭐ EL HALLAZGO DE LA RONDA DE CORRECCIÓN, convertido en guardián.
+     *
+     * El modo ENTRADA pide `incluirCeros` A PROPÓSITO (el regreso del estampado deja el bucket en
+     * cero y hay que poder elegirlo), pero el corte del servidor ordena por `abs(existencia)` ⇒
+     * **los renglones en cero son los ÚLTIMOS, o sea los PRIMEROS que el tope descarta**. Medido
+     * contra la base: con sitio para 40 de 80 renglones, de los 16 en cero sobrevivieron **0**.
+     * Con el `limite` por omisión, el único modo que existe para los ceros se quedaba sin ellos.
+     */
+    it.each([
+      { modo: 'SALIDA', idTipo: '5' },
+      { modo: 'ENTRADA (incluirCeros)', idTipo: '1' },
+    ])(
+      '⭐ el modo $modo pide el TECHO del contrato, no el `limite` por omisión',
+      async ({ idTipo }) => {
+        const usuario = userEvent.setup();
+        renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+        await elegirModelo(usuario);
+        await usuario.selectOptions(screen.getByTestId('mov-tipo'), idTipo);
+        await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+        // Sólo las consultas ENCENDIDAS: las apagadas no piden nada al servidor.
+        const encendidas = useExistenciasPtMock.mock.calls.filter(([, hab]) => hab !== false);
+        expect(encendidas.length).toBeGreaterThan(0);
+        for (const [q] of encendidas) expect(q.limite).toBe(TOPE_EXISTENCIAS_PT);
+      },
+    );
+
+    it('⭐ y la del modo ENTRADA sigue pidiendo los CEROS (el techo no la sustituye)', async () => {
+      // El techo evita que el tope se los coma; `incluirCeros` es lo que los trae. Las dos cosas
+      // hacen falta: si alguien quitara la bandera «porque ya no se recorta», volvería el defecto.
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // entrada
+
+      const conCeros = useExistenciasPtMock.mock.calls
+        .filter(([, hab]) => hab !== false)
+        .map(([q]) => q)
+        .filter((q) => q.incluirCeros === 'true');
+      expect(conCeros.length).toBeGreaterThan(0);
+      for (const q of conCeros) expect(q.limite).toBe(TOPE_EXISTENCIAS_PT);
+    });
+
+    it('⭐ avisa cuando la lista de existencias vino recortada', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockImplementation((query: Record<string, unknown>, hab?: boolean) => {
+        const base = existenciasPorConsulta(query, hab);
+        if (base.data === undefined) return base;
+        return {
+          ...base,
+          data: { ...(base.data as object), truncado: true, totalFilas: 4321, limite: 1000 },
+        };
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      const aviso = screen.getByTestId('mov-truncado');
+      expect(aviso).toHaveTextContent('4,321');
+      expect(aviso).toHaveTextContent(/no significa que no tenga piezas/);
+    });
+
+    it('y NO avisa cuando cupo todo (el aviso tiene que significar algo)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5');
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.queryByTestId('mov-truncado')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Fila 0.100 · el motivo es obligatorio', () => {
     /** Deja la pantalla lista para guardar, SIN motivo. */
     async function capturaSinMotivo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {

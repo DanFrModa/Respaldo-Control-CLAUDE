@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
 
@@ -83,6 +84,11 @@ export function ExistenciasPtPagina(): React.JSX.Element {
   });
   const filas = consulta.data?.filas ?? [];
   const totalExistencia = consulta.data?.totalExistencia ?? 0;
+  // ⭐ Fila 0.143 — RENGLONES ≠ RENGLONES DEVUELTOS. `totalFilas` es cuántos hay de verdad con este
+  // filtro; `filas.length` es cuántos cupieron. Pintar el segundo donde va el primero es la misma
+  // mentira que la fila vino a matar, sólo que en la tarjeta de KPIs.
+  const totalFilas = consulta.data?.totalFilas ?? filas.length;
+  const recortada = consulta.data?.truncado === true;
   // Sub-título fiel al proto ("· 3 almacenes"): la cuenta REAL sale del catálogo ya cargado
   // para los filtros; mientras no llega, el sufijo simplemente no se pinta.
   const numAlmacenes = (almacenes.data?.datos ?? []).length;
@@ -98,8 +104,10 @@ export function ExistenciasPtPagina(): React.JSX.Element {
     {
       clave: 'renglones',
       etiqueta: 'Renglones',
-      valor: filas.length.toLocaleString('es-MX'),
-      pie: 'modelo × color × talla × almacén',
+      valor: totalFilas.toLocaleString('es-MX'),
+      pie: recortada
+        ? `modelo × color × talla × almacén · se listan ${filas.length.toLocaleString('es-MX')}`
+        : 'modelo × color × talla × almacén',
     },
   ];
 
@@ -222,10 +230,21 @@ export function ExistenciasPtPagina(): React.JSX.Element {
             Incluir ceros
           </label>
           {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
-          <span className="ml-auto text-xs text-faint">
-            {filas.length.toLocaleString('es-MX')} renglones
+          {/* El conteo de la derecha cuenta el UNIVERSO del filtro, no lo que cupo (fila 0.143):
+              con recorte dice las dos cifras para que «1,000» no se lea como «no hay más». */}
+          <span className="ml-auto text-xs text-faint" data-testid="exist-conteo">
+            {recortada
+              ? `${filas.length.toLocaleString('es-MX')} de ${totalFilas.toLocaleString('es-MX')} renglones`
+              : `${totalFilas.toLocaleString('es-MX')} renglones`}
           </span>
         </div>
+
+        <AvisoExistenciasRecortadas
+          idBase="exist"
+          datos={consulta.data}
+          mostrados={filas.length}
+          consejo="Filtra por modelo, almacén, color o talla para ver el resto; los totales de esta pantalla sí son de todos."
+        />
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
         <div className="overflow-auto lg:min-h-0 lg:flex-1">
@@ -315,7 +334,10 @@ export function ExistenciasPtPagina(): React.JSX.Element {
           </span>
           <span className="flex items-baseline gap-1.5">
             <span className="text-[10.5px] font-medium text-faint uppercase">Renglones</span>
-            <b className="num">{filas.length.toLocaleString('es-MX')}</b>
+            <b className="num">{totalFilas.toLocaleString('es-MX')}</b>
+            {recortada ? (
+              <span className="text-faint">(se listan {filas.length.toLocaleString('es-MX')})</span>
+            ) : null}
           </span>
         </div>
       </div>

@@ -123325,7 +123325,7 @@
     },
     "/api/inventarios/pt/existencias": {
       "get": {
-        "summary": "Existencias de PT por modelo×color×talla×almacén (consulta)",
+        "summary": "Existencias de PT por modelo×color×talla×almacén (consulta con tope; nunca la vista entera)",
         "tags": [
           "inventario-pt"
         ],
@@ -123405,6 +123405,17 @@
             "name": "agrupar",
             "required": false,
             "description": "Con \"color-talla\" la respuesta incluye además `porColorTalla`: la existencia del modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, para la matriz del cajón). Requiere `idModelo`."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`), cuántos renglones hay en total (`totalFilas`) y si hubo corte (`truncado`)."
           }
         ],
         "security": [
@@ -123520,16 +123531,32 @@
                         ],
                         "additionalProperties": false
                       },
-                      "description": "Existencias por modelo×color×talla×almacén."
+                      "description": "Existencias por modelo×color×talla×almacén. Es como mucho `limite` renglones: cuando `truncado` es true, los devueltos son los de MAYOR existencia en valor absoluto (los de más piezas y los negativos), ordenados para leerse por modelo/color/talla/almacén."
                     },
                     "totalExistencia": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Suma de la existencia de todas las filas."
+                      "description": "Suma de la existencia de TODOS los renglones del filtro (del universo completo, NO sólo de los devueltos): sigue siendo verdad aunque `truncado` sea true."
+                    },
+                    "totalFilas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos renglones cumplen el filtro en total. Si es mayor que `filas.length`, la lista viene cortada (y `truncado` lo dice)."
+                    },
+                    "limite": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tope de renglones que se aplicó."
+                    },
+                    "truncado": {
+                      "type": "boolean",
+                      "description": "true si el filtro tiene MÁS renglones de los que caben en `limite`. La pantalla debe decirlo: los totales son del universo, pero la lista no lo es."
                     },
                     "porColorTalla": {
-                      "description": "Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes.",
+                      "description": "Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes. NO le afecta `limite`: es un agregado del universo completo, así que la matriz es exacta aunque `filas` venga cortada.",
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -123581,7 +123608,10 @@
                   },
                   "required": [
                     "filas",
-                    "totalExistencia"
+                    "totalExistencia",
+                    "totalFilas",
+                    "limite",
+                    "truncado"
                   ],
                   "additionalProperties": false,
                   "description": "Existencias de producto terminado (consulta de solo lectura, D3)."

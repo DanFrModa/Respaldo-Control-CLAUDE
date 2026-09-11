@@ -36,6 +36,9 @@
        - `src/selector-proveedor-unico.test.ts` recorre los .tsx de `src/` para exigir que ningun
          `<SelectNativo>` se alimente del catalogo de proveedores (el defecto que Daniel reporto
          cuatro veces: un `<select>` nativo solo busca por prefijo);
+       - `src/tope-existencias-pt.test.ts` lee `frontend/openapi.json` para exigir que el `limite`
+         que piden las pantallas de captura de PT (fila 0.143) sea el techo REAL que el backend
+         publica: si se separan, cada carga de Movimientos y Traspasos seria un 400;
        - `src/documentos.test.ts` ejecuta `herramientas/verificar-documentos.mjs` (fila 0.142) con
          `node:child_process` para que el CRUCE MECANICO de los documentos (el contador de filas de
          HOJA-DE-RUTA.md contra su linea de resumen, y el numero de version en sus cuatro sitios) lo
@@ -48,6 +51,7 @@
     "src/cabeceras-seguridad-nginx.test.ts",
     "src/abreviatura-e2e.test.ts",
     "src/selector-proveedor-unico.test.ts",
-    "src/ventana-fecha-pt.test.ts"
+    "src/ventana-fecha-pt.test.ts",
+    "src/tope-existencias-pt.test.ts"
   ]
 }

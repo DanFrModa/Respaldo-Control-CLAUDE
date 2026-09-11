@@ -47446,7 +47446,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Existencias de PT por modelo×color×talla×almacén (consulta) */
+    /** Existencias de PT por modelo×color×talla×almacén (consulta con tope; nunca la vista entera) */
     get: {
       parameters: {
         query?: {
@@ -47464,6 +47464,8 @@ export interface paths {
           incluirCeros?: string;
           /** @description Con "color-talla" la respuesta incluye además `porColorTalla`: la existencia del modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, para la matriz del cajón). Requiere `idModelo`. */
           agrupar?: 'color-talla';
+          /** @description Tope de renglones a devolver (1-5000). Si se omite manda el del dominio; la respuesta siempre dice cuál se aplicó (`limite`), cuántos renglones hay en total (`totalFilas`) y si hubo corte (`truncado`). */
+          limite?: number;
         };
         header?: never;
         path?: never;
@@ -47478,7 +47480,7 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description Existencias por modelo×color×talla×almacén. */
+              /** @description Existencias por modelo×color×talla×almacén. Es como mucho `limite` renglones: cuando `truncado` es true, los devueltos son los de MAYOR existencia en valor absoluto (los de más piezas y los negativos), ordenados para leerse por modelo/color/talla/almacén. */
               filas: {
                 /** @description Id del modelo. */
                 idModelo: number;
@@ -47505,9 +47507,15 @@ export interface paths {
                 /** @description Existencia actual (Σ de movimientos, D3). */
                 existencia: number;
               }[];
-              /** @description Suma de la existencia de todas las filas. */
+              /** @description Suma de la existencia de TODOS los renglones del filtro (del universo completo, NO sólo de los devueltos): sigue siendo verdad aunque `truncado` sea true. */
               totalExistencia: number;
-              /** @description Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes. */
+              /** @description Cuántos renglones cumplen el filtro en total. Si es mayor que `filas.length`, la lista viene cortada (y `truncado` lo dice). */
+              totalFilas: number;
+              /** @description Tope de renglones que se aplicó. */
+              limite: number;
+              /** @description true si el filtro tiene MÁS renglones de los que caben en `limite`. La pantalla debe decirlo: los totales son del universo, pero la lista no lo es. */
+              truncado: boolean;
+              /** @description Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes. NO le afecta `limite`: es un agregado del universo completo, así que la matriz es exacta aunque `filas` venga cortada. */
               porColorTalla?: {
                 /** @description Id del color. */
                 idColor: number;

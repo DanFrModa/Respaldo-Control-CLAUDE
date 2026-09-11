@@ -8,7 +8,7 @@
  *  • `POST /inventarios/pt/movimientos`            (perm `inventario-pt.mover`) → movimiento manual.
  *  • `POST /inventarios/pt/traspasos`              (perm `inventario-pt.mover`) → traspaso (2 patas).
  *  • `POST /inventarios/pt/movimientos/:id/cancelar` (perm `inventario-pt.mover`) → inverso auditado.
- *  • `GET  /inventarios/pt/existencias`            (perm `inventario-pt.ver`)   → existencias (vista).
+ *  • `GET  /inventarios/pt/existencias`            (perm `inventario-pt.ver`)   → existencias (vista, con TOPE).
  *  • `GET  /inventarios/pt/kardex`                 (perm `inventario-pt.ver`)   → kardex por modelo.
  *  • `GET  /inventarios/pt/kardex/folio/:folio`    (perm `inventario-pt.ver`)   → un movimiento por folio.
  *  • `GET  /inventarios/pt/traspasos/:id/impreso` (perm `inventario-pt.ver`)   → hoja del traspaso (PDF).
@@ -137,7 +137,8 @@ export const rutasMovimientosPt: FastifyPluginCallbackZod = (app, _opciones, don
     preHandler: app.conPermiso('inventario-pt.ver'),
     schema: {
       tags: ['inventario-pt'],
-      summary: 'Existencias de PT por modelo×color×talla×almacén (consulta)',
+      summary:
+        'Existencias de PT por modelo×color×talla×almacén (consulta con tope; nunca la vista entera)',
       security: SEGURIDAD_SESION,
       querystring: esquemaExistenciasPtQuery,
       response: { 200: esquemaExistenciasPtLista, ...respuestasError },

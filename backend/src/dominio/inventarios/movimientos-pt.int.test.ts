@@ -41,6 +41,8 @@ import {
   obtenerMovimientoPorFolio,
   registrarMovimientoPt,
   registrarTraspasoPt,
+  RENGLONES_EXISTENCIAS_PT_POR_OMISION,
+  TOPE_RENGLONES_EXISTENCIAS_PT,
 } from './movimientos-pt.js';
 import { listarTiposMovimiento } from './tipos-movimiento.js';
 
@@ -1618,5 +1620,351 @@ describe('rótulos reservados al SISTEMA (fila 0.171)', () => {
     // Y las salidas y entradas legítimas de siempre siguen ofreciéndose.
     expect(porCodigo.get('otras-salidas')).toBe(true);
     expect(porCodigo.get('inventario-inicial')).toBe(true);
+  });
+});
+
+/**
+ * ⭐ EL TOPE DE LAS EXISTENCIAS (fila 0.143).
+ *
+ * El defecto: `consultarExistenciasPt` tenía todos sus filtros opcionales y ningún `LIMIT`, así que
+ * abrir Existencias sin elegir modelo pedía la vista ENTERA en una sola respuesta (56 860 filas en
+ * una base sintética de 525 000 renglones). Aquí se fija la cura completa, que son cuatro cosas y
+ * no una: **que corte**, **por dónde corta**, **que el corte sea el mismo en dos llamadas** y —la
+ * que de verdad importa— **que los totales sigan siendo del universo y no del pedazo**.
+ *
+ * ⚠️ Las pruebas piden un `limite` explícito y pequeño con MÁS renglones sembrados de los que caben:
+ * una prueba de «se recorta a N» que corre con menos de N filas pasa sin medir nada. Sembrar 1 001
+ * renglones para ejercitar el default costaría un minuto de reloj por prueba y mediría lo mismo: el
+ * mecanismo es idéntico, sólo cambia el número. Que el default EXISTA y valga 1 000 lo fija aparte
+ * la prueba «sin pedir `limite`…» y, sin base de datos, `contrato/esquemas/tope-existencias-honesto`.
+ */
+describe('El TOPE de las existencias (fila 0.143)', () => {
+  let colorAzul: Color;
+  let colorVerde: Color;
+  let tallaG: Talla;
+
+  /** Entra `cantidad` piezas de un artículo concreto (un renglón de existencia por artículo). */
+  async function entradaDe(
+    color: Color,
+    talla: Talla,
+    cantidad: number,
+    almacen: Almacen = almPrimeras,
+  ): Promise<number> {
+    const mov = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almacen.id,
+        idModelo: modelo.id,
+        fecha: '2026-06-19',
+        motivo: 'Siembra de la prueba del tope',
+        lineas: [{ idColor: color.id, tallas: [{ idTalla: talla.id, cantidad }] }],
+      },
+      bd(),
+    );
+    return mov.id;
+  }
+
+  /** Saca `cantidad` piezas de un artículo (para dejar un renglón en cero o en negativo). */
+  async function salidaDe(color: Color, talla: Talla, cantidad: number): Promise<number> {
+    const mov = await registrarMovimientoPt(
+      sesion(),
+      {
+        idTipoMov: tOtrasSalidas.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-06-20',
+        motivo: 'Siembra de la prueba del tope',
+        lineas: [{ idColor: color.id, tallas: [{ idTalla: talla.id, cantidad }] }],
+      },
+      bd(),
+    );
+    return mov.id;
+  }
+
+  /**
+   * SEIS renglones con cantidades distintas a propósito: así el orden por cantidad y el orden de
+   * presentación (modelo, color, talla, almacén) NO coinciden, y cada prueba puede medir el suyo.
+   *
+   * Presentación: Azul/CH(300) · Azul/M(20) · Rojo/CH(500) · Rojo/M(40) · Verde/CH(10) · Verde/M(5)
+   * Cantidad:     Rojo/CH(500) · Azul/CH(300) · Rojo/M(40) · Azul/M(20) · Verde/CH(10) · Verde/M(5)
+   */
+  async function sembrarSeisRenglones(): Promise<void> {
+    await entradaDe(colorRojo, tallaCH, 500);
+    await entradaDe(colorRojo, tallaM, 40);
+    await entradaDe(colorAzul, tallaCH, 300);
+    await entradaDe(colorAzul, tallaM, 20);
+    await entradaDe(colorVerde, tallaCH, 10);
+    await entradaDe(colorVerde, tallaM, 5);
+  }
+
+  /** Llave legible de un renglón, para comparar listas sin depender de ids que cambian por corrida. */
+  const llave = (f: { color: string; etiquetaTalla: string }): string =>
+    `${f.color}/${f.etiquetaTalla}`;
+
+  beforeEach(async () => {
+    colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    colorVerde = await cliente.color.create({ data: { nombre: 'Verde' } });
+    tallaG = await cliente.talla.create({ data: { etiqueta: 'G', orden: 3 } });
+  });
+
+  it('⭐ SIN NINGÚN FILTRO ya no trae todo: corta al `limite` y lo dice', async () => {
+    await sembrarSeisRenglones();
+
+    // Exactamente la llamada que hacía la pantalla al abrirse: sin modelo, sin almacén, sin nada.
+    const cortada = await consultarExistenciasPt(sesion(), { limite: 3 }, bd());
+
+    expect(cortada.filas).toHaveLength(3);
+    expect(cortada.truncado).toBe(true);
+    expect(cortada.limite).toBe(3);
+    // ⭐ Y LO QUE DE VERDAD IMPORTA: los totales son de los SEIS, no de los tres devueltos.
+    // Sumando en JS lo que llegó darían 840 y 3 — creíbles, y falsos.
+    expect(cortada.totalFilas).toBe(6);
+    expect(cortada.totalExistencia).toBe(875);
+  });
+
+  it('⭐⭐ el corte se lleva lo PEQUEÑO: sobreviven los renglones con más piezas', async () => {
+    await sembrarSeisRenglones();
+    const cortada = await consultarExistenciasPt(sesion(), { limite: 3 }, bd());
+
+    // Los tres mayores (500, 300, 40) — NO «los tres primeros del alfabeto», que serían
+    // Azul/CH, Azul/M y Rojo/CH y dejarían fuera 40 piezas para enseñar 20.
+    expect(new Set(cortada.filas.map(llave))).toEqual(new Set(['Rojo/CH', 'Azul/CH', 'Rojo/M']));
+  });
+
+  it('⭐ una existencia NEGATIVA no se esconde detrás del recorte', async () => {
+    await sembrarSeisRenglones();
+    // Verde/G queda en -100: entra 100, sale 100 y se CANCELA la entrada (inverso auditado, D3).
+    const idEntrada = await entradaDe(colorVerde, tallaG, 100);
+    await salidaDe(colorVerde, tallaG, 100);
+    await cancelarMovimientoPt(sesion(), idEntrada, { motivo: 'la entrada nunca ocurrió' }, bd());
+
+    const todo = await consultarExistenciasPt(sesion(), {}, bd());
+    expect(todo.filas.find((f) => llave(f) === 'Verde/G')?.existencia).toBe(-100);
+    expect(todo.totalExistencia).toBe(775);
+
+    // Con sitio para tres: 500, 300 y el -100. Ordenar por `existencia DESC` a secas daría
+    // {500, 300, 40} y mandaría TODAS las anomalías al final, justo a la zona que el tope se lleva.
+    const cortada = await consultarExistenciasPt(sesion(), { limite: 3 }, bd());
+    expect(new Set(cortada.filas.map(llave))).toEqual(new Set(['Rojo/CH', 'Azul/CH', 'Verde/G']));
+    expect(cortada.totalFilas).toBe(7);
+    expect(cortada.totalExistencia).toBe(775);
+  });
+
+  it('⭐ el corte es DETERMINISTA aunque todos empaten: dos llamadas, los mismos renglones', async () => {
+    // Cuatro renglones con la MISMA cantidad: aquí no decide la cantidad, decide el desempate.
+    // Sin desempate en el `ORDER BY`, «los dos primeros» sería lo que le apeteciera al plan.
+    await entradaDe(colorRojo, tallaCH, 50);
+    await entradaDe(colorRojo, tallaM, 50);
+    await entradaDe(colorAzul, tallaCH, 50);
+    await entradaDe(colorAzul, tallaM, 50);
+
+    const primera = await consultarExistenciasPt(sesion(), { limite: 2 }, bd());
+    const segunda = await consultarExistenciasPt(sesion(), { limite: 2 }, bd());
+
+    expect(primera.filas).toHaveLength(2);
+    expect(primera.truncado).toBe(true);
+    expect(primera.filas.map(llave)).toEqual(segunda.filas.map(llave));
+    // Y son los que predice el desempate documentado (la llave de la vista, ascendente): el color
+    // Rojo se creó antes que el Azul, y CH antes que M.
+    expect(new Set(primera.filas.map(llave))).toEqual(new Set(['Rojo/CH', 'Rojo/M']));
+  });
+
+  it('la lista se ENTREGA en el orden de siempre, aunque el corte sea por cantidad', async () => {
+    await sembrarSeisRenglones();
+
+    // Sin recorte: el orden de presentación es exactamente el de antes de la fila 0.143.
+    const completa = await consultarExistenciasPt(sesion(), { limite: 6 }, bd());
+    expect(completa.truncado).toBe(false);
+    expect(completa.filas.map(llave)).toEqual([
+      'Azul/CH',
+      'Azul/M',
+      'Rojo/CH',
+      'Rojo/M',
+      'Verde/CH',
+      'Verde/M',
+    ]);
+
+    // Con recorte: los tres que sobreviven se leen igual (por color y talla), NO por cantidad.
+    // Por cantidad serían Rojo/CH(500), Azul/CH(300), Rojo/M(40) — otro orden distinto.
+    const cortada = await consultarExistenciasPt(sesion(), { limite: 3 }, bd());
+    expect(cortada.filas.map(llave)).toEqual(['Azul/CH', 'Rojo/CH', 'Rojo/M']);
+  });
+
+  it('`incluirCeros` cambia el UNIVERSO, y el conteo lo refleja', async () => {
+    await sembrarSeisRenglones();
+    // Verde/G en cero: entra 7 y salen 7. Existe como renglón de la vista, pero con existencia 0.
+    await entradaDe(colorVerde, tallaG, 7);
+    await salidaDe(colorVerde, tallaG, 7);
+
+    const sinCeros = await consultarExistenciasPt(sesion(), { limite: 2 }, bd());
+    const conCeros = await consultarExistenciasPt(
+      sesion(),
+      { limite: 2, incluirCeros: true },
+      bd(),
+    );
+
+    // Mismo `limite`, mismos 2 renglones devueltos… y universos DISTINTOS. Si `totalFilas` se
+    // calculara sobre otra `WHERE` que la lista, esto sería el sitio donde se notaría.
+    expect(sinCeros.filas).toHaveLength(2);
+    expect(conCeros.filas).toHaveLength(2);
+    expect(sinCeros.totalFilas).toBe(6);
+    expect(conCeros.totalFilas).toBe(7);
+    // El cero no mueve la suma, pero sí el conteo: son dos preguntas distintas.
+    expect(sinCeros.totalExistencia).toBe(875);
+    expect(conCeros.totalExistencia).toBe(875);
+  });
+
+  /**
+   * 🔴 EL SESGO DEL `abs()` CONTRA LOS CEROS — el hallazgo de la ronda de corrección, fijado aquí
+   * para que un quinto consumidor no lo redescubra a golpes.
+   *
+   * El corte ordena por `abs(existencia) DESC`, así que **un renglón en CERO queda siempre el
+   * último**: es el PRIMERO que el tope descarta, por muy grande que sea el `limite`. Eso importa
+   * porque `incluirCeros` existe precisamente para quien los quiere — el modo ENTRADA de
+   * Movimientos PT pide los buckets de orden que quedaron en cero al irse a estampado.
+   *
+   * ⚠️ Esto NO afirma que el sesgo esté bien: afirma que EXISTE y que es sistemático, que es lo que
+   * obliga a las pantallas de captura a pedir el techo (`frontend/.../tope-existencias.ts`). Si
+   * alguien cambia el criterio del corte, esta prueba tiene que caer y volverse a pensar.
+   */
+  it('🔴 con `incluirCeros`, los renglones en CERO son los PRIMEROS que el tope descarta', async () => {
+    await sembrarSeisRenglones(); // 6 con saldo
+    // Dos renglones en CERO: entran 7 y salen 7 (existen en la vista, con existencia 0).
+    await entradaDe(colorVerde, tallaG, 7);
+    await salidaDe(colorVerde, tallaG, 7);
+    await entradaDe(colorAzul, tallaG, 9);
+    await salidaDe(colorAzul, tallaG, 9);
+
+    const universo = await consultarExistenciasPt(sesion(), { incluirCeros: true }, bd());
+    expect(universo.totalFilas).toBe(8);
+    expect(universo.filas.filter((f) => f.existencia === 0)).toHaveLength(2);
+
+    // Con sitio para SIETE de los ocho —o sea, sobra hueco para uno de los dos ceros— el que se
+    // queda fuera es un CERO, no el renglón de 5 piezas.
+    const casiTodo = await consultarExistenciasPt(
+      sesion(),
+      { incluirCeros: true, limite: 7 },
+      bd(),
+    );
+    expect(casiTodo.truncado).toBe(true);
+    expect(casiTodo.filas.filter((f) => f.existencia === 0)).toHaveLength(1);
+    expect(casiTodo.filas.map(llave)).toContain('Verde/M'); // 5 piezas: sobrevive al cero
+
+    // Y con sitio para seis, NINGUNO de los dos ceros llega, aunque los seis con saldo sí.
+    const seis = await consultarExistenciasPt(sesion(), { incluirCeros: true, limite: 6 }, bd());
+    expect(seis.filas.filter((f) => f.existencia === 0)).toHaveLength(0);
+    expect(seis.totalFilas).toBe(8);
+  });
+
+  it('sin pedir `limite` manda el del dominio, y si todo cabe no hay recorte', async () => {
+    await sembrarSeisRenglones();
+    const salida = await consultarExistenciasPt(sesion(), {}, bd());
+
+    // A1: el valor por omisión lo pone el DOMINIO. Si alguien le quitara el `.default()`, el
+    // `LIMIT` se quedaría sin número y volveríamos al defecto de la fila.
+    expect(salida.limite).toBe(RENGLONES_EXISTENCIAS_PT_POR_OMISION);
+    expect(salida.truncado).toBe(false);
+    expect(salida.filas).toHaveLength(6);
+    expect(salida.totalFilas).toBe(6);
+  });
+
+  /**
+   * ⭐⭐ EL DEFAULT, MEDIDO DE VERDAD Y NO POR ANALOGÍA.
+   *
+   * Las pruebas de arriba piden un `limite` pequeño porque así se lee lo que miden. Pero una prueba
+   * de «se recorta a N» que nunca ve N renglones deja el número por omisión sin medir: si alguien
+   * cambiara el `.default()` a `undefined`, todo aquello seguiría verde. Aquí se siembran **1 050
+   * renglones de existencia** —por encima de los 1 000— con inserción directa (un solo movimiento y
+   * un `createMany`: por el dominio serían minutos) y se pide **sin `limite`**, tal cual lo hace la
+   * pantalla al abrirse.
+   */
+  it('⭐⭐ con MÁS renglones que el tope por omisión, corta en 1 000 y cuenta los 1 050', async () => {
+    await cliente.color.createMany({
+      data: Array.from({ length: 30 }, (_, i) => ({
+        nombre: `Masivo ${String(i).padStart(3, '0')}`,
+      })),
+    });
+    await cliente.talla.createMany({
+      data: Array.from({ length: 35 }, (_, i) => ({ etiqueta: `TM${String(i)}`, orden: 100 + i })),
+    });
+    const coloresMasivos = await cliente.color.findMany({
+      where: { nombre: { startsWith: 'Masivo ' } },
+    });
+    const tallasMasivas = await cliente.talla.findMany({
+      where: { etiqueta: { startsWith: 'TM' } },
+    });
+    expect(coloresMasivos.length * tallasMasivas.length).toBe(1050);
+
+    const mov = await cliente.movimiento.create({
+      data: {
+        idEmpresa: empresa.id,
+        folio: 900_001,
+        fecha: new Date('2026-06-19T00:00:00Z'),
+        idTipoMov: tEntradaInicial.id,
+        idAlmacen: almPrimeras.id,
+        origenTipo: 'manual',
+      },
+    });
+    // Cantidades TODAS distintas y crecientes: así se sabe exactamente cuáles son las 1 000 mayores.
+    let n = 0;
+    await cliente.movimientoDetPt.createMany({
+      data: coloresMasivos.flatMap((c) =>
+        tallasMasivas.map((t) => {
+          n += 1;
+          return {
+            idMovimiento: mov.id,
+            idModelo: modelo.id,
+            idColor: c.id,
+            idTalla: t.id,
+            cantidad: n,
+          };
+        }),
+      ),
+    });
+
+    // La llamada de la pantalla al abrirse: sin filtros y sin `limite`.
+    const salida = await consultarExistenciasPt(sesion(), {}, bd());
+
+    expect(salida.limite).toBe(RENGLONES_EXISTENCIAS_PT_POR_OMISION);
+    expect(salida.filas).toHaveLength(RENGLONES_EXISTENCIAS_PT_POR_OMISION);
+    expect(salida.truncado).toBe(true);
+    // ⭐ El conteo y la suma son de los 1 050, no de los 1 000 que llegaron.
+    expect(salida.totalFilas).toBe(1050);
+    expect(salida.totalExistencia).toBe((1050 * 1051) / 2);
+    // Y las que sobreviven son las 1 000 MAYORES (de la 51 a la 1 050), no las mil primeras.
+    const menor = Math.min(...salida.filas.map((f) => f.existencia));
+    expect(menor).toBe(51);
+  });
+
+  it('pedir más del tope DURO se rechaza (no se puede volver a pedir la vista entera)', async () => {
+    await expect(
+      consultarExistenciasPt(sesion(), { limite: TOPE_RENGLONES_EXISTENCIAS_PT + 1 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(consultarExistenciasPt(sesion(), { limite: 0 }, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+  });
+
+  it('⭐ la RAMA GEMELA: con `agrupar=color-talla` la matriz NO se recorta', async () => {
+    await sembrarSeisRenglones();
+    const cortada = await consultarExistenciasPt(
+      sesion(),
+      { idModelo: modelo.id, agrupar: 'color-talla', limite: 1 },
+      bd(),
+    );
+
+    // La lista viene cortada al hueso…
+    expect(cortada.filas).toHaveLength(1);
+    expect(cortada.truncado).toBe(true);
+    expect(cortada.totalFilas).toBe(6);
+    // …y el encabezado del recorte viaja también por esta rama (si sólo se hubiera puesto en la
+    // otra, la pantalla de la matriz no tendría cómo enterarse).
+    expect(cortada.limite).toBe(1);
+    // …pero el rollup es un agregado del universo: las SEIS celdas, y su suma es el total real.
+    expect(cortada.porColorTalla).toHaveLength(6);
+    const sumaCeldas = (cortada.porColorTalla ?? []).reduce((s, c) => s + c.existencia, 0);
+    expect(sumaCeldas).toBe(875);
+    expect(sumaCeldas).toBe(cortada.totalExistencia);
   });
 });

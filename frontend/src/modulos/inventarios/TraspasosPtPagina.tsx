@@ -18,9 +18,11 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
 import { SelectorOrdenPt } from './SelectorOrdenPt';
+import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
 import {
   SIN_ORDEN,
   aIdOrden,
@@ -103,10 +105,17 @@ export function TraspasosPtPagina(): React.JSX.Element {
   // queda DESHABILITADA hasta que haya modelo y origen válidos: así no se dispara un GET con un
   // idModelo inválido (que el backend rechazaría con 400) al abrir la pantalla.
   const hayOrigen = modelo !== undefined && idAlmacenOrigen !== '';
+  // Fila 0.143 — el TECHO del contrato, no el `limite` por omisión: de estos renglones salen el
+  // desplegable de órdenes y el «disponible» del aviso, así que hace falta la lista COMPLETA del
+  // modelo, no una ventana. El universo aquí es UN MODELO; el default es para todo el almacén.
   const existencias = useExistenciasPt(
     hayOrigen
-      ? { idModelo: modelo.id, idAlmacen: Number(idAlmacenOrigen) }
-      : { idModelo: modelo?.id ?? 0 },
+      ? {
+          idModelo: modelo.id,
+          idAlmacen: Number(idAlmacenOrigen),
+          limite: TOPE_EXISTENCIAS_PT,
+        }
+      : { idModelo: modelo?.id ?? 0, limite: TOPE_EXISTENCIAS_PT },
     hayOrigen,
   );
   // §Post-F9.40 — las órdenes CON EXISTENCIA REAL en el ORIGEN (más el bucket «sin orden»).
@@ -392,6 +401,18 @@ export function TraspasosPtPagina(): React.JSX.Element {
                     : <strong>{totalDisponibleBucket.toLocaleString('es-MX')}</strong> pzas.
                   </p>
                 ) : null}
+                {/* ⭐ Fila 0.143 — el «disponible» de arriba y la lista de órdenes se arman con las
+                    FILAS de existencias, que desde la 0.143 vienen topadas. Si el tope alcanza,
+                    ese número se queda CORTO y un bucket puede faltar del desplegable. El servidor
+                    sigue validando el saldo de verdad bajo bloqueo (D3), así que esto no deja pasar
+                    un traspaso indebido — pero sí engañaría al que lo captura, y por eso se dice. */}
+                <AvisoExistenciasRecortadas
+                  idBase="traspaso"
+                  datos={existencias.data}
+                  mostrados={existencias.data?.filas.length ?? 0}
+                  consejo="El disponible de arriba y la lista de órdenes pueden quedarse cortos; el servidor sí valida el saldo real al guardar."
+                  className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+                />
               </div>
 
               {avisoExcede > 0 ? (
