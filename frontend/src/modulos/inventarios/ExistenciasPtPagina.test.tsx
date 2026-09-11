@@ -127,6 +127,34 @@ describe('ExistenciasPtPagina · el TOPE (fila 0.143)', () => {
     expect(screen.getAllByText('56,860')).toHaveLength(3);
   });
 
+  /**
+   * ⭐⭐ LA GEMELA EN NEGATIVO — el único sitio donde la simetría se rompe a propósito.
+   *
+   * Las TRES pantallas de captura piden el techo (5 000) porque necesitan la lista completa de
+   * órdenes de un modelo, y eso está fijado por sus propias pruebas. **Ésta, no.** Existencias es
+   * un INFORME sobre todo el almacén: su universo es el inventario entero, y pedir el techo aquí
+   * traería 5 000 renglones en cada carga — que es exactamente el defecto que la fila 0.143 vino a
+   * matar, sólo que con otro número.
+   *
+   * 🔑 Sin esta prueba, alguien que copiara el patrón de las pantallas de captura a esta pantalla
+   * —un cambio de una línea, y plausible, porque son vecinas y se parecen— **dejaría la suite
+   * entera en verde** mientras la fila pierde su razón de ser. Un guardián en positivo («las de
+   * captura SÍ lo mandan») no ve ese cambio: hace falta el que dice «ésta NO».
+   */
+  it('⭐⭐ la pantalla de EXISTENCIAS **no** manda `limite`: se queda con el default del dominio', () => {
+    // Se limpia para medir SÓLO las consultas de este render (los `mock.calls` se acumulan entre
+    // pruebas del archivo: sin esto, el conteo de abajo arrastraría las de las pruebas anteriores).
+    useExistenciasMock.mockClear();
+    renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
+
+    const consultas = useExistenciasMock.mock.calls.map(([q]) => q as Record<string, unknown>);
+    // Sin esto el `for` de abajo pasaría con CERO consultas, que es la vacuidad de siempre.
+    expect(consultas.length).toBeGreaterThan(0);
+    // A1: el tope de esta pantalla lo pone el DOMINIO (1 000). Mandar `limite` desde aquí sería
+    // decidir en el cliente una regla que es del servidor — y, con el techo, resucitar el defecto.
+    for (const q of consultas) expect(q.limite).toBeUndefined();
+  });
+
   it('sin corte no hay aviso, y el conteo es una sola cifra (el aviso tiene que significar algo)', () => {
     renderConProveedores(<ExistenciasPtPagina />, { sesion: sesion() });
 

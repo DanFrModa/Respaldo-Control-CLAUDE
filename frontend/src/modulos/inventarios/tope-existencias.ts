@@ -26,15 +26,23 @@
  * nota en el modelo patológico, que es justo donde hace falta. Y su universo es **UN MODELO**, no
  * el almacén: el número por omisión, pensado para «todo el inventario», aquí no aplica.
  *
- * ⚠️ **Lo que esto NO hace, dicho en voz alta: no elimina el techo, lo sube 5×.** Con 8 tallas × 3
- * almacenes son 24 renglones por (color × orden), así que 5 000 alcanza para ~208 combinaciones —
- * con 5 colores, unas 41 órdenes del mismo modelo. Un modelo muy longevo puede pasarlo, y entonces
- * vuelve a faltar un bucket (con el aviso puesto, eso sí). **La cura de fondo es que el desplegable
- * salga de un agregado en SERVIDOR** —«dame las órdenes con existencia de este modelo», A1— en vez
- * de deducirse en el navegador de una lista de renglones; eso es fila propia y no la abre ésta.
+ * ⚠️ **Lo que esto NO hace, dicho en voz alta: no elimina el techo, lo sube 5×** — y ahora se puede
+ * decir en ÓRDENES, que es la unidad en la que el negocio piensa. **DANIEL dio la forma real de un
+ * modelo:** 8 tallas × 3 colores, en primeras, segundas y quizá tránsito ⇒ **~72 renglones por
+ * ORDEN**. Con eso: el `limite` por omisión (1 000) se agota a las **~14 órdenes** del mismo
+ * modelo, y el techo de 5 000 aguanta **~69**. ⇒ **por omisión, un modelo que se haya producido
+ * quince veces ya perdía buckets del desplegable** — no era un caso remoto, y es lo que hace que
+ * este techo valga la pena. Pasadas las ~69, vuelve a faltar un bucket (con el aviso puesto, eso
+ * sí). **La cura de fondo es que el desplegable salga de un agregado en SERVIDOR** —«dame las
+ * órdenes con existencia de este modelo», A1— en vez de deducirse en el navegador de una lista de
+ * renglones; eso es fila propia y no la abre ésta.
+ *
+ * ⏳ La dimensión que decide el residuo es **cuántas órdenes acumula un modelo a lo largo de su
+ * vida**, y ésa es la única que falta: Daniel describió la matriz (tallas × colores × almacenes)
+ * pero no ese número. Queda preguntada. Mientras no se sepa, ~69 órdenes es el margen real.
  *
  * 🔒 El número vive DOS veces —aquí y como `.max()` en el querystring publicado— y por eso
- * `tope-existencias.test.ts` lo cruza contra el `openapi.json` generado: si el backend baja su
+ * `src/tope-existencias-pt.test.ts` lo cruza contra el `openapi.json` generado: si el backend baja su
  * techo, estas pantallas pedirían un `limite` que la API contesta con **400 en cada carga**.
  */
 export const TOPE_EXISTENCIAS_PT = 5000;

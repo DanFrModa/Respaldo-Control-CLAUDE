@@ -308,7 +308,12 @@ entra por folio.
      palabras. ⚠️ Queda dicho el límite, **con los dos números que de verdad rigen**: en Existencias
      el corte es a **1 000** (su default), así que ahí un modelo con más de 1 000 renglones ya no se ve
      completo ni filtrando; en las pantallas de captura, que piden el techo, el límite empieza en
-     **5 000**. Ese residuo pediría paginar de verdad — o mejor, el agregado del punto 4.
+     **5 000**. **Con la forma real que dio DANIEL** —8 tallas × 3 colores en primeras, segundas y
+     quizá tránsito, o sea **~72 renglones por ORDEN**— eso son **~14 órdenes** del mismo modelo con
+     el default y **~69** con el techo. ⇒ por omisión, un modelo producido quince veces ya perdía
+     buckets: de ahí que las pantallas de captura pidan el techo. Ese residuo pediría paginar de
+     verdad — o mejor, el agregado del punto 4. ⏳ **Falta el dato que decide:** cuántas órdenes
+     acumula un modelo a lo largo de su vida (preguntado a Daniel).
   4. **🔴 El `abs()` del corte deja los CEROS al final, y eso apuntaba a una pantalla concreta** (visto
      en la revisión de la fila). Un renglón en cero tiene `abs = 0` ⇒ es el PRIMERO que el tope
      descarta — medido: con 80 renglones y sitio para 40, de los 16 en cero sobrevivieron **0**. El

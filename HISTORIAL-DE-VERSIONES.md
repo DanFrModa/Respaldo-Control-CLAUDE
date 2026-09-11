@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.146 · 11-sep-2026 · **en prueba** — **La pantalla de existencias ya no se trae el inventario entero**
+
+### Qué se puede hacer ahora que antes no
+
+- **Abrir las existencias de producto terminado sin que el sistema pida la tabla completa.** Antes
+  traía **todos** los renglones en una sola respuesta; hoy trae los mil con más mercancía y **avisa
+  claramente de que hay más y de que conviene filtrar**. Medido: de unos 10 MB a 198 KB.
+- ⭐ **Y las pantallas de capturar movimientos y traspasos siguen viendo la lista COMPLETA de su
+  modelo**, que es lo que necesitan para armar el desplegable de órdenes.
+
+### Qué cambió y puede sorprender
+
+- **En la pantalla de consulta, los contadores cuentan el total de verdad, no lo que cabe.** Si hay
+  56.000 renglones y se enseñan mil, dice las dos cifras.
+- **Cuando no caben todos, se conservan los de mayor cantidad — y también los negativos.** Un saldo
+  en negativo es una anomalía que alguien tiene que ver, así que se ordena por el tamaño del número
+  sin importar el signo. Esconderlos detrás de un aviso sería el mismo defecto con otra ropa.
+
+### Qué sigue pendiente o roto
+
+- **Un modelo con más de 5.000 renglones no se podría ver completo ni filtrando.** Con la forma que
+  describió Daniel —8 tallas, 3 colores, tres destinos— eso son unas **69 órdenes del mismo modelo**.
+  Falta saber cuántas acumula un modelo a lo largo de su vida para saber si ese techo basta.
+- **La cura de fondo sería que el desplegable de órdenes lo arme el servidor** en vez de deducirlo el
+  navegador de una lista de renglones. Queda anotado como trabajo aparte.
+
+---
+
 ## 0.145 · 10-sep-2026 · **en prueba** — **Ya no te vuelve a pedir que compres lo que ya compraste**
 
 ### Qué se puede hacer ahora que antes no
