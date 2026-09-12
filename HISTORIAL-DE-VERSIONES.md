@@ -92,6 +92,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   agregarlos como al editarlos.
 - **Lo que ya estaba capturado con tela suelta se queda como está**, se sigue viendo y se sigue
   editando. Sólo deja de poder nacer así.
+- ⚠️ **Y ojo con los renglones VIEJOS de corte, maquila o empaque que traían cantidad:** siguen
+  mostrando su importe inflado (una cantidad por su precio) con la casilla ya invisible, y **a la
+  primera vez que se editen —aunque sólo se toque la descripción— el importe baja al precio solo**,
+  sin que nadie mueva una cifra. Es exactamente lo pedido: esos tres conceptos llevan precio y no
+  cantidad. Pero conviene saberlo antes de ver bajar un número sin haberlo tocado.
 
 ### Qué sigue pendiente o roto
 
