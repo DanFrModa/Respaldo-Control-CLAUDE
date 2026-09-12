@@ -36,6 +36,11 @@ function ordenFake(over: {
     consumoPorPrenda: Prisma.Decimal;
     precioSugerido: Prisma.Decimal | null;
     precio?: Prisma.Decimal | null;
+    // ⭐⭐ 0.163 — el COMPLEMENTO (cárdigan): lo declara el CATÁLOGO (`nombreComplemento`), lo
+    // cuantifica la RECETA de la orden y lo valúa el ESTIMADO del catálogo.
+    nombreComplemento?: string | null;
+    consumoComplementoPorPrenda?: Prisma.Decimal | null;
+    precioSugeridoComplemento?: Prisma.Decimal | null;
   }[];
   avios?: {
     consumoPorPrenda: Prisma.Decimal;
@@ -51,7 +56,12 @@ function ordenFake(over: {
     recetaTelas: (over.telas ?? []).map((t) => ({
       consumoPorPrenda: t.consumoPorPrenda,
       precio: t.precio ?? null,
-      tela: { precioSugerido: t.precioSugerido },
+      consumoComplementoPorPrenda: t.consumoComplementoPorPrenda ?? null,
+      tela: {
+        precioSugerido: t.precioSugerido,
+        nombreComplemento: t.nombreComplemento ?? null,
+        precioSugeridoComplemento: t.precioSugeridoComplemento ?? null,
+      },
     })),
     recetaAvios: (over.avios ?? []).map((a) => ({
       consumoPorPrenda: a.consumoPorPrenda,
@@ -379,5 +389,91 @@ describe('divisorCongelado (0.061): el divisor de una orden CERRADA no se recalc
     // Se cerró una orden sin recibos: el divisor congelado es 0 y el unitario quedó NULL. Si esto
     // devolviera null, la lectura volvería a re-sumar en vivo y el costo se descongelaría solo.
     expect(divisorCongelado(CERRADA, { ...CONGELADO, cantidadBaseCongelada: 0 })).toBe(0);
+  });
+});
+
+// ── ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA (el cárdigan que acompaña a la felpa) ───────────────
+//
+// Lo que estas pruebas vigilan: el teórico de la orden IGNORABA el complemento mientras el MRP sí lo
+// compraba y lo cobraba. Ahora el renglón de tela vale por LAS DOS mitades — y sólo cuando el dato
+// está COMPLETO (catálogo + receta + estimado), porque un dato viejo que falta se TOLERA, no se
+// rellena (REGLA 0-B).
+describe('teoricoPorPrenda · el COMPLEMENTO de la tela (0.163)', () => {
+  it('suma consumoComplemento × estimado del catálogo DENTRO del renglón de tela', () => {
+    const t = teoricoPorPrenda(
+      ordenFake({
+        telas: [
+          {
+            consumoPorPrenda: D(2),
+            precioSugerido: D(30),
+            precio: D(25), // precio CONGELADO de la orden: manda para el cuerpo
+            nombreComplemento: 'Cardigan',
+            consumoComplementoPorPrenda: D(0.5),
+            precioSugeridoComplemento: D(40),
+          },
+        ],
+      }),
+    );
+    expect(t.tela).toBeCloseTo(2 * 25 + 0.5 * 40, 6); // 50 + 20 = 70
+  });
+
+  it('una tela SIN complemento cuesta exactamente lo de siempre (no-regresión)', () => {
+    const t = teoricoPorPrenda(
+      ordenFake({ telas: [{ consumoPorPrenda: D(2), precioSugerido: D(30) }] }),
+    );
+    expect(t.tela).toBeCloseTo(60, 6);
+  });
+
+  it('si el CATÁLOGO no declara complemento, el consumo de la receta NO se valúa', () => {
+    // Le quitaron el complemento a la tela después de capturar la receta: quién lo lleva lo dice
+    // el catálogo, y sólo él.
+    const t = teoricoPorPrenda(
+      ordenFake({
+        telas: [
+          {
+            consumoPorPrenda: D(2),
+            precioSugerido: D(30),
+            nombreComplemento: null,
+            consumoComplementoPorPrenda: D(0.5),
+            precioSugeridoComplemento: D(40),
+          },
+        ],
+      }),
+    );
+    expect(t.tela).toBeCloseTo(60, 6);
+  });
+
+  it('si la RECETA no trajo el consumo, no hay nada que valuar (se tolera, no se rellena)', () => {
+    const t = teoricoPorPrenda(
+      ordenFake({
+        telas: [
+          {
+            consumoPorPrenda: D(2),
+            precioSugerido: D(30),
+            nombreComplemento: 'Cardigan',
+            consumoComplementoPorPrenda: null,
+            precioSugeridoComplemento: D(40),
+          },
+        ],
+      }),
+    );
+    expect(t.tela).toBeCloseTo(60, 6);
+  });
+
+  it('sin ESTIMADO capturado el complemento suma cero, pero el cuerpo no se altera', () => {
+    const t = teoricoPorPrenda(
+      ordenFake({
+        telas: [
+          {
+            consumoPorPrenda: D(2),
+            precioSugerido: D(30),
+            nombreComplemento: 'Cardigan',
+            consumoComplementoPorPrenda: D(0.5),
+            precioSugeridoComplemento: null,
+          },
+        ],
+      }),
+    );
+    expect(t.tela).toBeCloseTo(60, 6);
   });
 });

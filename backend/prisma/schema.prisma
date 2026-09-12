@@ -1703,6 +1703,16 @@ model Tela {
   favorito          Boolean            @default(false)
   /// Precio de referencia por unidad (informativo; el costo real va por lote/orden).
   precioSugerido    Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
+  /// ⭐⭐ 0.163 — PRECIO ESTIMADO DEL **COMPLEMENTO** por unidad. DANIEL: *«El complemento de la
+  /// tela debe de llevar un costo estimado»*. Gemelo de `precioSugerido`, pero del cárdigan: es el
+  /// ÚLTIMO escalón de la cascada del complemento (última compra real → precio del color →
+  /// ESTE). Hasta esta fila el costeo ignoraba el complemento por completo mientras el MRP sí lo
+  /// compraba y lo cobraba ⇒ se compraba y no se cobraba, y el precio cotizado salía BAJO.
+  /// Sólo tiene sentido si la tela LLEVA complemento (`nombreComplemento` no nulo): el dominio lo
+  /// RECHAZA si no, y lo LIMPIA en la misma transacción cuando se le quita el complemento a la
+  /// tela — la misma invariante que ya protege a `TelaColor.precioComplemento`.
+  /// NULL = no se estimó (REGLA 0-B: nace NULL para todas las telas existentes, sin backfill).
+  precioSugeridoComplemento Decimal?   @map("precio_sugerido_complemento") @db.Decimal(12, 2)
   /// ¿Es tela de producción (vs. muestra/insumo no productivo)? Default true.
   /// LEGADO desde A1.1 (Daniel, 6-ago-2026): la casilla salió de la UI (ya no se captura ni
   /// se muestra); el dato se conserva con su default server-side. La columna NO se borra.
@@ -8695,6 +8705,21 @@ model PrecostoLinea {
   /// Consumo (tela: por prenda; avío por talla: PROMEDIO, decisión (g)). Nullable (arte/manual).
   consumo         Decimal?            @db.Decimal(12, 4)
   precioUnit      Decimal             @map("precio_unit") @db.Decimal(12, 2)
+  /// ⭐⭐ 0.163 — EL COMPLEMENTO DE LA TELA, EN EL MISMO RENGLÓN. El cárdigan viaja DENTRO del
+  /// renglón de su tela (nunca como renglón aparte: la llave de deduplicación del recálculo es
+  /// `origen:idTela:idAvio:idModeloArte`, y un segundo `bom_tela` de la misma tela la rompería).
+  /// Los tres son NULL en todo lo que no sea una tela con complemento (arte, avío, manual, y todo
+  /// lo anterior a esta fila).
+  /// Consumo del complemento por prenda, copiado de `ModeloTela.consumoComplementoPorPrenda`.
+  consumoComplemento    Decimal?        @map("consumo_complemento") @db.Decimal(12, 4)
+  /// Precio unitario con el que se valuó el complemento (la cascada del complemento).
+  precioUnitComplemento Decimal?        @map("precio_unit_complemento") @db.Decimal(12, 2)
+  /// `consumoComplemento × precioUnitComplemento`. ⚠️ **Ya está SUMADO dentro de `importe`**: el
+  /// total del precosto es Σ `importe`, así que el dinero del cárdigan llega a la lista de precios
+  /// sin que ningún consumidor tenga que sumarlo aparte. Esta columna es el DESGLOSE (para que se
+  /// vea de dónde salió) y lo que permite reponerlo al editar el renglón a mano.
+  importeComplemento    Decimal?        @map("importe_complemento") @db.Decimal(12, 2)
+  /// `consumo × precioUnit` **+ `importeComplemento`** (cuerpo + complemento).
   importe         Decimal             @db.Decimal(12, 2)
   /// Renglón de origen BOM AJUSTADO a mano en la CALCULADORA DE NEGOCIACIÓN (rediseño R5, B12): se
   /// editó su consumo/precio o se quitó/agregó en la mesa, SIN tocar el BOM del modelo. Cuando está

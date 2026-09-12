@@ -48,7 +48,16 @@ async function crearOc(opciones: {
   estatus: Estatus;
   idProveedor: number;
   fecha: string | null;
-  linea: { idTela?: number; idAvio?: number; precio: number; cantidad?: number };
+  linea: {
+    idTela?: number;
+    idAvio?: number;
+    precio: number;
+    cantidad?: number;
+    /** ⭐⭐ 0.163 — `undefined` = la línea NO compró complemento (NULL, como todo el histórico). */
+    cantidadComplemento?: number;
+    /** ⭐⭐ 0.163 — `undefined` = se cobró al precio del cuerpo (así lo dice el modelo). */
+    precioComplemento?: number;
+  };
   idEmpresa?: number;
 }): Promise<void> {
   folio += 1;
@@ -66,6 +75,8 @@ async function crearOc(opciones: {
             idAvio: opciones.linea.idAvio ?? null,
             cantidad: opciones.linea.cantidad ?? 10,
             precio: opciones.linea.precio,
+            cantidadComplemento: opciones.linea.cantidadComplemento ?? null,
+            precioComplemento: opciones.linea.precioComplemento ?? null,
           },
         ],
       },
@@ -409,5 +420,86 @@ describe('leerUltimosPreciosCompra — A9, unidades (R1) y bordes', () => {
       avios: [idAvio],
     });
     expect(r.porMaterial.size).toBe(0);
+  });
+});
+
+// ── ⭐⭐ 0.163 — LA ÚLTIMA COMPRA REAL **DEL COMPLEMENTO** (el cárdigan) ──────────────────────────
+//
+// Es una SEGUNDA consulta y no una columna más de la primera, por una razón de negocio: la compra
+// más reciente de una tela **no tiene por qué haber comprado complemento**. Estas pruebas fijan ese
+// contrato contra la base, que es donde vive el `DISTINCT ON`.
+describe('leerUltimosPreciosCompra — el COMPLEMENTO de la tela (0.163)', () => {
+  it('toma la línea más reciente QUE SÍ COMPRÓ complemento, no la más reciente a secas', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-01',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 40 },
+    });
+    // Compra POSTERIOR del CUERPO solo (sin complemento): manda para el cuerpo y NO para el cárdigan.
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-20',
+      linea: { idTela, precio: 110 },
+    });
+
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.porMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(110);
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(40);
+  });
+
+  it('sin precio propio, el complemento vale el precio del CUERPO de esa misma línea', async () => {
+    // El modelo lo dice: «precioComplemento NULL = se cobra al mismo precio que el cuerpo», y así lo
+    // totaliza la propia OC. Es la lectura fiel de lo que se pagó, NO un fallback del costeo.
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-05',
+      linea: { idTela, precio: 77, cantidadComplemento: 3 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(77);
+  });
+
+  it('respeta el MISMO criterio de estatus que el cuerpo (una OC cancelada no cuenta)', async () => {
+    await crearOc({
+      estatus: 'cancelada',
+      idProveedor: provA,
+      fecha: '2026-08-30',
+      linea: { idTela, precio: 999, cantidadComplemento: 5, precioComplemento: 999 },
+    });
+    await crearOc({
+      estatus: 'recibida_total',
+      idProveedor: provA,
+      fecha: '2026-08-02',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 41 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(41);
+  });
+
+  it('A9: una compra de complemento de OTRA empresa no existe para esta sesión', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-15',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 50 },
+      idEmpresa: otraEmpresa.id,
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.size).toBe(0);
+  });
+
+  it('si nadie compró complemento, el mapa queda vacío (y el del cuerpo NO)', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-10',
+      linea: { idTela, precio: 100 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.porMaterial.size).toBe(1);
+    expect(r.complementoPorMaterial.size).toBe(0);
   });
 });

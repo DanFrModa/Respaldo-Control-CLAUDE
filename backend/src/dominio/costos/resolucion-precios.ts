@@ -40,6 +40,15 @@
  *                           luego por NOMBRE — ver {@link resolverPrecioColorReferencia}.
  *   6. sugerido           — `Tela.precioSugerido` (genérico, el de F7). Sin nada ⇒ `null`.
  *
+ * CASCADA DEL COMPLEMENTO DE LA TELA (⭐⭐ 0.163 — el cárdigan que acompaña a la felpa; DANIEL:
+ * *«El complemento de la tela debe de llevar un costo estimado»*). Viaja DENTRO del renglón de su
+ * tela, así que NO es una cascada de material aparte: es la del MISMO renglón para su otra mitad.
+ *   1. última compra   — `OrdenCompraLinea.precioComplemento` de la compra más reciente que compró
+ *                        complemento (mismo criterio de estatus y mismo desempate que el cuerpo).
+ *   2. color           — `TelaColor.precioComplemento`, sólo si el llamador tiene color en la mano.
+ *   3. estimado        — `Tela.precioSugeridoComplemento`. Sin nada ⇒ `sin-precio` (NUNCA un 0 mudo).
+ * Ver {@link resolverPrecioComplementoTela}.
+ *
  * CASCADA DEL AVÍO (§Post-F9.97: TODOS los precios están ya en unidad de consumo — metro, pieza,
  * kilo—, así que no hay nada que normalizar. Hasta V1-E8a cada escalón dividía por un «factor de
  * conversión» presentación→consumo; se retiró con la dualidad de unidades que lo justificaba):
@@ -139,6 +148,8 @@ export interface ColorTelaReferencia {
   nombre: string;
   /** `TelaColor.precio` (del cuerpo). */
   precio: number | null;
+  /** `TelaColor.precioComplemento` (del cárdigan, 0.163). `null`/omitido = ese color no lo fija. */
+  precioComplemento?: number | null;
   /** LEGACY: `TelaColor.idColor` — liga al color de PRENDA de las filas migradas; null en las nuevas. */
   idColor: number | null;
 }
@@ -226,6 +237,141 @@ export function resolverPrecioTela(entrada: EntradaPrecioTela): PrecioResuelto {
     return { precio: entrada.precioSugerido, origen: 'sugerido', idProveedor: null };
   }
   return { precio: null, origen: 'sin-precio', idProveedor: null };
+}
+
+// ── COMPLEMENTO DE LA TELA (0.163) ────────────────────────────────────────────
+
+/**
+ * ⭐⭐ **0.163 — EL COMPLEMENTO TAMBIÉN CUESTA.** DANIEL: *«El complemento de la tela debe de llevar
+ * un costo estimado»*.
+ *
+ * Una tela puede llevar COMPLEMENTO (el cárdigan que acompaña a la felpa): el CATÁLOGO dice quién lo
+ * lleva (`Tela.nombreComplemento`) y la RECETA dice cuánto (`ModeloTela.consumoComplementoPorPrenda`,
+ * congelado en `OrdenTela`). Viaja DENTRO del mismo renglón de tela, nunca como renglón aparte.
+ * Hasta esta fila el costeo lo ignoraba por completo mientras el MRP sí lo compraba y lo cobraba
+ * (`cantidadComplemento × (precioComplemento ?? precio)`): **se compraba y no se cobraba**, y el
+ * precio cotizado al cliente salía BAJO. Esta cascada es lo que lo valúa.
+ *
+ * TRES ESCALONES — el espejo del cuerpo, con lo que el complemento SÍ tiene:
+ *   1. **última compra REAL del complemento** — `OrdenCompraLinea.precioComplemento` de la línea
+ *      más reciente que compró complemento, con el MISMO criterio de estatus de OC y el MISMO
+ *      desempate que el cuerpo (`ultimo-precio-compra.ts`; no hay una regla nueva que mantener).
+ *   2. **precio por COLOR** — `TelaColor.precioComplemento`, sólo cuando el llamador tiene color en
+ *      la mano. ⚠️ Hoy **ningún motor de COSTEO se lo pasa** (la receta, el pre-costo y el precosto
+ *      son POR MODELO: el color aparece hasta la orden), así que queda PREPARADO y sin alimentar.
+ *      🔎 Medido el 12-sep-2026, para que nadie lo dé por muerto: el `color-referencia` del CUERPO
+ *      **sí está vivo — en el MRP** (`compras/mrp.ts:1360` le pasa el `TelaColor.precio` del color
+ *      con el que se pide el renglón, §Post-F9.89(b)); el comentario de `mrp.ts:733` que lo llama
+ *      «inalcanzable» está desactualizado. El día que el MRP quiera también el precio del cárdigan
+ *      por color, este escalón ya existe: sólo hay que alimentarlo.
+ *   3. **el estimado del catálogo** — `Tela.precioSugeridoComplemento` (el campo que estrena 0.163).
+ *
+ * Sin ninguno ⇒ `precio: null` + `origen: 'sin-precio'`: el complemento **NO se valúa en silencio a
+ * cero**, se dice — exactamente como ya hace el cuerpo.
+ *
+ * ⚠️ **Lo que esta cascada NO hace a propósito: caer al precio del CUERPO.** `OrdenCompraLinea`
+ * documenta *«precioComplemento NULL = se cobra al mismo precio que el cuerpo»*, y eso se respeta
+ * **al leer una compra** (el escalón 1 usa `precioComplemento ?? precio` de esa línea: es el dinero
+ * que realmente se pagó). Pero inventar ese fallback al COSTEAR convertiría un dato faltante en un
+ * número que parece bueno, que es justo el silencio que esta fila vino a matar.
+ */
+export type OrigenPrecioComplemento =
+  | 'ultimo-precio-compra'
+  | 'color-complemento'
+  | 'sugerido-complemento'
+  | 'sin-precio';
+
+/** Entrada de la resolución del precio del COMPLEMENTO de una tela (todo ya leído por el llamador). */
+export interface EntradaPrecioComplemento {
+  /** `Tela.precioSugeridoComplemento` (el estimado del catálogo). Último escalón. */
+  precioSugeridoComplemento: number | null;
+  /**
+   * `TelaColor.precioComplemento` del color en contexto. Omitir/`null` = el llamador no tiene color
+   * (el caso de TODO el costeo por modelo) ⇒ la cascada salta este escalón.
+   */
+  precioColorComplemento?: number | null;
+  /** ESCALÓN 1: última compra REAL del complemento de esta tela. Omitir = no se consultó. */
+  ultimaCompraComplemento?: CompraRealPrecio | null;
+}
+
+/** Resultado de resolver el precio del complemento (misma forma que el del cuerpo, con su origen). */
+export interface PrecioComplementoResuelto {
+  /** Precio efectivo del complemento por unidad de consumo, o `null` si no hay ninguno. */
+  precio: number | null;
+  /** De qué escalón salió (traza: se ve de dónde salió el número). */
+  origen: OrigenPrecioComplemento;
+  /** Proveedor que firma el precio cuando el escalón lo identifica (hoy: la última compra). */
+  idProveedor: number | null;
+}
+
+/**
+ * Resuelve el precio del COMPLEMENTO de una tela: última compra real → precio por color → estimado
+ * del catálogo → `sin-precio`. Función PURA (el llamador ya leyó catálogo y compras) y sin redondeo:
+ * la precisión final la decide quien guarda.
+ *
+ * 📌 **Por qué el escalón 2 (color) va DEBAJO de la última compra y no encima.** Es la misma
+ * asimetría que el cuerpo lleva escrita en `resolverPrecioAvioCatalogo`: la «última compra» que
+ * alimenta el escalón 1 es **CIEGA al color**. ⚠️ Ojo con el porqué, porque el motivo cambió y
+ * conviene medirlo: desde V1-E3u (§Post-F9.89) la línea de OC de una tela **SÍ puede nombrar el
+ * color** (`OrdenCompraLinea.idTelaColor`, nullable) — lo que pasa es que
+ * {@link leerUltimasComprasDeComplemento} **no filtra por él a propósito**, para que una tela que
+ * nunca se compró en ESE color siga teniendo un precio real reciente en vez de ninguno. Hoy es
+ * inofensivo porque ningún llamador del costeo pasa color; el día que alguien meta color al
+ * precosto tiene que subir `color-complemento` por encima del escalón 1, o restringir la última
+ * compra al color — si no, un cárdigan NEGRO se costearía con el precio del BLANCO comprado al
+ * final, en silencio.
+ */
+export function resolverPrecioComplementoTela(
+  entrada: EntradaPrecioComplemento,
+): PrecioComplementoResuelto {
+  // 1. La última compra REAL del complemento (el dinero que de verdad se pagó por el cárdigan).
+  const ultima = entrada.ultimaCompraComplemento;
+  if (ultima != null && precioUsable(ultima.precio)) {
+    return {
+      precio: ultima.precio,
+      origen: 'ultimo-precio-compra',
+      idProveedor: ultima.idProveedor,
+    };
+  }
+  // 2. Precio del complemento EN ESTE COLOR (`TelaColor.precioComplemento`), si hay color.
+  if (precioUsable(entrada.precioColorComplemento)) {
+    return {
+      precio: entrada.precioColorComplemento,
+      origen: 'color-complemento',
+      idProveedor: null,
+    };
+  }
+  // 3. El ESTIMADO del catálogo (`Tela.precioSugeridoComplemento`) — la decisión de Daniel.
+  if (precioUsable(entrada.precioSugeridoComplemento)) {
+    return {
+      precio: entrada.precioSugeridoComplemento,
+      origen: 'sugerido-complemento',
+      idProveedor: null,
+    };
+  }
+  // Sin nada: se DICE que falta (nunca un cero mudo).
+  return { precio: null, origen: 'sin-precio', idProveedor: null };
+}
+
+/**
+ * Resuelve el `precioColorComplemento` (escalón 2) desde los colores HIJOS de la tela, dado el color
+ * de PRENDA en contexto. Gemelo exacto de {@link resolverPrecioColorReferencia} —liga legacy
+ * `idColor` primero, nombre insensible después— pero leyendo `TelaColor.precioComplemento`.
+ */
+export function resolverPrecioColorComplemento(
+  coloresTela: readonly ColorTelaReferencia[],
+  contexto: { idColor: number; nombre: string },
+): number | null {
+  const porLiga = coloresTela.find((c) => c.idColor !== null && c.idColor === contexto.idColor);
+  if (porLiga !== undefined && precioUsable(porLiga.precioComplemento)) {
+    return porLiga.precioComplemento;
+  }
+  const clave = contexto.nombre.trim().toLowerCase();
+  const porNombre = coloresTela.find((c) => c.nombre.trim().toLowerCase() === clave);
+  if (porNombre !== undefined && precioUsable(porNombre.precioComplemento)) {
+    return porNombre.precioComplemento;
+  }
+  return null;
 }
 
 // ── AVÍO ──────────────────────────────────────────────────────────────────────

@@ -620,6 +620,15 @@ function RenglonPrecosto({
             Ajustado
           </Badge>
         ) : null}
+        {/* ⭐⭐ 0.163 — EL COMPLEMENTO, DEBAJO DE SU TELA. `importe` ya lo incluye, así que sin esta
+            línea el renglón mostraría un importe que NO es `consumo × precio` y nadie sabría por
+            qué. Es el desglose de la otra mitad de la misma tela, no un renglón aparte. */}
+        {linea.importeComplemento !== null ? (
+          <div className="text-xs text-muted-foreground" data-testid="linea-complemento">
+            + complemento: {linea.consumoComplemento ?? '—'} × {moneda(linea.precioUnitComplemento)}{' '}
+            = {moneda(linea.importeComplemento)}
+          </div>
+        ) : null}
       </TableCell>
       <TableCell className="text-right">{linea.consumo ?? '—'}</TableCell>
       <TableCell className="text-right">{moneda(linea.precioUnit)}</TableCell>

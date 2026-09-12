@@ -1565,3 +1565,125 @@ describe('V1-E3e — el precosto valúa con la ÚLTIMA COMPRA REAL (§Post-F9.48
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(20);
   });
 });
+
+// ── ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA, en el PRECOSTO PERSISTIDO ────────────────────────
+//
+// Éste es el camino del dinero hacia el CLIENTE: el precosto persistido alimenta la lista de
+// precios. Mientras el complemento no entrara aquí, el MRP compraba el cárdigan y la cotización no
+// lo cobraba. El renglón NO se parte en dos: el cárdigan viaja DENTRO del renglón de su tela (la
+// llave de deduplicación del recálculo es `origen:idTela:idAvio:idModeloArte`).
+describe('el COMPLEMENTO de la tela en el precosto persistido (0.163)', () => {
+  /** Tela con cárdigan + modelo que la usa. */
+  async function modeloConCardigan(opciones: {
+    precioSugerido: number;
+    precioSugeridoComplemento: number | null;
+    consumoPorPrenda: number;
+    consumoComplementoPorPrenda: number | null;
+  }): Promise<number> {
+    const tela = await cliente.tela.create({
+      data: {
+        nombre: `Felpa cardigan ${String(Math.random())}`,
+        precioSugerido: opciones.precioSugerido,
+        nombreComplemento: 'Cardigan',
+        precioSugeridoComplemento: opciones.precioSugeridoComplemento,
+      },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: `CARD-${String(Math.floor(Math.random() * 1e9))}`,
+        maquilaBase: 0,
+        telas: {
+          create: [
+            {
+              idTela: tela.id,
+              consumoPorPrenda: opciones.consumoPorPrenda,
+              consumoComplementoPorPrenda: opciones.consumoComplementoPorPrenda,
+            },
+          ],
+        },
+      },
+    });
+    return modelo.id;
+  }
+
+  it('el renglón de tela guarda el desglose y su importe vale cuerpo + cárdigan', async () => {
+    const idModelo = await modeloConCardigan({
+      precioSugerido: 20,
+      precioSugeridoComplemento: 30,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(linea?.consumo).toBe(2);
+    expect(linea?.precioUnit).toBe(20);
+    expect(linea?.consumoComplemento).toBe(0.5);
+    expect(linea?.precioUnitComplemento).toBe(30);
+    expect(linea?.importeComplemento).toBe(15);
+    expect(linea?.importe).toBe(55); // 2×20 + 0.5×30
+    // Y NO se partió en dos renglones de tela.
+    expect(precosto.lineas.filter((l) => l.conceptoCodigo === 'tela')).toHaveLength(1);
+    // El dinero del cárdigan llega al total sin que nadie lo sume aparte.
+    expect(precosto.costoTotal).toBe(redondear2(55 + 2.2)); // + el ancla de empaque de la fixture
+  });
+
+  it('editar el CUERPO a mano NO borra el dinero del cárdigan', async () => {
+    const idModelo = await modeloConCardigan({
+      precioSugerido: 20,
+      precioSugeridoComplemento: 30,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+
+    const editado = await editarLinea(sesion(), precosto.id, linea!.id, { precioUnit: 10 }, bd());
+    const tela = editado.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(tela?.precioUnit).toBe(10);
+    expect(tela?.importeComplemento).toBe(15); // se conserva
+    expect(tela?.importe).toBe(35); // 2×10 + 15
+  });
+
+  it('sin estimado del catálogo el cárdigan no se valúa, y el cuerpo no se altera', async () => {
+    const idModelo = await modeloConCardigan({
+      precioSugerido: 20,
+      precioSugeridoComplemento: null,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(linea?.importe).toBe(40);
+    expect(linea?.precioUnitComplemento).toBeNull();
+    expect(linea?.importeComplemento).toBeNull();
+    expect(linea?.consumoComplemento).toBe(0.5); // el consumo SÍ se sabe; lo que falta es el precio
+  });
+
+  it('una tela SIN complemento guarda los tres campos en null (no-regresión)', async () => {
+    const tela = await cliente.tela.create({
+      data: { nombre: 'Rib liso 0163', precioSugerido: 12 },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'SIN-CARD-0163',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(linea?.importe).toBe(24);
+    expect(linea?.consumoComplemento).toBeNull();
+    expect(linea?.precioUnitComplemento).toBeNull();
+    expect(linea?.importeComplemento).toBeNull();
+  });
+});

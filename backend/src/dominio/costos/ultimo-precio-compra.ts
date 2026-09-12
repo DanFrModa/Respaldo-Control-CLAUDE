@@ -27,6 +27,11 @@
  * El global se DERIVA de los representantes por proveedor sin una segunda consulta: la línea más
  * reciente de un material es, necesariamente, la más reciente dentro de su propio grupo de proveedor.
  *
+ *  • ⭐⭐ **por COMPLEMENTO de la tela** (0.163) — la línea más reciente **que compró cárdigan**, con
+ *    `COALESCE(precio_complemento, precio)`. Ésa SÍ necesita su propia consulta, y el porqué está en
+ *    {@link leerUltimasComprasDeComplemento}: la compra más reciente de una tela no tiene por qué
+ *    haber comprado complemento.
+ *
  * ⭐ UNIDADES (§Post-F9.97): el precio se devuelve **POR UNIDAD DE CONSUMO** porque la línea de OC
  * **ya está en unidad de consumo** — se lee tal cual, sin dividir por nada. Hasta V1-E8a aquí se
  * aplicaba un «factor de conversión» presentación→consumo y el factor viajaba en el resultado para
@@ -85,18 +90,24 @@ export interface UltimaCompraMaterial {
   compra: ReferenciaCompra;
 }
 
-/** Resultado de la lectura por lote: los dos mapas que la cascada necesita. */
+/** Resultado de la lectura por lote: los mapas que la cascada necesita. */
 export interface UltimosPreciosCompra {
   /** Clave {@link claveMaterial} → la compra más reciente del material (cualquier proveedor). */
   porMaterial: ReadonlyMap<string, UltimaCompraMaterial>;
   /** Clave {@link claveMaterialProveedor} → la compra más reciente A ESE proveedor. */
   porMaterialProveedor: ReadonlyMap<string, UltimaCompraMaterial>;
+  /**
+   * ⭐⭐ 0.163 — Clave {@link claveMaterial} (siempre `tela-…`) → la compra más reciente que compró
+   * COMPLEMENTO de esa tela, con su precio de complemento. Ver {@link leerUltimosPreciosCompra}.
+   */
+  complementoPorMaterial: ReadonlyMap<string, UltimaCompraMaterial>;
 }
 
 /** Resultado VACÍO (para los caminos que no piden ningún material; evita crear mapas sueltos). */
 export const SIN_ULTIMOS_PRECIOS: UltimosPreciosCompra = {
   porMaterial: new Map(),
   porMaterialProveedor: new Map(),
+  complementoPorMaterial: new Map(),
 };
 
 /** Clave de cruce de un material: `tela-<id>` / `avio-<id>` (la misma de `costo-real-compras.ts`). */
@@ -125,6 +136,8 @@ interface FilaUltimaCompra {
   idTela: number | null;
   idAvio: number | null;
   precio: Prisma.Decimal;
+  /** 0.163 — precio del COMPLEMENTO de la línea. NULL = «al mismo precio que el cuerpo». */
+  precioComplemento: Prisma.Decimal | null;
   idOrdenCompra: number;
   numCompra: bigint;
   estatus: string;
@@ -177,6 +190,7 @@ export async function leerUltimosPreciosCompra(
       l."id_tela"        AS "idTela",
       l."id_avio"        AS "idAvio",
       l."precio"         AS "precio",
+      l."precio_complemento" AS "precioComplemento",
       oc."id"            AS "idOrdenCompra",
       oc."num_compra"    AS "numCompra",
       oc."estatus"::text AS "estatus",
@@ -226,7 +240,87 @@ export async function leerUltimosPreciosCompra(
       porMaterial.set(claveGlobal, ultima);
     }
   }
-  return { porMaterial, porMaterialProveedor };
+  const complementoPorMaterial = await leerUltimasComprasDeComplemento(cliente, idEmpresa, telas);
+  return { porMaterial, porMaterialProveedor, complementoPorMaterial };
+}
+
+/**
+ * ⭐⭐ 0.163 — ÚLTIMA COMPRA REAL **DEL COMPLEMENTO** (el cárdigan) de cada tela pedida.
+ *
+ * Es **UNA SEGUNDA consulta**, y no una columna más de la primera, por una razón de negocio: la
+ * compra más reciente de una tela **no tiene por qué haber comprado complemento**. `OrdenCompraLinea`
+ * sólo trae `cantidad_complemento` cuando esa línea realmente lo pidió (es NULL en las telas sin
+ * complemento y en TODO el histórico migrado), así que «la última compra del complemento» es la
+ * línea más reciente **que sí lo compró** — filtrarlo dentro del `DISTINCT ON` del cuerpo daría el
+ * complemento de una línea equivocada, o ninguno. Sigue siendo **por lote** (una consulta para todas
+ * las telas), que es lo que la decisión de rendimiento de V1-E3e protege.
+ *
+ * El PRECIO es `COALESCE(precio_complemento, precio)` porque así lo dice el modelo —*«`precioComplemento`
+ * NULL = se cobra al mismo precio que el cuerpo»*— y así lo cobra la OC (`aCompraSalida`): ése es el
+ * dinero que de verdad se pagó por el cárdigan. ⚠️ **No es un fallback inventado al costear**: la
+ * cascada NUNCA cae sola al precio del cuerpo (ver `resolverPrecioComplementoTela`); esto es la
+ * lectura fiel de una compra que sí existió.
+ *
+ * Mismo criterio de estatus (`ESTATUS_COMPRADO`), mismo desempate (fecha DESC NULLS LAST → folio
+ * DESC → renglón DESC) y misma acotación a la empresa activa (A9) que el cuerpo: no hay una regla
+ * nueva que mantener.
+ *
+ * ⚠️ **NO se filtra por COLOR, a propósito.** Desde V1-E3u (§Post-F9.89) la línea de OC de una tela
+ * sí puede nombrarlo (`orden_compra_linea.id_tela_color`), pero acotar por él dejaría sin precio
+ * real a cualquier tela que nunca se haya comprado en ESE color — y el llamador del costeo, hoy, ni
+ * siquiera tiene color. El precio que sale de aquí es por TELA; quien algún día meta color al
+ * costeo debe leer la nota del escalón 2 en `resolverPrecioComplementoTela` antes de usarlo.
+ */
+async function leerUltimasComprasDeComplemento(
+  cliente: ClienteLectura,
+  idEmpresa: number,
+  telas: readonly number[],
+): Promise<ReadonlyMap<string, UltimaCompraMaterial>> {
+  const mapa = new Map<string, UltimaCompraMaterial>();
+  if (telas.length === 0) {
+    return mapa;
+  }
+  const filas = await cliente.$queryRaw<FilaUltimaCompra[]>(Prisma.sql`
+    SELECT DISTINCT ON (l."id_tela")
+      l."id"             AS "idLinea",
+      l."id_tela"        AS "idTela",
+      l."id_avio"        AS "idAvio",
+      l."precio"         AS "precio",
+      COALESCE(l."precio_complemento", l."precio") AS "precioComplemento",
+      oc."id"            AS "idOrdenCompra",
+      oc."num_compra"    AS "numCompra",
+      oc."estatus"::text AS "estatus",
+      oc."fecha"         AS "fecha",
+      oc."id_proveedor"  AS "idProveedor",
+      p."nombre"         AS "proveedor"
+    FROM "orden_compra_linea" l
+    JOIN "ordenes_compra" oc ON oc."id" = l."id_orden_compra"
+    JOIN "proveedores"    p  ON p."id"  = oc."id_proveedor"
+    WHERE oc."id_empresa" = ${idEmpresa}
+      AND oc."estatus"::text IN (${Prisma.join(ESTATUS_COMPRADO.map((e) => String(e)))})
+      AND l."id_tela" IN (${Prisma.join(telas)})
+      AND l."cantidad_complemento" IS NOT NULL
+    ORDER BY
+      l."id_tela",
+      oc."fecha" DESC NULLS LAST, oc."num_compra" DESC, l."id" DESC
+  `);
+  for (const f of filas) {
+    if (f.idTela === null || f.precioComplemento === null) continue;
+    mapa.set(claveMaterial('tela', f.idTela), {
+      precio: f.precioComplemento.toNumber(),
+      idProveedor: f.idProveedor,
+      proveedor: f.proveedor,
+      compra: {
+        idOrdenCompra: f.idOrdenCompra,
+        numCompra: Number(f.numCompra),
+        estatus: f.estatus,
+        fecha: aFechaCorta(f.fecha),
+        idProveedor: f.idProveedor,
+        proveedor: f.proveedor,
+      },
+    });
+  }
+  return mapa;
 }
 
 /**

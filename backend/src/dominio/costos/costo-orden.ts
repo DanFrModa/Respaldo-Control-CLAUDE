@@ -7,7 +7,11 @@
  *  • TEÓRICO (`*Calc`) — calculado de la **RECETA CONGELADA DE LA ORDEN** `paraCosto` (V1-E3d,
  *    §Post-F9.43) × su precio congelado (o el de catálogo si esa orden no congeló ninguno), referido
  *    a las piezas CORTADAS (la producción):
- *      telaPorPrenda   = Σ ( OrdenTela.consumoPorPrenda × (OrdenTela.precio ?? Tela.precioSugerido) )
+ *      telaPorPrenda   = Σ ( OrdenTela.consumoPorPrenda × (OrdenTela.precio ?? Tela.precioSugerido)
+ *                             + OrdenTela.consumoComplementoPorPrenda × Tela.precioSugeridoComplemento )
+ *                        ⭐⭐ 0.163: el COMPLEMENTO (cárdigan) va en el MISMO renglón. La orden no
+ *                        congela precio de complemento, así que se valúa con el ESTIMADO del
+ *                        catálogo — el número que Daniel mandó crear justo para esto.
  *      aviosPorPrenda  = Σ ( OrdenAvio.consumoPorPrenda × (OrdenAvio.precio ?? Avio.precioReferencia) )
  *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes de la OP
  *      tela/avios/procesos (TOTALES) = por-prenda × cortado
@@ -97,7 +101,19 @@ const seleccionOrdenCosto = {
       idTela: true,
       consumoPorPrenda: true,
       precio: true,
-      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+      // ⭐⭐ 0.163: el COMPLEMENTO de la tela (el cárdigan) también cuesta. Quién lo lleva lo dice el
+      // CATÁLOGO (`nombreComplemento`), cuánto lo dice la RECETA CONGELADA DE LA ORDEN (0.156) y con
+      // qué se valúa lo dice el ESTIMADO del catálogo (ver `teoricoPorPrenda`).
+      consumoComplementoPorPrenda: true,
+      tela: {
+        select: {
+          nombre: true,
+          unidadMedida: true,
+          precioSugerido: true,
+          nombreComplemento: true,
+          precioSugeridoComplemento: true,
+        },
+      },
     },
   },
   recetaAvios: {
@@ -123,6 +139,20 @@ const seleccionOrdenCosto = {
 
 type OrdenConCosto = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenCosto }>;
 
+/**
+ * ⭐⭐ 0.163 — Costo del COMPLEMENTO por prenda de un renglón de tela de la receta congelada:
+ * `consumoComplementoPorPrenda × Tela.precioSugeridoComplemento`. Cero cuando la tela no declara
+ * complemento, cuando la receta no trajo el consumo, o cuando nadie capturó el estimado — en los
+ * tres casos no hay nada que valuar y el teórico queda como estaba (REGLA 0-B: el dato viejo que
+ * falta se TOLERA, no se rellena ni se compensa).
+ */
+function complementoPorPrenda(t: OrdenConCosto['recetaTelas'][number]): number {
+  if (t.tela.nombreComplemento == null || t.consumoComplementoPorPrenda == null) {
+    return 0;
+  }
+  return t.consumoComplementoPorPrenda.toNumber() * num(t.tela.precioSugeridoComplemento);
+}
+
 /** Costo TEÓRICO por prenda (los tres componentes), determinista sobre la receta paraCosto. */
 export interface TeoricoPorPrenda {
   tela: number;
@@ -144,7 +174,20 @@ export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
     (s, t) =>
       s +
       num(t.consumoPorPrenda) *
-        (t.precio === null ? num(t.tela.precioSugerido) : t.precio.toNumber()),
+        (t.precio === null ? num(t.tela.precioSugerido) : t.precio.toNumber()) +
+      // ⭐⭐ 0.163 — EL COMPLEMENTO, EN EL MISMO RENGLÓN (el cárdigan que acompaña a la felpa).
+      // Hasta esta fila el costeo lo ignoraba mientras el MRP sí lo compraba y lo cobraba: se
+      // compraba y no se cobraba. Hacen falta LAS DOS mitades del dato —que el CATÁLOGO declare
+      // complemento y que la RECETA DE LA ORDEN diga cuánto (0.156)—; si falta cualquiera, esto
+      // suma cero y el renglón queda exactamente como antes.
+      //
+      // ⚠️ **Se valúa con el ESTIMADO del catálogo, a propósito.** Aquí el CUERPO usa «el precio
+      // que la orden congeló, o el del catálogo si no congeló ninguno» — y la orden NO congela
+      // precio de complemento (`OrdenTela` tiene `precio`, no `precioComplemento`). El estimado es
+      // justo el número que Daniel mandó crear para esto: *«El complemento de la tela debe de
+      // llevar un costo estimado»*. El precio REALMENTE pagado por el cárdigan sí entra al costo,
+      // pero por el otro camino: el REAL DE COMPRAS (`costo-real-compras.ts`), que lee las OC.
+      complementoPorPrenda(t),
     0,
   );
   const avios = orden.recetaAvios.reduce(

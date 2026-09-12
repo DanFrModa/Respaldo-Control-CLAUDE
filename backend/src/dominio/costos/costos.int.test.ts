@@ -12,7 +12,10 @@
  *       devuelve a cálculo vivo; una orden cerrada no se puede costear;
  *  (e) una orden `noCostear` se rechaza al costear;
  *  (f) lista de costos y márgenes por pedido (fórmula D2);
- *  (g) sin `consultas.ver-importes` los importes salen en null (permiso de importes).
+ *  (g) sin `consultas.ver-importes` los importes salen en null (permiso de importes);
+ *  (h) ⭐⭐ 0.163: el COMPLEMENTO de la tela (el cárdigan) SE COBRA en el pre-costo — cascada
+ *      completa (última compra real → estimado del catálogo → «sin precio» explícito) y su
+ *      desglose en el renglón. Antes de esta fila se compraba y no se cobraba.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -900,5 +903,126 @@ describe('cerrarOrden / reabrirOrden: el costo deja de "ir cambiando"', () => {
     expect(
       (cierre?.datos as { cantidadBaseCongelada?: number } | null)?.cantidadBaseCongelada,
     ).toBe(25);
+  });
+});
+
+// ── ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA, de punta a punta ─────────────────────────────────
+//
+// DANIEL: «El complemento de la tela debe de llevar un costo estimado».
+//
+// EL DEFECTO QUE ESTAS PRUEBAS VIGILAN: el catálogo ya declaraba el complemento, la receta ya decía
+// cuánto lleva y el MRP ya lo COMPRABA y lo COBRABA… pero el COSTEO lo ignoraba por completo. Se
+// compraba y no se cobraba, y el precio cotizado al cliente salía BAJO. Aquí se mide con el motor
+// entero (catálogo → receta → pre-costo → precio sugerido), no sólo con la cascada pura.
+describe('el COMPLEMENTO de la tela en el pre-costo (0.163)', () => {
+  /** Modelo mínimo con UNA tela con cárdigan; devuelve su id y el de la tela. */
+  async function modeloConComplemento(opciones: {
+    precioSugerido: number;
+    precioSugeridoComplemento: number | null;
+    consumoPorPrenda: number;
+    consumoComplementoPorPrenda: number | null;
+  }): Promise<{ idModelo: number; idTela: number }> {
+    const tela = await cliente.tela.create({
+      data: {
+        nombre: `Felpa con cardigan ${String(Math.random())}`,
+        precioSugerido: opciones.precioSugerido,
+        nombreComplemento: 'Cardigan',
+        precioSugeridoComplemento: opciones.precioSugeridoComplemento,
+      },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: `MOD-C-${String(Math.floor(Math.random() * 1e9))}`,
+        maquilaBase: 0,
+        telas: {
+          create: [
+            {
+              idTela: tela.id,
+              consumoPorPrenda: opciones.consumoPorPrenda,
+              consumoComplementoPorPrenda: opciones.consumoComplementoPorPrenda,
+            },
+          ],
+        },
+      },
+    });
+    return { idModelo: modelo.id, idTela: tela.id };
+  }
+
+  it('el renglón de tela vale cuerpo + cárdigan, y el desglose dice de dónde salió', async () => {
+    const { idModelo: id } = await modeloConComplemento({
+      precioSugerido: 20,
+      precioSugeridoComplemento: 30,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const pre = await calcularPreCosto(sesion(), id, bd());
+    const fila = pre.telas[0];
+    expect(fila?.importe).toBe(55); // 2×20 = 40 del cuerpo + 0.5×30 = 15 del cárdigan
+    expect(pre.totalTela).toBe(55);
+    expect(pre.costoTotal).toBe(55);
+    // El desglose (lo que hace que se VEA de dónde salió cada peso).
+    expect(fila?.nombreComplemento).toBe('Cardigan');
+    expect(fila?.consumoComplementoPorPrenda).toBe(0.5);
+    expect(fila?.precioUnitarioComplemento).toBe(30);
+    expect(fila?.importeComplemento).toBe(15);
+    expect(fila?.origenPrecioComplemento).toBe('sugerido-complemento');
+  });
+
+  it('sin estimado capturado el complemento NO se valúa a cero en silencio: lo DICE', async () => {
+    const { idModelo: id } = await modeloConComplemento({
+      precioSugerido: 20,
+      precioSugeridoComplemento: null,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const pre = await calcularPreCosto(sesion(), id, bd());
+    expect(pre.totalTela).toBe(40); // sólo el cuerpo
+    expect(pre.telas[0]?.origenPrecioComplemento).toBe('sin-precio');
+    expect(pre.telas[0]?.precioUnitarioComplemento).toBeNull();
+    // El consumo SÍ se ve (hay cárdigan; lo que falta es su precio).
+    expect(pre.telas[0]?.consumoComplementoPorPrenda).toBe(0.5);
+  });
+
+  it('la ÚLTIMA COMPRA REAL del complemento gana sobre el estimado del catálogo', async () => {
+    const { idModelo: id, idTela } = await modeloConComplemento({
+      precioSugerido: 20,
+      precioSugeridoComplemento: 30,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Alsatex 0163' } });
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: 9163n,
+        idEmpresa: empresa.id,
+        idProveedor: proveedor.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-09-01T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idTela,
+              cantidad: 100,
+              precio: 22,
+              cantidadComplemento: 10,
+              precioComplemento: 44,
+            },
+          ],
+        },
+      },
+    });
+    const pre = await calcularPreCosto(sesion(), id, bd());
+    expect(pre.telas[0]?.precioUnitario).toBe(22); // el cuerpo, por su propia cascada
+    expect(pre.telas[0]?.precioUnitarioComplemento).toBe(44);
+    expect(pre.telas[0]?.origenPrecioComplemento).toBe('ultimo-precio-compra');
+    expect(pre.totalTela).toBe(66); // 2×22 + 0.5×44
+  });
+
+  it('una tela SIN complemento sigue costando exactamente lo de siempre (no-regresión)', async () => {
+    const pre = await calcularPreCosto(sesion(), idModelo, bd());
+    expect(pre.totalTela).toBe(30);
+    expect(pre.costoTotal).toBe(49);
+    expect(pre.telas[0]?.nombreComplemento).toBeNull();
+    expect(pre.telas[0]?.importeComplemento).toBe(0);
   });
 });

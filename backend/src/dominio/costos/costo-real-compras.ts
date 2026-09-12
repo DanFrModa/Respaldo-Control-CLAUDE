@@ -166,6 +166,19 @@ export interface RequeridoMaterial {
   ultimaCompra: ReferenciaCompra | null;
   /** Precio de CATÁLOGO por unidad de consumo (`Tela.precioSugerido` / `Avio.precioReferencia`). */
   precioCatalogo: number | null;
+
+  // ── ⭐⭐ 0.163 — LA PISTA PARALELA DEL COMPLEMENTO (el cárdigan que acompaña a la felpa) ──
+  // No es otro material: es la OTRA MITAD del mismo. Por eso viaja aquí y no como una fila más
+  // (una fila aparte se cruzaría con las compras por la misma clave `tela-<id>` y se contaría dos
+  // veces). Todo va en 0/null en avíos, en líneas libres y en telas sin complemento.
+  /** Consumo BRUTO del COMPLEMENTO sobre las piezas cortadas. 0 = no hay complemento que valuar. */
+  requeridoComplemento: number;
+  /** Último precio de compra DEL COMPLEMENTO, o null si nunca se compró con complemento. */
+  ultimoPrecioComplemento: number | null;
+  /** OC de la que salió ese último precio del complemento (null si no hay). */
+  ultimaCompraComplemento: ReferenciaCompra | null;
+  /** Estimado del catálogo del complemento (`Tela.precioSugeridoComplemento`), o null. */
+  precioCatalogoComplemento: number | null;
 }
 
 /** Una línea de OC (autorizada+) LIGADA a la orden de producción. */
@@ -180,6 +193,17 @@ export interface LineaCompraLigada {
   cantidad: number;
   unidad: string | null;
   precio: number;
+  /**
+   * ⭐⭐ 0.163 — cantidad del COMPLEMENTO comprada en ESTE renglón (0 = el renglón no compró
+   * cárdigan). Viaja en la MISMA línea de OC que el cuerpo, con su propio precio.
+   */
+  cantidadComplemento: number;
+  /**
+   * ⭐⭐ 0.163 — precio del complemento de ESTE renglón, ya resuelto como `precioComplemento ?? precio`:
+   * el modelo dice *«NULL = se cobra al mismo precio que el cuerpo»* y así lo cobra la OC. Es el
+   * dinero que REALMENTE se pagó por el cárdigan.
+   */
+  precioComplemento: number;
   compra: ReferenciaCompra;
 }
 
@@ -212,6 +236,11 @@ export interface MaterialRealCalculado {
     cantidad: number;
     unidad: string | null;
     precio: number;
+    /** ⭐⭐ 0.163 — cantidad de COMPLEMENTO de ese renglón de OC (0 = no compró cárdigan). */
+    cantidadComplemento: number;
+    /** ⭐⭐ 0.163 — su precio (`precioComplemento ?? precio`). */
+    precioComplemento: number;
+    /** Importe del renglón: cuerpo + complemento (los dos se pagaron en la misma línea). */
     importe: number;
   })[];
   importeDirecto: number;
@@ -221,6 +250,19 @@ export interface MaterialRealCalculado {
   origenPrecio: OrigenPrecioReal;
   ultimaCompra: ReferenciaCompra | null;
   importe: number;
+
+  // ── ⭐⭐ 0.163 — el desglose del COMPLEMENTO (ya sumado dentro de `importeDirecto`/
+  // `importeValuado`/`importe`: es la otra mitad del MISMO material, no un renglón aparte).
+  /** Requerido del complemento sobre las piezas cortadas (0 = no aplica). */
+  requeridoComplemento: number;
+  /** Complemento realmente comprado para esta orden. */
+  compradoComplemento: number;
+  /** Remanente de complemento que hubo que valuar (requerido − comprado, nunca negativo). */
+  cantidadValuadaComplemento: number;
+  /** Precio con el que se valuó ese remanente, o null. */
+  precioValuadoComplemento: number | null;
+  /** De dónde salió ese precio (misma escala de orígenes que el cuerpo). */
+  origenPrecioComplemento: OrigenPrecioReal;
 }
 
 /** Resultado completo del cálculo (crudo). */
@@ -308,6 +350,8 @@ export function combinarCostoReal(
     const previo = requeridosUnicos[i];
     if (previo !== undefined) {
       previo.requerido += r.requerido;
+      // ⭐⭐ 0.163: el complemento se fusiona con su cuerpo (es el MISMO material, otra mitad).
+      previo.requeridoComplemento += r.requeridoComplemento;
       previo.esGenerico = previo.esGenerico || r.esGenerico;
     }
   }
@@ -336,17 +380,25 @@ export function combinarCostoReal(
     compras: MaterialRealCalculado['compras'];
     directo: number;
     comprado: number;
+    compradoComplemento: number;
     hayPrecioCero: boolean;
   } => {
     let directo = 0;
     let comprado = 0;
+    let compradoComplemento = 0;
     let hayPrecioCero = false;
     const compras = lista.map((l) => {
       // El importe de CADA renglón se redondea aquí y el directo es su suma: así la lista del
       // desglose suma EXACTAMENTE el importe directo que se muestra arriba (punto de centavos).
-      const importe = redondear2(l.cantidad * l.precio);
+      // ⭐⭐ 0.163: el renglón de OC de una tela con complemento PAGA LAS DOS MITADES en la misma
+      // línea (`cantidad × precio + cantidadComplemento × precioComplemento`, tal como lo totaliza
+      // la propia orden de compra). Contar sólo el cuerpo dejaba fuera dinero realmente gastado.
+      const importe = redondear2(
+        l.cantidad * l.precio + l.cantidadComplemento * l.precioComplemento,
+      );
       directo += importe;
       comprado += l.cantidad;
+      compradoComplemento += l.cantidadComplemento;
       if (l.precio <= TOLERANCIA) {
         hayPrecioCero = true;
       }
@@ -355,10 +407,18 @@ export function combinarCostoReal(
         cantidad: redondear4(l.cantidad),
         unidad: l.unidad,
         precio: redondear2(l.precio),
+        cantidadComplemento: redondear4(l.cantidadComplemento),
+        precioComplemento: redondear2(l.precioComplemento),
         importe,
       };
     });
-    return { compras, directo: redondear2(directo), comprado, hayPrecioCero };
+    return {
+      compras,
+      directo: redondear2(directo),
+      comprado,
+      compradoComplemento,
+      hayPrecioCero,
+    };
   };
 
   // 1) Un renglón por material REQUERIDO (el caso normal).
@@ -368,7 +428,7 @@ export function combinarCostoReal(
     if (lista.length > 0) {
       hayCompras = true;
     }
-    const { compras, directo, comprado, hayPrecioCero } = armarCompras(lista);
+    const { compras, directo, comprado, compradoComplemento, hayPrecioCero } = armarCompras(lista);
 
     if (hayPrecioCero) {
       avisos.push(
@@ -399,7 +459,37 @@ export function combinarCostoReal(
       );
     }
 
-    const valuado = redondear2(cantidadValuada * (precioValuado ?? 0));
+    // ⭐⭐ 0.163 — EL REMANENTE DEL COMPLEMENTO, con su propia cascada de valuación. Mismos tres
+    // escalones que el cuerpo (última compra real → catálogo → nada), sobre los datos del
+    // complemento: así el cárdigan que la orden consume y NADIE compró para ella deja de costar
+    // cero. El aviso se emite una sola vez por material, nombrando al complemento.
+    const cantidadValuadaComplemento = Math.max(0, r.requeridoComplemento - compradoComplemento);
+    let precioValuadoComplemento: number | null = null;
+    let origenPrecioComplemento: OrigenPrecioReal;
+    if (cantidadValuadaComplemento <= TOLERANCIA) {
+      origenPrecioComplemento = lista.length > 0 ? 'compra-directa' : 'sin-precio';
+    } else if (r.ultimoPrecioComplemento !== null) {
+      precioValuadoComplemento = r.ultimoPrecioComplemento;
+      origenPrecioComplemento = 'ultimo-precio-compra';
+    } else if (r.precioCatalogoComplemento !== null) {
+      precioValuadoComplemento = r.precioCatalogoComplemento;
+      origenPrecioComplemento = 'catalogo';
+      avisos.push(
+        `El complemento de «${r.material}» nunca se ha comprado con orden de compra: se valuó a ` +
+          `su costo estimado del catálogo.`,
+      );
+    } else {
+      origenPrecioComplemento = 'sin-precio';
+      avisos.push(
+        `El complemento de «${r.material}» no tiene precio (ni compras ni costo estimado en el ` +
+          `catálogo de telas): se valuó en cero. Revísalo.`,
+      );
+    }
+
+    const valuado = redondear2(
+      cantidadValuada * (precioValuado ?? 0) +
+        cantidadValuadaComplemento * (precioValuadoComplemento ?? 0),
+    );
     const importe = redondear2(directo + valuado);
 
     // Un material que la orden REQUIERE y que acaba costando CERO es casi siempre un dato faltante
@@ -436,6 +526,13 @@ export function combinarCostoReal(
       origenPrecio,
       ultimaCompra: origenPrecio === 'ultimo-precio-compra' ? r.ultimaCompra : null,
       importe,
+      // ⭐⭐ 0.163 — el desglose del complemento (ya sumado en los importes de arriba).
+      requeridoComplemento: redondear4(r.requeridoComplemento),
+      compradoComplemento: redondear4(compradoComplemento),
+      cantidadValuadaComplemento: redondear4(cantidadValuadaComplemento),
+      precioValuadoComplemento:
+        precioValuadoComplemento === null ? null : redondear2(precioValuadoComplemento),
+      origenPrecioComplemento,
     });
   }
 
@@ -447,7 +544,7 @@ export function combinarCostoReal(
     if (clavesUsadas.has(clave)) continue;
     const primera = lista[0];
     if (primera === undefined) continue;
-    const { compras, directo, comprado, hayPrecioCero } = armarCompras(lista);
+    const { compras, directo, comprado, compradoComplemento, hayPrecioCero } = armarCompras(lista);
 
     if (primera.tipo === 'libre') {
       renglonesLibres += lista.length;
@@ -493,6 +590,13 @@ export function combinarCostoReal(
       origenPrecio: 'compra-directa',
       ultimaCompra: null,
       importe: primera.tipo === 'libre' ? 0 : directo,
+      // 0.163: aquí NO hay requerido que valuar (el material no está en el BOM de costo); lo
+      // comprado de complemento sí se reporta, y su dinero ya va dentro de `importeDirecto`.
+      requeridoComplemento: 0,
+      compradoComplemento: redondear4(compradoComplemento),
+      cantidadValuadaComplemento: 0,
+      precioValuadoComplemento: null,
+      origenPrecioComplemento: 'compra-directa',
     });
   }
 
@@ -554,6 +658,9 @@ const seleccionLineaOc = {
   cantidad: true,
   unidad: true,
   precio: true,
+  // ⭐⭐ 0.163: el COMPLEMENTO se paga en la MISMA línea de OC, con su propia cantidad y precio.
+  cantidadComplemento: true,
+  precioComplemento: true,
   tela: { select: { nombre: true } },
   avio: { select: { clave: true, descripcion: true } },
   ordenCompra: {
@@ -620,25 +727,41 @@ async function leerUltimosPrecios(
   }[],
 ): Promise<{
   precios: Map<string, { precio: number; compra: ReferenciaCompra }>;
+  /** ⭐⭐ 0.163 — lo mismo, del COMPLEMENTO de cada tela (clave → precio + OC). */
+  preciosComplemento: Map<string, { precio: number; compra: ReferenciaCompra }>;
   avisos: string[];
 }> {
   const precios = new Map<string, { precio: number; compra: ReferenciaCompra }>();
+  const preciosComplemento = new Map<string, { precio: number; compra: ReferenciaCompra }>();
   const avisos: string[] = [];
   if (materiales.length === 0) {
-    return { precios, avisos };
+    return { precios, preciosComplemento, avisos };
   }
-  const { porMaterial } = await leerUltimosPreciosCompra(cliente, idEmpresa, {
-    telas: materiales.flatMap((m) => (m.idTela === null ? [] : [m.idTela])),
-    avios: materiales.flatMap((m) => (m.idAvio === null ? [] : [m.idAvio])),
-  });
+  const { porMaterial, complementoPorMaterial } = await leerUltimosPreciosCompra(
+    cliente,
+    idEmpresa,
+    {
+      telas: materiales.flatMap((m) => (m.idTela === null ? [] : [m.idTela])),
+      avios: materiales.flatMap((m) => (m.idAvio === null ? [] : [m.idAvio])),
+    },
+  );
   for (const m of materiales) {
     const id = m.idTela ?? m.idAvio;
     if (id === null) continue;
-    const ultima = porMaterial.get(claveMaterial(m.idTela === null ? 'avio' : 'tela', id));
-    if (ultima === undefined) continue;
-    precios.set(m.clave, { precio: ultima.precio, compra: ultima.compra });
+    const clave = claveMaterial(m.idTela === null ? 'avio' : 'tela', id);
+    const ultima = porMaterial.get(clave);
+    if (ultima !== undefined) {
+      precios.set(m.clave, { precio: ultima.precio, compra: ultima.compra });
+    }
+    // El complemento va SÓLO en telas (un avío no lleva cárdigan).
+    if (m.idTela !== null) {
+      const ultimaC = complementoPorMaterial.get(clave);
+      if (ultimaC !== undefined) {
+        preciosComplemento.set(m.clave, { precio: ultimaC.precio, compra: ultimaC.compra });
+      }
+    }
   }
-  return { precios, avisos };
+  return { precios, preciosComplemento, avisos };
 }
 
 /**
@@ -658,8 +781,18 @@ const seleccionOrdenReal = {
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      // ⭐⭐ 0.163: cuánto cárdigan consume la orden (receta congelada, 0.156).
+      consumoComplementoPorPrenda: true,
       precio: true,
-      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
+      tela: {
+        select: {
+          nombre: true,
+          unidadMedida: true,
+          precioSugerido: true,
+          nombreComplemento: true,
+          precioSugeridoComplemento: true,
+        },
+      },
     },
   },
   recetaAvios: {
@@ -694,6 +827,10 @@ interface MaterialBom {
   esGenerico: boolean;
   consumoPorPrenda: number;
   precioCatalogo: number | null;
+  /** ⭐⭐ 0.163 — consumo del COMPLEMENTO por prenda (0 si no lleva o si la receta no lo trajo). */
+  consumoComplementoPorPrenda: number;
+  /** ⭐⭐ 0.163 — estimado del catálogo del complemento (`Tela.precioSugeridoComplemento`). */
+  precioCatalogoComplemento: number | null;
 }
 
 /**
@@ -716,6 +853,13 @@ function bomParaCosto(orden: OrdenReal): MaterialBom[] {
       esGenerico: false,
       consumoPorPrenda: num(t.consumoPorPrenda),
       precioCatalogo: numOrNull(t.precio) ?? numOrNull(t.tela.precioSugerido),
+      // ⭐⭐ 0.163 — el COMPLEMENTO: hacen falta LAS DOS mitades del dato (que el CATÁLOGO lo
+      // declare y que la RECETA DE LA ORDEN diga cuánto). Si falta cualquiera, no hay complemento
+      // que requerir ni que valuar y todo queda como antes de esta fila.
+      consumoComplementoPorPrenda:
+        t.tela.nombreComplemento === null ? 0 : num(t.consumoComplementoPorPrenda),
+      precioCatalogoComplemento:
+        t.tela.nombreComplemento === null ? null : numOrNull(t.tela.precioSugeridoComplemento),
     })),
     ...orden.recetaAvios.map((a) => ({
       clave: `avio-${String(a.idAvio)}`,
@@ -727,6 +871,9 @@ function bomParaCosto(orden: OrdenReal): MaterialBom[] {
       esGenerico: a.avio.esGenerico,
       consumoPorPrenda: num(a.consumoPorPrenda),
       precioCatalogo: numOrNull(a.precio) ?? numOrNull(a.avio.precioReferencia),
+      // Un avío no tiene complemento (es cosa de la tela): siempre en 0/null.
+      consumoComplementoPorPrenda: 0,
+      precioCatalogoComplemento: null,
     })),
   ];
 }
@@ -735,7 +882,10 @@ function bomParaCosto(orden: OrdenReal): MaterialBom[] {
 interface BaseRequerido {
   origen: OrigenRequerido;
   piezasBase: number;
-  filas: Omit<RequeridoMaterial, 'ultimoPrecio' | 'ultimaCompra'>[];
+  filas: Omit<
+    RequeridoMaterial,
+    'ultimoPrecio' | 'ultimaCompra' | 'ultimoPrecioComplemento' | 'ultimaCompraComplemento'
+  >[];
   /** Materiales del snapshot que NO son `paraCosto`: no se valúan (pero su compra sí cuenta). */
   clavesNoCosteables: Set<string>;
   avisos: string[];
@@ -763,10 +913,19 @@ async function armarRequerido(
   const piezasBase = cant.cortado;
 
   const teorico = {
+    // ⭐⭐ 0.163: el teórico con el que se compara el real incluye el COMPLEMENTO — si no, el aviso
+    // de "el real quedó por debajo de la mitad del teórico" mediría dos cosas distintas y gritaría
+    // (o callaría) por la razón equivocada en cuanto una tela llevara cárdigan.
     tela:
       bom
         .filter((b) => b.tipo === 'tela')
-        .reduce((s, b) => s + b.consumoPorPrenda * (b.precioCatalogo ?? 0), 0) * piezasBase,
+        .reduce(
+          (s, b) =>
+            s +
+            b.consumoPorPrenda * (b.precioCatalogo ?? 0) +
+            b.consumoComplementoPorPrenda * (b.precioCatalogoComplemento ?? 0),
+          0,
+        ) * piezasBase,
     avios:
       bom
         .filter((b) => b.tipo === 'avio')
@@ -809,6 +968,8 @@ async function armarRequerido(
         esGenerico: b.esGenerico,
         requerido: b.consumoPorPrenda * piezasBase,
         precioCatalogo: b.precioCatalogo,
+        requeridoComplemento: b.consumoComplementoPorPrenda * piezasBase,
+        precioCatalogoComplemento: b.precioCatalogoComplemento,
       })),
       clavesNoCosteables,
       avisos,
@@ -882,6 +1043,13 @@ async function armarRequerido(
       requerido:
         delSnapshot === undefined ? b.consumoPorPrenda * piezasBase : delSnapshot.cantidad * escala,
       precioCatalogo: b.precioCatalogo,
+      // ⭐⭐ 0.163 — el requerido del COMPLEMENTO sale SIEMPRE de la receta × piezas cortadas, aunque
+      // el del cuerpo venga del snapshot del MRP. No es una inconsistencia: `RequerimientoOrden` no
+      // guarda complemento (la explosión lo deriva como RAZÓN sobre el cuerpo al generar la OC,
+      // §Post-F9.219), así que no hay nada del snapshot con qué afinarlo. La receta es la única
+      // fuente que lo sabe.
+      requeridoComplemento: b.consumoComplementoPorPrenda * piezasBase,
+      precioCatalogoComplemento: b.precioCatalogoComplemento,
     };
   });
 
@@ -936,6 +1104,10 @@ export async function calcularCostoRealDeOrden(
       cantidad,
       unidad: l.unidad,
       precio: num(l.precio),
+      // ⭐⭐ 0.163 — el COMPLEMENTO de la MISMA línea. `precioComplemento` NULL = se cobró al precio
+      // del cuerpo (así lo dice el modelo y así lo totaliza la propia OC): ése es el dinero real.
+      cantidadComplemento: num(l.cantidadComplemento),
+      precioComplemento: numOrNull(l.precioComplemento) ?? num(l.precio),
       compra: referencia(l),
     };
   });
@@ -946,17 +1118,26 @@ export async function calcularCostoRealDeOrden(
   // 3) Último precio de compra SOLO de los materiales que tienen consumo sin compra propia (los
   //    que la compra ligada ya cubre por completo no necesitan valuarse → cero consultas de más).
   const compradoPorClave = new Map<string, number>();
+  const compradoComplementoPorClave = new Map<string, number>();
   for (const l of ligadas) {
     compradoPorClave.set(l.clave, (compradoPorClave.get(l.clave) ?? 0) + l.cantidad);
+    compradoComplementoPorClave.set(
+      l.clave,
+      (compradoComplementoPorClave.get(l.clave) ?? 0) + l.cantidadComplemento,
+    );
   }
+  // ⭐⭐ 0.163: un material entra a la consulta si le falta por comprar el CUERPO **o** el
+  // COMPLEMENTO (si sólo se mirara el cuerpo, el cárdigan sin comprar se valuaría en cero).
   const porValuar = base.filas.filter(
-    (f) => f.requerido - (compradoPorClave.get(f.clave) ?? 0) > TOLERANCIA,
+    (f) =>
+      f.requerido - (compradoPorClave.get(f.clave) ?? 0) > TOLERANCIA ||
+      f.requeridoComplemento - (compradoComplementoPorClave.get(f.clave) ?? 0) > TOLERANCIA,
   );
-  const { precios, avisos: avisosUltimos } = await leerUltimosPrecios(
-    cliente,
-    idEmpresa,
-    porValuar,
-  );
+  const {
+    precios,
+    preciosComplemento,
+    avisos: avisosUltimos,
+  } = await leerUltimosPrecios(cliente, idEmpresa, porValuar);
   for (const aviso of avisosUltimos) {
     if (!avisosPrevios.includes(aviso)) {
       avisosPrevios.push(aviso);
@@ -965,10 +1146,13 @@ export async function calcularCostoRealDeOrden(
 
   const requeridos: RequeridoMaterial[] = base.filas.map((f) => {
     const u = precios.get(f.clave);
+    const uc = preciosComplemento.get(f.clave);
     return {
       ...f,
       ultimoPrecio: u === undefined ? null : u.precio,
       ultimaCompra: u === undefined ? null : u.compra,
+      ultimoPrecioComplemento: uc === undefined ? null : uc.precio,
+      ultimaCompraComplemento: uc === undefined ? null : uc.compra,
     };
   });
 
@@ -1061,6 +1245,9 @@ export async function costoRealOrden(
         cantidad: c.cantidad,
         unidad: c.unidad,
         precio: money(c.precio),
+        // ⭐⭐ 0.163 — el complemento de esa línea de OC (su dinero ya va dentro de `importe`).
+        cantidadComplemento: c.cantidadComplemento,
+        precioComplemento: money(c.precioComplemento),
         importe: money(c.importe),
       })),
       importeDirecto: money(m.importeDirecto),
@@ -1070,6 +1257,12 @@ export async function costoRealOrden(
       origenPrecio: m.origenPrecio,
       ultimaCompra: m.ultimaCompra,
       importe: money(m.importe),
+      // ⭐⭐ 0.163 — el desglose del complemento del material.
+      requeridoComplemento: m.requeridoComplemento,
+      compradoComplemento: m.compradoComplemento,
+      cantidadValuadaComplemento: m.cantidadValuadaComplemento,
+      precioValuadoComplemento: money(m.precioValuadoComplemento),
+      origenPrecioComplemento: m.origenPrecioComplemento,
     })),
   };
 }

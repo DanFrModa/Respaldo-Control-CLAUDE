@@ -89,6 +89,9 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
     tipoComponente: tela.tipoComponente,
     favorito: tela.favorito,
     precioSugerido: tela.precioSugerido === null ? null : tela.precioSugerido.toNumber(),
+    // ⭐⭐ 0.163 — el costo ESTIMADO del complemento (cárdigan).
+    precioSugeridoComplemento:
+      tela.precioSugeridoComplemento === null ? null : tela.precioSugeridoComplemento.toNumber(),
     peso: tela.peso === null ? null : tela.peso.toNumber(),
     ancho: tela.ancho === null ? null : tela.ancho.toNumber(),
     paraProduccion: tela.paraProduccion,

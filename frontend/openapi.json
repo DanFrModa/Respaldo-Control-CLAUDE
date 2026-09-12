@@ -26502,6 +26502,17 @@
                             ],
                             "description": "Precio de referencia por unidad, o null."
                           },
+                          "precioSugeridoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163)."
+                          },
                           "peso": {
                             "anyOf": [
                               {
@@ -26660,6 +26671,7 @@
                           "tipoComponente",
                           "favorito",
                           "precioSugerido",
+                          "precioSugeridoComplemento",
                           "peso",
                           "ancho",
                           "paraProduccion",
@@ -26920,6 +26932,10 @@
                     "type": "number",
                     "minimum": 0
                   },
+                  "precioSugeridoComplemento": {
+                    "type": "number",
+                    "minimum": 0
+                  },
                   "peso": {
                     "type": "number",
                     "minimum": 0,
@@ -27174,6 +27190,17 @@
                       ],
                       "description": "Precio de referencia por unidad, o null."
                     },
+                    "precioSugeridoComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163)."
+                    },
                     "peso": {
                       "anyOf": [
                         {
@@ -27332,6 +27359,7 @@
                     "tipoComponente",
                     "favorito",
                     "precioSugerido",
+                    "precioSugeridoComplemento",
                     "peso",
                     "ancho",
                     "paraProduccion",
@@ -27697,6 +27725,17 @@
                       ],
                       "description": "Precio de referencia por unidad, o null."
                     },
+                    "precioSugeridoComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163)."
+                    },
                     "peso": {
                       "anyOf": [
                         {
@@ -27855,6 +27894,7 @@
                     "tipoComponente",
                     "favorito",
                     "precioSugerido",
+                    "precioSugeridoComplemento",
                     "peso",
                     "ancho",
                     "paraProduccion",
@@ -28086,6 +28126,17 @@
                     "type": "boolean"
                   },
                   "precioSugerido": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "precioSugeridoComplemento": {
                     "anyOf": [
                       {
                         "type": "number",
@@ -28402,6 +28453,17 @@
                       ],
                       "description": "Precio de referencia por unidad, o null."
                     },
+                    "precioSugeridoComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163)."
+                    },
                     "peso": {
                       "anyOf": [
                         {
@@ -28560,6 +28622,7 @@
                     "tipoComponente",
                     "favorito",
                     "precioSugerido",
+                    "precioSugeridoComplemento",
                     "peso",
                     "ancho",
                     "paraProduccion",
@@ -28923,6 +28986,17 @@
                       ],
                       "description": "Precio de referencia por unidad, o null."
                     },
+                    "precioSugeridoComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163)."
+                    },
                     "peso": {
                       "anyOf": [
                         {
@@ -29081,6 +29155,7 @@
                     "tipoComponente",
                     "favorito",
                     "precioSugerido",
+                    "precioSugeridoComplemento",
                     "peso",
                     "ancho",
                     "paraProduccion",
@@ -218935,7 +219010,61 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "consumo × precio (o null sin importes)."
+                            "description": "consumo × precio + importe del complemento (o null sin importes)."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo. Null = esta tela NO lleva complemento."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta). Null = no aplica o no se capturó."
+                          },
+                          "precioUnitarioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "consumo × precio del complemento, YA sumado en `importe` (o null sin importes)."
+                          },
+                          "origenPrecioComplemento": {
+                            "type": "string",
+                            "enum": [
+                              "ultimo-precio-compra",
+                              "color-complemento",
+                              "sugerido-complemento",
+                              "sin-precio"
+                            ],
+                            "description": "De qué escalón de la cascada salió el precio del complemento (traza)."
                           }
                         },
                         "required": [
@@ -218943,7 +219072,12 @@
                           "tela",
                           "consumoPorPrenda",
                           "precioUnitario",
-                          "importe"
+                          "importe",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "precioUnitarioComplemento",
+                          "importeComplemento",
+                          "origenPrecioComplemento"
                         ],
                         "additionalProperties": false
                       },
@@ -222087,6 +222221,21 @@
                                   ],
                                   "description": "Precio unitario de la línea (o null sin importes)."
                                 },
+                                "cantidadComplemento": {
+                                  "type": "number",
+                                  "description": "Cantidad de COMPLEMENTO comprada en la línea (0 = no compró complemento)."
+                                },
+                                "precioComplemento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio del complemento en la línea (null sin importes). Cuando la OC no lo captura, es el precio del cuerpo: así lo cobra la propia orden de compra."
+                                },
                                 "importe": {
                                   "anyOf": [
                                     {
@@ -222096,7 +222245,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "cantidad × precio (o null sin importes)."
+                                  "description": "cantidad × precio + cantidadComplemento × precioComplemento (o null sin importes): lo que esa línea costó COMPLETA."
                                 }
                               },
                               "required": [
@@ -222109,6 +222258,8 @@
                                 "cantidad",
                                 "unidad",
                                 "precio",
+                                "cantidadComplemento",
+                                "precioComplemento",
                                 "importe"
                               ],
                               "additionalProperties": false
@@ -222231,6 +222382,39 @@
                               }
                             ],
                             "description": "Costo real del material = directo + valuado."
+                          },
+                          "requeridoComplemento": {
+                            "type": "number",
+                            "description": "Complemento que la orden requiere (receta × piezas cortadas). 0 = no aplica."
+                          },
+                          "compradoComplemento": {
+                            "type": "number",
+                            "description": "Complemento comprado y ligado a la orden."
+                          },
+                          "cantidadValuadaComplemento": {
+                            "type": "number",
+                            "description": "Complemento SIN compra propia = max(0, requerido − comprado)."
+                          },
+                          "precioValuadoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó ese remanente (o null sin precio / sin importes)."
+                          },
+                          "origenPrecioComplemento": {
+                            "type": "string",
+                            "enum": [
+                              "compra-directa",
+                              "ultimo-precio-compra",
+                              "catalogo",
+                              "sin-precio"
+                            ],
+                            "description": "De dónde salió el precio del complemento."
                           }
                         },
                         "required": [
@@ -222249,7 +222433,12 @@
                           "importeValuado",
                           "origenPrecio",
                           "ultimaCompra",
-                          "importe"
+                          "importe",
+                          "requeridoComplemento",
+                          "compradoComplemento",
+                          "cantidadValuadaComplemento",
+                          "precioValuadoComplemento",
+                          "origenPrecioComplemento"
                         ],
                         "additionalProperties": false
                       },
@@ -256274,7 +256463,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -256381,6 +256603,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -256778,7 +257003,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -256885,6 +257143,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -257282,7 +257543,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -257389,6 +257683,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -257854,7 +258151,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -257961,6 +258291,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -258416,7 +258749,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -258523,6 +258889,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -258929,7 +259298,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -259036,6 +259438,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -259444,7 +259849,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -259551,6 +259989,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",
@@ -259948,7 +260389,40 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Importe del renglón (o null sin importes)."
+                            "description": "Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163)."
+                          },
+                          "consumoComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda (receta), o null."
+                          },
+                          "precioUnitComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio con el que se valuó el complemento (o null sin precio / sin importes)."
+                          },
+                          "importeComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del complemento, YA sumado dentro de `importe` (o null)."
                           },
                           "notas": {
                             "anyOf": [
@@ -260055,6 +260529,9 @@
                           "consumo",
                           "precioUnit",
                           "importe",
+                          "consumoComplemento",
+                          "precioUnitComplemento",
+                          "importeComplemento",
                           "notas",
                           "idTela",
                           "idTelaProveedor",

@@ -832,6 +832,32 @@ function exigirComplementoCoherente(
 }
 
 /**
+ * ⭐⭐ 0.163 — MISMA INVARIANTE, para el ESTIMADO de la tela. `Tela.precioSugeridoComplemento` sólo
+ * tiene sentido si la tela LLEVA complemento: capturarlo sin `nombreComplemento` se RECHAZA con
+ * mensaje claro (no se ignora en silencio), igual que el `precioComplemento` de un color. Vale para
+ * el alta y para la edición, cualquiera que sea el estado FINAL del complemento en esa operación.
+ *
+ * `null` SÍ se admite siempre: quitar un precio que no debería existir nunca es un error (y es
+ * justo lo que manda la UI al desmarcar "lleva complemento").
+ */
+function exigirEstimadoComplementoCoherente(
+  llevaComplemento: boolean,
+  precioSugeridoComplemento: number | null | undefined,
+): void {
+  if (
+    llevaComplemento ||
+    precioSugeridoComplemento === undefined ||
+    precioSugeridoComplemento === null
+  ) {
+    return;
+  }
+  throw new ErrorValidacion(
+    `Capturaste un costo estimado del complemento, pero esta tela NO lleva complemento. ` +
+      `Decláralo primero (nombre del complemento) o quita ese precio.`,
+  );
+}
+
+/**
  * Reemplaza el grid de colores de una tela DENTRO de la transacción (A2): borra los que
  * sobran, crea los que faltan y ACTUALIZA los datos de los que cambiaron (diff mínimo, sin
  * tocar lo que no varía — así se conserva la auditoría de cada renglón). Los colores son
@@ -958,6 +984,12 @@ function datosOpcionalesCrear(
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
   if (datos.unidadMedida !== undefined) data.unidadMedida = datos.unidadMedida;
   if (datos.precioSugerido !== undefined) data.precioSugerido = datos.precioSugerido;
+  // ⭐⭐ 0.163: el estimado del COMPLEMENTO. La coherencia con `nombreComplemento` la exige
+  // `exigirEstimadoComplementoCoherente` ANTES de llegar aquí (nunca se guarda un precio de un
+  // complemento que no existe).
+  if (datos.precioSugeridoComplemento !== undefined) {
+    data.precioSugeridoComplemento = datos.precioSugeridoComplemento;
+  }
   // Peso (gr/m²) y ancho (m) de la tela (A1.1): informativos, opcionales.
   if (datos.peso !== undefined) data.peso = datos.peso;
   if (datos.ancho !== undefined) data.ancho = datos.ancho;
@@ -1046,6 +1078,19 @@ function aplicarOpcionalesEditar(
     cambios.precioSugerido = nuevo;
     detalle.precioSugerido = {
       de: actual.precioSugerido === null ? null : actual.precioSugerido.toNumber(),
+      a: nuevo,
+    };
+  }
+
+  // ⭐⭐ 0.163 — estimado del COMPLEMENTO (decimal nullable): misma semántica que precioSugerido.
+  if (cambiaDecimal(datos.precioSugeridoComplemento, actual.precioSugeridoComplemento)) {
+    const nuevo = datos.precioSugeridoComplemento ?? null;
+    cambios.precioSugeridoComplemento = nuevo;
+    detalle.precioSugeridoComplemento = {
+      de:
+        actual.precioSugeridoComplemento === null
+          ? null
+          : actual.precioSugeridoComplemento.toNumber(),
       a: nuevo,
     };
   }
@@ -1148,6 +1193,7 @@ async function crearTelaValidada(
       const llevaComplemento =
         datos.nombreComplemento !== undefined && datos.nombreComplemento !== '';
       exigirComplementoCoherente(llevaComplemento, datos.colores);
+      exigirEstimadoComplementoCoherente(llevaComplemento, datos.precioSugeridoComplemento);
 
       const datosCrear: Prisma.TelaUncheckedCreateInput = {
         nombre: datos.nombre,
@@ -1268,11 +1314,28 @@ export async function actualizarTela(
       if (datos.colores !== undefined) {
         exigirComplementoCoherente(complementoFinal !== null, datos.colores);
       }
+      // ⭐⭐ 0.163: el ESTIMADO de la tela sigue exactamente la misma regla que los colores.
+      exigirEstimadoComplementoCoherente(
+        complementoFinal !== null,
+        datos.precioSugeridoComplemento,
+      );
       if (dejaDeLlevar) {
         await tx.telaColor.updateMany({
           where: { idTela: datos.id, precioComplemento: { not: null } },
           data: { precioComplemento: null, ...datosModificacion(sesion) },
         });
+        // ⭐⭐ 0.163 — y el estimado de la TELA se limpia en la MISMA transacción, por la misma
+        // razón: un costo estimado de un complemento que ya no existe es basura que confunde (y
+        // seguiría costeando si alguien volviera a declarar otro complemento distinto).
+        // Se escribe en `cambios` (no en un update aparte) para que viaje en el ÚNICO update de
+        // la tela y quede en la bitácora como lo que es: un cambio de campo de la tela.
+        if (actual.precioSugeridoComplemento !== null) {
+          cambios.precioSugeridoComplemento = null;
+          detalleOpcionales.precioSugeridoComplemento = {
+            de: actual.precioSugeridoComplemento.toNumber(),
+            a: null,
+          };
+        }
       }
 
       // Colores: solo se tocan si vienen en el payload (omitir = no tocar). El grid puede

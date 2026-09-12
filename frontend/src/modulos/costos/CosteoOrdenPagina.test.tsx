@@ -186,6 +186,9 @@ describe('CosteoOrdenPagina — desglose del real', () => {
               estatus: 'autorizada',
               fecha: '2026-06-10',
               idProveedor: 2,
+              // 0.163: la línea de OC trae su complemento (aquí, sin cárdigan).
+              cantidadComplemento: 0,
+              precioComplemento: 0,
               proveedor: 'Textiles del Bajío',
               cantidad: 200,
               unidad: 'm',
@@ -200,6 +203,12 @@ describe('CosteoOrdenPagina — desglose del real', () => {
           origenPrecio: 'compra-directa',
           ultimaCompra: null,
           importe: 5000,
+          // 0.163: este material no lleva complemento (el desglose va en ceros).
+          requeridoComplemento: 0,
+          compradoComplemento: 0,
+          cantidadValuadaComplemento: 0,
+          precioValuadoComplemento: null,
+          origenPrecioComplemento: 'compra-directa',
         },
       ],
     };
@@ -214,6 +223,76 @@ describe('CosteoOrdenPagina — desglose del real', () => {
     expect(cajon).toHaveTextContent('Textiles del Bajío');
     expect(cajon).toHaveTextContent('OC 4001');
     expect(cajon).toHaveTextContent('Comprado para esta orden');
+  });
+
+  // ⭐⭐ 0.163 — EL COMPLEMENTO (el cárdigan) se paga en la MISMA línea de OC y su consumo se valúa
+  // junto al del cuerpo: su dinero YA está dentro de `importe`. Si la pantalla no lo dijera, la
+  // línea mostraría un total que no cuadra con `cantidad × precio`.
+  it('0.163 · la línea de OC y lo valuado DICEN la parte del complemento', async () => {
+    const usuario = userEvent.setup();
+    montar(costoOrden());
+    const desglose: CostoRealOrden = {
+      idOrden: 1,
+      folio: 77,
+      tela: 4300,
+      avios: 0,
+      total: 4300,
+      importeDirecto: 3900,
+      importeValuado: 400,
+      importeLibre: 0,
+      hayCompras: true,
+      origenRequerido: 'receta',
+      piezasBase: 100,
+      avisos: [],
+      materiales: [
+        {
+          tipo: 'tela',
+          idTela: 3,
+          idAvio: null,
+          material: 'Felpa con cardigán',
+          unidad: 'm',
+          esGenerico: false,
+          requerido: 200,
+          comprado: 200,
+          compras: [
+            {
+              idOrdenCompra: 9,
+              numCompra: 4002,
+              estatus: 'autorizada',
+              fecha: '2026-09-01',
+              idProveedor: 2,
+              proveedor: 'Textiles del Bajío',
+              cantidad: 200,
+              unidad: 'm',
+              precio: 18,
+              cantidadComplemento: 50,
+              precioComplemento: 6,
+              importe: 3900, // 200×18 + 50×6
+            },
+          ],
+          importeDirecto: 3900,
+          cantidadValuada: 0,
+          precioValuado: null,
+          importeValuado: 400,
+          origenPrecio: 'compra-directa',
+          ultimaCompra: null,
+          importe: 4300,
+          requeridoComplemento: 100,
+          compradoComplemento: 50,
+          cantidadValuadaComplemento: 50,
+          precioValuadoComplemento: 8,
+          origenPrecioComplemento: 'catalogo',
+        },
+      ],
+    };
+    mock.real = { data: desglose, isPending: false, isError: false, error: null };
+
+    await usuario.click(screen.getByTestId('costeo-ver-desglose'));
+    const cajon = await screen.findByTestId('costeo-desglose');
+    // La línea de OC dice las DOS mitades que pagó.
+    expect(cajon).toHaveTextContent(/complemento/i);
+    // Y lo valuado dice cuánto de ese importe es cárdigan.
+    expect(screen.getByTestId('valuado-complemento')).toHaveTextContent('complemento');
   });
 });
 

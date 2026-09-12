@@ -1295,6 +1295,82 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
       expect(conAmbos.colores[0]?.precioComplemento?.toNumber()).toBe(55);
     });
 
+    // ⭐⭐ 0.163 — EL COSTO ESTIMADO DEL COMPLEMENTO (DANIEL: «El complemento de la tela debe de
+    // llevar un costo estimado»). Es el ÚLTIMO escalón con el que el costeo valúa el cárdigan, así
+    // que su coherencia con `nombreComplemento` importa igual que la del precio por color: un
+    // estimado de un complemento que no existe costearía dinero fantasma.
+    it('0.163 · RECHAZA el estimado del complemento si la tela NO lo lleva (alta y edición)', async () => {
+      const sesion = sesionAdmin();
+      await expect(
+        crearTela(
+          sesion,
+          {
+            nombre: 'Lisa 3',
+            unidadMedida: 'KG',
+            idProveedor: proveedorAlsatex,
+            precioSugeridoComplemento: 62,
+            colores: [],
+          },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      expect(await cliente.tela.count({ where: { nombre: 'Lisa 3' } })).toBe(0);
+
+      const sinComplemento = await crearTela(
+        sesion,
+        { nombre: 'Lisa 4', unidadMedida: 'KG', idProveedor: proveedorAlsatex, colores: [] },
+        bd(),
+      );
+      await expect(
+        actualizarTela(sesion, { id: sinComplemento.id, precioSugeridoComplemento: 62 }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+      expect(
+        (await cliente.tela.findUniqueOrThrow({ where: { id: sinComplemento.id } }))
+          .precioSugeridoComplemento,
+      ).toBeNull();
+
+      // Y si la MISMA edición declara el complemento, entonces SÍ se acepta.
+      const conAmbos = await actualizarTela(
+        sesion,
+        { id: sinComplemento.id, nombreComplemento: 'Cardigan', precioSugeridoComplemento: 62 },
+        bd(),
+      );
+      expect(conAmbos.precioSugeridoComplemento?.toNumber()).toBe(62);
+    });
+
+    it('0.163 · al DEJAR de llevar complemento se LIMPIA también el ESTIMADO de la tela', async () => {
+      const sesion = sesionAdmin();
+      const tela = await crearTela(
+        sesion,
+        {
+          nombre: 'Felpa con cardigan 3',
+          unidadMedida: 'KG',
+          idProveedor: proveedorAlsatex,
+          nombreComplemento: 'Cardigan',
+          precioSugerido: 90,
+          precioSugeridoComplemento: 62,
+          colores: [],
+        },
+        bd(),
+      );
+      expect(tela.precioSugeridoComplemento?.toNumber()).toBe(62);
+
+      const sinComplemento = await actualizarTela(
+        sesion,
+        { id: tela.id, nombreComplemento: null },
+        bd(),
+      );
+      expect(sinComplemento.nombreComplemento).toBeNull();
+      expect(sinComplemento.precioSugeridoComplemento).toBeNull();
+      // En la BASE, no sólo en la proyección (la limpieza va en la MISMA transacción).
+      expect(
+        (await cliente.tela.findUniqueOrThrow({ where: { id: tela.id } }))
+          .precioSugeridoComplemento,
+      ).toBeNull();
+      // El precio del CUERPO no se tocó.
+      expect(sinComplemento.precioSugerido?.toNumber()).toBe(90);
+    });
+
     it('al DEJAR de llevar complemento se LIMPIA el precio del complemento de TODOS sus colores', async () => {
       const sesion = sesionAdmin();
       const tela = await crearTela(

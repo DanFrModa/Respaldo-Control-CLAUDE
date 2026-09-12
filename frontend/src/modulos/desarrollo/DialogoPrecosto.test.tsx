@@ -140,6 +140,10 @@ function linea(
     descripcion: 'x',
     consumo: null,
     precioUnit: 10,
+    // 0.163: renglón SIN complemento (el desglose del cárdigan va en null).
+    consumoComplemento: null,
+    precioUnitComplemento: null,
+    importeComplemento: null,
     importe: 10,
     notas: null,
     idTela: null,
@@ -214,6 +218,58 @@ describe('<DialogoPrecosto>', () => {
     expect(boton).toBeInTheDocument();
     await usuario.click(boton);
     expect(generarMutate).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  // ⭐⭐ 0.163 — EL COMPLEMENTO, DEBAJO DE SU TELA. `importe` YA lo incluye, así que si la fila no
+  // lo enseñara el usuario vería un importe que no es `consumo × precio` y no sabría por qué.
+  it('0.163 · el renglón de tela enseña el desglose del complemento bajo su descripción', () => {
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [
+          linea({
+            id: 1,
+            conceptoCodigo: 'tela',
+            descripcion: 'Felpa con cardigán',
+            origen: 'bom_tela',
+            consumo: 2,
+            precioUnit: 20,
+            consumoComplemento: 0.5,
+            precioUnitComplemento: 30,
+            importeComplemento: 15,
+            importe: 55,
+          }),
+        ],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    const desglose = screen.getByTestId('linea-complemento');
+    expect(desglose).toHaveTextContent('0.5');
+    expect(desglose).toHaveTextContent('complemento');
+  });
+
+  it('una tela SIN complemento no pinta ningún desglose (0.163)', () => {
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [linea({ id: 1, conceptoCodigo: 'tela', descripcion: 'Rib', origen: 'bom_tela' })],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+    expect(screen.queryByTestId('linea-complemento')).not.toBeInTheDocument();
   });
 
   it('un BORRADOR muestra renglones por concepto y congela con confirmación', async () => {

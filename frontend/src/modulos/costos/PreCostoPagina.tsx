@@ -139,7 +139,27 @@ export function PreCostoPagina(): React.JSX.Element {
                       ) : (
                         pre.data.telas.map((t) => (
                           <TableRow key={t.idTela}>
-                            <TableCell>{t.tela}</TableCell>
+                            <TableCell>
+                              {t.tela}
+                              {/* ⭐⭐ 0.163 — EL COMPLEMENTO, DEBAJO DE SU TELA. El `importe` del
+                                  renglón ya lo incluye, así que sin esta línea la fila enseñaría un
+                                  importe que NO es `consumo × precio` y nadie sabría por qué.
+                                  Cuando la tela lo lleva pero no hay precio, se DICE: un
+                                  complemento sin valuar es justo lo que esta fila vino a destapar. */}
+                              {t.nombreComplemento !== null ? (
+                                <div
+                                  className="text-xs text-muted-foreground"
+                                  data-testid="precosto-complemento"
+                                >
+                                  + {t.nombreComplemento}:{' '}
+                                  {t.consumoComplementoPorPrenda === null
+                                    ? 'falta su consumo en la receta del modelo'
+                                    : t.origenPrecioComplemento === 'sin-precio'
+                                      ? `${String(t.consumoComplementoPorPrenda)} sin costo estimado (captúralo en el catálogo de telas)`
+                                      : `${String(t.consumoComplementoPorPrenda)} × ${moneda(t.precioUnitarioComplemento)} = ${moneda(t.importeComplemento)}`}
+                                </div>
+                              ) : null}
+                            </TableCell>
                             <TableCell className="text-right">{t.consumoPorPrenda}</TableCell>
                             <TableCell className="text-right">{moneda(t.precioUnitario)}</TableCell>
                             <TableCell className="text-right">{moneda(t.importe)}</TableCell>

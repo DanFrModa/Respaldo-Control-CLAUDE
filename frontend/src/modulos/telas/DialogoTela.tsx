@@ -98,6 +98,15 @@ const esquemaTelaFormulario = z
         error: 'El precio sugerido debe ser un número no negativo',
       }),
     /**
+     * ⭐⭐ 0.163 — costo ESTIMADO del complemento (el cárdigan). Sólo se captura cuando la tela
+     * lleva complemento; el backend RECHAZA un precio de complemento en una tela que no lo declara.
+     */
+    precioSugeridoComplemento: z
+      .string()
+      .refine((v) => v.trim() === '' || (Number.isFinite(Number(v)) && Number(v) >= 0), {
+        error: 'El costo estimado del complemento debe ser un número no negativo',
+      }),
+    /**
      * Peso en gr/m² (A1.1). Texto de un input numérico; vacío = sin valor. El tope espeja
      * el contrato (DECIMAL(8,2) en la base): así el error es de captura, no un 400 del API.
      */
@@ -163,6 +172,7 @@ const VALORES_INICIALES: DatosTelaFormulario = {
   nombreProveedor: '',
   unidadMedida: '',
   precioSugerido: '',
+  precioSugeridoComplemento: '',
   peso: '',
   ancho: '',
   favorito: true,
@@ -283,6 +293,8 @@ export function DialogoTela({
         nombreProveedor: texto(tela.nombreProveedor),
         unidadMedida: tela.unidadMedida,
         precioSugerido: tela.precioSugerido === null ? '' : String(tela.precioSugerido),
+        precioSugeridoComplemento:
+          tela.precioSugeridoComplemento === null ? '' : String(tela.precioSugeridoComplemento),
         peso: tela.peso === null ? '' : String(tela.peso),
         ancho: tela.ancho === null ? '' : String(tela.ancho),
         favorito: tela.favorito,
@@ -392,6 +404,11 @@ export function DialogoTela({
     const categoria = idCategoria === SIN_CATEGORIA ? null : Number(idCategoria);
     const composicion = idComposicion === SIN_COMPOSICION ? null : Number(idComposicion);
     const precio = precioACuerpo(datos.precioSugerido);
+    // ⭐⭐ 0.163: sin complemento no hay estimado que mandar (el backend lo rechazaría); al desmarcar
+    // la casilla en una EDICIÓN se manda `null` explícito, que es lo que lo borra.
+    const precioComplemento = datos.llevaComplemento
+      ? precioACuerpo(datos.precioSugeridoComplemento)
+      : undefined;
     const peso = precioACuerpo(datos.peso);
     const ancho = precioACuerpo(datos.ancho);
 
@@ -413,6 +430,7 @@ export function DialogoTela({
         idComposicion: composicion,
         ...(idProveedor === null ? {} : { idProveedor }),
         precioSugerido: precio ?? null,
+        precioSugeridoComplemento: precioComplemento ?? null,
         peso: peso ?? null,
         ancho: ancho ?? null,
         colores: coloresCuerpo,
@@ -450,6 +468,7 @@ export function DialogoTela({
       ...(categoria === null ? {} : { idCategoria: categoria }),
       ...(composicion === null ? {} : { idComposicion: composicion }),
       ...(precio === undefined ? {} : { precioSugerido: precio }),
+      ...(precioComplemento === undefined ? {} : { precioSugeridoComplemento: precioComplemento }),
       ...(peso === undefined ? {} : { peso }),
       ...(ancho === undefined ? {} : { ancho }),
     };
@@ -779,6 +798,32 @@ export function DialogoTela({
                         Entradas y salidas del cuerpo y del complemento van siempre juntas.
                       </FieldDescription>
                       <FieldError errors={[errors.nombreComplemento]} />
+                    </Field>
+
+                    {/* ⭐⭐ 0.163 — el COMPLEMENTO TAMBIÉN CUESTA. Daniel: «El complemento de la
+                        tela debe de llevar un costo estimado». Es el último escalón con el que el
+                        costeo valúa el cárdigan cuando no hay compras ni precio por color. */}
+                    <Field data-invalid={Boolean(errors.precioSugeridoComplemento)}>
+                      <FieldLabel htmlFor="tela-precio-complemento">
+                        Costo estimado del complemento
+                      </FieldLabel>
+                      <Input
+                        id="tela-precio-complemento"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="Ej. 62.00"
+                        aria-invalid={Boolean(errors.precioSugeridoComplemento)}
+                        disabled={guardando}
+                        data-testid="tela-precio-complemento"
+                        {...registrar('precioSugeridoComplemento')}
+                      />
+                      <FieldDescription>
+                        Por unidad. Se usa al costear cuando el complemento no se ha comprado ni
+                        tiene precio por color (vacío = sin estimado).
+                      </FieldDescription>
+                      <FieldError errors={[errors.precioSugeridoComplemento]} />
                     </Field>
                   </>
                 ) : null}
