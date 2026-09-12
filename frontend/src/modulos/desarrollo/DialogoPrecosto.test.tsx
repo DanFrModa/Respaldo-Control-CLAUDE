@@ -513,6 +513,93 @@ describe('<DialogoPrecosto>', () => {
     );
   });
 
+  /**
+   * 🔴 EL INSUMO ELEGIDO NO PUEDE SOBREVIVIR AL CAMBIO DE CONCEPTO (hallazgo del reviewer de la
+   * 0.152: dos mutaciones suyas sobrevivieron a las 15 pruebas de este archivo).
+   *
+   * Cambiar el concepto cambia QUÉ se puede capturar, así que el `onChange` del selector llama a
+   * `limpiar()`. Sin eso, la secuencia «elijo Tela → elijo una del catálogo → cambio a Corte» deja
+   * el selector escondido pero **`idTela` vivo en el estado**, y se manda igual — y el dominio lo
+   * ACEPTA bajo un concepto abierto (sólo exige catálogo en tela/avíos). Nacería un renglón de
+   * «Corte» descrito como *"Felpa perchada"* y con el precio de la tela.
+   *
+   * Se cubren los DOS destinos, porque fallan por caminos distintos: un concepto de SÓLO PRECIO
+   * (esconde consumo y catálogo) y uno ABIERTO (sigue ofreciendo el avío, y ahí el estado viejo
+   * pasa más desapercibido).
+   */
+  async function elegirTelaYCambiarConcepto(
+    usuario: ReturnType<typeof userEvent.setup>,
+    idConceptoDestino: string,
+  ): Promise<void> {
+    await usuario.selectOptions(screen.getByTestId('agregar-linea-concepto'), '1'); // Tela
+    await usuario.click(screen.getByTestId('agregar-linea-tela-busqueda'));
+    const opciones = await screen.findAllByTestId('agregar-linea-tela-opcion');
+    fireEvent.mouseDown(opciones[0] as HTMLElement); // el combobox elige en `mousedown`
+    const alta = screen.getByTestId('form-agregar-manual');
+    // Se ensucia TODO lo que `limpiar()` debe borrar, no sólo la tela.
+    await usuario.type(within(alta).getByLabelText('Descripción'), 'Felpa vieja');
+    await usuario.type(within(alta).getByLabelText('Consumo'), '2');
+    await usuario.type(screen.getByTestId('agregar-linea-precio'), '99');
+    // Y se cambia de concepto: a partir de aquí nada de lo anterior debe viajar.
+    await usuario.selectOptions(screen.getByTestId('agregar-linea-concepto'), idConceptoDestino);
+  }
+
+  it('🔴 cambiar de concepto a uno de SÓLO PRECIO borra la tela elegida (no se manda idTela)', async () => {
+    const usuario = userEvent.setup();
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false })],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    await elegirTelaYCambiarConcepto(usuario, '8'); // Corte
+    // El catálogo de telas ya no se ve… y tampoco debe seguir vivo por dentro.
+    expect(screen.queryByTestId('agregar-linea-tela-busqueda')).not.toBeInTheDocument();
+    await usuario.type(screen.getByTestId('agregar-linea-precio'), '7');
+
+    await usuario.click(screen.getByTestId('agregar-linea'));
+    // Sin `idTela`, sin la descripción vieja y sin consumo: el corte es un monto por prenda.
+    expect(agregarMutate).toHaveBeenCalledWith(
+      { id: 11, cuerpo: { idConceptoCosto: 8, precioUnit: 7 } },
+      expect.anything(),
+    );
+  });
+
+  it('🔴 cambiar de concepto a uno ABIERTO también borra la tela elegida', async () => {
+    const usuario = userEvent.setup();
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false })],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    await elegirTelaYCambiarConcepto(usuario, '5'); // Estampado (concepto abierto)
+    await usuario.type(screen.getByTestId('agregar-linea-precio'), '4');
+
+    await usuario.click(screen.getByTestId('agregar-linea'));
+    // Un renglón de estampado limpio: ni la tela, ni su descripción, ni el consumo de antes.
+    expect(agregarMutate).toHaveBeenCalledWith(
+      { id: 11, cuerpo: { idConceptoCosto: 5, consumo: null, precioUnit: 4 } },
+      expect.anything(),
+    );
+  });
+
   it('un concepto de SÓLO PRECIO (corte) no pinta Consumo al agregar, y no lo manda', async () => {
     const usuario = userEvent.setup();
     historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
