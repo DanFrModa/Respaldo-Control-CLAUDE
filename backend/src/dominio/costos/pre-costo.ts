@@ -47,8 +47,10 @@ import { num, numOrNull, promedioSimple, redondear2, redondear4 } from './decima
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';
 import {
   resolverPrecioAvioCatalogo,
+  resolverPrecioComplementoTela,
   resolverPrecioTela,
   type CompraRealPrecio,
+  type OrigenPrecioComplemento,
 } from './resolucion-precios.js';
 import {
   claveMaterial,
@@ -94,11 +96,22 @@ const incluirReceta = {
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      // ⭐⭐ 0.163: cuánto cárdigan lleva la prenda (0.156 lo metió a la receta). Sin él, el
+      // complemento se compraba y no se cobraba.
+      consumoComplementoPorPrenda: true,
       idTelaProveedor: true,
       telaProveedor: {
         select: { idProveedor: true, precio: true, manejaPrecioPorColor: true },
       },
-      tela: { select: { nombre: true, precioSugerido: true } },
+      tela: {
+        select: {
+          nombre: true,
+          precioSugerido: true,
+          // ⭐⭐ 0.163: quién LLEVA complemento lo dice el catálogo; el estimado es su último escalón.
+          nombreComplemento: true,
+          precioSugeridoComplemento: true,
+        },
+      },
     },
   },
   avios: {
@@ -135,7 +148,25 @@ type ModeloConReceta = Prisma.ModeloGetPayload<{ include: typeof incluirReceta }
 
 /** Números CRUDOS del pre-costo (sin ocultar), reutilizados por el detalle y la lista de precios. */
 interface NumerosPreCosto {
-  telas: { idTela: number; tela: string; consumo: number; precio: number; importe: number }[];
+  telas: {
+    idTela: number;
+    tela: string;
+    consumo: number;
+    precio: number;
+    /** Importe del CUERPO + el del complemento (lo que esa tela cuesta por prenda, completa). */
+    importe: number;
+    // ⭐⭐ 0.163 — el COMPLEMENTO viaja en el MISMO renglón (nunca como renglón aparte).
+    /** Nombre del complemento según el CATÁLOGO ("Cardigan"); null = esta tela no lleva. */
+    nombreComplemento: string | null;
+    /** Consumo del complemento por prenda (receta); null = la receta no lo trajo. */
+    consumoComplemento: number | null;
+    /** Precio con el que se valuó el complemento; null = no hay ninguno en la cascada. */
+    precioComplemento: number | null;
+    /** De qué escalón de la cascada salió ese precio (traza). */
+    origenComplemento: OrigenPrecioComplemento;
+    /** `consumoComplemento × precioComplemento` (0 si no aplica). Ya sumado dentro de `importe`. */
+    importeComplemento: number;
+  }[];
   avios: {
     idAvio: number;
     clave: string;
@@ -159,6 +190,15 @@ function aCompraReal(
   porProveedor = false,
 ): CompraRealPrecio | null {
   const u = (porProveedor ? ultimos.porMaterialProveedor : ultimos.porMaterial).get(clave);
+  return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
+}
+
+/** ⭐⭐ 0.163 — lo mismo, pero del mapa de últimas compras DEL COMPLEMENTO. */
+function aCompraRealComplemento(
+  ultimos: UltimosPreciosCompra,
+  clave: string,
+): CompraRealPrecio | null {
+  const u = ultimos.complementoPorMaterial.get(clave);
   return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
 }
 
@@ -208,12 +248,38 @@ function numerosPreCosto(modelo: ModeloConReceta, ultimos: UltimosPreciosCompra)
             ),
     });
     const precio = redondear2(resuelto.precio ?? 0);
+    // ⭐⭐ 0.163 — EL COMPLEMENTO, EN EL MISMO RENGLÓN. Quién lo lleva lo dice el CATÁLOGO
+    // (`nombreComplemento`) y cuánto lo dice la RECETA (`consumoComplementoPorPrenda`, 0.156): hacen
+    // falta LOS DOS. Si la tela no lo declara o la receta no lo trajo, no hay complemento que valuar
+    // y el renglón queda EXACTAMENTE como antes de esta fila.
+    const llevaComplemento =
+      t.tela.nombreComplemento !== null && t.consumoComplementoPorPrenda !== null;
+    const consumoComplemento = llevaComplemento
+      ? redondear4(num(t.consumoComplementoPorPrenda))
+      : null;
+    const complemento = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: numOrNull(t.tela.precioSugeridoComplemento),
+      // Sin color: el pre-costo es POR MODELO y el color aparece hasta la orden (el escalón 2 de la
+      // cascada se salta solo, igual que el `color-referencia` del cuerpo).
+      ultimaCompraComplemento: aCompraRealComplemento(ultimos, claveMaterial('tela', t.idTela)),
+    });
+    const precioComplemento = complemento.precio === null ? null : redondear2(complemento.precio);
+    const importeComplemento =
+      consumoComplemento === null || precioComplemento === null
+        ? 0
+        : redondear2(consumoComplemento * precioComplemento);
     return {
       idTela: t.idTela,
       tela: t.tela.nombre,
       consumo,
       precio,
-      importe: redondear2(consumo * precio),
+      // El importe del renglón es la tela COMPLETA: cuerpo + cárdigan.
+      importe: redondear2(consumo * precio + importeComplemento),
+      nombreComplemento: t.tela.nombreComplemento,
+      consumoComplemento,
+      precioComplemento: llevaComplemento ? precioComplemento : null,
+      origenComplemento: llevaComplemento ? complemento.origen : 'sin-precio',
+      importeComplemento,
     };
   });
   const avios = modelo.avios.map((a) => {
@@ -304,6 +370,9 @@ export async function calcularPreCosto(
 
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const $ = (v: number): number | null => (verImportes ? redondear2(v) : null);
+  /** Igual que `$`, pero para un precio que YA puede ser nulo de verdad (0.163: «sin precio»). */
+  const dinero = (v: number | null): number | null =>
+    verImportes && v !== null ? redondear2(v) : null;
 
   return {
     idModelo: modelo.id,
@@ -315,6 +384,12 @@ export async function calcularPreCosto(
       consumoPorPrenda: t.consumo,
       precioUnitario: $(t.precio),
       importe: $(t.importe),
+      // ⭐⭐ 0.163 — el desglose del complemento, para que se VEA de dónde salió su precio.
+      nombreComplemento: t.nombreComplemento,
+      consumoComplementoPorPrenda: t.consumoComplemento,
+      precioUnitarioComplemento: dinero(t.precioComplemento),
+      importeComplemento: $(t.importeComplemento),
+      origenPrecioComplemento: t.origenComplemento,
     })),
     avios: n.avios.map((a) => ({
       idAvio: a.idAvio,

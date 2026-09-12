@@ -448,6 +448,16 @@ export const esquemaTelaCrear = z.object({
     .nonnegative({ error: 'El precio sugerido no puede ser negativo' })
     .optional(),
   /**
+   * ⭐⭐ 0.163 — COSTO ESTIMADO DEL COMPLEMENTO (el cárdigan) por unidad. DANIEL: *«El complemento
+   * de la tela debe de llevar un costo estimado»*. Gemelo de `precioSugerido`, pero del cárdigan.
+   * SOLO tiene sentido si la tela declara complemento: capturarlo sin `nombreComplemento` lo
+   * RECHAZA el dominio (misma invariante que el `precioComplemento` de los colores).
+   */
+  precioSugeridoComplemento: z
+    .number({ error: 'El precio estimado del complemento debe ser un número' })
+    .nonnegative({ error: 'El precio estimado del complemento no puede ser negativo' })
+    .optional(),
+  /**
    * Peso de la tela en gr/m² (A1.1). Informativo, opcional, no negativo. El tope respeta el
    * DECIMAL(8,2) de la base (como las puntadas del bordado): sin él, un valor de 1,000,000
    * desbordaría la columna y daría un 500 opaco en vez de un 400 legible.
@@ -544,6 +554,15 @@ export const esquemaTelaEditar = z
       .nonnegative({ error: 'El precio sugerido no puede ser negativo' })
       .nullable()
       .optional(),
+    /**
+     * ⭐⭐ 0.163 — estimado del COMPLEMENTO: `null` lo quita; un número lo fija; omitir = no tocar.
+     * Quitarle el complemento a la tela lo LIMPIA solo, en la misma transacción.
+     */
+    precioSugeridoComplemento: z
+      .number({ error: 'El precio estimado del complemento debe ser un número' })
+      .nonnegative({ error: 'El precio estimado del complemento no puede ser negativo' })
+      .nullable()
+      .optional(),
     /** `null` quita el peso (gr/m²); un número lo fija; omitir = no tocar (A1.1). Tope del DECIMAL(8,2). */
     peso: z
       .number({ error: 'El peso debe ser un número' })
@@ -623,6 +642,13 @@ export const esquemaTelaSalida = z
       .describe('Rol típico de la tela en el lote (D5).'),
     favorito: z.boolean().describe('¿Tela de uso frecuente?'),
     precioSugerido: z.number().nullable().describe('Precio de referencia por unidad, o null.'),
+    precioSugeridoComplemento: z
+      .number()
+      .nullable()
+      .describe(
+        'Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la ' +
+          'cascada que valúa el complemento al costear (0.163).',
+      ),
     peso: z.number().nullable().describe('Peso de la tela en gr/m² (A1.1), o null.'),
     ancho: z.number().nullable().describe('Ancho de la tela en metros (A1.1), o null.'),
     paraProduccion: z.boolean().describe('¿Es tela de producción (vs. muestra/insumo)?'),

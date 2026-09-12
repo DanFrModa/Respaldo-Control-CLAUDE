@@ -50,6 +50,11 @@ function requerido(over: Partial<RequeridoMaterial> & { clave: string }): Requer
     ultimoPrecio: null,
     ultimaCompra: null,
     precioCatalogo: null,
+    // 0.163 — por defecto, SIN complemento: los casos que lo ejercitan lo pasan explícito.
+    requeridoComplemento: 0,
+    ultimoPrecioComplemento: null,
+    ultimaCompraComplemento: null,
+    precioCatalogoComplemento: null,
     ...over,
   };
 }
@@ -64,6 +69,9 @@ function ligada(over: Partial<LineaCompraLigada> & { clave: string }): LineaComp
     cantidad: 0,
     unidad: 'm',
     precio: 1,
+    // 0.163 — por defecto la línea NO compra complemento.
+    cantidadComplemento: 0,
+    precioComplemento: 0,
     compra: compra(100),
     ...over,
   };
@@ -612,5 +620,161 @@ describe('combinarCostoReal — unidades, redondeo y datos repetidos', () => {
       [],
     );
     expect(r.materiales[0]?.esGenerico).toBe(true);
+  });
+});
+
+// ── ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA, también en el REAL DE COMPRAS ─────────────────────
+//
+// Dos huecos distintos, los dos de dinero:
+//  (a) el IMPORTE DIRECTO de una línea de OC contaba sólo el cuerpo, aunque esa misma línea PAGA el
+//      cárdigan (`cantidadComplemento × (precioComplemento ?? precio)`, tal como lo totaliza la OC);
+//  (b) el remanente de complemento que la orden consume y nadie compró para ella se valuaba en cero
+//      porque no existía requerido de complemento.
+describe('combinarCostoReal · el COMPLEMENTO de la tela (0.163)', () => {
+  it('(a) el importe DIRECTO de la línea de OC incluye el complemento que esa línea pagó', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 100, requeridoComplemento: 20 })],
+      [
+        ligada({
+          clave: 'tela-1',
+          cantidad: 100,
+          precio: 30,
+          cantidadComplemento: 20,
+          precioComplemento: 15,
+        }),
+      ],
+    );
+    // 100×30 = 3000 del cuerpo + 20×15 = 300 del cárdigan.
+    expect(r.tela).toBe(3300);
+    expect(r.importeDirecto).toBe(3300);
+    expect(r.materiales[0]?.compras[0]?.importe).toBe(3300);
+    expect(r.materiales[0]?.compradoComplemento).toBe(20);
+  });
+
+  it('(a-bis) sin precio propio, el complemento se pagó AL PRECIO DEL CUERPO (así cobra la OC)', () => {
+    // El lector de BD ya resuelve `precioComplemento ?? precio`; aquí se comprueba el efecto.
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10, requeridoComplemento: 10 })],
+      [
+        ligada({
+          clave: 'tela-1',
+          cantidad: 10,
+          precio: 30,
+          cantidadComplemento: 10,
+          precioComplemento: 30,
+        }),
+      ],
+    );
+    expect(r.tela).toBe(600);
+  });
+
+  it('(b) el complemento requerido y NO comprado se valúa a su último precio de compra', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({
+          clave: 'tela-1',
+          requerido: 0,
+          requeridoComplemento: 20,
+          ultimoPrecioComplemento: 12,
+          ultimaCompraComplemento: compra(77),
+          precioCatalogoComplemento: 99,
+        }),
+      ],
+      [],
+    );
+    expect(r.tela).toBe(240); // 20 × 12 (el último precio gana al estimado)
+    expect(r.materiales[0]?.cantidadValuadaComplemento).toBe(20);
+    expect(r.materiales[0]?.precioValuadoComplemento).toBe(12);
+    expect(r.materiales[0]?.origenPrecioComplemento).toBe('ultimo-precio-compra');
+  });
+
+  it('(b-bis) sin compras del complemento, se valúa a su ESTIMADO del catálogo y se AVISA', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({
+          clave: 'tela-1',
+          requerido: 0,
+          requeridoComplemento: 10,
+          precioCatalogoComplemento: 8,
+        }),
+      ],
+      [],
+    );
+    expect(r.tela).toBe(80);
+    expect(r.materiales[0]?.origenPrecioComplemento).toBe('catalogo');
+    expect(r.avisos.some((a) => a.includes('complemento de') && a.includes('estimado'))).toBe(true);
+  });
+
+  it('(b-ter) sin precio de ninguna clase se valúa en cero pero SE DICE (nunca en silencio)', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 0, requeridoComplemento: 10 })],
+      [],
+    );
+    expect(r.tela).toBe(0);
+    expect(r.materiales[0]?.origenPrecioComplemento).toBe('sin-precio');
+    expect(r.avisos.some((a) => a.includes('complemento de') && a.includes('cero'))).toBe(true);
+  });
+
+  it('lo COMPRADO de complemento descuenta del requerido de complemento (no se cuenta dos veces)', () => {
+    const r = combinarCostoReal(
+      [
+        requerido({
+          clave: 'tela-1',
+          requerido: 0,
+          requeridoComplemento: 30,
+          ultimoPrecioComplemento: 10,
+          ultimaCompraComplemento: compra(77),
+        }),
+      ],
+      [
+        ligada({
+          clave: 'tela-1',
+          cantidad: 0,
+          precio: 0.01,
+          cantidadComplemento: 20,
+          precioComplemento: 10,
+        }),
+      ],
+    );
+    // Directo: 20×10 = 200. Valuado: (30−20)×10 = 100. Total 300 (y NO 30×10 + 200 = 500).
+    expect(r.materiales[0]?.cantidadValuadaComplemento).toBe(10);
+    expect(r.tela).toBe(300);
+  });
+
+  // 🔴 RONDA DE CORRECCIÓN (arreglo 3): el aviso de PRECIO EN CERO miraba sólo el cuerpo.
+  it('avisa de PRECIO EN CERO cuando el que va en cero es el COMPLEMENTO', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10, requeridoComplemento: 10 })],
+      [
+        ligada({
+          clave: 'tela-1',
+          cantidad: 10,
+          precio: 30, // el cuerpo SÍ tiene precio: sin el arreglo, nadie avisaba
+          cantidadComplemento: 10,
+          precioComplemento: 0,
+        }),
+      ],
+    );
+    expect(r.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(true);
+  });
+
+  it('un complemento en CERO no dispara el aviso si la línea no compró complemento', () => {
+    // `precioComplemento: 0` con `cantidadComplemento: 0` es el estado NORMAL de un avío o de una
+    // tela sin cárdigan: ahí el cero no significa nada y avisar sería ruido en cada renglón.
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10 })],
+      [ligada({ clave: 'tela-1', cantidad: 10, precio: 30 })],
+    );
+    expect(r.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(false);
+  });
+
+  it('una tela SIN complemento da exactamente los mismos números de siempre (no-regresión)', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 20 })],
+      [ligada({ clave: 'tela-1', cantidad: 40, precio: 25 })],
+    );
+    expect(r.importeDirecto).toBe(1000); // 40×25
+    expect(r.importeValuado).toBe(1200); // 60×20
+    expect(r.tela).toBe(2200);
   });
 });

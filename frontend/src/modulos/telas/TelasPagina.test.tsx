@@ -81,6 +81,7 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     tipoComponente: 'CUERPO',
     favorito: false,
     precioSugerido: null,
+    precioSugeridoComplemento: null,
     peso: null,
     ancho: null,
     paraProduccion: true,

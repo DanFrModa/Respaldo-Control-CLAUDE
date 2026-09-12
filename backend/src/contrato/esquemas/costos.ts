@@ -41,7 +41,13 @@ export type BaseProrrateo = z.infer<typeof esquemaBaseProrrateo>;
 
 // ── Pre-costo por modelo (receta × catálogo) ─────────────────────────────────────────────────────
 
-/** Un renglón de tela del pre-costo (consumo × precio de catálogo). */
+/**
+ * Un renglón de tela del pre-costo (consumo × precio de catálogo) **con su complemento**.
+ *
+ * ⭐⭐ 0.163 — el COMPLEMENTO (el cárdigan) viaja DENTRO del renglón de su tela, nunca como renglón
+ * aparte: `importe` es la tela COMPLETA (cuerpo + cárdigan) y los campos `*Complemento` son el
+ * desglose, para que se vea de dónde salió cada peso. `nombreComplemento` null = esta tela no lleva.
+ */
 const esquemaPreCostoTela = z.object({
   idTela: z.number().int().describe('Id de la tela.'),
   tela: z.string().describe('Nombre de la tela.'),
@@ -50,7 +56,29 @@ const esquemaPreCostoTela = z.object({
     .number()
     .nullable()
     .describe('Precio de catálogo por unidad (o null sin importes).'),
-  importe: z.number().nullable().describe('consumo × precio (o null sin importes).'),
+  importe: z
+    .number()
+    .nullable()
+    .describe('consumo × precio + importe del complemento (o null sin importes).'),
+  nombreComplemento: z
+    .string()
+    .nullable()
+    .describe('Nombre del complemento según el catálogo. Null = esta tela NO lleva complemento.'),
+  consumoComplementoPorPrenda: z
+    .number()
+    .nullable()
+    .describe('Consumo del complemento por prenda (receta). Null = no aplica o no se capturó.'),
+  precioUnitarioComplemento: z
+    .number()
+    .nullable()
+    .describe('Precio con el que se valuó el complemento (o null sin precio / sin importes).'),
+  importeComplemento: z
+    .number()
+    .nullable()
+    .describe('consumo × precio del complemento, YA sumado en `importe` (o null sin importes).'),
+  origenPrecioComplemento: z
+    .enum(['ultimo-precio-compra', 'color-complemento', 'sugerido-complemento', 'sin-precio'])
+    .describe('De qué escalón de la cascada salió el precio del complemento (traza).'),
 });
 
 /** Un renglón de avío del pre-costo (consumo × precio de catálogo). */
@@ -237,7 +265,24 @@ const esquemaCompraReal = z.object({
     .describe('Cantidad comprada en la línea, en unidad de CONSUMO (§Post-F9.97).'),
   unidad: z.string().nullable().describe('Unidad de la línea —siempre la de CONSUMO, §Post-F9.97.'),
   precio: z.number().nullable().describe('Precio unitario de la línea (o null sin importes).'),
-  importe: z.number().nullable().describe('cantidad × precio (o null sin importes).'),
+  // ⭐⭐ 0.163 — el COMPLEMENTO (cárdigan) se compra en la MISMA línea, con su cantidad y su precio.
+  cantidadComplemento: z
+    .number()
+    .describe('Cantidad de COMPLEMENTO comprada en la línea (0 = no compró complemento).'),
+  precioComplemento: z
+    .number()
+    .nullable()
+    .describe(
+      'Precio del complemento en la línea (null sin importes). Cuando la OC no lo captura, es el ' +
+        'precio del cuerpo: así lo cobra la propia orden de compra.',
+    ),
+  importe: z
+    .number()
+    .nullable()
+    .describe(
+      'cantidad × precio + cantidadComplemento × precioComplemento (o null sin importes): lo que ' +
+        'esa línea costó COMPLETA.',
+    ),
 });
 
 /** Un material del costo REAL: lo comprado directo + lo valuado a último precio de compra. */
@@ -280,6 +325,24 @@ const esquemaMaterialReal = z.object({
     .nullable()
     .describe('OC de la que salió el ÚLTIMO precio de compra (null si no aplica).'),
   importe: z.number().nullable().describe('Costo real del material = directo + valuado.'),
+
+  // ⭐⭐ 0.163 — EL COMPLEMENTO DE LA TELA, desglosado. Su dinero YA está dentro de
+  // `importeDirecto`/`importeValuado`/`importe`: es la otra mitad del MISMO material, no un
+  // renglón aparte. Todo en 0/null en avíos, líneas libres y telas sin complemento.
+  requeridoComplemento: z
+    .number()
+    .describe('Complemento que la orden requiere (receta × piezas cortadas). 0 = no aplica.'),
+  compradoComplemento: z.number().describe('Complemento comprado y ligado a la orden.'),
+  cantidadValuadaComplemento: z
+    .number()
+    .describe('Complemento SIN compra propia = max(0, requerido − comprado).'),
+  precioValuadoComplemento: z
+    .number()
+    .nullable()
+    .describe('Precio con el que se valuó ese remanente (o null sin precio / sin importes).'),
+  origenPrecioComplemento: esquemaOrigenPrecioReal.describe(
+    'De dónde salió el precio del complemento.',
+  ),
 });
 
 /** Resumen del costo REAL de materiales (el que se muestra junto al teórico y al guardado). */

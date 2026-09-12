@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest';
 import {
   resolverPrecioAvio,
   resolverPrecioAvioCatalogo,
+  resolverPrecioColorComplemento,
   resolverPrecioColorReferencia,
+  resolverPrecioComplementoTela,
   resolverPrecioTela,
 } from './resolucion-precios.js';
 
@@ -392,5 +394,94 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
         resolverPrecioAvio({ ...base, ultimaCompra: null, ultimaCompraProveedorAmarrado: null }),
       ).toEqual(resolverPrecioAvio(base));
     });
+  });
+});
+
+// ── ⭐⭐ 0.163 — LA CASCADA DEL COMPLEMENTO (el cárdigan que acompaña a la felpa) ──────────────────
+//
+// El defecto que estas pruebas vigilan: hasta esta fila el costeo IGNORABA el complemento mientras
+// el MRP sí lo compraba y lo cobraba ⇒ se compraba y no se cobraba. Lo que se mide aquí es el orden
+// de los tres escalones y —sobre todo— que el último recurso sea DECIR que falta, nunca un 0 mudo
+// ni el precio del cuerpo.
+
+describe('resolverPrecioComplementoTela (cascada de 3 pasos, 0.163)', () => {
+  it('1) la última compra REAL del complemento gana sobre el color y sobre el estimado', () => {
+    const r = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: 50,
+      precioColorComplemento: 60,
+      ultimaCompraComplemento: { precio: 70, idProveedor: 7 },
+    });
+    expect(r).toEqual({ precio: 70, origen: 'ultimo-precio-compra', idProveedor: 7 });
+  });
+
+  it('2) sin compra, manda el precio del COLOR (cuando el llamador tiene color en la mano)', () => {
+    const r = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: 50,
+      precioColorComplemento: 60,
+    });
+    expect(r).toEqual({ precio: 60, origen: 'color-complemento', idProveedor: null });
+  });
+
+  it('3) sin compra ni color, el ESTIMADO del catálogo (la decisión de Daniel)', () => {
+    const r = resolverPrecioComplementoTela({ precioSugeridoComplemento: 50 });
+    expect(r).toEqual({ precio: 50, origen: 'sugerido-complemento', idProveedor: null });
+  });
+
+  it('4) SIN NADA: se DICE que falta — nunca un cero mudo', () => {
+    const r = resolverPrecioComplementoTela({ precioSugeridoComplemento: null });
+    expect(r).toEqual({ precio: null, origen: 'sin-precio', idProveedor: null });
+  });
+
+  it('4-bis) y NUNCA cae sola al precio del CUERPO: la entrada ni siquiera lo conoce', () => {
+    // Si algún día alguien metiera ese fallback, esta prueba lo caza: el único dato disponible es
+    // el del complemento, y sin él el resultado tiene que ser `sin-precio`.
+    const r = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: null,
+      precioColorComplemento: null,
+      ultimaCompraComplemento: null,
+    });
+    expect(r.precio).toBeNull();
+    expect(r.origen).toBe('sin-precio');
+  });
+
+  it('un precio NEGATIVO o no finito no es usable: la cascada sigue al escalón siguiente', () => {
+    const r = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: 50,
+      precioColorComplemento: -1,
+      ultimaCompraComplemento: { precio: Number.NaN, idProveedor: 7 },
+    });
+    expect(r).toEqual({ precio: 50, origen: 'sugerido-complemento', idProveedor: null });
+  });
+
+  it('un precio CERO capturado a propósito SÍ es usable (0 ≠ "sin precio")', () => {
+    const r = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: 50,
+      precioColorComplemento: 0,
+    });
+    expect(r).toEqual({ precio: 0, origen: 'color-complemento', idProveedor: null });
+  });
+});
+
+describe('resolverPrecioColorComplemento (0.163)', () => {
+  const colores = [
+    { nombre: 'Marino', precio: 90, precioComplemento: 45, idColor: 11 },
+    { nombre: 'Negro', precio: 95, precioComplemento: 48, idColor: null },
+  ];
+
+  it('pega por la LIGA LEGACY idColor (filas migradas)', () => {
+    expect(resolverPrecioColorComplemento(colores, { idColor: 11, nombre: 'lo que sea' })).toBe(45);
+  });
+
+  it('si no hay liga, pega por NOMBRE insensible a mayúsculas', () => {
+    expect(resolverPrecioColorComplemento(colores, { idColor: 99, nombre: 'NEGRO' })).toBe(48);
+  });
+
+  it('sin pegue devuelve null (la cascada cae al escalón siguiente)', () => {
+    expect(resolverPrecioColorComplemento(colores, { idColor: 99, nombre: 'Rojo' })).toBeNull();
+  });
+
+  it('un color que existe pero NO fija precio de complemento no cuenta como pegue', () => {
+    const sinPrecio = [{ nombre: 'Marino', precio: 90, precioComplemento: null, idColor: 11 }];
+    expect(resolverPrecioColorComplemento(sinPrecio, { idColor: 11, nombre: 'Marino' })).toBeNull();
   });
 });

@@ -12943,6 +12943,39 @@ cascada de resolución de precios para el complemento**, como sí la hay para el
 (`costos/resolucion-precios.ts`). Inventarla de pasada habría metido una regla de **dinero** que nadie
 decidió, en una fila que venía a arreglar otra cosa.
 
+> ## ✅ CONTESTADO POR DANIEL (12-sep-2026) — **«El complemento de la tela debe de llevar un costo estimado»**
+>
+> Textual, y con eso la fila 0.163 dejó de estar atascada. **Construido en v0.149.**
+>
+> 🔑 **Se construyó como CASCADA, no como precio único**, y la razón es una decisión suya anterior:
+> §Post-F9.48 (*«no hay ningún motivo para tener dos costos diferentes»* — manda el precio REAL de
+> compra). Un estimado que tapara al precio real sería exactamente el defecto que aquella decisión vino
+> a matar. Así que el estimado es **el último escalón**, igual que `Tela.precioSugerido` lo es para el
+> cuerpo: **(1)** la última compra REAL del complemento · **(2)** el precio por color
+> (`TelaColor.precioComplemento`) donde el llamador tenga color · **(3)** el **estimado del catálogo**
+> (`Tela.precioSugeridoComplemento`, el campo que nace con esta decisión). Si no hay ninguno, **«sin
+> precio» explícito** — nunca un cero callado.
+>
+> ⚠️ **Dos cosas que §(f) daba por ciertas y al medirlas NO lo eran:**
+> **(1)** *«el único precio de complemento que existe es `TelaColor.precioComplemento`»* — **falso**: hay
+> tres más (`OrdenCompraLinea.precioComplemento`, `EntradaTelaLinea.precioUnitComplemento` y
+> `MovimientoDetTela.costoUnitComplemento`). El primero es justo la fuente del escalón (1), y vive en la
+> **misma tabla** que `ultimo-precio-compra.ts` ya consulta para el cuerpo ⇒ **el dato real ya se estaba
+> capturando en cada compra**; lo que faltaba era mirarlo.
+> **(2)** §(f) habla de *«el precosto»* en singular: son **CUATRO** motores (`costos/pre-costo.ts`,
+> `desarrollo/precostos.ts`, `costos/costo-orden.ts`, `costos/costo-real-compras.ts`), y valuar en unos
+> sí y en otros no habría dado cifras que se contradicen entre pantallas.
+>
+> 📌 **Dónde NO se puso el estimado, y por qué:** en el renglón de la receta. `ModeloTela` **no tiene ni
+> una sola columna de precio** —ni para el cuerpo—; el precio siempre se resuelve por cascada. Meterlo
+> ahí habría sido el primer precio tecleado del BOM, y justo después de que la fila 0.152 sacara el
+> texto libre del precosteo por decisión del propio Daniel (*«toda la información debe de venir desde la
+> receta»*). Un precio por modelo además **se queda viejo en silencio**, que es lo que §Post-F9.48 mató.
+>
+> ⏳ **Queda una pregunta abierta que NO bloqueó la construcción** (sólo cambiaría el orden de un
+> escalón, una línea): *¿el estimado debe mandar SIEMPRE, aunque ya se haya comprado?* **Default
+> aplicado: NO** — manda el precio real, por §Post-F9.48.
+
 ⏳ **Queda como decisión abierta, con recomendación del coder: 🔴 debería bloquear V1.** Es dinero, y es
 la mitad que falta para que llevar el cárdigan **como complemento** sea de verdad equivalente a llevarlo
 **suelto** — que es la promesa entera de §Post-F9.214. Anotada también en `HOJA-DE-RUTA.md` §6.

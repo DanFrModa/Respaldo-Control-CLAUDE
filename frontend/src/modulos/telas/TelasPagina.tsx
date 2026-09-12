@@ -571,6 +571,14 @@ function RenglonTela({
                     </Dato>
                   ) : null}
                   <Dato etiqueta="Precio sugerido">{formatearPrecio(tela.precioSugerido)}</Dato>
+                  {/* ⭐⭐ 0.163: el costo estimado del complemento sólo existe si la tela lo lleva. */}
+                  {tela.nombreComplemento !== null ? (
+                    <Dato etiqueta={`Costo est. ${tela.nombreComplemento}`}>
+                      <span data-testid="tela-detalle-precio-complemento">
+                        {formatearPrecio(tela.precioSugeridoComplemento)}
+                      </span>
+                    </Dato>
+                  ) : null}
                   <Dato etiqueta="¿Favorita?">{tela.favorito ? 'Sí' : 'No'}</Dato>
                   {hayTexto(tela.descripcion) ? (
                     <div className="col-span-2 min-w-0 sm:col-span-3">

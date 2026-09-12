@@ -143,6 +143,7 @@ function telaEjemplo(sobre: Partial<Tela> = {}): Tela {
     tipoComponente: 'OTRO',
     favorito: false,
     precioSugerido: null,
+    precioSugeridoComplemento: null,
     peso: null,
     ancho: null,
     paraProduccion: true,
@@ -216,6 +217,9 @@ describe('<DialogoTela>', () => {
     expect(cuerpo.unidadMedida).toBe('KG');
     expect('idCategoria' in cuerpo).toBe(false);
     expect('precioSugerido' in cuerpo).toBe(false);
+    // ⭐⭐ 0.163: sin complemento declarado, su costo estimado ni siquiera se puede capturar.
+    expect('precioSugeridoComplemento' in cuerpo).toBe(false);
+    expect(screen.queryByTestId('tela-precio-complemento')).not.toBeInTheDocument();
     // Peso y ancho vacíos también se omiten (A1.1 punto 1).
     expect('peso' in cuerpo).toBe(false);
     expect('ancho' in cuerpo).toBe(false);
@@ -250,6 +254,33 @@ describe('<DialogoTela>', () => {
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
     expect((crearMutate.mock.calls[0]?.[0] as { favorito?: boolean }).favorito).toBe(false);
+  });
+
+  // ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA. DANIEL: «El complemento de la tela debe de llevar un
+  // costo estimado». El campo sólo aparece cuando la tela declara complemento (el backend RECHAZA un
+  // estimado sin `nombreComplemento`), y lo capturado viaja como NÚMERO.
+  it('0.163 · con complemento declarado, su costo estimado se captura y viaja como número', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: TelaCrear, opciones?: { onSuccess?: (r: Tela) => void }) => {
+        opciones?.onSuccess?.(telaEjemplo());
+      },
+    );
+    renderConProveedores(<DialogoTela abierto alCambiarAbierto={vi.fn()} tela={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Felpa con cardigán');
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'KG');
+    await usuario.click(screen.getByTestId('selector-proveedor-stub'));
+    // Antes de marcar la casilla, el campo del estimado NO existe.
+    expect(screen.queryByTestId('tela-precio-complemento')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('tela-lleva-complemento'));
+    await usuario.type(screen.getByTestId('tela-precio-complemento'), '62.5');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.nombreComplemento).toBe('Cardigan'); // pre-llenado por la casilla
+    expect(cuerpo.precioSugeridoComplemento).toBe(62.5);
   });
 
   // A1.1 punto 1: peso (gr/m²) y ancho (m) viajan como número cuando se capturan.

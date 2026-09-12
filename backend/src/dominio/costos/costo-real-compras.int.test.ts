@@ -61,6 +61,10 @@ interface LineaOc {
   precio: number;
   unidad?: string;
   idOrden?: number | null;
+  /** ⭐⭐ 0.163 — el COMPLEMENTO se compra en la MISMA línea (undefined = no compró cárdigan). */
+  cantidadComplemento?: number;
+  /** ⭐⭐ 0.163 — su precio; undefined = se cobró al precio del cuerpo (así lo dice el modelo). */
+  precioComplemento?: number;
 }
 
 /**
@@ -94,6 +98,8 @@ async function crearOc(opciones: {
           descripcionLibre: l.descripcionLibre ?? null,
           cantidad: l.cantidad,
           precio: l.precio,
+          cantidadComplemento: l.cantidadComplemento ?? null,
+          precioComplemento: l.precioComplemento ?? null,
           unidad: l.unidad ?? null,
           idOrden: l.idOrden === undefined ? idOrden : l.idOrden,
         })),
@@ -672,5 +678,126 @@ describe('enganche con el costeo (obtenerCostoOrden / guardarCostoOrden)', () =>
     const fila = await cliente.costoOrden.findUnique({ where: { idOrden } });
     expect(fila?.telaReal).toBeNull();
     expect(fila?.aviosReal).toBeNull();
+  });
+});
+
+// ── ⭐⭐ 0.163 — EL COMPLEMENTO TAMBIÉN CUESTA, en el REAL DE COMPRAS ─────────────────────────────
+//
+// La fixture de este archivo tiene una orden de 100 piezas cortadas con 2 m de felpa por prenda.
+// Aquí se le declara CÁRDIGAN a esa felpa (catálogo) y se le pone consumo en la receta CONGELADA de
+// la orden, que es de donde el costeo lo lee.
+describe('costoRealOrden — el COMPLEMENTO de la tela (0.163)', () => {
+  /** Declara el cárdigan en el catálogo y en la receta de la orden. 0.5 × 100 = 50 requeridos. */
+  async function conCardigan(precioSugeridoComplemento: number | null): Promise<void> {
+    await cliente.tela.update({
+      where: { id: idTela },
+      data: { nombreComplemento: 'Cardigan', precioSugeridoComplemento },
+    });
+    await cliente.ordenTela.updateMany({
+      where: { idOrden, idTela },
+      data: { consumoComplementoPorPrenda: 0.5 },
+    });
+  }
+
+  it('lo comprado de complemento entra al importe DIRECTO de su línea de OC', async () => {
+    await conCardigan(7);
+    await crearOc({
+      estatus: 'autorizada',
+      lineas: [
+        { idTela, cantidad: 200, precio: 18, cantidadComplemento: 50, precioComplemento: 6 },
+      ],
+    });
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    // 200×18 = 3600 del cuerpo + 50×6 = 300 del cárdigan, en la MISMA línea.
+    expect(felpa?.compras[0]?.importe).toBe(3900);
+    expect(felpa?.compras[0]?.cantidadComplemento).toBe(50);
+    expect(felpa?.compras[0]?.precioComplemento).toBe(6);
+    expect(felpa?.importeDirecto).toBe(3900);
+    // Ya se compró todo el cárdigan requerido: no queda remanente que valuar.
+    expect(felpa?.requeridoComplemento).toBe(50);
+    expect(felpa?.compradoComplemento).toBe(50);
+    expect(felpa?.cantidadValuadaComplemento).toBe(0);
+  });
+
+  it('el complemento requerido y NO comprado se valúa a su ESTIMADO del catálogo', async () => {
+    await conCardigan(7);
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    expect(felpa?.cantidadValuadaComplemento).toBe(50);
+    expect(felpa?.precioValuadoComplemento).toBe(7);
+    expect(felpa?.origenPrecioComplemento).toBe('catalogo');
+    // Cuerpo (200 × catálogo 20 = 4000) + cárdigan (50 × 7 = 350).
+    expect(felpa?.importe).toBe(4350);
+  });
+
+  it('sin estimado, el complemento se valúa en cero pero el sistema LO DICE', async () => {
+    await conCardigan(null);
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    expect(felpa?.origenPrecioComplemento).toBe('sin-precio');
+    expect(felpa?.importe).toBe(4000); // sólo el cuerpo
+    expect(real.avisos.some((a) => a.includes('complemento de') && a.includes('cero'))).toBe(true);
+  });
+
+  // 🔴 RONDA DE CORRECCIÓN — M17: la RESOLUCIÓN `precioComplemento ?? precio` vive en el LECTOR de
+  // BD, y hasta ahora ninguna prueba la medía (la unitaria de `combinarCostoReal` recibe el precio
+  // YA resuelto). Si se cayera, el cárdigan comprado sin precio propio valdría CERO en el costo real.
+  //
+  // ⚠️ Ojo con la frontera que toca el arreglo 1: al COSTEAR un cárdigan del que no se sabe nada, la
+  // cascada NO cae al precio del cuerpo (`leerUltimasComprasDeComplemento` exige precio propio).
+  // Aquí la pregunta es OTRA —cuánto dinero salió por ESTA compra— y la respuesta fiel sigue siendo
+  // el precio del cuerpo, porque así lo totaliza la propia orden de compra (`aCompraSalida`).
+  it('M17 · un cárdigan comprado SIN precio propio se paga al precio del cuerpo en ESTA orden', async () => {
+    await conCardigan(7);
+    await crearOc({
+      estatus: 'autorizada',
+      // Exactamente como la escribe la explosión del MRP: cantidad de complemento SÍ, precio NO.
+      lineas: [{ idTela, cantidad: 200, precio: 18, cantidadComplemento: 50 }],
+    });
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    // 200×18 = 3600 del cuerpo + 50×18 = 900 del cárdigan (al precio del cuerpo) = 4500.
+    expect(felpa?.compras[0]?.precioComplemento).toBe(18);
+    expect(felpa?.compras[0]?.importe).toBe(4500);
+    expect(felpa?.importeDirecto).toBe(4500);
+  });
+
+  // 🔴 RONDA DE CORRECCIÓN — M11: el COMPLEMENTO dentro del `teorico.tela` de `armarRequerido`. Ese
+  // teórico no se muestra: es el umbral del aviso «el real quedó por debajo de la MITAD del
+  // teórico». Sin el complemento, el umbral se calcula sobre media orden y el aviso deja de saltar
+  // justo cuando más falta hace (se compró el cárdigan tirado de precio, o no se compró).
+  it('M11 · el teórico con el que se compara el real INCLUYE el complemento', async () => {
+    // Los números están elegidos para que el aviso dependa EXCLUSIVAMENTE del complemento:
+    //   receta: 2 m de cuerpo (catálogo 20) + 0.5 de cárdigan (estimado 60), sobre 100 cortadas.
+    //   teórico de TELA **con** complemento = (2×20 + 0.5×60) × 100 = 7 000  ⇒ mitad = 3 500
+    //   teórico de TELA **sin** complemento = (2×20)        × 100 = 4 000  ⇒ mitad = 2 000
+    //   real de TELA (todo comprado, barato)  = 200×15 + 50×1        = 3 050
+    // 3 050 está DEBAJO de 3 500 y ENCIMA de 2 000: el aviso sólo puede saltar si el teórico
+    // incluye el cárdigan. Sin el arreglo, el sistema se quedaba callado con la orden a mitad de
+    // precio — que es justo el caso que este aviso existe para cazar.
+    await conCardigan(60);
+    await crearOc({
+      estatus: 'autorizada',
+      lineas: [
+        { idTela, cantidad: 200, precio: 15, cantidadComplemento: 50, precioComplemento: 1 },
+      ],
+    });
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.materiales.find((m) => m.idTela === idTela)?.importe).toBe(3050);
+    expect(
+      real.avisos.some((a) => a.includes('costo real de TELA quedó por debajo de la MITAD')),
+    ).toBe(true);
+  });
+
+  it('si el CATÁLOGO no declara complemento, la receta no lo mete al requerido (no-regresión)', async () => {
+    await cliente.ordenTela.updateMany({
+      where: { idOrden, idTela },
+      data: { consumoComplementoPorPrenda: 0.5 },
+    });
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    const felpa = real.materiales.find((m) => m.idTela === idTela);
+    expect(felpa?.requeridoComplemento).toBe(0);
+    expect(felpa?.importe).toBe(4000);
   });
 });

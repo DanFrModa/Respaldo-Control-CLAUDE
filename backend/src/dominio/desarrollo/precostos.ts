@@ -48,6 +48,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull, promedioSimple, redondear2, redondear4 } from '../costos/decimales.js';
 import {
   resolverPrecioAvioCatalogo,
+  resolverPrecioComplementoTela,
   resolverPrecioTela,
   type CompraRealPrecio,
 } from '../costos/resolucion-precios.js';
@@ -108,11 +109,21 @@ const incluirBomModelo = {
     select: {
       idTela: true,
       consumoPorPrenda: true,
+      // ⭐⭐ 0.163: cuánto cárdigan lleva la prenda (la receta lo trae desde 0.156).
+      consumoComplementoPorPrenda: true,
       idTelaProveedor: true,
       // `idProveedor`: V1-E3e lo necesita para el escalón 1 con amarre (§Post-F9.48 — el amarre
       // elige el PROVEEDOR y el precio sale de la última compra A ESE proveedor).
       telaProveedor: { select: { idProveedor: true, precio: true, manejaPrecioPorColor: true } },
-      tela: { select: { nombre: true, precioSugerido: true } },
+      tela: {
+        select: {
+          nombre: true,
+          precioSugerido: true,
+          // ⭐⭐ 0.163: quién LLEVA complemento lo dice el catálogo; el estimado es su último escalón.
+          nombreComplemento: true,
+          precioSugeridoComplemento: true,
+        },
+      },
     },
   },
   avios: {
@@ -194,6 +205,15 @@ function aCompraReal(
   porProveedor = false,
 ): CompraRealPrecio | null {
   const u = (porProveedor ? ultimos.porMaterialProveedor : ultimos.porMaterial).get(clave);
+  return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
+}
+
+/** ⭐⭐ 0.163 — lo mismo, del mapa de últimas compras DEL COMPLEMENTO (el cárdigan). */
+function aCompraRealComplemento(
+  ultimos: UltimosPreciosCompra,
+  clave: string,
+): CompraRealPrecio | null {
+  const u = ultimos.complementoPorMaterial.get(clave);
   return u === undefined ? null : { precio: u.precio, idProveedor: u.idProveedor };
 }
 
@@ -422,6 +442,28 @@ function lineasBomDesdeModelo(
       (resuelto.origen === 'ultimo-precio-compra' &&
         t.telaProveedor != null &&
         resuelto.idProveedor === t.telaProveedor.idProveedor);
+    // ⭐⭐ 0.163 — EL COMPLEMENTO, DENTRO DEL MISMO RENGLÓN. No puede ser un renglón aparte: la
+    // llave de deduplicación del recálculo es `origen:idTela:idAvio:idModeloArte` ({@link claveLinea})
+    // y un segundo `bom_tela` de la misma tela la rompería. `importe` es la tela COMPLETA, así que el
+    // dinero del cárdigan llega al `costoTotal` (Σ importes) y de ahí a la lista de precios SIN que
+    // ningún consumidor del total tenga que cambiar. El desglose queda en las tres columnas nuevas.
+    const llevaComplemento =
+      t.tela.nombreComplemento !== null && t.consumoComplementoPorPrenda !== null;
+    const consumoComplemento = llevaComplemento
+      ? redondear4(num(t.consumoComplementoPorPrenda))
+      : null;
+    const complemento = resolverPrecioComplementoTela({
+      precioSugeridoComplemento: numOrNull(t.tela.precioSugeridoComplemento),
+      // Sin color: el precosto es POR MODELO (el color aparece hasta la orden), así que el escalón
+      // del color se salta solo — igual que el `color-referencia` del cuerpo.
+      ultimaCompraComplemento: aCompraRealComplemento(ultimos, claveMaterial('tela', t.idTela)),
+    });
+    const precioUnitComplemento =
+      !llevaComplemento || complemento.precio === null ? null : redondear2(complemento.precio);
+    const importeComplemento =
+      consumoComplemento === null || precioUnitComplemento === null
+        ? null
+        : redondear2(consumoComplemento * precioUnitComplemento);
     lineas.push({
       idConceptoCosto: conceptos.tela,
       origen: 'bom_tela',
@@ -430,7 +472,10 @@ function lineasBomDesdeModelo(
       descripcion: t.tela.nombre,
       consumo,
       precioUnit,
-      importe: redondear2(consumo * precioUnit),
+      consumoComplemento,
+      precioUnitComplemento,
+      importeComplemento,
+      importe: redondear2(consumo * precioUnit + (importeComplemento ?? 0)),
       ...auditoria,
     });
   }
@@ -630,6 +675,15 @@ function aLineaSalida(
     consumo: linea.consumo === null ? null : linea.consumo.toNumber(),
     precioUnit: verImportes ? linea.precioUnit.toNumber() : null,
     importe: verImportes ? linea.importe.toNumber() : null,
+    // ⭐⭐ 0.163 — el desglose del COMPLEMENTO del renglón de tela (ya sumado dentro de `importe`).
+    consumoComplemento:
+      linea.consumoComplemento === null ? null : linea.consumoComplemento.toNumber(),
+    precioUnitComplemento:
+      verImportes && linea.precioUnitComplemento !== null
+        ? linea.precioUnitComplemento.toNumber()
+        : null,
+    importeComplemento:
+      verImportes && linea.importeComplemento !== null ? linea.importeComplemento.toNumber() : null,
     notas: linea.notas,
     idTela: linea.idTela,
     idTelaProveedor: linea.idTelaProveedor,
@@ -1190,6 +1244,10 @@ export async function editarLinea(
         descripcion: true,
         consumo: true,
         precioUnit: true,
+        // ⭐⭐ 0.163: el importe del complemento se CONSERVA al editar el cuerpo a mano. Sin leerlo
+        // aquí, editar el consumo o el precio de la tela borraría el dinero del cárdigan en
+        // silencio — el mismo defecto que esta fila vino a matar, por la puerta de atrás.
+        importeComplemento: true,
         // El CÓDIGO del concepto: de él depende si este renglón lleva cantidad (§Post-F9.210·3).
         conceptoCosto: { select: { codigo: true } },
       },
@@ -1215,7 +1273,14 @@ export async function editarLinea(
     const precioUnit = redondear2(
       datos.precioUnit === undefined ? linea.precioUnit.toNumber() : datos.precioUnit,
     );
-    const importe = consumo === null ? precioUnit : redondear2(consumo * precioUnit);
+    // ⭐⭐ 0.163: el complemento NO se edita a mano (no hay campo que lo capture); su importe se
+    // ARRASTRA tal cual para que el renglón siga valiendo la tela COMPLETA. `recalcular` lo vuelve
+    // a resolver desde la cascada cuando el renglón no está ajustado.
+    const importeComplemento = linea.importeComplemento?.toNumber() ?? 0;
+    const importe =
+      consumo === null
+        ? redondear2(precioUnit + importeComplemento)
+        : redondear2(consumo * precioUnit + importeComplemento);
     // Editar un renglón de origen BOM lo marca AJUSTADO (B12): recalcular ya no lo pisa.
     const esBom = (ORIGENES_BOM as readonly string[]).includes(linea.origen);
 
@@ -1364,6 +1429,11 @@ export async function restaurarLineaBom(
           descripcion: original.descripcion,
           consumo: original.consumo ?? null,
           precioUnit: original.precioUnit,
+          // ⭐⭐ 0.163: restaurar devuelve el renglón COMPLETO al valor del BOM, complemento incluido
+          // (si no, una tela que dejó de llevar cárdigan conservaría su importe para siempre).
+          consumoComplemento: original.consumoComplemento ?? null,
+          precioUnitComplemento: original.precioUnitComplemento ?? null,
+          importeComplemento: original.importeComplemento ?? null,
           importe: original.importe,
           idTelaProveedor: original.idTelaProveedor ?? null,
           idAvioProveedor: original.idAvioProveedor ?? null,

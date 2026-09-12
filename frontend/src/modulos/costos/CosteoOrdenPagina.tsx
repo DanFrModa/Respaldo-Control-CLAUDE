@@ -611,7 +611,20 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                           {cantidad(m.cantidadValuada, m.unidad)}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica>{moneda(m.precioValuado)}</TablaDensaCelda>
-                        <TablaDensaCelda numerica>{moneda(m.importeValuado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {moneda(m.importeValuado)}
+                          {/* ⭐⭐ 0.163: si parte de lo valuado es COMPLEMENTO, se dice — su dinero
+                              ya está dentro de este importe y del total del renglón. */}
+                          {m.cantidadValuadaComplemento > 0 ? (
+                            <span
+                              className="block text-[10px] font-normal text-muted-foreground"
+                              data-testid="valuado-complemento"
+                            >
+                              incl. {cantidad(m.cantidadValuadaComplemento, m.unidad)} de
+                              complemento × {moneda(m.precioValuadoComplemento)}
+                            </span>
+                          ) : null}
+                        </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">
                           {moneda(m.importe)}
                         </TablaDensaCelda>
@@ -624,8 +637,14 @@ export function CosteoOrdenPagina(): React.JSX.Element {
                           >
                             OC {c.numCompra} · {c.proveedor}
                             {c.fecha === null ? '' : ` · ${c.fecha}`} ·{' '}
-                            {cantidad(c.cantidad, c.unidad)} × {moneda(c.precio)} ={' '}
-                            {moneda(c.importe)}
+                            {cantidad(c.cantidad, c.unidad)} × {moneda(c.precio)}
+                            {/* ⭐⭐ 0.163 — el COMPLEMENTO se paga en la MISMA línea de OC, así que
+                                su importe YA está sumado en `c.importe`. Sin enseñarlo, la línea
+                                mostraría un total que no cuadra con `cantidad × precio`. */}
+                            {c.cantidadComplemento > 0
+                              ? ` + ${cantidad(c.cantidadComplemento, c.unidad)} × ${moneda(c.precioComplemento)} (complemento)`
+                              : ''}{' '}
+                            = {moneda(c.importe)}
                           </TablaDensaCelda>
                         </TablaDensaFila>
                       ))}

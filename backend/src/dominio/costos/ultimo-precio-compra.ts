@@ -27,6 +27,12 @@
  * El global se DERIVA de los representantes por proveedor sin una segunda consulta: la línea más
  * reciente de un material es, necesariamente, la más reciente dentro de su propio grupo de proveedor.
  *
+ *  • ⭐⭐ **por COMPLEMENTO de la tela** (0.163) — la línea más reciente en la que se compró cárdigan
+ *    **y alguien le puso SU PROPIO precio** (`precio_complemento IS NOT NULL`; sin `COALESCE` al
+ *    precio del cuerpo, y el porqué —que es un defecto de dinero real— está en
+ *    {@link leerUltimasComprasDeComplemento}). Ésa SÍ necesita su propia consulta: la compra más
+ *    reciente de una tela no tiene por qué haber comprado complemento.
+ *
  * ⭐ UNIDADES (§Post-F9.97): el precio se devuelve **POR UNIDAD DE CONSUMO** porque la línea de OC
  * **ya está en unidad de consumo** — se lee tal cual, sin dividir por nada. Hasta V1-E8a aquí se
  * aplicaba un «factor de conversión» presentación→consumo y el factor viajaba en el resultado para
@@ -85,18 +91,24 @@ export interface UltimaCompraMaterial {
   compra: ReferenciaCompra;
 }
 
-/** Resultado de la lectura por lote: los dos mapas que la cascada necesita. */
+/** Resultado de la lectura por lote: los mapas que la cascada necesita. */
 export interface UltimosPreciosCompra {
   /** Clave {@link claveMaterial} → la compra más reciente del material (cualquier proveedor). */
   porMaterial: ReadonlyMap<string, UltimaCompraMaterial>;
   /** Clave {@link claveMaterialProveedor} → la compra más reciente A ESE proveedor. */
   porMaterialProveedor: ReadonlyMap<string, UltimaCompraMaterial>;
+  /**
+   * ⭐⭐ 0.163 — Clave {@link claveMaterial} (siempre `tela-…`) → la compra más reciente que compró
+   * COMPLEMENTO de esa tela, con su precio de complemento. Ver {@link leerUltimosPreciosCompra}.
+   */
+  complementoPorMaterial: ReadonlyMap<string, UltimaCompraMaterial>;
 }
 
 /** Resultado VACÍO (para los caminos que no piden ningún material; evita crear mapas sueltos). */
 export const SIN_ULTIMOS_PRECIOS: UltimosPreciosCompra = {
   porMaterial: new Map(),
   porMaterialProveedor: new Map(),
+  complementoPorMaterial: new Map(),
 };
 
 /** Clave de cruce de un material: `tela-<id>` / `avio-<id>` (la misma de `costo-real-compras.ts`). */
@@ -125,6 +137,8 @@ interface FilaUltimaCompra {
   idTela: number | null;
   idAvio: number | null;
   precio: Prisma.Decimal;
+  /** 0.163 — precio del COMPLEMENTO de la línea. NULL = «al mismo precio que el cuerpo». */
+  precioComplemento: Prisma.Decimal | null;
   idOrdenCompra: number;
   numCompra: bigint;
   estatus: string;
@@ -177,6 +191,7 @@ export async function leerUltimosPreciosCompra(
       l."id_tela"        AS "idTela",
       l."id_avio"        AS "idAvio",
       l."precio"         AS "precio",
+      l."precio_complemento" AS "precioComplemento",
       oc."id"            AS "idOrdenCompra",
       oc."num_compra"    AS "numCompra",
       oc."estatus"::text AS "estatus",
@@ -226,7 +241,106 @@ export async function leerUltimosPreciosCompra(
       porMaterial.set(claveGlobal, ultima);
     }
   }
-  return { porMaterial, porMaterialProveedor };
+  const complementoPorMaterial = await leerUltimasComprasDeComplemento(cliente, idEmpresa, telas);
+  return { porMaterial, porMaterialProveedor, complementoPorMaterial };
+}
+
+/**
+ * ⭐⭐ 0.163 — ÚLTIMA COMPRA REAL **DEL COMPLEMENTO** (el cárdigan) de cada tela pedida.
+ *
+ * Es **UNA SEGUNDA consulta**, y no una columna más de la primera, por una razón de negocio: la
+ * compra más reciente de una tela **no tiene por qué haber comprado complemento**. `OrdenCompraLinea`
+ * sólo trae `cantidad_complemento` cuando esa línea realmente lo pidió (es NULL en las telas sin
+ * complemento y en TODO el histórico migrado), así que «la última compra del complemento» es la
+ * línea más reciente **que sí lo compró** — filtrarlo dentro del `DISTINCT ON` del cuerpo daría el
+ * complemento de una línea equivocada, o ninguno. Sigue siendo **por lote** (una consulta para todas
+ * las telas), que es lo que la decisión de rendimiento de V1-E3e protege.
+ *
+ * 🔴 **SÓLO CUENTAN LAS LÍNEAS EN LAS QUE ALGUIEN LE PUSO PRECIO AL CÁRDIGAN**
+ * (`precio_complemento IS NOT NULL`) — y por eso aquí NO hay `COALESCE` al precio del cuerpo.
+ *
+ * ⚠️ Es la corrección del reviewer de la 0.163, y el porqué importa porque el caso que rompía es
+ * **el camino NORMAL del negocio, no un borde**: la OC que genera el MRP **nunca captura**
+ * `precioComplemento` (`compras/mrp.ts:3238` lo dice con todas sus letras; `ordenes-compra.ts:719`
+ * lo guarda NULL), pero sí trae `cantidad_complemento`. Con el `COALESCE` que esto tenía, esas
+ * líneas entraban con **el precio del CUERPO** y ganaban el escalón 1 **por encima del estimado del
+ * catálogo**: una felpa a 40 con cárdigan estimado en 62 pasaba a costearse a 40 en cuanto se
+ * autorizaba UNA orden automática — con la traza diciendo `ultimo-precio-compra`, o sea con cara de
+ * dato duro. El número que Daniel mandó crear quedaba neutralizado por el uso normal del sistema.
+ *
+ * Sin `COALESCE`, el escalón 1 significa lo único que puede sostener: *«la última compra en la que
+ * alguien de verdad le puso precio al cárdigan»*. Si nadie lo ha hecho, la cascada baja al color y
+ * al ESTIMADO, que es donde debía estar.
+ *
+ * ⚠️⚠️ **Esto NO contradice el `precioComplemento ?? precio` de `calcularCostoRealDeOrden`** (el
+ * lector de líneas ligadas a UNA orden). Allí la pregunta es otra —*«¿cuánto dinero salió por esta
+ * compra?»*— y la respuesta fiel sigue siendo que un complemento sin precio propio se pagó al del
+ * cuerpo, porque así lo totaliza la propia OC (`aCompraSalida`). Aquí la pregunta es *«¿con qué
+ * precio costeo un cárdigan del que no sé nada?»*, y la respuesta no puede ser un precio que nadie
+ * tecleó para él.
+ *
+ * Mismo criterio de estatus (`ESTATUS_COMPRADO`), mismo desempate (fecha DESC NULLS LAST → folio
+ * DESC → renglón DESC) y misma acotación a la empresa activa (A9) que el cuerpo: no hay una regla
+ * nueva que mantener.
+ *
+ * ⚠️ **NO se filtra por COLOR, a propósito.** Desde V1-E3u (§Post-F9.89) la línea de OC de una tela
+ * sí puede nombrarlo (`orden_compra_linea.id_tela_color`), pero acotar por él dejaría sin precio
+ * real a cualquier tela que nunca se haya comprado en ESE color — y el llamador del costeo, hoy, ni
+ * siquiera tiene color. El precio que sale de aquí es por TELA; quien algún día meta color al
+ * costeo debe leer la nota del escalón 2 en `resolverPrecioComplementoTela` antes de usarlo.
+ */
+async function leerUltimasComprasDeComplemento(
+  cliente: ClienteLectura,
+  idEmpresa: number,
+  telas: readonly number[],
+): Promise<ReadonlyMap<string, UltimaCompraMaterial>> {
+  const mapa = new Map<string, UltimaCompraMaterial>();
+  if (telas.length === 0) {
+    return mapa;
+  }
+  const filas = await cliente.$queryRaw<FilaUltimaCompra[]>(Prisma.sql`
+    SELECT DISTINCT ON (l."id_tela")
+      l."id"             AS "idLinea",
+      l."id_tela"        AS "idTela",
+      l."id_avio"        AS "idAvio",
+      l."precio"         AS "precio",
+      l."precio_complemento" AS "precioComplemento",
+      oc."id"            AS "idOrdenCompra",
+      oc."num_compra"    AS "numCompra",
+      oc."estatus"::text AS "estatus",
+      oc."fecha"         AS "fecha",
+      oc."id_proveedor"  AS "idProveedor",
+      p."nombre"         AS "proveedor"
+    FROM "orden_compra_linea" l
+    JOIN "ordenes_compra" oc ON oc."id" = l."id_orden_compra"
+    JOIN "proveedores"    p  ON p."id"  = oc."id_proveedor"
+    WHERE oc."id_empresa" = ${idEmpresa}
+      AND oc."estatus"::text IN (${Prisma.join(ESTATUS_COMPRADO.map((e) => String(e)))})
+      AND l."id_tela" IN (${Prisma.join(telas)})
+      -- Compró cárdigan Y alguien le puso SU precio. Las dos condiciones, por lo de arriba.
+      AND l."cantidad_complemento" IS NOT NULL
+      AND l."precio_complemento" IS NOT NULL
+    ORDER BY
+      l."id_tela",
+      oc."fecha" DESC NULLS LAST, oc."num_compra" DESC, l."id" DESC
+  `);
+  for (const f of filas) {
+    if (f.idTela === null || f.precioComplemento === null) continue;
+    mapa.set(claveMaterial('tela', f.idTela), {
+      precio: f.precioComplemento.toNumber(),
+      idProveedor: f.idProveedor,
+      proveedor: f.proveedor,
+      compra: {
+        idOrdenCompra: f.idOrdenCompra,
+        numCompra: Number(f.numCompra),
+        estatus: f.estatus,
+        fecha: aFechaCorta(f.fecha),
+        idProveedor: f.idProveedor,
+        proveedor: f.proveedor,
+      },
+    });
+  }
+  return mapa;
 }
 
 /**

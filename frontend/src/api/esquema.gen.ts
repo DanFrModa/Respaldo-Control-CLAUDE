@@ -11596,6 +11596,8 @@ export interface paths {
                 favorito: boolean;
                 /** @description Precio de referencia por unidad, o null. */
                 precioSugerido: number | null;
+                /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
+                precioSugeridoComplemento: number | null;
                 /** @description Peso de la tela en gr/m² (A1.1), o null. */
                 peso: number | null;
                 /** @description Ancho de la tela en metros (A1.1), o null. */
@@ -11755,6 +11757,7 @@ export interface paths {
             /** @default true */
             paraProduccion?: boolean;
             precioSugerido?: number;
+            precioSugeridoComplemento?: number;
             peso?: number;
             ancho?: number;
             /** @default [] */
@@ -11821,6 +11824,8 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
+              precioSugeridoComplemento: number | null;
               /** @description Peso de la tela en gr/m² (A1.1), o null. */
               peso: number | null;
               /** @description Ancho de la tela en metros (A1.1), o null. */
@@ -12016,6 +12021,8 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
+              precioSugeridoComplemento: number | null;
               /** @description Peso de la tela en gr/m² (A1.1), o null. */
               peso: number | null;
               /** @description Ancho de la tela en metros (A1.1), o null. */
@@ -12200,6 +12207,8 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
+              precioSugeridoComplemento: number | null;
               /** @description Peso de la tela en gr/m² (A1.1), o null. */
               peso: number | null;
               /** @description Ancho de la tela en metros (A1.1), o null. */
@@ -12349,6 +12358,7 @@ export interface paths {
             favorito?: boolean;
             paraProduccion?: boolean;
             precioSugerido?: number | null;
+            precioSugeridoComplemento?: number | null;
             peso?: number | null;
             ancho?: number | null;
             colores?: {
@@ -12415,6 +12425,8 @@ export interface paths {
               favorito: boolean;
               /** @description Precio de referencia por unidad, o null. */
               precioSugerido: number | null;
+              /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
+              precioSugeridoComplemento: number | null;
               /** @description Peso de la tela en gr/m² (A1.1), o null. */
               peso: number | null;
               /** @description Ancho de la tela en metros (A1.1), o null. */
@@ -87208,8 +87220,25 @@ export interface paths {
                 consumoPorPrenda: number;
                 /** @description Precio de catálogo por unidad (o null sin importes). */
                 precioUnitario: number | null;
-                /** @description consumo × precio (o null sin importes). */
+                /** @description consumo × precio + importe del complemento (o null sin importes). */
                 importe: number | null;
+                /** @description Nombre del complemento según el catálogo. Null = esta tela NO lleva complemento. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda (receta). Null = no aplica o no se capturó. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitarioComplemento: number | null;
+                /** @description consumo × precio del complemento, YA sumado en `importe` (o null sin importes). */
+                importeComplemento: number | null;
+                /**
+                 * @description De qué escalón de la cascada salió el precio del complemento (traza).
+                 * @enum {string}
+                 */
+                origenPrecioComplemento:
+                  | 'ultimo-precio-compra'
+                  | 'color-complemento'
+                  | 'sugerido-complemento'
+                  | 'sin-precio';
               }[];
               /** @description Avíos de la receta (paraPreCosto). */
               avios: {
@@ -88365,7 +88394,11 @@ export interface paths {
                   unidad: string | null;
                   /** @description Precio unitario de la línea (o null sin importes). */
                   precio: number | null;
-                  /** @description cantidad × precio (o null sin importes). */
+                  /** @description Cantidad de COMPLEMENTO comprada en la línea (0 = no compró complemento). */
+                  cantidadComplemento: number;
+                  /** @description Precio del complemento en la línea (null sin importes). Cuando la OC no lo captura, es el precio del cuerpo: así lo cobra la propia orden de compra. */
+                  precioComplemento: number | null;
+                  /** @description cantidad × precio + cantidadComplemento × precioComplemento (o null sin importes): lo que esa línea costó COMPLETA. */
                   importe: number | null;
                 }[];
                 /** @description Σ de lo comprado directo (o null sin importes). */
@@ -88398,6 +88431,23 @@ export interface paths {
                 } | null;
                 /** @description Costo real del material = directo + valuado. */
                 importe: number | null;
+                /** @description Complemento que la orden requiere (receta × piezas cortadas). 0 = no aplica. */
+                requeridoComplemento: number;
+                /** @description Complemento comprado y ligado a la orden. */
+                compradoComplemento: number;
+                /** @description Complemento SIN compra propia = max(0, requerido − comprado). */
+                cantidadValuadaComplemento: number;
+                /** @description Precio con el que se valuó ese remanente (o null sin precio / sin importes). */
+                precioValuadoComplemento: number | null;
+                /**
+                 * @description De dónde salió el precio del complemento.
+                 * @enum {string}
+                 */
+                origenPrecioComplemento:
+                  | 'compra-directa'
+                  | 'ultimo-precio-compra'
+                  | 'catalogo'
+                  | 'sin-precio';
               }[];
             };
           };
@@ -103445,8 +103495,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -103644,8 +103700,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -103847,8 +103909,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -104067,8 +104135,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -104271,8 +104345,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -104474,8 +104554,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -104673,8 +104759,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */
@@ -104874,8 +104966,14 @@ export interface paths {
                 consumo: number | null;
                 /** @description Precio unitario (o null sin importes). */
                 precioUnit: number | null;
-                /** @description Importe del renglón (o null sin importes). */
+                /** @description Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con cárdigan es `consumo × precioUnit + importeComplemento` (0.163). */
                 importe: number | null;
+                /** @description Consumo del complemento por prenda (receta), o null. */
+                consumoComplemento: number | null;
+                /** @description Precio con el que se valuó el complemento (o null sin precio / sin importes). */
+                precioUnitComplemento: number | null;
+                /** @description Importe del complemento, YA sumado dentro de `importe` (o null). */
+                importeComplemento: number | null;
                 /** @description Notas del renglón, o null. */
                 notas: string | null;
                 /** @description Traza: tela del amarre, o null. */

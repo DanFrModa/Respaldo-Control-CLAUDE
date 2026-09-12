@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.149 · 12-sep-2026 · **en prueba** — **El complemento de la tela ya cuesta: se compraba y no se cobraba**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Que el cárdigan que acompaña a una tela entre al costo.** Hasta hoy el sistema **compraba el
+  complemento y te lo cobraba en la orden de compra**, pero al costear la prenda lo ignoraba por
+  completo ⇒ **el precio que salía para el cliente quedaba BAJO**. Ya no.
+- **Capturar un costo estimado del complemento en el catálogo de la tela**, una sola vez, junto al
+  precio sugerido del cuerpo. Es lo que pidió Daniel.
+- El costo del complemento aparece en los **cuatro** sitios donde se cuenta dinero: el precosteo
+  rápido, el precosteo que alimenta la lista de precios, el costo de la orden y el costo real.
+
+### Qué cambió y puede sorprender
+
+- **El estimado NO manda siempre: es el último recurso.** Si esa tela ya se compró, manda **lo que
+  realmente se pagó** por el cárdigan; si hay precio para ese color, ése; y sólo si no hay nada,
+  el estimado. Es la misma regla que ya rige para el cuerpo: no puede haber dos costos distintos
+  de la misma cosa.
+- **Si no hay ningún precio, el sistema lo dice — no lo pone en cero.** Un cero callado es
+  exactamente lo que hacía que el precio saliera bajo.
+- **Los modelos que ya tengan precosteos van a costar más que ayer**, y eso es lo correcto: antes les
+  faltaba el cárdigan. Los precosteos **ya congelados no se mueven**.
+- Las telas existentes **nacen sin estimado** y no hay que ir a llenarlas: cada una cae al escalón que
+  le toque.
+
+### Qué sigue pendiente o roto
+
+- **Al comprar, el cárdigan se sigue cotizando al precio del cuerpo** cuando no tiene el suyo propio.
+  Eso es una decisión de compra, no de costeo, y se atiende aparte.
+- **La pantalla de la receta enseña el nombre y el consumo del complemento, pero todavía no su
+  precio.** No afecta a ningún total: esa pantalla no calcula importes.
+
+---
+
 ## 0.148 · 12-sep-2026 · **en prueba** — **La tela del precosteo se elige del catálogo, y se acaba la tela duplicada**
 
 ### Qué se puede hacer ahora que antes no

@@ -178,7 +178,28 @@ export const esquemaPrecostoLineaSalida = z
     descripcion: z.string().describe('Descripción del renglón (nombre del insumo o del concepto).'),
     consumo: z.number().nullable().describe('Consumo/cantidad (o null si no aplica).'),
     precioUnit: z.number().nullable().describe('Precio unitario (o null sin importes).'),
-    importe: z.number().nullable().describe('Importe del renglón (o null sin importes).'),
+    importe: z
+      .number()
+      .nullable()
+      .describe(
+        'Importe del renglón, complemento INCLUIDO (o null sin importes). En una tela con ' +
+          'cárdigan es `consumo × precioUnit + importeComplemento` (0.163).',
+      ),
+    // ⭐⭐ 0.163 — EL COMPLEMENTO DE LA TELA, en el MISMO renglón (nunca uno aparte). Los tres van
+    // null en todo lo que no sea una tela con complemento. `importeComplemento` YA está sumado en
+    // `importe`: es el desglose, para que se vea de dónde salió el dinero.
+    consumoComplemento: z
+      .number()
+      .nullable()
+      .describe('Consumo del complemento por prenda (receta), o null.'),
+    precioUnitComplemento: z
+      .number()
+      .nullable()
+      .describe('Precio con el que se valuó el complemento (o null sin precio / sin importes).'),
+    importeComplemento: z
+      .number()
+      .nullable()
+      .describe('Importe del complemento, YA sumado dentro de `importe` (o null).'),
     notas: z.string().nullable().describe('Notas del renglón, o null.'),
     idTela: z.number().int().nullable().describe('Traza: tela del amarre, o null.'),
     idTelaProveedor: z
