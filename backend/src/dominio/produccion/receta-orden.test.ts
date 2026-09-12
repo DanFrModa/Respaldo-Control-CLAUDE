@@ -19,6 +19,7 @@ import { Prisma } from '../../datos/index.js';
 
 import {
   calcularDesalineacion,
+  exigirComplementoDeclarado,
   exigirCompraNoCongelada,
   laCulpaEsDeLaNormalizacion,
   magnitudDelAvisoDeCaptura,
@@ -47,6 +48,12 @@ function tela(over: Partial<RecetaOrdenTela> = {}): RecetaOrdenTela {
     nombre: 'Jersey',
     unidad: 'kg',
     consumoPorPrenda: 1.5,
+    // ⭐⭐ 0.165 — por default la tela NO lleva complemento (el caso normal): el catálogo no lo
+    // declara, así que no hay nada que enseñar ni que vigilar.
+    nombreComplemento: null,
+    consumoComplementoPorPrenda: null,
+    consumoComplementoModelo: null,
+    precioComplemento: null,
     precio: 30,
     paraPreCosto: true,
     paraProduccion: true,
@@ -133,6 +140,40 @@ function arte(over: Partial<RecetaOrdenArte> = {}): RecetaOrdenArte {
   };
 }
 
+/*
+ * ⭐⭐ 0.165 (§Post-F9.219) — la puerta que deja CORREGIR el complemento en la orden sin dejar entrar
+ * un número que la compra no podría usar. El reparto es el mismo del BOM: *quién* lleva complemento
+ * lo dice el CATÁLOGO, *cuánto* lo dice la receta.
+ */
+describe('exigirComplementoDeclarado — el complemento en la receta de la ORDEN', () => {
+  const felpa = { nombre: 'Felpa', nombreComplemento: 'Cardigan' };
+  const jersey = { nombre: 'Jersey', nombreComplemento: null };
+
+  it('la tela que SÍ declara complemento lo acepta', () => {
+    expect(() => {
+      exigirComplementoDeclarado(felpa, 0.15);
+    }).not.toThrow();
+  });
+
+  it('la tela que NO lo declara lo rechaza, y dice qué hacer', () => {
+    expect(() => {
+      exigirComplementoDeclarado(jersey, 0.15);
+    }).toThrow(/no lleva complemento/i);
+    expect(() => {
+      exigirComplementoDeclarado(jersey, 0.15);
+    }).toThrow(/catálogo de telas/i);
+  });
+
+  it('BORRARLO (null) y no tocarlo (undefined) siempre se valen', () => {
+    expect(() => {
+      exigirComplementoDeclarado(jersey, null);
+    }).not.toThrow();
+    expect(() => {
+      exigirComplementoDeclarado(jersey, undefined);
+    }).not.toThrow();
+  });
+});
+
 describe('calcularDesalineacion — receta congelada vs. BOM vivo del modelo', () => {
   it('todo alineado: no hay nada que avisar', () => {
     const d = calcularDesalineacion([tela()], [avio()], [arte()], [], false);
@@ -147,6 +188,53 @@ describe('calcularDesalineacion — receta congelada vs. BOM vivo del modelo', (
     expect(d.cambios[0]).toMatchObject({ tipo: 'tela', que: 'consumo', idRenglon: 1 });
     expect(d.cambios[0]?.detalle).toContain('1.5');
     expect(d.cambios[0]?.detalle).toContain('2');
+  });
+
+  /*
+   * ⭐⭐ 0.165 (§Post-F9.219) — EL COMPLEMENTO TAMBIÉN SE VIGILA. Hasta esta fila el detector
+   * comparaba consumo y precio del CUERPO y nada más: capturar el cárdigan en el modelo DESPUÉS de
+   * crear la orden no avisaba absolutamente nada, y la orden seguía comprando sin él.
+   */
+  it('el modelo CAPTURÓ el consumo del complemento después: avisa nombrándolo', () => {
+    const d = calcularDesalineacion(
+      [tela({ nombreComplemento: 'Cardigan', consumoComplementoModelo: 0.15 })],
+      [],
+      [],
+      [],
+      false,
+    );
+    expect(d.hayCambios).toBe(true);
+    expect(d.cambios).toHaveLength(1);
+    expect(d.cambios[0]).toMatchObject({ tipo: 'tela', que: 'consumo', idRenglon: 1 });
+    expect(d.cambios[0]?.detalle).toContain('Cardigan');
+    expect(d.cambios[0]?.detalle).toContain('0.15');
+  });
+
+  it('el complemento alineado no avisa, y sin complemento en el catálogo tampoco', () => {
+    const alineado = calcularDesalineacion(
+      [
+        tela({
+          nombreComplemento: 'Cardigan',
+          consumoComplementoPorPrenda: 0.15,
+          consumoComplementoModelo: 0.15,
+        }),
+      ],
+      [],
+      [],
+      [],
+      false,
+    );
+    expect(alineado.cambios).toEqual([]);
+    // El catálogo ya no declara complemento ⇒ nada que vigilar, aunque la orden traiga el número
+    // congelado de cuando sí lo llevaba (manda el catálogo de hoy, como en la compra y el costeo).
+    const sinCatalogo = calcularDesalineacion(
+      [tela({ nombreComplemento: null, consumoComplementoPorPrenda: 0.15 })],
+      [],
+      [],
+      [],
+      false,
+    );
+    expect(sinCatalogo.cambios).toEqual([]);
   });
 
   it('el modelo cambió el PRECIO: avisa con las dos cifras', () => {

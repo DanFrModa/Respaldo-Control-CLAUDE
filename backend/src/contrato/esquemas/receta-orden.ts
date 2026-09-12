@@ -181,7 +181,55 @@ export const esquemaRecetaOrdenTela = z
     idTela: z.number().int().describe('Id de la tela.'),
     nombre: z.string().describe('Nombre de la tela.'),
     unidad: z.string().nullable().describe('Unidad de medida de la tela.'),
-    consumoPorPrenda: z.number().describe('Consumo por prenda CONGELADO en esta orden.'),
+    consumoPorPrenda: z
+      .number()
+      .describe(
+        'Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO.',
+      ),
+    /**
+     * ⭐⭐ 0.165 (§Post-F9.219) — EL COMPLEMENTO, EN EL MISMO RENGLÓN (el cárdigan de la felpa).
+     *
+     * Hasta esta fila el complemento lo escribían CINCO puertas y **no lo leía ninguna pantalla**:
+     * la receta de la orden congelaba `consumoComplementoPorPrenda` (0.156), el MRP lo compraba y el
+     * costeo lo valuaba (0.163)… y quien abría la receta veía sólo el cuerpo. Sale con la MISMA
+     * forma que en el pre-costo (`costos.ts`): nombre del catálogo + consumo + precio, nunca como
+     * renglón aparte.
+     *
+     * `nombreComplemento` lo dice el CATÁLOGO **de hoy** (`Tela.nombreComplemento`); `null` = esta
+     * tela no lleva complemento ⇒ no hay nada que enseñar (es la misma lectura que hacen la compra y
+     * el costeo: manda el catálogo, no lo que la orden haya congelado).
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva.'),
+    /** Consumo del complemento CONGELADO en esta orden; `null` = la receta no lo trajo. */
+    consumoComplementoPorPrenda: z
+      .number()
+      .nullable()
+      .describe('Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar.'),
+    /** Lo que el BOM del modelo dice HOY del complemento (null si ya no está o no lo capturó). */
+    consumoComplementoModelo: z
+      .number()
+      .nullable()
+      .describe('Consumo del complemento que trae HOY el BOM del modelo (null si no hay).'),
+    /**
+     * Precio con el que se valúa el complemento DE ESTA ORDEN: `Tela.precioSugeridoComplemento`, el
+     * ESTIMADO del catálogo (0.163). `null` = nadie lo capturó ⇒ el complemento no se valúa (y se
+     * DICE; nunca un cero mudo).
+     *
+     * ⚠️ **Es el mismo número que costea la orden**, no otra cascada: `costos/costo-orden.ts` valúa
+     * el complemento con ese estimado porque la orden **no congela precio de complemento**
+     * (`OrdenTela` tiene `precio`, no `precioComplemento`). Dos pantallas con dos reglas de dinero
+     * darían cifras que se contradicen — por eso aquí se lee lo mismo y no se resuelve nada nuevo.
+     */
+    precioComplemento: z
+      .number()
+      .nullable()
+      .describe(
+        'Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). ' +
+          'null = sin costo estimado.',
+      ),
     precio: z
       .number()
       .nullable()
@@ -683,6 +731,24 @@ export type DatosRecetaAgregar = z.input<typeof esquemaRecetaAgregarCuerpo>;
 export const esquemaRecetaEditarCuerpo = z
   .object({
     consumoPorPrenda: esquemaConsumoReceta.optional(),
+    /**
+     * ⭐⭐ 0.165 (§Post-F9.219) — CORREGIR EL COMPLEMENTO **EN ESTA ORDEN** (sólo telas).
+     *
+     * Hasta esta fila el número sólo podía entrar por «traer del modelo» o «restaurar»: si alguien
+     * lo capturaba mal, la orden se quedaba con él —y el MRP compraba con él— sin forma de tocarlo
+     * desde la receta. `null` = BORRARLO (la orden deja de llevar consumo de complemento y la OC
+     * vuelve a nacer con el complemento pendiente, como antes de 0.156); omitido = no se toca.
+     *
+     * **Positivo, nunca 0** (§Post-F9.219(d): *un cárdigan que consume 0 no es un cárdigan*), y el
+     * DOMINIO rechaza capturarlo en una tela que el catálogo no declara con complemento — el mismo
+     * reparto de autoridad del BOM: *quién* lo lleva lo dice el catálogo, *cuánto* lo dice la receta.
+     */
+    consumoComplementoPorPrenda: z
+      .number({ error: 'El consumo del complemento debe ser un número' })
+      .positive({ error: 'El consumo del complemento debe ser mayor a 0' })
+      .max(999999, { error: 'El consumo del complemento es demasiado grande' })
+      .nullable()
+      .optional(),
     precio: esquemaPrecioReceta.optional(),
     paraPreCosto: z.boolean().optional(),
     paraProduccion: z.boolean().optional(),

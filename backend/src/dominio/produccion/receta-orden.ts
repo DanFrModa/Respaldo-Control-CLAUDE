@@ -450,6 +450,10 @@ const SELECT_TELA = {
   id: true,
   idTela: true,
   consumoPorPrenda: true,
+  // ⭐⭐ 0.165 — el COMPLEMENTO congelado (0.156) y lo que el CATÁLOGO dice de él HOY: su nombre
+  // (quién lleva complemento) y su estimado (con qué se valúa, 0.163). Van en la MISMA consulta
+  // —la relación ya se traía por el nombre de la tela—, así que no hay ni una lectura más.
+  consumoComplementoPorPrenda: true,
   precio: true,
   paraPreCosto: true,
   paraProduccion: true,
@@ -461,7 +465,14 @@ const SELECT_TELA = {
   notas: true,
   liberadoEn: true,
   liberadoPorId: true,
-  tela: { select: { nombre: true, unidadMedida: true } },
+  tela: {
+    select: {
+      nombre: true,
+      unidadMedida: true,
+      nombreComplemento: true,
+      precioSugeridoComplemento: true,
+    },
+  },
   telaProveedor: { select: { proveedor: { select: { nombre: true } } } },
 } satisfies Prisma.OrdenTelaSelect;
 
@@ -560,6 +571,10 @@ function fotoTela(f: FilaTela): object {
   return {
     idTela: f.idTela,
     consumoPorPrenda: num(f.consumoPorPrenda),
+    // ⭐⭐ 0.165 — el consumo del complemento entra a la FOTO: desde esta fila se puede editar, y
+    // una foto que no lo trae no permitiría reconstruir de qué venía el renglón (D3/A7).
+    consumoComplementoPorPrenda:
+      f.consumoComplementoPorPrenda === null ? null : num(f.consumoComplementoPorPrenda),
     precio: dec(f.precio),
     paraPreCosto: f.paraPreCosto,
     paraProduccion: f.paraProduccion,
@@ -784,6 +799,32 @@ function pesos(valor: number | null): string {
 }
 
 /**
+ * ⭐⭐ 0.165 (§Post-F9.219) — LA PUERTA DEL COMPLEMENTO **EN LA ORDEN**: un consumo de complemento
+ * sólo se captura donde el CATÁLOGO declara complemento (`Tela.nombreComplemento`). Es palabra por
+ * palabra la misma guarda que el BOM del modelo (`modelos/bom-modelo.ts::exigirTelasValidas`) y el
+ * mismo reparto de autoridad de §Post-F9.219(b): *quién* lo lleva lo dice el catálogo, *cuánto* lo
+ * dice la receta.
+ *
+ * ⚠️ Sin ella, un número capturado sobre una tela sin complemento viajaría a la explosión y
+ * `validarLineas` rechazaría la orden de compra ENTERA —con sus otras líneas— por un renglón que el
+ * comprador nunca tecleó. Se corta en la puerta, que es donde se puede explicar.
+ *
+ * `undefined` (el PATCH no lo trae) y `null` (BORRARLO) **siempre pasan**: quitar el complemento deja
+ * la orden como estaba antes de 0.156, y eso es legítimo aunque el catálogo ya no lo declare.
+ */
+export function exigirComplementoDeclarado(
+  tela: { nombre: string; nombreComplemento: string | null },
+  consumoComplemento: number | null | undefined,
+): void {
+  if (consumoComplemento === undefined || consumoComplemento === null) return;
+  if (tela.nombreComplemento !== null) return;
+  throw new ErrorValidacion(
+    `La tela "${tela.nombre}" no lleva complemento: no se le puede capturar consumo de ` +
+      `complemento. Si sí lo lleva, decláraselo primero en el catálogo de telas.`,
+  );
+}
+
+/**
  * Compara la receta congelada con el BOM VIVO del modelo y arma los avisos (regla 5 del encabezado).
  * PURA sobre lo ya leído (sin BD) para poder probarla sin Postgres.
  */
@@ -808,6 +849,12 @@ export function calcularDesalineacion(
     material: string,
     consumo: { orden: number | null; modelo: number | null },
     precio: { orden: number | null; modelo: number | null; deCompra: boolean },
+    /**
+     * ⭐⭐ 0.165 (§Post-F9.219) — el COMPLEMENTO de una TELA (el cárdigan de la felpa). Sólo lo
+     * traen las telas; `nombre` null = el catálogo no declara complemento ⇒ no hay nada que vigilar
+     * (es la misma lectura que hacen la compra y el costeo: manda el catálogo de hoy).
+     */
+    complemento?: { nombre: string | null; orden: number | null; modelo: number | null },
   ): CambioReceta[] => {
     const propios: CambioReceta[] = [];
     if (
@@ -838,6 +885,29 @@ export function calcularDesalineacion(
         idMaterialModelo: null,
         que: 'consumo',
         detalle: `La cantidad de "${material}" pasó de ${cifra(consumo.orden)} a ${cifra(consumo.modelo)} en el modelo.`,
+      });
+    }
+    /*
+     * ⭐⭐ 0.165 — Y LO MISMO PARA EL COMPLEMENTO, que hasta esta fila no se comparaba con nada:
+     * capturar el cárdigan en el modelo DESPUÉS de crear la orden **no avisaba absolutamente nada**,
+     * así que la orden seguía comprando sin él y nadie se enteraba. Va como `consumo` —que es lo que
+     * es, «mismo insumo, cantidad distinta»— y el texto NOMBRA al complemento con el nombre del
+     * catálogo, que es lo que distingue este aviso del del cuerpo.
+     */
+    if (
+      complemento !== undefined &&
+      complemento.nombre !== null &&
+      difieren(complemento.orden, complemento.modelo)
+    ) {
+      propios.push({
+        tipo,
+        idRenglon: r.id,
+        material,
+        idMaterialModelo: null,
+        que: 'consumo',
+        detalle:
+          `La cantidad de ${complemento.nombre} (el complemento de "${material}") pasó de ` +
+          `${cifra(complemento.orden)} a ${cifra(complemento.modelo)} en el modelo.`,
       });
     }
     // El precio solo se compara si la orden CONGELÓ uno: `null` significa "esta orden no congeló
@@ -883,6 +953,11 @@ export function calcularDesalineacion(
         t.nombre,
         { orden: t.consumoPorPrenda, modelo: t.consumoModelo },
         { orden: t.precio, modelo: t.precioModelo, deCompra: t.precioModeloDeCompra },
+        {
+          nombre: t.nombreComplemento,
+          orden: t.consumoComplementoPorPrenda,
+          modelo: t.consumoComplementoModelo,
+        },
       ),
     );
   }
@@ -1160,6 +1235,20 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       nombre: f.tela.nombre,
       unidad: f.tela.unidadMedida,
       consumoPorPrenda: num(f.consumoPorPrenda),
+      // ⭐⭐ 0.165 — EL COMPLEMENTO SE VE (§Post-F9.219). El nombre y el estimado salen del CATÁLOGO
+      // DE HOY —igual que los leen la compra y el costeo—; el consumo, de lo que ESTA orden congeló.
+      // Si el catálogo ya no declara complemento, no hay complemento que enseñar: el nombre viaja en
+      // `null` y con él se apaga todo el bloque (misma regla que aplica el MRP al pedirlo).
+      nombreComplemento: f.tela.nombreComplemento,
+      consumoComplementoPorPrenda:
+        f.consumoComplementoPorPrenda === null ? null : num(f.consumoComplementoPorPrenda),
+      consumoComplementoModelo: delModelo?.consumoComplementoPorPrenda ?? null,
+      // El MISMO número con el que `costos/costo-orden.ts` valúa el complemento de esta orden (la
+      // orden no congela precio de complemento). Sin estimado: `null` = «sin costo estimado», dicho.
+      precioComplemento:
+        f.tela.nombreComplemento === null || f.tela.precioSugeridoComplemento === null
+          ? null
+          : f.tela.precioSugeridoComplemento.toNumber(),
       precio: dec(f.precio),
       paraPreCosto: f.paraPreCosto,
       paraProduccion: f.paraProduccion,
@@ -2309,6 +2398,8 @@ export async function editarRenglonReceta(
             'dejarlo fuera de la compra de esta orden',
           );
         }
+        // ⭐⭐ 0.165 — el complemento sólo se captura donde el CATÁLOGO dice que lo hay.
+        exigirComplementoDeclarado(fila.tela, datos.consumoComplementoPorPrenda);
         // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de Desarrollo.
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
@@ -2318,6 +2409,14 @@ export async function editarRenglonReceta(
             ...(datos.consumoPorPrenda === undefined
               ? {}
               : { consumoPorPrenda: new Prisma.Decimal(datos.consumoPorPrenda) }),
+            ...(datos.consumoComplementoPorPrenda === undefined
+              ? {}
+              : {
+                  consumoComplementoPorPrenda:
+                    datos.consumoComplementoPorPrenda === null
+                      ? null
+                      : new Prisma.Decimal(datos.consumoComplementoPorPrenda),
+                }),
             ...(datos.precio === undefined
               ? {}
               : { precio: datos.precio === null ? null : new Prisma.Decimal(datos.precio) }),
@@ -4416,7 +4515,13 @@ async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void>
 
 /** La receta como la necesita el impreso de la OP: nombres + consumo, ya filtrada. */
 export interface RecetaParaImpreso {
-  telas: { nombre: string; consumoPorPrenda: number }[];
+  /** ⭐⭐ 0.165: la tela va con SU COMPLEMENTO (el cárdigan), que también se corta y se recibe. */
+  telas: {
+    nombre: string;
+    consumoPorPrenda: number;
+    nombreComplemento: string | null;
+    consumoComplementoPorPrenda: number | null;
+  }[];
   avios: { clave: string; descripcion: string; consumoPorPrenda: number }[];
   /** Artes de la orden, ordenados por descripción (V1-E3f: el nombre se retiró). */
   artes: { descripcion: string; tipoArte: string; idModeloArte: number | null }[];
@@ -4432,7 +4537,13 @@ export async function leerRecetaParaImpreso(tx: Tx, idOrden: number): Promise<Re
   const [telas, avios, artes] = await Promise.all([
     tx.ordenTela.findMany({
       where: { idOrden, paraProduccion: true, excluido: false },
-      select: { consumoPorPrenda: true, tela: { select: { nombre: true } } },
+      select: {
+        consumoPorPrenda: true,
+        // ⭐⭐ 0.165 — el complemento congelado (0.156) y su nombre en el catálogo de HOY: sin esto
+        // el cárdigan NO llegaba al papel que leen el corte y el almacén, aunque la OC sí lo pidiera.
+        consumoComplementoPorPrenda: true,
+        tela: { select: { nombre: true, nombreComplemento: true } },
+      },
       orderBy: { tela: { nombre: 'asc' } },
     }),
     tx.ordenAvio.findMany({
@@ -4453,6 +4564,13 @@ export async function leerRecetaParaImpreso(tx: Tx, idOrden: number): Promise<Re
     telas: telas.map((t) => ({
       nombre: t.tela.nombre,
       consumoPorPrenda: num(t.consumoPorPrenda),
+      // Manda el CATÁLOGO de hoy: si la tela ya no declara complemento, no se imprime (igual que la
+      // compra deja de pedirlo), aunque la orden tenga el número congelado de cuando sí lo llevaba.
+      nombreComplemento: t.tela.nombreComplemento,
+      consumoComplementoPorPrenda:
+        t.tela.nombreComplemento === null || t.consumoComplementoPorPrenda === null
+          ? null
+          : num(t.consumoComplementoPorPrenda),
     })),
     avios: avios.map((a) => ({
       clave: a.avio.clave,
