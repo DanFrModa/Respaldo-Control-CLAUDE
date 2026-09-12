@@ -741,6 +741,33 @@ describe('combinarCostoReal · el COMPLEMENTO de la tela (0.163)', () => {
     expect(r.tela).toBe(300);
   });
 
+  // 🔴 RONDA DE CORRECCIÓN (arreglo 3): el aviso de PRECIO EN CERO miraba sólo el cuerpo.
+  it('avisa de PRECIO EN CERO cuando el que va en cero es el COMPLEMENTO', () => {
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10, requeridoComplemento: 10 })],
+      [
+        ligada({
+          clave: 'tela-1',
+          cantidad: 10,
+          precio: 30, // el cuerpo SÍ tiene precio: sin el arreglo, nadie avisaba
+          cantidadComplemento: 10,
+          precioComplemento: 0,
+        }),
+      ],
+    );
+    expect(r.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(true);
+  });
+
+  it('un complemento en CERO no dispara el aviso si la línea no compró complemento', () => {
+    // `precioComplemento: 0` con `cantidadComplemento: 0` es el estado NORMAL de un avío o de una
+    // tela sin cárdigan: ahí el cero no significa nada y avisar sería ruido en cada renglón.
+    const r = combinarCostoReal(
+      [requerido({ clave: 'tela-1', requerido: 10 })],
+      [ligada({ clave: 'tela-1', cantidad: 10, precio: 30 })],
+    );
+    expect(r.avisos.some((a) => a.includes('PRECIO EN CERO'))).toBe(false);
+  });
+
   it('una tela SIN complemento da exactamente los mismos números de siempre (no-regresión)', () => {
     const r = combinarCostoReal(
       [requerido({ clave: 'tela-1', requerido: 100, ultimoPrecio: 20 })],

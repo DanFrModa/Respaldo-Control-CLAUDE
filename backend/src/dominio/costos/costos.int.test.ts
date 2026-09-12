@@ -1018,6 +1018,42 @@ describe('el COMPLEMENTO de la tela en el pre-costo (0.163)', () => {
     expect(pre.totalTela).toBe(66); // 2×22 + 0.5×44
   });
 
+  // 🔴 RONDA DE CORRECCIÓN de la 0.163 — EL CASO QUE NEUTRALIZABA EL ESTIMADO.
+  // La OC que genera el MRP trae la CANTIDAD de cárdigan pero **nunca su precio** (`mrp.ts:3238`).
+  // Mientras el escalón 1 aceptara esas líneas con `COALESCE(precio_complemento, precio)`, bastaba
+  // UNA orden automática autorizada para que el cárdigan se costeara al precio de la felpa —para
+  // siempre, y con la traza diciendo `ultimo-precio-compra`, o sea con cara de dato duro—. Es el
+  // camino NORMAL del negocio, no un borde: el estimado que Daniel mandó crear quedaba muerto.
+  it('una OC automática (cárdigan SIN precio propio) NO pisa el estimado del catálogo', async () => {
+    const { idModelo: id, idTela } = await modeloConComplemento({
+      precioSugerido: 40,
+      precioSugeridoComplemento: 62,
+      consumoPorPrenda: 1,
+      consumoComplementoPorPrenda: 1,
+    });
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Alsatex MRP 0163' } });
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: 9164n,
+        idEmpresa: empresa.id,
+        idProveedor: proveedor.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-09-05T00:00:00.000Z'),
+        lineas: {
+          // Exactamente como la escribe la explosión: cantidad de complemento SÍ, precio NO.
+          create: [{ idTela, cantidad: 100, precio: 40, cantidadComplemento: 100 }],
+        },
+      },
+    });
+    const pre = await calcularPreCosto(sesion(), id, bd());
+    // El CUERPO sí toma el precio real de esa compra (su escalón 1 funciona igual que siempre).
+    expect(pre.telas[0]?.precioUnitario).toBe(40);
+    // 🔑 Y el cárdigan conserva SU estimado: 62, no 40.
+    expect(pre.telas[0]?.precioUnitarioComplemento).toBe(62);
+    expect(pre.telas[0]?.origenPrecioComplemento).toBe('sugerido-complemento');
+    expect(pre.totalTela).toBe(102); // 1×40 + 1×62 (y NO 80)
+  });
+
   it('una tela SIN complemento sigue costando exactamente lo de siempre (no-regresión)', async () => {
     const pre = await calcularPreCosto(sesion(), idModelo, bd());
     expect(pre.totalTela).toBe(30);

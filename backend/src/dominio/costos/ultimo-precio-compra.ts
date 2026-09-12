@@ -27,10 +27,11 @@
  * El global se DERIVA de los representantes por proveedor sin una segunda consulta: la línea más
  * reciente de un material es, necesariamente, la más reciente dentro de su propio grupo de proveedor.
  *
- *  • ⭐⭐ **por COMPLEMENTO de la tela** (0.163) — la línea más reciente **que compró cárdigan**, con
- *    `COALESCE(precio_complemento, precio)`. Ésa SÍ necesita su propia consulta, y el porqué está en
- *    {@link leerUltimasComprasDeComplemento}: la compra más reciente de una tela no tiene por qué
- *    haber comprado complemento.
+ *  • ⭐⭐ **por COMPLEMENTO de la tela** (0.163) — la línea más reciente en la que se compró cárdigan
+ *    **y alguien le puso SU PROPIO precio** (`precio_complemento IS NOT NULL`; sin `COALESCE` al
+ *    precio del cuerpo, y el porqué —que es un defecto de dinero real— está en
+ *    {@link leerUltimasComprasDeComplemento}). Ésa SÍ necesita su propia consulta: la compra más
+ *    reciente de una tela no tiene por qué haber comprado complemento.
  *
  * ⭐ UNIDADES (§Post-F9.97): el precio se devuelve **POR UNIDAD DE CONSUMO** porque la línea de OC
  * **ya está en unidad de consumo** — se lee tal cual, sin dividir por nada. Hasta V1-E8a aquí se
@@ -255,11 +256,28 @@ export async function leerUltimosPreciosCompra(
  * complemento de una línea equivocada, o ninguno. Sigue siendo **por lote** (una consulta para todas
  * las telas), que es lo que la decisión de rendimiento de V1-E3e protege.
  *
- * El PRECIO es `COALESCE(precio_complemento, precio)` porque así lo dice el modelo —*«`precioComplemento`
- * NULL = se cobra al mismo precio que el cuerpo»*— y así lo cobra la OC (`aCompraSalida`): ése es el
- * dinero que de verdad se pagó por el cárdigan. ⚠️ **No es un fallback inventado al costear**: la
- * cascada NUNCA cae sola al precio del cuerpo (ver `resolverPrecioComplementoTela`); esto es la
- * lectura fiel de una compra que sí existió.
+ * 🔴 **SÓLO CUENTAN LAS LÍNEAS EN LAS QUE ALGUIEN LE PUSO PRECIO AL CÁRDIGAN**
+ * (`precio_complemento IS NOT NULL`) — y por eso aquí NO hay `COALESCE` al precio del cuerpo.
+ *
+ * ⚠️ Es la corrección del reviewer de la 0.163, y el porqué importa porque el caso que rompía es
+ * **el camino NORMAL del negocio, no un borde**: la OC que genera el MRP **nunca captura**
+ * `precioComplemento` (`compras/mrp.ts:3238` lo dice con todas sus letras; `ordenes-compra.ts:719`
+ * lo guarda NULL), pero sí trae `cantidad_complemento`. Con el `COALESCE` que esto tenía, esas
+ * líneas entraban con **el precio del CUERPO** y ganaban el escalón 1 **por encima del estimado del
+ * catálogo**: una felpa a 40 con cárdigan estimado en 62 pasaba a costearse a 40 en cuanto se
+ * autorizaba UNA orden automática — con la traza diciendo `ultimo-precio-compra`, o sea con cara de
+ * dato duro. El número que Daniel mandó crear quedaba neutralizado por el uso normal del sistema.
+ *
+ * Sin `COALESCE`, el escalón 1 significa lo único que puede sostener: *«la última compra en la que
+ * alguien de verdad le puso precio al cárdigan»*. Si nadie lo ha hecho, la cascada baja al color y
+ * al ESTIMADO, que es donde debía estar.
+ *
+ * ⚠️⚠️ **Esto NO contradice el `precioComplemento ?? precio` de `calcularCostoRealDeOrden`** (el
+ * lector de líneas ligadas a UNA orden). Allí la pregunta es otra —*«¿cuánto dinero salió por esta
+ * compra?»*— y la respuesta fiel sigue siendo que un complemento sin precio propio se pagó al del
+ * cuerpo, porque así lo totaliza la propia OC (`aCompraSalida`). Aquí la pregunta es *«¿con qué
+ * precio costeo un cárdigan del que no sé nada?»*, y la respuesta no puede ser un precio que nadie
+ * tecleó para él.
  *
  * Mismo criterio de estatus (`ESTATUS_COMPRADO`), mismo desempate (fecha DESC NULLS LAST → folio
  * DESC → renglón DESC) y misma acotación a la empresa activa (A9) que el cuerpo: no hay una regla
@@ -286,7 +304,7 @@ async function leerUltimasComprasDeComplemento(
       l."id_tela"        AS "idTela",
       l."id_avio"        AS "idAvio",
       l."precio"         AS "precio",
-      COALESCE(l."precio_complemento", l."precio") AS "precioComplemento",
+      l."precio_complemento" AS "precioComplemento",
       oc."id"            AS "idOrdenCompra",
       oc."num_compra"    AS "numCompra",
       oc."estatus"::text AS "estatus",
@@ -299,7 +317,9 @@ async function leerUltimasComprasDeComplemento(
     WHERE oc."id_empresa" = ${idEmpresa}
       AND oc."estatus"::text IN (${Prisma.join(ESTATUS_COMPRADO.map((e) => String(e)))})
       AND l."id_tela" IN (${Prisma.join(telas)})
+      -- Compró cárdigan Y alguien le puso SU precio. Las dos condiciones, por lo de arriba.
       AND l."cantidad_complemento" IS NOT NULL
+      AND l."precio_complemento" IS NOT NULL
     ORDER BY
       l."id_tela",
       oc."fecha" DESC NULLS LAST, oc."num_compra" DESC, l."id" DESC

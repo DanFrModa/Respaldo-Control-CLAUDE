@@ -496,6 +496,12 @@ function RenglonPrecosto({
   alEliminar: () => void;
   alRestaurar: () => void;
 }): React.JSX.Element {
+  // ⭐⭐ 0.163 (ronda de corrección): el aviso de «sin costo estimado» SÓLO puede decirse cuando los
+  // importes se ven. Sin `consultas.ver-importes` el precio llega `null` **por ocultación**, no por
+  // ausencia: decir «no hay» ahí sería una MENTIRA, y de las caras (mandaría a capturar un dato que
+  // ya existe). Se deriva del PERMISO, igual que en el editor de arriba.
+  const { tienePermiso } = useSesion();
+  const verImportes = tienePermiso('consultas.ver-importes');
   const editar = useEditarLinea();
   const [editando, setEditando] = useState(false);
   const [descripcion, setDescripcion] = useState(linea.descripcion);
@@ -622,11 +628,20 @@ function RenglonPrecosto({
         ) : null}
         {/* ⭐⭐ 0.163 — EL COMPLEMENTO, DEBAJO DE SU TELA. `importe` ya lo incluye, así que sin esta
             línea el renglón mostraría un importe que NO es `consumo × precio` y nadie sabría por
-            qué. Es el desglose de la otra mitad de la misma tela, no un renglón aparte. */}
-        {linea.importeComplemento !== null ? (
+            qué. Es el desglose de la otra mitad de la misma tela, no un renglón aparte.
+
+            🔴 RONDA DE CORRECCIÓN: la guarda mira el CONSUMO, no el importe. Con `importeComplemento`
+            la fila se callaba entera —ni nombre, ni aviso, ni «—»— justo en el caso que va a ser el
+            NORMAL el día del despliegue: el estimado nace NULL en todas las telas (sin backfill, como
+            manda la regla 0-B), así que toda tela con cárdigan empieza SIN precio. La experiencia
+            habría sido «no cambió nada y el precio sigue bajo», sin un solo empujón a capturarlo — y
+            ésta es la pantalla donde se arma el precio que se le cotiza al cliente. `consumo` no está
+            tras la reja de importes, así que la guarda funciona también sin `ver-importes`. */}
+        {linea.consumoComplemento !== null ? (
           <div className="text-xs text-muted-foreground" data-testid="linea-complemento">
-            + complemento: {linea.consumoComplemento ?? '—'} × {moneda(linea.precioUnitComplemento)}{' '}
-            = {moneda(linea.importeComplemento)}
+            {verImportes && linea.importeComplemento === null
+              ? `+ complemento: ${String(linea.consumoComplemento)} sin costo estimado (captúralo en el catálogo de telas)`
+              : `+ complemento: ${String(linea.consumoComplemento)} × ${moneda(linea.precioUnitComplemento)} = ${moneda(linea.importeComplemento)}`}
           </div>
         ) : null}
       </TableCell>

@@ -399,7 +399,15 @@ export function combinarCostoReal(
       directo += importe;
       comprado += l.cantidad;
       compradoComplemento += l.cantidadComplemento;
-      if (l.precio <= TOLERANCIA) {
+      // ⭐⭐ 0.163 (ronda de corrección): el aviso de PRECIO EN CERO mira las DOS mitades de la
+      // línea. El contrato admite `precioComplemento` en 0 (`compra.ts:181`, `.min(0)`), así que un
+      // cárdigan capturado a cero subvalúa el costo real exactamente igual que un cuerpo a cero — y
+      // callarlo sería la misma asimetría que esta fila vino a cerrar. Sólo se mira cuando la línea
+      // REALMENTE compró complemento: en un avío o en una tela sin cárdigan, el 0 no significa nada.
+      if (
+        l.precio <= TOLERANCIA ||
+        (l.cantidadComplemento > 0 && l.precioComplemento <= TOLERANCIA)
+      ) {
         hayPrecioCero = true;
       }
       return {

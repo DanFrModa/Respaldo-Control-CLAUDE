@@ -1666,6 +1666,44 @@ describe('el COMPLEMENTO de la tela en el precosto persistido (0.163)', () => {
     expect(linea?.consumoComplemento).toBe(0.5); // el consumo SÍ se sabe; lo que falta es el precio
   });
 
+  // 🔴 RONDA DE CORRECCIÓN — M16: los tres campos del complemento en el `update` de
+  // `restaurarLineaBom`. Si se caen, restaurar deja el desglose RANCIO (el del BOM viejo) mientras
+  // `importe` sí vuelve al nuevo, y el siguiente `editarLinea` arrastra ese importe equivocado
+  // hacia el costo que se cotiza. Para que la prueba discrimine, el BOM tiene que haber CAMBIADO
+  // entre el ajuste y la restauración: por eso se sube el estimado del catálogo en medio.
+  it('M16 · restaurar devuelve el renglón al BOM VIGENTE, con su complemento al día', async () => {
+    const idModelo = await modeloConCardigan({
+      precioSugerido: 20,
+      precioSugeridoComplemento: 30,
+      consumoPorPrenda: 2,
+      consumoComplementoPorPrenda: 0.5,
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(linea?.importeComplemento).toBe(15); // 0.5 × 30
+
+    // El cárdigan sube de precio en el CATÁLOGO (el BOM vigente pasa a valer 0.5 × 80 = 40)…
+    const idTela = linea?.idTela;
+    await cliente.tela.update({
+      where: { id: idTela! },
+      data: { precioSugeridoComplemento: 80 },
+    });
+    // …y alguien había ajustado el renglón a mano (queda AJUSTADO: recalcular ya no lo pisa).
+    await editarLinea(sesion(), precosto.id, linea!.id, { precioUnit: 10 }, bd());
+
+    const restaurado = await restaurarLineaBom(sesion(), precosto.id, linea!.id, bd());
+    const tela = restaurado.lineas.find((l) => l.conceptoCodigo === 'tela');
+    expect(tela?.ajustado).toBe(false);
+    expect(tela?.precioUnit).toBe(20); // el cuerpo vuelve al BOM
+    // 🔑 y el complemento vuelve al BOM VIGENTE, no al que tenía guardado.
+    expect(tela?.precioUnitComplemento).toBe(80);
+    expect(tela?.importeComplemento).toBe(40);
+    expect(tela?.consumoComplemento).toBe(0.5);
+    expect(tela?.importe).toBe(80); // 2×20 + 40 — y cuadra con su propio desglose
+  });
+
   it('una tela SIN complemento guarda los tres campos en null (no-regresión)', async () => {
     const tela = await cliente.tela.create({
       data: { nombre: 'Rib liso 0163', precioSugerido: 12 },

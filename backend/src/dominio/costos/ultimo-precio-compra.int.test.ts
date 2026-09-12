@@ -449,17 +449,43 @@ describe('leerUltimosPreciosCompra — el COMPLEMENTO de la tela (0.163)', () =>
     expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(40);
   });
 
-  it('sin precio propio, el complemento vale el precio del CUERPO de esa misma línea', async () => {
-    // El modelo lo dice: «precioComplemento NULL = se cobra al mismo precio que el cuerpo», y así lo
-    // totaliza la propia OC. Es la lectura fiel de lo que se pagó, NO un fallback del costeo.
+  // 🔴 RONDA DE CORRECCIÓN de la 0.163 — ESTA PRUEBA FIJABA LA CONDUCTA EQUIVOCADA.
+  // Antes esperaba 77 (el precio del CUERPO) para una línea que compró cárdigan SIN precio propio.
+  // El problema es que ése es **el camino normal del negocio, no un borde**: la OC que genera el MRP
+  // nunca captura `precioComplemento` (`mrp.ts:3238`), así que una sola orden automática autorizada
+  // bastaba para que el escalón 1 —que va POR ENCIMA del estimado— devolviera el precio de la felpa
+  // y el costo estimado del cárdigan no se volviera a usar jamás, con cara de dato duro.
+  it('una compra SIN precio propio del complemento NO cuenta como último precio del cárdigan', async () => {
     await crearOc({
       estatus: 'autorizada',
       idProveedor: provA,
       fecha: '2026-08-05',
-      linea: { idTela, precio: 77, cantidadComplemento: 3 },
+      linea: { idTela, precio: 77, cantidadComplemento: 3 }, // precioComplemento NULL
     });
     const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
-    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(77);
+    // El CUERPO sí se leyó (esa compra existió); el complemento NO tiene precio que ofrecer.
+    expect(r.porMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(77);
+    expect(r.complementoPorMaterial.size).toBe(0);
+  });
+
+  it('una OC posterior SIN precio de cárdigan no pisa a la anterior que SÍ lo tenía', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-01',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 62 },
+    });
+    // La automática del MRP: trae cantidad de cárdigan, pero nadie le tecleó su precio.
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-25',
+      linea: { idTela, precio: 40, cantidadComplemento: 5 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.porMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(40); // cuerpo: la última
+    // 🔑 El cárdigan conserva el ÚLTIMO precio que alguien le puso de verdad — no se "lava" a 40.
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(62);
   });
 
   it('respeta el MISMO criterio de estatus que el cuerpo (una OC cancelada no cuenta)', async () => {

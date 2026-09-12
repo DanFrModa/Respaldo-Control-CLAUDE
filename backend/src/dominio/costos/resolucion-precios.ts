@@ -269,11 +269,18 @@ export function resolverPrecioTela(entrada: EntradaPrecioTela): PrecioResuelto {
  * Sin ninguno ⇒ `precio: null` + `origen: 'sin-precio'`: el complemento **NO se valúa en silencio a
  * cero**, se dice — exactamente como ya hace el cuerpo.
  *
- * ⚠️ **Lo que esta cascada NO hace a propósito: caer al precio del CUERPO.** `OrdenCompraLinea`
- * documenta *«precioComplemento NULL = se cobra al mismo precio que el cuerpo»*, y eso se respeta
- * **al leer una compra** (el escalón 1 usa `precioComplemento ?? precio` de esa línea: es el dinero
- * que realmente se pagó). Pero inventar ese fallback al COSTEAR convertiría un dato faltante en un
- * número que parece bueno, que es justo el silencio que esta fila vino a matar.
+ * ⚠️ **Lo que esta cascada NO hace, en NINGÚN escalón: caer al precio del CUERPO.** `OrdenCompraLinea`
+ * documenta *«precioComplemento NULL = se cobra al mismo precio que el cuerpo»*, pero eso responde a
+ * otra pregunta: *«¿cuánto salió de la caja por ESTA compra?»* (y ahí sí se respeta — ver
+ * `calcularCostoRealDeOrden`). La pregunta de aquí es *«¿con qué precio costeo un cárdigan del que
+ * no sé nada?»*, y la respuesta no puede ser un precio que nadie tecleó para él.
+ *
+ * 🔴 Por eso el ESCALÓN 1 sólo mira compras **con `precio_complemento` propio**
+ * (`leerUltimasComprasDeComplemento`). No es celo: la OC que genera el MRP **nunca** captura ese
+ * campo, así que con un `COALESCE` al precio del cuerpo bastaba **una sola orden automática
+ * autorizada** para que el cárdigan se costeara al precio de la felpa para siempre —con la traza
+ * diciendo `ultimo-precio-compra`— y el estimado del catálogo no volviera a usarse nunca. El camino
+ * normal del negocio habría anulado, en silencio, justo el número que esta fila vino a crear.
  */
 export type OrigenPrecioComplemento =
   | 'ultimo-precio-compra'
