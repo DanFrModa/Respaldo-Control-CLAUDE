@@ -158,6 +158,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idGenero: null,
     genero: null,
     cantidadFotos: 0,
+    numeroDeModelosDeProduccion: 0,
     urlFotoPrincipal: null,
     idTipoProducto: null,
     tipoProducto: null,
@@ -181,7 +182,16 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
 
 /** Ficha de ejemplo (datos + BOM). */
 function ficha(m: Modelo, extra: Partial<ModeloFicha> = {}): ModeloFicha {
-  return { ...m, telas: [], avios: [], artes: [], tallasCurva: [], avisosCurva: [], ...extra };
+  return {
+    ...m,
+    telas: [],
+    avios: [],
+    artes: [],
+    tallasCurva: [],
+    avisosCurva: [],
+    modelosDeProduccion: [],
+    ...extra,
+  };
 }
 
 function pagina(datos: Modelo[]): TipoPagina {
@@ -604,6 +614,116 @@ describe('<ModelosPagina>', () => {
 
     await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     expect(await screen.findByTestId('pasar-a-produccion')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ 0.149 — El botón desaparece cuando el desarrollo YA tiene modelos de producción nacidos de
+   * él: ahí promoverlo es un acto imposible (el servidor lo rechaza siempre) y ofrecerlo era
+   * precargar un número que ya estaba decidido negar — la pregunta literal de Daniel.
+   *
+   * 🔑 Lo decide `numeroDeModelosDeProduccion`, que viaja en la fila DEL LISTADO: el botón se pinta
+   * antes de que exista ninguna ficha. Por eso la prueba pone la ficha vacía a propósito —si el
+   * componente se apoyara en ella, el botón reaparecería y esto caería—.
+   */
+  it('⭐⭐ 0.149 · un desarrollo que YA tiene modelos por color NO ofrece «Pasar a producción»', async () => {
+    const conHijos = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+      numeroDeModelosDeProduccion: 2,
+    });
+    useModelos.mockReturnValue(listaConDatos([conHijos]));
+    useFichaModelo.mockImplementation((id) =>
+      id === undefined
+        ? { data: undefined, isPending: false, isError: false, error: null }
+        : fichaCargada(ficha(conHijos)),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    // Se espera a que el cajón esté pintado (si no, la ausencia se cumpliría sola).
+    await screen.findByTestId('editar-modelo');
+    expect(screen.queryByTestId('pasar-a-produccion')).toBeNull();
+  });
+
+  it('⭐ 0.149 · la ficha del desarrollo lista sus modelos de producción, con liga al hijo', async () => {
+    const padre = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+      numeroDeModelosDeProduccion: 2,
+    });
+    const hijoRojo = modelo(7, '71003', true);
+    useModelos.mockReturnValue(listaConDatos([padre, hijoRojo]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 1
+        ? fichaCargada(
+            ficha(padre, {
+              modelosDeProduccion: [
+                {
+                  id: 7,
+                  codigo: '71003',
+                  numeroProduccion: 71_003,
+                  idColor: 3,
+                  color: 'Rojo',
+                  activo: true,
+                },
+                {
+                  id: 8,
+                  codigo: '71008',
+                  numeroProduccion: 71_008,
+                  idColor: null,
+                  color: null,
+                  activo: false,
+                },
+              ],
+            }),
+          )
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(hijoRojo)),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const hijos = await screen.findAllByTestId('hijo-de-desarrollo');
+    expect(hijos).toHaveLength(2);
+    expect(hijos[0]).toHaveTextContent('71003');
+    expect(hijos[0]).toHaveTextContent('Rojo');
+    // Sin color = MULTICOLOR (un caso real del importador por Excel), no un hueco.
+    expect(hijos[1]).toHaveTextContent('Multicolor');
+
+    // Y es NAVEGABLE: tocar el código del hijo abre SU ficha en el mismo cajón.
+    await usuario.click(within(hijos[0] as HTMLElement).getByRole('button', { name: '71003' }));
+    expect(await screen.findByRole('heading', { name: /71003/ })).toBeInTheDocument();
+  });
+
+  it('⭐ 0.149 · un modelo SIN hijos no pinta la sección del linaje (nunca un «0»)', async () => {
+    const solo = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([solo]));
+    useFichaModelo.mockImplementation((id) =>
+      id === undefined
+        ? { data: undefined, isPending: false, isError: false, error: null }
+        : fichaCargada(ficha(solo)),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await screen.findByTestId('detalle-modelo');
+    expect(screen.queryByTestId('hijo-de-desarrollo')).toBeNull();
+    expect(screen.queryByText(/Modelos de producción de este desarrollo/)).toBeNull();
+    // Control: sin hijos el botón SÍ está (no se lo comió la regla de arriba).
+    expect(screen.getByTestId('pasar-a-produccion')).toBeInTheDocument();
   });
 
   it('un modelo YA de producción no ofrece «Pasar a producción»', async () => {

@@ -47,7 +47,7 @@ import { copiarRecetaDelModelo, traerDelModelo } from '../produccion/receta-orde
 
 import { listarFotosArte } from './arte-modelo.js';
 import { sugerirAviosFavoritos } from './avios-favoritos.js';
-import { leerBom } from './bom-modelo.js';
+import { leerBom, obtenerFichaModelo } from './bom-modelo.js';
 import { obtenerMedidasAvio } from './medidas-avio-talla.js';
 import { listarModelos } from './modelos.js';
 
@@ -484,5 +484,58 @@ describe('las demás lecturas de la receta también resuelven', () => {
     // comprobara contra el hijo, abrir sus fotos daría `ErrorNoEncontrado` sobre un renglón que la
     // pantalla enseña. Sin fotos la lista es vacía — lo que se prueba es que NO lanza.
     await expect(listarFotosArte(sesion(), idHijoRojo, idArtePadre, bd())).resolves.toEqual([]);
+  });
+});
+
+// ── ⭐⭐ 0.149 · EL LINAJE EN LA OTRA DIRECCIÓN ────────────────────────────────────────────────
+
+/**
+ * Todo lo de arriba pregunta *«¿de quién es mi receta?»* — del hijo al padre. Esto prueba la
+ * pregunta contraria, *«¿quiénes leen la mía?»*, que es la que la ficha del desarrollo enseña y la
+ * que decide si el botón «Pasar a producción» se pinta siquiera.
+ */
+describe('⭐⭐ 0.149 · obtenerFichaModelo — el linaje HACIA ABAJO', () => {
+  it('la ficha del DESARROLLO trae sus hijos ORDENADOS por nº de producción, con color y estado', async () => {
+    const rojo = await cliente.color.create({ data: { nombre: 'Rojo 149' } });
+    // A propósito FUERA de orden al crearlos y con el nº de producción puesto: si la consulta
+    // perdiera su `orderBy`, saldrían en orden de inserción (71008 primero) y la prueba lo vería.
+    await cliente.modelo.update({
+      where: { id: idHijoAzul },
+      data: { numeroProduccion: 71_008 },
+    });
+    await cliente.modelo.update({
+      where: { id: idHijoRojo },
+      data: { numeroProduccion: 71_003, idColor: rojo.id, activo: false },
+    });
+
+    const ficha = await obtenerFichaModelo(sesion(), idPadre, bd());
+
+    expect(ficha.modelosDeProduccion.map((h) => h.numeroProduccion)).toEqual([71_003, 71_008]);
+    expect(ficha.modelosDeProduccion.map((h) => h.id)).toEqual([idHijoRojo, idHijoAzul]);
+    // El color viaja RESUELTO por el servidor (la pantalla no traduce ids), y `null` es el hijo
+    // MULTICOLOR — un caso real del importador por Excel, no un dato que falte.
+    expect(ficha.modelosDeProduccion[0]?.color).toEqual({ nombre: 'Rojo 149' });
+    expect(ficha.modelosDeProduccion[1]?.color).toBeNull();
+    // ⚠️ El DESCONTINUADO sigue saliendo: su número de catálogo está gastado igual, y esconderlo
+    // haría que la ficha dijera que se puede promover cuando el servidor lo va a rechazar.
+    expect(ficha.modelosDeProduccion[0]?.activo).toBe(false);
+  });
+
+  it('la ficha de un HIJO, y la de un modelo SUELTO (como los migrados), traen la lista VACÍA', async () => {
+    // Vacío = «no tiene», no «no se sabe»: la pantalla no pinta la sección en vez de pintar «0».
+    // `idSuelto` es exactamente la forma de los ~4,987 migrados del Access (linaje en NULL).
+    expect((await obtenerFichaModelo(sesion(), idHijoRojo, bd())).modelosDeProduccion).toEqual([]);
+    expect((await obtenerFichaModelo(sesion(), idSuelto, bd())).modelosDeProduccion).toEqual([]);
+  });
+
+  it('el LISTADO paga sólo el CONTEO (no la lista): 2 en el padre, 0 en el hijo y en el suelto', async () => {
+    // La pantalla decide con ESTE número si enseña el botón, y `seleccion` es una fila del
+    // listado, no la ficha. Si el conteo se cayera del `_count`, el botón volvería a aparecer.
+    const pagina = await listarModelos(sesion(), { pagina: 1, porPagina: 50 }, bd());
+    const por = (id: number): number | undefined =>
+      pagina.datos.find((m) => m.id === id)?._count.modelosDeProduccion;
+    expect(por(idPadre)).toBe(2);
+    expect(por(idHijoRojo)).toBe(0);
+    expect(por(idSuelto)).toBe(0);
   });
 });

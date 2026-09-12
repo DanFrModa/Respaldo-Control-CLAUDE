@@ -198,6 +198,9 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     secuenciaEstampado: modelo.secuenciaEstampado,
     llevaArte: modelo.llevaArte,
     cantidadFotos: modelo._count.fotos,
+    // ⭐ 0.149 — el linaje HACIA ABAJO, en número: con esto la pantalla decide si enseña el botón
+    // «Pasar a producción» (un desarrollo con hijos NO se puede promover). La LISTA va en la ficha.
+    numeroDeModelosDeProduccion: modelo._count.modelosDeProduccion,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,
     // Agregados del listado (proto vModelos, R9): tela principal, stock PT y costo del último
@@ -339,6 +342,15 @@ function aModeloFichaSalida(modelo: ModeloFicha): z.infer<typeof esquemaModeloFi
       posicion: t.posicion,
     })),
     avisosCurva: modelo.avisosCurva,
+    // ⭐ 0.149 — los hijos del linaje, sólo en la ficha.
+    modelosDeProduccion: modelo.modelosDeProduccion.map((h) => ({
+      id: h.id,
+      codigo: h.codigo,
+      numeroProduccion: h.numeroProduccion,
+      idColor: h.idColor,
+      color: h.color?.nombre ?? null,
+      activo: h.activo,
+    })),
   };
 }
 
@@ -589,6 +601,11 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         serieContinuada: propuesta.serieContinuada,
         avisos: propuesta.avisos,
         yaEnProduccion: propuesta.yaEnProduccion,
+        // ⭐⭐ 0.149 — ⚠️ este handler copia CAMPO POR CAMPO: añadirlo al Zod y olvidarlo aquí es un
+        // fallo SILENCIOSO de serialización (el campo sale del contrato pero nunca del servidor),
+        // no un error de tipos.
+        tieneHijos: propuesta.tieneHijos,
+        codigosHijos: propuesta.codigosHijos,
       };
     },
   });

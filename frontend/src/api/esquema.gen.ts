@@ -14345,6 +14345,8 @@ export interface paths {
                 llevaArte: boolean;
                 /** @description Cantidad de fotos del modelo. */
                 cantidadFotos: number;
+                /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+                numeroDeModelosDeProduccion: number;
                 /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
                 urlFotoPrincipal: string | null;
                 /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -14584,6 +14586,8 @@ export interface paths {
               llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
+              /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+              numeroDeModelosDeProduccion: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
               /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -14806,6 +14810,8 @@ export interface paths {
               llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
+              /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+              numeroDeModelosDeProduccion: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
               /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -14979,6 +14985,21 @@ export interface paths {
               }[];
               /** @description Avisos de curva distinta contra las órdenes del modelo (no bloquean). */
               avisosCurva: string[];
+              /** @description Modelos de producción nacidos de este desarrollo (vacía si ninguno). */
+              modelosDeProduccion: {
+                /** @description Id del modelo de producción (para navegar a su ficha). */
+                id: number;
+                /** @description Código vigente del modelo de producción. */
+                codigo: string;
+                /** @description Nº de 5 dígitos del hijo, o null si aún no lo tiene. */
+                numeroProduccion: number | null;
+                /** @description Id del color del hijo, o null si es multicolor. */
+                idColor: number | null;
+                /** @description Nombre del color del hijo, o null si es multicolor. */
+                color: string | null;
+                /** @description Falso si el hijo está descontinuado (se informa, no se oculta). */
+                activo: boolean;
+              }[];
             };
           };
         };
@@ -15166,6 +15187,8 @@ export interface paths {
               llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
+              /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+              numeroDeModelosDeProduccion: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
               /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -15401,6 +15424,8 @@ export interface paths {
               llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
+              /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+              numeroDeModelosDeProduccion: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
               /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -15560,6 +15585,10 @@ export interface paths {
               avisos: string[];
               /** @description true si el modelo ya está en el catálogo de producción. */
               yaEnProduccion: boolean;
+              /** @description true si el desarrollo ya tiene modelos de producción (promoverlo se rechaza). */
+              tieneHijos: boolean;
+              /** @description Códigos de los modelos de producción nacidos de este desarrollo. */
+              codigosHijos: string[];
             };
           };
         };
@@ -16049,6 +16078,8 @@ export interface paths {
                 llevaArte: boolean;
                 /** @description Cantidad de fotos del modelo. */
                 cantidadFotos: number;
+                /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+                numeroDeModelosDeProduccion: number;
                 /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
                 urlFotoPrincipal: string | null;
                 /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
@@ -16291,6 +16322,8 @@ export interface paths {
               llevaArte: boolean;
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
+              /** @description Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno). */
+              numeroDeModelosDeProduccion: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
               /** @description Nombre de la tela principal (primer renglón del BOM), o null. */

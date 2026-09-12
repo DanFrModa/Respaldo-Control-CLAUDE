@@ -71,6 +71,32 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.150 · 12-sep-2026 · **en prueba** — **De un modelo de desarrollo ya se ve qué salió de él, y el botón deja de ofrecer lo imposible**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver, desde un modelo de desarrollo, TODOS los modelos de producción que nacieron de él**, con su
+  número y su color, y saltar a cualquiera con un clic. Hasta hoy el parentesco sólo se veía en un
+  sentido: desde el hijo se sabía de qué desarrollo venía, pero desde el padre **no había forma de
+  saber qué había salido de ahí** — aunque el dato llevaba meses guardado.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **El botón «Pasar a producción» ya no aparece en un desarrollo que ya tiene hijos.** Antes se veía,
+  abría la ventana y **proponía un número** — y al confirmar el sistema lo rechazaba. Era un camino que
+  nunca podía terminar bien. Ahora directamente no se ofrece.
+- **Donde sí puede funcionar, el botón sigue igual**, con su aviso de siempre: promover un desarrollo
+  sin hijos **no tiene vuelta atrás** y lo deja con un solo número para todos sus colores.
+- **En los modelos que vienen de Access no aparece nada nuevo**: llegaron sin parentesco y el sistema no
+  se lo inventa. La sección simplemente no se pinta.
+
+### Qué sigue pendiente o roto
+
+- **Está preguntado a Daniel si ese botón debe retirarse del catálogo por completo.** Mientras no lo
+  diga, se queda donde hoy sí tiene sentido.
+
+---
+
 ## 0.149 · 12-sep-2026 · **en prueba** — **El complemento de la tela ya cuesta: se compraba y no se cobraba**
 
 ### Qué se puede hacer ahora que antes no

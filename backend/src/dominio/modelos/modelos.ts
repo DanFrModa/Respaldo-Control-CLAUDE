@@ -78,7 +78,11 @@ export type ModeloConRelaciones = Modelo & {
   modeloDesarrollo: { codigo: string } | null;
   /** ⭐ V1-E7d — quien FIRMÓ la revisión de esta versión (§Post-F9.110), o null. */
   revisadoPor: { nombre: string } | null;
-  _count: { fotos: number };
+  /**
+   * ⭐ 0.149 — `modelosDeProduccion` = cuántos modelos de producción nacieron de este desarrollo
+   * (0 en todo lo demás: los migrados, los capturados a mano y los hijos, que no tienen hijos).
+   */
+  _count: { fotos: number; modelosDeProduccion: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
    * fotos. La resuelve el LISTADO en una sola consulta (sin N+1) para la galería; en las demás
@@ -121,7 +125,13 @@ export const incluirRelacionesModelo = {
   // ⭐ V1-E7d — quién firmó la REVISIÓN de esta versión, por NOMBRE: la ficha dice "aprobada por
   // Aurora", no un cuid. Un `select` de una columna por la PK de usuarios: no es un N+1.
   revisadoPor: { select: { nombre: true } },
-  _count: { select: { fotos: true } },
+  // ⭐ 0.149 — el CONTEO de modelos de producción nacidos de este desarrollo (linaje hacia abajo).
+  // Es la misma forma que ya se paga por `fotos`: un agregado del motor, no una consulta por fila.
+  // 🔴 Va en el LISTADO —y no sólo en la ficha— porque la pantalla decide con ESTA fila si enseña
+  // el botón «Pasar a producción», y `seleccion` es una fila del listado, no la ficha. Sólo el
+  // NÚMERO: la lista de hijos se paga en la ficha (el listado son ~4,987 modelos y alimenta también
+  // la galería).
+  _count: { select: { fotos: true, modelosDeProduccion: true } },
 } satisfies Prisma.ModeloInclude;
 
 /**

@@ -90,6 +90,7 @@ function modelo(
     idGenero: null,
     genero: null,
     cantidadFotos: urlFoto === null ? 0 : 1,
+    numeroDeModelosDeProduccion: 0,
     urlFotoPrincipal: urlFoto,
     idTipoProducto: null,
     tipoProducto: null,

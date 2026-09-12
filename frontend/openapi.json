@@ -33602,6 +33602,12 @@
                             "maximum": 9007199254740991,
                             "description": "Cantidad de fotos del modelo."
                           },
+                          "numeroDeModelosDeProduccion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                          },
                           "urlFotoPrincipal": {
                             "anyOf": [
                               {
@@ -33725,6 +33731,7 @@
                           "secuenciaEstampado",
                           "llevaArte",
                           "cantidadFotos",
+                          "numeroDeModelosDeProduccion",
                           "urlFotoPrincipal",
                           "telaPrincipal",
                           "stockPt",
@@ -34433,6 +34440,12 @@
                       "maximum": 9007199254740991,
                       "description": "Cantidad de fotos del modelo."
                     },
+                    "numeroDeModelosDeProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                    },
                     "urlFotoPrincipal": {
                       "anyOf": [
                         {
@@ -34556,6 +34569,7 @@
                     "secuenciaEstampado",
                     "llevaArte",
                     "cantidadFotos",
+                    "numeroDeModelosDeProduccion",
                     "urlFotoPrincipal",
                     "telaPrincipal",
                     "stockPt",
@@ -35160,6 +35174,12 @@
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
                       "description": "Cantidad de fotos del modelo."
+                    },
+                    "numeroDeModelosDeProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
                     },
                     "urlFotoPrincipal": {
                       "anyOf": [
@@ -35768,6 +35788,76 @@
                         "type": "string"
                       },
                       "description": "Avisos de curva distinta contra las órdenes del modelo (no bloquean)."
+                    },
+                    "modelosDeProduccion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del modelo de producción (para navegar a su ficha)."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Código vigente del modelo de producción."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº de 5 dígitos del hijo, o null si aún no lo tiene."
+                          },
+                          "idColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del color del hijo, o null si es multicolor."
+                          },
+                          "color": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color del hijo, o null si es multicolor."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si el hijo está descontinuado (se informa, no se oculta)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "numeroProduccion",
+                          "idColor",
+                          "color",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Modelo de producción nacido de un modelo de desarrollo."
+                      },
+                      "description": "Modelos de producción nacidos de este desarrollo (vacía si ninguno)."
                     }
                   },
                   "required": [
@@ -35808,6 +35898,7 @@
                     "secuenciaEstampado",
                     "llevaArte",
                     "cantidadFotos",
+                    "numeroDeModelosDeProduccion",
                     "urlFotoPrincipal",
                     "telaPrincipal",
                     "stockPt",
@@ -35821,7 +35912,8 @@
                     "avios",
                     "artes",
                     "tallasCurva",
-                    "avisosCurva"
+                    "avisosCurva",
+                    "modelosDeProduccion"
                   ],
                   "additionalProperties": false,
                   "description": "Ficha de un modelo con su receta (BOM) completa."
@@ -36565,6 +36657,12 @@
                       "maximum": 9007199254740991,
                       "description": "Cantidad de fotos del modelo."
                     },
+                    "numeroDeModelosDeProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                    },
                     "urlFotoPrincipal": {
                       "anyOf": [
                         {
@@ -36688,6 +36786,7 @@
                     "secuenciaEstampado",
                     "llevaArte",
                     "cantidadFotos",
+                    "numeroDeModelosDeProduccion",
                     "urlFotoPrincipal",
                     "telaPrincipal",
                     "stockPt",
@@ -37291,6 +37390,12 @@
                       "maximum": 9007199254740991,
                       "description": "Cantidad de fotos del modelo."
                     },
+                    "numeroDeModelosDeProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                    },
                     "urlFotoPrincipal": {
                       "anyOf": [
                         {
@@ -37414,6 +37519,7 @@
                     "secuenciaEstampado",
                     "llevaArte",
                     "cantidadFotos",
+                    "numeroDeModelosDeProduccion",
                     "urlFotoPrincipal",
                     "telaPrincipal",
                     "stockPt",
@@ -37690,6 +37796,17 @@
                     "yaEnProduccion": {
                       "type": "boolean",
                       "description": "true si el modelo ya está en el catálogo de producción."
+                    },
+                    "tieneHijos": {
+                      "type": "boolean",
+                      "description": "true si el desarrollo ya tiene modelos de producción (promoverlo se rechaza)."
+                    },
+                    "codigosHijos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Códigos de los modelos de producción nacidos de este desarrollo."
                     }
                   },
                   "required": [
@@ -37698,7 +37815,9 @@
                     "serie",
                     "serieContinuada",
                     "avisos",
-                    "yaEnProduccion"
+                    "yaEnProduccion",
+                    "tieneHijos",
+                    "codigosHijos"
                   ],
                   "additionalProperties": false,
                   "description": "Propuesta de número de producción para un modelo de desarrollo."
@@ -38831,6 +38950,12 @@
                           "maximum": 9007199254740991,
                           "description": "Cantidad de fotos del modelo."
                         },
+                        "numeroDeModelosDeProduccion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                        },
                         "urlFotoPrincipal": {
                           "anyOf": [
                             {
@@ -38954,6 +39079,7 @@
                         "secuenciaEstampado",
                         "llevaArte",
                         "cantidadFotos",
+                        "numeroDeModelosDeProduccion",
                         "urlFotoPrincipal",
                         "telaPrincipal",
                         "stockPt",
@@ -39606,6 +39732,12 @@
                       "maximum": 9007199254740991,
                       "description": "Cantidad de fotos del modelo."
                     },
+                    "numeroDeModelosDeProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno)."
+                    },
                     "urlFotoPrincipal": {
                       "anyOf": [
                         {
@@ -39729,6 +39861,7 @@
                     "secuenciaEstampado",
                     "llevaArte",
                     "cantidadFotos",
+                    "numeroDeModelosDeProduccion",
                     "urlFotoPrincipal",
                     "telaPrincipal",
                     "stockPt",

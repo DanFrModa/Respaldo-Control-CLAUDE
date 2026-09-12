@@ -442,6 +442,127 @@ describe('⭐⭐ pasarModeloAProduccion — las guardas que protegen el linaje (
   });
 });
 
+/**
+ * ⭐⭐⭐ 0.149 — **LA PROPUESTA Y LA GUARDA TIENEN QUE DECIR LO MISMO.**
+ *
+ * Es LA prueba de esta fila. El defecto que la originó no era de datos —promover un desarrollo con
+ * hijos ya no escribía nada, la guarda corre antes del lock, antes de proponer número y antes de la
+ * única escritura— sino de CONFIANZA: el sistema **enseñaba el botón, abría el diálogo y precargaba
+ * un número que ya tenía decidido rechazar**, y sólo lo decía al pulsar. Daniel, textual: *«me
+ * ofrece poner el 54003. ¿Qué pasa si lo pongo?»*.
+ *
+ * Se cierra haciendo que las dos preguntas salgan de la MISMA función
+ * (`listarHijosDeDesarrollo`). Esto lo comprueba en las dos direcciones, sobre los mismos modelos:
+ *
+ *     tieneHijos === true   ⟺   promover lanza ErrorConflicto
+ *
+ * 🔑 Si alguien vuelve a darle a la propuesta una consulta propia y divergen —otro `where`, un
+ * filtro de `activo` en una y no en la otra—, esta prueba cae. Es exactamente para eso.
+ */
+describe('⭐⭐ 0.149 · la propuesta dice lo MISMO que la guarda (el botón no ofrece lo imposible)', () => {
+  /** Promueve y contesta si el servidor lo RECHAZÓ por conflicto (la otra mitad de la equivalencia). */
+  async function promoverRechaza(idModelo: number): Promise<boolean> {
+    return pasarModeloAProduccion(sesion(), idModelo, {}, bd()).then(
+      () => false,
+      (e: unknown) => e instanceof ErrorConflicto,
+    );
+  }
+
+  it('CON hijos: tieneHijos = true, los NOMBRA, y promover se rechaza (nada escrito, nada en bitácora)', async () => {
+    const idPadre = await crearModeloDesarrollo('CYA-26-71-030');
+    const color = await cliente.color.create({ data: { nombre: 'Rojo 0.149' } });
+    await cliente.modelo.create({
+      data: {
+        codigo: '71004',
+        origen: 'produccion',
+        numeroProduccion: 71_004,
+        idModeloDesarrollo: idPadre,
+        idColor: color.id,
+      },
+    });
+
+    const propuesta = await consultarPropuestaProduccion(sesion(), idPadre, bd());
+    expect(propuesta.tieneHijos).toBe(true);
+    // Los NOMBRA: el diálogo dice *cuáles* son, que es lo único que explica el porqué.
+    expect(propuesta.codigosHijos).toEqual(['71004']);
+
+    const bitacoraAntes = await cliente.bitacora.count();
+    expect(await promoverRechaza(idPadre)).toBe(true);
+
+    // Cero escrituras y cero bitácora: el rechazo ocurre antes de la única escritura.
+    const padre = await cliente.modelo.findUniqueOrThrow({ where: { id: idPadre } });
+    expect(padre.origen).toBe('desarrollo');
+    expect(padre.codigo).toBe('CYA-26-71-030');
+    expect(padre.numeroProduccion).toBeNull();
+    expect(await cliente.bitacora.count()).toBe(bitacoraAntes);
+  });
+
+  it('SIN hijos: tieneHijos = false, codigosHijos vacío, y promover SÍ pasa', async () => {
+    const id = await crearModeloDesarrollo('CYA-26-71-031');
+    const propuesta = await consultarPropuestaProduccion(sesion(), id, bd());
+    expect(propuesta.tieneHijos).toBe(false);
+    expect(propuesta.codigosHijos).toEqual([]);
+    expect(await promoverRechaza(id)).toBe(false);
+  });
+
+  it('⚠️ un hijo DESCONTINUADO cuenta igual en las DOS (su número sigue gastado)', async () => {
+    // El modo de fallo concreto que un filtro `activo: true` en UNA de las dos consultas
+    // introduciría: la propuesta diría «adelante» y el servidor rechazaría. Aquí las dos dicen no.
+    const idPadre = await crearModeloDesarrollo('CYA-26-71-032');
+    await cliente.modelo.create({
+      data: {
+        codigo: '71005',
+        origen: 'produccion',
+        numeroProduccion: 71_005,
+        idModeloDesarrollo: idPadre,
+        activo: false,
+      },
+    });
+    expect((await consultarPropuestaProduccion(sesion(), idPadre, bd())).tieneHijos).toBe(true);
+    expect(await promoverRechaza(idPadre)).toBe(true);
+  });
+
+  it('🔑 la equivalencia, medida modelo por modelo sobre una población mezclada', async () => {
+    // Tres estados distintos del MISMO eje: un desarrollo con hijo, uno sin, y —tras promover al
+    // segundo— uno que YA está en producción. Para cada uno se pregunta lo mismo por las dos
+    // puertas y se compara el par completo. Es la forma ejecutable de la garantía; las tres pruebas
+    // de arriba son sus casos con nombre.
+    const conHijo = await crearModeloDesarrollo('CYA-26-71-033');
+    await cliente.modelo.create({
+      data: {
+        codigo: '71006',
+        origen: 'produccion',
+        numeroProduccion: 71_006,
+        idModeloDesarrollo: conHijo,
+      },
+    });
+    const sinHijo = await crearModeloDesarrollo('CYA-26-71-034');
+
+    const medir = async (
+      id: number,
+    ): Promise<{ tieneHijos: boolean; yaEnProduccion: boolean; rechaza: boolean }> => {
+      const { tieneHijos, yaEnProduccion } = await consultarPropuestaProduccion(sesion(), id, bd());
+      return { tieneHijos, yaEnProduccion, rechaza: await promoverRechaza(id) };
+    };
+
+    // ⚠️ `yaEnProduccion` separa el tercer caso: ése también se rechaza, pero por la OTRA razón
+    // («ya está en producción»), y mezclarlo haría que la prueba pasara por el motivo equivocado.
+    const medido = [await medir(conHijo), await medir(sinHijo), await medir(sinHijo)];
+    expect(medido).toEqual([
+      { tieneHijos: true, yaEnProduccion: false, rechaza: true },
+      // `sinHijo` la PRIMERA vez: sin hijos y en desarrollo ⇒ promover pasa (y lo transforma).
+      { tieneHijos: false, yaEnProduccion: false, rechaza: false },
+      // El MISMO modelo, ya promovido: la guarda que ahora lo rechaza es la otra.
+      { tieneHijos: false, yaEnProduccion: true, rechaza: true },
+    ]);
+    // La equivalencia, dicha como tal sobre los que la guarda A gobierna (los que aún no están en
+    // producción): decir «tiene hijos» y rechazar son el MISMO bit.
+    for (const m of medido.filter((x) => !x.yaEnProduccion)) {
+      expect(m.rechaza).toBe(m.tieneHijos);
+    }
+  });
+});
+
 describe('pasarModeloAProduccion', () => {
   it('asigna el número propuesto, cambia el código y CONSERVA el de desarrollo', async () => {
     await sembrarProduccion(['71001', '71002']);

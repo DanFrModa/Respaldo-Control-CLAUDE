@@ -1617,4 +1617,90 @@ describe('API de modelos (F1-E4)', () => {
       }
     });
   });
+
+  /**
+   * ⭐⭐ 0.149 — **EL LINAJE HACIA ABAJO, POR EL API.** El dominio ya lo prueba
+   * (`receta-compartida.int.test.ts` / `nomenclatura.int.test.ts`); lo que SÓLO se puede medir aquí
+   * es la SERIALIZACIÓN, y es donde está el modo de fallo silencioso:
+   * `/modelos/:id/propuesta-produccion` **copia campo por campo** en su handler, así que un campo
+   * añadido al esquema Zod y olvidado en el handler **sale del contrato pero nunca del servidor**,
+   * sin error de tipos y sin que ninguna prueba de dominio lo note.
+   */
+  describe('⭐⭐ 0.149 · el linaje hacia abajo viaja por el API', () => {
+    it('el listado trae el CONTEO, la ficha la LISTA, y la propuesta dice que NO se puede promover', async () => {
+      const cookie = await cookieAdmin();
+      const { body: padre } = await crearModeloApi(cookie, { codigo: 'CYA-26-71-149' });
+      const color = await cliente.color.create({ data: { nombre: 'Rojo API 149' } });
+      // El hijo se siembra en BD: nace por `derivarModeloDeProduccion` (al generar la OP), que este
+      // archivo no monta. Lo que se mide aquí es cómo VIAJA, no cómo nace.
+      const hijo = await cliente.modelo.create({
+        data: {
+          codigo: '71401',
+          origen: 'produccion',
+          numeroProduccion: 71_401,
+          idModeloDesarrollo: padre.id,
+          idColor: color.id,
+        },
+      });
+
+      // 1) LISTADO: sólo el número (lo que decide si la pantalla pinta el botón).
+      const listado = await app.inject({
+        method: 'GET',
+        url: '/api/modelos?origen=todos&porPagina=100',
+        headers: { cookie },
+      });
+      const filas = listado.json<{
+        datos: { id: number; numeroDeModelosDeProduccion: number }[];
+      }>().datos;
+      expect(filas.find((m) => m.id === padre.id)?.numeroDeModelosDeProduccion).toBe(1);
+      expect(filas.find((m) => m.id === hijo.id)?.numeroDeModelosDeProduccion).toBe(0);
+
+      // 2) FICHA: la lista completa, con el color YA RESUELTO por el servidor.
+      const ficha = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${String(padre.id)}`,
+        headers: { cookie },
+      });
+      expect(
+        ficha.json<{ modelosDeProduccion: Record<string, unknown>[] }>().modelosDeProduccion,
+      ).toEqual([
+        {
+          id: hijo.id,
+          codigo: '71401',
+          numeroProduccion: 71_401,
+          idColor: color.id,
+          color: 'Rojo API 149',
+          activo: true,
+        },
+      ]);
+      // Y la del HIJO viene vacía (no tiene hijos): vacío es «no tiene», no «no se sabe».
+      const fichaHijo = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${String(hijo.id)}`,
+        headers: { cookie },
+      });
+      expect(fichaHijo.json<{ modelosDeProduccion: unknown[] }>().modelosDeProduccion).toEqual([]);
+
+      // 3) PROPUESTA: los dos campos nuevos, que es donde el handler copia a mano.
+      const propuesta = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${String(padre.id)}/propuesta-produccion`,
+        headers: { cookie },
+      });
+      const cuerpo = propuesta.json<{ tieneHijos: boolean; codigosHijos: string[] }>();
+      expect(cuerpo.tieneHijos).toBe(true);
+      expect(cuerpo.codigosHijos).toEqual(['71401']);
+
+      // 4) Y el servidor RECHAZA de verdad lo que la propuesta acaba de declarar imposible: es la
+      // equivalencia, medida aquí de punta a punta (409, no un 500 ni un 200 silencioso).
+      const promover = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${String(padre.id)}/pasar-a-produccion`,
+        headers: { cookie },
+        payload: {},
+      });
+      expect(promover.statusCode).toBe(409);
+      expect(promover.json<{ mensaje: string }>().mensaje).toContain('71401');
+    });
+  });
 });
