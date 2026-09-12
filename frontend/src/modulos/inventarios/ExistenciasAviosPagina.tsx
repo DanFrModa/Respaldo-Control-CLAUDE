@@ -1,9 +1,11 @@
 import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import type { Avio } from '@/api/avios';
-import { useExistenciasAvio } from '@/api/inventario-materiales';
+import { useExistenciasAvio, useFijarUbicacionAvio } from '@/api/inventario-materiales';
+import type { ExistenciaAvioFila } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -17,7 +19,9 @@ import {
 import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
+import { useSesion } from '@/sesion/useSesion';
 
+import { BotonUbicacion, DialogoUbicacionMaterial } from './DialogoUbicacionMaterial';
 import { SelectorAvio } from './SelectorAvio';
 
 /** Valor del filtro que significa "todos". */
@@ -36,9 +40,19 @@ const TODOS = 'TODOS';
  * (solo `existencia/esGenerico/unidad`); viven en el catálogo de avíos (`modulos/avios/AviosPagina`).
  * Aquí se re-viste el INVENTARIO y se conserva la distinción Genérico/Por orden que sí trae el dato.
  *
+ * ⭐⭐ FILA 0.103 — la columna **Ubicación** dice DÓNDE está guardado el avío dentro de ese almacén
+ * (texto libre, sin catálogo). Se captura y se corrige AQUÍ mismo, que es donde el almacenista ya
+ * trabaja, con `inventario-avios.mover`; quien sólo puede ver la lee y ya. «—» = todavía no
+ * anotada, que es lo normal en lo que ya existía (REGLA 0-B: nada se rellena hacia atrás).
+ *
  * `inventario-avios.ver` gobierna el acceso.
  */
 export function ExistenciasAviosPagina(): React.JSX.Element {
+  const { tienePermiso } = useSesion();
+  const puedeUbicar = tienePermiso('inventario-avios.mover');
+  /** Renglón cuyo «dónde está guardado» se está editando (fila 0.103). */
+  const [ubicando, setUbicando] = useState<ExistenciaAvioFila | null>(null);
+  const fijarUbicacion = useFijarUbicacionAvio();
   const [avio, setAvio] = useState<Avio | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [soloGenericos, setSoloGenericos] = useState(false);
@@ -191,6 +205,14 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
                         <Warehouse className="size-3.5" aria-hidden />
                         {f.almacen}
                       </p>
+                      {/* Fila 0.103 — dónde está guardado, tocable para capturar/corregir. */}
+                      <BotonUbicacion
+                        ubicacion={f.ubicacion}
+                        editable={puedeUbicar}
+                        alEditar={() => setUbicando(f)}
+                        etiqueta={`${f.avio} en ${f.almacen}`}
+                        idPrueba={`avios-ubicacion-movil-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                      />
                     </div>
                     <span className="num text-lg font-semibold">
                       {f.existencia.toLocaleString('es-MX')}
@@ -213,6 +235,7 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
                       <TablaDensaHead>Descripción</TablaDensaHead>
                       <TablaDensaHead>Tipo</TablaDensaHead>
                       <TablaDensaHead>Almacén</TablaDensaHead>
+                      <TablaDensaHead>Ubicación</TablaDensaHead>
                       <TablaDensaHead numerica>Existencia</TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -242,6 +265,15 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
                           </ChipEstado>
                         </TablaDensaCelda>
                         <TablaDensaCelda>{f.almacen}</TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <BotonUbicacion
+                            ubicacion={f.ubicacion}
+                            editable={puedeUbicar}
+                            alEditar={() => setUbicando(f)}
+                            etiqueta={`${f.avio} en ${f.almacen}`}
+                            idPrueba={`avios-ubicacion-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                          />
+                        </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">
                           {f.existencia.toLocaleString('es-MX')}
                           {f.unidad !== null ? (
@@ -271,6 +303,33 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
           </span>
         </div>
       </div>
+
+      {/* ── ⭐⭐ Dónde está guardado (fila 0.103) ─────────────────────────────── */}
+      <DialogoUbicacionMaterial
+        abierto={ubicando !== null}
+        material={ubicando === null ? '' : `${ubicando.avio} · ${ubicando.descripcion}`}
+        almacen={ubicando?.almacen ?? ''}
+        ubicacionActual={ubicando?.ubicacion ?? null}
+        cargando={fijarUbicacion.isPending}
+        alCerrar={() => setUbicando(null)}
+        alGuardar={(ubicacion) => {
+          if (ubicando === null) return;
+          fijarUbicacion.mutate(
+            { idAvio: ubicando.idAvio, idAlmacen: ubicando.idAlmacen, ubicacion },
+            {
+              onSuccess: (guardada) => {
+                setUbicando(null);
+                toast.success(
+                  guardada.ubicacion === null
+                    ? 'Se borró la ubicación.'
+                    : `Guardado: ${guardada.ubicacion}`,
+                );
+              },
+              onError: (e) => toast.error(e.message),
+            },
+          );
+        }}
+      />
     </div>
   );
 }

@@ -1327,6 +1327,15 @@ export type ExistenciaTelaColorHijo = ExistenciaTelaAgrupada['colores'][number];
 export type ExistenciasTelaColorQuery = NonNullable<
   paths['/api/inventarios/telas/color/existencias']['get']['parameters']['query']
 >;
+/**
+ * ⭐⭐ FILA 0.103 — cuerpo de «dónde está guardado este color en este almacén». Texto LIBRE (Daniel:
+ * *«por ahora NO un catálogo de posiciones»*); **vacío = borrar** la ubicación.
+ */
+export type UbicacionTelaColorFijar =
+  paths['/api/inventarios/telas/color/ubicacion']['put']['requestBody']['content']['application/json'];
+/** Lo que contesta el servidor al fijar/borrar una ubicación (`ubicacion: null` = quedó sin anotar). */
+export type UbicacionMaterial =
+  paths['/api/inventarios/telas/color/ubicacion']['put']['responses']['200']['content']['application/json'];
 /** Kardex de un color de tela (dos componentes con saldo corrido). */
 export type KardexTelaColor =
   paths['/api/inventarios/telas/color/kardex']['get']['responses']['200']['content']['application/json'];
@@ -1385,6 +1394,9 @@ export type ExistenciaAvioFila = ExistenciasAvio['filas'][number];
 export type ExistenciasAvioQuery = NonNullable<
   paths['/api/inventarios/avios/existencias']['get']['parameters']['query']
 >;
+/** ⭐⭐ FILA 0.103 — cuerpo de «dónde está guardado este avío en este almacén» (vacío = borrar). */
+export type UbicacionAvioFijar =
+  paths['/api/inventarios/avios/ubicacion']['put']['requestBody']['content']['application/json'];
 /** Kardex de un avío (`GET /api/inventarios/avios/kardex`). */
 export type KardexAvio =
   paths['/api/inventarios/avios/kardex']['get']['responses']['200']['content']['application/json'];

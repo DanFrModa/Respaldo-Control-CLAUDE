@@ -1823,6 +1823,8 @@ interface FilaExistenciaColor {
   almacen: string;
   cuerpo: Prisma.Decimal;
   complemento: Prisma.Decimal;
+  /** Fila 0.103 — dónde está guardado ESE color en ESE almacén; null = no anotada. */
+  ubicacion: string | null;
 }
 
 /**
@@ -1881,13 +1883,18 @@ export async function consultarExistenciasTelaColor(
       e."id_almacen"     AS "idAlmacen",
       a."nombre"         AS "almacen",
       e."existencia_cuerpo"      AS "cuerpo",
-      e."existencia_complemento" AS "complemento"
+      e."existencia_complemento" AS "complemento",
+      u."ubicacion"      AS "ubicacion"
     FROM "existencia_tela_color" e
     JOIN "telas"         te  ON te."id" = e."id_tela"
     JOIN "telas_colores" c   ON c."id"  = e."id_tela_color"
     LEFT JOIN "telas_categorias" cat ON cat."id" = te."id_categoria"
     LEFT JOIN "proveedores"      p   ON p."id"   = te."id_proveedor"
     JOIN "almacenes"     a   ON a."id" = e."id_almacen"
+    -- Fila 0.103: la UBICACIÓN física viaja pegada al renglón de existencia (LEFT: lo normal es
+    -- que todavía no esté anotada, y eso NO debe esconder la existencia).
+    LEFT JOIN "ubicaciones_tela_color" u
+           ON u."id_tela_color" = e."id_tela_color" AND u."id_almacen" = e."id_almacen"
     WHERE ${where}
     ORDER BY te."nombre" ASC, c."nombre" ASC, a."nombre" ASC
   `);
@@ -1936,6 +1943,7 @@ export async function consultarExistenciasTelaColor(
       almacen: f.almacen,
       cuerpo,
       complemento,
+      ubicacion: f.ubicacion,
     });
     colorActual.existenciaCuerpo += cuerpo;
     colorActual.existenciaComplemento += complemento;
