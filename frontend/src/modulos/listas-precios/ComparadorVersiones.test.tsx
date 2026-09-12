@@ -36,6 +36,7 @@ function linea(
     idAvio: null,
     idAvioProveedor: null,
     idModeloArte: null,
+    soloPrecio: false,
     editable: false,
     eliminable: false,
     ajustado: false,

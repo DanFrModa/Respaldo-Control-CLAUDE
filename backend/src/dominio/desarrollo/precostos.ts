@@ -58,6 +58,12 @@ import {
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
 import { conRecetaCompartidaDeUno } from '../modelos/receta-compartida.js';
+import {
+  CONCEPTO_EMPAQUE,
+  esConceptoAncla,
+  esConceptoSoloPrecio,
+  insumoDeCatalogoDelConcepto,
+} from './conceptos-precosto.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaLineaManual = z.input<typeof esquemaPrecostoLineaManualCrear>;
@@ -249,27 +255,46 @@ function precioAvioDeCatalogo(
   };
 }
 
+/**
+ * Precio de una TELA del catálogo para un renglón MANUAL (§Post-F9.210·12, fila 0.152), con la
+ * MISMA cascada que usa el renglón del BOM ({@link lineasBomDesdeModelo}) — si no, volverían a
+ * existir dos precios para la misma tela, que es justo la queja que originó la fila.
+ *
+ * SIN amarre: un renglón manual no viene del BOM, así que no hay proveedor elegido por Desarrollo.
+ * La cascada arranca entonces en la ÚLTIMA COMPRA REAL (§Post-F9.48) y cae al `precioSugerido`.
+ *
+ * La TRAZA es fiel: `idTelaProveedor` sólo se llena cuando el escalón que ganó IDENTIFICA a un
+ * proveedor (hoy, la última compra real) **y** esa tela tiene fila de precios con él; si el precio
+ * salió del sugerido genérico, queda `null` (no se acredita un proveedor que no firmó ese precio).
+ */
+function precioTelaDeCatalogo(
+  tela: {
+    precioSugerido: Prisma.Decimal | null;
+    proveedoresPrecio: { id: number; idProveedor: number }[];
+  },
+  idTela: number,
+  ultimos: UltimosPreciosCompra,
+): { precio: number | null; idTelaProveedor: number | null } {
+  const resuelto = resolverPrecioTela({
+    precioSugerido: numOrNull(tela.precioSugerido),
+    amarre: null,
+    ultimaCompra: aCompraReal(ultimos, claveMaterial('tela', idTela)),
+    ultimaCompraProveedorAmarrado: null,
+  });
+  const fila =
+    resuelto.idProveedor === null
+      ? undefined
+      : tela.proveedoresPrecio.find((p) => p.idProveedor === resuelto.idProveedor);
+  return {
+    // Redondeo a 2 aquí, como en el avío: lo que se guarda y lo que multiplica al importe tienen
+    // que ser EL MISMO número (la columna es `Decimal(12,2)`).
+    precio: resuelto.precio === null ? null : redondear2(resuelto.precio),
+    idTelaProveedor: fila?.id ?? null,
+  };
+}
+
 /** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
 const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
-
-/**
- * Código del concepto de EMPAQUE. Vive en su propia constante porque **dos** reglas distintas lo
- * miran: la de ancla fija ({@link CONCEPTOS_ANCLA}) y la del contenido mínimo para congelar
- * ({@link exigirCostoCongelable}) — y la segunda existe justamente porque el empaque es la única
- * de las tres anclas que nace con un valor **puesto por el sistema**, no capturado por nadie.
- */
-const CONCEPTO_EMPAQUE = 'empaque';
-
-/**
- * Códigos de los conceptos ANCLA fijos (rediseño R5 + V1-E8w): un renglón `manual` por prenda, ÚNICO,
- * que se EDITA pero NO se elimina ni se agrega dos veces — maquila/costura, corte y **empaque**.
- *
- * ⭐ **`empaque` es el tercero** (§Post-F9.153, Daniel 30-ago-2026): *"nos falto meter el costo del
- * empaque. Es un campo adicional…. como si fuera corte"* · *"el empaque no es de catalogo…. es
- * simplemente un campo que casi siempre es el mismo costo"*. Su importe default NO está clavado
- * aquí: sale de `ConfiguracionEmpresa.costoEmpaqueBase` (ver {@link costoEmpaqueDeEmpresa}).
- */
-const CONCEPTOS_ANCLA = ['maquila', 'corte', CONCEPTO_EMPAQUE] as const;
 
 /**
  * Costo de empaque por prenda de RESPALDO, para una empresa que todavía no tiene fila de
@@ -282,15 +307,16 @@ export const COSTO_EMPAQUE_DEFECTO = 2.2;
 
 /**
  * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de origen `manual` bajo uno de los
- * conceptos de {@link CONCEPTOS_ANCLA} — hoy **tres**: `maquila`, `corte` y `empaque` (este último
+ * conceptos ANCLA de `conceptos-precosto.ts` — hoy **tres**: `maquila`, `corte` y `empaque` (este último
  * desde V1-E8w / §Post-F9.153). Son ÚNICOS por precosto, editables pero NO eliminables (a diferencia
  * del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
  *
- * ⚠️ La lista NO se repite aquí a propósito: se lee de `CONCEPTOS_ANCLA`, para que agregar una cuarta
- * ancla no deje este docstring mintiendo — que es justo lo que pasó cuando entró `empaque`.
+ * ⚠️ La lista NO se repite aquí a propósito: vive en `conceptos-precosto.ts` (un solo sitio para el
+ * servidor, el contrato y —vía banderas— la pantalla), para que agregar una cuarta ancla no deje
+ * este docstring mintiendo — que es justo lo que pasó cuando entró `empaque`.
  */
 function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
-  return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
+  return origen === 'manual' && esConceptoAncla(conceptoCodigo);
 }
 
 /**
@@ -618,6 +644,9 @@ function aLineaSalida(
     eliminable: !esAncla,
     // R5, B12: renglón de origen BOM ajustado a mano (recalcular no lo pisa; se puede restaurar).
     ajustado: linea.ajustado,
+    // §Post-F9.210·3: corte/maquila/empaque llevan sólo precio. Viaja como BANDERA para que la
+    // pantalla no tenga que conocer ningún código de concepto (antes llevaba su propia copia).
+    soloPrecio: esConceptoSoloPrecio(linea.conceptoCosto.codigo),
   };
 }
 
@@ -902,12 +931,21 @@ export async function recalcularDesdeBom(
  * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
  * (`eliminable = !esAncla`), así que no queda atrapado como antes.
  *
- * Petición de Daniel (ago-2026): el renglón se puede LIGAR A UN AVÍO DEL CATÁLOGO (`idAvio`) en
- * vez de teclear su nombre. Entonces el DOMINIO (A1, nunca la ruta ni el frontend) resuelve la
- * descripción (`clave — descripción`) y el PRECIO con la MISMA cascada del BOM
- * ({@link precioAvioDeCatalogo}), y guarda la traza `idAvio`/`idAvioProveedor` (el renglón queda
- * LIGADO, no sólo con el nombre copiado). Un `precioUnit` explícito MANDA sobre el del catálogo, y
- * el renglón se sigue pudiendo editar después (`editarLinea`) — el precio resuelto no queda fijo.
+ * El renglón se LIGA A UN INSUMO DEL CATÁLOGO — `idAvio` (Daniel, ago-2026) o ⭐ `idTela`
+ * (§Post-F9.210·12, fila 0.152) — en vez de teclear su nombre. Entonces el DOMINIO (A1, nunca la
+ * ruta ni el frontend) resuelve la descripción y el PRECIO con la MISMA cascada del BOM
+ * ({@link precioAvioDeCatalogo} / {@link precioTelaDeCatalogo}) y guarda la traza
+ * `idAvio`/`idAvioProveedor` o `idTela`/`idTelaProveedor` (el renglón queda LIGADO, no sólo con el
+ * nombre copiado). Un `precioUnit` explícito MANDA sobre el del catálogo, y el renglón se sigue
+ * pudiendo editar después (`editarLinea`) — el precio resuelto no queda fijo.
+ *
+ * ⭐ **Y bajo los conceptos de TELA y AVÍOS el catálogo es OBLIGATORIO** (Daniel, 7-sep-2026:
+ * *"no sé por qué en el precosteo hay espacio para meter otra tela que no viene de un catálogo…
+ * se duplican las cosas"*). El material suelto vive SÓLO en la mesa de negociación (donde sigue la
+ * jareta estimada, §Post-F9.139), nunca en la receta. Los conceptos de COSTO siguen libres.
+ *
+ * ⭐ **Corte, maquila y empaque llevan SÓLO PRECIO** (§Post-F9.210·3): su consumo se guarda en
+ * `null` aunque venga en la entrada — el importe de esos renglones es el precio a secas.
  */
 export async function agregarLineaManual(
   sesion: SesionUsuario,
@@ -930,7 +968,7 @@ export async function agregarLineaManual(
 
     const concepto = await tx.conceptoCosto.findUnique({
       where: { id: datos.idConceptoCosto },
-      // `fijo` ya NO se trae: la regla de anclas mira `CONCEPTOS_ANCLA` + la presencia en ESTE
+      // `fijo` ya NO se trae: la regla de anclas mira la lista de `conceptos-precosto.ts` + la presencia en ESTE
       // precosto, no la bandera del catálogo (V1-E8w). Quedaba muerto en el select.
       select: { id: true, codigo: true, nombre: true, activo: true },
     });
@@ -946,7 +984,7 @@ export async function agregarLineaManual(
     // es ancla desde hoy, así que todo borrador anterior a esta versión no lo tiene y, con el veto,
     // no habría manera de ponérselo (ni a mano ni recalculando, que no toca los `manual`). Se
     // comprueba la PRESENCIA en ESTE precosto: si ya está, se rechaza igual que antes.
-    if ((CONCEPTOS_ANCLA as readonly string[]).includes(concepto.codigo)) {
+    if (esConceptoAncla(concepto.codigo)) {
       const yaExiste = await tx.precostoLinea.findFirst({
         where: { idPrecosto, origen: 'manual', idConceptoCosto: concepto.id },
         select: { id: true },
@@ -956,6 +994,66 @@ export async function agregarLineaManual(
           `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
         );
       }
+    }
+
+    // ⭐ §Post-F9.210·12 (Daniel, 7-sep-2026): bajo TELA y AVÍOS el insumo SALE DEL CATÁLOGO, punto.
+    // El precosteo dejó de ser un tercer sitio donde teclear material ("no entiendo por qué hay doble
+    // información… se duplican las cosas"): el material sin catálogo vive SÓLO en la mesa de
+    // negociación —donde sigue viva la jareta estimada, §Post-F9.139—, nunca en la receta. Los
+    // conceptos de COSTO (corte, maquila, empaque, fletes, muestras…) siguen libres: ahí el texto
+    // libre *es* el punto. La regla se decide aquí porque es aquí donde se conoce el CÓDIGO del
+    // concepto (el esquema sólo ve su id).
+    const insumoExigido = insumoDeCatalogoDelConcepto(concepto.codigo);
+    if (insumoExigido === 'tela' && datos.idTela === undefined) {
+      throw new ErrorConflicto(
+        `Bajo "${concepto.nombre}" la tela se elige del CATÁLOGO: el material suelto vive en la mesa de negociación, no en el precosteo.`,
+      );
+    }
+    if (insumoExigido === 'avio' && datos.idAvio === undefined) {
+      throw new ErrorConflicto(
+        `Bajo "${concepto.nombre}" el avío se elige del CATÁLOGO: el material suelto vive en la mesa de negociación, no en el precosteo.`,
+      );
+    }
+
+    // Renglón LIGADO a una TELA del catálogo (§Post-F9.210·12): misma mecánica que el avío de abajo
+    // —el dominio resuelve descripción y precio, y guarda la traza— sobre las columnas `idTela`/
+    // `idTelaProveedor` que la tabla YA tenía (las escribía sólo el BOM; por eso, para la tela, la
+    // única vía que quedaba era la libre).
+    let tela: {
+      id: number;
+      etiqueta: string;
+      precio: number | null;
+      idTelaProveedor: number | null;
+    } | null = null;
+    if (datos.idTela !== undefined) {
+      const delCatalogo = await tx.tela.findUnique({
+        where: { id: datos.idTela },
+        select: {
+          id: true,
+          nombre: true,
+          activo: true,
+          precioSugerido: true,
+          proveedoresPrecio: { select: { id: true, idProveedor: true } },
+        },
+      });
+      if (delCatalogo === null) {
+        throw new ErrorNoEncontrado('Tela', datos.idTela);
+      }
+      if (!delCatalogo.activo) {
+        throw new ErrorConflicto(
+          `La tela "${delCatalogo.nombre}" está desactivada; no se puede precostear.`,
+        );
+      }
+      const ultimosDeLaTela = await leerUltimosPreciosCompra(tx, sesion.idEmpresaActiva, {
+        telas: [delCatalogo.id],
+      });
+      const resuelto = precioTelaDeCatalogo(delCatalogo, delCatalogo.id, ultimosDeLaTela);
+      tela = {
+        id: delCatalogo.id,
+        etiqueta: delCatalogo.nombre,
+        precio: resuelto.precio,
+        idTelaProveedor: resuelto.idTelaProveedor,
+      };
     }
 
     // Renglón LIGADO a un avío del catálogo: el dominio resuelve descripción y precio (cascada de E1).
@@ -1001,17 +1099,23 @@ export async function agregarLineaManual(
       };
     }
 
+    // ⭐ §Post-F9.210·3 (Daniel: *"Solo debe de llevar el precio. **no la cantidad**"*): corte,
+    // maquila y empaque son un MONTO POR PRENDA; multiplicarlos por un "consumo" no significa nada.
+    // La casilla desaparece de la pantalla y la regla se impone AQUÍ (A1), para que ninguna otra
+    // puerta —ni un cliente viejo del API— pueda volver a meter una cantidad por ahí.
     // El consumo TECLEADO también se redondea a la escala de su columna (`Decimal(12,4)`): el input
     // es texto libre, así que puede llegar con más decimales de los que se pueden guardar.
-    const consumo = datos.consumo == null ? null : redondear4(datos.consumo);
+    const soloPrecio = esConceptoSoloPrecio(concepto.codigo);
+    const consumo = soloPrecio || datos.consumo == null ? null : redondear4(datos.consumo);
     // El precio TECLEADO manda; si no vino, el del catálogo del avío. Si el avío no tiene NINGÚN
     // precio en la cascada (sin proveedores, sin `precioReferencia` y sin medidas activas) el
     // renglón entra en CERO — mismo criterio que el renglón del BOM, que también valúa 0. Ese cero
     // NO se le avisa al usuario en pantalla (lo ve en la columna Precio y lo puede editar); lo
     // único que queda es la marca `sinPrecioCatalogo` en la bitácora de abajo, para poder
     // rastrearlo después. El esquema ya exige que venga el precio o el avío.
-    const sinPrecioCatalogo = datos.precioUnit === undefined && (avio?.precio ?? null) === null;
-    const precioUnit = redondear2(datos.precioUnit ?? avio?.precio ?? 0);
+    const precioCatalogo = avio?.precio ?? tela?.precio ?? null;
+    const sinPrecioCatalogo = datos.precioUnit === undefined && precioCatalogo === null;
+    const precioUnit = redondear2(datos.precioUnit ?? precioCatalogo ?? 0);
     const importe = consumo === null ? precioUnit : redondear2(consumo * precioUnit);
 
     const linea = await tx.precostoLinea.create({
@@ -1019,13 +1123,14 @@ export async function agregarLineaManual(
         idPrecosto,
         idConceptoCosto: concepto.id,
         origen: 'manual',
-        descripcion: datos.descripcion ?? avio?.etiqueta ?? concepto.nombre,
+        descripcion: datos.descripcion ?? avio?.etiqueta ?? tela?.etiqueta ?? concepto.nombre,
         consumo,
         precioUnit,
         importe,
         // Traza: el renglón queda LIGADO al avío (y al proveedor cuyo precio se usó), no sólo con
         // su nombre copiado.
         ...(avio === null ? {} : { idAvio: avio.id, idAvioProveedor: avio.idProveedor }),
+        ...(tela === null ? {} : { idTela: tela.id, idTelaProveedor: tela.idTelaProveedor }),
         ...(datos.notas === undefined ? {} : { notas: datos.notas }),
         ...datosCreacion(sesion),
       },
@@ -1042,7 +1147,8 @@ export async function agregarLineaManual(
         idLinea: linea.id,
         idConcepto: concepto.id,
         ...(avio === null ? {} : { idAvio: avio.id }),
-        // El avío no tenía precio en NINGÚN escalón de la cascada y el renglón entró en $0: queda
+        ...(tela === null ? {} : { idTela: tela.id }),
+        // El insumo no tenía precio en NINGÚN escalón de la cascada y el renglón entró en $0: queda
         // la marca aquí (es lo único que lo delata; en pantalla sólo se ve el 0).
         ...(sinPrecioCatalogo ? { sinPrecioCatalogo: true } : {}),
       },
@@ -1078,7 +1184,15 @@ export async function editarLinea(
 
     const linea = await tx.precostoLinea.findFirst({
       where: { id: idLinea, idPrecosto },
-      select: { id: true, origen: true, descripcion: true, consumo: true, precioUnit: true },
+      select: {
+        id: true,
+        origen: true,
+        descripcion: true,
+        consumo: true,
+        precioUnit: true,
+        // El CÓDIGO del concepto: de él depende si este renglón lleva cantidad (§Post-F9.210·3).
+        conceptoCosto: { select: { codigo: true } },
+      },
     });
     if (linea === null) {
       throw new ErrorNoEncontrado('PrecostoLinea', idLinea);
@@ -1087,8 +1201,12 @@ export async function editarLinea(
     const descripcion = datos.descripcion ?? linea.descripcion;
     // Mismo redondeo a 4 que en el alta: el consumo tecleado puede traer más decimales de los que
     // la columna guarda, y el importe se calcula con ESTE número.
+    // ⭐ §Post-F9.210·3: en corte/maquila/empaque NO hay cantidad — el importe es el precio a secas.
+    // Se fuerza aquí, no sólo en el alta, porque editar es la puerta por la que un renglón de esos
+    // se toca todos los días (son ÚNICOS por prenda: se editan, no se agregan).
+    const soloPrecio = esConceptoSoloPrecio(linea.conceptoCosto.codigo);
     const consumoCrudo = datos.consumo === undefined ? numOrNull(linea.consumo) : datos.consumo;
-    const consumo = consumoCrudo === null ? null : redondear4(consumoCrudo);
+    const consumo = soloPrecio || consumoCrudo === null ? null : redondear4(consumoCrudo);
     // El precio se REDONDEA A 2 antes de guardarlo y de calcular el importe (misma regla que el
     // alta). Sin esto, precio e importe de la MISMA fila podían descuadrarse un centavo: la columna
     // es `Decimal(12,2)` y Postgres redondea half-up al guardar (1.005 → 1.01), mientras que

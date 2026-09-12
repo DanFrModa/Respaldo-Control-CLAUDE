@@ -58,4 +58,31 @@ describe('esquemaPrecostoLineaManualCrear', () => {
       esquemaPrecostoLineaManualCrear.safeParse({ idConceptoCosto: 5, precioUnit: -1 }).success,
     ).toBe(false);
   });
+
+  // ── ⭐ fila 0.152 · §Post-F9.210·12: la TELA también se elige del catálogo ──────────────────
+
+  it('acepta ligar el renglón a una TELA del catálogo, y entonces el precio es OPCIONAL', () => {
+    const datos = esquemaPrecostoLineaManualCrear.parse({ idConceptoCosto: 1, idTela: 41 });
+    expect(datos.idTela).toBe(41);
+    expect(datos.precioUnit).toBeUndefined();
+  });
+
+  it('rechaza ligar el MISMO renglón a una tela Y a un avío (es uno u otro)', () => {
+    const resultado = esquemaPrecostoLineaManualCrear.safeParse({
+      idConceptoCosto: 1,
+      idTela: 41,
+      idAvio: 77,
+    });
+    expect(resultado.success).toBe(false);
+    expect(JSON.stringify(resultado.error?.issues)).toContain('idTela');
+  });
+
+  it('rechaza un idTela que no sea entero positivo', () => {
+    expect(
+      esquemaPrecostoLineaManualCrear.safeParse({ idConceptoCosto: 1, idTela: 0 }).success,
+    ).toBe(false);
+    expect(
+      esquemaPrecostoLineaManualCrear.safeParse({ idConceptoCosto: 1, idTela: 2.5 }).success,
+    ).toBe(false);
+  });
 });

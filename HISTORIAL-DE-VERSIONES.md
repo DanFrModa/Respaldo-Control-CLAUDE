@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.148 · 12-sep-2026 · **en prueba** — **La tela del precosteo se elige del catálogo, y se acaba la tela duplicada**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Meter telas en el precosteo eligiéndolas del catálogo**, igual que ya se hacía con los avíos.
+  Antes el precosteo **sólo dejaba elegir avíos**: para la tela, la única manera era escribirla a mano.
+  Por eso la misma tela acababa apareciendo dos veces —la del catálogo y la tecleada— sin que nada
+  dijera cuál mandaba.
+- **La tela elegida trae su precio del catálogo**, con la misma cascada que ya usan los avíos, y
+  **queda ligada al proveedor** cuando el precio viene de uno concreto.
+
+### Qué cambió y puede sorprender
+
+- **Bajo «tela» y bajo «avíos» ya no se puede escribir un renglón a mano**: hay que elegirlo del
+  catálogo. Si de verdad hace falta un concepto libre, para eso están los **conceptos de costo**, que
+  siguen siendo libres — y la **mesa de negociación**, donde el texto libre se queda tal cual.
+- **Corte, maquila y empaque ya no piden cantidad, sólo precio.** Es lo que pidió Daniel: *«Solo debe
+  de llevar el precio, no la cantidad»*. La casilla de Consumo desapareció para esos tres, tanto al
+  agregarlos como al editarlos.
+- **Lo que ya estaba capturado con tela suelta se queda como está**, se sigue viendo y se sigue
+  editando. Sólo deja de poder nacer así.
+- ⚠️ **Y ojo con los renglones VIEJOS de corte, maquila o empaque que traían cantidad:** siguen
+  mostrando su importe inflado (una cantidad por su precio) con la casilla ya invisible, y **a la
+  primera vez que se editen —aunque sólo se toque la descripción— el importe baja al precio solo**,
+  sin que nadie mueva una cifra. Es exactamente lo pedido: esos tres conceptos llevan precio y no
+  cantidad. Pero conviene saberlo antes de ver bajar un número sin haberlo tocado.
+
+### Qué sigue pendiente o roto
+
+- **Esto no cambia nada de lo que llega a la orden de producción**: la receta de la OP se copia del
+  modelo, no del precosteo. El temor de que la tela suelta se colara hasta producción **no ocurría**.
+
+---
+
 ## 0.147 · 11-sep-2026 · **en prueba** — **Dar «administrar roles» ya no regala cuatro poderes de propina**
 
 ### Qué se puede hacer ahora que antes no

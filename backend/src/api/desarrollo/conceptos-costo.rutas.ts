@@ -25,6 +25,7 @@ import {
   listarConceptosCosto,
   obtenerConceptoCosto,
 } from '../../dominio/desarrollo/conceptos-costo.js';
+import { banderasDelConcepto } from '../../dominio/desarrollo/conceptos-precosto.js';
 
 /** Proyecta el modelo Prisma `ConceptoCosto` a la forma JSON del contrato (fechas ISO). */
 function aConceptoCostoSalida(concepto: ConceptoCosto): z.infer<typeof esquemaConceptoCostoSalida> {
@@ -35,6 +36,10 @@ function aConceptoCostoSalida(concepto: ConceptoCosto): z.infer<typeof esquemaCo
     orden: concepto.orden,
     fijo: concepto.fijo,
     activo: concepto.activo,
+    // Las banderas del precosteo salen del DOMINIO (A1: la lista de códigos vive en un solo sitio,
+    // `dominio/desarrollo/conceptos-precosto.ts`); aquí sólo se copian a la forma JSON. Viajan para
+    // que la pantalla del precosto no necesite su propia copia de esos códigos.
+    ...banderasDelConcepto(concepto.codigo),
     creadoEn: concepto.creadoEn.toISOString(),
     creadoPorId: concepto.creadoPorId,
     modificadoEn: concepto.modificadoEn.toISOString(),

@@ -61,6 +61,18 @@ export const esquemaConceptoCostoEditar = esquemaConceptoCostoCrear.partial().ex
 /** Datos validados de edición de concepto de costo. */
 export type DatosConceptoCostoEditar = z.infer<typeof esquemaConceptoCostoEditar>;
 
+/**
+ * De qué CATÁLOGO sale el insumo de un concepto en el precosteo (§Post-F9.210·12): la tela, del
+ * catálogo de telas; los avíos, del de avíos. Los conceptos de costo abiertos (corte, maquila,
+ * empaque, fletes…) no tienen catálogo y ahí el texto libre se conserva.
+ */
+export const esquemaInsumoDeCatalogo = z
+  .enum(['tela', 'avio'])
+  .describe('Catálogo del que sale el insumo del concepto (tela o avío).');
+
+/** Catálogo del que sale el insumo de un concepto. */
+export type InsumoDeCatalogo = z.infer<typeof esquemaInsumoDeCatalogo>;
+
 /** Salida de un concepto de costo en la API (proyección del modelo a JSON). */
 export const esquemaConceptoCostoSalida = z
   .object({
@@ -72,6 +84,23 @@ export const esquemaConceptoCostoSalida = z
       .boolean()
       .describe('Concepto FIJO (tela/avíos/maquila): no se puede desactivar. Lo pone el seed.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
+    // ── Banderas del PRECOSTEO (§Post-F9.210, fila 0.152) ────────────────────────────────────
+    // Las calcula el DOMINIO (`dominio/desarrollo/conceptos-precosto.ts`) a partir del `codigo`, y
+    // viajan aquí para que la pantalla NO tenga que conocer ni un solo código de concepto: antes
+    // el frontend llevaba su propia copia tecleada a mano de la lista de anclas.
+    anclaFija: z
+      .boolean()
+      .describe(
+        'Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable.',
+      ),
+    soloPrecio: z
+      .boolean()
+      .describe('Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque.'),
+    insumoCatalogo: esquemaInsumoDeCatalogo
+      .nullable()
+      .describe(
+        'Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto.',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
