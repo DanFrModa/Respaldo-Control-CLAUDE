@@ -73423,7 +73423,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -73556,6 +73600,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -75234,7 +75282,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -75367,6 +75459,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -76398,6 +76494,18 @@
                     "minimum": 0,
                     "maximum": 999999
                   },
+                  "consumoComplementoPorPrenda": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 999999
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "precio": {
                     "anyOf": [
                       {
@@ -76952,7 +77060,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -77085,6 +77237,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -78529,7 +78685,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -78662,6 +78862,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -80090,7 +80294,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -80223,6 +80471,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -81638,7 +81890,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -81771,6 +82067,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -83174,7 +83474,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -83307,6 +83651,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -84756,7 +85104,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -84889,6 +85281,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -86315,7 +86711,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -86448,6 +86888,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -87851,7 +88295,51 @@
                           },
                           "consumoPorPrenda": {
                             "type": "number",
-                            "description": "Consumo por prenda CONGELADO en esta orden."
+                            "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                          },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                          },
+                          "consumoComplementoPorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                          },
+                          "consumoComplementoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                          },
+                          "precioComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                           },
                           "precio": {
                             "anyOf": [
@@ -87984,6 +88472,10 @@
                           "nombre",
                           "unidad",
                           "consumoPorPrenda",
+                          "nombreComplemento",
+                          "consumoComplementoPorPrenda",
+                          "consumoComplementoModelo",
+                          "precioComplemento",
                           "precio",
                           "paraPreCosto",
                           "paraProduccion",
@@ -89473,7 +89965,51 @@
                               },
                               "consumoPorPrenda": {
                                 "type": "number",
-                                "description": "Consumo por prenda CONGELADO en esta orden."
+                                "description": "Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO."
+                              },
+                              "nombreComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Nombre del complemento según el catálogo HOY (\"Cardigan\"); null = no lleva."
+                              },
+                              "consumoComplementoPorPrenda": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar."
+                              },
+                              "consumoComplementoModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Consumo del complemento que trae HOY el BOM del modelo (null si no hay)."
+                              },
+                              "precioComplemento": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado."
                               },
                               "precio": {
                                 "anyOf": [
@@ -89606,6 +90142,10 @@
                               "nombre",
                               "unidad",
                               "consumoPorPrenda",
+                              "nombreComplemento",
+                              "consumoComplementoPorPrenda",
+                              "consumoComplementoModelo",
+                              "precioComplemento",
                               "precio",
                               "paraPreCosto",
                               "paraProduccion",

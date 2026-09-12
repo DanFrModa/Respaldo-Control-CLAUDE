@@ -152,6 +152,26 @@ export interface FotoImpreso {
 export interface TelaImpreso {
   nombre: string;
   consumoPorPrenda: number;
+  /**
+   * ⭐⭐ 0.165 (§Post-F9.219) — el COMPLEMENTO de esta tela (el cárdigan de la felpa) según el
+   * CATÁLOGO de hoy; `null` = no lleva ⇒ el papel no lo menciona.
+   */
+  nombreComplemento: string | null;
+  /** Consumo del complemento congelado en la orden; `null` = no se capturó (no se imprime). */
+  consumoComplementoPorPrenda: number | null;
+}
+
+/**
+ * ⭐⭐ 0.165 — Renglón de TELA tal como se lee en el papel, con su complemento si lo lleva:
+ * `Felpa (consumo 1.2 / prenda + Cardigan 0.15 / prenda)`. Hacen falta LAS DOS mitades del dato
+ * —que el catálogo declare complemento y que la orden haya congelado cuánto—; si falta cualquiera,
+ * la línea sale exactamente como salía antes (REGLA 0-B: lo que falta se tolera, no se rellena).
+ */
+export function textoTelaImpreso(t: TelaImpreso): string {
+  const cuerpo = `${t.nombre} (consumo ${t.consumoPorPrenda} / prenda`;
+  return t.nombreComplemento === null || t.consumoComplementoPorPrenda === null
+    ? `${cuerpo})`
+    : `${cuerpo} + ${t.nombreComplemento} ${t.consumoComplementoPorPrenda} / prenda)`;
 }
 
 /** Un renglón de la sección AVÍOS (avíos de la receta de la orden `paraProduccion`; sin precio). */
@@ -1095,7 +1115,9 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     tablaMatriz(datos),
     seccionLista(
       'Telas',
-      datos.telas.map((t) => `${t.nombre} (consumo ${t.consumoPorPrenda} / prenda)`),
+      // ⭐⭐ 0.165 — la tela va CON SU COMPLEMENTO: el cárdigan se corta y se recibe igual que la
+      // felpa, y hasta esta fila no llegaba al papel que leen el corte y el almacén.
+      datos.telas.map((t) => textoTelaImpreso(t)),
     ),
     // "Arte", no "Bordados" (Daniel unificó el vocabulario: bordado/estampado = ARTE). El SUBTIPO
     // sí se conserva por renglón ("Bordado"/"Estampado").
