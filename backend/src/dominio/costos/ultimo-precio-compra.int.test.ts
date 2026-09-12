@@ -488,6 +488,63 @@ describe('leerUltimosPreciosCompra — el COMPLEMENTO de la tela (0.163)', () =>
     expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(62);
   });
 
+  // 🔴 SEGUNDA RONDA — «MÁS RECIENTE» es la propiedad que DEFINE este escalón, y no la fijaba nadie.
+  // El reviewer invirtió el `ORDER BY` de esta consulta a ASC y 403 pruebas de integración siguieron
+  // en verde: las que había tenían dos OC, pero **sólo una pasaba el filtro de precio propio**, así
+  // que el desempate nunca llegaba a ejercitarse. Las tres de abajo lo ejercitan entero —fecha,
+  // folio y, de paso, el `NULLS LAST`— con las DOS compras pasando el filtro.
+  it('entre DOS compras con precio de cárdigan, gana la de FECHA más reciente', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-01',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 50 },
+    });
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-20',
+      linea: { idTela, precio: 110, cantidadComplemento: 5, precioComplemento: 70 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(70);
+  });
+
+  it('a IGUAL fecha desempata el FOLIO mayor (el mismo criterio que el cuerpo)', async () => {
+    // `crearOc` numera el folio de forma creciente, así que la segunda es la del folio mayor.
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-10',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 11 },
+    });
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-10',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 22 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(22);
+  });
+
+  it('las OC SIN fecha van al final: una con fecha les gana (NULLS LAST)', async () => {
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: null,
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 99 },
+    });
+    await crearOc({
+      estatus: 'autorizada',
+      idProveedor: provA,
+      fecha: '2026-08-01',
+      linea: { idTela, precio: 100, cantidadComplemento: 5, precioComplemento: 50 },
+    });
+    const r = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
+    expect(r.complementoPorMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(50);
+  });
+
   it('respeta el MISMO criterio de estatus que el cuerpo (una OC cancelada no cuenta)', async () => {
     await crearOc({
       estatus: 'cancelada',
