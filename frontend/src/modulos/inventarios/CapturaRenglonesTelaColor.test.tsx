@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -85,6 +85,58 @@ vi.mock('@/api/telas', async (original) => ({
           },
         }
       : { data: undefined },
+}));
+
+// ⭐⭐ Fila 0.146: los LOTES del almacén de origen. Devuelve dos SÓLO para el color 11 en el
+// almacén 5 — así una prueba puede comprobar que la consulta va con el almacén y el color, y no con
+// cualquier cosa.
+const lotesQuery = vi.fn();
+vi.mock('@/api/inventario-materiales', () => ({
+  useLotesTelaColor: (query: { idAlmacen: number; idTelaColor: number } | undefined) => {
+    lotesQuery(query);
+    if (query === undefined) return { data: undefined, isPending: false, isError: false };
+    if (query.idAlmacen === 5 && query.idTelaColor === 11) {
+      return {
+        data: {
+          idAlmacen: 5,
+          idTelaColor: 11,
+          nombreComplemento: 'Cardigan',
+          lotes: [
+            {
+              idPartida: 71,
+              folio: 501,
+              loteProveedor: 'L-VIEJO',
+              factura: null,
+              fecha: null,
+              cuerpo: 100,
+              complemento: 0,
+            },
+            {
+              idPartida: 72,
+              folio: 502,
+              loteProveedor: null,
+              factura: null,
+              fecha: null,
+              cuerpo: 300,
+              complemento: 20,
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      };
+    }
+    return {
+      data: {
+        idAlmacen: query.idAlmacen,
+        idTelaColor: query.idTelaColor,
+        nombreComplemento: null,
+        lotes: [],
+      },
+      isPending: false,
+      isError: false,
+    };
+  },
 }));
 
 const { CapturaRenglonesTelaColor } = await import('./CapturaRenglonesTelaColor');
@@ -647,5 +699,97 @@ describe('<CapturaRenglonesTelaColor> · §Post-F9.159(a): el renglón sin OC se
     await usuario.click(screen.getByTestId('sel-sin-colores'));
     expect(screen.getByTestId('captura-color-sin-colores')).toBeInTheDocument();
     expect(screen.queryByTestId('captura-color-sin-colores-diagnostico')).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ FILA 0.146 — ESCOGER EL LOTE DEL ORIGEN (Daniel §Post-F9.205·1)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+describe('<CapturaRenglonesTelaColor> · el LOTE del origen (fila 0.146)', () => {
+  it('sin `idAlmacenLotesOrigen` el campo NI APARECE (ajustes, salidas y entradas no eligen lote)', async () => {
+    // 🔴 La gemela en negativo: es lo que impide que el selector se cuele en las otras cuatro
+    // pantallas que comparten este componente, donde una salida NO nombra partida por diseño.
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
+    await userEvent.click(screen.getByTestId('sel-felpa'));
+    await userEvent.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    expect(screen.queryByTestId('captura-color-lote-origen')).toBeNull();
+  });
+
+  it('⭐ ofrece los lotes con su saldo y el elegido VIAJA en el renglón', async () => {
+    const onChange = vi.fn();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor renglones={[]} onChange={onChange} idAlmacenLotesOrigen={5} />,
+    );
+    await userEvent.click(screen.getByTestId('sel-felpa'));
+    await userEvent.selectOptions(screen.getByTestId('captura-color-color'), '11');
+
+    const selector = screen.getByTestId('captura-color-lote-origen');
+    // La PRIMERA opción es «que lo decida el sistema»: escoger es la excepción, no el trámite.
+    expect(selector).toHaveValue('');
+    // Y el saldo va a la vista: sin él, escoger sería a ciegas — que es justo lo que la fila evita.
+    expect(
+      within(selector).getByRole('option', { name: /Folio 501 · L-VIEJO · quedan 100/ }),
+    ).toBeTruthy();
+
+    await userEvent.selectOptions(selector, '72');
+    await userEvent.type(screen.getByTestId('captura-color-cantidad'), '40');
+    await userEvent.click(screen.getByTestId('captura-color-agregar'));
+
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({ idTelaColor: 11, idPartida: 72 }),
+    ]);
+  });
+
+  it('sin escoger nada, el renglón va SIN lote (el servidor reparte FIFO, como siempre)', async () => {
+    // Tipado a propósito: así lo emitido se puede inspeccionar sin `any` ni aserciones forzadas.
+    const onChange = vi.fn<(r: { idTelaColor: number; idPartida?: number }[]) => void>();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor renglones={[]} onChange={onChange} idAlmacenLotesOrigen={5} />,
+    );
+    await userEvent.click(screen.getByTestId('sel-felpa'));
+    await userEvent.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    await userEvent.type(screen.getByTestId('captura-color-cantidad'), '40');
+    await userEvent.click(screen.getByTestId('captura-color-agregar'));
+
+    // La red anti-vacuidad va PRIMERO: sin ella, un `onChange` que no se llamara dejaría la
+    // aserción de abajo pasando sobre `undefined` y la prueba diría que todo está bien.
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [emitidos] = onChange.mock.calls[0] ?? [[]];
+    // El renglón NO trae la llave del lote. Si se colara un `idPartida` —aunque fuese el que el
+    // FIFO habría escogido de todas formas— esto se pone rojo: elegir tiene que ser explícito.
+    expect(emitidos[0]).not.toHaveProperty('idPartida');
+  });
+
+  it('🔴 NO fusiona dos renglones del mismo color cuando uno nombra un lote: avisa y no agrega', async () => {
+    // Fusionar sumaría cantidades bajo UN solo lote: o se pierde la elección previa, o se le cuelga
+    // a un lote tela que no es suya. Las dos producen el papel equivocado que la fila viene a evitar.
+    const onChange = vi.fn();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[
+          {
+            idTelaColor: 11,
+            tela: 'Felpa Suiza',
+            color: 'Marino',
+            nombreComplemento: 'Cardigan',
+            cantidad: 50,
+            cantidadComplemento: 0,
+            idPartida: 71,
+            loteEtiqueta: 'Folio 501 · L-VIEJO',
+          },
+        ]}
+        onChange={onChange}
+        idAlmacenLotesOrigen={5}
+      />,
+    );
+    await userEvent.click(screen.getByTestId('sel-felpa'));
+    await userEvent.selectOptions(screen.getByTestId('captura-color-color'), '11');
+    await userEvent.selectOptions(screen.getByTestId('captura-color-lote-origen'), '72');
+    await userEvent.type(screen.getByTestId('captura-color-cantidad'), '30');
+    await userEvent.click(screen.getByTestId('captura-color-agregar'));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('captura-color-aviso').textContent).toContain('sólo puede');
   });
 });

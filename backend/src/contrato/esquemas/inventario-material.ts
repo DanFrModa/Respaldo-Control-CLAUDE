@@ -587,9 +587,47 @@ export const esquemaSalidaTelaColorSinOrdenCrear = z
 export type DatosSalidaTelaColorSinOrdenCrear = z.infer<typeof esquemaSalidaTelaColorSinOrdenCrear>;
 
 /**
+ * ⭐ Un renglón de TRASPASO por color (fila 0.146). Es el de salida MÁS el lote OPCIONAL: la única
+ * captura del sistema donde una SALIDA puede nombrar la partida de la que sale la tela.
+ *
+ * 🔑 **Por qué aquí y en ningún otro sitio.** La partida es la unidad de ENTRADA y el consumo
+ * empareja por tela+color: las salidas a orden, las salidas sin orden y los ajustes NO llevan
+ * partida, y por eso siguen usando {@link esquemaTelaColorLineaSalida}, que ni siquiera tiene el
+ * campo. El traspaso es la excepción desde la 0.142 —sus dos patas nombran el lote— y hasta ahora
+ * lo escogía SIEMPRE el sistema (FIFO por folio). Daniel (§Post-F9.205·1): *«está bien que decida el
+ * sistema **pero que haya posibilidad de seleccionar otro si es que el cortador decide un lote
+ * específico**»*.
+ *
+ * ⚠️ **Omitirlo NO es un caso raro: es el camino normal.** Sin `idPartida` el reparto sigue siendo
+ * el FIFO de la 0.142, intacto. El campo sólo aparece cuando alguien, mirando el anaquel, decidió
+ * otra cosa.
+ *
+ * 🔴 **Y lo elegido NO se completa con FIFO por detrás** (decisión del lead de la fila): si ese lote
+ * no alcanza para lo capturado, el dominio RECHAZA el traspaso diciendo cuánto tiene. Mezclar en un
+ * mismo renglón el lote que la persona escogió con otro que puso el sistema produciría un papel que
+ * nombra un lote y una tela que es de dos.
+ */
+export const esquemaTelaColorLineaTraspaso = z
+  .object({
+    ...camposTelaColorLinea,
+    idPartida: idPositivo('la partida')
+      .optional()
+      .describe(
+        'Partida (lote) del almacén de ORIGEN de la que sale esta tela. Omitido = lo decide el ' +
+          'sistema, FIFO por folio (el comportamiento de siempre).',
+      ),
+  })
+  .refine(alMenosUnaCantidad.fn, { error: alMenosUnaCantidad.error });
+
+/** Datos de un renglón de traspaso por color (con lote de origen opcional). */
+export type DatosTelaColorLineaTraspaso = z.infer<typeof esquemaTelaColorLineaTraspaso>;
+
+/**
  * Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). El MOTIVO es
  * obligatorio desde la fila 0.172 (ver {@link motivoTraspasoMaterial}): antes llevaba unas
- * `observaciones` opcionales, así que mandarle tela a un cortador no exigía decir por qué.
+ * `observaciones` opcionales, así que mandarle tela a un cortador no exigía decir por qué. Desde la
+ * fila 0.146 cada renglón puede además nombrar SU lote de origen (ver
+ * {@link esquemaTelaColorLineaTraspaso}).
  */
 export const esquemaTraspasoTelaColorCrear = z
   .object({
@@ -598,7 +636,7 @@ export const esquemaTraspasoTelaColorCrear = z
     fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
     motivo: motivoTraspasoMaterial,
     lineas: z
-      .array(esquemaTelaColorLineaSalida)
+      .array(esquemaTelaColorLineaTraspaso)
       .min(1, { error: 'Captura al menos un renglón de tela y color' }),
   })
   .describe('Traspaso de tela por color entre almacenes (dos patas atómicas). Motivo obligatorio.');
@@ -1080,6 +1118,85 @@ export const esquemaPartidasTelaLista = z
 
 /** Forma de la respuesta de la búsqueda de partidas. */
 export type PartidasTelaLista = z.infer<typeof esquemaPartidasTelaLista>;
+
+// ── ⭐⭐ LOS LOTES DEL ORIGEN, PARA ESCOGER UNO (fila 0.146) ──────────────────────────────────────
+//
+// DANIEL (§Post-F9.205·1): *«está bien que decida el sistema **pero que haya posibilidad de
+// seleccionar otro si es que el cortador decide un lote específico**»*. Esta es la lista que la
+// captura del traspaso necesita para que esa elección sea posible: qué lotes hay HOY en el almacén
+// de ORIGEN de un color, y cuánto queda de cada uno.
+//
+// 🔑 **No es la búsqueda de partidas de arriba, y la diferencia importa.** Aquélla busca partidas
+// por folio/lote/factura en TODA la empresa y no sabe nada de saldos: sirve para encontrar una
+// entrada. Ésta responde *«¿de cuál de estos rollos saco?»* en UN almacén, con el NETO de hoy
+// (Σ de movimientos con signo, D3 — nunca una columna de saldo, nunca la vista).
+
+/** UN lote del almacén de origen con lo que le queda, por componente. */
+const esquemaLoteTelaColorSalida = z.object({
+  idPartida: z.number().int(),
+  folio: z.number().int().describe('Folio de la partida (A3).'),
+  loteProveedor: z.string().nullable().describe('Lote del proveedor o null.'),
+  factura: z.string().nullable().describe('Factura/remisión que la amparó o null.'),
+  fecha: z.string().nullable().describe('Fecha de la entrada (YYYY-MM-DD) o null.'),
+  cuerpo: z
+    .number()
+    .describe(
+      'Lo que queda de CUERPO de este lote en este almacén (neto de hoy, acotado a la existencia real).',
+    ),
+  complemento: z
+    .number()
+    .describe(
+      'Lo que queda de COMPLEMENTO de este lote en este almacén (existencia independiente del cuerpo).',
+    ),
+});
+
+/** Un lote del almacén de origen con su saldo. */
+export type LoteTelaColorSalida = z.infer<typeof esquemaLoteTelaColorSalida>;
+
+/** Filtros de los lotes de un color en un almacén (querystring). */
+export const esquemaLotesTelaColorQuery = z
+  .object({
+    idAlmacen: z.coerce
+      .number({ error: 'El almacén es obligatorio' })
+      .int()
+      .positive()
+      .describe('Almacén del que se quieren los lotes (el ORIGEN del traspaso).'),
+    idTelaColor: z.coerce
+      .number({ error: 'El color de tela es obligatorio' })
+      .int()
+      .positive()
+      .describe('Color de tela del que se quieren los lotes.'),
+  })
+  .describe('Almacén + color del que se quieren los lotes con saldo.');
+
+/** Parámetros de los lotes por color ya coaccionados. */
+export type LotesTelaColorQuery = z.infer<typeof esquemaLotesTelaColorQuery>;
+
+/**
+ * Los lotes VIVOS de un color en un almacén, del folio más VIEJO al más nuevo — o sea, en el mismo
+ * orden en el que el FIFO los tomaría, para que «el primero de la lista» sea de verdad «el que
+ * elegiría el sistema».
+ *
+ * ⚠️ **Un saldo por lote puede quedar por ENCIMA de lo que de verdad hay**: las salidas a orden no
+ * nombran lote (decisión P3, §Post-F9.9), así que consumen sin descontarle nada a ninguno. Por eso
+ * estos saldos vienen ACOTADOS a la existencia real del color —el mismo tope que aplica el reparto
+ * del traspaso (`repartirPorPartida`), del folio más viejo al más nuevo—: así lo que esta lista
+ * ofrece es lo mismo que el traspaso va a aceptar, y no una promesa que el guardado desmienta.
+ */
+export const esquemaLotesTelaColorSalida = z
+  .object({
+    idAlmacen: z.number().int(),
+    idTelaColor: z.number().int(),
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Cómo se llama el complemento ("Cardigan"), o null si la tela no lleva.'),
+    lotes: z.array(esquemaLoteTelaColorSalida).describe('Lotes con algo que dar, FIFO por folio.'),
+  })
+  .describe('Lotes con saldo de un color en un almacén (para escoger de cuál sale la tela).');
+
+/** Forma de la respuesta de los lotes por color. */
+export type LotesTelaColorLista = z.infer<typeof esquemaLotesTelaColorSalida>;
 
 // ── ⭐⭐ LOS DOS AVISOS DE LA SALIDA DE TELA (fila 0.101 — Daniel §Post-F9.193, dec. 8 y 9) ───────
 //

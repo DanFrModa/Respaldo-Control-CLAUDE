@@ -1345,6 +1345,19 @@ export type PartidaTela = PartidasTela['datos'][number];
 export type PartidasTelaQuery = NonNullable<
   paths['/api/inventarios/telas/partidas']['get']['parameters']['query']
 >;
+/**
+ * ⭐⭐ Los LOTES CON SALDO de un color en un almacén (fila 0.146): la lista entre la que se escoge
+ * de cuál sale la tela del traspaso. Vienen FIFO por folio y acotados a la existencia real, así que
+ * lo que la pantalla ofrece es lo mismo que el guardado acepta.
+ */
+export type LotesTelaColor =
+  paths['/api/inventarios/telas/color/lotes']['get']['responses']['200']['content']['application/json'];
+/** Un lote del almacén de origen con lo que le queda, por componente. */
+export type LoteTelaColor = LotesTelaColor['lotes'][number];
+/** Parámetros de los lotes de un color en un almacén (querystring). */
+export type LotesTelaColorQuery = NonNullable<
+  paths['/api/inventarios/telas/color/lotes']['get']['parameters']['query']
+>;
 
 // ── Inventario de AVÍOS por kardex (Módulo 4, F4-E1; multi-almacén, R4) ───────
 

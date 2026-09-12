@@ -38,6 +38,7 @@ import {
   consultarExistenciasTelaColor,
   kardexTelaColor,
   listarPartidasTela,
+  lotesTelaColorEnAlmacen,
   registrarConteoTelaColor,
   registrarSalidaTelaColorAOrden,
   saldosTelaColorParaConteo,
@@ -628,6 +629,123 @@ describe('el traspaso NOMBRA el lote en las dos patas (fila 0.142)', () => {
     await expect(
       cancelarMovimientoTelaColor(sesion(), traspaso.entrada.id, { motivo: 'Me equivoqué' }, bd()),
     ).rejects.toThrow(ErrorConflicto);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ FILA 0.146 — EL LOTE QUE ESCOGE EL CORTADOR (Daniel §Post-F9.205·1)
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// La 0.142 dejó el reparto FIFO y NADIE podía cambiarlo. Daniel: *«está bien que decida el sistema
+// **pero que haya posibilidad de seleccionar otro si es que el cortador decide un lote
+// específico**»*. Lo que aquí se mide es lo que NO se puede medir sin base de datos:
+//  • que el lote elegido gane al FIFO **en las dos patas del kardex**, que es donde vive la verdad;
+//  • que un lote que no alcanza **no se complete por detrás** y el traspaso no deje NADA escrito;
+//  • que la lista que la pantalla ofrece salga del mismo saldo con el que el guardado juzga.
+
+describe('el lote se puede ESCOGER a mano (fila 0.146)', () => {
+  it('⭐ el lote elegido GANA al FIFO, y lo nombran las DOS patas', async () => {
+    // El FIFO se llevaría el folio VIEJO. Se escoge el NUEVO a propósito: si la elección se
+    // ignorara, el reparto saldría del viejo y esta prueba lo vería.
+    await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-VIEJO' });
+    const nuevo = await entrarColor(colorMarino.id, 300, 0, { loteProveedor: 'L-NUEVO' });
+    const idPartidaNueva = nuevo.renglones[0]!.idPartida!;
+    const folioNuevo = nuevo.renglones[0]!.partidaFolio!;
+
+    const traspaso = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        motivo: 'El cortador pidió ese rollo',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 120, idPartida: idPartidaNueva }],
+      },
+      bd(),
+    );
+
+    const esperado = [{ folioPartida: folioNuevo, cuerpo: 120, complemento: 0 }];
+    expect(await renglonesConLote(traspaso.salida.id)).toEqual(esperado);
+    expect(await renglonesConLote(traspaso.entrada.id)).toEqual(esperado);
+  });
+
+  it('🔴 si el lote elegido NO alcanza, se RECHAZA — no se completa con FIFO ni se escribe nada', async () => {
+    // 🔑 Esta es LA decisión de la fila. Sin ella, lo cómodo sería tomar 300 del lote elegido y
+    // pedirle 200 al viejo: el cortador recibiría un papel que nombra UN lote y tela que es de DOS.
+    await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-VIEJO' });
+    const nuevo = await entrarColor(colorMarino.id, 300, 0, { loteProveedor: 'L-NUEVO' });
+    const idPartidaNueva = nuevo.renglones[0]!.idPartida!;
+    const movimientosAntes = await cliente.movimiento.count({ where: { idEmpresa: empresa.id } });
+
+    const error = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        motivo: 'El cortador pidió ese rollo',
+        // 500 hay de sobra en el COLOR (800 en total): lo que no alcanza es el LOTE.
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 500, idPartida: idPartidaNueva }],
+      },
+      bd(),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    // El mensaje dice CUÁNTO hay: sin ese número, «no alcanza» obliga a adivinar.
+    expect((error as Error).message).toContain('300');
+    // Y NADA quedó escrito: la transacción entera se deshizo (A2).
+    expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(
+      movimientosAntes,
+    );
+  });
+
+  it('⭐ la LISTA que se ofrece sale del mismo saldo con el que el guardado juzga', async () => {
+    // El saldo por lote viene INFLADO cuando el almacén consume: la salida a orden no nombra lote
+    // (P3), así que se lleva 400 sin descontárselos a nadie. Si la lista enseñara el saldo crudo,
+    // ofrecería 500 del lote viejo y el traspaso los rechazaría — una promesa que el guardado
+    // desmiente. Por eso los dos lados usan el MISMO tope.
+    await entrarColor(colorMarino.id, 500, 0, { loteProveedor: 'L-VIEJO' });
+    await entrarColor(colorMarino.id, 300, 0, { loteProveedor: 'L-NUEVO' });
+    const idOrden = await crearOrden();
+    await registrarSalidaTelaColorAOrden(
+      sesion(),
+      {
+        idOrden,
+        idAlmacen: almA.id,
+        fecha: '2026-08-06',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 400 }],
+      },
+      bd(),
+    );
+
+    const lista = await lotesTelaColorEnAlmacen(
+      sesion(),
+      { idAlmacen: almA.id, idTelaColor: colorMarino.id },
+      bd(),
+    );
+    // El déficit (800 − 400 = 400 reales contra 800 reclamados) se le quita al MÁS VIEJO, que es la
+    // misma hipótesis con la que reparte el FIFO.
+    expect(lista.lotes.map((l) => ({ lote: l.loteProveedor, cuerpo: l.cuerpo }))).toEqual([
+      { lote: 'L-VIEJO', cuerpo: 100 },
+      { lote: 'L-NUEVO', cuerpo: 300 },
+    ]);
+
+    // Y lo que la lista ofrece, el guardado lo acepta: 100 del viejo pasan…
+    const viejo = lista.lotes[0]!;
+    const t = await traspasarTelaColor(
+      sesion(),
+      {
+        idAlmacenOrigen: almA.id,
+        idAlmacenDestino: almB.id,
+        fecha: '2026-08-06',
+        motivo: 'El cortador pidió ese rollo',
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 100, idPartida: viejo.idPartida }],
+      },
+      bd(),
+    );
+    expect(await renglonesConLote(t.entrada.id)).toEqual([
+      { folioPartida: viejo.folio, cuerpo: 100, complemento: 0 },
+    ]);
   });
 });
 

@@ -49852,6 +49852,148 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/inventarios/telas/color/lotes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Lotes con saldo de un color en un almacén (para escoger de cuál sale la tela) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Almacén del que se quieren los lotes (el ORIGEN del traspaso). */
+          idAlmacen: number;
+          /** @description Color de tela del que se quieren los lotes. */
+          idTelaColor: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Lotes con saldo de un color en un almacén (para escoger de cuál sale la tela). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idAlmacen: number;
+              idTelaColor: number;
+              /** @description Cómo se llama el complemento ("Cardigan"), o null si la tela no lleva. */
+              nombreComplemento: string | null;
+              /** @description Lotes con algo que dar, FIFO por folio. */
+              lotes: {
+                idPartida: number;
+                /** @description Folio de la partida (A3). */
+                folio: number;
+                /** @description Lote del proveedor o null. */
+                loteProveedor: string | null;
+                /** @description Factura/remisión que la amparó o null. */
+                factura: string | null;
+                /** @description Fecha de la entrada (YYYY-MM-DD) o null. */
+                fecha: string | null;
+                /** @description Lo que queda de CUERPO de este lote en este almacén (neto de hoy, acotado a la existencia real). */
+                cuerpo: number;
+                /** @description Lo que queda de COMPLEMENTO de este lote en este almacén (existencia independiente del cuerpo). */
+                complemento: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/inventarios/telas/color/traspasos': {
     parameters: {
       query?: never;
@@ -49883,6 +50025,8 @@ export interface paths {
               idTelaColor: number;
               cantidad: number;
               cantidadComplemento?: number;
+              /** @description Partida (lote) del almacén de ORIGEN de la que sale esta tela. Omitido = lo decide el sistema, FIFO por folio (el comportamiento de siempre). */
+              idPartida?: number;
             }[];
           };
         };
