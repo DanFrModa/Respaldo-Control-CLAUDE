@@ -60,9 +60,13 @@ Un objeto de Git **no se purga mientras siga siendo alcanzable desde cualquier r
 historial **completo** (ver el aviso de §5):
 
 - **65 ramas remotas** contienen `bff9653d`, de 223.
+  ⚠️ **Medido el 11-sep ANTES de empujar la rama de este documento**, y el conteo **se auto-invalida**:
+  cualquier rama nueva sacada de `prueba` hereda el commit, así que el comando de §5 devolverá **una
+  más por cada rama viva** (esta misma ya suma una). Lo que importa no es el número sino **cuántas
+  tienen trabajo que no esté en `prueba`**: ésas son las que hay que rehacer, el resto se borra.
 - ⭐ **63 de esas 65 ya están contenidas en `prueba`**: son ramas de trabajo ya integradas, y **borrarlas
   no pierde nada**.
-- **Sólo 2 tienen trabajo que no está en `prueba`**, y hay que tratarlas aparte:
+- **Sólo 2 tenían trabajo que no está en `prueba`** al medir, y hay que tratarlas aparte (más esta misma rama, en cuanto exista):
   - `origin/tarea/propuesta-facturacion-cfdi` — es el **PR #338**, abierto y vivo.
   - `origin/trabajo/el-impreso-por-lote-sin-reventar` — la fila **0.140**, suspendida por Daniel con el
     trabajo comiteado sin terminar.
