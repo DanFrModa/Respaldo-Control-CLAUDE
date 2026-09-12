@@ -14,10 +14,16 @@
 -- `telas_colores` / `avios` daría UNA sola para todas las bodegas. Ninguna de las dos contesta la
 -- pregunta.
 --
--- ⚠️ SIN `id_empresa`, a propósito: el estante es un hecho FÍSICO del almacén, y el almacén ya es
--- quien pertenece a una empresa (o es global, `id_empresa IS NULL`). El aislamiento A9 lo pone la
--- puerta de escritura del dominio (`exigirAlmacenDelTipo`, que rechaza el almacén de otra empresa)
--- y las consultas, que sólo muestran la ubicación de renglones de existencia que la sesión ya veía.
+-- ⚠️ CON `id_empresa` (A9), y la unicidad es artículo × almacén × EMPRESA. La primera versión de
+-- esta migración no lo llevaba, con el argumento de que «el almacén ya pertenece a una empresa» —
+-- FALSO para el almacén GLOBAL (`id_empresa IS NULL`), que es justo el que siembra
+-- `sembrarAlmacenUnicoGlobal` para TELA y AVÍO, o sea el caso normal hoy. Medido contra Postgres:
+-- la empresa A leía la ubicación que escribió la B, y la nota de B pisaba la de A — una sola fila,
+-- última escritura gana, sin aviso. Y era incoherente dentro de la MISMA pantalla, porque la
+-- existencia de ese mismo almacén global YA se separa por empresa (`existencia_tela_color` /
+-- `existencia_avio` llevan `id_empresa`): la ubicación habría sido el único dato compartido.
+-- La empresa sale de la sesión (`sesion.idEmpresaActiva`), la misma que ya filtra la existencia.
+-- FK a `empresas` con RESTRICT: una empresa no se borra físico, se desactiva.
 --
 -- `ubicacion` es TEXT NOT NULL: borrar la ubicación se hace BORRANDO LA FILA (lo hace el dominio
 -- cuando el texto llega vacío), no guardando una cadena vacía que después habría que distinguir de
@@ -38,6 +44,7 @@ CREATE TABLE "ubicaciones_tela_color" (
     "id" SERIAL NOT NULL,
     "id_tela_color" INTEGER NOT NULL,
     "id_almacen" INTEGER NOT NULL,
+    "id_empresa" INTEGER NOT NULL,
     "ubicacion" TEXT NOT NULL,
     "creado_en" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "creado_por_id" TEXT,
@@ -52,6 +59,7 @@ CREATE TABLE "ubicaciones_avio" (
     "id" SERIAL NOT NULL,
     "id_avio" INTEGER NOT NULL,
     "id_almacen" INTEGER NOT NULL,
+    "id_empresa" INTEGER NOT NULL,
     "ubicacion" TEXT NOT NULL,
     "creado_en" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "creado_por_id" TEXT,
@@ -65,13 +73,19 @@ CREATE TABLE "ubicaciones_avio" (
 CREATE INDEX "ubicaciones_tela_color_id_almacen_idx" ON "ubicaciones_tela_color"("id_almacen");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ubicaciones_tela_color_id_tela_color_id_almacen_key" ON "ubicaciones_tela_color"("id_tela_color", "id_almacen");
+CREATE INDEX "ubicaciones_tela_color_id_empresa_idx" ON "ubicaciones_tela_color"("id_empresa");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ubicaciones_tela_color_id_tela_color_id_almacen_id_empresa_key" ON "ubicaciones_tela_color"("id_tela_color", "id_almacen", "id_empresa");
 
 -- CreateIndex
 CREATE INDEX "ubicaciones_avio_id_almacen_idx" ON "ubicaciones_avio"("id_almacen");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ubicaciones_avio_id_avio_id_almacen_key" ON "ubicaciones_avio"("id_avio", "id_almacen");
+CREATE INDEX "ubicaciones_avio_id_empresa_idx" ON "ubicaciones_avio"("id_empresa");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ubicaciones_avio_id_avio_id_almacen_id_empresa_key" ON "ubicaciones_avio"("id_avio", "id_almacen", "id_empresa");
 
 -- AddForeignKey
 ALTER TABLE "ubicaciones_tela_color" ADD CONSTRAINT "ubicaciones_tela_color_id_tela_color_fkey" FOREIGN KEY ("id_tela_color") REFERENCES "telas_colores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -84,3 +98,9 @@ ALTER TABLE "ubicaciones_avio" ADD CONSTRAINT "ubicaciones_avio_id_avio_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "ubicaciones_avio" ADD CONSTRAINT "ubicaciones_avio_id_almacen_fkey" FOREIGN KEY ("id_almacen") REFERENCES "almacenes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ubicaciones_tela_color" ADD CONSTRAINT "ubicaciones_tela_color_id_empresa_fkey" FOREIGN KEY ("id_empresa") REFERENCES "empresas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ubicaciones_avio" ADD CONSTRAINT "ubicaciones_avio_id_empresa_fkey" FOREIGN KEY ("id_empresa") REFERENCES "empresas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -158,6 +158,11 @@ model Empresa {
   /// Corridas semanales de pago de esta empresa (0.113, A9). Restrict.
   corridasPago CorridaPago[]
 
+  /// ⭐ FILA 0.103 — ubicaciones físicas ANOTADAS POR ESTA EMPRESA (A9). Restrict: la empresa no se
+  /// borra físico —se desactiva—, y sus anotaciones de almacén viajan con ella.
+  ubicacionesTelaColor UbicacionTelaColor[]
+  ubicacionesAvio      UbicacionAvio[]
+
   @@map("empresas")
 }
 
@@ -533,12 +538,14 @@ model Almacen {
 /// colgarla de `TelaColor`/`Avio` daría una sola ubicación para todas las bodegas: ninguna de las
 /// dos contesta la pregunta del almacenista.
 ///
-/// ⚠️ **NO lleva `id_empresa`, y es a propósito.** La repisa es un hecho FÍSICO del almacén, y el
-/// almacén ya es quien pertenece a una empresa (o es global). Si dos empresas comparten un almacén
-/// global, comparten también el estante: duplicar el dato por empresa inventaría dos ubicaciones
-/// para un mismo lugar. El aislamiento A9 lo pone la puerta de escritura
-/// (`exigirAlmacenDelTipo`, que ya rechaza el almacén de otra empresa) y las consultas, que sólo
-/// muestran ubicaciones de renglones de existencia que la sesión ya podía ver.
+/// ⚠️ **SÍ lleva `id_empresa`, y la primera versión NO lo llevaba: era un defecto.** El argumento
+/// era «el almacén ya pertenece a una empresa», y es FALSO para el almacén GLOBAL (`id_empresa IS
+/// NULL`) — que hoy es el caso NORMAL, porque `sembrarAlmacenUnicoGlobal` siembra así los almacenes
+/// de TELA y de AVÍO. Medido contra Postgres: la empresa A leía la ubicación escrita por la B y la
+/// pisaba sin aviso, una sola fila y última escritura gana. Y la incoherencia estaba dentro de la
+/// MISMA pantalla: la existencia del almacén global YA se separa por empresa (`existencia_*` lleva
+/// `id_empresa`), así que la ubicación habría sido el único dato compartido de ese renglón. La
+/// dimensión correcta es artículo × almacén × EMPRESA, y así está el `@@unique`.
 ///
 /// SIN backfill (REGLA 0-B): los materiales que ya existen nacen SIN ubicación —la ausencia de
 /// fila ES "no anotada"— y se van llenando conforme el almacén los acomoda.
@@ -549,6 +556,10 @@ model UbicacionTelaColor {
   /// Almacén donde está ese estante. Restrict: un almacén con ubicaciones no se borra físico.
   idAlmacen   Int       @map("id_almacen")
   almacen     Almacen   @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+  /// Empresa que anotó ESTA ubicación (A9). Imprescindible en el almacén GLOBAL, donde conviven
+  /// varias empresas: sin esto se pisan la nota entre ellas. Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
   /// Texto LIBRE del lugar físico ("Rack 4, nivel 2"). NOT NULL: borrar la ubicación se hace
   /// borrando la fila, no guardando una cadena vacía que después habría que distinguir de null.
   ubicacion   String
@@ -558,8 +569,9 @@ model UbicacionTelaColor {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idTelaColor, idAlmacen])
+  @@unique([idTelaColor, idAlmacen, idEmpresa])
   @@index([idAlmacen])
+  @@index([idEmpresa])
   @@map("ubicaciones_tela_color")
 }
 
@@ -573,6 +585,9 @@ model UbicacionAvio {
   /// Almacén donde está ese estante. Restrict: un almacén con ubicaciones no se borra físico.
   idAlmacen Int     @map("id_almacen")
   almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+  /// Empresa que anotó ESTA ubicación (A9, ver la gemela de telas). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
   /// Texto LIBRE del lugar físico. NOT NULL (ver la gemela de telas).
   ubicacion String
 
@@ -581,8 +596,9 @@ model UbicacionAvio {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  @@unique([idAvio, idAlmacen])
+  @@unique([idAvio, idAlmacen, idEmpresa])
   @@index([idAlmacen])
+  @@index([idEmpresa])
   @@map("ubicaciones_avio")
 }
 

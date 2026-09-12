@@ -13,8 +13,12 @@
  *
  *  1. **El almacén se valida por la MISMA puerta que los movimientos** (`exigirAlmacenDelTipo`):
  *     existe, está activo, es de esta empresa o global (A9) y es del TIPO del artículo (fila
- *     0.137). Un almacén de otra empresa, para esta sesión, no existe — ése es el aislamiento, y
- *     por eso las tablas no llevan `id_empresa` (ver la cabecera del modelo en `schema.prisma`).
+ *     0.137). ⚠️ Pero esa puerta NO basta como aislamiento, y por eso la fila lleva además
+ *     `idEmpresa`: el almacén **global** (`idEmpresa` nulo) lo comparten TODAS las empresas —es el
+ *     que siembra `sembrarAlmacenUnicoGlobal` para TELA y AVÍO—, así que sin la empresa en la llave
+ *     dos empresas escribirían la MISMA fila y se pisarían la nota. La empresa sale de la sesión
+ *     (`sesion.idEmpresaActiva`), exactamente la misma fuente con la que la consulta de existencias
+ *     ya filtra (`e."id_empresa"`).
  *  2. **VACÍO = BORRAR.** Nunca se guarda una cadena vacía: al vaciar el campo se borra la fila, de
  *     modo que «no hay fila» y «no hay ubicación» son el mismo hecho. Si hubiera dos maneras de
  *     decir «sin ubicación», las consultas tendrían que distinguirlas para siempre.
@@ -61,7 +65,7 @@ interface FilaUbicacion {
 interface PuertaUbicacion {
   /** Nombre del modelo para la bitácora (A7). */
   entidad: 'UbicacionTelaColor' | 'UbicacionAvio';
-  /** La pareja artículo×almacén, tal cual para el `datos` de la bitácora. */
+  /** La llave artículo×almacén×empresa, tal cual para el `datos` de la bitácora. */
   llave: Record<string, number>;
   buscar: () => Promise<FilaUbicacion | null>;
   crear: (texto: string) => Promise<FilaUbicacion>;
@@ -140,7 +144,8 @@ export async function fijarUbicacionTelaColor(
     });
     if (color === null) throw new ErrorNoEncontrado('TelaColor', datos.idTelaColor);
 
-    const llave = { idTelaColor: datos.idTelaColor, idAlmacen: datos.idAlmacen };
+    // La llave lleva la EMPRESA: en el almacén global cada empresa tiene su propia anotación.
+    const llave = { idTelaColor: datos.idTelaColor, idAlmacen: datos.idAlmacen, idEmpresa };
     return guardarUbicacion(
       tx,
       sesion,
@@ -149,7 +154,7 @@ export async function fijarUbicacionTelaColor(
         llave,
         buscar: () =>
           tx.ubicacionTelaColor.findUnique({
-            where: { idTelaColor_idAlmacen: llave },
+            where: { idTelaColor_idAlmacen_idEmpresa: llave },
             select: { id: true, ubicacion: true },
           }),
         crear: (texto) =>
@@ -192,7 +197,8 @@ export async function fijarUbicacionAvio(
     const avio = await tx.avio.findUnique({ where: { id: datos.idAvio }, select: { id: true } });
     if (avio === null) throw new ErrorNoEncontrado('Avio', datos.idAvio);
 
-    const llave = { idAvio: datos.idAvio, idAlmacen: datos.idAlmacen };
+    // La llave lleva la EMPRESA (ver la gemela de telas).
+    const llave = { idAvio: datos.idAvio, idAlmacen: datos.idAlmacen, idEmpresa };
     return guardarUbicacion(
       tx,
       sesion,
@@ -201,7 +207,7 @@ export async function fijarUbicacionAvio(
         llave,
         buscar: () =>
           tx.ubicacionAvio.findUnique({
-            where: { idAvio_idAlmacen: llave },
+            where: { idAvio_idAlmacen_idEmpresa: llave },
             select: { id: true, ubicacion: true },
           }),
         crear: (texto) =>

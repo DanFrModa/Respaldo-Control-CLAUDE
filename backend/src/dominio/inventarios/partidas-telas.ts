@@ -1892,9 +1892,14 @@ export async function consultarExistenciasTelaColor(
     LEFT JOIN "proveedores"      p   ON p."id"   = te."id_proveedor"
     JOIN "almacenes"     a   ON a."id" = e."id_almacen"
     -- Fila 0.103: la UBICACIÓN física viaja pegada al renglón de existencia (LEFT: lo normal es
-    -- que todavía no esté anotada, y eso NO debe esconder la existencia).
+    -- que todavía no esté anotada, y eso NO debe esconder la existencia). ⚠️ La EMPRESA entra en el
+    -- ON —no basta artículo×almacén—: el almacén GLOBAL lo comparten varias empresas y cada una
+    -- tiene su propia anotación; se cruza contra e."id_empresa", la misma columna con la que el
+    -- WHERE ya separa la existencia.
     LEFT JOIN "ubicaciones_tela_color" u
-           ON u."id_tela_color" = e."id_tela_color" AND u."id_almacen" = e."id_almacen"
+           ON u."id_tela_color" = e."id_tela_color"
+          AND u."id_almacen"    = e."id_almacen"
+          AND u."id_empresa"    = e."id_empresa"
     WHERE ${where}
     ORDER BY te."nombre" ASC, c."nombre" ASC, a."nombre" ASC
   `);

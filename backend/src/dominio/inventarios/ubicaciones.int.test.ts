@@ -4,10 +4,14 @@
  *
  *  (a) lo guardado VIAJA PEGADO al renglón de existencia que ya se consulta (no hace falta una
  *      segunda pantalla) — y el almacén donde nadie anotó nada sigue apareciendo, con `null`;
- *  (b) re-fijar ACTUALIZA la misma fila (el `@@unique` artículo×almacén no admite duplicados);
+ *  (b) re-fijar ACTUALIZA la misma fila (el `@@unique` artículo×almacén×empresa no admite duplicados);
  *  (c) **VACÍO BORRA**: no se guarda la cadena vacía, se borra la fila, y la consulta vuelve a `null`;
  *  (d) el almacén pasa por la MISMA puerta que los movimientos: tipo correcto (fila 0.137) y
- *      empresa propia o global (A9) — el de otra empresa, para esta sesión, no existe.
+ *      empresa propia o global (A9) — el de otra empresa, para esta sesión, no existe;
+ *  (e) ⭐ y en el almacén **GLOBAL** —el que siembra `sembrarAlmacenUnicoGlobal` para TELA y AVÍO, o
+ *      sea el caso normal— cada empresa tiene su PROPIA anotación: no se pisan y no se leen. Esto
+ *      es lo que la primera versión hacía mal (una sola fila artículo×almacén, última escritura
+ *      gana), y es lo que la llave artículo×almacén×EMPRESA arregla.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -38,6 +42,9 @@ const PERM_AVIOS: ClavePermiso[] = ['inventario-avios.ver', 'inventario-avios.mo
 
 const sesion = (permisos: ClavePermiso[]) =>
   sesionDePrueba({ idEmpresaActiva: empresa.id, permisos });
+/** La misma sesión, pero de OTRA empresa: con esto se mide el aislamiento en el almacén global. */
+const sesionDe = (idEmpresaActiva: number, permisos: ClavePermiso[]) =>
+  sesionDePrueba({ idEmpresaActiva, permisos });
 const bd = () => ({ cliente });
 
 beforeAll(() => {
@@ -71,9 +78,9 @@ beforeEach(async () => {
 });
 
 /** Mete tela del color en un almacén, para que haya renglón de existencia donde ver la ubicación. */
-async function entrarTela(idAlmacen: number, cantidad: number): Promise<void> {
+async function entrarTela(idAlmacen: number, cantidad: number, idEmpresa?: number): Promise<void> {
   await ajustarInventarioTelaColor(
-    sesion(PERM_TELAS),
+    sesionDe(idEmpresa ?? empresa.id, PERM_TELAS),
     {
       idTipoMov: idTipoAjusteEntrada,
       idAlmacen,
@@ -86,8 +93,15 @@ async function entrarTela(idAlmacen: number, cantidad: number): Promise<void> {
 }
 
 /** La ubicación del color en un almacén, tal como la ve la pantalla de existencias. */
-async function ubicacionEnPantalla(idAlmacen: number): Promise<string | null | undefined> {
-  const lista = await consultarExistenciasTelaColor(sesion(PERM_TELAS), {}, bd());
+async function ubicacionEnPantalla(
+  idAlmacen: number,
+  idEmpresa?: number,
+): Promise<string | null | undefined> {
+  const lista = await consultarExistenciasTelaColor(
+    sesionDe(idEmpresa ?? empresa.id, PERM_TELAS),
+    {},
+    bd(),
+  );
   const color = lista.telas[0]?.colores[0];
   return color?.almacenes.find((a) => a.idAlmacen === idAlmacen)?.ubicacion;
 }
@@ -118,7 +132,7 @@ describe('Ubicación de TELA — se guarda y se ve donde el almacenista ya traba
     expect(lista.totalCuerpo).toBe(120);
   });
 
-  it('(b) re-fijar ACTUALIZA la misma fila, no duplica (unique artículo×almacén)', async () => {
+  it('(b) re-fijar ACTUALIZA la misma fila, no duplica (unique artículo×almacén×empresa)', async () => {
     await entrarTela(almTelaA.id, 100);
     const llave = { idTelaColor: colorMarino.id, idAlmacen: almTelaA.id };
     await fijarUbicacionTelaColor(sesion(PERM_TELAS), { ...llave, ubicacion: 'Rack 4' }, bd());
@@ -184,6 +198,42 @@ describe('Ubicación de TELA — se guarda y se ve donde el almacenista ya traba
     expect(await cliente.ubicacionTelaColor.count()).toBe(0);
   });
 
+  it('(e) DOS EMPRESAS anotan el MISMO color en el MISMO almacén GLOBAL sin pisarse (A9)', async () => {
+    // `almTelaA` NO tiene empresa: es GLOBAL, igual que los que siembra `sembrarAlmacenUnicoGlobal`
+    // para TELA y AVÍO. Ése es justo el caso que el argumento «el almacén ya pertenece a una
+    // empresa» NO cubría, y por el que la ubicación se compartía entre empresas.
+    expect(almTelaA.idEmpresa).toBeNull();
+    await entrarTela(almTelaA.id, 100);
+    await entrarTela(almTelaA.id, 50, otraEmpresa.id);
+    const llave = { idTelaColor: colorMarino.id, idAlmacen: almTelaA.id };
+
+    await fijarUbicacionTelaColor(sesion(PERM_TELAS), { ...llave, ubicacion: 'Rack 4' }, bd());
+    await fijarUbicacionTelaColor(
+      sesionDe(otraEmpresa.id, PERM_TELAS),
+      { ...llave, ubicacion: 'Pasillo Z' },
+      bd(),
+    );
+
+    // Dos filas, una por empresa: la segunda NO pisó a la primera.
+    expect(await cliente.ubicacionTelaColor.count()).toBe(2);
+    // Y cada quien ve LA SUYA en su pantalla, no la de la otra.
+    expect(await ubicacionEnPantalla(almTelaA.id)).toBe('Rack 4');
+    expect(await ubicacionEnPantalla(almTelaA.id, otraEmpresa.id)).toBe('Pasillo Z');
+  });
+
+  it('(e) lo que la otra empresa anotó en el almacén global NO se ve desde aquí', async () => {
+    await entrarTela(almTelaA.id, 100);
+    await entrarTela(almTelaA.id, 50, otraEmpresa.id);
+    await fijarUbicacionTelaColor(
+      sesionDe(otraEmpresa.id, PERM_TELAS),
+      { idTelaColor: colorMarino.id, idAlmacen: almTelaA.id, ubicacion: 'Pasillo Z' },
+      bd(),
+    );
+
+    // Esta empresa nunca anotó nada: tiene que ver "no anotada", no el estante de la otra.
+    expect(await ubicacionEnPantalla(almTelaA.id)).toBeNull();
+  });
+
   it('contesta "no existe" del COLOR, no un error de llave foránea', async () => {
     await expect(
       fijarUbicacionTelaColor(
@@ -237,5 +287,49 @@ describe('Ubicación de AVÍO — la gemela', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('rechaza el almacén de OTRA empresa (A9) — la gemela de telas, que faltaba', async () => {
+    await expect(
+      fijarUbicacionAvio(
+        sesion(PERM_AVIOS),
+        { idAvio: avioCierre.id, idAlmacen: almOtraEmpresa.id, ubicacion: 'Pasillo B' },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(await cliente.ubicacionAvio.count()).toBe(0);
+  });
+
+  it('(e) dos empresas anotan el MISMO avío en el MISMO almacén global sin pisarse ni verse', async () => {
+    expect(almAvio.idEmpresa).toBeNull();
+    const entrar = async (idEmpresaActiva: number, cantidad: number) => {
+      await ajustarInventarioAvio(
+        sesionDe(idEmpresaActiva, PERM_AVIOS),
+        {
+          idTipoMov: idTipoAjusteEntrada,
+          idAlmacen: almAvio.id,
+          fecha: '2026-09-01',
+          motivo: 'Conteo físico inicial',
+          lineas: [{ idAvio: avioCierre.id, cantidad }],
+        },
+        bd(),
+      );
+    };
+    await entrar(empresa.id, 500);
+    await entrar(otraEmpresa.id, 300);
+    const llave = { idAvio: avioCierre.id, idAlmacen: almAvio.id };
+
+    await fijarUbicacionAvio(sesion(PERM_AVIOS), { ...llave, ubicacion: 'Caja 3' }, bd());
+    await fijarUbicacionAvio(
+      sesionDe(otraEmpresa.id, PERM_AVIOS),
+      { ...llave, ubicacion: 'Caja 9' },
+      bd(),
+    );
+
+    expect(await cliente.ubicacionAvio.count()).toBe(2);
+    const mia = await consultarExistenciasAvio(sesion(PERM_AVIOS), {}, bd());
+    expect(mia.filas[0]?.ubicacion).toBe('Caja 3');
+    const suya = await consultarExistenciasAvio(sesionDe(otraEmpresa.id, PERM_AVIOS), {}, bd());
+    expect(suya.filas[0]?.ubicacion).toBe('Caja 9');
   });
 });
