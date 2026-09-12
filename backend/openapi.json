@@ -242770,6 +242770,30 @@
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
                           },
+                          "anclaFija": {
+                            "type": "boolean",
+                            "description": "Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque."
+                          },
+                          "insumoCatalogo": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "tela",
+                                  "avio"
+                                ],
+                                "description": "Catálogo del que sale el insumo del concepto (tela o avío)."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -242812,6 +242836,9 @@
                           "orden",
                           "fijo",
                           "activo",
+                          "anclaFija",
+                          "soloPrecio",
+                          "insumoCatalogo",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -243086,6 +243113,30 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "anclaFija": {
+                      "type": "boolean",
+                      "description": "Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable."
+                    },
+                    "soloPrecio": {
+                      "type": "boolean",
+                      "description": "Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque."
+                    },
+                    "insumoCatalogo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "tela",
+                            "avio"
+                          ],
+                          "description": "Catálogo del que sale el insumo del concepto (tela o avío)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -243128,6 +243179,9 @@
                     "orden",
                     "fijo",
                     "activo",
+                    "anclaFija",
+                    "soloPrecio",
+                    "insumoCatalogo",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -243347,6 +243401,30 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "anclaFija": {
+                      "type": "boolean",
+                      "description": "Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable."
+                    },
+                    "soloPrecio": {
+                      "type": "boolean",
+                      "description": "Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque."
+                    },
+                    "insumoCatalogo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "tela",
+                            "avio"
+                          ],
+                          "description": "Catálogo del que sale el insumo del concepto (tela o avío)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -243389,6 +243467,9 @@
                     "orden",
                     "fijo",
                     "activo",
+                    "anclaFija",
+                    "soloPrecio",
+                    "insumoCatalogo",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -243638,6 +243719,30 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "anclaFija": {
+                      "type": "boolean",
+                      "description": "Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable."
+                    },
+                    "soloPrecio": {
+                      "type": "boolean",
+                      "description": "Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque."
+                    },
+                    "insumoCatalogo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "tela",
+                            "avio"
+                          ],
+                          "description": "Catálogo del que sale el insumo del concepto (tela o avío)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -243680,6 +243785,9 @@
                     "orden",
                     "fijo",
                     "activo",
+                    "anclaFija",
+                    "soloPrecio",
+                    "insumoCatalogo",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -243897,6 +244005,30 @@
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
                     },
+                    "anclaFija": {
+                      "type": "boolean",
+                      "description": "Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable."
+                    },
+                    "soloPrecio": {
+                      "type": "boolean",
+                      "description": "Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque."
+                    },
+                    "insumoCatalogo": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "tela",
+                            "avio"
+                          ],
+                          "description": "Catálogo del que sale el insumo del concepto (tela o avío)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -243939,6 +244071,9 @@
                     "orden",
                     "fijo",
                     "activo",
+                    "anclaFija",
+                    "soloPrecio",
+                    "insumoCatalogo",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -256228,6 +256363,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -256250,7 +256389,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -256727,6 +256867,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -256749,7 +256893,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -257226,6 +257371,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -257248,7 +257397,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -257484,14 +257634,20 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "idTela": {
+                    "description": "Tela del catálogo (Tela.id) a la que se liga el renglón. Con ella, el dominio resuelve descripción y precio.",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "descripcion": {
-                    "description": "Descripción del renglón (por default el avío elegido, o el nombre del concepto).",
+                    "description": "Descripción del renglón (por default el insumo elegido, o el nombre del concepto).",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
                   },
                   "consumo": {
-                    "description": "Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit.",
+                    "description": "Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit. En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -257787,6 +257943,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -257809,7 +257969,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -258040,7 +258201,7 @@
                     "maxLength": 200
                   },
                   "consumo": {
-                    "description": "Nuevo consumo (null para vaciarlo; omitir para no tocar).",
+                    "description": "Nuevo consumo (null para vaciarlo; omitir para no tocar). En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null.",
                     "anyOf": [
                       {
                         "type": "number",
@@ -258344,6 +258505,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -258366,7 +258531,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -258852,6 +259018,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -258874,7 +259044,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -259362,6 +259533,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -259384,7 +259559,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -259861,6 +260037,10 @@
                           "ajustado": {
                             "type": "boolean",
                             "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          },
+                          "soloPrecio": {
+                            "type": "boolean",
+                            "description": "¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo."
                           }
                         },
                         "required": [
@@ -259883,7 +260063,8 @@
                           "idModeloArte",
                           "editable",
                           "eliminable",
-                          "ajustado"
+                          "ajustado",
+                          "soloPrecio"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."

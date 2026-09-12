@@ -97465,6 +97465,12 @@ export interface paths {
                 fijo: boolean;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
+                /** @description Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable. */
+                anclaFija: boolean;
+                /** @description Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque. */
+                soloPrecio: boolean;
+                /** @description Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto. */
+                insumoCatalogo: ('tela' | 'avio') | null;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -97612,6 +97618,12 @@ export interface paths {
               fijo: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable. */
+              anclaFija: boolean;
+              /** @description Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque. */
+              soloPrecio: boolean;
+              /** @description Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto. */
+              insumoCatalogo: ('tela' | 'avio') | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -97756,6 +97768,12 @@ export interface paths {
               fijo: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable. */
+              anclaFija: boolean;
+              /** @description Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque. */
+              soloPrecio: boolean;
+              /** @description Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto. */
+              insumoCatalogo: ('tela' | 'avio') | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -97889,6 +97907,12 @@ export interface paths {
               fijo: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable. */
+              anclaFija: boolean;
+              /** @description Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque. */
+              soloPrecio: boolean;
+              /** @description Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto. */
+              insumoCatalogo: ('tela' | 'avio') | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -98032,6 +98056,12 @@ export interface paths {
               fijo: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
+              /** @description Ancla fija por prenda (maquila/corte/empaque): única por precosto, no eliminable. */
+              anclaFija: boolean;
+              /** @description Lleva SÓLO precio, sin cantidad (§Post-F9.210·3): corte, maquila y empaque. */
+              soloPrecio: boolean;
+              /** @description Catálogo del que DEBE salir su insumo, o null si es un concepto de costo abierto. */
+              insumoCatalogo: ('tela' | 'avio') | null;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -103435,6 +103465,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -103632,6 +103664,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -103833,6 +103867,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -103966,9 +104002,11 @@ export interface paths {
             idConceptoCosto: number;
             /** @description Avío del catálogo (Avio.id) al que se liga el renglón. Con él, el dominio resuelve descripción y precio. */
             idAvio?: number;
-            /** @description Descripción del renglón (por default el avío elegido, o el nombre del concepto). */
+            /** @description Tela del catálogo (Tela.id) a la que se liga el renglón. Con ella, el dominio resuelve descripción y precio. */
+            idTela?: number;
+            /** @description Descripción del renglón (por default el insumo elegido, o el nombre del concepto). */
             descripcion?: string;
-            /** @description Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit. */
+            /** @description Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit. En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null. */
             consumo?: number | null;
             /** @description Precio unitario (o monto directo si no hay consumo). Obligatorio salvo que venga `idAvio`. */
             precioUnit?: number;
@@ -104049,6 +104087,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -104251,6 +104291,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -104371,7 +104413,7 @@ export interface paths {
           'application/json': {
             /** @description Nueva descripción (omitir = no tocar). */
             descripcion?: string;
-            /** @description Nuevo consumo (null para vaciarlo; omitir para no tocar). */
+            /** @description Nuevo consumo (null para vaciarlo; omitir para no tocar). En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null. */
             consumo?: number | null;
             /** @description Nuevo precio unitario (omitir = no tocar). */
             precioUnit?: number;
@@ -104452,6 +104494,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -104649,6 +104693,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time
@@ -104848,6 +104894,8 @@ export interface paths {
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
+                /** @description ¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo. */
+                soloPrecio: boolean;
               }[];
               /**
                * Format: date-time

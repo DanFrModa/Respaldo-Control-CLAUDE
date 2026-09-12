@@ -462,11 +462,16 @@ describe('renglón manual LIGADO a un avío del catálogo (Daniel, ago-2026)', (
     // justamente lo que se hace al ajustar un precio a mano.
     const idPrecosto = await borradorPelon('CENTAVO');
     const idConcepto = await conceptoAvios();
+    // ⭐ fila 0.152: bajo "Avíos" el insumo sale del catálogo; el precio TECLEADO sigue mandando,
+    // que es justo lo que este caso mide (el centavo del redondeo, no de dónde salió el precio).
+    const avio: Avio = await cliente.avio.create({
+      data: { clave: 'CIN-C', descripcion: 'Cinta', precioReferencia: 9 },
+    });
 
     let precosto = await agregarLineaManual(
       sesion(),
       idPrecosto,
-      { idConceptoCosto: idConcepto, descripcion: 'Cinta', precioUnit: 1.005 },
+      { idConceptoCosto: idConcepto, idAvio: avio.id, descripcion: 'Cinta', precioUnit: 1.005 },
       bd(),
     );
     let linea = precosto.lineas.find((l) => l.descripcion === 'Cinta')!;
@@ -533,6 +538,212 @@ describe('renglón manual LIGADO a un avío del catálogo (Daniel, ago-2026)', (
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+});
+
+describe('⭐ renglón manual LIGADO a una TELA del catálogo (§Post-F9.210·12, fila 0.152)', () => {
+  /** Modelo pelón + su precosto borrador (sin BOM: sólo corte + maquila + empaque). */
+  async function borradorPelon(codigo: string): Promise<number> {
+    const modelo = await cliente.modelo.create({ data: { codigo, maquilaBase: 5 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    return precosto.id;
+  }
+
+  async function idConcepto(codigo: string): Promise<number> {
+    const c = await cliente.conceptoCosto.findFirstOrThrow({ where: { codigo } });
+    return c.id;
+  }
+
+  it('resuelve nombre y PRECIO del catálogo y deja el renglón LIGADO a la tela', async () => {
+    const tela: Tela = await cliente.tela.create({
+      data: { nombre: 'Felpa perchada', precioSugerido: 12 },
+    });
+    const idPrecosto = await borradorPelon('TELA-CAT');
+
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: await idConcepto('tela'), idTela: tela.id, consumo: 2 },
+      bd(),
+    );
+
+    const linea = precosto.lineas.find((l) => l.idTela === tela.id)!;
+    expect(linea.descripcion).toBe('Felpa perchada');
+    expect(linea.precioUnit).toBe(12);
+    expect(linea.importe).toBe(24); // 2 × 12
+    // LIGADO, no sólo con el nombre copiado. Sin compra real, la traza del proveedor va vacía:
+    // el precio salió del sugerido genérico y nadie lo firmó.
+    expect(linea.idTelaProveedor).toBeNull();
+    // Sigue siendo MANUAL: sobrevive al recalcular y se puede quitar.
+    expect(linea.origen).toBe('manual');
+    expect(linea.eliminable).toBe(true);
+  });
+
+  it('valúa con la MISMA cascada del BOM: la última COMPRA REAL manda, y acredita al proveedor', async () => {
+    const tela: Tela = await cliente.tela.create({
+      data: { nombre: 'Rib 1x1', precioSugerido: 12 },
+    });
+    const prov: Proveedor = await cliente.proveedor.create({ data: { nombre: 'Telas SA' } });
+    const telaProv = await cliente.telaProveedor.create({
+      data: { idTela: tela.id, idProveedor: prov.id, precio: 99 },
+    });
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: BigInt(9001),
+        idEmpresa: empresa.id,
+        idProveedor: prov.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-07-01T00:00:00.000Z'),
+        lineas: { create: [{ idTela: tela.id, cantidad: 100, precio: 30 }] },
+      },
+    });
+
+    const idPrecosto = await borradorPelon('TELA-COMPRA');
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: await idConcepto('tela'), idTela: tela.id, consumo: 1 },
+      bd(),
+    );
+
+    const linea = precosto.lineas.find((l) => l.idTela === tela.id)!;
+    // 30 de la compra real, NO el 12 del sugerido ni el 99 del catálogo del proveedor: un renglón
+    // manual tiene que valuar igual que uno del BOM, o vuelven a existir dos precios para lo mismo.
+    expect(linea.precioUnit).toBe(30);
+    // Traza FIEL: el escalón que ganó identifica al proveedor, y esa tela tiene fila con él.
+    expect(linea.idTelaProveedor).toBe(telaProv.id);
+  });
+
+  it('🔴 bajo el concepto de TELA ya NO se puede teclear material suelto (era la raíz de la duplicidad)', async () => {
+    const idPrecosto = await borradorPelon('TELA-SUELTA');
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: await idConcepto('tela'), descripcion: 'Tela extra', precioUnit: 10 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('🔴 bajo el concepto de AVÍOS tampoco: el avío se elige del catálogo', async () => {
+    const idPrecosto = await borradorPelon('AVIO-SUELTO');
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: await idConcepto('avios'), descripcion: 'Botón raro', precioUnit: 2 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('los conceptos de COSTO siguen LIBRES (ahí el texto libre es el punto)', async () => {
+    const idPrecosto = await borradorPelon('COSTO-LIBRE');
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      {
+        idConceptoCosto: await idConcepto('estampado'),
+        descripcion: 'Flete de la muestra',
+        precioUnit: 40,
+      },
+      bd(),
+    );
+    expect(precosto.lineas.find((l) => l.descripcion === 'Flete de la muestra')?.importe).toBe(40);
+  });
+
+  it('rechaza una tela inexistente o DESACTIVADA', async () => {
+    const idPrecosto = await borradorPelon('TELA-MALA');
+    const idTelaConcepto = await idConcepto('tela');
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: idTelaConcepto, idTela: 999_999 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+
+    const apagada: Tela = await cliente.tela.create({
+      data: { nombre: 'Tela de baja', precioSugerido: 5, activo: false },
+    });
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        idPrecosto,
+        { idConceptoCosto: idTelaConcepto, idTela: apagada.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+});
+
+describe('⭐ corte/maquila/empaque llevan SÓLO PRECIO, no cantidad (§Post-F9.210·3, fila 0.152)', () => {
+  /** Borrador con las anclas ya puestas por `generarPrecosto`. */
+  async function borrador(codigo: string): Promise<number> {
+    const modelo = await cliente.modelo.create({ data: { codigo, maquilaBase: 5 } });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    return precosto.id;
+  }
+
+  it('EDITAR la maquila con una cantidad no la guarda: el importe es el precio a secas', async () => {
+    const idPrecosto = await borrador('SOLO-PRECIO-EDIT');
+    const antes = await obtenerPrecosto(sesion(), idPrecosto, bd());
+    const maquila = antes.lineas.find((l) => l.conceptoCodigo === 'maquila')!;
+
+    const despues = await editarLinea(
+      sesion(),
+      idPrecosto,
+      maquila.id,
+      { consumo: 12, precioUnit: 7 },
+      bd(),
+    );
+    const linea = despues.lineas.find((l) => l.id === maquila.id)!;
+    expect(linea.consumo).toBeNull();
+    expect(linea.importe).toBe(7); // NO 84
+    // Y la bandera viaja al frontend, para que ni siquiera pinte la casilla.
+    expect(linea.soloPrecio).toBe(true);
+  });
+
+  it('AGREGAR el ancla que falta con cantidad tampoco la guarda', async () => {
+    const idPrecosto = await borrador('SOLO-PRECIO-ALTA');
+    const antes = await obtenerPrecosto(sesion(), idPrecosto, bd());
+    // El corte nace con el precosto: se quita primero para poder volver a agregarlo a mano
+    // (es la puerta real de los borradores que nacieron sin un ancla).
+    const corte = antes.lineas.find((l) => l.conceptoCodigo === 'corte')!;
+    await cliente.precostoLinea.delete({ where: { id: corte.id } });
+
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: corte.idConceptoCosto, consumo: 3, precioUnit: 5 },
+      bd(),
+    );
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'corte')!;
+    expect(linea.consumo).toBeNull();
+    expect(linea.importe).toBe(5); // NO 15
+  });
+
+  it('un concepto que SÍ lleva cantidad conserva la suya (la regla no se derramó)', async () => {
+    const idPrecosto = await borrador('CON-CANTIDAD');
+    const estampado = await cliente.conceptoCosto.findFirstOrThrow({
+      where: { codigo: 'estampado' },
+    });
+    const precosto = await agregarLineaManual(
+      sesion(),
+      idPrecosto,
+      { idConceptoCosto: estampado.id, descripcion: 'Serigrafía', consumo: 3, precioUnit: 5 },
+      bd(),
+    );
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'estampado')!;
+    expect(linea.consumo).toBe(3);
+    expect(linea.importe).toBe(15);
+    expect(linea.soloPrecio).toBe(false);
   });
 });
 
@@ -633,14 +844,18 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
-    // R5/B12: un renglón de tela SÍ se puede agregar a mano en la calculadora (scratch), y es quitable.
+    // R5/B12: un renglón de tela SÍ se puede agregar a mano en la calculadora (scratch), y es
+    // quitable — pero ⭐ desde la fila 0.152 (§Post-F9.210·12) la tela SALE DEL CATÁLOGO.
     const conceptoTela = await cliente.conceptoCosto.findFirstOrThrow({
       where: { codigo: 'tela' },
+    });
+    const telaExtra: Tela = await cliente.tela.create({
+      data: { nombre: 'Tela extra', precioSugerido: 10 },
     });
     const conManualTela = await agregarLineaManual(
       sesion(),
       precosto.id,
-      { idConceptoCosto: conceptoTela.id, descripcion: 'Tela extra', precioUnit: 10 },
+      { idConceptoCosto: conceptoTela.id, idTela: telaExtra.id },
       bd(),
     );
     const manualTela = conManualTela.lineas.find(

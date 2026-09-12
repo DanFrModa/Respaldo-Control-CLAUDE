@@ -13758,6 +13758,17 @@ que se inventen) **siguen libres**: ahí el texto libre *es* el punto, y prohibi
 ⇒ Era **especificación, no queja**. Se quita la casilla de Consumo que hoy se pinta sin condición al
 editar esos tres renglones (`DialogoPrecosto.tsx:552-560`). La columna sigue siendo nullable para todos.
 
+> ✅ **CONSTRUIDO — v0.148 (12-sep-2026), junto con el punto (12) en la fila 0.152.** ⚠️ **Y al medirlo,
+> esta nota se quedaba corta en un punto que importa: la casilla de Consumo estaba en DOS sitios, no en
+> uno.** Además del editor de fila que cita la línea de arriba, el **formulario de alta** la pintaba
+> igual ⇒ quitarla sólo del primero habría dejado la casilla puesta justo al **agregar** el ancla que
+> faltara, que es cuando más se usa. Los dos quedaron, y el servidor fuerza `consumo = null` en las dos
+> puertas: **la regla no vive en la pantalla**. La lista de los tres conceptos quedó en **un solo sitio
+> del dominio** (`backend/src/dominio/desarrollo/conceptos-precosto.ts`) y sus banderas viajan por el
+> contrato — el frontend **tenía una copia tecleada a mano** de esa lista, comentada como *«espejo»*, y
+> se retiró. *Decisión técnica del lead: lista de códigos en el dominio y NO una columna nueva en
+> `ConceptoCosto`, para que la fila no arrastrara una migración que no necesitaba.*
+
 ##### ✅ (9) la fecha de la lista — **SE QUEDA, ROTULADA «FECHA DE CITA»**
 > *«Ok, dejala… **solo ponle fecha de cita**»*
 

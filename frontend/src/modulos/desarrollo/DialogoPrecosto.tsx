@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { Avio } from '@/api/avios';
-import { useConceptosCosto } from '@/api/conceptos-costo';
+import { useConceptosCosto, type ConceptoCosto } from '@/api/conceptos-costo';
 import type { Desarrollo } from '@/api/desarrollos';
+import type { Tela } from '@/api/telas';
 import {
   useAgregarLinea,
   useCongelarPrecosto,
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/table';
 import { moneda } from '@/modulos/costos/comun';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
+import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
 import { useSesion } from '@/sesion/useSesion';
 
 import { TechPackDesarrollo } from './TechPackDesarrollo';
@@ -519,7 +521,7 @@ function RenglonPrecosto({
       return;
     }
     const consumoNum = consumo.trim() === '' ? null : Number(consumo);
-    if (consumoNum !== null && (Number.isNaN(consumoNum) || consumoNum < 0)) {
+    if (!linea.soloPrecio && consumoNum !== null && (Number.isNaN(consumoNum) || consumoNum < 0)) {
       toast.error('El consumo debe ser un número ≥ 0.');
       return;
     }
@@ -527,7 +529,13 @@ function RenglonPrecosto({
       {
         id: idPrecosto,
         idLinea: linea.id,
-        cuerpo: { descripcion: descripcionLimpia, consumo: consumoNum, precioUnit: precioNum },
+        cuerpo: {
+          descripcion: descripcionLimpia,
+          // §Post-F9.210·3: corte/maquila/empaque llevan SÓLO precio. No se manda cantidad (el
+          // dominio la deja en null de todos modos: la bandera viene de ahí, no de una lista local).
+          ...(linea.soloPrecio ? {} : { consumo: consumoNum }),
+          precioUnit: precioNum,
+        },
       },
       {
         onSuccess: () => {
@@ -551,13 +559,20 @@ function RenglonPrecosto({
           />
         </TableCell>
         <TableCell className="text-right">
-          <Input
-            aria-label="Consumo"
-            className="text-right"
-            value={consumo}
-            onChange={(e) => setConsumo(e.target.value)}
-            placeholder="—"
-          />
+          {/* ⭐ §Post-F9.210·3 (Daniel): corte, maquila y empaque *"solo debe de llevar el precio.
+              no la cantidad"* — son un monto por prenda. La bandera la calcula el SERVIDOR
+              (`dominio/desarrollo/conceptos-precosto.ts`): aquí no hay lista de códigos. */}
+          {linea.soloPrecio ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <Input
+              aria-label="Consumo"
+              className="text-right"
+              value={consumo}
+              onChange={(e) => setConsumo(e.target.value)}
+              placeholder="—"
+            />
+          )}
         </TableCell>
         <TableCell className="text-right">
           <Input
@@ -654,26 +669,21 @@ function RenglonPrecosto({
 }
 
 /**
- * Formulario de alta de un renglón MANUAL (concepto + avío del catálogo + descripción + consumo +
- * precio). El insumo se puede ELEGIR DEL CATÁLOGO DE AVÍOS con búsqueda server-side (Daniel,
- * ago-2026: antes sólo se podía teclear el nombre y el precio a mano). Al elegir un avío, el PRECIO lo
- * resuelve el BACKEND con la cascada amarrada (A1: la cascada NO se replica aquí) y el renglón
- * queda LIGADO al avío; si se teclea un precio, ese manda. Sin avío, todo sigue como antes (texto
- * libre + precio obligatorio) — hay conceptos que no son avíos.
- */
-/**
- * Códigos de los conceptos ANCLA fijos (espejo de `CONCEPTOS_ANCLA` en `dominio/desarrollo/
- * precostos.ts`): un renglón `manual` por prenda, **único**, editable pero no eliminable.
+ * Formulario de alta de un renglón MANUAL (concepto + insumo del CATÁLOGO + descripción + consumo +
+ * precio).
  *
- * ⭐ V1-E8w: `empaque` es el TERCERO (§Post-F9.153), y el filtro pasó de *"esconder el concepto"* a
- * **"esconderlo sólo si ESTE precosto ya lo tiene"** — que es la regla real del servidor. Importa:
- * todo borrador anterior a la versión que estrena un ancla nueva **nació sin ella** (el recalcular
- * desde el BOM no toca los `manual`), así que esconderla siempre lo dejaría sin salida. Con esto, el
- * selector es la puerta por la que un borrador viejo recibe su empaque — y sigue sin ofrecer un
- * duplicado cuando ya está.
+ * ⭐ **El insumo sale del catálogo, no de un texto libre** (§Post-F9.210·12, Daniel 7-sep-2026:
+ * *"no sé por qué en el precosteo hay espacio para meter otra tela que no viene de un catálogo…
+ * se duplican las cosas"*). Bajo el concepto de TELA se elige del catálogo de telas y bajo el de
+ * AVÍOS del de avíos; el PRECIO lo resuelve el BACKEND con la cascada amarrada (A1: la cascada NO
+ * se replica aquí) y el renglón queda LIGADO. Los conceptos de COSTO (corte, maquila, empaque,
+ * fletes, muestras…) siguen con texto libre + precio: ahí el texto *es* el punto.
+ *
+ * 🔑 **Esta pantalla ya no conoce ni un código de concepto.** Antes llevaba su propia copia de la
+ * lista de anclas, tecleada a mano; hoy pregunta por las BANDERAS que manda el servidor
+ * (`anclaFija` / `soloPrecio` / `insumoCatalogo`), que salen de un solo sitio del dominio
+ * (`conceptos-precosto.ts`). Una lista en dos lugares es una lista que se desincroniza.
  */
-const CONCEPTOS_ANCLA = ['maquila', 'corte', 'empaque'];
-
 function FormAgregarManual({
   idPrecosto,
   lineas,
@@ -690,12 +700,23 @@ function FormAgregarManual({
 
   const [idConcepto, setIdConcepto] = useState('');
   const [avio, setAvio] = useState<Avio | null>(null);
+  const [tela, setTela] = useState<Tela | null>(null);
   const [descripcion, setDescripcion] = useState('');
   const [consumo, setConsumo] = useState('');
   const [precio, setPrecio] = useState('');
 
+  const listaConceptos: ConceptoCosto[] = conceptos.data?.datos ?? [];
+  const conceptoSel = listaConceptos.find((c) => String(c.id) === idConcepto);
+  /** De qué catálogo DEBE salir el insumo de este concepto (null = concepto de costo abierto). */
+  const insumoCatalogo = conceptoSel?.insumoCatalogo ?? null;
+  /** ¿Sólo precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3). */
+  const soloPrecio = conceptoSel?.soloPrecio ?? false;
+  /** El avío se ofrece en su concepto y en los conceptos abiertos que sí llevan cantidad. */
+  const ofreceAvio = insumoCatalogo === 'avio' || (insumoCatalogo === null && !soloPrecio);
+
   function limpiar(): void {
     setAvio(null);
+    setTela(null);
     setDescripcion('');
     setConsumo('');
     setPrecio('');
@@ -706,11 +727,21 @@ function FormAgregarManual({
       toast.error('Elige un concepto.');
       return;
     }
+    // El catálogo es OBLIGATORIO en tela/avíos: el material suelto vive en la mesa de negociación,
+    // no aquí (§Post-F9.210·12). El servidor lo exige igual; esto sólo evita el viaje.
+    if (insumoCatalogo === 'tela' && tela === null) {
+      toast.error('Elige la tela del catálogo.');
+      return;
+    }
+    if (insumoCatalogo === 'avio' && avio === null) {
+      toast.error('Elige el avío del catálogo.');
+      return;
+    }
     const precioNum = Number(precio);
     const precioVacio = precio.trim() === '';
-    // Con avío elegido el precio puede ir en blanco: lo resuelve el catálogo (en el servidor).
-    if (precioVacio && avio === null) {
-      toast.error('Teclea el precio o elige un avío del catálogo.');
+    // Con un insumo del catálogo elegido el precio puede ir en blanco: lo resuelve el servidor.
+    if (precioVacio && avio === null && tela === null) {
+      toast.error('Teclea el precio o elige una tela/avío del catálogo.');
       return;
     }
     if (!precioVacio && (Number.isNaN(precioNum) || precioNum < 0)) {
@@ -718,7 +749,7 @@ function FormAgregarManual({
       return;
     }
     const consumoNum = consumo.trim() === '' ? null : Number(consumo);
-    if (consumoNum !== null && (Number.isNaN(consumoNum) || consumoNum < 0)) {
+    if (!soloPrecio && consumoNum !== null && (Number.isNaN(consumoNum) || consumoNum < 0)) {
       toast.error('El consumo debe ser un número ≥ 0.');
       return;
     }
@@ -728,8 +759,10 @@ function FormAgregarManual({
         cuerpo: {
           idConceptoCosto: Number(idConcepto),
           ...(avio === null ? {} : { idAvio: avio.id }),
+          ...(tela === null ? {} : { idTela: tela.id }),
           ...(descripcion.trim() === '' ? {} : { descripcion: descripcion.trim() }),
-          consumo: consumoNum,
+          // §Post-F9.210·3: corte/maquila/empaque van SIN cantidad.
+          ...(soloPrecio ? {} : { consumo: consumoNum }),
           ...(precioVacio ? {} : { precioUnit: precioNum }),
         },
       },
@@ -752,7 +785,13 @@ function FormAgregarManual({
           <SelectNativo
             id="manual-concepto"
             value={idConcepto}
-            onChange={(e) => setIdConcepto(e.target.value)}
+            onChange={(e) => {
+              setIdConcepto(e.target.value);
+              // Cambiar de concepto cambia QUÉ se puede capturar: la tela elegida no tiene sentido
+              // bajo "estampado", ni el avío bajo "tela". Se limpia para no mandar un insumo que la
+              // pantalla ya no muestra.
+              limpiar();
+            }}
             data-testid="agregar-linea-concepto"
           >
             <option value="">Elige…</option>
@@ -760,9 +799,9 @@ function FormAgregarManual({
                 precosto YA tenga puesta (maquila/corte/empaque son únicos por prenda: se editan, no
                 se duplican). Un ancla que falta —el caso de los borradores anteriores a la versión
                 que la estrenó— SÍ se ofrece, que es su única forma de llegar. Tela/avíos siempre,
-                como renglón scratch de negociación. */}
-            {(conceptos.data?.datos ?? [])
-              .filter((c) => !(CONCEPTOS_ANCLA.includes(c.codigo) && anclasPuestas.has(c.codigo)))
+                como renglón scratch de negociación (ahora, del catálogo). */}
+            {listaConceptos
+              .filter((c) => !(c.anclaFija && anclasPuestas.has(c.codigo)))
               .map((c) => (
                 <option key={c.id} value={String(c.id)}>
                   {c.nombre}
@@ -770,38 +809,61 @@ function FormAgregarManual({
               ))}
           </SelectNativo>
         </Field>
-        <Field>
-          <FieldLabel htmlFor="manual-avio">Avío del catálogo</FieldLabel>
-          <SelectorAvio
-            idSeleccionado={avio?.id}
-            alSeleccionar={(elegido) => setAvio(elegido)}
-            alLimpiar={() => setAvio(null)}
-            idInput="manual-avio"
-            testid="agregar-linea-avio"
-          />
-          <FieldDescription>
-            Opcional: el precio y la descripción salen del catálogo (y quedan editables).
-          </FieldDescription>
-        </Field>
+        {insumoCatalogo === 'tela' ? (
+          <Field>
+            <FieldLabel htmlFor="manual-tela">Tela del catálogo</FieldLabel>
+            <SelectorTela
+              idSeleccionado={tela?.id}
+              alSeleccionar={(elegida) => setTela(elegida)}
+              alLimpiar={() => setTela(null)}
+              idInput="manual-tela"
+              testid="agregar-linea-tela"
+            />
+            <FieldDescription>
+              Obligatoria: el precio y la descripción salen del catálogo (y quedan editables).
+            </FieldDescription>
+          </Field>
+        ) : null}
+        {ofreceAvio ? (
+          <Field>
+            <FieldLabel htmlFor="manual-avio">Avío del catálogo</FieldLabel>
+            <SelectorAvio
+              idSeleccionado={avio?.id}
+              alSeleccionar={(elegido) => setAvio(elegido)}
+              alLimpiar={() => setAvio(null)}
+              idInput="manual-avio"
+              testid="agregar-linea-avio"
+            />
+            <FieldDescription>
+              {insumoCatalogo === 'avio'
+                ? 'Obligatorio: el precio y la descripción salen del catálogo (y quedan editables).'
+                : 'Opcional: el precio y la descripción salen del catálogo (y quedan editables).'}
+            </FieldDescription>
+          </Field>
+        ) : null}
         <Field>
           <FieldLabel htmlFor="manual-descripcion">Descripción</FieldLabel>
           <Input
             id="manual-descripcion"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            placeholder={avio === null ? '(opcional)' : `${avio.clave} — ${avio.descripcion}`}
+            placeholder={
+              avio !== null ? `${avio.clave} — ${avio.descripcion}` : (tela?.nombre ?? '(opcional)')
+            }
           />
         </Field>
-        <Field>
-          <FieldLabel htmlFor="manual-consumo">Consumo</FieldLabel>
-          <Input
-            id="manual-consumo"
-            className="text-right"
-            value={consumo}
-            onChange={(e) => setConsumo(e.target.value)}
-            placeholder="—"
-          />
-        </Field>
+        {soloPrecio ? null : (
+          <Field>
+            <FieldLabel htmlFor="manual-consumo">Consumo</FieldLabel>
+            <Input
+              id="manual-consumo"
+              className="text-right"
+              value={consumo}
+              onChange={(e) => setConsumo(e.target.value)}
+              placeholder="—"
+            />
+          </Field>
+        )}
         <Field>
           <FieldLabel htmlFor="manual-precio">Precio</FieldLabel>
           <Input
@@ -809,7 +871,7 @@ function FormAgregarManual({
             className="text-right"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
-            placeholder={avio === null ? '' : 'del catálogo'}
+            placeholder={avio === null && tela === null ? '' : 'del catálogo'}
             data-testid="agregar-linea-precio"
           />
         </Field>

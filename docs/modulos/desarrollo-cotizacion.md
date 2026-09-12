@@ -180,7 +180,8 @@ enfrente**, dentro del panel de negociación del renglón. Va en las **dos direc
 ### ⭐ El costo de EMPAQUE, tercera ancla fija (V1-E8w, §Post-F9.153)
 
 Todo precosto nace con **tres renglones `manual` auto-creados, únicos y no eliminables**: `maquila`,
-`corte` y —desde V1-E8w— **`empaque`** (`CONCEPTOS_ANCLA`, `precostos.ts`). El importe del empaque sale de
+`corte` y —desde V1-E8w— **`empaque`** (`CONCEPTOS_ANCLA`, `dominio/desarrollo/conceptos-precosto.ts`).
+El importe del empaque sale de
 **`ConfiguracionEmpresa.costoEmpaqueBase`** (default 2.20, editable en Administración › Empresas): Daniel
 lo pidió movible *sin deploy* porque va a subir.
 
@@ -195,6 +196,34 @@ toca los `manual`). Si mañana se agrega una cuarta ancla, esto ya no vuelve a s
 
 ⚠️ **Estrenar un ancla exige `SEED_ON_START=true`** en el deploy: sin el concepto sembrado,
 `generarPrecosto` truena con *"falta el concepto de costo base …"*.
+
+### ⭐ El precosteo toma del CATÁLOGO: se acabó la tela «suelta» (fila 0.152, §Post-F9.210·12 y ·3)
+
+Daniel: *«no entiendo por qué hay doble información… **toda la información debe de venir desde la
+receta**… no sé por qué en el precosteo hay espacio para meter otra tela que no viene de un catálogo»*
+y *«no me deja meter telas… **solo avíos**»*. Las dos quejas eran **la misma raíz**: el alta de un
+renglón manual aceptaba `idAvio` y **nada más**, así que para la tela la única vía era el texto libre —
+y de ahí las dos telas del mismo modelo.
+
+- **El insumo se elige del catálogo:** `agregarLineaManual` acepta ahora **`idTela`** además de `idAvio`
+  y lo valúa con **la misma cascada del BOM** (`precioTelaDeCatalogo` → `resolverPrecioTela`: última
+  compra real → sugerido), dejando la traza `idTela`/`idTelaProveedor` (columnas que la tabla **ya
+  tenía**: sólo las escribía el BOM ⇒ **sin migración**). El precio tecleado sigue mandando.
+- **Bajo `tela` y `avios` el catálogo es OBLIGATORIO** (409 si falta). El material **sin catálogo** vive
+  **sólo en la mesa de negociación** —donde sigue viva la **jareta estimada** (§Post-F9.139), que la
+  mesa nunca escribe en el catálogo—, nunca en la receta. Los **conceptos de costo** (corte, maquila,
+  empaque, fletes, muestras, los que se inventen) **siguen libres**: ahí el texto libre *es* el punto.
+- **Corte, maquila y empaque llevan SÓLO PRECIO** (*«Solo debe de llevar el precio. no la cantidad»*):
+  su `consumo` se guarda en `null` **en el alta y en la edición**, y la pantalla ya no pinta la casilla.
+- 📌 **Lo suelto nunca llegó a la OP:** `receta-orden.ts` copia del **BOM del MODELO**, así que el temor
+  de que se duplicara en producción no ocurría. Lo que sí se duplicaba era el **costo**.
+- 🔑 **Una sola lista de códigos**, en `dominio/desarrollo/conceptos-precosto.ts`, que viaja al frontend
+  como **banderas** del contrato (`anclaFija` / `soloPrecio` / `insumoCatalogo` en el concepto de costo
+  y `soloPrecio` en el renglón). `DialogoPrecosto.tsx` llevaba su **propia copia tecleada a mano** de la
+  lista de anclas; ya no tiene ninguna.
+- **REGLA 0-B:** los renglones viejos con tela suelta **se quedan como están** (siguen mostrándose y
+  editándose); la puerta se cierra para lo que se capture de aquí en adelante. Sin migración, sin
+  permisos, sin semillas.
 
 ### ⭐ Sin aprobación no sale documento, ni borrador (V1-E8b, §Post-F9.125(c))
 

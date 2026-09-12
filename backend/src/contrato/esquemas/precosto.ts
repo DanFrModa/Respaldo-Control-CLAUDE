@@ -57,15 +57,21 @@ const notasLinea = z
  * y activo. El importe lo arma el dominio: `consumo × precioUnit` si hay consumo, o `precioUnit` a
  * secas (monto directo).
  *
- * El insumo se puede ELEGIR DEL CATÁLOGO DE AVÍOS (`idAvio`, petición de Daniel ago-2026: los
- * avíos del precosteo no se podían elegir): con `idAvio` el DOMINIO resuelve descripción y PRECIO
- * con la MISMA cascada amarrada del BOM (`resolverPrecioAvio` / promedio de medidas) y deja el
- * renglón LIGADO al avío (traza `idAvio`/`idAvioProveedor`). El texto libre se conserva como opción
- * (hay conceptos que no son avíos: maquila extra, fletes, muestras…).
+ * El insumo se ELIGE DEL CATÁLOGO: `idAvio` (avíos, petición de Daniel ago-2026) o ⭐ `idTela`
+ * (telas, §Post-F9.210·12 — fila 0.152). Con cualquiera de los dos el DOMINIO resuelve descripción
+ * y PRECIO con la MISMA cascada amarrada del BOM y deja el renglón LIGADO (traza
+ * `idTela`/`idTelaProveedor` o `idAvio`/`idAvioProveedor`).
  *
- * Por eso `precioUnit` es OPCIONAL **sólo** cuando viene `idAvio` (el catálogo lo resuelve y el
- * usuario lo puede editar después); sin avío el precio se teclea y es OBLIGATORIO. Si viene el
- * precio, MANDA sobre el del catálogo (queda editable de entrada).
+ * ⭐ **El material SUELTO se acabó** (Daniel, 7-sep-2026: *"no sé por qué en el precosteo hay
+ * espacio para meter otra tela que no viene de un catálogo… se duplican las cosas"*): bajo los
+ * conceptos de **tela** y **avíos** el catálogo es OBLIGATORIO —la regla la impone el dominio, que
+ * es quien conoce el código del concepto—. El texto libre sigue vivo en los **conceptos de costo**
+ * (maquila extra, fletes, muestras…) y en la **mesa de negociación**, que es donde vive la jareta
+ * estimada (§Post-F9.139).
+ *
+ * Por eso `precioUnit` es OPCIONAL **sólo** cuando viene `idAvio`/`idTela` (el catálogo lo resuelve
+ * y el usuario lo puede editar después); sin insumo del catálogo el precio se teclea y es
+ * OBLIGATORIO. Si viene el precio, MANDA sobre el del catálogo (queda editable de entrada).
  */
 export const esquemaPrecostoLineaManualCrear = z
   .object({
@@ -82,16 +88,26 @@ export const esquemaPrecostoLineaManualCrear = z
       .describe(
         'Avío del catálogo (Avio.id) al que se liga el renglón. Con él, el dominio resuelve descripción y precio.',
       ),
+    idTela: z
+      .number({ error: 'El id de la tela debe ser un número' })
+      .int({ error: 'El id de la tela debe ser entero' })
+      .positive({ error: 'El id de la tela debe ser positivo' })
+      .optional()
+      .describe(
+        'Tela del catálogo (Tela.id) a la que se liga el renglón. Con ella, el dominio resuelve descripción y precio.',
+      ),
     descripcion: descripcionLinea
       .optional()
-      .describe('Descripción del renglón (por default el avío elegido, o el nombre del concepto).'),
+      .describe(
+        'Descripción del renglón (por default el insumo elegido, o el nombre del concepto).',
+      ),
     consumo: z
       .number({ error: 'El consumo debe ser un número' })
       .nonnegative({ error: 'El consumo no puede ser negativo' })
       .nullable()
       .optional()
       .describe(
-        'Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit.',
+        'Consumo (cantidad). Si viene, importe = consumo × precioUnit; si no, importe = precioUnit. En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null.',
       ),
     precioUnit: z
       .number({ error: 'El precio debe ser un número' })
@@ -102,10 +118,18 @@ export const esquemaPrecostoLineaManualCrear = z
       ),
     notas: notasLinea.nullable().optional().describe('Notas del renglón (opcional).'),
   })
-  .refine((datos) => datos.precioUnit !== undefined || datos.idAvio !== undefined, {
-    error: 'El precio es obligatorio (o elige un avío del catálogo para tomar el suyo)',
-    path: ['precioUnit'],
-  });
+  .refine((datos) => !(datos.idTela !== undefined && datos.idAvio !== undefined), {
+    error: 'Un renglón se liga a UNA tela o a UN avío, no a los dos',
+    path: ['idTela'],
+  })
+  .refine(
+    (datos) =>
+      datos.precioUnit !== undefined || datos.idAvio !== undefined || datos.idTela !== undefined,
+    {
+      error: 'El precio es obligatorio (o elige una tela/avío del catálogo para tomar el suyo)',
+      path: ['precioUnit'],
+    },
+  );
 
 /** Datos validados de alta de un renglón manual. */
 export type DatosPrecostoLineaManualCrear = z.infer<typeof esquemaPrecostoLineaManualCrear>;
@@ -122,7 +146,9 @@ export const esquemaPrecostoLineaEditar = z.object({
     .nonnegative({ error: 'El consumo no puede ser negativo' })
     .nullable()
     .optional()
-    .describe('Nuevo consumo (null para vaciarlo; omitir para no tocar).'),
+    .describe(
+      'Nuevo consumo (null para vaciarlo; omitir para no tocar). En un concepto de SÓLO PRECIO (corte/maquila/empaque) el dominio lo deja en null.',
+    ),
   precioUnit: z
     .number({ error: 'El precio debe ser un número' })
     .nonnegative({ error: 'El precio no puede ser negativo' })
@@ -179,6 +205,11 @@ export const esquemaPrecostoLineaSalida = z
       .boolean()
       .describe(
         '¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa).',
+      ),
+    soloPrecio: z
+      .boolean()
+      .describe(
+        '¿Su concepto lleva SÓLO precio, sin cantidad? (corte/maquila/empaque, §Post-F9.210·3): la UI no pinta Consumo.',
       ),
   })
   .describe('Renglón de precosto.');

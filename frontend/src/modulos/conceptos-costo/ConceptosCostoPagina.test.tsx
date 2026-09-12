@@ -41,6 +41,11 @@ function concepto(
     orden: id,
     fijo,
     activo,
+    // Banderas del precosteo (§Post-F9.210): las calcula el servidor desde el `codigo`; esta
+    // pantalla (el CRUD del catálogo) no las usa, pero forman parte del contrato.
+    anclaFija: ['maquila', 'corte', 'empaque'].includes(codigo),
+    soloPrecio: ['maquila', 'corte', 'empaque'].includes(codigo),
+    insumoCatalogo: codigo === 'tela' ? 'tela' : codigo === 'avios' ? 'avio' : null,
     creadoEn: '2026-07-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-07-01T00:00:00.000Z',
