@@ -57,6 +57,15 @@ export function DialogoPasarAProduccion({
     }
   }, [abierto, propuestoCodigo, tocado]);
 
+  // ⭐⭐ 0.149 — **EL ACTO IMPOSIBLE, DICHO ANTES DEL CLIC.** Lo dice la MISMA consulta que usa la
+  // guarda del servidor (`listarHijosDeDesarrollo`), así que el diálogo no puede discrepar de lo
+  // que el backend acepta. Lo normal es que este diálogo ni se abra —el botón desaparece cuando el
+  // desarrollo tiene hijos (`ModelosPagina.tsx`)—, pero un deep-link, una pestaña vieja o un hijo
+  // que nació mientras el cajón estaba abierto llegan igual hasta aquí: entonces confirmar se
+  // apaga y se nombran los hijos, en vez de dejar pulsar para que el servidor conteste que no.
+  const tieneHijos = propuesta.data?.tieneHijos ?? false;
+  const codigosHijos = propuesta.data?.codigosHijos ?? [];
+
   const formaValida = /^\d{5}$/.test(numero.trim());
   const errorForma =
     numero.trim() === '' || formaValida
@@ -64,7 +73,7 @@ export function DialogoPasarAProduccion({
       : { message: 'El número debe tener 5 dígitos.' };
 
   function confirmar(): void {
-    if (modelo === null || !formaValida) {
+    if (modelo === null || !formaValida || tieneHijos) {
       return;
     }
     promover.mutate(
@@ -159,19 +168,45 @@ export function DialogoPasarAProduccion({
             </p>
           ) : null}
 
+          {/* ⭐⭐ 0.149 — Con hijos el aviso ámbar («esto le da UN número…») ya no aplica: no es que
+              sea inconveniente, es que NO SE PUEDE. Por eso lo sustituye —no lo acompaña—, con el
+              mismo texto con el que el servidor lo rechaza y nombrando a los hijos, que es lo único
+              que explica el porqué. */}
+          {tieneHijos ? (
+            <p
+              className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              role="alert"
+              data-testid="aviso-ya-tiene-modelos-por-color"
+            >
+              <b>Este modelo ya no se puede pasar a producción.</b> De él ya nacieron modelos de
+              producción por color
+              {codigosHijos.length > 0 ? (
+                <>
+                  {' ('}
+                  <b className="mono">{codigosHijos.join(', ')}</b>
+                  {')'}
+                </>
+              ) : null}
+              : su número no es suyo, es el de cada color, y pasarlo a producción le daría un número
+              MÁS a la misma prenda. Si falta un color, sale solo al generar la OP de ese color.
+            </p>
+          ) : null}
+
           {/* ⭐⭐ V1-E3 (§Post-F9.172(b)): pulsar esto es lo CONTRARIO del camino normal, y no tiene
               vuelta atrás. Se dice aquí, antes del clic, porque el daño era silencioso: el modelo
               quedaba con UN número para todos sus colores y sus OP ya no hacían nacer ninguno. */}
-          <p
-            className="rounded-md border border-amber-400/50 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-            data-testid="aviso-un-numero-para-todos-los-colores"
-          >
-            <b>Esto le da UN número a todo el modelo, no uno por color.</b> Lo normal es dejar que
-            el número se lo dé su <b>OP</b>: al generar la orden de cada color nace su propio modelo
-            de producción, con su número y compartiendo esta receta. <b>No hay vuelta atrás:</b> un
-            modelo ya pasado a producción no vuelve a desarrollo y sus OP no harán nacer modelos por
-            color.
-          </p>
+          {tieneHijos ? null : (
+            <p
+              className="rounded-md border border-amber-400/50 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+              data-testid="aviso-un-numero-para-todos-los-colores"
+            >
+              <b>Esto le da UN número a todo el modelo, no uno por color.</b> Lo normal es dejar que
+              el número se lo dé su <b>OP</b>: al generar la orden de cada color nace su propio
+              modelo de producción, con su número y compartiendo esta receta.{' '}
+              <b>No hay vuelta atrás:</b> un modelo ya pasado a producción no vuelve a desarrollo y
+              sus OP no harán nacer modelos por color.
+            </p>
+          )}
         </div>
 
         <DialogFooter>
@@ -186,7 +221,7 @@ export function DialogoPasarAProduccion({
           <Button
             type="button"
             onClick={confirmar}
-            disabled={!formaValida || promover.isPending}
+            disabled={!formaValida || promover.isPending || tieneHijos}
             data-testid="confirmar-pasar-a-produccion"
           >
             {promover.isPending ? (

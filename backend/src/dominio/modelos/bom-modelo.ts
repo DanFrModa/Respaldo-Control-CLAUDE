@@ -57,7 +57,12 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
-import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
+import {
+  exigirRecetaPropia,
+  listarHijosDeDesarrollo,
+  resolverIdRecetaDeModelo,
+  type HijoDeDesarrollo,
+} from './receta-compartida.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { eliminarObjetosBestEffort, type ServicioArchivos } from '../../comun/archivos.js';
@@ -565,6 +570,19 @@ export type ModeloFicha = ModeloConRelaciones &
      * coincide con las tallas que piden sus órdenes. Uno por cada conjunto distinto. NUNCA bloquean.
      */
     avisosCurva: string[];
+    /**
+     * ⭐ 0.149 — **EL LINAJE HACIA ABAJO**: los modelos de PRODUCCIÓN que nacieron de este
+     * desarrollo (uno por color), ordenados por su nº de 5 dígitos. La dirección contraria —de qué
+     * desarrollo nació este modelo— ya viajaba en `codigoModeloDesarrollo`; ésta faltaba.
+     *
+     * Viaja SÓLO en la ficha: el listado son ~4,987 modelos y alimenta también la galería, así que
+     * ahí sólo va el CONTEO (`_count.modelosDeProduccion`).
+     *
+     * Vacía en todo lo que no es un desarrollo con hijos — incluidos los ~4,987 migrados del
+     * Access, que llevan el linaje en `NULL`. Vacía significa «no tiene», no «no se sabe»
+     * (REGLA 0-B): la pantalla no pinta la sección, en vez de pintar «0 modelos».
+     */
+    modelosDeProduccion: HijoDeDesarrollo[];
   };
 
 /**
@@ -586,14 +604,17 @@ export async function obtenerFichaModelo(
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  const [bom, tallasCurva, avisosCurva] = await Promise.all([
+  const [bom, tallasCurva, avisosCurva, modelosDeProduccion] = await Promise.all([
     leerBom(cliente, idModelo, sesion.idEmpresaActiva),
     leerTallasCurvaModelo(cliente, idModelo),
     // ⭐ V1-E3r: `idEmpresaActiva` NO es opcional aquí (A9) — cuenta ÓRDENES, y las órdenes son por
     // empresa aunque el catálogo de tallas sea global (ADR-0007).
     avisosDeCurvaDelModelo(cliente, idModelo, sesion.idEmpresaActiva),
+    // ⭐ 0.149 — los hijos del linaje, por la MISMA función que usa la guarda de «pasar a
+    // producción» (ver `receta-compartida.ts`). Sin `take`: la ficha los enseña todos.
+    listarHijosDeDesarrollo(cliente, idModelo),
   ]);
-  return { ...modelo, ...bom, tallasCurva, avisosCurva };
+  return { ...modelo, ...bom, tallasCurva, avisosCurva, modelosDeProduccion };
 }
 
 // ── Validación de componentes (existen y están activos) ────────────────────────

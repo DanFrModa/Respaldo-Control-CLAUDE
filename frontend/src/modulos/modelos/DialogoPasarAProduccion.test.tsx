@@ -32,6 +32,8 @@ function propuesta(
   numero: number | null,
   avisos: string[] = [],
   libres = 995,
+  // ⭐ 0.149 — el linaje HACIA ABAJO. Por defecto vacío: el caso normal es un desarrollo sin hijos.
+  codigosHijos: string[] = [],
 ): Record<string, unknown> {
   return {
     data: {
@@ -46,6 +48,8 @@ function propuesta(
       serieContinuada: false,
       avisos,
       yaEnProduccion: false,
+      tieneHijos: codigosHijos.length > 0,
+      codigosHijos,
     },
     isPending: false,
     isError: false,
@@ -161,6 +165,37 @@ describe('<DialogoPasarAProduccion>', () => {
     expect(aviso).toHaveTextContent('No hay vuelta atrás');
     // Y avisa SIN estorbar: el botón sigue disponible (no es una valla, es una advertencia).
     expect(screen.getByTestId('confirmar-pasar-a-produccion')).toBeEnabled();
+  });
+
+  /**
+   * ⭐⭐ 0.149 — El diálogo normalmente ni se abre en este caso (el botón desaparece), pero un
+   * deep-link, una pestaña vieja o un hijo que nació mientras el cajón estaba abierto llegan igual
+   * hasta aquí. Entonces el diálogo **deja de ofrecer** un número que el servidor tiene decidido
+   * rechazar: lo dice, nombra a los hijos, y apaga el botón.
+   */
+  it('⭐⭐ 0.149 · con modelos por color ya nacidos: lo dice, los NOMBRA y no deja confirmar', async () => {
+    propuestaMock.mockReturnValue(propuesta(71_003, [], 995, ['71001', '71002']));
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoPasarAProduccion abierto alCambiarAbierto={() => {}} modelo={modeloDesarrollo()} />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
+
+    const aviso = await screen.findByTestId('aviso-ya-tiene-modelos-por-color');
+    expect(aviso).toHaveTextContent('ya no se puede pasar a producción');
+    // Los NOMBRA: sin los códigos, el usuario no sabe qué mirar para entender el porqué.
+    expect(aviso).toHaveTextContent('71001, 71002');
+
+    // Y el ámbar de «esto le da UN número a todo el modelo» SE VA: ahí ya no es un inconveniente
+    // que se acepta, es un acto imposible. Dos mensajes contradictorios serían peor que ninguno.
+    expect(screen.queryByTestId('aviso-un-numero-para-todos-los-colores')).toBeNull();
+
+    // El botón queda apagado aunque el número tenga la forma correcta (llegó precargado).
+    expect(await screen.findByTestId('numero-produccion')).toHaveValue('71003');
+    const confirmar = screen.getByTestId('confirmar-pasar-a-produccion');
+    expect(confirmar).toBeDisabled();
+    await usuario.click(confirmar);
+    expect(promoverMutate).not.toHaveBeenCalled();
   });
 
   it('no deja confirmar un número que no tiene 5 dígitos', async () => {

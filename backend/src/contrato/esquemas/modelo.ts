@@ -809,6 +809,20 @@ export const esquemaModeloSalida = z
     llevaArte: esquemaLlevaArte,
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
+     * ⭐ 0.149 — **EL LINAJE HACIA ABAJO, en número**: cuántos modelos de PRODUCCIÓN nacieron de
+     * este desarrollo (uno por color). `0` en todo lo que no es un desarrollo con hijos, incluidos
+     * los migrados del Access.
+     *
+     * 🔴 Va en el LISTADO porque con esto la pantalla decide si enseña siquiera el botón «Pasar a
+     * producción» — un desarrollo que ya tiene hijos NO se puede promover, y el botón lo ofrecía
+     * igual. Sólo el NÚMERO: la LISTA de hijos se paga en la ficha (`modelosDeProduccion`), que el
+     * listado son ~4,987 modelos y alimenta también la galería.
+     */
+    numeroDeModelosDeProduccion: z
+      .number()
+      .int()
+      .describe('Cuántos modelos de producción nacieron de este desarrollo (0 si ninguno).'),
+    /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o
      * `null` si el modelo no tiene fotos. La resuelve el listado para que la galería pinte la
      * miniatura SIN una petición por celda (sin N+1). Vida corta: se regenera en cada listado.
@@ -861,6 +875,30 @@ export const esquemaModeloSalida = z
 /** Forma de un modelo (listado) tal como lo devuelve la API. */
 export type ModeloSalida = z.infer<typeof esquemaModeloSalida>;
 
+/**
+ * ⭐ 0.149 — Un HIJO del linaje: un modelo de PRODUCCIÓN nacido de un desarrollo, tal como lo
+ * enseña la ficha del padre. Lo mínimo para reconocerlo y para poder IR a él (`id`).
+ */
+export const esquemaModeloHijoLinajeSalida = z
+  .object({
+    id: z.number().int().describe('Id del modelo de producción (para navegar a su ficha).'),
+    codigo: z.string().describe('Código vigente del modelo de producción.'),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Nº de 5 dígitos del hijo, o null si aún no lo tiene.'),
+    /** `null` = el hijo NO es de un color (matriz MULTICOLOR): no es un dato que falte. */
+    idColor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del color del hijo, o null si es multicolor.'),
+    color: z.string().nullable().describe('Nombre del color del hijo, o null si es multicolor.'),
+    activo: z.boolean().describe('Falso si el hijo está descontinuado (se informa, no se oculta).'),
+  })
+  .describe('Modelo de producción nacido de un modelo de desarrollo.');
+
 /** Salida de la FICHA de un modelo: datos generales + BOM completo embebido. */
 export const esquemaModeloFichaSalida = esquemaModeloSalida
   .extend({
@@ -885,6 +923,18 @@ export const esquemaModeloFichaSalida = esquemaModeloSalida
     avisosCurva: z
       .array(z.string())
       .describe('Avisos de curva distinta contra las órdenes del modelo (no bloquean).'),
+    /**
+     * ⭐ 0.149 — **LOS HIJOS DEL LINAJE**: los modelos de PRODUCCIÓN nacidos de este desarrollo
+     * (uno por color), ordenados por su nº de 5 dígitos. La dirección contraria —de qué desarrollo
+     * nació este modelo— ya viajaba en `codigoModeloDesarrollo`; ésta es la que faltaba, y es la
+     * que contesta *«¿quiénes están leyendo esta receta?»* antes de tocarla.
+     *
+     * Vacía cuando no tiene (los migrados, los capturados a mano y los propios hijos). Vacía es
+     * «no tiene», no «no se sabe»: la pantalla NO pinta la sección, en vez de pintar «0».
+     */
+    modelosDeProduccion: z
+      .array(esquemaModeloHijoLinajeSalida)
+      .describe('Modelos de producción nacidos de este desarrollo (vacía si ninguno).'),
   })
   .describe('Ficha de un modelo con su receta (BOM) completa.');
 
@@ -985,6 +1035,19 @@ export const esquemaPropuestaProduccion = z
       .describe('true si se pasó a la serie de continuación del género (Caballero 1→5).'),
     avisos: z.array(z.string()).describe('Avisos para enseñar junto al campo (nunca bloquean).'),
     yaEnProduccion: z.boolean().describe('true si el modelo ya está en el catálogo de producción.'),
+    /**
+     * ⭐⭐ 0.149 — **true = el acto es IMPOSIBLE**: este desarrollo ya tiene modelos de producción
+     * nacidos de él, y promoverlo le daría un número MÁS a la misma prenda. Lo dice LA MISMA
+     * consulta que usa la guarda que lo rechaza (`listarHijosDeDesarrollo`), así que la propuesta y
+     * el servidor no pueden discrepar: `tieneHijos === true` ⟺ promover lanza conflicto.
+     */
+    tieneHijos: z
+      .boolean()
+      .describe('true si el desarrollo ya tiene modelos de producción (promoverlo se rechaza).'),
+    /** Los códigos de esos hijos, para NOMBRARLOS en vez de decir «no se puede». */
+    codigosHijos: z
+      .array(z.string())
+      .describe('Códigos de los modelos de producción nacidos de este desarrollo.'),
   })
   .describe('Propuesta de número de producción para un modelo de desarrollo.');
 

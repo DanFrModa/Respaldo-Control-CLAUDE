@@ -364,3 +364,73 @@ export async function exigirRecetaPropia(lector: Lector, idModelo: number): Prom
       `hay que cambiar es SÓLO este color, el cambio va en su ORDEN de producción, no en el modelo.`,
   );
 }
+
+/**
+ * ⭐ 0.149 — **EL LINAJE HACIA ABAJO**: los modelos de PRODUCCIÓN que nacieron de un desarrollo.
+ *
+ * Todo lo de arriba pregunta *«¿de quién es mi receta?»* — del hijo hacia el padre. Ésta es la
+ * pregunta contraria, *«¿quiénes leen la mía?»*, y es la consulta que el índice
+ * `@@index([idModeloDesarrollo])` de `schema.prisma` llevaba esperando desde que se creó (su
+ * comentario dice, con estas palabras, *«dame los modelos de producción de este desarrollo»*).
+ *
+ * 🔴 **Por qué vive AQUÍ y hay UNA sola, y no una por cada quien la necesita.** La usan dos cosas
+ * que TIENEN que coincidir:
+ *
+ *  1. la **guarda A** de `promoverAProduccionNucleo` (`nomenclatura.ts`), que RECHAZA promover un
+ *     desarrollo que ya tiene hijos, y
+ *  2. la **propuesta** que alimenta el botón «Pasar a producción» (`consultarPropuestaProduccion`),
+ *     que decide si ese botón se enseña siquiera.
+ *
+ * Si cada una consultara por su cuenta y divergieran —un `where` distinto, un filtro de `activo`
+ * en una y no en la otra—, el botón volvería a ofrecer exactamente lo que el servidor tiene
+ * decidido rechazar: **el defecto que esta fila vino a cerrar, reintroducido**. Una consulta, un
+ * criterio, y las dos preguntas se responden igual por construcción.
+ *
+ * ⚠️ **Sin filtro de `activo`, a propósito.** Un hijo descontinuado sigue siendo un número de
+ * catálogo gastado de la misma serie para la misma prenda: promover al padre le daría un segundo
+ * número igual. El `activo` viaja en la salida para que la pantalla lo pueda decir, no para
+ * esconder al hijo.
+ *
+ * ⚠️ Un hijo puede no tener color (`idColor` es nullable — el modelo MULTICOLOR), y en lo migrado
+ * del Access las DOS columnas del linaje van en `NULL`: ahí esta consulta devuelve `[]`, que es la
+ * respuesta correcta y no un dato que falte (REGLA 0-B).
+ *
+ * @param limite tope de filas. La guarda lo usa (5) porque sólo arma un mensaje; la ficha no, que
+ *   los quiere todos.
+ */
+export async function listarHijosDeDesarrollo(
+  lector: Lector,
+  idDesarrollo: number,
+  limite?: number,
+): Promise<HijoDeDesarrollo[]> {
+  return lector.modelo.findMany({
+    where: { idModeloDesarrollo: idDesarrollo },
+    orderBy: { numeroProduccion: 'asc' },
+    select: {
+      id: true,
+      codigo: true,
+      numeroProduccion: true,
+      idColor: true,
+      // El NOMBRE del color lo resuelve el servidor (un `select` de una columna por la PK de
+      // colores: no es un N+1). Si no, la pantalla tendría que paginar el catálogo entero de
+      // colores para traducir un id —y con una página corta traduciría de menos, en silencio.
+      color: { select: { nombre: true } },
+      activo: true,
+    },
+    ...(limite === undefined ? {} : { take: limite }),
+  });
+}
+
+/** Un modelo de PRODUCCIÓN nacido de un desarrollo, tal como lo devuelve {@link listarHijosDeDesarrollo}. */
+export interface HijoDeDesarrollo {
+  id: number;
+  codigo: string;
+  /** Nº de 5 dígitos del hijo, o `null` si aún no lo tiene. Es el criterio de orden. */
+  numeroProduccion: number | null;
+  /** Color del hijo, o `null` en el modelo MULTICOLOR. */
+  idColor: number | null;
+  /** El color, por su nombre (resuelto en servidor), o `null` si el hijo no es de un color. */
+  color: { nombre: string } | null;
+  /** Falso si el hijo está descontinuado. Se informa; NO filtra (ver el encabezado). */
+  activo: boolean;
+}

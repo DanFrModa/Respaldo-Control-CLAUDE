@@ -903,7 +903,22 @@ export function ModelosPagina(): React.JSX.Element {
                     <Pencil aria-hidden />
                     Editar
                   </Button>
-                  {seleccion.origen === 'desarrollo' ? (
+                  {/* ⭐⭐ 0.149 — El botón DESAPARECE cuando el desarrollo ya tiene modelos de
+                      producción nacidos de él: ahí promoverlo es un acto IMPOSIBLE —el servidor lo
+                      rechaza siempre (guarda A de `promoverAProduccionNucleo`)— y enseñarlo era
+                      ofrecer un número que ya estaba decidido negar. Era la pregunta literal de
+                      Daniel: *«me ofrece poner el 54003, ¿qué pasa si lo pongo?»*.
+
+                      🔑 Se decide con `numeroDeModelosDeProduccion`, que viaja en la fila DEL
+                      LISTADO y no en la ficha: `seleccion` es un renglón del listado y el botón se
+                      pinta antes de que exista ninguna ficha. Y lo cuenta el mismo linaje que lee
+                      la guarda, así que el botón no puede volver a discrepar del servidor.
+
+                      ⚠️ Sin hijos SÍ se deja, con su aviso ámbar: es el uso para el que se
+                      construyó (§Post-F9.34/§Post-F9.46). Retirarlo del todo es decisión de
+                      Daniel. */}
+                  {seleccion.origen === 'desarrollo' &&
+                  seleccion.numeroDeModelosDeProduccion === 0 ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -942,7 +957,14 @@ export function ModelosPagina(): React.JSX.Element {
         }
       >
         {seleccion !== null ? (
-          <DetalleModelo modelo={seleccion} puedeAdministrar={puedeAdministrar} />
+          <DetalleModelo
+            modelo={seleccion}
+            puedeAdministrar={puedeAdministrar}
+            alAbrirModelo={(id) => {
+              setIdAbrir(id);
+              setSeleccionId(id);
+            }}
+          />
         ) : errorFichaDeepLink !== null ? (
           <p className="text-sm text-destructive" role="alert">
             {errorFichaDeepLink.message}
@@ -1163,9 +1185,12 @@ function MatrizExistenciaModelo({
 function DetalleModelo({
   modelo,
   puedeAdministrar,
+  alAbrirModelo,
 }: {
   modelo: Modelo;
   puedeAdministrar: boolean;
+  /** ⭐ 0.149 — abrir OTRO modelo en este mismo cajón (el linaje hacia abajo es navegable). */
+  alAbrirModelo: (id: number) => void;
 }): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const ficha = useFichaModelo(modelo.id);
@@ -1247,6 +1272,57 @@ function DetalleModelo({
       {puedeVerInventario && celdasExistencia.length > 0 ? (
         <SeccionDetalle titulo="Matriz color × talla · existencia" icono={Grid3x3}>
           <MatrizExistenciaModelo celdas={celdasExistencia} />
+        </SeccionDetalle>
+      ) : null}
+
+      {/* ⭐⭐ 0.149 — **EL LINAJE HACIA ABAJO**. La dirección contraria —de qué desarrollo nació este
+          modelo— ya se veía (el letrero de `EditorBom` y la columna del Centro de Órdenes); ésta
+          faltaba, y es la que contesta *«¿quiénes están leyendo esta receta?»* ANTES de tocarla.
+          También es lo que explica, sin decirlo, por qué el botón «Pasar a producción» ya no está.
+
+          Sólo aparece cuando HAY hijos: en los ~4,987 modelos migrados del Access el linaje va en
+          `null`, y ahí la sección desaparece en vez de enseñar un «0 modelos» que no informa de
+          nada (REGLA 0-B: vacío es «no tiene», no «falta el dato»). */}
+      {ficha.data !== undefined && ficha.data.modelosDeProduccion.length > 0 ? (
+        <SeccionDetalle titulo="Modelos de producción de este desarrollo" icono={GitBranchIcon}>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Nacieron de este desarrollo, uno por color, y{' '}
+            <b className="font-medium text-foreground">comparten esta misma receta</b>: lo que se
+            edite aquí les llega a todos. Por eso este modelo ya no se puede pasar a producción — su
+            número no es suyo, es el de cada color.
+          </p>
+          <TablaDensa>
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead>Código</TablaDensaHead>
+                <TablaDensaHead>Color</TablaDensaHead>
+                <TablaDensaHead>Estado</TablaDensaHead>
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {ficha.data.modelosDeProduccion.map((hijo) => (
+                <TablaDensaFila key={hijo.id} data-testid="hijo-de-desarrollo">
+                  <TablaDensaCelda>
+                    <button
+                      type="button"
+                      className="mono underline underline-offset-2 hover:text-foreground"
+                      onClick={() => alAbrirModelo(hijo.id)}
+                    >
+                      {hijo.codigo}
+                    </button>
+                  </TablaDensaCelda>
+                  {/* `null` = el hijo NO es de un color (nació de una matriz MULTICOLOR): es un
+                      caso real del importador por Excel, no un dato que falte. */}
+                  <TablaDensaCelda>
+                    {hijo.color ?? <span className="text-muted-foreground">Multicolor</span>}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>
+                    <EstadoBadge activo={hijo.activo} />
+                  </TablaDensaCelda>
+                </TablaDensaFila>
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
         </SeccionDetalle>
       ) : null}
 

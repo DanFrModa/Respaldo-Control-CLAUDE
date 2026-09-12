@@ -257,6 +257,7 @@ function fichaBase(
     secuenciaEstampado: 'antes',
     llevaArte: true,
     cantidadFotos: 0,
+    numeroDeModelosDeProduccion: 0,
     urlFotoPrincipal: null,
     telaPrincipal: null,
     stockPt: null,
@@ -290,6 +291,7 @@ function fichaBase(
     artes,
     tallasCurva: [],
     avisosCurva: [],
+    modelosDeProduccion: [],
     ...extra,
   };
 }

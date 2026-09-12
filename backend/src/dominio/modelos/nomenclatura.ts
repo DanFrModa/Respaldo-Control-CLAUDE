@@ -67,6 +67,9 @@ import {
   crearModeloNucleo,
   type MarcaNomenclaturaModelo,
 } from './modelos.js';
+// ⭐ 0.149 — el linaje HACIA ABAJO (los hijos de un desarrollo) se pregunta en un solo sitio, para
+// que la guarda que RECHAZA promover y la propuesta que decide si se enseña el botón no diverjan.
+import { listarHijosDeDesarrollo } from './receta-compartida.js';
 
 /** Tope del consecutivo de un par concepto+género (Daniel: los otros 3 dígitos). */
 export const CONSECUTIVO_MAX = 999;
@@ -813,12 +816,12 @@ export async function promoverAProduccionNucleo(
   // Ver el encabezado: promoverlo le daría al padre un segundo número de la misma serie para la
   // MISMA prenda, y dejaría a sus hijos colgando de un padre que ya no es de desarrollo —lo único
   // que la base NO puede vigilar sola—.
-  const hijos = await tx.modelo.findMany({
-    where: { idModeloDesarrollo: idModelo },
-    orderBy: { numeroProduccion: 'asc' },
-    select: { codigo: true },
-    take: 5,
-  });
+  //
+  // ⭐ 0.149 — la consulta la hace `listarHijosDeDesarrollo` (`receta-compartida.ts`) y NO una
+  // consulta propia: la MISMA la usa `consultarPropuestaProduccion` para decidir si la pantalla
+  // enseña siquiera el botón. Si divergieran, el botón volvería a ofrecer lo que esto rechaza.
+  // El `5` es sólo para el mensaje (no se enumeran veinte códigos en un error).
+  const hijos = await listarHijosDeDesarrollo(tx, idModelo, 5);
   if (hijos.length > 0) {
     throw new ErrorConflicto(
       `El modelo "${modelo.codigo}" ya tiene modelos de producción nacidos de él por color ` +
@@ -1432,12 +1435,30 @@ function sinNulos<T extends Record<string, unknown>>(
  * Consulta (sin escribir) qué número propondría el sistema para un modelo — lo que la pantalla usa
  * para llegar con el campo YA LLENO. La propuesta es informativa hasta que se guarda: entre la
  * consulta y el guardado alguien pudo tomar ese número, y ahí `pasarAProduccion` avisa del choque.
+ *
+ * ⭐⭐ **0.149 — y además dice si el acto es IMPOSIBLE, que es lo que faltaba.** Devuelve
+ * `tieneHijos`/`codigosHijos` leídos con {@link listarHijosDeDesarrollo}, **la misma consulta** que
+ * usa la guarda A de {@link promoverAProduccionNucleo}. Antes de esto el sistema enseñaba el botón,
+ * abría el diálogo y precargaba un número que ya tenía decidido rechazar, y sólo lo decía al pulsar
+ * —*«me ofrece poner el 54003; ¿qué pasa si lo pongo?»*, Daniel—. Daño de datos no había ninguno
+ * (la guarda corre antes del lock, antes de proponer número y antes de la única escritura: cero
+ * escrituras y cero bitácora); el daño era de CONFIANZA, y se cierra aquí.
+ *
+ * 🔑 **La equivalencia es la garantía, y está probada:** para un mismo modelo,
+ * `tieneHijos === true` ⟺ promoverlo lanza `ErrorConflicto`. Lo sostiene que las dos preguntas
+ * salen de la misma función, no de dos consultas parecidas.
  */
 export async function consultarPropuestaProduccion(
   sesion: SesionUsuario,
   idModelo: number,
   bd?: ContextoBd,
-): Promise<PropuestaNumeroProduccion & { yaEnProduccion: boolean }> {
+): Promise<
+  PropuestaNumeroProduccion & {
+    yaEnProduccion: boolean;
+    tieneHijos: boolean;
+    codigosHijos: string[];
+  }
+> {
   verificarPermiso(sesion, 'modelos.ver');
   return enTransaccion(async (tx) => {
     const modelo = await tx.modelo.findUnique({
@@ -1456,6 +1477,14 @@ export async function consultarPropuestaProduccion(
     }
     const digitos = await digitosDelModelo(tx, modelo);
     const propuesta = await proponerNumeroProduccion(tx, digitos);
-    return { ...propuesta, yaEnProduccion: modelo.origen === 'produccion' };
+    // Sin `take`: el diálogo los NOMBRA, y decir "y 3 más" es justo lo que no ayuda a entender por
+    // qué no se puede. Son los colores de UN desarrollo, no una tabla.
+    const hijos = await listarHijosDeDesarrollo(tx, idModelo);
+    return {
+      ...propuesta,
+      yaEnProduccion: modelo.origen === 'produccion',
+      tieneHijos: hijos.length > 0,
+      codigosHijos: hijos.map((h) => h.codigo),
+    };
   }, bd);
 }
