@@ -26,6 +26,8 @@ import type {
   KardexTelaColor,
   KardexTelaColorQuery,
   KardexTelaQuery,
+  LotesTelaColor,
+  LotesTelaColorQuery,
   MovimientoAvio,
   MovimientoMaterialCancelar,
   MovimientoTela,
@@ -106,6 +108,14 @@ async function registrarConteoTelaColor(cuerpo: ConteoTelaColorCrear): Promise<C
 
 async function obtenerSaldosTelaColor(query: SaldosTelaColorQuery): Promise<SaldosTelaColor> {
   const { data, error } = await api.GET('/api/inventarios/telas/color/saldos', {
+    params: { query },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function obtenerLotesTelaColor(query: LotesTelaColorQuery): Promise<LotesTelaColor> {
+  const { data, error } = await api.GET('/api/inventarios/telas/color/lotes', {
     params: { query },
   });
   if (!data) throw new ErrorDeApi(error);
@@ -368,6 +378,25 @@ export function usePreviaSalidaTelaColor(
     // Mientras se recalcula, el aviso anterior sigue en pantalla: quitarlo y devolverlo hace que
     // el bloque parpadee cada vez que se agrega un renglón.
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * ⭐⭐ LOS LOTES DEL ALMACÉN DE ORIGEN (fila 0.146 — Daniel §Post-F9.205·1: *«está bien que decida el
+ * sistema pero que haya posibilidad de seleccionar otro si es que el cortador decide un lote
+ * específico»*). Qué lotes hay HOY del color en ese almacén y cuánto queda de cada uno, para que la
+ * captura del traspaso pueda escoger en vez de aceptar el FIFO.
+ *
+ * Apagada hasta que haya almacén y color: sin los dos no hay nada que preguntar. Los saldos los
+ * calcula y acota el SERVIDOR (A1) — aquí no se compara ni se suma nada.
+ */
+export function useLotesTelaColor(
+  query: LotesTelaColorQuery | undefined,
+): UseQueryResult<LotesTelaColor, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'telas-color', 'lotes', query],
+    queryFn: () => obtenerLotesTelaColor(query as LotesTelaColorQuery),
+    enabled: query !== undefined,
   });
 }
 

@@ -37,6 +37,12 @@ function hoy(): string {
  * traspaso de PT. Se guarda en las observaciones de las DOS patas y sale IMPRESO en la hoja que
  * acompaña la tela.
  *
+ * ⭐⭐ Fila 0.146 — **SE PUEDE ESCOGER EL LOTE** (Daniel §Post-F9.205·1: *«está bien que decida el
+ * sistema pero que haya posibilidad de seleccionar otro si es que el cortador decide un lote
+ * específico»*). La captura enseña los lotes que el almacén de ORIGEN tiene de ese color con su
+ * saldo; por omisión sigue mandando el FIFO de la 0.142 (el camino normal). Si el lote escogido no
+ * alcanza, el servidor RECHAZA el traspaso diciendo cuánto tiene: nunca lo completa con otro lote.
+ *
  * §Post-F9.38 — al guardar ofrece la HOJA DEL TRASPASO (el papel que acompaña la tela). NO es un
  * documento nuevo: imprime el folio que el traspaso YA tiene (Daniel: *"no debe de generar otro
  * folio de nada"*). Y no es la única vía: la REIMPRESIÓN vive en el kardex del color («Existencias
@@ -120,6 +126,9 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
           idTelaColor: r.idTelaColor,
           cantidad: r.cantidad,
           ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
+          // ⭐ Fila 0.146 — el lote SÓLO viaja si alguien lo escogió. Sin él manda el FIFO del
+          // servidor, que es el camino normal y no cambió.
+          ...(r.idPartida === undefined ? {} : { idPartida: r.idPartida }),
         })),
       },
       {
@@ -191,7 +200,22 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
               <SelectNativo
                 id="traspaso-color-origen"
                 value={idAlmacenOrigen}
-                onChange={(e) => setIdAlmacenOrigen(e.target.value)}
+                onChange={(e) => {
+                  // 🔴 Fila 0.146 — cambiar el ORIGEN invalida los lotes ya escogidos (son de otro
+                  // almacén): se vacía lo capturado en vez de mandar al servidor un lote que ese
+                  // almacén no tiene. Sin esto, un cambio de origen produciría un rechazo que la
+                  // persona no podría explicarse.
+                  if (
+                    e.target.value !== idAlmacenOrigen &&
+                    renglones.some((r) => r.idPartida !== undefined)
+                  ) {
+                    setRenglones([]);
+                    toast.info(
+                      'Se limpiaron los renglones: los lotes que elegiste son del almacén de origen anterior.',
+                    );
+                  }
+                  setIdAlmacenOrigen(e.target.value);
+                }}
                 disabled={!puedeMover}
                 data-testid="traspaso-color-origen"
               >
@@ -253,10 +277,14 @@ export function TraspasoTelaColorPagina(): React.JSX.Element {
             </FieldDescription>
           </Field>
 
+          {/* ⭐⭐ Fila 0.146 — con el ORIGEN elegido, la captura ofrece los LOTES que ese almacén
+              tiene de cada color (con su saldo) para escoger de cuál sale la tela. Mientras no haya
+              origen no se pasa nada: no hay anaquel del que listar. */}
           <CapturaRenglonesTelaColor
             renglones={renglones}
             onChange={setRenglones}
             soloLectura={!puedeMover}
+            idAlmacenLotesOrigen={idAlmacenOrigen === '' ? undefined : Number(idAlmacenOrigen)}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">

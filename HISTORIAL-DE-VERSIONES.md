@@ -71,6 +71,33 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.151 · 12-sep-2026 · **en prueba** — **Al traspasar tela ya se puede elegir el lote a mano**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver los lotes que hay en el almacén de origen, con cuánto queda de cada uno, y escoger el que se
+  va a mover.** Hasta hoy el sistema decidía solo, siempre el más viejo. Si el cortador iba por un lote
+  concreto, no había manera de decírselo.
+- **Y se puede seguir dejando que decida el sistema**: es la primera opción de la lista y sigue siendo
+  lo que pasa si no se toca nada.
+
+### Qué cambió y puede sorprender
+
+- **Si el lote que eliges no alcanza para la cantidad, el sistema NO lo completa con otro lote: te
+  frena y te dice cuánto tiene ese lote.** Completar por detrás habría dejado tela mezclada sin que
+  nadie se enterara, que es peor que el aviso.
+- **La salida en ese caso es hacer otro traspaso** para el resto. Meter dos renglones del mismo color
+  en el mismo traspaso está bloqueado, con aviso.
+- **La lista de lotes enseña lo que el guardado va a aceptar de verdad**, no un número mayor. Esto es
+  menos obvio de lo que parece y fue un arreglo real: el saldo por lote venía **inflado**, porque las
+  salidas a una orden no dicen de qué lote salieron.
+
+### Qué sigue pendiente o roto
+
+- Nada nuevo. Quien no toque el selector trabaja exactamente como hasta ahora.
+
+---
+
 ## 0.150 · 12-sep-2026 · **en prueba** — **De un modelo de desarrollo ya se ve qué salió de él, y el botón deja de ofrecer lo imposible**
 
 ### Qué se puede hacer ahora que antes no

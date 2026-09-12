@@ -44,6 +44,8 @@
  *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
  *  • `GET  /inventarios/telas/color/kardex`          (`inventario-telas.ver`)   → kardex por color (2 componentes).
+ *  • `GET  /inventarios/telas/color/lotes`           (`inventario-telas.ver`)   → lotes CON SALDO del
+ *    almacén de origen de un color, para escoger de cuál sale la tela del traspaso (fila 0.146).
  *  • `GET  /inventarios/telas/partidas`              (`inventario-telas.ver`)   → búsqueda de partidas.
  *  • `GET  /inventarios/telas/traspasos/:id/impreso` (`inventario-telas.ver`)   → hoja del traspaso (PDF).
  *
@@ -60,6 +62,8 @@ import {
   esquemaKardexTelaQuery,
   esquemaKardexTelaLista,
   esquemaAjusteTelaColorCrear,
+  esquemaLotesTelaColorQuery,
+  esquemaLotesTelaColorSalida,
   esquemaSaldosTelaColorQuery,
   esquemaSaldosTelaColorSalida,
   esquemaConteoTelaColorCrear,
@@ -98,6 +102,7 @@ import {
   registrarConteoTelaColor,
   registrarSalidaTelaColorAOrden,
   registrarSalidaTelaColorSinOrden,
+  lotesTelaColorEnAlmacen,
   saldosTelaColorParaConteo,
   traspasarTelaColor,
 } from '../../dominio/inventarios/partidas-telas.js';
@@ -316,6 +321,29 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const movimiento = await registrarSalidaTelaColorSinOrden(sesion, request.body);
       return reply.code(201).send(movimiento);
+    },
+  });
+
+  // ── ⭐⭐ LOS LOTES DEL ORIGEN, PARA ESCOGER UNO (fila 0.146) ─────────────────
+  // Daniel §Post-F9.205·1: *«está bien que decida el sistema pero que haya posibilidad de
+  // seleccionar otro si es que el cortador decide un lote específico»*. Es SOLO LECTURA: enseña qué
+  // lotes hay HOY en el almacén de ORIGEN de un color y cuánto queda de cada uno (Σ de movimientos,
+  // acotada a la existencia real — el MISMO tope con el que el traspaso mide lo elegido). Va con
+  // `inventario-telas.ver` como las demás lecturas de tela; quien captura el traspaso lo tiene.
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/color/lotes',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Lotes con saldo de un color en un almacén (para escoger de cuál sale la tela)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaLotesTelaColorQuery,
+      response: { 200: esquemaLotesTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return lotesTelaColorEnAlmacen(sesion, request.query);
     },
   });
 

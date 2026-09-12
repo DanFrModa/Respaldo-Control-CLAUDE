@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { useLotesTelaColor } from '@/api/inventario-materiales';
 import { useTela, type Tela } from '@/api/telas';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -30,6 +31,13 @@ export interface RenglonTelaColor {
   cantidadComplemento: number;
   /** Número de lote del PROVEEDOR (solo entradas — dato de la partida). */
   loteProveedor?: string;
+  /**
+   * ⭐ Fila 0.146 — LOTE DEL ORIGEN que la persona escogió (sólo el TRASPASO, con
+   * `idAlmacenLotesOrigen`). Sin él manda el FIFO del servidor, que es el camino normal.
+   */
+  idPartida?: number;
+  /** Cómo se llama ese lote en pantalla ("Folio 12 · L-880"). Sólo para enseñarlo en la tabla. */
+  loteEtiqueta?: string;
   /** Precio por unidad del CUERPO (solo con `conPrecios`; viaja al kardex como costo, D1). */
   precioUnit?: number;
   /** Precio por unidad del COMPLEMENTO (solo con `conPrecios`; vive en el documento). */
@@ -137,6 +145,17 @@ function textoDeLaSalida(hayOfrecidos: boolean, estado: EstadoPendientesOc): str
 }
 
 /**
+ * ⭐ Fila 0.146 — cómo se nombra un lote en pantalla. El FOLIO manda (es lo que el sistema conoce y
+ * lo que sale impreso en la hoja del traspaso) y el lote del proveedor va detrás cuando existe,
+ * porque es lo que está escrito en el rollo que alguien tiene enfrente.
+ */
+function etiquetaLote(l: { folio: number; loteProveedor: string | null }): string {
+  return l.loteProveedor === null
+    ? `Folio ${String(l.folio)}`
+    : `Folio ${String(l.folio)} · ${l.loteProveedor}`;
+}
+
+/**
  * CAPTURA DE RENGLONES por TELA+COLOR (inventario NUEVO, etapa A2): el usuario elige la tela
  * (typeahead server-side), luego UNO de SUS colores (hijos de la tela, §Post-F9.11) y las DOS
  * cantidades — cuerpo y complemento — que viajan JUNTAS en el mismo renglón (Daniel: el
@@ -163,6 +182,7 @@ export function CapturaRenglonesTelaColor({
   soloLectura = false,
   conLoteProveedor = false,
   conPrecios = false,
+  idAlmacenLotesOrigen,
   lineasOc,
   idProveedorTelas,
   exigirOrdenCompra = false,
@@ -174,6 +194,16 @@ export function CapturaRenglonesTelaColor({
   conLoteProveedor?: boolean;
   /** Muestra y captura los precios unitarios de cuerpo y complemento (B1). */
   conPrecios?: boolean;
+  /**
+   * ⭐⭐ Fila 0.146 — almacén de ORIGEN del TRASPASO. Con él, la captura ofrece los LOTES que ese
+   * almacén tiene de ese color (con su saldo) para escoger de cuál sale la tela; `undefined` = esta
+   * pantalla no elige lote (ajuste, salida, entrada) y el campo ni aparece.
+   *
+   * Daniel §Post-F9.205·1: *«está bien que decida el sistema **pero que haya posibilidad de
+   * seleccionar otro si es que el cortador decide un lote específico**»*. Por eso la opción por
+   * omisión es «que lo decida el sistema»: escoger es la excepción, no el trámite.
+   */
+  idAlmacenLotesOrigen?: number | undefined;
   /**
    * Renglones de OC PENDIENTES de recibir (§Post-F9.14, replanteado en §Post-F9.15). `undefined` =
    * esta pantalla no liga a órdenes de compra (ajuste, traspaso, salida). Con un arreglo se pinta el
@@ -207,6 +237,13 @@ export function CapturaRenglonesTelaColor({
   const [precioUnit, setPrecioUnit] = useState<string>('');
   const [precioComplemento, setPrecioComplemento] = useState<string>('');
   const [idLineaOc, setIdLineaOc] = useState<string>('');
+  /** ⭐ Fila 0.146 — lote del ORIGEN escogido a mano; `''` = que lo decida el sistema (FIFO). */
+  const [idPartida, setIdPartida] = useState<string>('');
+  /**
+   * Por qué NO se pudo agregar el renglón. Hoy sólo lo enciende un caso: el color ya capturado
+   * cuando alguno de los dos renglones nombra un lote (ver {@link agregar}).
+   */
+  const [avisoCaptura, setAvisoCaptura] = useState<string>('');
   /**
    * Renglón de OC cuyo "Capturar" se acaba de pulsar: se guarda mientras llega la tela por su id
    * (`useTela` trae sus colores, que el buscador paginado podría no tener a mano). En cuanto llega,
@@ -214,6 +251,16 @@ export function CapturaRenglonesTelaColor({
    */
   const [pendientePrecargando, setPendientePrecargando] = useState<LineaOcPendiente | null>(null);
   const telaPrecargada = useTela(pendientePrecargando?.idTela);
+
+  // ⭐⭐ Fila 0.146 — los LOTES que el almacén de origen tiene de ESTE color, con su saldo. Apagada
+  // mientras no haya las dos cosas; el servidor los acota a la existencia real (A1: aquí no se
+  // compara nada, sólo se pintan).
+  const lotesOrigen = useLotesTelaColor(
+    idAlmacenLotesOrigen !== undefined && idTelaColor !== ''
+      ? { idAlmacen: idAlmacenLotesOrigen, idTelaColor: Number(idTelaColor) }
+      : undefined,
+  );
+  const lotes = lotesOrigen.data?.lotes ?? [];
 
   /**
    * 🔴 §Post-F9.159(a) — el renglón que se está armando NO viene de ninguna orden de compra. En la
@@ -241,6 +288,9 @@ export function CapturaRenglonesTelaColor({
   function elegirTela(t: Tela): void {
     setTela(t);
     setIdTelaColor('');
+    // El lote es de UN color concreto: cambiar de tela lo deja sin sentido.
+    setIdPartida('');
+    setAvisoCaptura('');
     setCantidadComplemento('');
     setPrecioUnit('');
     setPrecioComplemento('');
@@ -252,6 +302,10 @@ export function CapturaRenglonesTelaColor({
    */
   function elegirColor(valor: string): void {
     setIdTelaColor(valor);
+    // Un lote pertenece al color que lo trajo: al cambiar de color se vuelve a «lo decide el
+    // sistema» en vez de arrastrar una elección que ya no existe en la lista nueva.
+    setIdPartida('');
+    setAvisoCaptura('');
     if (!conPrecios) return;
     const color = tela?.colores.find((c) => String(c.id) === valor);
     setPrecioUnit(color?.precio == null ? '' : String(color.precio));
@@ -299,6 +353,7 @@ export function CapturaRenglonesTelaColor({
     // §Post-F9.159(a): el botón ya está apagado en este caso; esto es el cinturón, para que un
     // Enter o un cambio futuro del `disabled` no cuele un renglón que el servidor va a rechazar.
     if (renglonSinOrdenDeCompra) return;
+    const loteElegido = lotes.find((l) => String(l.idPartida) === idPartida);
     const precioCuerpoNum = precioUnit === '' ? undefined : Number(precioUnit);
     const precioComplNum = precioComplemento === '' ? undefined : Number(precioComplemento);
     const nuevo: RenglonTelaColor = {
@@ -321,6 +376,9 @@ export function CapturaRenglonesTelaColor({
         ? { precioUnitComplemento: precioComplNum }
         : {}),
       ...(idLineaOc === '' ? {} : { idOrdenCompraLinea: Number(idLineaOc) }),
+      ...(loteElegido === undefined
+        ? {}
+        : { idPartida: loteElegido.idPartida, loteEtiqueta: etiquetaLote(loteElegido) }),
     };
     if (conLoteProveedor) {
       // ENTRADA: el MISMO tela+color PUEDE repetirse — una factura con dos lotes del mismo color
@@ -331,6 +389,19 @@ export function CapturaRenglonesTelaColor({
       // SALIDA/TRASPASO: sin partida no hay qué distinga dos renglones del mismo color — si ya
       // está, se SUMAN las cantidades (el backend rechaza el color duplicado).
       const previo = renglones.find((r) => r.idTelaColor === colorElegido.id);
+      // 🔴 Fila 0.146 — PERO SI ALGUNO DE LOS DOS NOMBRA UN LOTE, NO SE FUSIONAN. Sumarlos
+      // obligaría a que el renglón resultante nombrara UN solo lote para tela que salió de dos: o
+      // se pierde la elección anterior, o se le cuelga a un lote tela que no es suya. Las dos
+      // cosas producirían el mismo daño que esta fila viene a evitar — un papel que nombra un lote
+      // equivocado — así que el renglón no se agrega y la pantalla dice por qué.
+      if (previo !== undefined && (previo.idPartida !== undefined || loteElegido !== undefined)) {
+        setAvisoCaptura(
+          `«${colorElegido.nombre}» ya está capturado en este traspaso. Un renglón sólo puede ` +
+            `salir de UN lote: quita el renglón anterior y vuelve a capturarlo con la cantidad ` +
+            `total, o haz otro traspaso para el otro lote.`,
+        );
+        return;
+      }
       const sinDuplicado = renglones.filter((r) => r.idTelaColor !== colorElegido.id);
       onChange([
         ...sinDuplicado,
@@ -349,6 +420,8 @@ export function CapturaRenglonesTelaColor({
     setPrecioUnit('');
     setPrecioComplemento('');
     setIdLineaOc('');
+    setIdPartida('');
+    setAvisoCaptura('');
   }
 
   function quitar(indice: number): void {
@@ -526,6 +599,58 @@ export function CapturaRenglonesTelaColor({
                 />
               </Field>
             ) : null}
+            {idAlmacenLotesOrigen !== undefined ? (
+              <Field>
+                <FieldLabel htmlFor="captura-color-lote-origen">Lote del origen</FieldLabel>
+                <SelectNativo
+                  id="captura-color-lote-origen"
+                  value={idPartida}
+                  onChange={(e) => {
+                    setIdPartida(e.target.value);
+                    setAvisoCaptura('');
+                  }}
+                  disabled={soloLectura || lotes.length === 0}
+                  data-testid="captura-color-lote-origen"
+                >
+                  {/* 🔴 La opción por omisión va PRIMERO y es la de siempre: el sistema reparte
+                      FIFO. Escoger es la excepción (Daniel §Post-F9.205·1), no el trámite. */}
+                  <option value="">Que lo decida el sistema (el más viejo primero)</option>
+                  {lotes.map((l) => (
+                    <option key={l.idPartida} value={String(l.idPartida)}>
+                      {etiquetaLote(l)} · quedan {l.cuerpo.toLocaleString('es-MX')}
+                      {lotesOrigen.data?.nombreComplemento === null
+                        ? ''
+                        : ` + ${l.complemento.toLocaleString('es-MX')} de ${String(
+                            lotesOrigen.data?.nombreComplemento ?? '',
+                          ).toLowerCase()}`}
+                    </option>
+                  ))}
+                </SelectNativo>
+                {/* Lo que se dice cuando NO hay nada que escoger se separa por SU disparador: sin
+                    color no se ha preguntado nada; con color y lista vacía, la respuesta es que
+                    esa tela no trae lote — y entonces el traspaso la mueve igual, sin nombre. */}
+                {idTelaColor === '' ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Elige el color para ver los lotes que hay en el almacén de origen.
+                  </p>
+                ) : lotesOrigen.isPending ? (
+                  <p className="text-[11px] text-muted-foreground">Consultando los lotes…</p>
+                ) : lotesOrigen.isError ? (
+                  <p className="text-[11px] text-warn" data-testid="captura-color-lotes-error">
+                    No se pudieron consultar los lotes del origen. El traspaso se puede registrar
+                    igual: lo repartirá el sistema.
+                  </p>
+                ) : lotes.length === 0 ? (
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="captura-color-sin-lotes"
+                  >
+                    En el almacén de origen no hay lotes con saldo de este color: la tela se
+                    traspasa sin nombre de lote.
+                  </p>
+                ) : null}
+              </Field>
+            ) : null}
             {conLoteProveedor ? (
               <Field>
                 <FieldLabel htmlFor="captura-color-lote-prov">Lote del proveedor</FieldLabel>
@@ -599,6 +724,11 @@ export function CapturaRenglonesTelaColor({
             {textoDeLaSalida(hayOfrecidos, estadoPendientesOc)}
           </p>
         ) : null}
+        {avisoCaptura !== '' ? (
+          <p className="text-xs text-warn" data-testid="captura-color-aviso">
+            {avisoCaptura}
+          </p>
+        ) : null}
         <Button
           type="button"
           variant="secondary"
@@ -631,6 +761,7 @@ export function CapturaRenglonesTelaColor({
                   <TableHead className="text-right">Complemento</TableHead>
                 ) : null}
                 {conLoteProveedor ? <TableHead>Lote prov.</TableHead> : null}
+                {idAlmacenLotesOrigen !== undefined ? <TableHead>Lote del origen</TableHead> : null}
                 {lineasOc !== undefined || exigirOrdenCompra ? (
                   <TableHead>Orden de compra</TableHead>
                 ) : null}
@@ -658,6 +789,13 @@ export function CapturaRenglonesTelaColor({
                   {conLoteProveedor ? (
                     <TableCell className="text-xs text-muted-foreground">
                       {r.loteProveedor ?? '—'}
+                    </TableCell>
+                  ) : null}
+                  {idAlmacenLotesOrigen !== undefined ? (
+                    <TableCell className="text-xs text-muted-foreground">
+                      {/* Sin elección NO se escribe «—»: el renglón SÍ va a llevar lote, sólo que
+                          lo escoge el servidor. Un guion haría creer que la tela viaja anónima. */}
+                      {r.loteEtiqueta ?? 'Lo decide el sistema'}
                     </TableCell>
                   ) : null}
                   {lineasOc !== undefined || exigirOrdenCompra ? (
