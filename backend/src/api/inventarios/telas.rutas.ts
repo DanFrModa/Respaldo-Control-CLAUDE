@@ -43,6 +43,8 @@
  *  • `POST /inventarios/telas/color/traspasos`       (`inventario-telas.mover`) → traspaso (2 patas, ambas cantidades).
  *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
  *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
+ *  • `PUT  /inventarios/telas/color/ubicacion`       (`inventario-telas.mover`) → ⭐ DÓNDE está
+ *    guardado ese color en ese almacén (texto libre, fila 0.103). Vacío = borrar la ubicación.
  *  • `GET  /inventarios/telas/color/kardex`          (`inventario-telas.ver`)   → kardex por color (2 componentes).
  *  • `GET  /inventarios/telas/color/lotes`           (`inventario-telas.ver`)   → lotes CON SALDO del
  *    almacén de origen de un color, para escoger de cuál sale la tela del traspaso (fila 0.146).
@@ -75,6 +77,8 @@ import {
   esquemaTraspasoTelaColorSalida,
   esquemaExistenciasTelaColorQuery,
   esquemaExistenciasTelaColorLista,
+  esquemaUbicacionTelaColorFijar,
+  esquemaUbicacionMaterialSalida,
   esquemaKardexTelaColorQuery,
   esquemaKardexTelaColorLista,
   esquemaPartidasTelaQuery,
@@ -107,6 +111,7 @@ import {
   traspasarTelaColor,
 } from '../../dominio/inventarios/partidas-telas.js';
 import { previaSalidaTelaColorAOrden } from '../../dominio/inventarios/previa-salida-tela-orden.js';
+import { fijarUbicacionTelaColor } from '../../dominio/inventarios/ubicaciones.js';
 
 const respuestasError = {
   400: esquemaErrorApi,
@@ -402,6 +407,26 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return consultarExistenciasTelaColor(sesion, request.query);
+    },
+  });
+
+  // ── ⭐ Ubicación física del color dentro del almacén (fila 0.103) ────────────
+  // NO es un movimiento (no toca el kardex, D3 intacto): es una NOTA editable de dónde está la
+  // mercancía, por eso es PUT y por eso se puede borrar. Se lee pegada al renglón de existencias.
+  app.route({
+    method: 'PUT',
+    url: '/inventarios/telas/color/ubicacion',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Fija dónde está guardado un color de tela en un almacén (vacío = borra)',
+      security: SEGURIDAD_SESION,
+      body: esquemaUbicacionTelaColorFijar,
+      response: { 200: esquemaUbicacionMaterialSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return fijarUbicacionTelaColor(sesion, request.body);
     },
   });
 

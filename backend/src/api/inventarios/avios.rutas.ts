@@ -13,8 +13,11 @@
  *  • `POST /inventarios/avios/movimientos/:id/cancelar` (`inventario-avios.mover`) → inverso auditado.
  *  • `GET  /inventarios/avios/existencias`           (`inventario-avios.ver`)   → existencias multi-almacén (vista).
  *  • `GET  /inventarios/avios/kardex`                (`inventario-avios.ver`)   → kardex por avío.
+ *  • `PUT  /inventarios/avios/ubicacion`             (`inventario-avios.mover`) → ⭐ DÓNDE está
+ *    guardado ese avío en ese almacén (texto libre, fila 0.103). Vacío = borrar la ubicación.
  *
- * NINGÚN endpoint edita/borra existencias (D3).
+ * NINGÚN endpoint edita/borra existencias (D3) — y la ubicación de la fila 0.103 TAMPOCO: es una
+ * nota de dónde está la mercancía, no un movimiento.
  */
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
@@ -27,6 +30,8 @@ import {
   esquemaTraspasoAvioSalida,
   esquemaExistenciasAvioQuery,
   esquemaExistenciasAvioLista,
+  esquemaUbicacionAvioFijar,
+  esquemaUbicacionMaterialSalida,
   esquemaKardexAvioQuery,
   esquemaKardexAvioLista,
   esquemaParamIdMaterial,
@@ -42,6 +47,7 @@ import {
   registrarSalidaAvioSinOrden,
   traspasarAvio,
 } from '../../dominio/inventarios/avios.js';
+import { fijarUbicacionAvio } from '../../dominio/inventarios/ubicaciones.js';
 
 const respuestasError = {
   400: esquemaErrorApi,
@@ -158,6 +164,26 @@ export const rutasInventarioAvios: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return consultarExistenciasAvio(sesion, request.query);
+    },
+  });
+
+  // ── ⭐ Ubicación física del avío dentro del almacén (fila 0.103) ─────────────
+  // NO es un movimiento (no toca el kardex, D3 intacto): es una NOTA editable de dónde está la
+  // mercancía, por eso es PUT y por eso se puede borrar. Se lee pegada al renglón de existencias.
+  app.route({
+    method: 'PUT',
+    url: '/inventarios/avios/ubicacion',
+    preHandler: app.conPermiso('inventario-avios.mover'),
+    schema: {
+      tags: ['inventario-avios'],
+      summary: 'Fija dónde está guardado un avío en un almacén (vacío = borra)',
+      security: SEGURIDAD_SESION,
+      body: esquemaUbicacionAvioFijar,
+      response: { 200: esquemaUbicacionMaterialSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return fijarUbicacionAvio(sesion, request.body);
     },
   });
 

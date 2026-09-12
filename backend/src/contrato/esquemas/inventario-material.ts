@@ -895,6 +895,74 @@ export const esquemaConteoTelaColorSalida = z
 /** Forma del resultado de un conteo por color. */
 export type ConteoTelaColorSalida = z.infer<typeof esquemaConteoTelaColorSalida>;
 
+// ── ⭐⭐ FILA 0.103 · DÓNDE ESTÁ GUARDADO EL MATERIAL (ubicación física por artículo × almacén) ────
+
+/**
+ * Tope del texto LIBRE de la ubicación. Daniel (3-sep-2026) cerró la fila con *«de texto libre está
+ * bien. Por ahora NO un catálogo de posiciones»*, así que aquí NO se valida formato: sólo se recorta
+ * el espacio sobrante y se pone un techo para que quepa en la celda de la tabla y nadie pegue un
+ * párrafo. Caben de sobra las formas que usa el almacén ("Rack 4, nivel 2 · pasillo B").
+ */
+const LARGO_MAX_UBICACION = 120;
+
+/**
+ * La ubicación TAL COMO VIAJA EN LAS CONSULTAS de existencias: `null` = NO ANOTADA. No es lo mismo
+ * que la cadena vacía — el dominio nunca guarda una: vaciar el campo BORRA la fila (ver
+ * `dominio/inventarios/ubicaciones.ts`), de modo que "no hay fila" y "no hay ubicación" son el
+ * mismo hecho y no hay dos maneras de decir lo mismo.
+ */
+const UBICACION_MATERIAL_SALIDA = z
+  .string()
+  .nullable()
+  .describe('Dónde está guardado el material en ESE almacén (texto libre); null = no anotada.');
+
+/** Texto de captura: se recorta y se topa; vacío = BORRAR la ubicación (no se guarda ''). */
+const esquemaTextoUbicacion = z
+  .string()
+  .trim()
+  .max(LARGO_MAX_UBICACION)
+  .describe(
+    `Dónde está guardado (texto libre, máx. ${String(LARGO_MAX_UBICACION)}). Vacío = borrar la ubicación.`,
+  );
+
+/** Cuerpo de "fijar la ubicación" de un COLOR DE TELA en un almacén (fila 0.103). */
+export const esquemaUbicacionTelaColorFijar = z
+  .object({
+    idTelaColor: z.number().int().positive(),
+    idAlmacen: z.number().int().positive(),
+    ubicacion: esquemaTextoUbicacion,
+  })
+  .describe('Ubicación física de un color de tela dentro de un almacén.');
+
+/** Datos de captura de la ubicación de un color de tela. */
+export type DatosUbicacionTelaColorFijar = z.infer<typeof esquemaUbicacionTelaColorFijar>;
+
+/** Cuerpo de "fijar la ubicación" de un AVÍO en un almacén (fila 0.103). */
+export const esquemaUbicacionAvioFijar = z
+  .object({
+    idAvio: z.number().int().positive(),
+    idAlmacen: z.number().int().positive(),
+    ubicacion: esquemaTextoUbicacion,
+  })
+  .describe('Ubicación física de un avío dentro de un almacén.');
+
+/** Datos de captura de la ubicación de un avío. */
+export type DatosUbicacionAvioFijar = z.infer<typeof esquemaUbicacionAvioFijar>;
+
+/**
+ * Lo que contesta el servidor tras fijar/borrar una ubicación: el almacén y el texto ya normalizado
+ * (`null` si se borró). La UI lo pinta tal cual en vez de re-adivinar lo que capturó el usuario.
+ */
+export const esquemaUbicacionMaterialSalida = z
+  .object({
+    idAlmacen: z.number().int(),
+    ubicacion: UBICACION_MATERIAL_SALIDA,
+  })
+  .describe('Ubicación ya guardada (null = quedó sin ubicación).');
+
+/** Forma de la respuesta de fijar una ubicación. */
+export type UbicacionMaterialSalida = z.infer<typeof esquemaUbicacionMaterialSalida>;
+
 // ── Existencias por COLOR (agrupadas TELA PADRE → colores hijos) ─────────────────────────────────
 
 /** Filtros de la consulta de existencias por color (querystring). */
@@ -927,6 +995,7 @@ const esquemaExistenciaColorAlmacen = z.object({
   almacen: z.string(),
   cuerpo: z.number().describe('Existencia del cuerpo en este almacén (Σ, D3).'),
   complemento: z.number().describe('Existencia del complemento en este almacén (Σ, D3).'),
+  ubicacion: UBICACION_MATERIAL_SALIDA,
 });
 
 /** Un COLOR (hijo) con su existencia total y el desglose por almacén. */
@@ -1513,6 +1582,7 @@ const esquemaExistenciaAvioFila = z.object({
   idAlmacen: z.number().int(),
   almacen: z.string(),
   existencia: z.number().describe('Existencia actual (Σ de movimientos, D3).'),
+  ubicacion: UBICACION_MATERIAL_SALIDA,
 });
 
 /** Una fila de existencia de avío tal como la devuelve la API. */

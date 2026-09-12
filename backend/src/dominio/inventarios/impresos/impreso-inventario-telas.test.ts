@@ -41,8 +41,14 @@ const listaFake: ExistenciasTelaColorLista = {
           existenciaCuerpo: 130,
           existenciaComplemento: 45,
           almacenes: [
-            { idAlmacen: 5, almacen: 'Bodega A', cuerpo: 100, complemento: 40 },
-            { idAlmacen: 6, almacen: 'Bodega B', cuerpo: 30, complemento: 5 },
+            {
+              idAlmacen: 5,
+              almacen: 'Bodega A',
+              cuerpo: 100,
+              complemento: 40,
+              ubicacion: 'Rack 4',
+            },
+            { idAlmacen: 6, almacen: 'Bodega B', cuerpo: 30, complemento: 5, ubicacion: null },
           ],
         },
       ],
@@ -67,7 +73,9 @@ const listaFake: ExistenciasTelaColorLista = {
           pantone: null,
           existenciaCuerpo: 7,
           existenciaComplemento: 0,
-          almacenes: [{ idAlmacen: 5, almacen: 'Bodega A', cuerpo: 7, complemento: 0 }],
+          almacenes: [
+            { idAlmacen: 5, almacen: 'Bodega A', cuerpo: 7, complemento: 0, ubicacion: null },
+          ],
         },
       ],
     },
@@ -167,7 +175,9 @@ describe('impreso inventario de telas (R9, inventario VIGENTE por color)', () =>
             pantone: null,
             existenciaCuerpo: 1,
             existenciaComplemento: 0,
-            almacenes: [{ idAlmacen: 1, almacen: 'Bodega', cuerpo: 1, complemento: 0 }],
+            almacenes: [
+              { idAlmacen: 1, almacen: 'Bodega', cuerpo: 1, complemento: 0, ubicacion: null },
+            ],
           },
         ],
       })),

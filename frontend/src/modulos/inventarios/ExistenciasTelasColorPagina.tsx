@@ -8,6 +8,7 @@ import {
   urlImpresoTraspasoTela,
   useCancelarTelaColor,
   useExistenciasTelaColor,
+  useFijarUbicacionTelaColor,
   useKardexTelaColor,
   usePartidasTela,
 } from '@/api/inventario-materiales';
@@ -37,6 +38,7 @@ import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
+import { BotonUbicacion, DialogoUbicacionMaterial } from './DialogoUbicacionMaterial';
 import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 
 /** Valor del filtro que significa "todos". */
@@ -45,6 +47,19 @@ const TODOS = 'TODOS';
 /** Formatea una cantidad con separador local. */
 function num(valor: number): string {
   return valor.toLocaleString('es-MX');
+}
+
+/**
+ * ⭐⭐ FILA 0.103 — el renglón COLOR×ALMACÉN cuyo «dónde está guardado» se está editando. Lleva ya
+ * resuelto lo que el diálogo necesita pintar, para que éste no tenga que volver a buscar nada.
+ */
+export interface UbicacionEnEdicion {
+  idTelaColor: number;
+  idAlmacen: number;
+  /** "Felpa · Marino", en palabras del almacén. */
+  material: string;
+  almacen: string;
+  ubicacion: string | null;
 }
 
 /** El color elegido para el cajón de kardex (con el contexto de su tela padre). */
@@ -82,6 +97,11 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
   const [incluirCeros, setIncluirCeros] = useState(false);
   const [colapsadas, setColapsadas] = useState<Set<number>>(new Set());
   const [colorKardex, setColorKardex] = useState<ColorKardex | undefined>(undefined);
+  /** ⭐⭐ Fila 0.103 — el renglón color×almacén que se está ubicando (null = nadie). */
+  const [ubicando, setUbicando] = useState<UbicacionEnEdicion | null>(null);
+  const { tienePermiso: tienePermisoPagina } = useSesion();
+  const puedeUbicar = tienePermisoPagina('inventario-telas.mover');
+  const fijarUbicacion = useFijarUbicacionTelaColor();
 
   const categorias = useTelasCategorias({
     pagina: 1,
@@ -288,6 +308,8 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
                           abierta={abierta}
                           onToggle={() => alternarTela(t.idTela)}
                           alAbrirKardex={setColorKardex}
+                          puedeUbicar={puedeUbicar}
+                          alUbicar={setUbicando}
                         />
                       );
                     })}
@@ -321,6 +343,33 @@ export function ExistenciasTelasColorPagina(): React.JSX.Element {
         alCerrar={() => setColorKardex(undefined)}
         idAlmacen={idAlmacen === TODOS ? undefined : Number(idAlmacen)}
       />
+
+      {/* ── ⭐⭐ Dónde está guardado (fila 0.103) ─────────────────────────────── */}
+      <DialogoUbicacionMaterial
+        abierto={ubicando !== null}
+        material={ubicando?.material ?? ''}
+        almacen={ubicando?.almacen ?? ''}
+        ubicacionActual={ubicando?.ubicacion ?? null}
+        cargando={fijarUbicacion.isPending}
+        alCerrar={() => setUbicando(null)}
+        alGuardar={(ubicacion) => {
+          if (ubicando === null) return;
+          fijarUbicacion.mutate(
+            { idTelaColor: ubicando.idTelaColor, idAlmacen: ubicando.idAlmacen, ubicacion },
+            {
+              onSuccess: (guardada) => {
+                setUbicando(null);
+                toast.success(
+                  guardada.ubicacion === null
+                    ? 'Se borró la ubicación.'
+                    : `Guardado: ${guardada.ubicacion}`,
+                );
+              },
+              onError: (e) => toast.error(e.message),
+            },
+          );
+        }}
+      />
     </div>
   );
 }
@@ -331,11 +380,16 @@ function RenglonesDeTela({
   abierta,
   onToggle,
   alAbrirKardex,
+  puedeUbicar,
+  alUbicar,
 }: {
   tela: ExistenciaTelaAgrupada;
   abierta: boolean;
   onToggle: () => void;
   alAbrirKardex: (color: ColorKardex) => void;
+  /** Fila 0.103: `inventario-telas.mover`. Sin él la ubicación se lee, pero no se edita. */
+  puedeUbicar: boolean;
+  alUbicar: (renglon: UbicacionEnEdicion) => void;
 }): React.JSX.Element {
   const llevaComplemento = tela.nombreComplemento !== null;
   return (
@@ -396,22 +450,40 @@ function RenglonesDeTela({
       </TablaDensaFila>
       {abierta
         ? tela.colores.map((c) => (
-            <RenglonColor key={c.idTelaColor} tela={tela} color={c} alAbrirKardex={alAbrirKardex} />
+            <RenglonColor
+              key={c.idTelaColor}
+              tela={tela}
+              color={c}
+              alAbrirKardex={alAbrirKardex}
+              puedeUbicar={puedeUbicar}
+              alUbicar={alUbicar}
+            />
           ))
         : null}
     </>
   );
 }
 
-/** Renglón de COLOR: doble clic (o el botón) abre el kardex de ese color. */
+/**
+ * Renglón de COLOR: doble clic (o el botón) abre el kardex de ese color.
+ *
+ * ⭐⭐ FILA 0.103 — la columna «Almacenes» dejó de ser un texto pegado con « · » y pasó a ser UNA
+ * LÍNEA POR ALMACÉN: cantidad + **dónde está guardado**. La ubicación es por color×almacén (el
+ * mismo marino puede estar en el rack 4 de Naucalpan y en el pasillo B del taller), así que juntar
+ * los almacenes en una sola cadena no dejaba sitio donde ponerla ni dónde pulsar para corregirla.
+ */
 function RenglonColor({
   tela,
   color,
   alAbrirKardex,
+  puedeUbicar,
+  alUbicar,
 }: {
   tela: ExistenciaTelaAgrupada;
   color: ExistenciaTelaColorHijo;
   alAbrirKardex: (color: ColorKardex) => void;
+  puedeUbicar: boolean;
+  alUbicar: (renglon: UbicacionEnEdicion) => void;
 }): React.JSX.Element {
   const llevaComplemento = tela.nombreComplemento !== null;
   function abrir(): void {
@@ -436,13 +508,31 @@ function RenglonColor({
         {color.pantone ?? '—'}
       </TablaDensaCelda>
       <TablaDensaCelda className="text-xs text-muted-foreground">
-        {color.almacenes
-          .map((a) =>
-            llevaComplemento
-              ? `${a.almacen}: ${num(a.cuerpo)} / ${num(a.complemento)}`
-              : `${a.almacen}: ${num(a.cuerpo)}`,
-          )
-          .join(' · ')}
+        <ul className="space-y-0.5">
+          {color.almacenes.map((a) => (
+            <li key={a.idAlmacen} className="flex flex-wrap items-center gap-x-2">
+              <span>
+                {a.almacen}:{' '}
+                {llevaComplemento ? `${num(a.cuerpo)} / ${num(a.complemento)}` : num(a.cuerpo)}
+              </span>
+              <BotonUbicacion
+                ubicacion={a.ubicacion}
+                editable={puedeUbicar}
+                alEditar={() =>
+                  alUbicar({
+                    idTelaColor: color.idTelaColor,
+                    idAlmacen: a.idAlmacen,
+                    material: `${tela.nombre} · ${color.nombre}`,
+                    almacen: a.almacen,
+                    ubicacion: a.ubicacion,
+                  })
+                }
+                etiqueta={`${tela.nombre} ${color.nombre} en ${a.almacen}`}
+                idPrueba={`telas-ubicacion-${String(color.idTelaColor)}-${String(a.idAlmacen)}`}
+              />
+            </li>
+          ))}
+        </ul>
       </TablaDensaCelda>
       <TablaDensaCelda className="text-xs">{etiquetaUnidadTela(tela.unidadMedida)}</TablaDensaCelda>
       <TablaDensaCelda numerica>{num(color.existenciaCuerpo)}</TablaDensaCelda>

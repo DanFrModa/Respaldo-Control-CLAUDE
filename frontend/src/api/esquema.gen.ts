@@ -50500,6 +50500,8 @@ export interface paths {
                     cuerpo: number;
                     /** @description Existencia del complemento en este almacén (Σ, D3). */
                     complemento: number;
+                    /** @description Dónde está guardado el material en ESE almacén (texto libre); null = no anotada. */
+                    ubicacion: string | null;
                   }[];
                 }[];
               }[];
@@ -50593,6 +50595,136 @@ export interface paths {
       };
     };
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/color/ubicacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Fija dónde está guardado un color de tela en un almacén (vacío = borra) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Ubicación física de un color de tela dentro de un almacén. */
+      requestBody: {
+        content: {
+          'application/json': {
+            idTelaColor: number;
+            idAlmacen: number;
+            /** @description Dónde está guardado (texto libre, máx. 120). Vacío = borrar la ubicación. */
+            ubicacion: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Ubicación ya guardada (null = quedó sin ubicación). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idAlmacen: number;
+              /** @description Dónde está guardado el material en ESE almacén (texto libre); null = no anotada. */
+              ubicacion: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     post?: never;
     delete?: never;
     options?: never;
@@ -53777,6 +53909,8 @@ export interface paths {
                 almacen: string;
                 /** @description Existencia actual (Σ de movimientos, D3). */
                 existencia: number;
+                /** @description Dónde está guardado el material en ESE almacén (texto libre); null = no anotada. */
+                ubicacion: string | null;
               }[];
               totalExistencia: number;
             };
@@ -53865,6 +53999,136 @@ export interface paths {
       };
     };
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/ubicacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Fija dónde está guardado un avío en un almacén (vacío = borra) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Ubicación física de un avío dentro de un almacén. */
+      requestBody: {
+        content: {
+          'application/json': {
+            idAvio: number;
+            idAlmacen: number;
+            /** @description Dónde está guardado (texto libre, máx. 120). Vacío = borrar la ubicación. */
+            ubicacion: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Ubicación ya guardada (null = quedó sin ubicación). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idAlmacen: number;
+              /** @description Dónde está guardado el material en ESE almacén (texto libre); null = no anotada. */
+              ubicacion: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     post?: never;
     delete?: never;
     options?: never;

@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.152 · 12-sep-2026 · **en prueba** — **Cada material puede decir en qué parte del almacén está guardado**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Anotar dónde está físicamente cada tela-color y cada avío, almacén por almacén**, y verlo en la
+  pantalla de existencias. Es **texto libre** —«Rack 3, nivel 2», «pasillo B al fondo»—: no hay que dar
+  de alta un catálogo de posiciones ni mantenerlo.
+- Se anota y se corrige desde la misma pantalla donde el almacenista ya consulta lo que hay.
+
+### Qué cambió y puede sorprender
+
+- **Borrar el texto borra la anotación**, no guarda un vacío. «Sin ubicación» y «nunca se anotó» son
+  la misma cosa a propósito.
+- **Sólo se puede anotar un material que ya tenga existencia en ese almacén.** Si nunca ha entrado
+  ahí, no aparece en la pantalla y no hay dónde pulsar — no se puede dejar el sitio apartado por
+  adelantado.
+- **En el celular, en telas todavía no se ve**, porque esa tarjeta nunca ha mostrado el desglose por
+  almacén. En avíos sí.
+- Los materiales que ya están **nacen sin ubicación** y se van llenando según se toquen. No hay nada
+  que ir a rellenar.
+
+### Qué sigue pendiente o roto
+
+- **El impreso del inventario de telas todavía no lleva la columna de ubicación** — y es justo el papel
+  que uno se lleva a la bodega. Queda anotado para atenderlo aparte.
+
+---
+
 ## 0.151 · 12-sep-2026 · **en prueba** — **Al traspasar tela ya se puede elegir el lote a mano**
 
 ### Qué se puede hacer ahora que antes no

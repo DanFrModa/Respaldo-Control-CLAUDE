@@ -158,6 +158,11 @@ model Empresa {
   /// Corridas semanales de pago de esta empresa (0.113, A9). Restrict.
   corridasPago CorridaPago[]
 
+  /// ⭐ FILA 0.103 — ubicaciones físicas ANOTADAS POR ESTA EMPRESA (A9). Restrict: la empresa no se
+  /// borra físico —se desactiva—, y sus anotaciones de almacén viajan con ella.
+  ubicacionesTelaColor UbicacionTelaColor[]
+  ubicacionesAvio      UbicacionAvio[]
+
   @@map("empresas")
 }
 
@@ -506,8 +511,95 @@ model Almacen {
   /// Inventarios cíclicos que cuentan este almacén (F7-E5). Restrict.
   inventariosCiclicos InventarioCiclico[]
 
+  /// ⭐ FILA 0.103 — DÓNDE está guardado cada material DENTRO de este almacén. Restrict: un
+  /// almacén con ubicaciones anotadas no se borra físico → se desactiva.
+  ubicacionesTelaColor UbicacionTelaColor[]
+  ubicacionesAvio      UbicacionAvio[]
+
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
+}
+
+/// ⭐⭐ FILA 0.103 — DÓNDE ESTÁ GUARDADO EL MATERIAL DENTRO DEL ALMACÉN (Daniel, 2-sep-2026:
+/// *«sí quiero que haya un lugar donde está ubicado. Principalmente para telas y avíos»*; cerrada
+/// el 3-sep: *«de texto libre está bien. Por ahora NO un catálogo de posiciones — si en algún
+/// momento se requiere lo hacemos»*).
+///
+/// El sistema ya sabía CUÁNTO hay y EN QUÉ ALMACÉN, pero no DÓNDE dentro de la bodega, así que el
+/// almacenista lo buscaba de memoria. Esto es **texto libre** ("Rack 4, nivel 2", "pasillo B"):
+/// sin catálogo, sin validación de formato y sin pantalla de administración propia — se captura y
+/// se corrige desde la misma pantalla de existencias donde se consulta.
+///
+/// 🔑 **POR QUÉ ES UNA TABLA APARTE Y NO UNA COLUMNA.** La ubicación es por ARTÍCULO × ALMACÉN
+/// (la misma felpa marino puede estar en el rack 4 de Naucalpan y en el pasillo B del taller), y
+/// esa pareja **no tiene fila propia en ninguna parte**: la existencia es Σ de movimientos (D3,
+/// vista `existencia_tela_color` / `existencia_avio`), o sea una AGREGACIÓN, no una fila donde
+/// colgar un dato. Colgarla de `Almacen` daría una ubicación por bodega (no por material) y
+/// colgarla de `TelaColor`/`Avio` daría una sola ubicación para todas las bodegas: ninguna de las
+/// dos contesta la pregunta del almacenista.
+///
+/// ⚠️ **SÍ lleva `id_empresa`, y la primera versión NO lo llevaba: era un defecto.** El argumento
+/// era «el almacén ya pertenece a una empresa», y es FALSO para el almacén GLOBAL (`id_empresa IS
+/// NULL`) — que hoy es el caso NORMAL, porque `sembrarAlmacenUnicoGlobal` siembra así los almacenes
+/// de TELA y de AVÍO. Medido contra Postgres: la empresa A leía la ubicación escrita por la B y la
+/// pisaba sin aviso, una sola fila y última escritura gana. Y la incoherencia estaba dentro de la
+/// MISMA pantalla: la existencia del almacén global YA se separa por empresa (`existencia_*` lleva
+/// `id_empresa`), así que la ubicación habría sido el único dato compartido de ese renglón. La
+/// dimensión correcta es artículo × almacén × EMPRESA, y así está el `@@unique`.
+///
+/// SIN backfill (REGLA 0-B): los materiales que ya existen nacen SIN ubicación —la ausencia de
+/// fila ES "no anotada"— y se van llenando conforme el almacén los acomoda.
+model UbicacionTelaColor {
+  id          Int       @id @default(autoincrement())
+  idTelaColor Int       @map("id_tela_color")
+  telaColor   TelaColor @relation(fields: [idTelaColor], references: [id], onDelete: Cascade)
+  /// Almacén donde está ese estante. Restrict: un almacén con ubicaciones no se borra físico.
+  idAlmacen   Int       @map("id_almacen")
+  almacen     Almacen   @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+  /// Empresa que anotó ESTA ubicación (A9). Imprescindible en el almacén GLOBAL, donde conviven
+  /// varias empresas: sin esto se pisan la nota entre ellas. Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Texto LIBRE del lugar físico ("Rack 4, nivel 2"). NOT NULL: borrar la ubicación se hace
+  /// borrando la fila, no guardando una cadena vacía que después habría que distinguir de null.
+  ubicacion   String
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idTelaColor, idAlmacen, idEmpresa])
+  @@index([idAlmacen])
+  @@index([idEmpresa])
+  @@map("ubicaciones_tela_color")
+}
+
+/// ⭐⭐ FILA 0.103 — la gemela de {@link UbicacionTelaColor} para AVÍOS. Misma regla y mismo porqué
+/// (léelos allá). La dimensión es avío × almacén, que es EXACTAMENTE la dimensión de existencia de
+/// avíos (R4: el lote del avío NO entra en la existencia, así que tampoco en la ubicación).
+model UbicacionAvio {
+  id        Int     @id @default(autoincrement())
+  idAvio    Int     @map("id_avio")
+  avio      Avio    @relation(fields: [idAvio], references: [id], onDelete: Cascade)
+  /// Almacén donde está ese estante. Restrict: un almacén con ubicaciones no se borra físico.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+  /// Empresa que anotó ESTA ubicación (A9, ver la gemela de telas). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Texto LIBRE del lugar físico. NOT NULL (ver la gemela de telas).
+  ubicacion String
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idAvio, idAlmacen, idEmpresa])
+  @@index([idAlmacen])
+  @@index([idEmpresa])
+  @@map("ubicaciones_avio")
 }
 
 /// Contador de folios de negocio POR EMPRESA y por tipo de documento (A3: los folios
@@ -1810,6 +1902,9 @@ model TelaColor {
   lineasCompra     OrdenCompraLinea[]
   /// Renglones de INVENTARIO CÍCLICO de telas que cuentan ESTE color (fila 0.099). Restrict.
   ciclicoDetalles  InventarioCiclicoDetTela[]
+  /// ⭐ FILA 0.103 — dónde está guardado este color en cada almacén. Cascade: la ubicación es un
+  /// ATRIBUTO del color, no un documento; si el color desaparece, su repisa no significa nada.
+  ubicaciones      UbicacionTelaColor[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2240,6 +2335,8 @@ model Avio {
   precostoLineas     PrecostoLinea[]
   /// Renglones de INVENTARIO CÍCLICO de avíos que cuentan ESTE avío (fila 0.099). Restrict.
   ciclicoDetalles    InventarioCiclicoDetAvio[]
+  /// ⭐ FILA 0.103 — dónde está guardado este avío en cada almacén. Cascade (ver `UbicacionAvio`).
+  ubicaciones        UbicacionAvio[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

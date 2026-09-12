@@ -1,4 +1,5 @@
 import { fireEvent, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ClavePermiso, ExistenciasTelaColor, KardexTelaColor } from '@/api/tipos';
@@ -28,7 +29,18 @@ const existencias: ExistenciasTelaColor = {
           pantone: '19-3920',
           existenciaCuerpo: 100,
           existenciaComplemento: 40,
-          almacenes: [{ idAlmacen: 5, almacen: 'Bodega A', cuerpo: 100, complemento: 40 }],
+          almacenes: [
+            // ⭐ Fila 0.103 — este color SÍ tiene anotado dónde está guardado…
+            {
+              idAlmacen: 5,
+              almacen: 'Bodega A',
+              cuerpo: 100,
+              complemento: 40,
+              ubicacion: 'Rack 4, nivel 2',
+            },
+            // …y en la otra bodega NO (el caso normal: nada se rellena hacia atrás, REGLA 0-B).
+            { idAlmacen: 6, almacen: 'Bodega B', cuerpo: 0, complemento: 0, ubicacion: null },
+          ],
         },
         {
           idTelaColor: 12,
@@ -36,7 +48,9 @@ const existencias: ExistenciasTelaColor = {
           pantone: null,
           existenciaCuerpo: 20,
           existenciaComplemento: 5,
-          almacenes: [{ idAlmacen: 5, almacen: 'Bodega A', cuerpo: 20, complemento: 5 }],
+          almacenes: [
+            { idAlmacen: 5, almacen: 'Bodega A', cuerpo: 20, complemento: 5, ubicacion: null },
+          ],
         },
       ],
     },
@@ -59,7 +73,9 @@ const existencias: ExistenciasTelaColor = {
           pantone: null,
           existenciaCuerpo: 33,
           existenciaComplemento: 0,
-          almacenes: [{ idAlmacen: 5, almacen: 'Bodega A', cuerpo: 33, complemento: 0 }],
+          almacenes: [
+            { idAlmacen: 5, almacen: 'Bodega A', cuerpo: 33, complemento: 0, ubicacion: null },
+          ],
         },
       ],
     },
@@ -169,6 +185,8 @@ const kardexFifo: KardexTelaColor = {
 
 const useKardexTelaColor = vi.fn<(q: unknown) => unknown>();
 const cancelarMutate = vi.fn();
+/** ⭐ Fila 0.103 — el doble de «fijar dónde está guardado». */
+const fijarUbicacionMutate = vi.fn();
 
 vi.mock('@/api/inventario-materiales', () => ({
   useExistenciasTelaColor: () => ({
@@ -226,6 +244,7 @@ vi.mock('@/api/inventario-materiales', () => ({
     isError: false,
   }),
   useCancelarTelaColor: () => ({ mutate: cancelarMutate, isPending: false }),
+  useFijarUbicacionTelaColor: () => ({ mutate: fijarUbicacionMutate, isPending: false }),
   urlImpresoTraspasoTela: (id: number) => `/api/inventarios/telas/traspasos/${String(id)}/impreso`,
   // El doble del constructor de la URL ECHA los filtros en el querystring (igual que el real): así
   // la prueba del botón puede distinguir "manda los filtros" de "manda una URL pelona".
@@ -268,6 +287,39 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     // Totales del pie (cuerpo y complemento).
     expect(screen.getByText('Cuerpo:')).toBeInTheDocument();
     expect(screen.getByText('Complemento:')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ 0.103 · cada ALMACÉN lleva su ubicación, y con `.mover` se captura/corrige ahí mismo', async () => {
+    const usuario = userEvent.setup();
+    useKardexTelaColor.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    // La ubicación es por color × ALMACÉN: el mismo marino está anotado en Bodega A y no en B.
+    expect(screen.getByTestId('telas-ubicacion-11-5')).toHaveTextContent('Rack 4, nivel 2');
+    expect(screen.getByTestId('telas-ubicacion-11-6')).toHaveTextContent('Anotar…');
+
+    await usuario.click(screen.getByTestId('telas-ubicacion-11-6'));
+    const campo = await screen.findByTestId('material-ubicacion');
+    expect(campo).toHaveValue('');
+    await usuario.type(campo, '  Pasillo B  ');
+    await usuario.click(screen.getByTestId('guardar-ubicacion-material'));
+    // Se manda el ALMACÉN que se pulsó (el 6), no el primero del renglón, y ya recortado.
+    expect(fijarUbicacionMutate).toHaveBeenCalledWith(
+      { idTelaColor: 11, idAlmacen: 6, ubicacion: 'Pasillo B' },
+      expect.anything(),
+    );
+  });
+
+  it('⭐⭐ 0.103 · sin `.mover` la ubicación se LEE pero no se puede tocar', () => {
+    useKardexTelaColor.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    expect(screen.getByTestId('telas-ubicacion-11-5')).toHaveTextContent('Rack 4, nivel 2');
+    // Sin anotar y sin permiso: «—», y ningún botón que invite a capturar.
+    expect(screen.getByTestId('telas-ubicacion-11-6')).toHaveTextContent('—');
+    expect(screen.queryByRole('button', { name: /Dónde está guardado/ })).not.toBeInTheDocument();
   });
 
   it('la tela SIN complemento muestra "—" en esa columna', () => {

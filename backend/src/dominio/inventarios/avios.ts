@@ -583,6 +583,8 @@ export async function consultarExistenciasAvio(
       idAlmacen: number;
       almacen: string;
       existencia: Prisma.Decimal;
+      /** Fila 0.103 — dónde está guardado ESE avío en ESE almacén; null = no anotada. */
+      ubicacion: string | null;
     }[]
   >(Prisma.sql`
     SELECT
@@ -593,10 +595,19 @@ export async function consultarExistenciasAvio(
       av."es_generico" AS "esGenerico",
       e."id_almacen"  AS "idAlmacen",
       a."nombre"      AS "almacen",
-      e."existencia"  AS "existencia"
+      e."existencia"  AS "existencia",
+      u."ubicacion"   AS "ubicacion"
     FROM "existencia_avio" e
     JOIN "avios"     av ON av."id" = e."id_avio"
     JOIN "almacenes" a  ON a."id" = e."id_almacen"
+    -- Fila 0.103: la UBICACIÓN física viaja pegada al renglón de existencia (LEFT: lo normal es
+    -- que todavía no esté anotada, y eso NO debe esconder la existencia). ⚠️ La EMPRESA entra en el
+    -- ON (ver la gemela de telas): el almacén GLOBAL lo comparten varias empresas y la anotación es
+    -- de cada una.
+    LEFT JOIN "ubicaciones_avio" u
+           ON u."id_avio"     = e."id_avio"
+          AND u."id_almacen"  = e."id_almacen"
+          AND u."id_empresa"  = e."id_empresa"
     WHERE ${where}
     ORDER BY av."clave" ASC, a."nombre" ASC
   `);
@@ -614,6 +625,7 @@ export async function consultarExistenciasAvio(
       idAlmacen: f.idAlmacen,
       almacen: f.almacen,
       existencia,
+      ubicacion: f.ubicacion,
     };
   });
 

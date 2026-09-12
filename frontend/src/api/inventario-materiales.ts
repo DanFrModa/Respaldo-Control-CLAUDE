@@ -45,6 +45,9 @@ import type {
   TraspasoAvioCrear,
   TraspasoTelaColor,
   TraspasoTelaColorCrear,
+  UbicacionAvioFijar,
+  UbicacionMaterial,
+  UbicacionTelaColorFijar,
 } from './tipos';
 
 /**
@@ -441,6 +444,22 @@ export function useKardexAvio(
   });
 }
 
+// ── ⭐⭐ FILA 0.103 · Dónde está guardado el material (ubicación física por artículo × almacén) ──
+
+async function fijarUbicacionTelaColor(
+  cuerpo: UbicacionTelaColorFijar,
+): Promise<UbicacionMaterial> {
+  const { data, error } = await api.PUT('/api/inventarios/telas/color/ubicacion', { body: cuerpo });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function fijarUbicacionAvio(cuerpo: UbicacionAvioFijar): Promise<UbicacionMaterial> {
+  const { data, error } = await api.PUT('/api/inventarios/avios/ubicacion', { body: cuerpo });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 // ── Hooks de mutación: TELAS ───────────────────────────────────────────────────
 
 /** Argumentos de una cancelación de movimiento de material. */
@@ -587,6 +606,37 @@ export function useCancelarAvio(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarMaterial) => cancelarAvio(id, cuerpo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+// ── ⭐⭐ Hooks de mutación: DÓNDE ESTÁ GUARDADO EL MATERIAL (fila 0.103) ────────
+
+/**
+ * Fija (o BORRA, si el texto va vacío) dónde está guardado un COLOR DE TELA en un almacén. Invalida
+ * las existencias porque la ubicación viaja pegada a ese renglón — no hay una consulta aparte.
+ */
+export function useFijarUbicacionTelaColor(): UseMutationResult<
+  UbicacionMaterial,
+  ErrorDeApi,
+  UbicacionTelaColorFijar
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fijarUbicacionTelaColor,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
+  });
+}
+
+/** La gemela para AVÍOS: fija o borra dónde está guardado el avío en un almacén (fila 0.103). */
+export function useFijarUbicacionAvio(): UseMutationResult<
+  UbicacionMaterial,
+  ErrorDeApi,
+  UbicacionAvioFijar
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fijarUbicacionAvio,
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_INVENTARIO_MATERIALES }),
   });
 }
