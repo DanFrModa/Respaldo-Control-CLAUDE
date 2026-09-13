@@ -11,6 +11,7 @@ const filaBase: ExistenciasPt['filas'][number] = {
   modelo: 'A-100',
   idColor: 7,
   color: 'Rojo',
+  colorActivo: true,
   idTalla: 11,
   etiquetaTalla: 'CH',
   ordenTalla: 1,

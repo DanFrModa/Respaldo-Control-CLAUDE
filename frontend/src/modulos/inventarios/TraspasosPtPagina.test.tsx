@@ -170,6 +170,58 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
   });
 
+  /**
+   * ⭐ FILA 0.164 — EL COLOR RETIRADO CON PIEZAS EN EL ORIGEN SE PUEDE TRASPASAR.
+   *
+   * Al fusionar dos colores duplicados (§Post-F9.222) el absorbido se apaga, pero sus piezas son
+   * movimientos ya asentados (D3) y siguen en el almacén. El catálogo de esta pantalla pide SOLO
+   * los activos —y así sigue, para no invitar a capturar sobre colores muertos—; lo que se abre es
+   * la puerta de lo que el SERVIDOR devuelve con existencia aquí, y va rotulado.
+   */
+  it('ofrece el color RETIRADO con existencia en el ORIGEN, rotulado (fila 0.164)', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue({
+      data: {
+        filas: [
+          {
+            idColor: 9,
+            color: 'Blanco Hueso',
+            colorActivo: false,
+            idTalla: 11,
+            idAlmacen: 3,
+            idOrden: null,
+            folioOrden: null,
+            existencia: 12,
+          },
+        ],
+        totalExistencia: 12,
+      },
+      refetch: vi.fn(),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+    await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+
+    const selectorColor = screen.getByTestId('traspaso-matriz-agregar-color');
+    const textos = [...selectorColor.querySelectorAll('option')].map((o) => o.textContent ?? '');
+    expect(textos).toContain('Blanco Hueso (retirado)');
+    expect(textos).toContain('Rojo'); // el catálogo vivo sigue ahí, y sin marca
+
+    await usuario.selectOptions(selectorColor, '9');
+    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('traspaso-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '12');
+    await ponerMotivo(usuario);
+    await usuario.click(screen.getByTestId('traspaso-guardar'));
+
+    const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idColor: number }[] }];
+    expect(cuerpo.lineas[0]?.idColor).toBe(9);
+  });
+
   it('el aviso de sobre-traspaso compara contra el bucket ELEGIDO, no contra el total del modelo', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue(EXISTENCIAS_CON_ORDEN);

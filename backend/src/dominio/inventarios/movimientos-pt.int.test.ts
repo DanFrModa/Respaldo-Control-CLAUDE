@@ -152,6 +152,36 @@ describe('Movimiento manual (F3-E3)', () => {
     expect(fila?.folioOrden).toBeNull();
   });
 
+  /**
+   * ⭐ FILA 0.164 — CADA RENGLÓN DICE SI SU COLOR SIGUE VIVO EN EL CATÁLOGO.
+   *
+   * La existencia son movimientos ya asentados (D3) y no se apaga cuando se apaga el color: al
+   * fusionar duplicados (§Post-F9.222) el absorbido queda inactivo con sus piezas intactas. Las dos
+   * pantallas de captura (Movimientos y Traspasos de PT) piden el catálogo SOLO de activos, así que
+   * sin este dato ese color no tenía forma de ofrecerse — ni de ofrecerse MARCADO, que es lo que
+   * evita que se capture sobre él como si fuera uno más.
+   *
+   * ⚠️ El dato viene del JOIN con `colores`, no de un tipo de TypeScript: `$queryRaw` no valida
+   * nada, así que si la columna desapareciera del SELECT el campo llegaría `undefined` y el
+   * frontend marcaría TODOS los colores como retirados. Por eso se mide aquí y no sólo con el
+   * typecheck.
+   */
+  it('(fila 0.164) la fila dice `colorActivo`, y sigue trayendo las piezas del color apagado', async () => {
+    await entrar(almPrimeras.id, 30);
+
+    const vivo = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(vivo.filas[0]?.colorActivo).toBe(true);
+
+    // Lo que hace una fusión con el color absorbido: se apaga (las piezas NO se tocan).
+    await cliente.color.update({ where: { id: colorRojo.id }, data: { activo: false } });
+
+    const apagado = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(apagado.filas).toHaveLength(1);
+    expect(apagado.filas[0]?.colorActivo).toBe(false);
+    expect(apagado.filas[0]?.existencia).toBe(30);
+    expect(apagado.totalExistencia).toBe(30);
+  });
+
   it('salida dentro de la existencia descuenta', async () => {
     await entrar(almPrimeras.id, 30);
     await registrarMovimientoPt(
