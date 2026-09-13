@@ -149,6 +149,11 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         nombre: 'Jersey',
         unidad: 'kg',
         consumoPorPrenda: 1.5,
+        // ⭐⭐ 0.165: por default esta tela NO lleva complemento (lo dice el catálogo).
+        nombreComplemento: null,
+        consumoComplementoPorPrenda: null,
+        consumoComplementoModelo: null,
+        precioComplemento: null,
         precio: 50,
         paraPreCosto: true,
         paraProduccion: true,
@@ -411,6 +416,84 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
   it('sin desalineación NO aparece ningún aviso (el caso normal)', () => {
     render(recetaDePrueba());
     expect(screen.queryByTestId('receta-desalineacion')).not.toBeInTheDocument();
+  });
+
+  /*
+   * ⭐⭐ 0.165 (§Post-F9.219) — EL COMPLEMENTO SE VE Y SE CORRIGE EN LA RECETA DE LA ORDEN.
+   *
+   * Lo que se fija aquí: el cárdigan de la felpa —que la orden congela, el MRP compra y el costo
+   * valúa— dejó de ser invisible en la pantalla que gobierna la receta, y se puede corregir sin
+   * pasar por el modelo. Quién lleva complemento lo dice el CATÁLOGO: sin nombre, no se pinta nada.
+   */
+  describe('el complemento de la tela (0.165)', () => {
+    /** La misma receta, con la tela llevando su cárdigan (nombre del catálogo + consumo + estimado). */
+    function conComplemento(over: Partial<RecetaOrden['telas'][number]> = {}): RecetaOrden {
+      const base = recetaDePrueba();
+      return {
+        ...base,
+        telas: base.telas.map((t) => ({
+          ...t,
+          nombreComplemento: 'Cardigan',
+          consumoComplementoPorPrenda: 0.15,
+          consumoComplementoModelo: 0.15,
+          precioComplemento: 30,
+          ...over,
+        })),
+      };
+    }
+
+    it('enseña el complemento con su nombre, su consumo y a cuánto sale (estimado)', () => {
+      render(conComplemento());
+      const bloque = screen.getByTestId('complemento-receta-tela-1');
+      expect(within(bloque).getByText('Cardigan')).toBeInTheDocument();
+      expect(screen.getByTestId('consumo-complemento-receta-tela-1')).toHaveValue('0.15');
+      expect(screen.getByTestId('precio-complemento-receta-tela-1')).toHaveTextContent(
+        '$30.00 estimado',
+      );
+    });
+
+    it('sin estimado en el catálogo lo DICE (nunca un importe callado)', () => {
+      render(conComplemento({ precioComplemento: null }));
+      expect(screen.getByTestId('precio-complemento-receta-tela-1')).toHaveTextContent(
+        'sin costo estimado',
+      );
+    });
+
+    it('la tela SIN complemento en el catálogo no pinta nada de esto', () => {
+      render(recetaDePrueba());
+      expect(screen.queryByTestId('complemento-receta-tela-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('precio-complemento-receta-tela-1')).not.toBeInTheDocument();
+    });
+
+    it('se puede CORREGIR en la orden, y vaciarlo lo BORRA (un cárdigan de 0 no es un cárdigan)', async () => {
+      render(conComplemento());
+      const caja = screen.getByTestId('consumo-complemento-receta-tela-1');
+      await userEvent.clear(caja);
+      await userEvent.type(caja, '0.2');
+      await userEvent.tab();
+      expect(editarMutateMock).toHaveBeenCalledWith(
+        {
+          idOrden: 50,
+          tipo: 'tela',
+          idRenglon: 1,
+          cuerpo: { consumoComplementoPorPrenda: 0.2 },
+        },
+        expect.anything(),
+      );
+
+      editarMutateMock.mockReset();
+      await userEvent.clear(screen.getByTestId('consumo-complemento-receta-tela-1'));
+      await userEvent.tab();
+      expect(editarMutateMock).toHaveBeenCalledWith(
+        {
+          idOrden: 50,
+          tipo: 'tela',
+          idRenglon: 1,
+          cuerpo: { consumoComplementoPorPrenda: null },
+        },
+        expect.anything(),
+      );
+    });
   });
 
   /*

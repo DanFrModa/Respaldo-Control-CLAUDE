@@ -1588,6 +1588,7 @@ function CeldaNumero({
   testid,
   alGuardar,
   compacto = false,
+  alBorrar,
 }: {
   valor: number | null;
   editable: boolean;
@@ -1596,6 +1597,13 @@ function CeldaNumero({
   alGuardar: (nuevo: number) => void;
   /** Caja angosta para las medidas por talla, que van varias en la misma línea. */
   compacto?: boolean;
+  /**
+   * ⭐⭐ 0.165 — qué hacer cuando el campo se deja VACÍO (o en 0). Sólo lo pasa el consumo del
+   * COMPLEMENTO, que es el único que se puede BORRAR: *un cárdigan que consume 0 no es un cárdigan*
+   * (§Post-F9.219(d)), así que vaciarlo significa «esta orden no lleva complemento capturado», no
+   * «lleva cero». Sin esta prop el campo se comporta exactamente como siempre.
+   */
+  alBorrar?: () => void;
 }): React.JSX.Element {
   const [texto, setTexto] = useState<string | null>(null);
   const mostrado = texto ?? (valor === null ? '' : String(valor));
@@ -1615,8 +1623,13 @@ function CeldaNumero({
       onChange={(e) => setTexto(e.target.value)}
       onBlur={() => {
         if (texto === null) return;
-        const n = Number(texto.replace(',', '.'));
+        const limpio = texto.trim();
+        const n = Number(limpio.replace(',', '.'));
         setTexto(null);
+        if (alBorrar !== undefined && (limpio === '' || n === 0)) {
+          if (valor !== null) alBorrar();
+          return;
+        }
         if (!Number.isFinite(n) || n < 0 || n === valor) return;
         alGuardar(n);
       }}
@@ -1960,6 +1973,54 @@ function SeccionTelas({
                     )
                   }
                 />
+                {/* ⭐⭐ 0.165 (§Post-F9.219) — EL COMPLEMENTO, DEBAJO DE SU CUERPO Y EN EL MISMO
+                    RENGLÓN (el cárdigan de la felpa): la orden ya lo congelaba, el MRP ya lo compraba
+                    y el costeo ya lo valuaba, pero esta pantalla no lo enseñaba. Se rotula con el
+                    nombre que le da el CATÁLOGO ("Cardigan"), nunca con la palabra «complemento» —la
+                    misma regla que el editor del BOM—, y por eso el bloque entero se apaga cuando el
+                    catálogo dice que esta tela no lleva. Vaciar el campo BORRA el consumo. */}
+                {t.nombreComplemento === null ? null : (
+                  <div
+                    className="mt-1 flex items-center justify-end gap-1"
+                    data-testid={`complemento-receta-tela-${t.id}`}
+                  >
+                    <span
+                      className="text-xs text-muted-foreground"
+                      title={`Consumo de ${t.nombreComplemento} por prenda (el complemento de ${t.nombre})`}
+                    >
+                      {t.nombreComplemento}
+                    </span>
+                    <CeldaNumero
+                      compacto
+                      valor={t.consumoComplementoPorPrenda}
+                      editable={editable && !t.excluido}
+                      ocupado={ocupado || editar.isPending}
+                      testid={`consumo-complemento-receta-tela-${t.id}`}
+                      alGuardar={(n) =>
+                        editar.mutate(
+                          {
+                            idOrden,
+                            tipo: 'tela',
+                            idRenglon: t.id,
+                            cuerpo: { consumoComplementoPorPrenda: n },
+                          },
+                          { onError: (error) => toast.error(error.message) },
+                        )
+                      }
+                      alBorrar={() =>
+                        editar.mutate(
+                          {
+                            idOrden,
+                            tipo: 'tela',
+                            idRenglon: t.id,
+                            cuerpo: { consumoComplementoPorPrenda: null },
+                          },
+                          { onError: (error) => toast.error(error.message) },
+                        )
+                      }
+                    />
+                  </div>
+                )}
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
                 <CeldaNumero
@@ -1974,6 +2035,25 @@ function SeccionTelas({
                     )
                   }
                 />
+                {/* 0.165 — A CUÁNTO SALE el complemento, con su ORIGEN dicho: es el ESTIMADO DEL
+                    CATÁLOGO, el mismo número con el que el costo de esta orden lo valúa (la orden no
+                    congela precio de complemento). Va en gris y NO se edita aquí, para que no se
+                    confunda con el precio congelado del cuerpo, que sí es de la orden. */}
+                {t.nombreComplemento === null ? null : (
+                  <div
+                    className="mt-1 text-xs text-muted-foreground"
+                    data-testid={`precio-complemento-receta-tela-${t.id}`}
+                    title={
+                      t.precioComplemento === null
+                        ? `Nadie capturó el costo estimado de ${t.nombreComplemento}: se captura en el catálogo de telas.`
+                        : `Estimado del catálogo de telas para ${t.nombreComplemento}.`
+                    }
+                  >
+                    {t.precioComplemento === null
+                      ? 'sin costo estimado'
+                      : `${formatearMoneda(t.precioComplemento)} estimado`}
+                  </div>
+                )}
               </TablaDensaCelda>
               {editable ? (
                 <TablaDensaCelda>

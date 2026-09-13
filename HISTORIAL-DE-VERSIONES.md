@@ -71,6 +71,36 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.153 · 12-sep-2026 · **en prueba** — **La receta de la orden ya enseña el complemento: se capturaba por cinco puertas y no se veía por ninguna**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver, en la receta de la orden, cuánto complemento lleva la prenda** —el cárdigan de la felpa—
+  junto al consumo del cuerpo. Hasta hoy ese dato **se podía capturar de cinco maneras distintas y no
+  había una sola pantalla donde comprobarlo**.
+- **Corregirlo ahí mismo**, sin salir de la receta. Dejarlo en blanco lo borra.
+- **Ver a cuánto sale**, con el mismo costo estimado con el que el sistema lo valúa. Si esa tela aún no
+  tiene estimado capturado, lo dice en vez de callarse.
+- **El impreso de la orden también lo lleva**: «Felpa (consumo 1.2 / prenda + Cardigan 0.15 / prenda)».
+
+### Qué cambió y puede sorprender
+
+- **El aviso de «esta receta ya no coincide con la del modelo» ahora también mira el complemento**, y
+  lo nombra. Antes dos recetas que sólo se diferenciaban en el cárdigan pasaban por iguales.
+- **Quién lleva complemento lo sigue diciendo el catálogo de telas.** Si una tela no lo declara, la
+  receta no deja ponerle consumo de complemento y no pinta nada.
+- Las órdenes viejas que no lo tengan **se quedan como están**; no hay nada que ir a rellenar.
+
+### Qué sigue pendiente o roto
+
+- **Queda un quinto sitio ciego, y tiene número: la fila 0.191.** Al comparar una orden con sus
+  hermanas, la firma que decide si son iguales **todavía no incluye el complemento** ⇒ dos hermanas que
+  sólo se diferencien en el cárdigan se siguen viendo idénticas.
+- Al **agregar** un renglón de tela a mano, el complemento todavía no se puede poner en el mismo paso:
+  se corrige justo después, desde la receta.
+
+---
+
 ## 0.152 · 12-sep-2026 · **en prueba** — **Cada material puede decir en qué parte del almacén está guardado**
 
 ### Qué se puede hacer ahora que antes no

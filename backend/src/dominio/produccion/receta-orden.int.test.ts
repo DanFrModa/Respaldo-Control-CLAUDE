@@ -1606,6 +1606,149 @@ describe('⭐ El QUINTO consumidor: el impreso de la OP lee la receta de la ORDE
   });
 });
 
+/*
+ * ⭐⭐ 0.165 (§Post-F9.219) — EL COMPLEMENTO DE LA TELA, EN LA RECETA DE LA ORDEN.
+ *
+ * El cárdigan viaja DENTRO del renglón de su felpa: el CATÁLOGO dice quién lo lleva
+ * (`Tela.nombreComplemento`) y con cuánto se valúa (`Tela.precioSugeridoComplemento`, 0.163); la
+ * RECETA dice cuánto lleva, congelado en la orden (0.156). Lo que se prueba aquí es lo que sólo la
+ * base puede demostrar: que la PUERTA de edición está enchufada de verdad (no la función suelta) y
+ * que el precio que enseña la receta SALE DE ESA COLUMNA — la misma con la que `costo-orden.ts`
+ * cobra—, para que una deriva futura entre pantalla y costo ponga algo rojo.
+ */
+describe('⭐⭐ 0.165 — el COMPLEMENTO en la receta de la ORDEN (§Post-F9.219)', () => {
+  /**
+   * Mete al modelo una FELPA con complemento declarado y crea una orden NUEVA que se lo copia.
+   * (Las órdenes del `beforeEach` nacieron antes que esta tela, así que no la llevan.)
+   */
+  async function conFelpa(
+    consumoComplemento: number | null = 0.15,
+  ): Promise<{ idTela: number; idOrden: number; idRenglon: number }> {
+    const felpa = await cliente.tela.create({
+      data: {
+        nombre: 'Felpa',
+        precioSugerido: 90,
+        nombreComplemento: 'Cardigan',
+        precioSugeridoComplemento: 30,
+      },
+    });
+    await cliente.modeloTela.create({
+      data: {
+        idModelo,
+        idTela: felpa.id,
+        consumoPorPrenda: 1.2,
+        consumoComplementoPorPrenda: consumoComplemento,
+      },
+    });
+    const idOrden = await crearOrdenConReceta(3n);
+    const receta = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    const renglon = receta.telas.find((t) => t.idTela === felpa.id)!;
+    return { idTela: felpa.id, idOrden, idRenglon: renglon.id };
+  }
+
+  it('la receta lo enseña, y su precio SALE de `Tela.precioSugeridoComplemento` (el que cobra el costo)', async () => {
+    const { idTela, idOrden } = await conFelpa();
+    const r = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    expect(r.telas.find((t) => t.idTela === idTela)).toMatchObject({
+      nombreComplemento: 'Cardigan',
+      consumoComplementoPorPrenda: 0.15,
+      consumoComplementoModelo: 0.15,
+      precioComplemento: 30,
+    });
+
+    // 🔴 LA LIGA, no el valor: si se le cambia el estimado al catálogo, la receta SIGUE al catálogo.
+    // Una constante (o una segunda cascada) se quedaría en 30 — que es exactamente la mentira que
+    // la 0.163 vino a matar: la pantalla diciendo una cifra y el costo cobrando otra.
+    await cliente.tela.update({ where: { id: idTela }, data: { precioSugeridoComplemento: 41.5 } });
+    const r2 = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    expect(r2.telas.find((t) => t.idTela === idTela)?.precioComplemento).toBe(41.5);
+
+    // Y sin estimado se DICE que falta (nunca un cero mudo).
+    await cliente.tela.update({
+      where: { id: idTela },
+      data: { precioSugeridoComplemento: null },
+    });
+    const r3 = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    expect(r3.telas.find((t) => t.idTela === idTela)?.precioComplemento).toBeNull();
+  });
+
+  it('🔴 la tela que el catálogo NO declara con complemento lo RECHAZA, y no escribe nada', async () => {
+    const r0 = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const jersey = r0.telas.find((t) => t.idTela === telaJersey.id)!;
+    await expect(
+      editarRenglonReceta(
+        sesion(),
+        ordenA,
+        'tela',
+        jersey.id,
+        { consumoComplementoPorPrenda: 0.2 },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorValidacion);
+
+    const fila = await cliente.ordenTela.findUniqueOrThrow({ where: { id: jersey.id } });
+    expect(fila.consumoComplementoPorPrenda).toBeNull();
+    // Y el renglón no se quedó marcado como ajustado por un intento que no entró (D3).
+    expect(fila.estado).toBe('sin_revisar');
+  });
+
+  it('se CORRIGE en la orden, `null` lo BORRA y omitirlo no lo toca', async () => {
+    const { idTela, idOrden, idRenglon } = await conFelpa();
+
+    // Corregir: entra por la puerta de verdad y queda en la orden (no en el modelo).
+    const r1 = await editarRenglonReceta(
+      sesion(),
+      idOrden,
+      'tela',
+      idRenglon,
+      { consumoComplementoPorPrenda: 0.22 },
+      bd(),
+    );
+    expect(r1.telas.find((t) => t.idTela === idTela)).toMatchObject({
+      estado: 'ajustado',
+      consumoComplementoPorPrenda: 0.22,
+      // El MODELO no se movió: sigue diciendo 0.15 (por eso la receta puede avisar la diferencia).
+      consumoComplementoModelo: 0.15,
+    });
+
+    // Omitido: el PATCH que sólo trae el precio NO toca el complemento.
+    const r2 = await editarRenglonReceta(
+      sesion(),
+      idOrden,
+      'tela',
+      idRenglon,
+      { precio: 95 },
+      bd(),
+    );
+    expect(r2.telas.find((t) => t.idTela === idTela)).toMatchObject({
+      precio: 95,
+      consumoComplementoPorPrenda: 0.22,
+    });
+
+    // `null`: BORRARLO deja la orden como antes de 0.156 (su OC vuelve a pedirlo a mano).
+    const r3 = await editarRenglonReceta(
+      sesion(),
+      idOrden,
+      'tela',
+      idRenglon,
+      { consumoComplementoPorPrenda: null },
+      bd(),
+    );
+    expect(r3.telas.find((t) => t.idTela === idTela)?.consumoComplementoPorPrenda).toBeNull();
+    const fila = await cliente.ordenTela.findUniqueOrThrow({ where: { id: idRenglon } });
+    expect(fila.consumoComplementoPorPrenda).toBeNull();
+  });
+
+  it('el impreso de la OP lo lleva al papel con el nombre del catálogo', async () => {
+    const { idOrden } = await conFelpa();
+    const receta = await enTransaccion((tx) => leerRecetaParaImpreso(tx, idOrden), bd());
+    expect(receta.telas.find((t) => t.nombre === 'Felpa')).toMatchObject({
+      nombreComplemento: 'Cardigan',
+      consumoComplementoPorPrenda: 0.15,
+    });
+  });
+});
+
 describe('⭐ Traer al pedido un insumo que el MODELO agregó (hallazgo del reviewer)', () => {
   it('nace con el amarre, las medidas por talla y las banderas del modelo, y NO se marca "a mano"', async () => {
     // El modelo agrega un avío DESPUÉS de que las órdenes congelaron su receta, con todo lo suyo.

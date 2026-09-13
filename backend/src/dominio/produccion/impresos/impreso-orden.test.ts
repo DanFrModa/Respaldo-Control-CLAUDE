@@ -36,6 +36,7 @@ import {
   recortarArtes,
   recortarFotos,
   textoTelaComprada,
+  textoTelaImpreso,
   MAX_ARTES,
   MAX_FOTOS,
   type DatosImpresoOrden,
@@ -141,7 +142,14 @@ function datosBase(over: Partial<DatosImpresoOrden> = {}): DatosImpresoOrden {
     observaciones: 'Cuidar el tono.',
     obsMaquila: 'Doble costura.',
     ...tabla,
-    telas: [{ nombre: 'Jersey', consumoPorPrenda: 0.4 }],
+    telas: [
+      {
+        nombre: 'Jersey',
+        consumoPorPrenda: 0.4,
+        nombreComplemento: null,
+        consumoComplementoPorPrenda: null,
+      },
+    ],
     listaArte: [{ descripcion: 'Logo pecho', tipoArte: 'Bordado' }],
     habilitacion: [{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }],
     fotos: [],
@@ -194,6 +202,36 @@ function ordenDensa(artes: number): DatosImpresoOrden {
     })),
   });
 }
+
+describe('textoTelaImpreso — el COMPLEMENTO llega al papel (0.165, §Post-F9.219)', () => {
+  it('la tela con complemento lo imprime con su nombre del catálogo y su consumo', () => {
+    expect(
+      textoTelaImpreso({
+        nombre: 'Felpa',
+        consumoPorPrenda: 1.2,
+        nombreComplemento: 'Cardigan',
+        consumoComplementoPorPrenda: 0.15,
+      }),
+    ).toBe('Felpa (consumo 1.2 / prenda + Cardigan 0.15 / prenda)');
+  });
+
+  it('sin complemento en el catálogo, o sin consumo congelado, la línea sale como siempre', () => {
+    const sinCatalogo = textoTelaImpreso({
+      nombre: 'Jersey',
+      consumoPorPrenda: 0.4,
+      nombreComplemento: null,
+      consumoComplementoPorPrenda: 0.15,
+    });
+    const sinConsumo = textoTelaImpreso({
+      nombre: 'Jersey',
+      consumoPorPrenda: 0.4,
+      nombreComplemento: 'Cardigan',
+      consumoComplementoPorPrenda: null,
+    });
+    expect(sinCatalogo).toBe('Jersey (consumo 0.4 / prenda)');
+    expect(sinConsumo).toBe('Jersey (consumo 0.4 / prenda)');
+  });
+});
 
 describe('armarTabla', () => {
   it('proyecta colores × tallas con totales por fila/columna y total general que cuadra', () => {
@@ -658,7 +696,13 @@ describe('armarDatosImpresoOrden', () => {
     return {
       telas: bom.telas
         .filter((t) => t.paraProduccion)
-        .map((t) => ({ nombre: t.nombre, consumoPorPrenda: t.consumoPorPrenda })),
+        .map((t) => ({
+          nombre: t.nombre,
+          consumoPorPrenda: t.consumoPorPrenda,
+          // ⭐⭐ 0.165: el complemento viaja al papel con su consumo congelado (null = no lleva).
+          nombreComplemento: t.nombreComplemento,
+          consumoComplementoPorPrenda: t.consumoComplementoPorPrenda,
+        })),
       avios: bom.avios
         .filter((a) => a.paraProduccion)
         .map((a) => ({
@@ -799,7 +843,15 @@ describe('armarDatosImpresoOrden', () => {
     );
 
     // Solo las telas/avíos paraProduccion entran; el arte no lleva precio en el impreso.
-    expect(datos.telas).toEqual([{ nombre: 'Jersey', consumoPorPrenda: 0.4 }]);
+    expect(datos.telas).toEqual([
+      {
+        nombre: 'Jersey',
+        consumoPorPrenda: 0.4,
+        // 0.165: esta tela del fixture no lleva complemento (el catálogo no lo declara).
+        nombreComplemento: null,
+        consumoComplementoPorPrenda: null,
+      },
+    ]);
     expect(datos.habilitacion).toEqual([
       { clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 },
     ]);

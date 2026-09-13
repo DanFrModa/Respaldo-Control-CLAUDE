@@ -29231,8 +29231,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -29749,8 +29757,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -30231,8 +30247,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -30587,6 +30611,7 @@ export interface paths {
         content: {
           'application/json': {
             consumoPorPrenda?: number;
+            consumoComplementoPorPrenda?: number | null;
             precio?: number | null;
             paraPreCosto?: boolean;
             paraProduccion?: boolean;
@@ -30717,8 +30742,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -31187,8 +31220,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -31662,8 +31703,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -32132,8 +32181,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -32617,8 +32674,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -33095,8 +33160,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -33565,8 +33638,16 @@ export interface paths {
                 nombre: string;
                 /** @description Unidad de medida de la tela. */
                 unidad: string | null;
-                /** @description Consumo por prenda CONGELADO en esta orden. */
+                /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                 consumoPorPrenda: number;
+                /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                nombreComplemento: string | null;
+                /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                consumoComplementoPorPrenda: number | null;
+                /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                consumoComplementoModelo: number | null;
+                /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                precioComplemento: number | null;
                 /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                 precio: number | null;
                 paraPreCosto: boolean;
@@ -34060,8 +34141,16 @@ export interface paths {
                   nombre: string;
                   /** @description Unidad de medida de la tela. */
                   unidad: string | null;
-                  /** @description Consumo por prenda CONGELADO en esta orden. */
+                  /** @description Consumo por prenda CONGELADO en esta orden. En una tela CON complemento, el CUERPO. */
                   consumoPorPrenda: number;
+                  /** @description Nombre del complemento según el catálogo HOY ("Cardigan"); null = no lleva. */
+                  nombreComplemento: string | null;
+                  /** @description Consumo del complemento por prenda CONGELADO en esta orden; null = sin capturar. */
+                  consumoComplementoPorPrenda: number | null;
+                  /** @description Consumo del complemento que trae HOY el BOM del modelo (null si no hay). */
+                  consumoComplementoModelo: number | null;
+                  /** @description Estimado del catálogo con el que se valúa el complemento (`Tela.precioSugeridoComplemento`). null = sin costo estimado. */
+                  precioComplemento: number | null;
                   /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
                   precio: number | null;
                   paraPreCosto: boolean;

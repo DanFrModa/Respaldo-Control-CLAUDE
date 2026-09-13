@@ -91,6 +91,11 @@ function unaTela(): RecetaOrden['telas'][number] {
     nombre: 'Jersey',
     unidad: 'kg',
     consumoPorPrenda: 1.5,
+    // 0.165: esta tela no lleva complemento (lo declara el catálogo).
+    nombreComplemento: null,
+    consumoComplementoPorPrenda: null,
+    consumoComplementoModelo: null,
+    precioComplemento: null,
     precio: 50,
     paraPreCosto: true,
     paraProduccion: true,
