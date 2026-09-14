@@ -15791,9 +15791,11 @@ papel del envío, el del recibo y el de la entrega ⇒ **lo tienen en la mano el
 cliente**. Por eso no es numeración interna y saltarlo tiene el mismo sentido que en las OC.
 
 🔴 **ES IRREVERSIBLE Y ES AHORA O NUNCA.** Los folios no se re-numeran: si se arranca con la
-numeración corrida, se queda así para siempre. Hoy `migracion/reparar-secuencias.ts` sólo sabe saltar
-en OP y OC ⇒ **falta construir las otras cinco y la regla del millar**, y esa ventana se cierra el
-día del go-live.
+numeración corrida, se queda así para siempre, y esa ventana se cierra el día del go-live.
+✅ **CONSTRUIDO el 14-sep-2026 (fila 0.194, v0.158):** `migracion/reparar-secuencias.ts` ya trae las
+**siete** banderas de escalón y la regla `--escalon-millar` (el explícito manda sobre ella, y el
+cuadro de confirmación dice de dónde sale cada número). El comando del arranque queda escrito en
+`docs/ARRANQUE.md` (paso 13) y en `backend/migracion/README.md`.
 
 - **Aplica en:** el go-live, y la fila **0.194** que nace de aquí. **Fecha:** 2026-09-14.
 

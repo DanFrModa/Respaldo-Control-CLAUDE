@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import { CLAVE_SECUENCIA_AUDITORIA } from '../src/dominio/calidad/auditorias.js';
 import { CLAVE_SECUENCIA_ORDEN_COMPRA } from '../src/dominio/compras/ordenes-compra.js';
+import { CLAVE_SECUENCIA_NOTA_SALIDA } from '../src/dominio/notas/notas-salida.js';
+import { CLAVE_SECUENCIA_PEDIDO } from '../src/dominio/pedidos/pedidos.js';
+import { CLAVE_SECUENCIA_ETAPA } from '../src/dominio/produccion/etapas.js';
 import { CLAVE_SECUENCIA_ORDEN } from '../src/dominio/produccion/ordenes.js';
+import { CLAVE_SECUENCIA_TERCERO } from '../src/dominio/terceros/cuenta-terceros.js';
 import {
   corridaEscribe,
   formatearEscalon,
   leerOpciones,
   modoDeUso,
+  siguienteMillar,
   type Plan,
 } from './reparar-secuencias.js';
 
@@ -17,11 +23,50 @@ import {
  *
  * El escalón es IRREVERSIBLE una vez que alguien captura con la numeración nueva, así que la
  * cáscara tiene tanto que garantizar como el motor: que nada se escriba por un error de dedo.
+ *
+ * Desde la fila 0.194 (§Post-F9.233) la cáscara lleva además **la regla del siguiente millar** y la
+ * precedencia del número explícito sobre ella.
  */
+
+describe('siguienteMillar (la REGLA del arranque, §Post-F9.233)', () => {
+  it('sube al millar de arriba — el ejemplo textual de Daniel', () => {
+    // *"una Nota de salida… si van en la 4804, ubícate en la 5000"*.
+    expect(siguienteMillar(4804n)).toBe(5000n);
+    expect(siguienteMillar(312n)).toBe(1000n);
+    expect(siguienteMillar(5847n)).toBe(6000n); // la OP del ejemplo de §Post-F9.36 → 6,000
+    expect(siguienteMillar(7920n)).toBe(8000n);
+  });
+
+  it('la tabla vacía arranca en 1,000 (también salta: es un conteo más)', () => {
+    expect(siguienteMillar(0n)).toBe(1000n);
+    expect(siguienteMillar(1n)).toBe(1000n);
+    expect(siguienteMillar(999n)).toBe(1000n);
+  });
+
+  /**
+   * ⭐ EL CASO QUE DECIDE EL DISEÑO: un máximo que YA cae justo en un millar.
+   *
+   * Quedarse en 5,000 sería "redondear hacia arriba" en el sentido matemático… y repetiría el folio
+   * 5,000, que ya está usado — la guarda del escalón por lo bajo abortaría la corrida del arranque.
+   * Por eso la regla es SIEMPRE estrictamente mayor: sube al millar siguiente.
+   */
+  it('un máximo que YA es millar exacto sube al SIGUIENTE, no se queda', () => {
+    expect(siguienteMillar(1000n)).toBe(2000n);
+    expect(siguienteMillar(5000n)).toBe(6000n);
+    expect(siguienteMillar(10000n)).toBe(11000n);
+  });
+
+  it('es SIEMPRE estrictamente mayor que su entrada (la propiedad que la hace segura)', () => {
+    for (const n of [0n, 1n, 999n, 1000n, 1001n, 4804n, 999999n, 1000000n]) {
+      expect(siguienteMillar(n) > n).toBe(true);
+    }
+  });
+});
 describe('leerOpciones', () => {
   it('sin banderas: corrida normal, sin escalón y escribiendo (lo de siempre)', () => {
     expect(leerOpciones([])).toEqual({
       escalones: new Map(),
+      millar: false,
       aplicar: false,
       simular: false,
       ayuda: false,
@@ -40,16 +85,47 @@ describe('leerOpciones', () => {
     );
   });
 
-  it('SÓLO OP y OC admiten escalón: las otras series ni siquiera tienen bandera', () => {
-    for (const bandera of [
-      '--escalon-pedido=100',
-      '--escalon-auditoria=100',
-      '--escalon-nota-salida=100',
-      '--escalon-etapa-mov=100',
-      '--escalon-movimiento-tercero=100',
-    ]) {
-      expect(() => leerOpciones([bandera])).toThrow(/Opción desconocida/);
+  /**
+   * §Post-F9.233 (Daniel, 14-sep-2026): *"me gustaría hacer saltos en TODOS los conteos"*. Hasta la
+   * fila 0.194 sólo OP y OC tenían bandera; las otras cinco arrancaban pegadas a "último + 1", y el
+   * día del go-live esa ventana se cierra para siempre.
+   */
+  it('LAS SIETE series admiten escalón explícito, cada una con su bandera', () => {
+    const esperadas: [string, string][] = [
+      ['--escalon-pedido=100', CLAVE_SECUENCIA_PEDIDO],
+      ['--escalon-orden=100', CLAVE_SECUENCIA_ORDEN],
+      ['--escalon-etapa=100', CLAVE_SECUENCIA_ETAPA],
+      ['--escalon-auditoria=100', CLAVE_SECUENCIA_AUDITORIA],
+      ['--escalon-orden-compra=100', CLAVE_SECUENCIA_ORDEN_COMPRA],
+      ['--escalon-nota-salida=100', CLAVE_SECUENCIA_NOTA_SALIDA],
+      ['--escalon-tercero=100', CLAVE_SECUENCIA_TERCERO],
+    ];
+    for (const [bandera, clave] of esperadas) {
+      expect(leerOpciones([bandera]).escalones.get(clave)).toBe(100n);
     }
+    // Y las siete de una vez, que es como se teclearían en el arranque.
+    expect(leerOpciones(esperadas.map(([b]) => b)).escalones.size).toBe(7);
+  });
+
+  it('--escalon-millar es la REGLA: se pide sola, sin número pegado', () => {
+    const opciones = leerOpciones(['--escalon-millar']);
+    expect(opciones.millar).toBe(true);
+    expect(opciones.escalones.size).toBe(0);
+    // Llevar un número sería confundirla con un escalón explícito: la regla NO se parametriza.
+    expect(() => leerOpciones(['--escalon-millar=1000'])).toThrow(/Opción desconocida/);
+  });
+
+  it('la regla y el número explícito CONVIVEN: es el comando del arranque', () => {
+    // §Post-F9.233: OP 6000 y OC 10000 los dijo Daniel; las otras cinco salen de la regla.
+    const opciones = leerOpciones([
+      '--escalon-millar',
+      '--escalon-orden=6000',
+      '--escalon-orden-compra=10000',
+    ]);
+    expect(opciones.millar).toBe(true);
+    expect(opciones.escalones.get(CLAVE_SECUENCIA_ORDEN)).toBe(6000n);
+    expect(opciones.escalones.get(CLAVE_SECUENCIA_ORDEN_COMPRA)).toBe(10000n);
+    expect(opciones.escalones.has(CLAVE_SECUENCIA_NOTA_SALIDA)).toBe(false);
   });
 
   it('una bandera desconocida ABORTA: nunca se ignora en silencio', () => {
@@ -98,6 +174,9 @@ describe('leerOpciones', () => {
 
   it('--aplicar sin escalón no significa nada: aborta en vez de dar falsa sensación', () => {
     expect(() => leerOpciones(['--aplicar'])).toThrow(/sólo tiene sentido con un escalón/);
+    // …pero la REGLA sí es un escalón: `--escalon-millar --aplicar` es una corrida legítima.
+    expect(leerOpciones(['--escalon-millar', '--aplicar']).aplicar).toBe(true);
+    expect(leerOpciones(['--escalon-millar', '--empresa=1']).idEmpresa).toBe(1);
   });
 
   it('--empresa sin escalón aborta: la reparación normal siempre corre para todas', () => {
@@ -145,22 +224,45 @@ describe('corridaEscribe (el cinturón nº 2: ensayo en seco por omisión)', () 
 });
 
 describe('modoDeUso', () => {
-  it('lista las banderas de escalón que existen de verdad, y sólo ésas', () => {
+  it('lista LAS SIETE banderas de escalón y la regla del millar', () => {
     const texto = modoDeUso();
-    expect(texto).toContain('--escalon-orden=<n>');
-    expect(texto).toContain('--escalon-orden-compra=<n>');
-    expect(texto).not.toContain('--escalon-pedido');
+    for (const bandera of [
+      '--escalon-pedido=<n>',
+      '--escalon-orden=<n>',
+      '--escalon-etapa=<n>',
+      '--escalon-auditoria=<n>',
+      '--escalon-orden-compra=<n>',
+      '--escalon-nota-salida=<n>',
+      '--escalon-tercero=<n>',
+    ]) {
+      expect(texto).toContain(bandera);
+    }
+    expect(texto).toContain('--escalon-millar');
+    // Y el comando del arranque, copiable: es el que se teclea una sola vez en la vida.
+    expect(texto).toContain('--escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000');
+  });
+
+  it('no inventa banderas: las que anuncia son exactamente las que el parser acepta', () => {
+    // El modo de uso se construye desde SERIES; si alguien lo escribiera a mano, esto lo cazaría.
+    const anunciadas = [...modoDeUso().matchAll(/--(escalon-[a-z-]+)=<n>/g)].map((m) => m[1] ?? '');
+    expect(anunciadas).toHaveLength(7);
+    for (const bandera of anunciadas) {
+      expect(() => leerOpciones([`--${bandera}=1000`])).not.toThrow();
+    }
   });
 });
 
 describe('formatearEscalon', () => {
-  const plan: Plan = {
+  /** Un plan con UN renglón, para no repetir el andamio en cada caso. */
+  const planCon = (renglon: Partial<Plan['series'][number]['renglones'][number]>): Plan => ({
     hayEscalon: true,
+    sinDatosConRegla: [],
     series: [
       {
         clave: CLAVE_SECUENCIA_ORDEN,
         descripcion: 'órdenes de producción',
         etiqueta: 'órdenes de producción (OP)',
+        flagEscalon: 'escalon-orden',
         renglones: [
           {
             idEmpresa: 1,
@@ -169,13 +271,17 @@ describe('formatearEscalon', () => {
             valorSecuencia: 5847n,
             comprometido: 5847n,
             escalon: 6000n,
+            origenEscalon: 'explicito',
+            millarRegla: 6000n,
             valorASembrar: 5999n,
             siguiente: 6000n,
+            ...renglon,
           },
         ],
       },
     ],
-  };
+  });
+  const plan: Plan = planCon({});
 
   it('canta los cuatro números del salto, con la empresa por su nombre', () => {
     const texto = formatearEscalon(plan, false);
@@ -236,5 +342,71 @@ describe('formatearEscalon', () => {
     const aplicado = formatearEscalon(plan, true);
     expect(aplicado).toContain('APLICADO');
     expect(aplicado).not.toContain('ENSAYO EN SECO');
+  });
+
+  /**
+   * ⭐ LA PROPIEDAD QUE PIDE §Post-F9.233 (a): el número explícito manda sobre la regla, y eso **no
+   * puede pasar en silencio**. El cuadro dice de dónde sale cada número y, cuando el explícito y la
+   * regla no coinciden, lo marca — en la MISMA pantalla que se lee antes de aplicar algo
+   * irreversible. Sin esta línea, mezclar `--escalon-millar` con una cifra a mano sería una decisión
+   * invisible.
+   */
+  describe('de dónde sale el número (la precedencia, visible)', () => {
+    it('explícito que COINCIDE con la regla: lo dice, sin alarma', () => {
+      const texto = formatearEscalon(planCon({ escalon: 6000n, millarRegla: 6000n }), false);
+      expect(texto).toContain('NÚMERO EXPLÍCITO --escalon-orden=6000');
+      expect(texto).toContain('que aquí decía lo mismo (6,000)');
+      expect(texto).not.toContain('⚠️  manda sobre la regla');
+    });
+
+    it('explícito que DIFIERE de la regla: lo canta con los dos números', () => {
+      // Escalón a mano 5,900 sobre un comprometido de 5,847: es válido (va por encima), pero la
+      // regla habría dicho 6,000. Quien aplica tiene que VER esa diferencia.
+      const texto = formatearEscalon(
+        planCon({ escalon: 5900n, millarRegla: 6000n, valorASembrar: 5899n, siguiente: 5900n }),
+        false,
+      );
+      expect(texto).toContain('NÚMERO EXPLÍCITO --escalon-orden=5900');
+      expect(texto).toContain('que decía 6,000');
+      expect(texto).toContain('se usa el explícito');
+    });
+
+    it('cuando sale de la REGLA, nombra la regla y de qué número la calculó', () => {
+      const texto = formatearEscalon(planCon({ origenEscalon: 'millar' }), false);
+      expect(texto).toContain('REGLA --escalon-millar');
+      expect(texto).toContain('el millar siguiente a 5,847');
+      expect(texto).not.toContain('NÚMERO EXPLÍCITO');
+    });
+
+    it('el origen sale TAMBIÉN al aplicar, no sólo en el ensayo', () => {
+      expect(formatearEscalon(planCon({ origenEscalon: 'millar' }), true)).toContain(
+        'REGLA --escalon-millar',
+      );
+    });
+
+    /**
+     * La regla recalcula contra el máximo del MOMENTO: repetirla después de capturar volvería a
+     * saltar. El escalón explícito no puede (su número ya está comprometido y aborta), así que el
+     * aviso es exclusivo de la regla — y va en la pantalla donde se decide aplicar, no en un .md.
+     */
+    it('avisa de que la regla es de UNA SOLA VEZ — y sólo cuando la regla está en juego', () => {
+      expect(formatearEscalon(planCon({ origenEscalon: 'millar' }), false)).toContain(
+        '--escalon-millar es de UNA SOLA VEZ',
+      );
+      expect(formatearEscalon(planCon({ origenEscalon: 'explicito' }), false)).not.toContain(
+        'UNA SOLA VEZ',
+      );
+    });
+  });
+
+  it('las series VACÍAS que no saltan se nombran: no se deducen de una ausencia', () => {
+    const conVacias: Plan = { ...plan, sinDatosConRegla: ['notas de salida', 'auditorías'] };
+    const texto = formatearEscalon(conVacias, false);
+    expect(texto).toContain('Series que NO saltan porque su tabla está VACÍA');
+    expect(texto).toContain('notas de salida');
+    expect(texto).toContain('auditorías');
+    expect(texto).toContain('--empresa=<id>');
+    // Y si no hay ninguna, el bloque ni aparece (no se anuncia una lista vacía).
+    expect(formatearEscalon(plan, false)).not.toContain('Series que NO saltan');
   });
 });
