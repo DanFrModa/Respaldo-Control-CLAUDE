@@ -152,9 +152,10 @@ export function EditorLineasOc({
    *
    * ⚠️ **Sigue siendo OPCIONAL, y no es descuido.** Hay órdenes que legítimamente todavía no saben
    * el tono (sin matriz color×talla, o sin amarre), y ahí la tela se compra sin color como siempre
-   * — incluso la explosión genera OC así. Lo que el servidor **sí** impide, al RECIBIR, es que un
-   * renglón mudo se quede con el tono que otro renglón de la misma OC reclama (`recepciones.ts`).
-   * El aviso de abajo lo anticipa cuando la tela va repetida; el juez es el servidor (A1).
+   * — incluso la explosión genera OC así. Lo que el servidor **sí** RECHAZA, al RECIBIR, es que un
+   * renglón mudo se quede con el tono que otro renglón de la misma OC **todavía espera**
+   * (`recepciones.ts`). El aviso de abajo lo anticipa cuando la tela va repetida; el juez es el
+   * servidor (A1).
    *
    * Los colores salen de la tela que ya viaja en `telas` (cada una trae sus `colores` hijos), así
    * que no hace falta ninguna consulta nueva. Si la tela del renglón no está en esa lista (una OC
@@ -174,8 +175,10 @@ export function EditorLineasOc({
       );
     }
     // ¿Esta MISMA tela está en otro renglón de la OC? Es la forma en la que el renglón mudo hace
-    // daño —se queda con el tono del hermano—, y la única que el servidor sabe rechazar al recibir.
-    // Decirlo AQUÍ, mientras la OC se arma, es lo que evita descubrirlo con la tela en la puerta.
+    // daño —se queda con el tono que el hermano todavía espera—, y la única que el servidor RECHAZA
+    // al recibir. Decirlo AQUÍ, mientras la OC se arma y cualquiera con `compras.administrar` la
+    // puede corregir, es lo que evita descubrirlo con la tela en la puerta y el permiso de
+    // dirección por medio.
     const telaRepetida = renglones.some(
       (r) => r.clave !== renglon.clave && r.tipo === 'tela' && r.idTela === renglon.idTela,
     );
@@ -212,7 +215,9 @@ export function EditorLineasOc({
         {telaRepetida && renglon.idTelaColor === null ? (
           <span className="mt-1 block text-warn" data-testid="aviso-color-tela-repetida-oc">
             Esta orden pide la misma tela en otro renglón. Mientras este no diga su color, al
-            recibir no habrá forma de saber cuál de los dos surte lo que llegue: dilo aquí.
+            recibir se <b>rechazará</b> la factura que traiga el tono que pide ese otro renglón.
+            Dilo aquí: después de autorizar, corregirlo ya sólo lo puede quien edite órdenes
+            autorizadas.
           </span>
         ) : null}
       </label>

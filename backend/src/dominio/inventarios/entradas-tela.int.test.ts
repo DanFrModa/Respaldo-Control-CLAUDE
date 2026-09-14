@@ -1362,8 +1362,8 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
    * control para ponérselo** ⇒ el cruce de arriba **no dispara** (sólo cruza si el renglón lo trae)
    * y por ahí entraba cualquier tono, **incluido el que su hermano ya tenía apartado**.
    *
-   * ⚠️ La OC se pide aquí como la pide la vida: un renglón con MARINO (el cuerpo) y otro mudo (las
-   * mangas).
+   * ⚠️ La OC se pide aquí como la pide la vida: un renglón con MARINO (el cuerpo, 100 kg) y otro
+   * mudo (las mangas, 50 kg).
    */
   async function ocFelpaMangas() {
     const oc = await crearOC(
@@ -1376,7 +1376,9 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
           {
             idTela: telaFelpa.id,
             idTelaColor: colorMarino.id,
-            cantidad: 150,
+            // 100 + 5 = exactamente lo que trae `facturaDeColor`: una sola remesa lo deja SURTIDO,
+            // que es la premisa del caso «el hermano ya no espera» de más abajo.
+            cantidad: 100,
             precio: 12,
             unidad: 'kg',
             cantidadComplemento: 5,
@@ -1406,10 +1408,10 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
     const entrada = await facturaDeColor(muda.id, colorMarino.id);
 
     // 🔴 El valor que la pone roja: que confirmar NO lance — que es lo que pasaba antes de la fila,
-    // con los 150 kg del cuerpo entrando por el renglón de las mangas y el cuerpo esperando eterno.
+    // con los kilos del cuerpo entrando por el renglón de las mangas y el cuerpo esperando eterno.
     await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(ErrorValidacion);
     await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
-      /lo pide OTRO renglón/,
+      /lo pide el renglón 1 de esa misma orden, al que todavía le falta material/,
     );
     // Y no escribió nada.
     expect(await cliente.movimiento.count()).toBe(0);
@@ -1417,8 +1419,8 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
   });
 
   /**
-   * ⚠️ **LA OTRA MITAD, y la que evita convertir el arreglo en una trampa.** Lo que de verdad viene
-   * para el renglón mudo **siempre se tiene que poder recibir**: si no, la tela se queda en la
+   * ⚠️ **LA OTRA MITAD, y la que evita convertir el arreglo en una trampa.** Un tono que **ningún
+   * hermano reclama** tiene que poder entrar por el renglón mudo: si no, la tela se queda en la
    * puerta, porque corregir una OC ya firmada exige `compras.editar-autorizada` (dirección).
    */
   it('el BLANCO sí entra por el renglón mudo: ningún hermano lo reclama', async () => {
@@ -1438,6 +1440,46 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
     const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
     expect(confirmada.estatus).toBe('confirmada');
     expect(confirmada.lineas[0]!.idTelaColor).toBe(colorMarino.id);
+  });
+
+  /**
+   * 🔴🔴 **EL CASO QUE LA PRIMERA VERSIÓN DE ESTA GUARDA DEJABA SIN NINGUNA PUERTA DE ENTRADA** —
+   * lo midió el reviewer, y es el reverso exacto del argumento con el que la guarda se justificó.
+   *
+   * El marino llega en DOS remesas. La primera surte el renglón del cuerpo ⇒ ese hermano **deja de
+   * esperar**, y con eso **desaparece del selector** de la entrada de tela
+   * (`lineasTelaPendientesDeProveedor` sólo ofrece lo que tiene faltante). Los kilos de la segunda
+   * remesa no se pueden ligar a él —ya no está en la lista— ni recibirse sueltos
+   * (`exigirRenglonesConOrdenDeCompra`): si además se les cierra el renglón mudo, **no queda camino
+   * ninguno** salvo editar una OC firmada, que exige `compras.editar-autorizada` (dirección).
+   *
+   * 🔑 Valor que la pone ROJA: que la guarda ignore el faltante del hermano (la versión rechazada).
+   * Entonces esta confirmación —que tiene que pasar— lanza `ErrorValidacion` y la tela se queda en
+   * la puerta.
+   */
+  it('🔴 con el hermano YA SURTIDO, el renglón mudo SÍ acepta ese tono (si no, no hay camino)', async () => {
+    const { conColor, muda } = await ocFelpaMangas();
+
+    // 1ª remesa: el cuerpo se surte entero por su propio renglón.
+    const primera = await facturaDeColor(conColor.id, colorMarino.id);
+    expect((await confirmarEntradaTela(sesion(), primera.id, bd())).estatus).toBe('confirmada');
+
+    // Y con eso el hermano deja de ofrecerse: ya no hay dónde ligar lo que siga llegando.
+    const pendientes = await lineasTelaPendientesDeProveedor(
+      sesion(PERM_COMPRAS),
+      proveedor.id,
+      undefined,
+      bd(),
+    );
+    expect(pendientes.some((p) => p.idOrdenCompraLinea === conColor.id)).toBe(false);
+
+    // 2ª remesa del MISMO tono, ligada al renglón mudo: tiene que ENTRAR.
+    const segunda = await facturaDeColor(muda.id, colorMarino.id);
+    const confirmada = await confirmarEntradaTela(sesion(), segunda.id, bd());
+    expect(confirmada.estatus).toBe('confirmada');
+    expect(confirmada.lineas[0]!.idTelaColor).toBe(colorMarino.id);
+    // Y se registró de verdad contra la OC (no es que "no truene sin hacer nada").
+    expect(await cliente.recepcionCompraLinea.count()).toBe(2);
   });
 });
 

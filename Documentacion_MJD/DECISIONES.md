@@ -13565,8 +13565,15 @@ se VE, y se puede quitar»* ya no es verdad, y se corrigió en el sitio.
   color×talla, o sin amarre. La propia pantalla «De qué color se compra la tela» lo dice con todas sus
   letras (*«mientras tanto, estas telas se compran sin color»*).
 - ✅ **Obligatorio-en-lo-que-se-puede-saber al recibir.** Si el renglón al que se ligan los kilos **no
-  dice** su color y ese tono **lo pide otro renglón de la misma OC**, se rechaza nombrando el color. Lo
-  que de verdad venía para el renglón mudo (un tono que nadie más reclama) **siempre se puede recibir**.
+  dice** su color y ese tono **lo pide otro renglón de la misma OC AL QUE TODAVÍA LE FALTA MATERIAL**,
+  se rechaza nombrando ese renglón. Mientras el renglón hermano siga esperando ese tono, sus kilos se
+  ligan a él.
+  🔴 **Las dos acotaciones son la guarda, no matices.** Un renglón mudo **solitario** no se toca (la OC
+  no dice el tono y nadie puede adivinarlo), y **un hermano YA SURTIDO tampoco protege nada**: en cuanto
+  queda surtido **desaparece del selector** de la entrada de tela (`lineasTelaPendientesDeProveedor`
+  sólo ofrece lo que tiene faltante) y recibir sin OC está prohibido (§Post-F9.159(a)) ⇒ cerrar ahí el
+  renglón mudo dejaba la segunda remesa **sin ningún camino de entrada**. Lo cazó el reviewer midiendo
+  el caso, y es el reverso exacto del argumento con el que se descartó bloquear todo renglón sin color.
 
 🔴 **POR QUÉ NO SE EXIGIÓ EL COLOR A SECAS — dos caminos probados y los dos rotos, medidos, no supuestos.**
 1. **Bloquear al RECIBIR todo renglón sin color** (la propuesta inicial) **dejaría la tela en la puerta**:

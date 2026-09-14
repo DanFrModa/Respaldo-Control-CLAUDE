@@ -97,9 +97,17 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Cuando la misma tela aparece en dos renglones y uno se quedó sin color, la pantalla avisa** en ese
   renglón. Es un aviso, no un candado: la orden se guarda y se autoriza igual. El aviso está para que
   el color se ponga **antes** de que llegue el material, no para estorbar.
+- 🔴 **Y hay un rechazo NUEVO en la entrada de tela, que quien recibe se va a encontrar de frente.**
+  Si se liga una factura a un renglón que no dice su color, y ese tono lo pide **otro renglón de la
+  misma orden al que todavía le falta material**, el sistema **no deja confirmar** y dice a qué renglón
+  hay que ligarlo. Es el caso de las mangas: los kilos del cuerpo entrando por el renglón equivocado
+  mientras el cuerpo se queda esperando.
+- **Pero sólo bloquea mientras ese otro renglón siga esperando.** En cuanto queda surtido, el renglón
+  sin color vuelve a aceptar ese tono — que es lo que permite meter una segunda remesa cuando el
+  renglón hermano ya se cerró y por eso desapareció de la lista de pendientes.
 - **Un renglón que no dice su color se sigue recibiendo de cualquier tono si es el único de esa tela.**
-  El sistema sólo impide lo que de verdad sabe: que ese tono ya tiene dueño en esa orden. Lo demás no
-  lo puede adivinar, y bloquearlo dejaría la tela parada en la puerta.
+  El sistema sólo impide lo que de verdad sabe: que ese tono ya tiene dueño **y ese dueño lo espera**.
+  Lo demás no lo puede adivinar, y bloquearlo dejaría la tela parada en la puerta.
 - **Las órdenes de compra viejas se siguen viendo igual.** Un renglón cuya tela ya no esté en la lista
   del proveedor enseña su color como texto, sin selector: el dato no se pierde.
 
@@ -108,8 +116,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Esto es el parche que hace usable el camino manual, no la solución de fondo.** La de fondo la
   decidió Daniel y vive aparte: que **la receta diga el consumo por partes** (*«150 de cuerpo y 50 de
   mangas»*), capturado una vez por modelo por la gente de Desarrollo, en vez de resolverlo orden por
-  orden en la compra. Él mismo la situó después del arranque (*«es raro, son pocos; si me llegara a
-  salir alguno que necesite meter, te aviso»*).
+  orden en la compra. Él mismo la situó después del arranque: *«es raro, son pocos. Si me llegara a
+  salir alguno que necesite meter, te aviso para pasarlo a V1»*.
 - **Las órdenes de compra que ya estaban capturadas no se tocaron.** Si alguna tiene la tela repetida
   con un renglón mudo, sigue como estaba; lo que cambia es que ahora se le puede poner el color a mano.
 

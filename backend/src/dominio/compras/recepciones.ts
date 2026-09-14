@@ -1054,12 +1054,60 @@ export async function registrarRecepcionesDesdeEntradaTela(
               idTelaColor: true,
               telaColor: { select: { nombre: true } },
             },
+            // Por `id` = el orden en que se capturaron (así los escribe `crearLineas`), que es el
+            // que el usuario ve numerado en el editor. Sin esto, «renglón 2» podría no ser el 2.
+            orderBy: { id: 'asc' },
           },
         },
       },
     },
   });
   const porId = new Map(lineasOC.map((l) => [l.id, l]));
+
+  // ⭐⭐ **Fila 0.160 — CUÁNTO SE HA RECIBIDO YA DE CADA RENGLÓN, medido ANTES de esta entrada.**
+  // Lo consume la guarda del renglón mudo (abajo): un hermano que YA quedó surtido no está
+  // esperando su tono, así que no hay nada que protegerle. Se pide UNA vez para todas las OC
+  // implicadas —no una por renglón— y con el mismo criterio que `recalcularEstatusOC`: sólo
+  // recepciones ACTIVAS (`reversadaEn: null`), porque una reversada no surtió nada.
+  //
+  // 🔑 **Y se mide ANTES a propósito.** Esta función valida entera antes de escribir ninguna
+  // `RecepcionCompraLinea`, así que dos renglones de la MISMA factura ven el mismo estado de
+  // partida: el hermano que esta factura está surtiendo AHORA sigue contando como «esperando»,
+  // que es justo lo que evita que los kilos del cuerpo se cuelen por el renglón de las mangas
+  // dentro de un solo documento.
+  const recibidoPrevio = new Map<number, { cuerpo: number; complemento: number }>();
+  {
+    const idsOc = [...new Set(lineasOC.map((l) => l.ordenCompra.id))];
+    const sumas = await tx.recepcionCompraLinea.groupBy({
+      by: ['idOrdenCompraLinea'],
+      where: { recepcionCompra: { idOrdenCompra: { in: idsOc }, reversadaEn: null } },
+      _sum: { cantidadRecibida: true, cantidadComplemento: true },
+    });
+    for (const s of sumas) {
+      recibidoPrevio.set(s.idOrdenCompraLinea, {
+        cuerpo: Number(s._sum.cantidadRecibida ?? 0),
+        complemento: Number(s._sum.cantidadComplemento ?? 0),
+      });
+    }
+  }
+
+  /** ¿Este renglón de OC TODAVÍA espera material (cuerpo o complemento, con su banda del 5%)? */
+  function sigueEsperando(linea: {
+    id: number;
+    cantidad: Prisma.Decimal;
+    cantidadComplemento: Prisma.Decimal | null;
+  }): boolean {
+    const ya = recibidoPrevio.get(linea.id) ?? { cuerpo: 0, complemento: 0 };
+    const falta = faltantePorRecibir({
+      pedido: Number(linea.cantidad),
+      recibido: ya.cuerpo,
+      pedidoComplemento:
+        linea.cantidadComplemento === null ? null : Number(linea.cantidadComplemento),
+      recibidoComplemento: ya.complemento,
+      tipo: 'tela',
+    });
+    return falta.cuerpo > 0 || falta.complemento > 0;
+  }
 
   // Agrupa por OC conservando el orden de captura dentro de cada una.
   const porOrdenCompra = new Map<
@@ -1103,7 +1151,8 @@ export async function registrarRecepcionesDesdeEntradaTela(
           `proveedor de verdad mandó otro color.`,
       );
     }
-    // ⭐⭐ **Fila 0.160 (§Post-F9.213·B) — Y EL RENGLÓN MUDO NO SE QUEDA CON UN TONO AJENO.**
+    // ⭐⭐ **Fila 0.160 (§Post-F9.213·B) — EL RENGLÓN MUDO NO LE QUITA EL TONO A UN HERMANO QUE
+    // TODAVÍA LO ESPERA.**
     //
     // 🔴 El agujero que cierra: el caso de las mangas (*"es la misma tela, pero las mangas van de
     // otro color"*) se resuelve partiendo la compra en DOS renglones de la misma tela, y el segundo
@@ -1112,27 +1161,42 @@ export async function registrarRecepcionesDesdeEntradaTela(
     // hermano ya tenía apartado: los 150 kg de marino se recibían contra el renglón de las mangas y
     // el renglón del cuerpo se quedaba esperando para siempre.
     //
-    // 🔑 **Por qué se bloquea SÓLO el tono que otro renglón reclama, y no todo renglón sin color.**
-    // Un renglón mudo **solitario** es legítimo y vivo: la orden todavía no tiene su matriz
-    // color×talla, o nadie amarró el tono, y la explosión genera la OC igual (la pantalla «De qué
-    // color se compra la tela» lo dice: *"mientras tanto, estas telas se compran sin color"*).
-    // Rechazarlo dejaría **la tela en la puerta** sin forma de meterla: corregir una OC ya firmada
-    // exige `compras.editar-autorizada`, que es un permiso de dirección. Aquí no se le pide a nadie
-    // que adivine lo que la OC no dice — sólo se le impide quedarse con lo que la OC **sí** dijo que
-    // era de otro renglón. Lo que de verdad venía para el renglón mudo siempre se puede recibir.
+    // 🔑 **Por qué se bloquea SÓLO el tono que un hermano SIGUE esperando, y no todo renglón mudo.**
+    // Dos acotaciones, y las dos evitan dejar material sin ninguna puerta de entrada:
+    //  1. **Un renglón mudo SOLITARIO no se toca.** Es legítimo y vivo: la orden todavía no tiene su
+    //     matriz color×talla, o nadie amarró el tono, y la explosión genera la OC igual (la pantalla
+    //     «De qué color se compra la tela» lo dice: *"mientras tanto, estas telas se compran sin
+    //     color"*). Aquí no se le pide a nadie que adivine lo que la OC no dice.
+    //  2. 🔴 **Y si el hermano YA QUEDÓ SURTIDO, tampoco.** Ésta es la que faltaba, y la cazó el
+    //     reviewer con el caso medido: recibido el marino del cuerpo en una primera remesa, el
+    //     hermano **desaparece del selector** de la entrada de tela —`lineasTelaPendientesDeProveedor`
+    //     sólo ofrece lo que tiene faltante— y recibir sin OC está prohibido
+    //     (`exigirRenglonesConOrdenDeCompra`, §Post-F9.159(a)). Bloquear ahí dejaba los kilos de la
+    //     segunda remesa **sin ningún camino**: ni por el mudo, ni por el hermano, ni sueltos; la
+    //     única salida era editar una OC firmada, que exige `compras.editar-autorizada` (dirección).
+    //     Era exactamente el mal —*dejar la tela en la puerta*— que esta guarda decía evitar.
+    //
+    // ⇒ **La invariante, dicha en una línea:** se protege a un hermano que todavía espera ese tono,
+    // no al tono en abstracto.
     if (linea.idTelaColor === null) {
-      const hermano = oc.lineas.find(
+      const esperando = oc.lineas.find(
         (h) =>
-          h.id !== linea.id && h.idTela === linea.idTela && h.idTelaColor === renglon.idTelaColor,
+          h.id !== linea.id &&
+          h.idTela === linea.idTela &&
+          h.idTelaColor === renglon.idTelaColor &&
+          sigueEsperando(h),
       );
-      if (hermano !== undefined) {
+      if (esperando !== undefined) {
+        const numero = oc.lineas.findIndex((h) => h.id === esperando.id) + 1;
+        const nombreColor = esperando.telaColor?.nombre ?? String(renglon.idTelaColor);
         throw new ErrorValidacion(
           `El renglón de la orden de compra ${Number(oc.numCompra)} al que estás ligando esto no ` +
-            `dice de qué color se pidió, y el color que llegó ` +
-            `("${hermano.telaColor?.nombre ?? String(renglon.idTelaColor)}") lo pide OTRO renglón ` +
-            `de esa misma orden. Liga estos kilos a ese renglón, o ponle su color al renglón mudo ` +
-            `en la orden de compra (el selector de color, junto a la tela) para que se pueda ` +
-            `cuadrar.`,
+            `dice de qué color se pidió, y el color que llegó ("${nombreColor}") lo pide el ` +
+            `renglón ${String(numero)} de esa misma orden, al que todavía le falta material. Liga ` +
+            `estos kilos al renglón ${String(numero)}. Si de verdad son de otro pedido, hay que ` +
+            `ponerle su color al renglón mudo en la orden de compra (el selector de color, junto a ` +
+            `la tela) — y como la orden ya está autorizada, eso sólo lo puede hacer quien tenga el ` +
+            `permiso de editar órdenes autorizadas.`,
         );
       }
     }
