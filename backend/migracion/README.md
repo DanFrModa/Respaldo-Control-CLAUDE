@@ -1,5 +1,43 @@
 # ETL de migración (CONTROL v1 Access → v2)
 
+> ## 🌱 ¿Buscas DATOS FICTICIOS para probar? Eso es otro script y NO es un ETL
+>
+> `sembrar-demo-inventarios.ts` siembra material, proveedores, compras, recepciones, existencias y
+> facturas **inventadas** para poder probar inventarios en `prueba`. **Nada que ver con la migración de
+> Access** — no lee un solo CSV y no toca nada de lo que ya exista.
+>
+> ```bash
+> # desde backend/, con .env apuntando al ambiente donde quieres los datos
+> npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts              # sembrar
+> npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts -- --simular # ensayo en seco
+> npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts -- --limpiar # retirar lo sembrado
+> ```
+>
+> **Todo entra por el DOMINIO**, nunca escribiendo a pelo: las existencias son Σ de movimientos, así que
+> sembrarlas directas daría números que la aplicación no reconoce. Es **idempotente** (cada id queda
+> anotado en `mapeo_migracion` bajo `Demo:*`) y lo sembrado se retira con `--limpiar`.
+>
+> 🔴 **Lo que hay que saber del borrado, porque costó dos rechazos en revisión:**
+> - **Sólo borra lo que él mismo creó**, por su marca en el mapeo. **Jamás deduce por almacén ni por
+>   nombre**: una versión temprana barría *todo* movimiento que viviera en un almacén DEMO y dejaba una
+>   tela real con **media pata de traspaso y existencia negativa**, diciendo «la base quedó como antes».
+> - **Si metiste algo tuyo en un almacén sembrado**, ese almacén **no se borra: se desactiva** con su
+>   contenido intacto, y se dice en el reporte. Abortar dejaría esa base sin poder limpiarse nunca
+>   (`Movimiento.idAlmacen` es RESTRICT). **Y conserva su marca**, para que la siguiente siembra lo
+>   reactive en vez de chocar con el nombre.
+> - **Lo que cuelga de lo ficticio y él no creó** (un pago, una recepción capturada encima) **aborta el
+>   borrado entero** nombrando los ids, sin tocar nada.
+> - `--simular` enseña **exactamente** lo que se va a borrar, marcas incluidas.
+>
+> ⚠️ **Los CFDI no se importan solos**: quedan como XML en `migracion/__fixtures__/demo-cfdi/` para
+> capturarlos a mano (que es lo que se quiere probar) o con `etl-cfdi-masivo.ts -- --dir=…`. Y llevan un
+> receptor genérico **mientras la empresa no tenga RFC capturado**: si ya lo tiene, hay que volver a
+> sembrar para que se reescriban con él, o el importador los rechaza por ir dirigidos a otro.
+>
+> 📌 **No insertes movimientos con SQL a pelo** para preparar un escenario: te saltas la secuencia
+> atómica de folios (A3) y la dejas desfasada — el reviewer se topó con eso montando sus pruebas y los
+> fallos eran de su montaje, no del script.
+
 Scripts que migran los datos reales del sistema viejo (CSV en `Respaldo CLAUDE/TABLAS/`, **encoding CP850**) a la BD de v2, cargando **vía los servicios de dominio** (modo migración), de forma **idempotente** y re-ejecutable.
 
 ---
