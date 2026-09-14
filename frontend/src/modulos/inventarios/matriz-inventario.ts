@@ -115,11 +115,55 @@ export function ordenesConExistencia(
   );
 }
 
-/** Opciones de color para la matriz, desde el catálogo (`{ id, nombre }`). */
+/** Cómo se rotula en el desplegable un color que ya NO está en el catálogo. */
+export const SUFIJO_COLOR_RETIRADO = ' (retirado)';
+
+/**
+ * ⭐ FILA 0.164 — OPCIONES DE COLOR PARA LA MATRIZ: EL CATÁLOGO VIVO **MÁS LOS COLORES RETIRADOS QUE
+ * TIENEN MERCANCÍA EN ESTE CONTEXTO**.
+ *
+ * El catálogo (`colores`) llega ya filtrado a los ACTIVOS por el servidor, y así tiene que seguir:
+ * una pantalla de captura que ofreciera todos los colores retirados invitaría a meter existencia
+ * bajo uno de ellos. Pero la existencia de PT son movimientos ya asentados (D3) y **no se apaga
+ * cuando se apaga el color**: al fusionar dos duplicados (§Post-F9.222) el absorbido queda
+ * `activo = false` con sus piezas intactas, y hasta esta fila ese color desaparecía de los dos
+ * desplegables ⇒ el **ajuste manual** y el **traspaso** de esas piezas se quedaban sin puerta.
+ *
+ * 🔑 **La puerta se abre SOLO donde hay mercancía, y quien decide dónde la hay es el SERVIDOR**:
+ * `filasExistencia` son los renglones de `consultarExistenciasPt` que la pantalla YA pidió para su
+ * contexto (modelo, y almacén cuando aplica), con el `colorActivo` que trae cada renglón. Esta
+ * función no consulta ni deduce existencia: la deriva, exactamente como {@link ordenesConExistencia}
+ * hace con los buckets de orden. Función PURA (A1).
+ *
+ * ⚠️ **El alcance lo fija la consulta que la pantalla hizo, no esta función.** En SALIDA los
+ * renglones vienen sin ceros ⇒ sólo aparece el color retirado que hoy tiene piezas. En ENTRADA la
+ * consulta pide `incluirCeros` a propósito (el va-y-ven del estampado) ⇒ también aparece el que
+ * quedó en cero, que es justo el que tiene que poder REGRESAR.
+ *
+ * 📌 Y el retirado se ofrece **rotulado** ({@link SUFIJO_COLOR_RETIRADO}): sin la marca, un color
+ * fusionado se leería como uno más del catálogo y volvería a capturarse. El nombre sólo se pinta —
+ * al API viaja el `idColor`.
+ */
 export function coloresOpciones(
   colores: readonly { id: number; nombre: string }[],
+  filasExistencia: readonly { idColor: number; color: string; colorActivo: boolean }[] = [],
 ): { id: number; nombre: string }[] {
-  return colores.map((c) => ({ id: c.id, nombre: c.nombre }));
+  const opciones = colores.map((c) => ({ id: c.id, nombre: c.nombre }));
+  const yaOfrecidos = new Set(opciones.map((c) => c.id));
+  // El `Map` es lo que deduplica: un mismo color retirado viene en TANTAS filas como
+  // talla×almacén×orden tenga piezas.
+  const retirados = new Map<number, string>();
+  for (const f of filasExistencia) {
+    if (f.colorActivo || yaOfrecidos.has(f.idColor)) continue;
+    retirados.set(f.idColor, `${f.color}${SUFIJO_COLOR_RETIRADO}`);
+  }
+  // Los retirados van al final: el catálogo vivo es lo que se captura todos los días.
+  return [
+    ...opciones,
+    ...[...retirados.entries()]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es') || a.id - b.id),
+  ];
 }
 
 /** Columnas (tallas) para la matriz, desde el catálogo, ordenadas por su `orden`. */

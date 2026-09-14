@@ -6,7 +6,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { MatrizLinea } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 
-import { aLineasApi, ordenesConExistencia, totalMatriz } from './matriz-inventario';
+import {
+  aLineasApi,
+  coloresOpciones,
+  ordenesConExistencia,
+  SUFIJO_COLOR_RETIRADO,
+  totalMatriz,
+} from './matriz-inventario';
 
 const matriz: MatrizLinea[] = [
   { idColor: 1, color: 'Marino', cantidades: { 10: 3, 11: 0 } },
@@ -88,5 +94,51 @@ describe('ordenesConExistencia (§Post-F9.40)', () => {
 describe('totalMatriz', () => {
   it('suma todas las celdas', () => {
     expect(totalMatriz(matriz)).toBe(8);
+  });
+});
+
+/**
+ * ⭐ FILA 0.164 — el catálogo vivo MÁS los colores retirados que tienen mercancía aquí. Nace de la
+ * fusión de duplicados (§Post-F9.222): el color absorbido se apaga y sus piezas siguen en el
+ * almacén, así que sin esto no había forma de ajustarlas ni de traspasarlas.
+ */
+describe('coloresOpciones (fila 0.164)', () => {
+  const CATALOGO = [
+    { id: 7, nombre: 'Rojo' },
+    { id: 8, nombre: 'Marino' },
+  ];
+  const retirado = (idColor: number, color: string) => ({ idColor, color, colorActivo: false });
+
+  it('sin filas de existencia devuelve EXACTAMENTE el catálogo (lo de siempre)', () => {
+    expect(coloresOpciones(CATALOGO)).toEqual(CATALOGO);
+    expect(coloresOpciones(CATALOGO, [])).toEqual(CATALOGO);
+  });
+
+  it('agrega el color RETIRADO con mercancía, rotulado y AL FINAL', () => {
+    expect(coloresOpciones(CATALOGO, [retirado(9, 'Blanco Hueso')])).toEqual([
+      ...CATALOGO,
+      { id: 9, nombre: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}` },
+    ]);
+  });
+
+  it('no duplica: ni el color repetido en varias filas ni el que ya está en el catálogo', () => {
+    expect(
+      coloresOpciones(CATALOGO, [
+        retirado(9, 'Blanco Hueso'),
+        retirado(9, 'Blanco Hueso'),
+        { idColor: 7, color: 'Rojo', colorActivo: true },
+      ]),
+    ).toEqual([...CATALOGO, { id: 9, nombre: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}` }]);
+  });
+
+  /**
+   * La puerta se abre por el color RETIRADO, no por «todo lo que tenga existencia»: un color ACTIVO
+   * que no venga en la página del catálogo no se cuela por aquí (ese hueco es otro problema, y
+   * ofrecerlo sin marca lo escondería).
+   */
+  it('un color ACTIVO que no está en el catálogo NO se agrega', () => {
+    expect(coloresOpciones(CATALOGO, [{ idColor: 9, color: 'Verde', colorActivo: true }])).toEqual(
+      CATALOGO,
+    );
   });
 });

@@ -47624,6 +47624,8 @@ export interface paths {
                 idColor: number;
                 /** @description Nombre del color. */
                 color: string;
+                /** @description Si el color sigue vivo en el catálogo (fila 0.164). La existencia son movimientos ya asentados (D3): un color desactivado —p. ej. absorbido por una fusión, §Post-F9.222— conserva sus piezas. Las pantallas de captura lo usan para ofrecer ese color marcado como retirado, en vez de dejar la mercancía sin puerta. */
+                colorActivo: boolean;
                 /** @description Id de la talla. */
                 idTalla: number;
                 /** @description Etiqueta visible de la talla. */

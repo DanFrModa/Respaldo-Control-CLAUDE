@@ -148,9 +148,12 @@ export function TraspasosPtPagina(): React.JSX.Element {
     [disponiblePorArticulo],
   );
 
+  // Fila 0.164 — al catálogo VIVO se le suman los colores RETIRADOS con existencia en el ORIGEN
+  // (la misma consulta que alimenta el «disponible»): un color absorbido por una fusión
+  // (§Post-F9.222) conserva sus piezas, y sin esto no había forma de traspasarlas.
   const coloresDisponibles = useMemo(
-    () => coloresOpciones(colores.data?.datos ?? []),
-    [colores.data],
+    () => coloresOpciones(colores.data?.datos ?? [], existencias.data?.filas ?? []),
+    [colores.data, existencias.data],
   );
   const tallasDisponibles = useMemo(
     () => tallasColumnas(tallasCat.data?.datos ?? []),
