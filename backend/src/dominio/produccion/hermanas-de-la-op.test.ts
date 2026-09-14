@@ -15,12 +15,28 @@ import {
 
 // ── Constructores del fixture ─────────────────────────────────────────────────────────────
 
-function tela(idTela: number, consumo: number, nombre = `Tela ${String(idTela)}`): MaterialDeLaOp {
+/**
+ * Una tela congelada. `complemento` (0.191) = la cantidad del cárdigan que la acompaña;
+ * `undefined` ⇒ **la tela NO lleva complemento**, que es el caso de la inmensa mayoría y el que
+ * tiene que seguir firmando exactamente como antes de esa fila.
+ */
+function tela(
+  idTela: number,
+  consumo: number,
+  extra: { nombre?: string; complemento?: number; nombreComplemento?: string | null } = {},
+): MaterialDeLaOp {
   return {
     tipo: 'tela',
     clave: `tela-${String(idTela)}`,
-    nombre,
+    nombre: extra.nombre ?? `Tela ${String(idTela)}`,
     consumoPorPrenda: consumo,
+    consumoComplementoPorPrenda: extra.complemento ?? null,
+    nombreComplemento:
+      extra.nombreComplemento === undefined
+        ? extra.complemento === undefined
+          ? null
+          : 'cárdigan'
+        : extra.nombreComplemento,
     porTalla: false,
     medidas: new Map(),
   };
@@ -47,6 +63,9 @@ function avio(
     clave: `avio-${String(idAvio)}`,
     nombre: extra.nombre ?? `AV-${String(idAvio)} — Avío ${String(idAvio)}`,
     consumoPorPrenda: consumo,
+    // El complemento es de TELA: los avíos no lo tienen (lo fija así el cargador).
+    consumoComplementoPorPrenda: null,
+    nombreComplemento: null,
     porTalla: extra.porTalla ?? false,
     medidas: new Map(
       (extra.medidas ?? []).map(([idTalla, valor]) => [
@@ -67,6 +86,8 @@ function arte(clave: string, nombre = clave): MaterialDeLaOp {
     clave,
     nombre,
     consumoPorPrenda: null,
+    consumoComplementoPorPrenda: null,
+    nombreComplemento: null,
     porTalla: false,
     medidas: new Map(),
   };
@@ -346,6 +367,169 @@ describe('la CANTIDAD congelada', () => {
           ],
         }),
       ]),
+    ]);
+    expect(r.get(1)?.aviso).toBeNull();
+    expect(r.get(2)?.aviso).toBeNull();
+  });
+});
+
+// ── El COMPLEMENTO de la tela (0.191) ─────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ **EL QUINTO PUNTO CIEGO DEL COMPLEMENTO.** La 0.165 tapó los otros cuatro (contrato, PATCH,
+ * impreso y el detector «difiere del modelo»); la firma de esta comparación quedó fuera de alcance y
+ * hasta la 0.191 miraba **sólo** `consumoPorPrenda`. Dos hermanas que sólo diferían en el cárdigan
+ * salían idénticas — con el agravante de que ese número SÍ viaja a la explosión del MRP, así que la
+ * diferencia invisible acababa comprando cantidades distintas.
+ *
+ * ⚠️ **El control negativo de este bloque es el que MÁS importa**: una tela SIN complemento tiene
+ * que firmar exactamente como antes, o el arreglo marcaría como «desviadas» a todas las órdenes que
+ * ya existen (ninguna de las cuales lleva cárdigan).
+ */
+describe('el COMPLEMENTO de la tela — el cárdigan que acompaña a la felpa', () => {
+  it('(a) avisa cuando dos hermanas SÓLO difieren en el consumo del complemento', () => {
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(3, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.4 })]),
+    ]);
+    expect(r.get(3)?.aviso).toBe('Esta OP no va igual que sus 2 hermanas: «Felpa».');
+    expect(r.get(3)?.diferencias[0]).toMatchObject({ que: 'cantidad', tipo: 'tela' });
+    // 🔴 Y el TEXTO dice EN QUÉ difieren: sin el complemento serían dos «1.2» idénticos bajo la
+    // afirmación de que algo cambió, que es casi peor que no avisar.
+    expect(r.get(3)?.diferencias[0]?.detalle).toBe(
+      '«Felpa»: esta OP lleva 1.2 + 0.4 de cárdigan · OP 5001, 5002 llevan 1.2 + 0.15 de cárdigan.',
+    );
+    expect(r.get(1)?.aviso).toBeNull();
+    expect(r.get(2)?.aviso).toBeNull();
+  });
+
+  it('(b) 🔴 CONTROL NEGATIVO: sin complemento en ninguna, NADIE se marca (firma intacta)', () => {
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa' })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa' })]),
+      op(3, [tela(7, 1.2, { nombre: 'Felpa' })]),
+    ]);
+    expect([...r.values()].every((f) => f.aviso === null)).toBe(true);
+    expect([...r.values()].every((f) => f.diferencias.length === 0)).toBe(true);
+  });
+
+  it('(b-bis) 🔴 la firma de una tela SIN complemento es LA MISMA de antes de 0.191', () => {
+    /*
+     * La firma no se exporta, así que se mide por su EFECTO observable, que es lo que importa: el
+     * texto de una tela sin complemento sigue siendo la cifra pelada («lleva 1.2»), sin cola ni
+     * paréntesis. Si la firma hubiera crecido con un sentinela, el texto lo habría delatado aquí.
+     */
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa' })]),
+      op(2, [tela(7, 2, { nombre: 'Felpa' })]),
+    ]);
+    expect(r.get(1)?.diferencias[0]?.detalle).toBe('«Felpa»: esta OP lleva 1.2 · OP 5002 lleva 2.');
+  });
+
+  it('(b-ter) 🔴 «complemento en 0» y «sin complemento» son valores DISTINTOS para la firma', () => {
+    /*
+     * ⚠️ **Hoy un 0 no se puede capturar**: el contrato lo rechaza (`positive`), por §Post-F9.219(d)
+     * —*un cárdigan que consume 0 no es un cárdigan*—. Así que esto es defensa en profundidad… pero
+     * lo que fija de verdad es la regla del CARGADOR: tiene que conservar el `null` con `numOrNull`
+     * y **nunca** con `num`, que lo convierte en 0. Con `num`, TODAS las telas sin complemento
+     * —o sea casi todas— pasarían a firmar `|C|0.0000` y cambiaría la firma de todo lo ya existente,
+     * que es exactamente lo que el control negativo (b) prohíbe.
+     */
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa' })]),
+    ]);
+    expect(r.get(1)?.diferencias[0]?.detalle).toBe(
+      '«Felpa»: esta OP lleva 1.2 + 0 de cárdigan · OP 5002 lleva 1.2.',
+    );
+  });
+
+  it('(c) una con complemento y la otra sin él: se detecta, y el texto lo dice', () => {
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(3, [tela(7, 1.2, { nombre: 'Felpa' })]),
+    ]);
+    expect(r.get(3)?.aviso).toBe('Esta OP no va igual que sus 2 hermanas: «Felpa».');
+    // Sigue siendo «cantidad» y no «no-la-lleva»: la tela SÍ la lleva; lo que falta es el cárdigan.
+    expect(r.get(3)?.diferencias[0]).toMatchObject({ que: 'cantidad', tipo: 'tela' });
+    expect(r.get(3)?.diferencias[0]?.detalle).toBe(
+      '«Felpa»: esta OP lleva 1.2 · OP 5001, 5002 llevan 1.2 + 0.15 de cárdigan.',
+    );
+  });
+
+  it('🔴🔴 EL GUARDIA DEL CATÁLOGO: si la tela ya no declara complemento, NO se compara', () => {
+    /*
+     * ⭐ **Es el reparto de autoridad del sistema entero, no una excepción de este archivo:** *quién*
+     * lleva complemento lo dice el CATÁLOGO (`Tela.nombreComplemento`) y *cuánto* lo dice la receta.
+     * Lo obedecen el MRP, los cuatro motores de costo, el impreso y el detector «difiere del modelo».
+     *
+     * ⚠️ **El estado es alcanzable:** `actualizarTela` deja vaciar el nombre sin tocar el consumo ya
+     * congelado en la orden (correcto por D3). Sin este guardia, éste sería el ÚNICO sitio que habla:
+     * señalaría una diferencia en un campo que la pantalla de la receta **ni siquiera pinta**, que no
+     * se puede editar ahí, y que ni se compra ni se costea ni se imprime.
+     *
+     * 🔑 **Y callar aquí NO pierde señal**, porque el guardia es del catálogo y por tanto **idéntico
+     * para las dos hermanas**: nunca puede comparar a una sí y a otra no. El aviso vuelve solo en
+     * cuanto alguien re-declara el complemento — que es cuando la diferencia empieza a importar.
+     */
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15, nombreComplemento: null })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.4, nombreComplemento: null })]),
+    ]);
+    expect(r.get(1)?.aviso).toBeNull();
+    expect(r.get(2)?.aviso).toBeNull();
+    expect(r.get(1)?.diferencias).toEqual([]);
+    expect(r.get(2)?.diferencias).toEqual([]);
+  });
+
+  it('🔴🔴 EL GUARDIA, EN EL TEXTO: la fila se marca POR EL CUERPO y el complemento inerte NO se cuela', () => {
+    /*
+     * ⭐⭐ **Ésta es la prueba que faltaba, y cubre el agujero exacto por el que el defecto de la
+     * primera versión volvía por la puerta de atrás.** El guardia vive en DOS sitios
+     * —{@link firmaDelComplemento} y {@link conElComplemento}— y las otras pruebas del bloque sólo
+     * llegan al primero: cuando el complemento inerte es la ÚNICA razón por la que la fila podría
+     * marcarse, la firma calla y **el texto nunca se pinta**, así que quitarle el guardia al texto
+     * pasaba desapercibido con la suite entera en verde.
+     *
+     * 🔴 **Basta con que la fila se marque POR OTRO MOTIVO** —aquí el consumo del CUERPO, que es el
+     * caso más común de todos— para que el texto sí se componga. Sin el guardia en `conElComplemento`
+     * salía, medido:
+     *
+     *     «Felpa»: esta OP lleva 1.2 + 0.15 de complemento · OP 5002 lleva 2 + 0.4 de complemento.
+     *
+     * o sea, la palabra genérica inventada sobre una tela cuyo catálogo YA NO declara complemento, y
+     * con dos cifras que no se compran, ni se costean, ni se imprimen, ni se pueden editar en la
+     * pantalla de la receta. El detalle tiene que salir **pelado**.
+     */
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15, nombreComplemento: null })]),
+      op(2, [tela(7, 2, { nombre: 'Felpa', complemento: 0.4, nombreComplemento: null })]),
+    ]);
+    // Se marca —el cuerpo SÍ difiere—, pero sólo por el cuerpo.
+    expect(r.get(1)?.diferencias[0]).toMatchObject({ que: 'cantidad', tipo: 'tela' });
+    expect(r.get(1)?.diferencias[0]?.detalle).toBe('«Felpa»: esta OP lleva 1.2 · OP 5002 lleva 2.');
+    expect(r.get(2)?.diferencias[0]?.detalle).toBe('«Felpa»: esta OP lleva 2 · OP 5001 lleva 1.2.');
+  });
+
+  it('🔴 …y en cuanto el catálogo VUELVE a declararlo, el aviso habla (el silencio no es permanente)', () => {
+    // El control del control: las mismas dos recetas, con el catálogo declarando el complemento.
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.4 })]),
+    ]);
+    expect(r.get(1)?.diferencias[0]?.detalle).toBe(
+      '«Felpa»: esta OP lleva 1.2 + 0.15 de cárdigan · OP 5002 lleva 1.2 + 0.4 de cárdigan.',
+    );
+  });
+
+  it('🔴 CONTROL NEGATIVO: una diferencia de complemento por debajo de los 4 decimales NO cuenta', () => {
+    // Misma escala que el cuerpo: `Decimal(12,4)` no puede guardarla, así que avisarla sería
+    // inventar un cambio.
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 + 1e-9 })]),
     ]);
     expect(r.get(1)?.aviso).toBeNull();
     expect(r.get(2)?.aviso).toBeNull();

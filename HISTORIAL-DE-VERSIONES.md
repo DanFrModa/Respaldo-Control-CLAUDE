@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.155 · 14-sep-2026 · **en prueba** — **El aviso de «esta orden no va igual que sus hermanas» ya mira el complemento de la tela**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Enterarse de que una orden de producción lleva distinto el cárdigan** que sus hermanas del mismo
+  modelo. El sistema ya avisaba cuando una orden del grupo se desviaba —otro cierre, una jareta de
+  menos, más consumo de tela—, pero **el complemento de la tela no lo miraba**: dos órdenes que sólo
+  diferían en cuánto cárdigan llevan salían «iguales» y el aviso **se quedaba callado**.
+- **Y el aviso dice EN QUÉ difieren**, con las dos cifras y con el nombre del complemento tal como está
+  en el catálogo: *«Felpa: esta OP lleva 1.2 + 0.4 de cárdigan · OP 5001, 5002 llevan 1.2 + 0.15 de
+  cárdigan»*. Antes, si el consumo del cuerpo era el mismo, el detalle habría enseñado dos cifras
+  idénticas bajo la afirmación de que algo cambió.
+
+### Qué cambió y puede sorprender
+
+- **Órdenes que hasta ayer salían limpias pueden empezar a mostrar el aviso**, si de verdad llevan el
+  complemento distinto entre ellas. No es un error nuevo: es una diferencia que ya existía y que nadie
+  veía. Y **el sistema avisa, nunca bloquea** — la orden se guarda y se compra igual.
+- **Las telas que no llevan complemento no cambian absolutamente nada.** Como no llevan cárdigan —que
+  es la inmensa mayoría—, se comparan exactamente igual que antes, y **ninguna orden vieja queda
+  marcada por este cambio**.
+- **Quién lleva complemento lo sigue diciendo el catálogo de telas, no la orden.** Si a una tela le
+  quitan el complemento en el catálogo, el sistema **deja de compararlo** —igual que deja de comprarlo,
+  de costearlo y de imprimirlo—, aunque la orden siga teniendo el número guardado de cuando sí lo
+  llevaba. No se pierde nada: en cuanto alguien vuelva a declarar el complemento en el catálogo, el
+  aviso vuelve a hablar, que es justo cuando la diferencia vuelve a importar.
+
+### Qué sigue pendiente o roto
+
+- Este era el **quinto y último sitio** que estaba ciego al complemento de la tela: los otros cuatro
+  —la pantalla de la receta, poder corregirlo ahí, el impreso de la orden y el aviso de «la receta
+  difiere del modelo»— se arreglaron en la 0.153.
+- **Lo que sigue sin compararse entre hermanas, a propósito:** el **precio** de la tela (se negocia por
+  proveedor y por fecha; compararlo sería ruido permanente) y el **color** (dos órdenes del mismo
+  modelo compran colores distintos por diseño).
+- Sigue en pie el límite conocido de este aviso: **las órdenes que vienen del sistema viejo y nadie ha
+  tocado no votan**, así que sobre una familia migrada el aviso no habla hasta que dos de sus órdenes
+  tengan receta decidida por una persona. La propia pantalla lo dice en su nota.
+
+---
+
 ## 0.154 · 13-sep-2026 · **en prueba** — **La mercancía de un color fusionado ya se puede mover otra vez**
 
 ### Qué se puede hacer ahora que antes no
