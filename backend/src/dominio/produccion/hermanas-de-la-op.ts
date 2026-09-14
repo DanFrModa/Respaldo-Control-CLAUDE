@@ -213,8 +213,17 @@
  *  1. **El CONJUNTO de materiales** — que esta OP lleve uno que las otras no, o que le falte uno que
  *     las otras sí. Un renglón **excluido** (la lápida de la jareta) NO se lleva: es precisamente el
  *     *«se decidió que ESTA orden no lo lleva»*, y por eso cuenta como diferencia.
- *  2. **La CANTIDAD congelada** — `consumoPorPrenda`, más (en avíos R18) el modo de captura
- *     `consumoPorTalla` y las medidas por talla.
+ *  2. **La CANTIDAD congelada** — `consumoPorPrenda`, el **consumo del COMPLEMENTO** de la tela
+ *     (`consumoComplementoPorPrenda`, el cárdigan que acompaña a la felpa; 0.191), y (en avíos R18)
+ *     el modo de captura `consumoPorTalla` con sus medidas por talla.
+ *
+ * ⭐⭐ **El complemento fue el QUINTO punto ciego, y llegó tarde a propósito de nadie.** La 0.165
+ * tapó los otros cuatro —el contrato de la receta de la orden, el PATCH que la edita, el impreso y
+ * el detector «difiere del modelo»— y éste quedó fuera de su alcance. Hasta la 0.191, dos hermanas
+ * que sólo diferían en el cárdigan firmaban **igual** y el aviso callaba, mientras la explosión del
+ * MRP sí usaba ese número (§Post-F9.219) y compraba cantidades distintas sin que nadie lo supiera.
+ * Una tela **sin** complemento (`null`: la mayoría, y todos los avíos y artes) firma exactamente
+ * como antes — ver {@link firmaDelComplemento}.
  *
  * ⚠️ **El PRECIO NO cuenta, y no es un olvido.** El precio se negocia por proveedor y por momento
  * (§Post-F9.43/.48: el precio que costea la receta del modelo ES la última compra real), así que dos
@@ -259,7 +268,7 @@ import { EstadoRenglonReceta, type PrismaClient } from '../../datos/index.js';
 import type { Tx } from '../../comun/transaccion.js';
 
 import { claveMaterial } from '../compras/comprometido-en-oc.js';
-import { num } from '../costos/decimales.js';
+import { num, numOrNull } from '../costos/decimales.js';
 import { idModeloDeLaReceta, SELECT_LINAJE_RECETA } from '../modelos/receta-compartida.js';
 
 /** Cualquier cliente con el que se puede LEER (dentro o fuera de transacción). */
@@ -300,6 +309,27 @@ export interface MaterialDeLaOp {
    * exista, igual que hace la comparación vertical, que para el arte tampoco mira consumo).
    */
   consumoPorPrenda: number | null;
+  /**
+   * ⭐⭐ 0.191 — **CONSUMO DEL COMPLEMENTO congelado** (`OrdenTela.consumoComplementoPorPrenda`, la
+   * cantidad del cárdigan que acompaña a la felpa). `null` = **esta tela no lleva complemento** — que
+   * es la inmensa mayoría de las telas, y TODOS los avíos y artes (el complemento es un concepto de
+   * tela: no se inventa nada en los otros dos tipos).
+   *
+   * 🔴 **Por qué tenía que entrar en la firma.** Es el QUINTO sitio ciego al complemento: la 0.165
+   * tapó los otros cuatro (el contrato de la receta de la orden, el PATCH que la edita, el impreso y
+   * el detector «difiere del modelo»), y éste quedó fuera de alcance. Mientras tanto, dos hermanas
+   * que sólo diferían en el cárdigan salían **idénticas** y el aviso que Daniel pidió no hablaba —
+   * con la agravante de que el complemento SÍ viaja a la explosión del MRP (§Post-F9.219), así que
+   * la diferencia invisible acababa comprando cantidades distintas de material.
+   */
+  consumoComplementoPorPrenda: number | null;
+  /**
+   * Cómo se llama el complemento en el CATÁLOGO de hoy (`Tela.nombreComplemento`): «cárdigan»,
+   * «puño»… Sólo sirve para NOMBRARLO en el texto del aviso; **no entra en la firma** (es del
+   * catálogo, idéntico para todas las hermanas, así que nunca puede distinguirlas). `null` cuando el
+   * catálogo no lo declara — ver {@link conElComplemento} para lo que se hace entonces.
+   */
+  nombreComplemento: string | null;
   /** Avíos R18: ¿la cantidad se captura POR TALLA? (`OrdenAvio.consumoPorTalla`). */
   porTalla: boolean;
   /**
@@ -381,6 +411,51 @@ function cifra(valor: number): string {
   return String(Number(valor.toFixed(DECIMALES)));
 }
 
+/**
+ * ⭐⭐ 0.191 — **Lo que el COMPLEMENTO le añade a la firma de una tela.**
+ *
+ * 🔴 **`''` cuando no hay complemento** — o sea, para casi todos los renglones que pasan por aquí
+ * (las telas sin cárdigan, **todos** los avíos y **todos** los artes), la firma sale **byte por byte
+ * la de antes de esta fila** (`P|1.5000`).
+ *
+ * ⚠️ **Dicho con precisión, porque la razón NO es la obvia.** La firma se recalcula en vivo para el
+ * grupo entero en la misma corrida y no se guarda en ninguna parte, así que *cualquier* regla
+ * uniforme —incluso un `|C|-` en todas— dejaría el resultado idéntico y ninguna orden vieja se
+ * marcaría. Lo que el sufijo vacío compra no es eso, es **que la uniformidad no dependa de nadie**:
+ * en cuanto el valor pueda llegar `null` en unas filas y numérico en otras, una regla que rellene el
+ * hueco con un valor inventado (un `0`, por ejemplo) **empieza a fabricar diferencias** — que es
+ * justo por lo que el cargador usa `numOrNull` y no `num`.
+ *
+ * El separador es `|C|` por lo mismo que el resto del archivo usa `|`: `toFixed(DECIMALES)` no puede
+ * producirlo nunca, así que dos firmas distintas no pueden colisionar al concatenarse.
+ */
+function firmaDelComplemento(m: MaterialDeLaOp): string {
+  return m.consumoComplementoPorPrenda === null
+    ? ''
+    : `|C|${m.consumoComplementoPorPrenda.toFixed(DECIMALES)}`;
+}
+
+/**
+ * ⭐⭐ 0.191 — **Y EL TEXTO, que es la otra mitad del arreglo.** Que la firma difiera sólo consigue
+ * que el aviso se encienda; si el detalle siguiera diciendo únicamente el consumo del cuerpo, la
+ * persona leería *«esta OP lleva 1.2 · OP 5001 lleva 1.2»* — dos cifras idénticas bajo la afirmación
+ * de que algo difiere. Es exactamente el defecto que ya se corrigió dos veces en {@link valorDe}
+ * (las medidas por talla, y luego el `consumoPorPrenda` de las capturadas por talla): **si algo
+ * distingue la firma, tiene que verse en el texto.**
+ *
+ * ⚠️ **Y aquí el catálogo NO manda, al revés que en el impreso.** `leerRecetaParaImpreso` calla el
+ * complemento cuando `Tela.nombreComplemento` ya es `null` (si no se va a comprar, no se imprime).
+ * Copiar esa regla aquí volvería a apagar el aviso justo en el caso raro, así que el NÚMERO
+ * congelado siempre se dice y lo único que aporta el catálogo es el **nombre**; sin él se usa la
+ * palabra genérica. Preferimos un aviso que nombra regular a un guardián que se apaga solo — el
+ * mismo criterio con el que {@link tallasComparables} devuelve `null`.
+ */
+function conElComplemento(texto: string, m: MaterialDeLaOp): string {
+  if (m.consumoComplementoPorPrenda === null) return texto;
+  const comoSeLlama = m.nombreComplemento ?? 'complemento';
+  return `${texto} + ${cifra(m.consumoComplementoPorPrenda)} de ${comoSeLlama}`;
+}
+
 /** «OP 5561, 5562» — los folios de un grupo, en orden y recortados. */
 function folios(lista: readonly number[]): string {
   const ordenados = [...lista].sort((a, b) => a - b);
@@ -422,7 +497,10 @@ function valorDe(m: MaterialDeLaOp, tallas: readonly number[] | null): ValorMate
   }
   const porPrenda = m.consumoPorPrenda.toFixed(DECIMALES);
   if (!m.porTalla) {
-    return { firma: `P|${porPrenda}`, texto: cifra(m.consumoPorPrenda) };
+    return {
+      firma: `P|${porPrenda}${firmaDelComplemento(m)}`,
+      texto: conElComplemento(cifra(m.consumoPorPrenda), m),
+    };
   }
   // `null` = sin corte común utilizable ⇒ entra el mapa entero de cada OP.
   const claves = tallas === null ? [...m.medidas.keys()] : [...tallas];
@@ -450,7 +528,14 @@ function valorDe(m: MaterialDeLaOp, tallas: readonly number[] | null): ValorMate
     .map(({ medida }) => `${medida?.etiqueta ?? '—'} ${cifra(medida?.consumo ?? 0)}`)
     .join(' · ');
   return {
-    firma: `T|${porPrenda}|${firma}`,
+    /*
+     * ⚠️ El complemento va TAMBIÉN aquí por simetría, aunque hoy no sea alcanzable: el complemento
+     * es de TELA y las telas siempre llegan con `porTalla: false`, mientras que los avíos llegan
+     * siempre con `consumoComplementoPorPrenda: null`. Es defensa en profundidad — omitirlo dejaría
+     * una rama donde una diferencia de complemento se perdería en silencio si algún día las dos
+     * cosas se cruzan, que es justo el modo de fallo que esta fila vino a cerrar.
+     */
+    firma: `T|${porPrenda}|${firma}${firmaDelComplemento(m)}`,
     // Sin ninguna talla comparable el texto no puede nombrar nada; decirlo así es más honesto que
     // enseñar un paréntesis vacío.
     /*
@@ -464,8 +549,8 @@ function valorDe(m: MaterialDeLaOp, tallas: readonly number[] | null): ValorMate
      */
     texto:
       porTallaTexto === ''
-        ? `${cifra(m.consumoPorPrenda)} por talla`
-        : `${cifra(m.consumoPorPrenda)} por talla (${porTallaTexto})`,
+        ? conElComplemento(`${cifra(m.consumoPorPrenda)} por talla`, m)
+        : conElComplemento(`${cifra(m.consumoPorPrenda)} por talla (${porTallaTexto})`, m),
   };
 }
 
@@ -785,7 +870,10 @@ const SELECT_TELA = {
   liberadoEn: true,
   liberadoPorId: true,
   consumoPorPrenda: true,
-  tela: { select: { nombre: true } },
+  // ⭐⭐ 0.191 — el complemento congelado (0.156) entra en la comparación, y su nombre del catálogo
+  // de hoy sirve para NOMBRARLO en el aviso (ver `firmaDelComplemento`/`conElComplemento`).
+  consumoComplementoPorPrenda: true,
+  tela: { select: { nombre: true, nombreComplemento: true } },
 } as const;
 
 /** `select` de un renglón de avío congelado (con sus medidas por talla, R18). */
@@ -1014,6 +1102,13 @@ export async function frenteAlGrupoDeOrdenes(
       clave: claveMaterial({ idTela: t.idTela, idAvio: null }),
       nombre: t.tela.nombre,
       consumoPorPrenda: num(t.consumoPorPrenda),
+      // ⭐⭐ 0.191 — `numOrNull`, NO `num`, y no es cosmético: `num` convierte el `null` en 0, con lo
+      // que NINGUNA tela llegaría ya sin complemento y el aviso le colgaría **«+ 0 de complemento»**
+      // al texto de TODAS ellas. De paso conserva la distinción entre «no se capturó» y «se capturó
+      // 0» (hoy el contrato no deja teclear 0, §Post-F9.219(d), así que eso es defensa en
+      // profundidad; lo del texto no lo es).
+      consumoComplementoPorPrenda: numOrNull(t.consumoComplementoPorPrenda),
+      nombreComplemento: t.tela.nombreComplemento,
       porTalla: false,
       medidas: new Map(),
     });
@@ -1025,6 +1120,9 @@ export async function frenteAlGrupoDeOrdenes(
       clave: claveMaterial({ idTela: null, idAvio: a.idAvio }),
       nombre: `${a.avio.clave} — ${a.avio.descripcion}`,
       consumoPorPrenda: num(a.consumoPorPrenda),
+      // El complemento es de TELA: un avío no lo tiene y aquí no se inventa ninguno.
+      consumoComplementoPorPrenda: null,
+      nombreComplemento: null,
       porTalla: a.consumoPorTalla,
       medidas: new Map(
         a.tallas.map((t) => [
@@ -1042,6 +1140,8 @@ export async function frenteAlGrupoDeOrdenes(
       nombre: ar.descripcion,
       // El arte NO tiene cantidad: se vigila que exista, igual que en la comparación vertical.
       consumoPorPrenda: null,
+      consumoComplementoPorPrenda: null,
+      nombreComplemento: null,
       porTalla: false,
       medidas: new Map(),
     });

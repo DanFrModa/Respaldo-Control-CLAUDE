@@ -15,6 +15,7 @@ import {
   abrirReceta,
   agregarRenglonReceta,
   copiarRecetaDelModelo,
+  editarRenglonReceta,
   liberarReceta,
   marcarRecetaRevisada,
   obtenerRecetaOrden,
@@ -291,6 +292,108 @@ describe('el caso de Daniel — el cierre que sólo lleva la café', () => {
     expect(receta.avios.some((a) => a.clave === 'CIE-02')).toBe(true);
     // Y la receta sigue siendo comprable exactamente igual que antes del aviso.
     expect(receta.frenteAlGrupo.aviso).not.toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ 0.191 — **EL COMPLEMENTO DE LA TELA, contra la base de verdad.**
+ *
+ * El embudo puro ya cubre la regla (`hermanas-de-la-op.test.ts`). Lo que SÓLO puede contestar
+ * Postgres es lo que esta fila tocó de la carga: que el `select` de `OrdenTela` traiga
+ * `consumoComplementoPorPrenda` **y** el `nombreComplemento` del catálogo. Si cualquiera de los dos
+ * faltara, el cargador entregaría `null` y el aviso volvería a callar — sin que ninguna prueba pura
+ * pudiera notarlo.
+ */
+describe('⭐⭐ el COMPLEMENTO de la tela (0.191) — que el select lo traiga', () => {
+  /** Una tela CON complemento declarado en el catálogo, y su renglón en el BOM del desarrollo. */
+  async function telaConCardigan(consumoComplemento: number): Promise<Tela> {
+    const felpa = await cliente.tela.create({
+      data: { nombre: 'Felpa', precioSugerido: 80, nombreComplemento: 'cárdigan' },
+    });
+    await cliente.modeloTela.create({
+      data: {
+        idModelo: idDesarrollo,
+        idTela: felpa.id,
+        consumoPorPrenda: 1.2,
+        consumoComplementoPorPrenda: consumoComplemento,
+      },
+    });
+    return felpa;
+  }
+
+  it('⭐ dos hermanas que SÓLO difieren en el cárdigan se detectan, y el aviso lo NOMBRA', async () => {
+    const felpa = await telaConCardigan(0.15);
+    const opRoja = await crearOrden(5001n, idHijoRojo);
+    const opAzul = await crearOrden(5002n, idHijoRojo);
+    const opCafe = await crearOrden(5003n, idHijoCafe);
+
+    // Se le corrige el consumo del cárdigan SÓLO a la café, por el camino real (el PATCH).
+    const antes = await obtenerRecetaOrden(sesion(), opCafe, bd());
+    const renglon = antes.telas.find((t) => t.idTela === felpa.id);
+    expect(renglon).toBeDefined();
+    if (renglon === undefined) return;
+    await editarRenglonReceta(
+      sesion(),
+      opCafe,
+      'tela',
+      renglon.id,
+      { consumoComplementoPorPrenda: 0.4 },
+      bd(),
+    );
+
+    const receta = await obtenerRecetaOrden(sesion(), opCafe, bd());
+    expect(receta.frenteAlGrupo.aviso).toContain('«Felpa»');
+    const dif = receta.frenteAlGrupo.diferencias.find((d) => d.material === 'Felpa');
+    expect(dif).toMatchObject({ tipo: 'tela', que: 'cantidad' });
+    // 🔴 El CUERPO no cambió: las dos cifras de «1.2» son iguales, así que si el texto no dijera el
+    // cárdigan el aviso se leería como un defecto. Que lo diga —y con el nombre del catálogo— es la
+    // mitad del arreglo que la firma sola no consigue.
+    expect(dif?.detalle).toBe(
+      '«Felpa»: esta OP lleva 1.2 + 0.4 de cárdigan · OP 5001, 5002 llevan 1.2 + 0.15 de cárdigan.',
+    );
+
+    // 🔴 CONTROL NEGATIVO: las otras dos siguen limpias.
+    for (const id of [opRoja, opAzul]) {
+      expect((await obtenerRecetaOrden(sesion(), id, bd())).frenteAlGrupo.aviso).toBeNull();
+    }
+  });
+
+  it('🔴 CONTROL NEGATIVO: con el MISMO cárdigan en las tres, nadie se marca', async () => {
+    await telaConCardigan(0.15);
+    const ids = [
+      await crearOrden(5001n, idHijoRojo),
+      await crearOrden(5002n, idHijoRojo),
+      await crearOrden(5003n, idHijoCafe),
+    ];
+    for (const id of ids) {
+      const receta = await obtenerRecetaOrden(sesion(), id, bd());
+      expect(receta.frenteAlGrupo.aviso).toBeNull();
+      expect(receta.frenteAlGrupo.diferencias).toEqual([]);
+    }
+  });
+
+  it('🔴🔴 CONTROL NEGATIVO: una tela SIN complemento no cambia de comportamiento', async () => {
+    /*
+     * La restricción dura de la fila: el Jersey del `beforeEach` no lleva complemento (como la
+     * inmensa mayoría). Aquí se le cambia el consumo del CUERPO a una hermana y el texto tiene que
+     * salir **pelado** —sin cola de complemento—, exactamente igual que antes de 0.191.
+     */
+    const opRoja = await crearOrden(5001n, idHijoRojo);
+    const opCafe = await crearOrden(5002n, idHijoCafe);
+    const antes = await obtenerRecetaOrden(sesion(), opCafe, bd());
+    const renglon = antes.telas.find((t) => t.idTela === telaJersey.id);
+    expect(renglon).toBeDefined();
+    if (renglon === undefined) return;
+    await editarRenglonReceta(sesion(), opCafe, 'tela', renglon.id, { consumoPorPrenda: 2 }, bd());
+
+    const receta = await obtenerRecetaOrden(sesion(), opCafe, bd());
+    const dif = receta.frenteAlGrupo.diferencias.find((d) => d.material === 'Jersey');
+    expect(dif?.detalle).toBe('«Jersey»: esta OP lleva 2 · OP 5001 lleva 1.5.');
+    // Y la otra sólo ve la diferencia del cuerpo, también pelada.
+    const otra = await obtenerRecetaOrden(sesion(), opRoja, bd());
+    expect(otra.frenteAlGrupo.diferencias[0]?.detalle).toBe(
+      '«Jersey»: esta OP lleva 1.5 · OP 5002 lleva 2.',
+    );
   });
 });
 
