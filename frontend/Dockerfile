@@ -16,6 +16,10 @@ RUN npm ci
 # no trae tooling de tests).
 COPY tsconfig.app.json tsconfig.build.json vite.config.ts index.html ./
 COPY src ./src
+# public/ lo copia Vite tal cual a dist/: ahí viven los favicon que index.html
+# referencia por ruta absoluta. Sin esta línea el icono existe en local y NO en
+# la imagen, que es donde se ve.
+COPY public ./public
 
 # ✅ AQUÍ **NO** VA TECHO DE MEMORIA, Y ESTÁ MEDIDO (25-ago-2026) — no es un olvido.
 #

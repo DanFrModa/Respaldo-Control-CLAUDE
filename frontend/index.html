@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Control v2</title>
     <!--
+      El icono de la pestaña. Sin esto Chrome pinta el globo genérico, que es lo
+      que se veía. El PNG sale del mismo logo de FR Moda que usa la aplicación
+      (src/assets/logo-frmoda.png), recortado a lienzo cuadrado: el original es
+      600x299 y un favicon rectangular se deforma.
+    -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/favicon-192.png" />
+    <!--
       Aplica el tema ANTES de renderizar React para evitar el parpadeo de tema
       al recargar (claro -> oscuro). El tema por defecto es CLARO (sin clase);
       solo se agrega la clase "dark" si el usuario eligio oscuro. La clave y los
