@@ -399,17 +399,22 @@ export interface RolOpcionDto {
  * Pasa con `roles.administrar` (quien gobierna el RBAC) **o** con `rc.catalogo-ver` / `rc.ruta-ver`
  * (quien opera la Ruta Crítica). Sigue siendo deny-by-default (A4): sin ninguno de los tres, 403.
  *
- * 🔑 POR QUÉ SE ABRE, Y POR QUÉ ESTO NO ENSANCHA NADA. Configurar los responsables de un proceso de
- * la RC exigía `roles.administrar` sólo porque el selector se poblaba de `GET /api/roles` — o sea,
- * para repartir una responsabilidad había que llevar **la llave maestra del sistema**. Es
- * exactamente el *«tener A implica B»* que Daniel señaló en la fila 0.120 (§Post-F9.230), pero atado
- * al revés: no era el permiso el que regalaba poder, era la pantalla la que pedía de más.
+ * 🔑 POR QUÉ SE ABRE. Configurar los responsables de un proceso de la RC exigía `roles.administrar`
+ * sólo porque el selector se poblaba de `GET /api/roles` — o sea, para repartir una responsabilidad
+ * había que llevar **la llave maestra del sistema**. Es exactamente el *«tener A implica B»* que
+ * Daniel señaló en la fila 0.120 (§Post-F9.230), pero atado al revés: no era el permiso el que
+ * regalaba poder, era la pantalla la que pedía de más.
  *
- * Y lo que sale por aquí ya lo veía quien tiene esos permisos: `GET /ruta-critica/procesos`
- * (`rc.catalogo-ver`) devuelve `roles: [{ idRol, nombre }]` de cada proceso, y
- * `GET /ruta-critica/ordenes/:id/ruta` (`rc.ruta-ver`) devuelve `rolesResponsables`. Los NOMBRES de
- * los roles ya están en sus pantallas; lo que NO sale por aquí —y sigue bajo `roles.administrar`—
- * es `clavesPermisos` y `totalUsuarios`, que es lo único de gobierno que tiene un rol.
+ * ⚠️ SÍ ENSANCHA, Y HAY QUE DECIRLO CON EL NÚMERO. Un selector para ASIGNAR roles necesita **por
+ * fuerza** los que todavía NO están asignados —ésa es su función—, así que aquí sale el CATÁLOGO
+ * COMPLETO, y eso es más de lo que hoy enseñan las pantallas de la RC: `GET /ruta-critica/procesos`
+ * y `GET /ruta-critica/ordenes/:id/ruta` proyectan la relación `ProcesoDefRol`, o sea **sólo los
+ * roles YA ASIGNADOS** a un proceso. Medido contra una base sembrada de verdad: **26 roles, 10
+ * asignados ⇒ 16 nombres que hoy no salen por ahí**, entre ellos 8 de los 9 de sistema.
+ *
+ * Y es aceptable porque **lo que se protege no es el NOMBRE de un rol sino su GOBIERNO**:
+ * `clavesPermisos` (qué puede) y `totalUsuarios` (a cuánta gente alcanza) no salen por aquí y siguen
+ * exclusivamente bajo `roles.administrar`. Un nombre suelto no concede nada; un mapa de permisos sí.
  */
 export function exigirVerOpcionesRoles(sesion: SesionUsuario): void {
   if (tienePermiso(sesion, 'roles.administrar') || tienePermiso(sesion, 'rc.catalogo-ver')) {

@@ -91,9 +91,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Lo que se abre es sólo la lista de NOMBRES de roles**, que es lo único que necesita un selector.
   **Quién puede qué —el mapa de permisos de cada rol y a cuánta gente alcanza— sigue saliendo
   únicamente para quien administra el sistema**, exactamente igual que antes.
-- **Y esos nombres ya se veían.** La pantalla de procesos y el plan de la orden llevaban tiempo
-  enseñando los roles responsables a quien tiene esos mismos permisos; lo que cambia es de dónde los
-  toma el selector, no quién los puede ver.
+- **Sí se ven nombres de rol que antes no se veían, y conviene saberlo.** Las pantallas de la Ruta
+  Crítica enseñaban los responsables **ya asignados** a cada paso; la lista para elegir tiene que
+  traerlos **todos**, porque si no, no se podría asignar a nadie nuevo. Hoy eso son **16 nombres de
+  rol de los 26 que existen** que antes no aparecían por ahí.
 - **Nadie que no pudiera antes puede ahora guardar nada.** Marcar responsables sigue exigiendo
   administrar el catálogo de la Ruta Crítica, igual que ayer; lo que se destrabó es poder **ver la
   lista para elegir**.

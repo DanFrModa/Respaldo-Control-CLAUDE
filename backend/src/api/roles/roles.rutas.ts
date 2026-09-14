@@ -113,7 +113,9 @@ export const rutasRoles: FastifyPluginCallbackZod = (app, _opciones, done) => {
   // ⭐ Fila 0.190: poblar el selector de "roles responsables" de un proceso de la Ruta Crítica NO
   // debe exigir la llave maestra del RBAC. Esta ruta devuelve sólo id + nombre y acepta CUALQUIERA
   // de los tres permisos que de verdad la necesitan; el dominio reaplica la MISMA reja
-  // (`exigirVerOpcionesRoles`), que es donde está argumentado por qué no ensancha nada.
+  // (`exigirVerOpcionesRoles`), que es donde está argumentado QUÉ ensancha (el catálogo completo,
+  // que es el mínimo que necesita un selector de asignación) y por qué es aceptable (sale el
+  // nombre, nunca el gobierno del rol: ni `clavesPermisos` ni `totalUsuarios`).
   // Se registra ANTES de `/roles/:id` por legibilidad (el router de Fastify da prioridad al
   // segmento estático de todos modos).
   app.route({

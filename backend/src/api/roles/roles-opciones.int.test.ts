@@ -200,7 +200,13 @@ describe('Configurar responsables de un proceso SIN la llave maestra (fila 0.190
     expect(alta.statusCode).toBe(201);
     const idProceso = alta.json<{ id: number }>().id;
 
+    // `noUncheckedIndexedAccess` obliga a estrechar el índice antes de usarlo: sin esta guarda el
+    // typecheck del backend se cae (y ni el lint ni las pruebas lo ven — sólo `npm run typecheck`).
     const elegido = roles[0];
+    if (elegido === undefined) {
+      throw new Error('El catálogo de roles vino vacío: el seed debería traer los de sistema.');
+    }
+
     const guardado = await app.inject({
       method: 'PUT',
       url: `/api/ruta-critica/procesos/${idProceso}/roles`,

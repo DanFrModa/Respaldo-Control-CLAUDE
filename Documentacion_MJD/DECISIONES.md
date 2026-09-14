@@ -15688,11 +15688,23 @@ de más. Y muerde justo el día del reparto: la 0.120 acababa de fabricar cuatro
 >   del alta de Usuarios. Aflojarle el permiso habría abierto `clavesPermisos` y `totalUsuarios`
 >   —**lo único que un rol tiene de gobierno**— a todo el que pueda abrir la Ruta Crítica, o sea a
 >   medio organigrama. Es el defecto de la 0.120 repetido con otro nombre.
-> - **La puerta nueva, en cambio, no enseña nada que esos permisos no vieran ya.** Medido contra el
->   árbol: `GET /ruta-critica/procesos` (`rc.catalogo-ver`) ya devuelve `roles: [{ idRol, nombre }]`
->   de cada proceso, y `GET /ruta-critica/ordenes/:id/ruta` (`rc.ruta-ver`) ya devuelve
->   `rolesResponsables`. Los nombres **ya estaban en sus pantallas**; lo único que cambia es de qué
->   endpoint los toma el selector.
+> - **La puerta nueva SÍ ensancha —y menos de lo que parece, pero hay que decirlo con el número.**
+>   Un selector para ASIGNAR roles necesita **por fuerza** los que todavía no están asignados: ésa es
+>   su función, y un catálogo recortado no serviría para nada. Las pantallas de la RC, en cambio,
+>   enseñan **sólo los roles YA ASIGNADOS** a un proceso (`GET /ruta-critica/procesos` y
+>   `GET /ruta-critica/ordenes/:id/ruta` proyectan la relación `ProcesoDefRol`). **Medido contra una
+>   base sembrada de verdad: 26 roles, 10 asignados ⇒ 16 nombres que hoy NO salen por las pantallas
+>   de la RC**, entre ellos **8 de los 9 roles de sistema**.
+> - **Y es aceptable porque lo que se protege no es el NOMBRE de un rol, sino su GOBIERNO.** Un
+>   nombre suelto no concede nada ni dice quién puede qué; `clavesPermisos` y `totalUsuarios` sí, y
+>   ésos no salen por la puerta nueva y siguen exclusivamente bajo `roles.administrar`.
+>
+> 🔴 **Este inciso decía lo contrario en la primera versión de la fila** —*«no enseña nada que esos
+> permisos no vieran ya… medido contra el árbol»*— y era **falso**: se leyó que esos endpoints traen
+> nombres de rol y se dio el salto a que traen *el catálogo*, sin medirlo. Lo cazó el reviewer
+> contando contra la base sembrada. **La decisión no cambia** —el diseño era y sigue siendo el
+> correcto—, **cambia su razón**, que además es más fuerte: no es que no se abra nada, es que **lo
+> que se abre es el mínimo que un selector necesita y no toca el gobierno de nadie**.
 >
 > ⚠️ **Y lo que NO cambia:** guardar responsables sigue exigiendo `rc.catalogo-administrar`. Lo que se
 > destrabó es **ver la lista para elegir**, no la facultad de fijarla.
