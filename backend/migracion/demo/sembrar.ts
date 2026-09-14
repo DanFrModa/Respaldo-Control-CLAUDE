@@ -288,7 +288,7 @@ export async function sembrarDemoInventarios(
   sesion: SesionUsuario,
   opciones: OpcionesSiembra,
 ): Promise<ResultadoSiembra> {
-  const reporte = new Reporte();
+  const reporte = new Reporte('DATOS FICTICIOS DE INVENTARIOS — resumen de la corrida');
   const m = new Marcador();
 
   if (opciones.simular) {
