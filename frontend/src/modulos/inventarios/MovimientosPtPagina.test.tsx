@@ -430,6 +430,60 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]).not.toHaveProperty('idOrden');
   });
 
+  /**
+   * ⭐ FILA 0.164 — EL COLOR RETIRADO QUE TIENE MERCANCÍA AQUÍ SE PUEDE ELEGIR.
+   *
+   * El catálogo de esta pantalla pide SOLO los colores activos, y así sigue. Pero al fusionar dos
+   * duplicados (§Post-F9.222) el absorbido se apaga con sus piezas intactas: sin esto, ajustar a
+   * mano esa mercancía no tenía puerta. Aparece rotulado —para que nadie lo confunda con uno del
+   * catálogo— y sólo porque el SERVIDOR lo devuelve con existencia en este contexto.
+   */
+  it('ofrece el color RETIRADO con existencia, rotulado, y se puede capturar con él', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue({
+      data: {
+        filas: [
+          {
+            idModelo: 1,
+            idColor: 9,
+            color: 'Blanco Hueso',
+            colorActivo: false,
+            idTalla: 11,
+            idAlmacen: 3,
+            idOrden: null,
+            folioOrden: null,
+            existencia: 30,
+          },
+        ],
+        totalExistencia: 30,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+    const selectorColor = screen.getByTestId('mov-matriz-agregar-color');
+    const textos = [...selectorColor.querySelectorAll('option')].map((o) => o.textContent ?? '');
+    expect(textos).toContain('Blanco Hueso (retirado)');
+    // Y el catálogo vivo sigue ahí, sin marca: la puerta se abre, no se sustituye.
+    expect(textos).toContain('Rojo');
+
+    await usuario.selectOptions(selectorColor, '9');
+    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+    const celda = screen.getByTestId('mov-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '30');
+    await ponerMotivo(usuario);
+    await usuario.click(screen.getByTestId('mov-guardar'));
+
+    const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idColor: number }[] }];
+    expect(cuerpo.lineas[0]?.idColor).toBe(9);
+  });
+
   it('si NO se pueden leer las existencias lo DICE (no inventa órdenes)', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue({

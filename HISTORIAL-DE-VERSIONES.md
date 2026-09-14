@@ -71,6 +71,35 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.154 · 13-sep-2026 · **en prueba** — **La mercancía de un color fusionado ya se puede mover otra vez**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Mover y traspasar producto terminado de un color que se fusionó con otro.** Al fusionar, el color
+  absorbido se apaga — y como las dos pantallas sólo listaban colores vivos, **la mercancía que quedaba
+  de ese color desaparecía del selector y no había manera de sacarla**.
+- Ahora ese color **vuelve a aparecer, pero sólo si de verdad hay piezas de él ahí**, rotulado
+  **«(retirado)»** y al final de la lista, para que nadie lo confunda con el catálogo vivo.
+
+### Qué cambió y puede sorprender
+
+- **No aparecen todos los colores apagados: sólo los que tienen existencia en ese almacén.** Un selector
+  con todos los colores muertos sería ruido, y dejaría capturar sobre colores que ya no se usan.
+- **Quién decide qué está retirado es el servidor**, no la pantalla. Así las dos pantallas no pueden
+  acabar opinando distinto.
+- **Al capturar una entrada** (por ejemplo, el regreso de estampado) también aparece, porque ahí la
+  pantalla ya miraba los renglones en cero.
+
+### Qué sigue pendiente o roto
+
+- **La fusión NO devuelve las piezas al color que absorbe**, y eso es a propósito: el kardex es un
+  rastro de movimientos ya asentados y no se reescribe. Lo que esta versión arregla es que **se puedan
+  mover a mano**, que es lo que hacía falta.
+- Queda anotado aparte (**fila 0.192**) que estos selectores traen como mucho 100 colores: hoy no
+  estorba, pero si algún día hay más colores activos que eso, los de más no saldrían.
+
+---
+
 ## 0.153 · 12-sep-2026 · **en prueba** — **La receta de la orden ya enseña el complemento: se capturaba por cinco puertas y no se veía por ninguna**
 
 ### Qué se puede hacer ahora que antes no

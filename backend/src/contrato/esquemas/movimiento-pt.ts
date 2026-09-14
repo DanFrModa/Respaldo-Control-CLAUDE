@@ -358,6 +358,14 @@ const esquemaExistenciaPtFila = z.object({
   modelo: z.string().describe('Código del modelo.'),
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  colorActivo: z
+    .boolean()
+    .describe(
+      'Si el color sigue vivo en el catálogo (fila 0.164). La existencia son movimientos ya ' +
+        'asentados (D3): un color desactivado —p. ej. absorbido por una fusión, §Post-F9.222— ' +
+        'conserva sus piezas. Las pantallas de captura lo usan para ofrecer ese color marcado ' +
+        'como retirado, en vez de dejar la mercancía sin puerta.',
+    ),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
   ordenTalla: z.number().int().describe('Orden del catálogo de la talla (para ordenar columnas).'),

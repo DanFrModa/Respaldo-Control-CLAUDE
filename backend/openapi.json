@@ -124204,6 +124204,10 @@
                             "type": "string",
                             "description": "Nombre del color."
                           },
+                          "colorActivo": {
+                            "type": "boolean",
+                            "description": "Si el color sigue vivo en el catálogo (fila 0.164). La existencia son movimientos ya asentados (D3): un color desactivado —p. ej. absorbido por una fusión, §Post-F9.222— conserva sus piezas. Las pantallas de captura lo usan para ofrecer ese color marcado como retirado, en vez de dejar la mercancía sin puerta."
+                          },
                           "idTalla": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -124268,6 +124272,7 @@
                           "modelo",
                           "idColor",
                           "color",
+                          "colorActivo",
                           "idTalla",
                           "etiquetaTalla",
                           "ordenTalla",

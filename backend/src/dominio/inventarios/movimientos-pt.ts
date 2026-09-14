@@ -916,6 +916,7 @@ export async function consultarExistenciasPt(
       modelo: string;
       idColor: number;
       color: string;
+      colorActivo: boolean;
       idTalla: number;
       etiquetaTalla: string;
       ordenTalla: number;
@@ -936,6 +937,11 @@ export async function consultarExistenciasPt(
         mo."codigo"     AS "modelo",
         e."id_color"    AS "idColor",
         c."nombre"      AS "color",
+        -- Fila 0.164 — si el color sigue VIVO en el catálogo. La existencia es de movimientos ya
+        -- asentados (D3) y no se apaga con el catálogo: un color fusionado (Post-F9.222) queda
+        -- inactivo con sus piezas intactas, y las pantallas de captura necesitan distinguirlo
+        -- para ofrecerlo SIN invitar a capturar sobre él.
+        c."activo"      AS "colorActivo",
         e."id_talla"    AS "idTalla",
         t."etiqueta"    AS "etiquetaTalla",
         t."orden"       AS "ordenTalla",
@@ -983,6 +989,7 @@ export async function consultarExistenciasPt(
       modelo: f.modelo,
       idColor: f.idColor,
       color: f.color,
+      colorActivo: f.colorActivo,
       idTalla: f.idTalla,
       etiquetaTalla: f.etiquetaTalla,
       ordenTalla: f.ordenTalla,

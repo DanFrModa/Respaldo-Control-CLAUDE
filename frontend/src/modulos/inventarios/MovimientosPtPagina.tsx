@@ -158,9 +158,13 @@ export function MovimientosPtPagina(): React.JSX.Element {
     ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
   const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
 
+  // Fila 0.164 — al catálogo VIVO se le suman los colores RETIRADOS que tienen mercancía en este
+  // contexto (el mismo `existencias` del que salen los buckets de orden, ya elegido por modo).
+  // Sin esto, las piezas que entraron con un color luego fusionado (§Post-F9.222) se quedaban sin
+  // forma de ajustarse a mano.
   const coloresDisponibles = useMemo(
-    () => coloresOpciones(colores.data?.datos ?? []),
-    [colores.data],
+    () => coloresOpciones(colores.data?.datos ?? [], existencias.data?.filas ?? []),
+    [colores.data, existencias.data],
   );
   const tallasDisponibles = useMemo(
     () => tallasColumnas(tallasCat.data?.datos ?? []),
