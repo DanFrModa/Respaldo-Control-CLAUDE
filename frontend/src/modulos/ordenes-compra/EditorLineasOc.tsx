@@ -29,6 +29,11 @@ import {
  * AvioProveedor (R1). Captura cantidad, unidad, precio y liga a una orden de producción POR LÍNEA.
  * Un botón opcional abre la matriz talla×color NATIVA (decisión c, suma = cantidad). Presentación
  * pura (A1): no valida reglas de negocio; el backend re-valida (XOR material, Σ matriz = cantidad).
+ *
+ * ⭐⭐ **Fila 0.160 (§Post-F9.213·B):** el renglón de TELA elige aquí su COLOR — ver
+ * {@link selectorColor}. Es lo que hace usable el único camino manual del caso de las mangas
+ * (partir la compra en dos renglones de la misma tela, uno por color) mientras llega el reparto por
+ * partes en la receta.
  */
 export function EditorLineasOc({
   renglones,
@@ -93,8 +98,9 @@ export function EditorLineasOc({
     // ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 **CAMBIAR DE TELA SUELTA EL COLOR.** Un `TelaColor` cuelga de
     // SU tela: el "Marino Alsa" de la felpa no existe en el cardigan. Si se conservara, el cerrojo
     // del dominio rechazaría el guardado con *"el color «Marino Alsa» es de la tela «Felpa 280», no
-    // de «Cardigan»"* y el usuario **no tendría ningún control aquí para corregirlo** — un error sin
-    // salida. Se suelta al cambiar de tela y se DICE (abajo, junto al selector).
+    // de «Cardigan»"*. ⚠️ Desde la fila 0.160 el renglón SÍ tiene selector de color, así que el
+    // error dejó de ser "sin salida"; soltarlo sigue siendo lo correcto porque el combo de colores
+    // pasa a ser el de la tela nueva y un id de la anterior no estaría ni en la lista.
     // ⚠️ Se conserva sólo si la tela no cambió (re-elegir la misma no debe perder el dato).
     const mismaTela = renglon !== undefined && renglon.idTela === idTela;
     actualizar(clave, {
@@ -132,6 +138,85 @@ export function EditorLineasOc({
       cambios.precio = String(prov.precio);
     }
     actualizar(clave, cambios);
+  }
+
+  /**
+   * ⭐⭐ **Fila 0.160 (§Post-F9.213·B) — EL COLOR DEL RENGLÓN, QUE AHORA SE ELIGE AQUÍ.**
+   *
+   * Hasta esta fila este bloque decía *"aquí no se ELIGE (eso vive en «De qué color se compra la
+   * tela»); aquí se VE, y se puede quitar"*, y era un agujero con nombre: el **único camino manual**
+   * que resuelve el caso de las mangas —partir la compra en dos renglones de la misma tela, uno por
+   * color— añade el segundo renglón **a mano**, y ese renglón **nacía sin color y sin forma de
+   * ponérselo**. La pantalla de la OP sólo sabe amarrar UN tono por (orden, tela), así que no podía
+   * llenarlo. Sin color, la recepción **no cruza nada** y esos kilos entran de cualquier tono.
+   *
+   * ⚠️ **Sigue siendo OPCIONAL, y no es descuido.** Hay órdenes que legítimamente todavía no saben
+   * el tono (sin matriz color×talla, o sin amarre), y ahí la tela se compra sin color como siempre
+   * — incluso la explosión genera OC así. Lo que el servidor **sí** impide, al RECIBIR, es que un
+   * renglón mudo se quede con el tono que otro renglón de la misma OC reclama (`recepciones.ts`).
+   * El aviso de abajo lo anticipa cuando la tela va repetida; el juez es el servidor (A1).
+   *
+   * Los colores salen de la tela que ya viaja en `telas` (cada una trae sus `colores` hijos), así
+   * que no hace falta ninguna consulta nueva. Si la tela del renglón no está en esa lista (una OC
+   * vieja cuyo proveedor cambió, p. ej.) se cae al texto de sólo lectura: un renglón antiguo tiene
+   * que poder VERSE aunque su tela ya no se ofrezca.
+   */
+  function selectorColor(renglon: RenglonOcCaptura, indice: number): React.JSX.Element | null {
+    if (renglon.idTela === null) {
+      return null;
+    }
+    const tela = telas.find((t) => t.id === renglon.idTela);
+    if (tela === undefined) {
+      return renglon.telaColor === null ? null : (
+        <span className="mt-1 block text-xs text-muted-foreground" data-testid="color-renglon-oc">
+          Color: <b className="text-foreground">{renglon.telaColor}</b>
+        </span>
+      );
+    }
+    // ¿Esta MISMA tela está en otro renglón de la OC? Es la forma en la que el renglón mudo hace
+    // daño —se queda con el tono del hermano—, y la única que el servidor sabe rechazar al recibir.
+    // Decirlo AQUÍ, mientras la OC se arma, es lo que evita descubrirlo con la tela en la puerta.
+    const telaRepetida = renglones.some(
+      (r) => r.clave !== renglon.clave && r.tipo === 'tela' && r.idTela === renglon.idTela,
+    );
+    return (
+      <label className="mt-1 block text-xs text-muted-foreground">
+        Color de la tela
+        <SelectNativo
+          className="mt-1"
+          aria-label={`Color de la tela del renglón ${indice + 1}`}
+          disabled={soloLectura}
+          value={renglon.idTelaColor === null ? '' : String(renglon.idTelaColor)}
+          onChange={(e) => {
+            const id = e.target.value === '' ? null : Number(e.target.value);
+            const color = tela.colores.find((c) => c.id === id);
+            actualizar(renglon.clave, {
+              idTelaColor: color === undefined ? null : color.id,
+              telaColor: color === undefined ? null : color.nombre,
+            });
+          }}
+          data-testid="selector-color-tela-oc"
+        >
+          <option value="">
+            {tela.colores.length === 0
+              ? 'Esta tela no tiene colores dados de alta'
+              : 'Sin color (no se podrá cuadrar al recibir)'}
+          </option>
+          {tela.colores.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.nombre}
+              {c.pantone === null ? '' : ` (${c.pantone})`}
+            </option>
+          ))}
+        </SelectNativo>
+        {telaRepetida && renglon.idTelaColor === null ? (
+          <span className="mt-1 block text-warn" data-testid="aviso-color-tela-repetida-oc">
+            Esta orden pide la misma tela en otro renglón. Mientras este no diga su color, al
+            recibir no habrá forma de saber cuál de los dos surte lo que llegue: dilo aquí.
+          </span>
+        ) : null}
+      </label>
+    );
   }
 
   /**
@@ -298,30 +383,7 @@ export function EditorLineasOc({
                       data-testid="descripcion-libre-oc"
                     />
                   )}
-                  {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR QUE PIDE ESTE RENGLÓN, a la vista.
-                      Antes viajaba invisible: se conservaba al guardar y el usuario no tenía forma
-                      de saber que estaba ahí. Aquí no se ELIGE (eso vive en «De qué color se compra
-                      la tela», sobre la matriz de la OP); aquí se VE, y se puede quitar. */}
-                  {renglon.tipo === 'tela' && renglon.telaColor !== null ? (
-                    <span
-                      className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
-                      data-testid="color-renglon-oc"
-                    >
-                      Color: <b className="text-foreground">{renglon.telaColor}</b>
-                      {soloLectura ? null : (
-                        <button
-                          type="button"
-                          className="underline"
-                          onClick={() =>
-                            actualizar(renglon.clave, { idTelaColor: null, telaColor: null })
-                          }
-                          data-testid="quitar-color-renglon-oc"
-                        >
-                          quitar
-                        </button>
-                      )}
-                    </span>
-                  ) : null}
+                  {renglon.tipo === 'tela' ? selectorColor(renglon, indice) : null}
                 </label>
               </div>
 

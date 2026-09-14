@@ -1007,7 +1007,9 @@ export async function bloquearOrdenesDeRenglones(
  * Una factura puede surtir VARIAS OCs (decisión de Daniel: la liga es por renglón) → se agrupa por
  * OC y se emite una recepción y un evento por cada una. Valida, por renglón:
  *  • que el renglón de OC exista, sea de esta empresa y sea de TELA;
- *  • que el color que llegó sea de la tela comprada;
+ *  • que el color que llegó sea de la tela comprada, que coincida con el que pidió el renglón si
+ *    éste lo dice, y —fila 0.160— que un renglón MUDO no se quede con el tono que otro renglón de
+ *    la misma OC reclama;
  *  • que la OC sea del MISMO proveedor que la factura (una factura de X no surte una OC de Y);
  *  • que la OC esté en `autorizada` o `recibida_parcial` (decisión (b), igual que la otra puerta).
  *
@@ -1042,7 +1044,17 @@ export async function registrarRecepcionesDesdeEntradaTela(
           idEmpresa: true,
           idProveedor: true,
           estatus: true,
-          lineas: { select: { id: true, cantidad: true, cantidadComplemento: true, idTela: true } },
+          lineas: {
+            select: {
+              id: true,
+              cantidad: true,
+              cantidadComplemento: true,
+              idTela: true,
+              // ⭐⭐ Fila 0.160 (§Post-F9.213·B): el tono que cada renglón HERMANO tiene apartado.
+              idTelaColor: true,
+              telaColor: { select: { nombre: true } },
+            },
+          },
         },
       },
     },
@@ -1081,6 +1093,8 @@ export async function registrarRecepcionesDesdeEntradaTela(
     // rechazo dejaría sin poder recibir a las ~7,978 OC que ya existen — un arreglo que rompe lo
     // que ya funciona no es un arreglo (§Post-F9.68: se esconde Y se bloquea lo que no se puede
     // hacer, pero no se bloquea lo que sí).
+    // ⭐ Fila 0.160: el renglón sin color dejó de ser *del todo* libre — justo abajo se le impide
+    // quedarse con el tono que otro renglón de la MISMA OC reclama. Sigue sin exigírsele color.
     if (linea.idTelaColor !== null && linea.idTelaColor !== renglon.idTelaColor) {
       throw new ErrorValidacion(
         `La orden de compra ${Number(oc.numCompra)} pidió el color ` +
@@ -1088,6 +1102,39 @@ export async function registrarRecepcionesDesdeEntradaTela(
           `trae otro color. Liga el renglón al de la OC que le corresponde, o corrige la OC si el ` +
           `proveedor de verdad mandó otro color.`,
       );
+    }
+    // ⭐⭐ **Fila 0.160 (§Post-F9.213·B) — Y EL RENGLÓN MUDO NO SE QUEDA CON UN TONO AJENO.**
+    //
+    // 🔴 El agujero que cierra: el caso de las mangas (*"es la misma tela, pero las mangas van de
+    // otro color"*) se resuelve partiendo la compra en DOS renglones de la misma tela, y el segundo
+    // se agrega a mano. Si ese renglón se queda sin color, la guarda de arriba **no dispara** —sólo
+    // cruza cuando el renglón trae color— y por ahí entraba **cualquier tono**, incluido el que su
+    // hermano ya tenía apartado: los 150 kg de marino se recibían contra el renglón de las mangas y
+    // el renglón del cuerpo se quedaba esperando para siempre.
+    //
+    // 🔑 **Por qué se bloquea SÓLO el tono que otro renglón reclama, y no todo renglón sin color.**
+    // Un renglón mudo **solitario** es legítimo y vivo: la orden todavía no tiene su matriz
+    // color×talla, o nadie amarró el tono, y la explosión genera la OC igual (la pantalla «De qué
+    // color se compra la tela» lo dice: *"mientras tanto, estas telas se compran sin color"*).
+    // Rechazarlo dejaría **la tela en la puerta** sin forma de meterla: corregir una OC ya firmada
+    // exige `compras.editar-autorizada`, que es un permiso de dirección. Aquí no se le pide a nadie
+    // que adivine lo que la OC no dice — sólo se le impide quedarse con lo que la OC **sí** dijo que
+    // era de otro renglón. Lo que de verdad venía para el renglón mudo siempre se puede recibir.
+    if (linea.idTelaColor === null) {
+      const hermano = oc.lineas.find(
+        (h) =>
+          h.id !== linea.id && h.idTela === linea.idTela && h.idTelaColor === renglon.idTelaColor,
+      );
+      if (hermano !== undefined) {
+        throw new ErrorValidacion(
+          `El renglón de la orden de compra ${Number(oc.numCompra)} al que estás ligando esto no ` +
+            `dice de qué color se pidió, y el color que llegó ` +
+            `("${hermano.telaColor?.nombre ?? String(renglon.idTelaColor)}") lo pide OTRO renglón ` +
+            `de esa misma orden. Liga estos kilos a ese renglón, o ponle su color al renglón mudo ` +
+            `en la orden de compra (el selector de color, junto a la tela) para que se pueda ` +
+            `cuadrar.`,
+        );
+      }
     }
     if (oc.idProveedor !== cabecera.idProveedor) {
       throw new ErrorValidacion(

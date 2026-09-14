@@ -1352,6 +1352,93 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
     expect(pendientesSin[0]!.idTelaColor).toBeNull();
     expect(pendientesSin[0]!.telaColor).toBeNull();
   });
+
+  // ── ⭐⭐ FILA 0.160 (§Post-F9.213·B) — EL RENGLÓN MUDO Y EL TONO DE SU HERMANO ────────────────
+
+  /**
+   * 🔴 **EL AGUJERO QUE CIERRA LA FILA 0.160.** El caso de las mangas (*"es la misma tela, pero las
+   * mangas van de otro color"*) se resuelve partiendo la compra en DOS renglones de la misma tela
+   * (la OC no exige unicidad) y agregando el segundo A MANO. Ese renglón **nacía sin color y sin
+   * control para ponérselo** ⇒ el cruce de arriba **no dispara** (sólo cruza si el renglón lo trae)
+   * y por ahí entraba cualquier tono, **incluido el que su hermano ya tenía apartado**.
+   *
+   * ⚠️ La OC se pide aquí como la pide la vida: un renglón con MARINO (el cuerpo) y otro mudo (las
+   * mangas).
+   */
+  async function ocFelpaMangas() {
+    const oc = await crearOC(
+      sesion(PERM_COMPRAS),
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        lineas: [
+          {
+            idTela: telaFelpa.id,
+            idTelaColor: colorMarino.id,
+            cantidad: 150,
+            precio: 12,
+            unidad: 'kg',
+            cantidadComplemento: 5,
+          },
+          // El renglón de las mangas, añadido a mano y MUDO.
+          {
+            idTela: telaFelpa.id,
+            cantidad: 50,
+            precio: 12,
+            unidad: 'kg',
+            cantidadComplemento: 5,
+          },
+        ],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_COMPRAS), oc.id, bd());
+    const conColor = oc.lineas.find((l) => l.idTelaColor !== null);
+    const muda = oc.lineas.find((l) => l.idTela !== null && l.idTelaColor === null);
+    expect(conColor).toBeDefined();
+    expect(muda).toBeDefined();
+    return { conColor: conColor!, muda: muda! };
+  }
+
+  it('🔴 el MARINO no se puede recibir contra el renglón MUDO: lo pide su hermano', async () => {
+    const { muda } = await ocFelpaMangas();
+    const entrada = await facturaDeColor(muda.id, colorMarino.id);
+
+    // 🔴 El valor que la pone roja: que confirmar NO lance — que es lo que pasaba antes de la fila,
+    // con los 150 kg del cuerpo entrando por el renglón de las mangas y el cuerpo esperando eterno.
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(ErrorValidacion);
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /lo pide OTRO renglón/,
+    );
+    // Y no escribió nada.
+    expect(await cliente.movimiento.count()).toBe(0);
+    expect(await cliente.partidaTela.count()).toBe(0);
+  });
+
+  /**
+   * ⚠️ **LA OTRA MITAD, y la que evita convertir el arreglo en una trampa.** Lo que de verdad viene
+   * para el renglón mudo **siempre se tiene que poder recibir**: si no, la tela se queda en la
+   * puerta, porque corregir una OC ya firmada exige `compras.editar-autorizada` (dirección).
+   */
+  it('el BLANCO sí entra por el renglón mudo: ningún hermano lo reclama', async () => {
+    const { muda } = await ocFelpaMangas();
+    const entrada = await facturaDeColor(muda.id, colorBlanco.id);
+
+    const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(confirmada.estatus).toBe('confirmada');
+    expect(confirmada.lineas[0]!.idTelaColor).toBe(colorBlanco.id);
+    expect(await cliente.recepcionCompraLinea.count()).toBe(1);
+  });
+
+  it('el MARINO entra por SU renglón, el que sí lo pide (el cruce normal sigue igual)', async () => {
+    const { conColor } = await ocFelpaMangas();
+    const entrada = await facturaDeColor(conColor.id, colorMarino.id);
+
+    const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(confirmada.estatus).toBe('confirmada');
+    expect(confirmada.lineas[0]!.idTelaColor).toBe(colorMarino.id);
+  });
 });
 
 /**

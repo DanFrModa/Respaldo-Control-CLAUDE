@@ -71,13 +71,38 @@ const espiaTelasQuery = vi.fn<(query: { idProveedor?: number }, opciones?: unkno
 /**
  * Telas por proveedor. La de Bloom lleva COMPLEMENTO (§Post-F9.18) y las dos declaran su
  * `unidadMedida`: en un renglón de tela la unidad la manda la tela, no se teclea.
+ *
+ * ⭐ Fila 0.160: y sus `colores` HIJOS, porque el renglón de tela ahora ELIGE su color de esa lista
+ * (el contrato los embebe en cada tela, así que una tela sin `colores` no existe en la vida real).
  */
 const TELAS_POR_PROVEEDOR: Record<
   number,
-  { id: number; nombre: string; unidadMedida: 'KG' | 'M'; nombreComplemento: string | null }[]
+  {
+    id: number;
+    nombre: string;
+    unidadMedida: 'KG' | 'M';
+    nombreComplemento: string | null;
+    colores: { id: number; nombre: string; pantone: string | null }[];
+  }[]
 > = {
-  5: [{ id: 30, nombre: 'Felpa Alsatex', unidadMedida: 'KG', nombreComplemento: null }],
-  21: [{ id: 40, nombre: 'Mesh Bloom', unidadMedida: 'M', nombreComplemento: 'Cardigan' }],
+  5: [
+    {
+      id: 30,
+      nombre: 'Felpa Alsatex',
+      unidadMedida: 'KG',
+      nombreComplemento: null,
+      colores: [{ id: 77, nombre: 'Marino Alsa 3040', pantone: '19-4023' }],
+    },
+  ],
+  21: [
+    {
+      id: 40,
+      nombre: 'Mesh Bloom',
+      unidadMedida: 'M',
+      nombreComplemento: 'Cardigan',
+      colores: [{ id: 91, nombre: 'Negro', pantone: null }],
+    },
+  ],
 };
 vi.mock('@/api/telas', () => ({
   etiquetaUnidadTela: (unidad: 'KG' | 'M') => (unidad === 'KG' ? 'kg' : 'm'),
