@@ -71,6 +71,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.156 · 14-sep-2026 · **en prueba** — **El renglón de tela de una orden de compra ya dice de qué color se pide**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Decir de qué color se compra la tela en CADA renglón de una orden de compra**, con un selector
+  que ofrece los colores de esa tela (y su pantone al lado). Hasta ahora el color llegaba solo, desde
+  la orden de producción, y en la orden de compra **sólo se podía mirar o borrar** — nunca poner.
+- ⭐⭐ **Y con eso queda usable el caso de las mangas.** Cuando una prenda lleva la misma tela en dos
+  colores (el cuerpo de uno, las mangas de otro), la única manera de comprarlo hoy es **partir la
+  compra en dos renglones de la misma tela** y agregar el segundo a mano. Ese segundo renglón **nacía
+  ciego**: sin color y sin forma de ponérselo. Ahora se le dice, y el papel que ve el proveedor y el
+  cruce de la recepción ya saben de qué tono habla.
+- **El almacén deja de poder quedarse con el color equivocado.** Si se reciben kilos contra un renglón
+  que no dice su color, y ese tono **lo pide otro renglón de la misma orden**, el sistema lo rechaza y
+  lo explica: *«el color que llegó lo pide OTRO renglón de esa misma orden»*. Antes los 150 kg del
+  cuerpo se podían meter por el renglón de las mangas, y el del cuerpo se quedaba esperando para
+  siempre.
+
+### Qué cambió y puede sorprender
+
+- **Poner el color sigue siendo OPCIONAL, a propósito.** Hay órdenes que todavía no saben el tono
+  —porque no tienen capturada su matriz de color×talla, o porque nadie amarró el color de la tela— y
+  ésas se compran sin color como siempre. Nada se bloquea por eso.
+- **Cuando la misma tela aparece en dos renglones y uno se quedó sin color, la pantalla avisa** en ese
+  renglón. Es un aviso, no un candado: la orden se guarda y se autoriza igual. El aviso está para que
+  el color se ponga **antes** de que llegue el material, no para estorbar.
+- 🔴 **Y hay un rechazo NUEVO en la entrada de tela, que quien recibe se va a encontrar de frente.**
+  Si se liga una factura a un renglón que no dice su color, y ese tono lo pide **otro renglón de la
+  misma orden al que todavía le falta material**, el sistema **no deja confirmar** y dice a qué renglón
+  hay que ligarlo. Es el caso de las mangas: los kilos del cuerpo entrando por el renglón equivocado
+  mientras el cuerpo se queda esperando.
+- **Pero sólo bloquea mientras ese otro renglón siga esperando.** En cuanto queda surtido, el renglón
+  sin color vuelve a aceptar ese tono — que es lo que permite meter una segunda remesa cuando el
+  renglón hermano ya se cerró y por eso desapareció de la lista de pendientes.
+- **Un renglón que no dice su color se sigue recibiendo de cualquier tono si es el único de esa tela.**
+  El sistema sólo impide lo que de verdad sabe: que ese tono ya tiene dueño **y ese dueño lo espera**.
+  Lo demás no lo puede adivinar, y bloquearlo dejaría la tela parada en la puerta.
+- **Las órdenes de compra viejas se siguen viendo igual.** Un renglón cuya tela ya no esté en la lista
+  del proveedor enseña su color como texto, sin selector: el dato no se pierde.
+
+### Qué sigue pendiente o roto
+
+- **Esto es el parche que hace usable el camino manual, no la solución de fondo.** La de fondo la
+  decidió Daniel y vive aparte: que **la receta diga el consumo por partes** (*«150 de cuerpo y 50 de
+  mangas»*), capturado una vez por modelo por la gente de Desarrollo, en vez de resolverlo orden por
+  orden en la compra. Él mismo la situó después del arranque: *«es raro, son pocos. Si me llegara a
+  salir alguno que necesite meter, te aviso para pasarlo a V1»*.
+- **Las órdenes de compra que ya estaban capturadas no se tocaron.** Si alguna tiene la tela repetida
+  con un renglón mudo, sigue como estaba; lo que cambia es que ahora se le puede poner el color a mano.
+
+---
+
 ## 0.155 · 14-sep-2026 · **en prueba** — **El aviso de «esta orden no va igual que sus hermanas» ya mira el complemento de la tela**
 
 ### Qué se puede hacer ahora que antes no

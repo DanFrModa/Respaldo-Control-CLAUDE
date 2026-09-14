@@ -13548,6 +13548,52 @@ quitar»*) ⇒ en la recepción el cruce de color **sólo se hace si el renglón
 (`recepciones.ts:1079-1090`), así que esos 5 kg **se pueden recibir de cualquier tono** y quien recibe
 vuelve a inventar la correspondencia — justo el mal que V1-E3u cerró.
 **En una frase: hoy se puede COMPRAR el caso, pero no DEFINIRLO.**
+⚠️ **Esto último dejó de ser verdad el 14-sep-2026 — ver B-bis, justo abajo:** el renglón YA tiene
+selector de color. El resto del diagnóstico de esta sección sigue en pie.
+
+#### B-bis · ✅ RESUELTO EL AGUJERO (fila 0.160, 14-sep-2026) — y la decisión de fondo que hubo que tomar
+
+El agujero de arriba queda tapado por **dos piezas**: el renglón de tela de una OC **ELIGE su color**
+en el editor (con los colores de esa tela, que ya viajaban con ella; no hizo falta consulta nueva), y la
+recepción **deja de dejarse colar el tono del vecino**. El comentario que decía *«aquí no se ELIGE… aquí
+se VE, y se puede quitar»* ya no es verdad, y se corrigió en el sitio.
+
+**LA PREGUNTA DE FONDO ERA UNA: ¿el color se vuelve obligatorio, o se deja opcional y se cruza?**
+**DECIDIDO: OPCIONAL al capturar — y en la recepción se bloquea SÓLO el tono que otro renglón reclama.**
+
+- ✅ **Opcional al capturar.** Hay órdenes que legítimamente **todavía no saben el tono**: sin matriz
+  color×talla, o sin amarre. La propia pantalla «De qué color se compra la tela» lo dice con todas sus
+  letras (*«mientras tanto, estas telas se compran sin color»*).
+- ✅ **Obligatorio-en-lo-que-se-puede-saber al recibir.** Si el renglón al que se ligan los kilos **no
+  dice** su color y ese tono **lo pide otro renglón de la misma OC AL QUE TODAVÍA LE FALTA MATERIAL**,
+  se rechaza nombrando ese renglón. Mientras el renglón hermano siga esperando ese tono, sus kilos se
+  ligan a él.
+  🔴 **Las dos acotaciones son la guarda, no matices.** Un renglón mudo **solitario** no se toca (la OC
+  no dice el tono y nadie puede adivinarlo), y **un hermano YA SURTIDO tampoco protege nada**: en cuanto
+  queda surtido **desaparece del selector** de la entrada de tela (`lineasTelaPendientesDeProveedor`
+  sólo ofrece lo que tiene faltante) y recibir sin OC está prohibido (§Post-F9.159(a)) ⇒ cerrar ahí el
+  renglón mudo dejaba la segunda remesa **sin ningún camino de entrada**. Lo cazó el reviewer midiendo
+  el caso, y es el reverso exacto del argumento con el que se descartó bloquear todo renglón sin color.
+
+🔴 **POR QUÉ NO SE EXIGIÓ EL COLOR A SECAS — dos caminos probados y los dos rotos, medidos, no supuestos.**
+1. **Bloquear al RECIBIR todo renglón sin color** (la propuesta inicial) **dejaría la tela en la puerta**:
+   corregir una OC ya firmada exige `compras.editar-autorizada`, que es un permiso de dirección (la
+   hermana callada de `compras.desautorizar`, que Daniel reservó para sí, §Post-F9.79).
+2. **Exigir color al AUTORIZAR cuando la tela va repetida** (el segundo intento) **rompe la generación
+   desde la explosión, y se rompió de verdad**: se construyó, y puso en rojo
+   `color-de-la-tela.int.test.ts` — una orden donde **sólo un color tiene su amarre** hace que el MRP
+   emita, en la MISMA OC, un renglón con tono y otro **mudo** (§Post-F9.213·A-bis), y esa OC se autoriza
+   todos los días. Autorizar parecía la puerta segura *precisamente porque* ahí la OC aún se edita; lo
+   que no se había medido es que **la forma «mala» no la fabrica una persona: la fabrica el generador**.
+   🔑 **La lección: el sitio bueno para una guarda no es el que tiene salida, es el que distingue el
+   error del caso legítimo.** Aquí sólo hay un hecho que el sistema *sabe* y la persona no: que ese tono
+   ya tiene dueño en esta orden. Todo lo demás es ignorancia declarada de la OC, y contra la ignorancia
+   no se pone un cerrojo, se pone un control — que es la otra mitad de la fila.
+
+⚠️ **Lo que esto NO tapa, dicho sin adornos:** un renglón mudo **solitario** sigue recibiéndose con
+cualquier tono, exactamente como hoy; y no se construyó nada para reparar OC ya capturadas (REGLA 0-B: lo
+viejo se limpia, no se arregla). La pantalla, eso sí, **avisa** cuando la tela se repite y el renglón se
+quedó mudo, para que se corrija antes de que llegue el material.
 
 ---
 
