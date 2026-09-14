@@ -31,6 +31,10 @@ export const ENTIDAD_DEMO = {
   entradaTela: 'Demo:EntradaTela',
   recepcion: 'Demo:RecepcionCompra',
   movimiento: 'Demo:Movimiento',
+  /** Partidas (lotes de entrada) que nacieron DENTRO del dominio al confirmar una entrada/ajuste. */
+  partida: 'Demo:PartidaTela',
+  /** Cargos/abonos de CxP que nacieron DENTRO del dominio al recibir o confirmar. */
+  movimientoTercero: 'Demo:MovimientoTercero',
 } as const;
 
 /** Una entidad de mapeo del sembrador. */

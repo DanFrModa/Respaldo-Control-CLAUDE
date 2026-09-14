@@ -45,7 +45,16 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
-import { contarDemo, limpiarDemoInventarios } from './demo/limpiar.js';
+import type { Invasor } from './demo/limpiar.js';
+import {
+  ErrorLimpiezaBloqueada,
+  conjuntoVacio,
+  almacenesOcupados,
+  detectarInvasores,
+  limpiarDemoInventarios,
+  planDeLimpieza,
+  reunirDemo,
+} from './demo/limpiar.js';
 import { catalogoCfdiDemo } from './demo/sembrar.js';
 import { sembrarDemoInventarios, type ResultadoSiembra } from './demo/sembrar.js';
 import { totalCfdi } from './demo/cfdi.js';
@@ -112,6 +121,22 @@ function imprimirPlan(): void {
   }
 }
 
+/** Imprime los estorbos que impiden limpiar, con qué hacer con cada uno. */
+function imprimirInvasores(invasores: Invasor[]): void {
+  console.error('');
+  console.error('🔴 NO SE BORRÓ NADA: alguien ya operó encima de los datos ficticios.');
+  console.error('   No se tocó NADA: ni lo ficticio ni, por supuesto, lo que capturaste encima.');
+  for (const i of invasores) {
+    console.error('');
+    console.error(`── ${i.que} (${String(i.cuantos)}) ──`);
+    console.error(
+      `   ids: ${i.ejemplos.map(String).join(', ')}${i.cuantos > i.ejemplos.length ? ', …' : ''}`,
+    );
+    console.error(`   → ${i.comoSeArregla}`);
+  }
+  console.error('');
+}
+
 /** Imprime el resumen de una siembra. */
 function imprimirResumen(r: ResultadoSiembra): void {
   console.log('');
@@ -140,29 +165,49 @@ export async function ejecutar(cliente: PrismaClient): Promise<number> {
   const limpiar = bandera('limpiar');
 
   if (limpiar) {
-    const hay = await contarDemo(cliente);
-    const total = Object.values(hay).reduce((a, b) => a + b, 0);
-    console.log('Datos ficticios anotados hoy:', JSON.stringify(hay));
-    if (total === 0) {
-      console.log('No hay nada que limpiar.');
+    const conjunto = await reunirDemo(cliente);
+    if (conjuntoVacio(conjunto)) {
+      console.log('No hay nada que limpiar (el mapeo Demo:* está vacío).');
       return 0;
     }
+    const invasores = await detectarInvasores(cliente, conjunto);
+    if (invasores.length > 0) {
+      imprimirInvasores(invasores);
+      return simular ? 0 : 1;
+    }
+    const ocupados = await almacenesOcupados(cliente, conjunto);
+    // El ensayo en seco enseña EXACTAMENTE lo que va a pasar —incluidos los almacenes que se
+    // conservan—, no un conteo aparte que después no cuadra: eso daba falsa tranquilidad.
+    console.log(
+      'Se borraría exactamente esto:',
+      JSON.stringify(planDeLimpieza(conjunto, ocupados), null, 2),
+    );
+    for (const o of ocupados) {
+      console.log(
+        `  ⚠️  El almacén "${o.nombre}" NO se borra: guarda ${o.motivo}. Se deja DESACTIVADO, con su contenido intacto.`,
+      );
+    }
     if (simular) {
-      console.log('ENSAYO EN SECO (--simular): no se borró nada.');
+      console.log('ENSAYO EN SECO (--simular): no se borró nada. Nadie ha operado encima.');
       return 0;
     }
     try {
       const borrado = await limpiarDemoInventarios(cliente);
       console.log('Borrado:', JSON.stringify(borrado, null, 2));
-      console.log('Listo: la base quedó como antes de sembrar (la bitácora se conserva, A7).');
+      console.log(
+        borrado.almacenesConservados.length === 0
+          ? 'Listo: la base quedó como antes de sembrar (la bitácora se conserva, A7).'
+          : 'Listo: se borró todo lo ficticio. Quedaron DESACTIVADOS los almacenes de arriba, ' +
+              'porque guardan material que NO sembró este script (su inventario está intacto). ' +
+              'La bitácora se conserva (A7).',
+      );
       return 0;
     } catch (error) {
-      console.error(
-        '\n🔴 NO SE BORRÓ NADA (la transacción se revirtió entera).\n' +
-          'Lo más probable: alguien ya OPERÓ encima de los datos ficticios (una nota de salida, un\n' +
-          'conteo cíclico, un pago aplicado, una orden que consumió la tela…) y la base lo protege.\n' +
-          'Cancela o revierte esos documentos desde la aplicación y vuelve a intentarlo.\n',
-      );
+      if (error instanceof ErrorLimpiezaBloqueada) {
+        imprimirInvasores(error.invasores);
+        return 1;
+      }
+      console.error('\n🔴 NO SE BORRÓ NADA (la transacción se revirtió entera).\n');
       console.error(error instanceof Error ? error.message : String(error));
       return 1;
     }

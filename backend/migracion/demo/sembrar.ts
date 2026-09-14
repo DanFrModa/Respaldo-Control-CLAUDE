@@ -124,6 +124,118 @@ async function anotarDemo(
   });
 }
 
+/** Todos los ids ya anotados bajo una entidad `Demo:*`. */
+async function idsMapeados(cliente: PrismaClient, entidad: EntidadDemo): Promise<number[]> {
+  const filas = await cliente.mapeoMigracion.findMany({
+    where: { entidad },
+    select: { idNuevo: true },
+  });
+  return [...new Set(filas.map((f) => Number(f.idNuevo)).filter((n) => Number.isFinite(n)))];
+}
+
+/** Qué material/documentos ficticios hay, para buscar lo que el dominio creó colgando de ellos. */
+interface RaicesDemo {
+  idsTela: number[];
+  idsAvio: number[];
+  idsTelaColor: number[];
+  idsProveedor: number[];
+  idsOc: number[];
+}
+
+/**
+ * Anota en `mapeo_migracion` lo que el DOMINIO creó por dentro y este script no nombró: movimientos
+ * de kardex de recepciones/entradas, partidas de tela y movimientos de cuenta corriente del
+ * proveedor ficticio. Va por LOTES (`createMany` con `skipDuplicates`), y corre justo después de
+ * sembrar: en ese momento todo lo que cuelga del material ficticio lo acaba de crear el sembrador.
+ *
+ * 🔑 Es la pieza que permite que `--limpiar` trabaje con un **conjunto cerrado** y que su chequeo de
+ * invasión distinga «esto lo hice yo» de «esto lo capturó alguien encima».
+ */
+async function anotarDerivados(cliente: PrismaClient, raices: RaicesDemo): Promise<void> {
+  const nuevas: { entidad: string; claveVieja: string; idNuevo: string }[] = [];
+  const agregar = (entidad: EntidadDemo, prefijo: string, ids: number[], ya: Set<number>): void => {
+    for (const id of ids) {
+      if (ya.has(id)) continue;
+      ya.add(id);
+      nuevas.push({ entidad, claveVieja: `${prefijo}-${String(id)}`, idNuevo: String(id) });
+    }
+  };
+
+  const yaMov = new Set(await idsMapeados(cliente, ENTIDAD_DEMO.movimiento));
+  agregar(
+    ENTIDAD_DEMO.movimiento,
+    'MOV-AUTO',
+    (
+      await cliente.movimiento.findMany({
+        where: {
+          OR: [
+            { detallesTela: { some: { idTela: { in: raices.idsTela } } } },
+            { detallesAvio: { some: { idAvio: { in: raices.idsAvio } } } },
+          ],
+        },
+        select: { id: true },
+      })
+    ).map((x) => x.id),
+    yaMov,
+  );
+
+  const yaPart = new Set(await idsMapeados(cliente, ENTIDAD_DEMO.partida));
+  agregar(
+    ENTIDAD_DEMO.partida,
+    'PART',
+    (
+      await cliente.partidaTela.findMany({
+        where: { idTelaColor: { in: raices.idsTelaColor } },
+        select: { id: true },
+      })
+    ).map((x) => x.id),
+    yaPart,
+  );
+
+  const yaRec = new Set(await idsMapeados(cliente, ENTIDAD_DEMO.recepcion));
+  agregar(
+    ENTIDAD_DEMO.recepcion,
+    'REC-AUTO',
+    (
+      await cliente.recepcionCompra.findMany({
+        where: { idOrdenCompra: { in: raices.idsOc } },
+        select: { id: true },
+      })
+    ).map((x) => x.id),
+    yaRec,
+  );
+
+  const yaMt = new Set(await idsMapeados(cliente, ENTIDAD_DEMO.movimientoTercero));
+  agregar(
+    ENTIDAD_DEMO.movimientoTercero,
+    'MT',
+    (
+      await cliente.movimientoTercero.findMany({
+        where: { idProveedor: { in: raices.idsProveedor } },
+        select: { id: true },
+      })
+    ).map((x) => x.id),
+    yaMt,
+  );
+
+  const yaEnt = new Set(await idsMapeados(cliente, ENTIDAD_DEMO.entradaTela));
+  agregar(
+    ENTIDAD_DEMO.entradaTela,
+    'ENT-AUTO',
+    (
+      await cliente.entradaTela.findMany({
+        where: { idProveedor: { in: raices.idsProveedor } },
+        select: { id: true },
+      })
+    ).map((x) => x.id),
+    yaEnt,
+  );
+
+  for (const bloque of enBloques(nuevas, 200)) {
+    await cliente.mapeoMigracion.createMany({ data: bloque, skipDuplicates: true });
+  }
+}
+
 /** Contador de lo creado vs. lo que ya estaba. */
 class Marcador {
   creados = 0;
@@ -491,6 +603,19 @@ export async function sembrarDemoInventarios(
     idsTelaColor,
     idsAvio,
     marcador: m,
+  });
+
+  // 7-bis. ⭐ ANOTAR LOS DERIVADOS. El dominio crea, por dentro, cosas que este script no nombra: el
+  //         movimiento de kardex de una recepción, la partida de una entrada de tela, el cargo de
+  //         CxP. Se anotan AQUÍ, recién creados, para que el conjunto que `--limpiar` borra salga
+  //         ENTERO del mapeo y nunca haya que deducirlo del almacén (ver la cabecera de
+  //         `demo/limpiar.ts`: deducirlo del almacén borraba inventario de verdad).
+  await anotarDerivados(cliente, {
+    idsTela: [...idsTela.values()],
+    idsAvio: [...idsAvio.values()],
+    idsTelaColor: [...idsTelaColor.values()],
+    idsProveedor: [...idsProveedor.values()],
+    idsOc: await idsMapeados(cliente, ENTIDAD_DEMO.ordenCompra),
   });
 
   // 8. Los CFDI ficticios (archivos; no se importan aquí — se dejan listos para probarlos a mano).
