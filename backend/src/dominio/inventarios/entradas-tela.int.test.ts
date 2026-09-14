@@ -1452,21 +1452,6 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
   });
 
   /**
-   * 🔴🔴 **EL CASO QUE LA PRIMERA VERSIÓN DE ESTA GUARDA DEJABA SIN NINGUNA PUERTA DE ENTRADA** —
-   * lo midió el reviewer, y es el reverso exacto del argumento con el que la guarda se justificó.
-   *
-   * El marino llega en DOS remesas. La primera surte el renglón del cuerpo ⇒ ese hermano **deja de
-   * esperar**, y con eso **desaparece del selector** de la entrada de tela
-   * (`lineasTelaPendientesDeProveedor` sólo ofrece lo que tiene faltante). Los kilos de la segunda
-   * remesa no se pueden ligar a él —ya no está en la lista— ni recibirse sueltos
-   * (`exigirRenglonesConOrdenDeCompra`): si además se les cierra el renglón mudo, **no queda camino
-   * ninguno** salvo editar una OC firmada, que exige `compras.editar-autorizada` (dirección).
-   *
-   * 🔑 Valor que la pone ROJA: que la guarda ignore el faltante del hermano (la versión rechazada).
-   * Entonces esta confirmación —que tiene que pasar— lanza `ErrorValidacion` y la tela se queda en
-   * la puerta.
-   */
-  /**
    * 🔴 **LA CLÁUSULA `reversadaEn: null` DEL groupBy, SOSTENIDA POR UNA PRUEBA.**
    *
    * Una recepción reversada **no surtió nada**: al cancelar la entrada de tela, el hermano vuelve a
@@ -1529,6 +1514,21 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
     );
   });
 
+  /**
+   * 🔴🔴 **EL CASO QUE LA PRIMERA VERSIÓN DE ESTA GUARDA DEJABA SIN NINGUNA PUERTA DE ENTRADA** —
+   * lo midió el reviewer, y es el reverso exacto del argumento con el que la guarda se justificó.
+   *
+   * El marino llega en DOS remesas. La primera surte el renglón del cuerpo ⇒ ese hermano **deja de
+   * esperar**, y con eso **desaparece del selector** de la entrada de tela
+   * (`lineasTelaPendientesDeProveedor` sólo ofrece lo que tiene faltante). Los kilos de la segunda
+   * remesa no se pueden ligar a él —ya no está en la lista— ni recibirse sueltos
+   * (`exigirRenglonesConOrdenDeCompra`): si además se les cierra el renglón mudo, **no queda camino
+   * ninguno** salvo editar una OC firmada, que exige `compras.editar-autorizada` (dirección).
+   *
+   * 🔑 Valor que la pone ROJA: que la guarda ignore el faltante del hermano (la versión rechazada).
+   * Entonces esta confirmación —que tiene que pasar— lanza `ErrorValidacion` y la tela se queda en
+   * la puerta.
+   */
   it('🔴 con el hermano YA SURTIDO, el renglón mudo SÍ acepta ese tono (si no, no hay camino)', async () => {
     const { conColor, muda } = await ocFelpaMangas();
 
