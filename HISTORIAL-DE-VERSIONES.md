@@ -92,9 +92,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Las telas que no llevan complemento no cambian absolutamente nada.** Como no llevan cárdigan —que
   es la inmensa mayoría—, se comparan exactamente igual que antes, y **ninguna orden vieja queda
   marcada por este cambio**.
-- Si la tela **lleva complemento pero el catálogo ya no le puso nombre**, el aviso no se calla: dice la
-  cantidad y lo llama «complemento» a secas. Preferimos un aviso que nombre regular a un aviso que
-  desaparezca.
+- **Quién lleva complemento lo sigue diciendo el catálogo de telas, no la orden.** Si a una tela le
+  quitan el complemento en el catálogo, el sistema **deja de compararlo** —igual que deja de comprarlo,
+  de costearlo y de imprimirlo—, aunque la orden siga teniendo el número guardado de cuando sí lo
+  llevaba. No se pierde nada: en cuanto alguien vuelva a declarar el complemento en el catálogo, el
+  aviso vuelve a hablar, que es justo cuando la diferencia vuelve a importar.
 
 ### Qué sigue pendiente o roto
 

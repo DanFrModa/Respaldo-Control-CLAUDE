@@ -225,6 +225,11 @@
  * Una tela **sin** complemento (`null`: la mayoría, y todos los avíos y artes) firma exactamente
  * como antes — ver {@link firmaDelComplemento}.
  *
+ * 🔴 **Con el mismo guardia que el resto del sistema:** *quién* lleva complemento lo dice el
+ * **CATÁLOGO** (`Tela.nombreComplemento`) y *cuánto* lo dice la receta. Si el catálogo ya no lo
+ * declara, el complemento **no se compara** — igual que no se compra, ni se costea, ni se imprime.
+ * La razón entera, en {@link firmaDelComplemento}.
+ *
  * ⚠️ **El PRECIO NO cuenta, y no es un olvido.** El precio se negocia por proveedor y por momento
  * (§Post-F9.43/.48: el precio que costea la receta del modelo ES la última compra real), así que dos
  * hermanas nacidas con una semana de diferencia congelan precios distintos **sin que nadie haya
@@ -324,10 +329,20 @@ export interface MaterialDeLaOp {
    */
   consumoComplementoPorPrenda: number | null;
   /**
-   * Cómo se llama el complemento en el CATÁLOGO de hoy (`Tela.nombreComplemento`): «cárdigan»,
-   * «puño»… Sólo sirve para NOMBRARLO en el texto del aviso; **no entra en la firma** (es del
-   * catálogo, idéntico para todas las hermanas, así que nunca puede distinguirlas). `null` cuando el
-   * catálogo no lo declara — ver {@link conElComplemento} para lo que se hace entonces.
+   * 🔴 **EL GUARDIA: cómo se llama el complemento en el CATÁLOGO de hoy** (`Tela.nombreComplemento`):
+   * «cárdigan», «puño»… `null` = **el catálogo ya no declara complemento en esta tela**.
+   *
+   * Hace **dos** cosas, y la segunda es la que importa:
+   *  1. **nombra** el complemento en el texto del aviso (nunca se inventa una palabra genérica: el
+   *     nombre sale del catálogo o no se dice nada);
+   *  2. **decide si el complemento se compara siquiera.** *Quién* lleva complemento lo dice el
+   *     catálogo y *cuánto* lo dice la receta — el mismo reparto que obedecen el MRP, los cuatro
+   *     motores de costo, el impreso y el detector «difiere del modelo». Ver
+   *     {@link firmaDelComplemento}, donde está la razón entera.
+   *
+   * ⚠️ **No puede distinguir a una hermana de otra**, y por eso callar aquí no apaga nada: es del
+   * catálogo, así que vale igual para todo el grupo. Sólo pospone el aviso hasta que el complemento
+   * vuelva a existir para el negocio.
    */
   nombreComplemento: string | null;
   /** Avíos R18: ¿la cantidad se captura POR TALLA? (`OrdenAvio.consumoPorTalla`). */
@@ -428,11 +443,39 @@ function cifra(valor: number): string {
  *
  * El separador es `|C|` por lo mismo que el resto del archivo usa `|`: `toFixed(DECIMALES)` no puede
  * producirlo nunca, así que dos firmas distintas no pueden colisionar al concatenarse.
+ *
+ * ---
+ * ## 🔴🔴 EL GUARDIA DEL CATÁLOGO — `nombreComplemento === null` TAMBIÉN devuelve `''`
+ *
+ * **El reparto de autoridad está escrito como regla en el sistema, no es un detalle de este
+ * archivo:** *quién* lleva complemento lo dice el **CATÁLOGO** (`Tela.nombreComplemento`), *cuánto*
+ * lleva lo dice la **RECETA**. Lo declaran `schema.prisma`, `modelos/bom-modelo.ts`,
+ * `costos/resolucion-precios.ts` y `contrato/esquemas/receta-orden.ts`, y lo **obedecen otros SIETE
+ * sitios**: el MRP (no lo compra), el costeo de la orden, el pre-costo, el precosto persistido, el
+ * costo real de compras, el impreso y el detector «difiere del modelo» de la 0.165. Todos se callan
+ * cuando el catálogo ya no declara complemento.
+ *
+ * ⚠️ **Y el estado es ALCANZABLE, no teórico:** `actualizarTela` deja vaciar `nombreComplemento` sin
+ * tocar el `OrdenTela.consumoComplementoPorPrenda` ya congelado — y eso es CORRECTO por D3 (lo
+ * guardado no se reescribe). Sin este guardia, este módulo sería **el único que habla**: diría
+ * *«esta OP lleva 1.2 + 0.15 de complemento»* sobre un campo que `PanelRecetaOrden.tsx` **ni
+ * siquiera pinta**, que no se puede editar ahí, y que ni se compra, ni se costea, ni se imprime. Un
+ * guardián que señala algo **invisible e inerte** no avisa: entrena a la gente a ignorarlo.
+ *
+ * 🔑 **Por qué callar aquí NO apaga el guardián** (y por qué el argumento contrario —el que traía la
+ * primera versión de esta fila— es falso): el guardia es del **CATÁLOGO**, así que vale **IDÉNTICO
+ * para todas las hermanas del grupo**. Nunca puede comparar a una sí y a otra no. Sólo calla
+ * mientras la diferencia **no produce ningún efecto en el negocio**, y vuelve a hablar en cuanto
+ * alguien re-declara el complemento en el catálogo — que es exactamente el momento en que la
+ * diferencia empieza a importar. **No se pierde señal: se pospone a cuando es accionable.** Es lo
+ * contrario de {@link tallasComparables}, cuyo `null` sí existe para no apagar una comparación que
+ * SÍ distingue unas hermanas de otras.
  */
 function firmaDelComplemento(m: MaterialDeLaOp): string {
-  return m.consumoComplementoPorPrenda === null
-    ? ''
-    : `|C|${m.consumoComplementoPorPrenda.toFixed(DECIMALES)}`;
+  // El catálogo decide QUIÉN lleva complemento: si ya no lo declara, no hay complemento que comparar
+  // (y el número congelado sigue guardado, intacto, por D3).
+  if (m.nombreComplemento === null || m.consumoComplementoPorPrenda === null) return '';
+  return `|C|${m.consumoComplementoPorPrenda.toFixed(DECIMALES)}`;
 }
 
 /**
@@ -443,17 +486,17 @@ function firmaDelComplemento(m: MaterialDeLaOp): string {
  * (las medidas por talla, y luego el `consumoPorPrenda` de las capturadas por talla): **si algo
  * distingue la firma, tiene que verse en el texto.**
  *
- * ⚠️ **Y aquí el catálogo NO manda, al revés que en el impreso.** `leerRecetaParaImpreso` calla el
- * complemento cuando `Tela.nombreComplemento` ya es `null` (si no se va a comprar, no se imprime).
- * Copiar esa regla aquí volvería a apagar el aviso justo en el caso raro, así que el NÚMERO
- * congelado siempre se dice y lo único que aporta el catálogo es el **nombre**; sin él se usa la
- * palabra genérica. Preferimos un aviso que nombra regular a un guardián que se apaga solo — el
- * mismo criterio con el que {@link tallasComparables} devuelve `null`.
+ * ⚠️ **Y manda el MISMO guardia del catálogo que la firma** (ver {@link firmaDelComplemento}), por
+ * construcción: las dos preguntan lo mismo, así que **no puede haber una firma que distinga y un
+ * texto que no la explique** — que es la clase de defecto que este archivo ya arregló dos veces. Sin
+ * nombre en el catálogo **no hay nada que decir** (ni que comparar), y de paso desaparece la
+ * tentación de inventarle una palabra genérica a un complemento que el catálogo ya no reconoce: el
+ * nombre que se enseña es siempre el del catálogo, igual que en el impreso y en el detector de la
+ * 0.165.
  */
 function conElComplemento(texto: string, m: MaterialDeLaOp): string {
-  if (m.consumoComplementoPorPrenda === null) return texto;
-  const comoSeLlama = m.nombreComplemento ?? 'complemento';
-  return `${texto} + ${cifra(m.consumoComplementoPorPrenda)} de ${comoSeLlama}`;
+  if (m.nombreComplemento === null || m.consumoComplementoPorPrenda === null) return texto;
+  return `${texto} + ${cifra(m.consumoComplementoPorPrenda)} de ${m.nombreComplemento}`;
 }
 
 /** «OP 5561, 5562» — los folios de un grupo, en orden y recortados. */

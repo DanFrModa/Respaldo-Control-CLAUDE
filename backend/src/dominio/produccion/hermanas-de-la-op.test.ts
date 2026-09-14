@@ -459,18 +459,39 @@ describe('el COMPLEMENTO de la tela — el cárdigan que acompaña a la felpa', 
     );
   });
 
-  it('sin nombre en el catálogo, el aviso NO se calla: usa la palabra genérica', () => {
+  it('🔴🔴 EL GUARDIA DEL CATÁLOGO: si la tela ya no declara complemento, NO se compara', () => {
     /*
-     * ⚠️ Al revés que el impreso, donde manda el catálogo de hoy: si `Tela.nombreComplemento` ya es
-     * null, `leerRecetaParaImpreso` no imprime el complemento. Copiar esa regla aquí apagaría el
-     * guardián justo en el caso raro, así que el NÚMERO congelado siempre se dice.
+     * ⭐ **Es el reparto de autoridad del sistema entero, no una excepción de este archivo:** *quién*
+     * lleva complemento lo dice el CATÁLOGO (`Tela.nombreComplemento`) y *cuánto* lo dice la receta.
+     * Lo obedecen el MRP, los cuatro motores de costo, el impreso y el detector «difiere del modelo».
+     *
+     * ⚠️ **El estado es alcanzable:** `actualizarTela` deja vaciar el nombre sin tocar el consumo ya
+     * congelado en la orden (correcto por D3). Sin este guardia, éste sería el ÚNICO sitio que habla:
+     * señalaría una diferencia en un campo que la pantalla de la receta **ni siquiera pinta**, que no
+     * se puede editar ahí, y que ni se compra ni se costea ni se imprime.
+     *
+     * 🔑 **Y callar aquí NO pierde señal**, porque el guardia es del catálogo y por tanto **idéntico
+     * para las dos hermanas**: nunca puede comparar a una sí y a otra no. El aviso vuelve solo en
+     * cuanto alguien re-declara el complemento — que es cuando la diferencia empieza a importar.
      */
     const r = compararConHermanas([
       op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15, nombreComplemento: null })]),
       op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.4, nombreComplemento: null })]),
     ]);
+    expect(r.get(1)?.aviso).toBeNull();
+    expect(r.get(2)?.aviso).toBeNull();
+    expect(r.get(1)?.diferencias).toEqual([]);
+    expect(r.get(2)?.diferencias).toEqual([]);
+  });
+
+  it('🔴 …y en cuanto el catálogo VUELVE a declararlo, el aviso habla (el silencio no es permanente)', () => {
+    // El control del control: las mismas dos recetas, con el catálogo declarando el complemento.
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15 })]),
+      op(2, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.4 })]),
+    ]);
     expect(r.get(1)?.diferencias[0]?.detalle).toBe(
-      '«Felpa»: esta OP lleva 1.2 + 0.15 de complemento · OP 5002 lleva 1.2 + 0.4 de complemento.',
+      '«Felpa»: esta OP lleva 1.2 + 0.15 de cárdigan · OP 5002 lleva 1.2 + 0.4 de cárdigan.',
     );
   });
 
