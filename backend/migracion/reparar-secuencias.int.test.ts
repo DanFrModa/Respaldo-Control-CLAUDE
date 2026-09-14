@@ -440,7 +440,14 @@ describe('la REGLA del siguiente millar (fila 0.194 · §Post-F9.233)', () => {
     // Con un escalón EXPLÍCITO esto aborta (alguien tecleó una cifra y no aterriza). Con la REGLA
     // no: si `nota-salida` no tiene ni filas ni secuencia no hay folio que saltar, y tumbar el
     // comando del go-live por eso empujaría a quitar la regla — que es peor. Pero tiene que VERSE.
+    // (El lado EXPLÍCITO de esa asimetría lo sostiene la prueba de abajo, en su propio `it`.)
     await opMigrada(5847n);
+    // 🔑 Con una secuencia viva de OTRA serie, que es la forma REAL de la base el día 13 (los pasos
+    // 11-12 ya corrieron esto, así que `secuencias` NO llega vacía). Sin ella, una unión sin filtrar
+    // por clave no tiene de dónde sacar empresas y el defecto no se manifiesta aquí.
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
 
     const plan = await planificar(cliente, { millar: true });
 
@@ -448,7 +455,28 @@ describe('la REGLA del siguiente millar (fila 0.194 · §Post-F9.233)', () => {
     expect(formatearEscalon(plan, false)).toContain(
       'Series que NO saltan porque NO TIENEN NI UN FOLIO',
     );
-    // Y el explícito sobre esa misma serie vacía sigue abortando, como siempre.
+  });
+
+  /**
+   * EL OTRO LADO DE LA ASIMETRÍA, EN SU PROPIO `it` A PROPÓSITO: una cifra A MANO sobre una serie
+   * sin ni un folio **ABORTA**, porque ese número no aterrizaría en ninguna empresa y el escalón
+   * sería un NO-OP SILENCIOSO — el reporte cantaría 5,000 y no pasaría nada.
+   *
+   * POR QUÉ VIVE APARTE (y no como tercera aserción de la prueba de arriba, donde estaba): con la
+   * mutación que quita el filtro por clave a la unión de empresas, la prueba de arriba se ponía roja
+   * en su PRIMERA aserción y moría ahí ⇒ ésta **nunca se evaluaba**. Medido por CLI sobre la base
+   * del día 13, ese camino sí se rompía: mutado salía EXIT=0 planeando «nota-salida → 5,000» sobre
+   * una tabla vacía, y sano EXIT=1 abortando. Una prueba que muere antes de llegar a su aserción
+   * clave no mide esa aserción.
+   */
+  it('una cifra A MANO sobre una serie sin ni un folio ABORTA (no es un no-op silencioso)', async () => {
+    await opMigrada(5847n);
+    // Mismo fixture que la de arriba: secuencia viva de OTRA serie, la forma real de la base el
+    // día 13 del arranque (los pasos 11-12 ya corrieron esto, así que `secuencias` NO llega vacía).
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
+
     await expect(
       planificar(cliente, { escalones: escalones([CLAVE_SECUENCIA_NOTA_SALIDA, 5000n]) }),
     ).rejects.toThrow(/no tiene ninguna fila/);
@@ -574,6 +602,13 @@ describe('la REGLA del siguiente millar (fila 0.194 · §Post-F9.233)', () => {
     // El otro lado de la moneda: la clasificación tiene que seguir cazando la serie que de verdad
     // no tiene nada, o el aviso del cuadro se volvería ruido.
     await pedidoMigrado(4804n);
+    // 🔑 Y con una secuencia de OTRA serie viva, que es la forma REAL de la base el día 13: los pasos
+    // 11-12 ya corrieron `reparar-secuencias`, así que `secuencias` NO llega vacía. Sin esta fila, la
+    // clasificación se podía quedar sin filtrar por clave y nadie se enteraba: el bloque de vacías
+    // desaparecía entero y el aborto de la cifra a mano sobre una tabla vacía dejaba de saltar.
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
 
     const plan = await planificar(cliente, { millar: true });
 
