@@ -11,6 +11,7 @@ import { CLAVE_SECUENCIA_ORDEN } from '../src/dominio/produccion/ordenes.js';
 import {
   aplicarPlan,
   ErrorEscalonInvalido,
+  formatearEscalon,
   formatearReporte,
   planificar,
   repararSecuencias,
@@ -64,6 +65,17 @@ async function ocMigrada(numCompra: bigint): Promise<void> {
 async function opMigrada(folioOp: bigint): Promise<void> {
   await cliente.orden.create({
     data: { folio: folioOp, idEmpresa: empresa.id, idModelo, idCliente: idClienteNegocio },
+  });
+}
+
+/** Inserta un PEDIDO INTERNO "migrado" (una de las cinco series que no sabían saltar hasta 0.194). */
+async function pedidoMigrado(folioPedido: bigint, idEmpresa = 0): Promise<void> {
+  await cliente.pedido.create({
+    data: {
+      folio: folioPedido,
+      idEmpresa: idEmpresa === 0 ? empresa.id : idEmpresa,
+      idCliente: idClienteNegocio,
+    },
   });
 }
 
@@ -336,5 +348,295 @@ describe('salto al escalón de arranque (fila 0.187 · §Post-F9.36 punto 5)', (
       { cliente },
     );
     expect(enLaOtra).toBe(201n);
+  });
+});
+
+describe('la REGLA del siguiente millar (fila 0.194 · §Post-F9.233)', () => {
+  /**
+   * Daniel, 14-sep-2026: *"me gustaría hacer saltos en TODOS los conteos. Si quieres ubícate en el
+   * siguiente millar. Ejemplo, una Nota de salida… si van en la 4804, ubícate en la 5000."*
+   *
+   * La regla se programa como REGLA y no como siete números tecleados porque **hoy nadie conoce los
+   * máximos**: se sabrán el día de la migración, y un número escrito a mano POR DEBAJO del máximo
+   * real es el error que arruinaría el arranque. Aquí se mide justo eso: que el número lo saque del
+   * dato, serie por serie y empresa por empresa.
+   */
+  it('cada serie salta al millar siguiente a SU PROPIO máximo real', async () => {
+    await pedidoMigrado(4804n); // el ejemplo de Daniel, con la serie de pedidos internos
+    await opMigrada(5847n);
+    await ocMigrada(7920n);
+
+    const plan = await planificar(cliente, { millar: true });
+    await aplicarPlan(cliente, plan);
+
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n);
+    expect(await folio(CLAVE_SECUENCIA_ORDEN)).toBe(6000n);
+    expect(await folio(CLAVE_SECUENCIA_ORDEN_COMPRA)).toBe(8000n);
+  });
+
+  it('el número EXPLÍCITO manda sobre la regla (§Post-F9.233 (a))', async () => {
+    // Con 312 OP migradas la regla diría 1,000; Daniel dijo 6000, y gana Daniel.
+    await opMigrada(312n);
+    await pedidoMigrado(4804n);
+
+    const plan = await planificar(cliente, {
+      millar: true,
+      escalones: escalones([CLAVE_SECUENCIA_ORDEN, 6000n]),
+    });
+    await aplicarPlan(cliente, plan);
+
+    expect(await folio(CLAVE_SECUENCIA_ORDEN)).toBe(6000n); // el explícito
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n); // la regla, en la que no se tocó
+  });
+
+  it('el comando REAL del arranque: los dos explícitos de Daniel y la regla en el resto', async () => {
+    await opMigrada(5847n);
+    await ocMigrada(7920n);
+    await pedidoMigrado(4804n);
+
+    const plan = await planificar(cliente, {
+      millar: true,
+      escalones: escalones([CLAVE_SECUENCIA_ORDEN, 6000n], [CLAVE_SECUENCIA_ORDEN_COMPRA, 10000n]),
+    });
+    await aplicarPlan(cliente, plan);
+
+    expect(await folio(CLAVE_SECUENCIA_ORDEN)).toBe(6000n);
+    expect(await folio(CLAVE_SECUENCIA_ORDEN_COMPRA)).toBe(10000n);
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n);
+  });
+
+  it('un explícito POR DEBAJO del máximo ABORTA aunque la regla esté puesta, y no escribe nada', async () => {
+    await opMigrada(6120n);
+    await pedidoMigrado(4804n);
+
+    const error = await planificar(cliente, {
+      millar: true,
+      escalones: escalones([CLAVE_SECUENCIA_ORDEN, 6000n]),
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorEscalonInvalido);
+    const mensaje = error instanceof Error ? error.message : '';
+    expect(mensaje).toContain('6,000'); // lo que se pidió
+    expect(mensaje).toContain('6,120'); // lo que ya está comprometido
+    expect(mensaje).toContain('la regla del millar diría 7,000'); // la salida, sin adivinar
+    // La corrida ENTERA se cae: ni la serie del escalón malo ni las que iban por la regla.
+    expect(await cliente.secuencia.count()).toBe(0);
+  });
+
+  it('ENSAYO: planificar con la regla NO escribe nada (el cinturón nº 2 vale igual)', async () => {
+    await pedidoMigrado(4804n);
+    await opMigrada(5847n);
+
+    const plan = await planificar(cliente, { millar: true });
+
+    expect(plan.hayEscalon).toBe(true); // ⇒ `corridaEscribe` exige --aplicar
+    expect(await cliente.secuencia.count()).toBe(0);
+    // Y lo ensayado es lo que se aplica: mismo plan, mismos números.
+    await aplicarPlan(cliente, plan);
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n);
+  });
+
+  it('una serie VACÍA no tumba la corrida: se anota y se canta en el cuadro', async () => {
+    // Con un escalón EXPLÍCITO esto aborta (alguien tecleó una cifra y no aterriza). Con la REGLA
+    // no: si `nota-salida` no tiene ni filas ni secuencia no hay folio que saltar, y tumbar el
+    // comando del go-live por eso empujaría a quitar la regla — que es peor. Pero tiene que VERSE.
+    // (El lado EXPLÍCITO de esa asimetría lo sostiene la prueba de abajo, en su propio `it`.)
+    await opMigrada(5847n);
+    // 🔑 Con una secuencia viva de OTRA serie, que es la forma REAL de la base el día 13 (los pasos
+    // 11-12 ya corrieron esto, así que `secuencias` NO llega vacía). Sin ella, una unión sin filtrar
+    // por clave no tiene de dónde sacar empresas y el defecto no se manifiesta aquí.
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
+
+    const plan = await planificar(cliente, { millar: true });
+
+    expect(plan.sinDatosConRegla).toContain('notas de salida');
+    expect(formatearEscalon(plan, false)).toContain(
+      'Series que NO saltan porque NO TIENEN NI UN FOLIO',
+    );
+  });
+
+  /**
+   * EL OTRO LADO DE LA ASIMETRÍA, EN SU PROPIO `it` A PROPÓSITO: una cifra A MANO sobre una serie
+   * sin ni un folio **ABORTA**, porque ese número no aterrizaría en ninguna empresa y el escalón
+   * sería un NO-OP SILENCIOSO — el reporte cantaría 5,000 y no pasaría nada.
+   *
+   * POR QUÉ VIVE APARTE (y no como tercera aserción de la prueba de arriba, donde estaba): con la
+   * mutación que quita el filtro por clave a la unión de empresas, la prueba de arriba se ponía roja
+   * en su PRIMERA aserción y moría ahí ⇒ ésta **nunca se evaluaba**. Medido por CLI sobre la base
+   * del día 13, ese camino sí se rompía: mutado salía EXIT=0 planeando «nota-salida → 5,000» sobre
+   * una tabla vacía, y sano EXIT=1 abortando. Una prueba que muere antes de llegar a su aserción
+   * clave no mide esa aserción.
+   */
+  it('una cifra A MANO sobre una serie sin ni un folio ABORTA (no es un no-op silencioso)', async () => {
+    await opMigrada(5847n);
+    // Mismo fixture que la de arriba: secuencia viva de OTRA serie, la forma real de la base el
+    // día 13 del arranque (los pasos 11-12 ya corrieron esto, así que `secuencias` NO llega vacía).
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
+
+    await expect(
+      planificar(cliente, { escalones: escalones([CLAVE_SECUENCIA_NOTA_SALIDA, 5000n]) }),
+    ).rejects.toThrow(/no tiene ninguna fila/);
+  });
+
+  it('la regla es POR EMPRESA: cada una salta desde su propio máximo', async () => {
+    // La secuencia es por (idEmpresa, clave), así que el millar también: si la otra empresa va en
+    // 200 no tiene por qué arrancar donde arranca la que va en 4,804.
+    const otra = await crearEmpresaPrueba(cliente, 'Marilyn Fitness de Prueba');
+    await pedidoMigrado(4804n);
+    await pedidoMigrado(200n, otra.id);
+
+    await aplicarPlan(cliente, await planificar(cliente, { millar: true }));
+
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n);
+    const enLaOtra = await enTransaccion(
+      (tx) => siguienteFolio(tx, otra.id, CLAVE_SECUENCIA_PEDIDO),
+      { cliente },
+    );
+    expect(enLaOtra).toBe(1000n);
+  });
+
+  it('el cuadro dice DE DÓNDE sale cada número — la precedencia, a la vista', async () => {
+    await opMigrada(5847n);
+    await pedidoMigrado(4804n);
+
+    const plan = await planificar(cliente, {
+      millar: true,
+      escalones: escalones([CLAVE_SECUENCIA_ORDEN, 6500n]),
+    });
+    const cuadro = formatearEscalon(plan, false);
+
+    expect(cuadro).toContain('NÚMERO EXPLÍCITO --escalon-orden=6500');
+    expect(cuadro).toContain('que decía 6,000'); // lo que la regla habría dicho — y NO se usó
+    expect(cuadro).toContain('REGLA --escalon-millar'); // la de pedidos, que sí salió de la regla
+    expect(cuadro).toContain('el millar siguiente a 4,804');
+  });
+
+  it('sin --escalon-millar ni banderas NADA salta: el escalón nunca es automático', async () => {
+    await pedidoMigrado(4804n);
+    await opMigrada(5847n);
+
+    const plan = await planificar(cliente);
+
+    expect(plan.hayEscalon).toBe(false);
+    expect(plan.sinDatosConRegla).toEqual([]);
+    await aplicarPlan(cliente, plan);
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(4805n); // último + 1, lo de siempre
+    expect(await folio(CLAVE_SECUENCIA_ORDEN)).toBe(5848n);
+  });
+
+  /**
+   * ⭐ LA PROPIEDAD QUE SOSTIENE LA FILA ENTERA, Y QUE NADIE SOSTENÍA: la regla mide contra
+   * `comprometido = max(tabla, secuencia)`, **no contra el máximo de la tabla**.
+   *
+   * POR QUÉ EXISTE: el reviewer cambió `siguienteMillar(comprometido)` por
+   * `siguienteMillar(maxTabla)` y **la suite entera siguió verde** (35 unitarias + 29 de
+   * integración). `siguienteMillar` está probada como "siempre mayor que su entrada"… y nada probaba
+   * CUÁL es su entrada. Es el mismo patrón que este repositorio ya documentó: la propiedad se
+   * cumplía y nadie la sostenía.
+   *
+   * QUÉ PASA CON LA MUTACIÓN PUESTA: con la tabla en 4,804 y la secuencia en 5,200 la regla diría
+   * 5,000, que es MENOR que lo comprometido ⇒ el comando del arranque **aborta** y su propio consejo
+   * se contradice («elige uno mayor que 5,200» junto a «la regla del millar diría 5,000»). No
+   * corrompe folios —la guarda aguanta— pero deja al operador empujado a teclear un número a mano de
+   * madrugada, que es justo lo que esta fila existe para evitar.
+   */
+  it('la regla mide contra lo COMPROMETIDO, no contra la tabla (secuencia por delante)', async () => {
+    // Un rollback quema folio sin dejar fila: la secuencia va por delante del máximo de la tabla.
+    await pedidoMigrado(4804n);
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_PEDIDO, valor: 5200n },
+    });
+
+    const plan = await planificar(cliente, { millar: true });
+    await aplicarPlan(cliente, plan);
+
+    // El millar siguiente a 5,200 (lo comprometido), NO el de 4,804 (la tabla), que sería 5,000 y
+    // caería POR DEBAJO de folios ya repartidos.
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(6000n);
+  });
+
+  it('y con la secuencia por delante NO aborta: el comando del arranque sale adelante solo', async () => {
+    await pedidoMigrado(4804n);
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_PEDIDO, valor: 5200n },
+    });
+
+    // Con la regla alimentada del máximo de la tabla, esto sería un ErrorEscalonInvalido.
+    const plan = await planificar(cliente, { millar: true });
+
+    const renglon = plan.series
+      .find((serie) => serie.clave === CLAVE_SECUENCIA_PEDIDO)
+      ?.renglones.find((r) => r.idEmpresa === empresa.id);
+    expect(renglon?.comprometido).toBe(5200n);
+    expect(renglon?.millarRegla).toBe(6000n);
+    expect(formatearEscalon(plan, false)).toContain('el millar siguiente a 5,200');
+  });
+
+  /**
+   * ⭐ EL SEGUNDO HUECO DEL MISMO ORIGEN (reviewer de la 0.194): las empresas de una serie salían
+   * SÓLO del `groupBy` de la tabla, mientras `comprometido` sí miraba la secuencia.
+   *
+   * Medido SIN mutar nada, con la secuencia de pedidos en 4,000 y la tabla vacía: el cuadro decía
+   * «arrancarán en 1» —FALSO, la siguiente salía 4,001— **y esa serie NO SALTABA**, se quedaba con
+   * la numeración corrida. En una pantalla de confirmación irreversible eso es grave por partida
+   * doble: miente sobre lo que va a pasar, y deja sin arreglar lo único que la fila viene a arreglar.
+   */
+  it('una serie con SECUENCIA VIVA y tabla VACÍA no es "vacía": salta, y no miente', async () => {
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_PEDIDO, valor: 4000n },
+    });
+
+    const plan = await planificar(cliente, { millar: true });
+
+    expect(plan.sinDatosConRegla).not.toContain('pedidos internos');
+    expect(formatearReporte(plan).join('\n')).not.toContain('pedido: sin datos');
+    await aplicarPlan(cliente, plan);
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n); // y NO 4,001
+  });
+
+  it('una serie SIN filas y SIN secuencia sí es vacía, y se sigue anunciando como tal', async () => {
+    // El otro lado de la moneda: la clasificación tiene que seguir cazando la serie que de verdad
+    // no tiene nada, o el aviso del cuadro se volvería ruido.
+    await pedidoMigrado(4804n);
+    // 🔑 Y con una secuencia de OTRA serie viva, que es la forma REAL de la base el día 13: los pasos
+    // 11-12 ya corrieron `reparar-secuencias`, así que `secuencias` NO llega vacía. Sin esta fila, la
+    // clasificación se podía quedar sin filtrar por clave y nadie se enteraba: el bloque de vacías
+    // desaparecía entero y el aborto de la cifra a mano sobre una tabla vacía dejaba de saltar.
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_ORDEN, valor: 5847n },
+    });
+
+    const plan = await planificar(cliente, { millar: true });
+
+    expect(plan.sinDatosConRegla).toContain('notas de salida');
+    expect(plan.sinDatosConRegla).not.toContain('pedidos internos');
+  });
+
+  it('la reparación de siempre también deja de decir "sin datos" con la secuencia viva', async () => {
+    // Sin escalón: el reporte normal cantaba «sin datos → no se toca» para una serie que SÍ tenía
+    // folios repartidos. El número que importa —el siguiente— nunca se imprimía.
+    await cliente.secuencia.create({
+      data: { idEmpresa: empresa.id, clave: CLAVE_SECUENCIA_PEDIDO, valor: 4000n },
+    });
+
+    const reporte = (await repararSecuencias(cliente, [CLAVE_SECUENCIA_PEDIDO])).join('\n');
+
+    expect(reporte).not.toContain('sin datos');
+    expect(reporte).toContain('siguiente = 4001');
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(4001n); // monótono: no retrocede a 1
+  });
+
+  it('con la regla, repetir la corrida antes de capturar no cambia nada (idempotente)', async () => {
+    await pedidoMigrado(4804n);
+
+    await aplicarPlan(cliente, await planificar(cliente, { millar: true }));
+    await aplicarPlan(cliente, await planificar(cliente, { millar: true }));
+
+    expect(await valorSecuencia(CLAVE_SECUENCIA_PEDIDO)).toBe(4999n);
+    expect(await folio(CLAVE_SECUENCIA_PEDIDO)).toBe(5000n);
   });
 });

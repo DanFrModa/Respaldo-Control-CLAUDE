@@ -1,7 +1,8 @@
 /**
  * REPARA TODAS las secuencias de folio contra el máximo REAL de su tabla (§Post-F9.17), y — sólo si
- * se le pide — SALTA la numeración de OP y OC al siguiente ESCALÓN redondo del arranque
- * (§Post-F9.36 punto 5, fila 0.187).
+ * se le pide — SALTA al ESCALÓN redondo del arranque **cualquiera de las SIETE series**
+ * (§Post-F9.36 punto 5 para OP y OC, fila 0.187; §Post-F9.233 para las otras cinco y para la regla
+ * del «siguiente millar», fila 0.194).
  *
  * POR QUÉ EXISTE — el defecto que lo motivó (reportado por Daniel, 7-ago-2026: *"hice la OC pero al
  * refrescar el listado, no la veo"*): los ETL que migran con folio EXPLÍCITO deben dejar su secuencia
@@ -20,28 +21,46 @@
  *   npx tsx --env-file=.env migracion/reparar-secuencias.ts
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
- * ⭐ EL SALTO AL ESCALÓN DEL ARRANQUE (fila 0.187 · decisión §Post-F9.36 punto 5)
+ * ⭐ EL SALTO AL ESCALÓN DEL ARRANQUE (filas 0.187 y 0.194 · §Post-F9.36 punto 5 y §Post-F9.233)
  *
- * Daniel: *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón.
- * Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP
- * y OC también."* El número exacto se fija EN EL ENSAYO, cuando se conozca el máximo real migrado.
+ * Daniel, primero por OP y OC: *"Continuaría. Pero no el siguiente número disponible. Me saltaría al
+ * siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo
+ * (para OP). Esto para OP y OC también."* Y el 14-sep-2026, ampliándolo a TODAS: *"me gustaría hacer
+ * saltos en todos los conteos. Si quieres ubícate en el siguiente millar. Ejemplo, una Nota de
+ * salida… si van en la 4804, ubícate en la 5000."*
  *
- *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000                     # ensayo
- *   npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
+ * Por eso hay DOS maneras de pedir el escalón, y conviven:
  *
- * ⚠️ En la línea de `--aplicar` el número va como MARCADOR a propósito (`EL-NUMERO-QUE-DIGA-DANIEL`), no
- * como cifra: el número del arranque todavía no está decidido y esta línea es copiable. Como no es
- * un entero, el parser la rechaza sola en vez de aplicar irreversiblemente un número que nadie
- * eligió. En el ENSAYO sí va una cifra: esa línea no escribe nada.
+ *  · **El número EXPLÍCITO de una serie** (`--escalon-orden=6000`): lo dijo Daniel con su cifra.
+ *  · **La REGLA del siguiente millar** (`--escalon-millar`): el comando MIRA el máximo real de cada
+ *    serie y sube al millar de arriba (4,804 → 5,000 · 312 → 1,000). Es una regla y no siete números
+ *    tecleados porque **hoy nadie conoce esos máximos** —se sabrán el día de la migración— y teclear
+ *    a mano un número POR DEBAJO del máximo real es justo el error que arruinaría el arranque.
+ *    ⚠️ Es de **UNA SOLA VEZ**: recalcula contra el máximo del MOMENTO, así que volver a correrla
+ *    después de empezar a capturar saltaría otra vez al millar de arriba (el escalón EXPLÍCITO, en
+ *    cambio, aborta al repetirse porque su número ya está comprometido). El cuadro lo avisa.
+ *
+ * 🔑 **El explícito MANDA sobre la regla** (§Post-F9.233 (a)): si una serie trae su `--escalon-…`, ése
+ * es su arranque aunque `--escalon-millar` esté puesto. Y para que eso **no pueda pasar en silencio**,
+ * el cuadro de confirmación imprime, renglón por renglón, DE DÓNDE sale el número y —cuando es
+ * explícito— **qué habría dicho la regla**, con un aviso si no coinciden.
+ *
+ * El comando del arranque, tal cual (los dos números explícitos son los de §Post-F9.233):
+ *
+ *   npx tsx --env-file=.env migracion/reparar-secuencias.ts \
+ *     --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000                      # ensayo
+ *   …el MISMO comando, con --aplicar al final                                                # escribe
  *
  * Tres cinturones, porque **es irreversible en cuanto alguien captura con la numeración nueva**:
- *  1. **Sólo OP y OC** admiten escalón (las otras cinco series no tienen bandera: no se pueden
- *     saltar ni por error de dedo). Cada serie declara la suya en {@link SERIES}.
+ *  1. **El escalón NUNCA es automático**: hay que pedirlo, por serie (`--escalon-…`) o por regla
+ *     (`--escalon-millar`). Sin ninguna de las dos, la corrida es la reparación de siempre.
  *  2. **Ensayo en seco por omisión**: con escalón y sin `--aplicar` NO se escribe NADA — se imprime
  *     el cuadro de lo que pasaría y se pide repetir el comando con `--aplicar`.
  *  3. **Aborta si el escalón no queda por encima de lo ya comprometido** (máximo de la tabla Y
  *     valor actual de la secuencia): pedir 6,000 cuando la última OP es 6,120 no se aplica en
- *     silencio ni "por lo bajo" — se aborta nombrando el caso, sin escribir nada de nada.
+ *     silencio ni "por lo bajo" — se aborta nombrando el caso, sin escribir nada de nada. La regla
+ *     del millar no puede tropezar con esto (siempre da un número ESTRICTAMENTE mayor); el número
+ *     explícito sí, y por eso la guarda se queda tal cual.
  *
  * Cualquier bandera desconocida ABORTA (un `--escalon-orden 6000` con espacio, o un `--dry_run`, no
  * pueden acabar en una corrida real por descuido).
@@ -72,17 +91,35 @@ interface SerieAReparar {
   descripcion: string;
   maximos: (cliente: PrismaClient) => Promise<{ idEmpresa: number; max: bigint }[]>;
   /**
-   * Bandera que fija el ESCALÓN de arranque de esta serie (`--escalon-orden=6000`). **Sólo la
-   * declaran las dos series que Daniel nombró** (OP y OC, §Post-F9.36 punto 5): una serie sin
-   * bandera no se puede saltar. Sumar otra en el futuro es esta línea y nada más.
+   * Bandera que fija el ESCALÓN de arranque de esta serie (`--escalon-orden=6000`). Desde la fila
+   * 0.194 la declaran **las SIETE** (§Post-F9.233: *"me gustaría hacer saltos en todos los
+   * conteos"*); hasta entonces sólo la tenían OP y OC. Es OBLIGATORIA a propósito: una serie nueva
+   * no puede entrar al arranque sin decir cómo se la nombra desde la línea de comandos.
    */
-  flagEscalon?: string;
+  flagEscalon: string;
   /**
    * Cómo se llama la serie EN EL CUADRO DEL ESCALÓN y en el modo de uso. La `descripcion` de
    * arriba arrastra apostillas históricas ("la que faltaba", del defecto §Post-F9.17) que en el
    * reporte de siempre explican algo, pero en la pantalla del arranque sólo estorban.
    */
-  etiquetaEscalon?: string;
+  etiquetaEscalon: string;
+}
+
+/** El escalón de la regla salta a múltiplos de MIL (Daniel: *"ubícate en el siguiente millar"*). */
+const MILLAR = 1000n;
+
+/**
+ * La REGLA del arranque (§Post-F9.233): el millar SIGUIENTE al folio ya comprometido.
+ *
+ * Es **estrictamente mayor** que su entrada, siempre — y eso no es un detalle de redondeo sino la
+ * propiedad que hace segura la regla:
+ *  · 4,804 → 5,000 (el ejemplo textual de Daniel) · 312 → 1,000 · 0 (tabla vacía) → 1,000.
+ *  · **5,000 → 6,000**, y NO 5,000: si el máximo ya cae justo en un millar, quedarse ahí repetiría
+ *    el folio 5,000 —que ya está usado— y la guarda del escalón por lo bajo abortaría la corrida.
+ *    Subir al siguiente millar mantiene además lo que Daniel busca: que el salto SE VEA.
+ */
+export function siguienteMillar(comprometido: bigint): bigint {
+  return (comprometido / MILLAR + 1n) * MILLAR;
 }
 
 /**
@@ -101,6 +138,8 @@ const SERIES: SerieAReparar[] = [
   {
     clave: CLAVE_SECUENCIA_PEDIDO,
     descripcion: 'pedidos internos',
+    flagEscalon: 'escalon-pedido',
+    etiquetaEscalon: 'pedidos internos',
     maximos: async (c) => {
       const filas = await c.pedido.groupBy({ by: ['idEmpresa'], _max: { folio: true } });
       return aMaximos('folio', filas);
@@ -119,6 +158,11 @@ const SERIES: SerieAReparar[] = [
   {
     clave: CLAVE_SECUENCIA_ETAPA,
     descripcion: 'etapas de producción (corte/envío/recibo/entrega)',
+    flagEscalon: 'escalon-etapa',
+    // Es UNA SOLA serie para corte, envío, recibo y entrega, y el folio SALE IMPRESO en el papel
+    // del envío, el del recibo y el de la entrega (§Post-F9.233 (b)): lo tienen en la mano el
+    // maquilero y el cliente ⇒ no es numeración interna, y saltarla tiene el mismo sentido que OC.
+    etiquetaEscalon: 'etapas de producción (corte/envío/recibo/entrega)',
     maximos: async (c) => {
       const filas = await c.etapaMovimiento.groupBy({ by: ['idEmpresa'], _max: { folio: true } });
       return aMaximos('folio', filas);
@@ -127,6 +171,8 @@ const SERIES: SerieAReparar[] = [
   {
     clave: CLAVE_SECUENCIA_AUDITORIA,
     descripcion: 'auditorías de calidad',
+    flagEscalon: 'escalon-auditoria',
+    etiquetaEscalon: 'auditorías de calidad',
     maximos: async (c) => {
       // Ojo: en auditorías el folio se llama `numAuditoria`.
       const filas = await c.auditoria.groupBy({ by: ['idEmpresa'], _max: { numAuditoria: true } });
@@ -147,6 +193,9 @@ const SERIES: SerieAReparar[] = [
   {
     clave: CLAVE_SECUENCIA_NOTA_SALIDA,
     descripcion: 'NOTAS DE SALIDA (la que faltaba)',
+    flagEscalon: 'escalon-nota-salida',
+    // La serie del EJEMPLO de Daniel: *"una Nota de salida… si van en la 4804, ubícate en la 5000"*.
+    etiquetaEscalon: 'notas de salida',
     maximos: async (c) => {
       const filas = await c.notaSalida.groupBy({ by: ['idEmpresa'], _max: { numNota: true } });
       return aMaximos('numNota', filas);
@@ -157,6 +206,8 @@ const SERIES: SerieAReparar[] = [
   {
     clave: CLAVE_SECUENCIA_TERCERO,
     descripcion: 'movimientos de cuenta corriente de terceros',
+    flagEscalon: 'escalon-tercero',
+    etiquetaEscalon: 'movimientos de cuenta corriente de terceros',
     maximos: async (c) => {
       const filas = await c.movimientoTercero.groupBy({ by: ['idEmpresa'], _max: { folio: true } });
       return aMaximos('folio', filas);
@@ -189,8 +240,22 @@ export interface RenglonPlan {
    * así que éste —y no el máximo de la tabla— es el número contra el que hay que medir el escalón.
    */
   comprometido: bigint;
-  /** Primer folio nuevo pedido con `--escalon-…` (ausente si no se pidió para esta empresa). */
+  /** Primer folio nuevo pedido con `--escalon-…` o con la regla (ausente si no le toca escalón). */
   escalon?: bigint;
+  /**
+   * De dónde sale el `escalon`: de la cifra que alguien tecleó para ESTA serie (`explicito`) o de
+   * la regla del siguiente millar (`millar`). Va al cuadro de confirmación: quien aplica una
+   * operación irreversible tiene que ver si el número lo eligió una persona o lo calculó el
+   * programa. Ausente cuando no hay escalón.
+   */
+  origenEscalon?: 'explicito' | 'millar';
+  /**
+   * Lo que la REGLA habría dicho para esta empresa, se haya usado o no. Cuando el escalón es
+   * explícito y los dos números NO coinciden, el cuadro lo canta — que es lo que vuelve imposible
+   * equivocarse EN SILENCIO al mezclar `--escalon-millar` con una cifra a mano. Ausente cuando no
+   * hay escalón.
+   */
+  millarRegla?: bigint;
   /** Valor que se sembrará en la secuencia. */
   valorASembrar: bigint;
   /** Folio que tomará la siguiente captura si el plan se aplica. */
@@ -201,8 +266,10 @@ export interface RenglonPlan {
 export interface PlanSerie {
   clave: string;
   descripcion: string;
-  /** Nombre corto para el cuadro del escalón (cae en `descripcion` si la serie no trae uno). */
+  /** Nombre corto para el cuadro del escalón (la `descripcion` arrastra apostillas históricas). */
   etiqueta: string;
+  /** Bandera de su escalón (`escalon-orden`), sin los guiones: el cuadro la cita tal cual se teclea. */
+  flagEscalon: string;
   renglones: RenglonPlan[];
 }
 
@@ -211,14 +278,32 @@ export interface Plan {
   series: PlanSerie[];
   /** ¿Algún renglón lleva escalón? Es lo que enciende el ensayo en seco por omisión. */
   hayEscalon: boolean;
+  /**
+   * Series a las que la REGLA del millar no pudo aplicarse porque no tienen NI UNA FILA NI UNA
+   * SECUENCIA VIVA en ninguna empresa (etiquetas). Las dos condiciones, no sólo la primera: una
+   * serie con folios ya repartidos y sin filas SÍ salta, y meterla aquí era mentir y dejarla
+   * corrida (defecto medido por el reviewer de la 0.194).
+   * No es un error —no hay folio que saltar ni empresa a la que aplicárselo—, pero **tiene que
+   * verse**: quien corre el arranque pidió que saltaran todas, y éstas no van a saltar. Con un
+   * escalón EXPLÍCITO el mismo caso ABORTA (alguien tecleó una cifra y debe aterrizar en algún
+   * sitio); con la regla sólo se informa, para que una serie vacía no tumbe el comando del go-live.
+   */
+  sinDatosConRegla: string[];
 }
 
 /** Filtros y escalones de una corrida. */
 export interface OpcionesPlan {
   /** Sólo estas series (lo usan los ETL para sembrar las suyas). Por omisión, todas. */
   claves?: readonly string[];
-  /** Serie → primer folio nuevo pedido. */
+  /** Serie → primer folio nuevo pedido A MANO. Manda sobre la regla del millar (§Post-F9.233 (a)). */
   escalones?: ReadonlyMap<string, bigint>;
+  /**
+   * Aplica la REGLA del siguiente millar a TODA serie que no traiga su número explícito
+   * (§Post-F9.233). El número se calcula por empresa, del máximo real de esa empresa: dos empresas
+   * de la misma serie pueden arrancar en millares distintos, y así debe ser (cada una numera lo
+   * suyo, la secuencia es por `idEmpresa`+clave).
+   */
+  millar?: boolean;
   /** Limita el ESCALÓN a una empresa (la reparación normal siempre corre para todas: es inocua). */
   idEmpresa?: number;
 }
@@ -234,7 +319,9 @@ function conMiles(n: bigint): string {
  * escalón se lea en palabras y no en ids).
  *
  * @throws {ErrorEscalonInvalido} si algún escalón pedido no queda POR ENCIMA de lo ya comprometido,
- * o si no hay ninguna empresa a la que aplicárselo. Se juntan todos los casos en un solo error y
+ * o si no hay ninguna empresa a la que aplicar un escalón EXPLÍCITO (el de la REGLA, en cambio, no
+ * aborta: la serie vacía se anota en `sinDatosConRegla` y se canta en el cuadro). Se juntan todos
+ * los casos en un solo error y
  * **no se escribe nada**: un escalón por lo bajo repetiría folios y, por la monotonía de
  * `sembrarSecuencia`, se quedaría en NO-OP mientras el reporte canta un número que no es.
  */
@@ -257,6 +344,22 @@ export async function planificar(
   const secuencias = new Map(
     filasSecuencia.map((s) => [`${String(s.idEmpresa)}|${s.clave}`, s.valor]),
   );
+  /**
+   * Qué empresas tienen SECUENCIA VIVA de cada clave, aunque su tabla esté vacía.
+   *
+   * 🔴 Existe por un defecto medido por el reviewer de la fila 0.194: las empresas de una serie se
+   * sacaban SÓLO del `groupBy` de la tabla, mientras `comprometido` sí mira la secuencia. Una serie
+   * con folios ya repartidos y ninguna fila —el rollback que quema folio, el caso que
+   * {@link RenglonPlan.comprometido} nombra— caía por tanto en "sin datos": el cuadro decía
+   * «arrancará en 1» siendo FALSO (la siguiente salía 4,001 con la secuencia en 4,000) **y esa serie
+   * NO SALTABA**, que es exactamente el daño que esta fila viene a impedir, y para siempre.
+   */
+  const empresasConSecuencia = new Map<string, Set<number>>();
+  for (const fila of filasSecuencia) {
+    const yaVistas = empresasConSecuencia.get(fila.clave) ?? new Set<number>();
+    yaVistas.add(fila.idEmpresa);
+    empresasConSecuencia.set(fila.clave, yaVistas);
+  }
 
   // Una `--empresa` que no existe se caza AQUÍ y no al escribir: si no, la única señal sería el
   // choque de la llave foránea de `secuencias`, que no le dice nada a quien está en el arranque.
@@ -269,16 +372,26 @@ export async function planificar(
 
   const casos: string[] = [];
   const plan: PlanSerie[] = [];
+  const sinDatosConRegla: string[] = [];
   let hayEscalon = false;
 
   for (const serie of series) {
     const maximos = await serie.maximos(cliente);
-    const escalon = opciones.escalones?.get(serie.clave);
+    const explicito = opciones.escalones?.get(serie.clave);
+    // La regla sólo entra donde NO hay cifra a mano: el explícito manda (§Post-F9.233 (a)).
+    const porRegla = explicito === undefined && opciones.millar === true;
+    const pideEscalon = explicito !== undefined || porRegla;
 
-    // A qué empresas alcanza esta serie: las que tienen histórico y —si se pidió el escalón para
-    // una empresa concreta— también ésa, aunque su tabla esté vacía (arranque desde cero).
-    const ids = new Set(maximos.map((m) => m.idEmpresa));
-    if (escalon !== undefined && opciones.idEmpresa !== undefined) ids.add(opciones.idEmpresa);
+    // A qué empresas alcanza esta serie: la UNIÓN de las que tienen histórico en la tabla y las que
+    // tienen SECUENCIA VIVA (folios ya repartidos sin fila que los respalde), y —si se pidió el
+    // escalón para una empresa concreta— también ésa, aunque no tenga ni lo uno ni lo otro
+    // (arranque desde cero). La unión no es un adorno: sin ella una serie con secuencia y sin filas
+    // se clasificaba como "vacía", el cuadro mentía y la serie se quedaba SIN saltar.
+    const ids = new Set([
+      ...maximos.map((m) => m.idEmpresa),
+      ...(empresasConSecuencia.get(serie.clave) ?? []),
+    ]);
+    if (pideEscalon && opciones.idEmpresa !== undefined) ids.add(opciones.idEmpresa);
 
     const renglones: RenglonPlan[] = [];
     /**
@@ -295,49 +408,74 @@ export async function planificar(
       const nombreEmpresa = empresas.get(idEmpresa) ?? `empresa ${String(idEmpresa)}`;
       const base = { idEmpresa, nombreEmpresa, maxTabla, valorSecuencia, comprometido };
       const leToca =
-        escalon !== undefined &&
-        (opciones.idEmpresa === undefined || opciones.idEmpresa === idEmpresa);
+        pideEscalon && (opciones.idEmpresa === undefined || opciones.idEmpresa === idEmpresa);
 
-      if (leToca && escalon !== undefined) {
+      if (leToca) {
+        // La regla se resuelve AQUÍ y no al leer las banderas: depende de `comprometido`, que es
+        // de esta empresa y esta serie. Por eso `--escalon-millar` no es "un número" sino una regla.
+        const millarRegla = siguienteMillar(comprometido);
+        const escalon = explicito ?? millarRegla;
         hayEscalon = true;
         alcanzadas += 1;
         if (escalon <= comprometido) {
+          // Sólo alcanzable con un número EXPLÍCITO — y eso depende de UNA cosa: que la regla reciba
+          // `comprometido` y no `maxTabla`. `siguienteMillar` es siempre mayor que SU ENTRADA, así
+          // que alimentarla con el máximo de la tabla la haría caer aquí en cuanto la secuencia
+          // fuera por delante (tabla 4,804 + secuencia 5,200 ⇒ diría 5,000 y abortaría). Lo sostiene
+          // una prueba de integración, no este comentario.
           casos.push(
             `  ✖ ${serie.clave} · empresa ${String(idEmpresa)} (${nombreEmpresa}): pediste arrancar ` +
               `en ${conMiles(escalon)}, pero el folio más alto ya comprometido es ` +
               `${conMiles(comprometido)} (máximo en la tabla ${conMiles(maxTabla)}, secuencia en ` +
               `${conMiles(valorSecuencia)}). Un escalón por debajo REPETIRÍA folios: elige uno mayor ` +
-              `que ${conMiles(comprometido)}.`,
+              `que ${conMiles(comprometido)} (la regla del millar diría ${conMiles(millarRegla)}).`,
           );
           continue;
         }
-        renglones.push({ ...base, escalon, valorASembrar: escalon - 1n, siguiente: escalon });
+        renglones.push({
+          ...base,
+          escalon,
+          origenEscalon: explicito === undefined ? 'millar' : 'explicito',
+          millarRegla,
+          valorASembrar: escalon - 1n,
+          siguiente: escalon,
+        });
       } else {
         renglones.push({ ...base, valorASembrar: maxTabla, siguiente: comprometido + 1n });
       }
     }
 
-    if (escalon !== undefined && alcanzadas === 0) {
-      // Ni una empresa a la que aplicárselo: sin esto, el escalón sería un no-op silencioso.
-      // (Sólo puede pasar SIN `--empresa`: con ella, esa empresa siempre entra en `ids`, y que
-      // exista ya se comprobó arriba.)
-      casos.push(
-        `  ✖ --${serie.flagEscalon ?? 'escalon'}: la serie "${serie.clave}" (${serie.descripcion}) ` +
-          `no tiene ninguna fila, así que no sé a qué empresa aplicarle el escalón. Corre primero ` +
-          `el ETL, o dilo con --empresa=<id>.`,
-      );
+    if (pideEscalon && alcanzadas === 0) {
+      // Ni una empresa a la que aplicárselo. (Sólo puede pasar SIN `--empresa`: con ella, esa
+      // empresa siempre entra en `ids`, y que exista ya se comprobó arriba.)
+      if (explicito === undefined) {
+        // Por REGLA: no es un error. La serie no tiene NI FILAS NI SECUENCIA en ninguna empresa,
+        // así que no hay folio que saltar y arrancará en 1; tumbar el comando del go-live por eso
+        // empujaría a quitar la regla, que es peor. Se informa en el cuadro, que es donde lo lee
+        // quien aplica.
+        sinDatosConRegla.push(serie.etiquetaEscalon);
+      } else {
+        // EXPLÍCITO: alguien tecleó una cifra y no va a aterrizar en ningún lado. Eso sí aborta,
+        // porque el escalón sería un no-op silencioso mientras el reporte canta un número.
+        casos.push(
+          `  ✖ --${serie.flagEscalon}: la serie "${serie.clave}" (${serie.descripcion}) ` +
+            `no tiene ninguna fila, así que no sé a qué empresa aplicarle el escalón. Corre primero ` +
+            `el ETL, o dilo con --empresa=<id>.`,
+        );
+      }
     }
 
     plan.push({
       clave: serie.clave,
       descripcion: serie.descripcion,
-      etiqueta: serie.etiquetaEscalon ?? serie.descripcion,
+      etiqueta: serie.etiquetaEscalon,
+      flagEscalon: serie.flagEscalon,
       renglones,
     });
   }
 
   if (casos.length > 0) throw new ErrorEscalonInvalido(casos);
-  return { series: plan, hayEscalon };
+  return { series: plan, hayEscalon, sinDatosConRegla };
 }
 
 /**
@@ -397,6 +535,15 @@ export function formatearEscalon(plan: Plan, escrito: boolean): string {
   );
   p.push('═══════════════════════════════════════════════════════════════');
   p.push(' ⚠️  IRREVERSIBLE en cuanto alguien capture con la numeración nueva.');
+  if (plan.series.some((s) => s.renglones.some((r) => r.origenEscalon === 'millar'))) {
+    // La REGLA se recalcula en cada corrida contra el máximo del momento: una vez capturado el
+    // 5,000, `--escalon-millar` volvería a subir al 6,000. El escalón EXPLÍCITO, en cambio, aborta
+    // al repetirse (ya está comprometido). Hay que decirlo AQUÍ, que es donde se decide aplicar.
+    p.push(' ⚠️  --escalon-millar es de UNA SOLA VEZ: recalcula contra el máximo del momento, así');
+    p.push(
+      '     que repetirlo DESPUÉS de empezar a capturar saltaría otra vez al millar de arriba.',
+    );
+  }
   for (const serie of plan.series) {
     for (const r of serie.renglones) {
       if (r.escalon === undefined) continue;
@@ -415,12 +562,37 @@ export function formatearEscalon(plan: Plan, escrito: boolean): string {
       p.push(
         `${'    folios que quedan sin usar'.padEnd(42)}${conMiles(r.escalon - r.comprometido - 1n).padStart(12)}`,
       );
+      // ⭐ DE DÓNDE SALE EL NÚMERO. Es lo que vuelve imposible equivocarse en silencio al mezclar
+      // `--escalon-millar` con una cifra a mano (§Post-F9.233 (a)): si el explícito y la regla no
+      // dicen lo mismo, el cuadro lo canta ANTES de que nadie escriba nada.
+      if (r.origenEscalon === 'explicito') {
+        p.push(`    de dónde sale: NÚMERO EXPLÍCITO --${serie.flagEscalon}=${String(r.escalon)}`);
+        p.push(
+          r.millarRegla === r.escalon
+            ? `      manda sobre la regla del millar, que aquí decía lo mismo (${conMiles(r.millarRegla ?? 0n)})`
+            : `      ⚠️  manda sobre la regla del millar, que decía ${conMiles(r.millarRegla ?? 0n)}: se usa el explícito`,
+        );
+      } else {
+        p.push(
+          `    de dónde sale: REGLA --escalon-millar (el millar siguiente a ${conMiles(r.comprometido)})`,
+        );
+      }
     }
+  }
+  if (plan.sinDatosConRegla.length > 0) {
+    // Las series vacías NO saltan, y quien pidió que saltaran todas tiene que verlo aquí — no
+    // deducirlo de una ausencia en el cuadro.
+    p.push('');
+    p.push('  Series que NO saltan porque NO TIENEN NI UN FOLIO (arrancarán en 1):');
+    for (const etiqueta of plan.sinDatosConRegla) {
+      p.push(`    · ${etiqueta}`);
+    }
+    p.push('    Si alguna debe saltar igual, dilo con --empresa=<id>.');
   }
   p.push('');
   p.push(
     escrito
-      ? ' Aplicado. La próxima OP/OC capturada tomará el número redondo de arriba.'
+      ? ' Aplicado. La próxima captura de cada serie de arriba tomará su número redondo.'
       : ' NO se escribió nada. Si el cuadro es correcto, repite el MISMO comando con --aplicar.',
   );
   return p.join('\n');
@@ -442,8 +614,10 @@ export async function repararSecuencias(
 
 /** Opciones de la línea de comandos. */
 export interface OpcionesCli {
-  /** Serie → primer folio nuevo pedido (vacío = corrida normal). */
+  /** Serie → primer folio nuevo pedido A MANO (vacío = ninguna cifra explícita). */
   escalones: Map<string, bigint>;
+  /** `--escalon-millar`: la regla del siguiente millar para toda serie sin cifra explícita. */
+  millar: boolean;
   idEmpresa?: number;
   /** Escribir de verdad el escalón (sin esto, con escalón sólo se ensaya). */
   aplicar: boolean;
@@ -455,21 +629,27 @@ export interface OpcionesCli {
 
 /** El modo de uso, construido desde {@link SERIES} para que las banderas no se desincronicen. */
 export function modoDeUso(): string {
-  const banderas = SERIES.filter((s) => s.flagEscalon !== undefined).map(
-    (s) =>
-      `  ${`--${s.flagEscalon ?? ''}=<n>`.padEnd(30)}primer folio nuevo de ${s.etiquetaEscalon ?? s.descripcion}`,
+  const banderas = SERIES.map(
+    (s) => `  ${`--${s.flagEscalon}=<n>`.padEnd(30)}primer folio nuevo de ${s.etiquetaEscalon}`,
   );
   return [
     'Uso: npx tsx --env-file=.env migracion/reparar-secuencias.ts [opciones]',
     '',
     'Sin opciones: adelanta TODA secuencia de folio al máximo real (idempotente e inocuo).',
     '',
-    'Salto al escalón de arranque (§Post-F9.36 punto 5) — sólo estas series:',
+    'Salto al escalón de arranque (§Post-F9.36 punto 5 · §Post-F9.233):',
+    `  ${'--escalon-millar'.padEnd(30)}REGLA: cada serie salta al millar siguiente a su máximo real`,
+    '',
+    '  …y el número EXPLÍCITO de una serie, que MANDA sobre la regla:',
     ...banderas,
+    '',
     `  ${'--aplicar'.padEnd(30)}escribe el escalón (sin esto sólo se ENSAYA)`,
     `  ${'--empresa=<id>'.padEnd(30)}limita el escalón a una empresa (por omisión, todas)`,
     `  ${'--simular'.padEnd(30)}ensayo en seco aunque no haya escalón (alias: --dry-run)`,
     `  ${'--ayuda'.padEnd(30)}esto`,
+    '',
+    'El comando del arranque (§Post-F9.233), primero SIN --aplicar para leer el cuadro:',
+    '  --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000',
   ].join('\n');
 }
 
@@ -482,11 +662,8 @@ export function modoDeUso(): string {
  * teclea con prisa.
  */
 export function leerOpciones(argv: readonly string[]): OpcionesCli {
-  const conValor = new Set([
-    'empresa',
-    ...SERIES.flatMap((s) => (s.flagEscalon === undefined ? [] : [s.flagEscalon])),
-  ]);
-  const solas = new Set(['aplicar', 'simular', 'dry-run', 'ayuda', 'help']);
+  const conValor = new Set(['empresa', ...SERIES.map((s) => s.flagEscalon)]);
+  const solas = new Set(['aplicar', 'simular', 'dry-run', 'ayuda', 'help', 'escalon-millar']);
 
   const valores = new Map<string, string>();
   const presentes = new Set<string>();
@@ -526,7 +703,6 @@ export function leerOpciones(argv: readonly string[]): OpcionesCli {
   const escalones = new Map<string, bigint>();
   for (const serie of SERIES) {
     const bandera = serie.flagEscalon;
-    if (bandera === undefined) continue;
     const crudo = valores.get(bandera);
     if (crudo === undefined) continue;
     if (!/^\d+$/.test(crudo)) {
@@ -556,17 +732,19 @@ export function leerOpciones(argv: readonly string[]): OpcionesCli {
     }
   }
 
+  const millar = presentes.has('escalon-millar');
+  const pideEscalon = escalones.size > 0 || millar;
   const aplicar = presentes.has('aplicar');
   const simular = presentes.has('simular') || presentes.has('dry-run');
   if (aplicar && simular) {
     throw new Error('--aplicar y --simular se contradicen: elige uno.');
   }
-  if (aplicar && escalones.size === 0) {
+  if (aplicar && !pideEscalon) {
     throw new Error(
       '--aplicar sólo tiene sentido con un escalón: sin él la reparación normal ya escribe (es inocua).',
     );
   }
-  if (idEmpresa !== undefined && escalones.size === 0) {
+  if (idEmpresa !== undefined && !pideEscalon) {
     throw new Error(
       '--empresa sólo acota el ESCALÓN: la reparación normal siempre corre para todas las empresas.',
     );
@@ -574,6 +752,7 @@ export function leerOpciones(argv: readonly string[]): OpcionesCli {
 
   return {
     escalones,
+    millar,
     ...(idEmpresa === undefined ? {} : { idEmpresa }),
     aplicar,
     simular,
@@ -612,6 +791,7 @@ async function principal(): Promise<void> {
   try {
     const plan = await planificar(cliente, {
       escalones: opciones.escalones,
+      millar: opciones.millar,
       ...(opciones.idEmpresa === undefined ? {} : { idEmpresa: opciones.idEmpresa }),
     });
 
@@ -630,6 +810,13 @@ async function principal(): Promise<void> {
     }
     if (plan.hayEscalon) {
       console.log(formatearEscalon(plan, escribe));
+    } else if (opciones.millar) {
+      // Pidió la regla y NINGUNA serie tenía folios que saltar. No es un error (nada se repite y
+      // todas arrancarán en 1), pero decirlo callando sería mentir por omisión.
+      console.log(
+        '\n⚠️  Pediste --escalon-millar y NINGUNA serie tiene datos: no saltó nada.\n' +
+          '   Corre primero los cargadores, o dilo con --empresa=<id> para saltar desde cero.',
+      );
     } else if (escribe) {
       console.log(
         '\nListo. Es idempotente y monótono: correrlo de nuevo no baja ninguna serie.\n' +

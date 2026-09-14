@@ -71,6 +71,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.158 · 14-sep-2026 · **en prueba** — **Al arrancar, TODOS los conteos van a saltar a un número redondo, no sólo las órdenes de producción y las de compra**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Que las siete numeraciones del sistema empiecen en redondo el día del arranque.** Hasta ahora
+  sólo sabían saltar las **órdenes de producción** y las **órdenes de compra**; las otras cinco
+  —pedidos internos, **notas de salida**, las etapas de producción (corte, envío a maquila, recibo y
+  entrega, que comparten un solo contador y **salen impresas** en los tres papeles), auditorías de
+  calidad y los movimientos de cuenta corriente de terceros— iban a arrancar pegadas al último
+  número traído del sistema viejo.
+- ⭐ **Y el número ya no hay que adivinarlo ni teclearlo: el programa lo calcula.** Se le pide *«súbete
+  al siguiente millar»* y él mira, serie por serie, hasta dónde llegó lo que se migró y sube al millar
+  de arriba: si las notas de salida van en la **4,804**, la siguiente que se haga será la **5,000**;
+  si una serie va en la 312, arrancará en la 1,000. **Nadie conoce hoy esos números** —se sabrán el
+  día de la migración—, y ése es justo el punto: escribir uno a mano **por debajo** del que traiga la
+  migración sería el error que arruina el arranque sin avisar.
+- **Los dos números que dio Daniel siguen mandando**: las órdenes de producción arrancan en **6,000**
+  y las de compra en **10,000**, aunque la regla diga otra cosa.
+
+### Qué cambió y puede sorprender
+
+- **El programa dice de dónde sale cada número, uno por uno, ANTES de escribir nada.** En el cuadro
+  de confirmación cada serie muestra si su número lo eligió una persona o lo calculó la regla — y
+  cuando lo eligió una persona, **qué habría dicho la regla**, con un aviso si no coinciden. Con las
+  órdenes de compra pasa: el número dicho es 10,000 y la regla diría 8,000, y eso se lee en pantalla.
+  **No se puede mezclar las dos cosas y no darse cuenta.**
+- **Sigue sin escribir nada si no se le pide dos veces.** El comando ensaya por omisión: imprime el
+  cuadro y no toca nada; hay que repetirlo con `--aplicar` para que escriba. Y **si el número pedido
+  queda por debajo de lo que ya existe, se cae sin escribir una sola línea** y dice los dos números.
+- **Una numeración que no tiene ni un folio no salta, y lo dice.** Si llega completamente vacía a la
+  migración (por ejemplo la cuenta corriente de terceros, cuya carga todavía no se corre), arrancará
+  en 1 y el cuadro la nombra en una lista aparte — en vez de tumbar el comando del día del arranque.
+  **Pero «sin papeles» no es lo mismo que «sin números repartidos»:** si una numeración ya repartió
+  folios aunque no haya quedado ningún documento (pasa cuando una captura se empieza y no se guarda),
+  **sí salta**, y el cuadro enseña su número. Las dos cosas se confundían en la primera versión de
+  esta entrega: el cuadro decía «arrancará en 1» cuando en realidad iba a seguir en 4,001, y esa
+  numeración se habría quedado corrida **para siempre**. Lo encontró la revisión antes de salir.
+- **No hay nada que hacer hoy en el sistema.** Esto es una herramienta del día de la migración: no
+  cambia ninguna pantalla, ningún permiso y ningún dato de lo que está en prueba.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Se aplica UNA sola vez, y no tiene vuelta atrás.** Los folios no se re-numeran: si se arranca
+  con la numeración corrida, se queda así para siempre. El paso está escrito en el instructivo del
+  arranque, después de cargar los datos y antes de que entre nadie a capturar.
+- ⚠️ **Y la regla del millar, en concreto, es de una sola vez:** vuelve a calcular contra lo que haya
+  en ese momento, así que correrla otra vez **después** de empezar a capturar volvería a saltar al
+  millar de arriba. El propio cuadro lo avisa.
+
+---
+
 ## 0.157 · 14-sep-2026 · **en prueba** — **Decir quién es responsable de un paso de la Ruta Crítica ya no exige poder tocar los permisos de todo el sistema**
 
 ### Qué se puede hacer ahora que antes no

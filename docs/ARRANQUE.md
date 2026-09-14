@@ -71,9 +71,9 @@ La ficha `docs/hoja-de-ruta/F10-etapas.md` marca sus **7 etapas como pendientes*
 5. **0.123 — los datos personales publicados** (77 nombres con lo que se le paga a cada quien, en un repositorio público). Ver paso manual 0.
 6. **0.163 — el costo no ve el complemento**: el cárdigan que se compra no se cobra ⇒ **el precio que se te cotiza sale bajo**. Es dinero.
 
-**Y dos huecos que encontré midiendo, que NO tienen renglón en ningún lado:**
+**Y dos huecos que encontré midiendo** *(el primero ya se cerró — fila 0.194, 14-sep-2026)***:**
 
-- 🔴 **El salto de folios no está programado.** Decidiste (`Documentacion_MJD/DECISIONES.md:1620-1625`) que las órdenes nuevas arranquen en un número redondo (6000, por ejemplo) y no en el siguiente disponible. El programa que acomoda los folios **sólo sabe hacer «último + 1»**: busqué «escalón» y «salto» en `backend/migracion/reparar-secuencias.ts` y **no aparecen** (`grep -i` → sin coincidencias). ⚠️ **Es irreversible una vez arrancado**, así que o se programa antes, o se arranca con numeración corrida.
+- ✅ **El salto de folios YA ESTÁ PROGRAMADO, y para las siete series** *(actualizado el 14-sep-2026, fila 0.194 — este renglón decía lo contrario y estaba viejo)*. Decidiste que la numeración nueva arranque en un número redondo (§Post-F9.36 punto 5 para OP y OC, **§Post-F9.233** para todas: *«me gustaría hacer saltos en todos los conteos… ubícate en el siguiente millar»*). El comando es uno solo y va en el paso 13 de abajo. ⚠️ **Sigue siendo irreversible** y **sigue siendo ahora o nunca**: si se arranca con la numeración corrida, se queda así para siempre.
 - **Cambiar la propia contraseña no existe.** Sólo el administrador puede cambiársela a alguien (`backend/src/api/usuarios/usuarios.rutas.ts:230`, exige permiso `usuarios.administrar`). Busqué una pantalla de "mi cuenta" y no hay. Con tres usuarios se aguanta; con veintitrés estorba.
 
 ### 2b. Procedimiento (esto NO es código, y es lo que más falta)
@@ -99,7 +99,7 @@ La ficha `docs/hoja-de-ruta/F10-etapas.md` marca sus **7 etapas como pendientes*
 | 2 | **Crear el ambiente real, separado del de prueba**: base de datos propia, claves nuevas (no reciclar las de prueba), R2, dominio | Gabriel | Hoy sólo existe `prueba` |
 | 3 | **Conseguir la carpeta física de fotos** (`S:\...\FotosMod` + arte) y correr el ensayo en seco | Gabriel | Lleva meses esperando |
 | 4 | **Recuperar los CSV del sistema viejo.** ⚠️ La carpeta `Respaldo CLAUDE/` **ya no está en la rama** (`ls` → no existe); vive en la rama `fuente-sistema-viejo` | Gabriel | Ver riesgo ⑤ |
-| 5 | **Decirle al lead el número redondo del salto de folios** (¿6000?) | **Daniel** | Irreversible |
+| 5 | ✅ **Los números del salto de folios ya están dichos** (§Post-F9.233, 14-sep): **OP 6000**, **OC 10000**, y las otras cinco por la regla del **siguiente millar**, que el comando calcula solo. **Nada que preguntar** | — | Irreversible |
 | 6 | **Decir quiénes son los otros dos usuarios** del arranque y apartar media mañana para el ensayo | **Daniel** | Camino crítico |
 | 7 | **Tus dos repasos**: Inventarios (0.096) y Finanzas (0.097), en ese orden inverso — Finanzas primero | **Daniel** | Bloquean V1 |
 
@@ -112,7 +112,7 @@ La ficha `docs/hoja-de-ruta/F10-etapas.md` marca sus **7 etapas como pendientes*
 | 10 | **Cambiar la contraseña del `admin`** (semilla `Control.2026!`, está publicada en el código) y desactivar las cuentas de prueba | Gabriel | Antes de que entre nadie |
 | 11 | **Correr los cargadores en el orden del instructivo** (`backend/migracion/README.md:34-80`), con `ETL_DESDE=2025` puesto **antes del primer comando** | lead | Si se olvida en uno solo, ese desalinea a todos |
 | 12 | **Correr los cuadres** y leerlos | lead | Es lo único que prueba que la migración cuadró |
-| 13 | **Acomodar los folios** y aplicar el salto al número redondo | lead | Después de cargar, nunca antes |
+| 13 | **Acomodar los folios** y aplicar el salto al número redondo — **de las SIETE series**, con este comando y en dos pasos (ensayo, leer el cuadro, y el MISMO comando con `--aplicar`): `npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000` | lead | Después de cargar, nunca antes. **`--escalon-millar` es de una sola vez**: si se repite después de capturar, vuelve a saltar |
 | 14 | **Crear los usuarios reales con sus permisos** (arreglando de paso el 0.120) | Gabriel/Daniel | Necesita los catálogos ya cargados |
 | 15 | **Marcar «Empaque»** en los talleres que empacan, uno por uno | **Daniel** | Dato de negocio; la siembra no lo pone (`DECISIONES.md:14150`) |
 | 16 | **Cargar las telas y avíos con los que se está trabajando** | Almacén | Si no, la primera explosión manda a comprar lo que ya está en bodega |
@@ -133,6 +133,6 @@ La ficha `docs/hoja-de-ruta/F10-etapas.md` marca sus **7 etapas como pendientes*
 1. **El ensayo va a encontrar cosas.** En un solo día de uso casual (23-ago) encontraste seis defectos reales, y ese ritmo no ha bajado. **Deja un día de colchón entre el ensayo y el arranque**; el plan de agosto ya lo contemplaba y sigue siendo la parte más valiosa de ese documento.
 2. **El cuadre de SINUBE está de acuerdo consigo mismo.** Es el único número del arranque que ningún reporte puede verificar. El paso 19 no es opcional.
 3. **La carga completa se corre UNA vez, sobre base limpia** (`README.md:11-24`). Si se interrumpe, **se vacía y se empieza de nuevo** — no se retoma. Conviene tener claro cuánto tarda antes del día del corte; **NO MEDIDO: no sé cuánto tarda la corrida completa** y no puedo medirlo sin base de datos.
-4. **El salto de folios es irreversible** y hoy no está programado (§2a). Es la decisión que menos se puede deshacer de todo el arranque.
+4. **El salto de folios es irreversible.** Ya está programado (§2a, fila 0.194) y sus números ya están decididos, pero sigue siendo **la decisión que menos se puede deshacer de todo el arranque**: se aplica una vez, después de cargar, y no se re-numera. El comando **ensaya por omisión** — el cuadro que imprime hay que leerlo antes de poner `--aplicar`, y dice de dónde sale cada número.
 5. **Los datos de origen no están donde el instructivo dice.** Los cargadores buscan `Respaldo CLAUDE/TABLAS/` y esa carpeta ya no está en la rama; se puede redirigir con `TABLAS_DIR`, **pero el instructivo no lo menciona** (busqué `TABLAS_DIR` en `README.md` → sin coincidencias). Es media línea de documentación y evita un tropiezo el día del corte.
 6. **Dos detalles menores del instructivo:** falta el cuadre de catálogos y modelos (`cuadre.ts`) en la lista ordenada de comandos —está en el índice del README (línea 400) pero no en la secuencia—, y `docs/ESTADO-DESPLIEGUE.md`, citado dos veces por la ficha de F10, **no existe**.

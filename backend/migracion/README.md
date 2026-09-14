@@ -213,11 +213,11 @@ npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts            # pone 
 npx tsx --env-file=.env migracion/realinear-estado-ordenes.ts --dry-run  # (opcional) simula: reporta sin escribir
 npx tsx --env-file=.env migracion/reparar-secuencias.ts                  # adelanta TODA secuencia de folio al máximo migrado
 
-# ⭐ SÓLO EN EL ARRANQUE (una vez, IRREVERSIBLE): que las OP/OC nuevas empiecen en número redondo.
-# ⚠️ Los números REALES los da Daniel el día del arranque: por eso la línea de --aplicar lleva un
-#    MARCADOR y no una cifra (si se copia tal cual, el parser la rechaza en vez de aplicarla).
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000  # ENSAYO: no escribe
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
+# ⭐ SÓLO EN EL ARRANQUE (una vez, IRREVERSIBLE): que TODAS las series nuevas empiecen en número
+#    redondo. `--escalon-millar` MIRA el máximo real de cada serie y sube al millar siguiente; los
+#    dos números que dio Daniel (OP 6000 · OC 10000) MANDAN sobre la regla. §Post-F9.233.
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000             # ENSAYO: no escribe
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000 --aplicar   # ESCRIBE (irreversible)
 ```
 
 ## ⚠️ PASO OBLIGATORIO AL TERMINAR CUALQUIER CARGA: reparar las secuencias de folio
@@ -240,39 +240,63 @@ avanzó), así que se corre cuantas veces se quiera y **conviene correrlo despu�
 Los ETL siembran además sus propias series al cerrar, pero este script es la red que no depende de que
 nadie se acuerde. **Al agregar un ETL que migre folios explícitos, agrega su serie aquí.**
 
-### ⭐ SÓLO EN EL ARRANQUE: el salto al ESCALÓN redondo (§Post-F9.36 punto 5, fila 0.187)
+### ⭐ SÓLO EN EL ARRANQUE: el salto al ESCALÓN redondo (§Post-F9.36 punto 5 y §Post-F9.233 · filas 0.187 y 0.194)
 
 Daniel decidió que al arrancar, la numeración **no siga en el siguiente disponible** sino que **salte
 a un número redondo**, para que se vea de un vistazo qué es nuevo y qué es histórico: _"Para saber que
 las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."_
-El número exacto **se fija en el ensayo**, cuando se conozca el máximo real migrado (si la última OP
-fuera 5,847 → arrancar en 6,000; si la última OC fuera 7,920 → 8,000: son **dos números distintos**).
+Y el **14-sep-2026 lo amplió a las SIETE series** (§Post-F9.233): _"me gustaría hacer saltos en todos
+los conteos. Si quieres ubícate en el siguiente millar. Ejemplo, una Nota de salida… si van en la
+4804, ubícate en la 5000."_
 
-🔴 **Los números de abajo (6000 / 8000) son un EJEMPLO, no la decisión.** El del arranque lo da
-Daniel cuando se vea el máximo real migrado. Por eso **el comando del paso 2 lleva un MARCADOR en vez
-de una cifra**: es la línea que escribe de verdad y es irreversible, así que si alguien la copia tal
-cual, el parser la rechaza (`EL-NUMERO-QUE-DIGA-DANIEL` no es un entero) en lugar de aplicar en
-silencio un número que nadie eligió. El paso 1 sí lleva cifras: **ese comando no escribe nada**.
+Por eso hay **dos maneras de pedir el escalón, y conviven**:
+
+| | Qué hace | Cuándo se usa |
+|---|---|---|
+| `--escalon-millar` | **REGLA**: mira el máximo real de CADA serie y sube al millar de arriba (4,804 → 5,000 · 312 → 1,000) | Las cinco series sin número dado |
+| `--escalon-<serie>=<n>` | **NÚMERO EXPLÍCITO** de una serie | OP **6000** y OC **10000**, que los dijo Daniel |
+
+🔑 **El explícito MANDA sobre la regla.** Y para que eso no pase en silencio, el cuadro de
+confirmación dice renglón por renglón **de dónde sale cada número** y, cuando es explícito, **qué
+habría dicho la regla** — con un ⚠️ si no coinciden (es el caso de la OC: 10,000 a mano contra 8,000
+de la regla).
+
+🔴 **Por qué una REGLA y no siete números tecleados:** hoy **nadie conoce esos máximos** —se sabrán el
+día de la migración—, y teclear a mano un número **por debajo** del máximo real es justo el error que
+arruinaría el arranque. La regla lo calcula del dato real, en ese momento.
 
 ```bash
-# 1) ENSAYO — no escribe nada; imprime el cuadro de lo que pasaría. Aquí SÍ va el número a probar.
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=6000 --escalon-orden-compra=8000
+# 1) ENSAYO — no escribe nada; imprime el cuadro de lo que pasaría, serie por serie.
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000
 
-# 2) Si el cuadro está bien, el MISMO comando con --aplicar — sustituyendo el marcador por el número
-#    que Daniel haya dado (tiene que ser EL MISMO que se ensayó en el paso 1).
-npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-orden=EL-NUMERO-QUE-DIGA-DANIEL --escalon-orden-compra=EL-NUMERO-QUE-DIGA-DANIEL --aplicar
+# 2) Si el cuadro está bien, el MISMO comando con --aplicar al final.
+npx tsx --env-file=.env migracion/reparar-secuencias.ts --escalon-millar --escalon-orden=6000 --escalon-orden-compra=10000 --aplicar
 ```
 
 ⚠️ **Es IRREVERSIBLE en cuanto alguien captura con la numeración nueva** (el folio 6,000 ya existe y
 la secuencia no puede volver atrás sin repetir números). Por eso el script trae tres cinturones:
 
-- **Sólo OP y OC** tienen bandera de escalón. Las otras cinco series no se pueden saltar ni por error
-  de dedo, y **cualquier bandera desconocida aborta** (un `--escalon-orden 6000` con espacio en vez de
-  `=` no se ignora en silencio: se cae y te dice cómo se escribe).
+- **El escalón NUNCA es automático**: hay que pedirlo, por serie o con `--escalon-millar`. Y
+  **cualquier bandera desconocida aborta** (un `--escalon-orden 6000` con espacio en vez de `=` no se
+  ignora en silencio: se cae y te dice cómo se escribe; `--escalon-millar` no lleva número pegado).
 - **Ensayo en seco por omisión**: con escalón y sin `--aplicar` **no se escribe nada**.
 - **Aborta si el escalón va POR LO BAJO** — si pides 6,000 y la última OP ya es 6,120, se cae
-  nombrando los dos números, **sin escribir nada de nada** (ni las otras series). No se aplica "por lo
-  que se pueda": repetiría folios.
+  nombrando los dos números **y el que diría la regla**, sin escribir nada de nada (ni las otras
+  series). No se aplica "por lo que se pueda": repetiría folios. *(La regla no puede tropezar con
+  esto: sube al millar siguiente **a lo ya comprometido** —el máximo de la tabla **o** el valor de la
+  secuencia, el que sea mayor—, así que siempre da un número estrictamente mayor.)*
+
+⚠️ **`--escalon-millar` es de UNA SOLA VEZ.** Recalcula contra el máximo del MOMENTO, así que
+repetirlo **después** de empezar a capturar saltaría otra vez al millar de arriba (el número
+explícito, en cambio, aborta al repetirse porque ya está comprometido). El cuadro lo avisa.
+
+Y una serie **sin ni un folio** —ni filas en la tabla **ni** secuencia viva—: con la REGLA no salta y
+se dice en el cuadro (arrancará en 1); con un número **explícito** aborta, porque esa cifra no
+aterrizaría en ninguna empresa. ⚠️ **Ojo: «tabla vacía» NO es lo mismo que «sin ni un folio».** Una
+serie puede tener la tabla vacía y la **secuencia viva** (un rollback reparte folio sin dejar fila);
+ésa **sí salta**, y el cuadro la muestra con su número. Mirar sólo la tabla era un defecto real de la
+fila 0.194, cazado por su reviewer: el cuadro decía «arrancará en 1» cuando la siguiente iba a ser la
+4,001, **y esa serie se quedaba con la numeración corrida para siempre**.
 
 Otras banderas: `--empresa=<id>` acota el escalón a una empresa (la reparación normal siempre corre
 para todas, que es inocua) · `--simular` (alias `--dry-run`) fuerza el ensayo · `--ayuda` lista todo.
@@ -497,7 +521,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/cuadre-fase.ts`              | Cuadre por fase                                                                                                                                                                                                                      |
 | `migracion/cuadre-f2.ts`                | Cuadre F2 en dos niveles (filas/sumas + columnas) + incidencias                                                                                                                                                                      |
 | `migracion/cuadre-f3.ts`                | **Cuadre F3 en tres niveles** (conteos + existencias Σ kardex vs `IPT_Mod_Alm` + no-doble-conteo)                                                                                                                                    |
-| `migracion/reparar-secuencias.ts`       | **Repara TODAS las secuencias de folio** contra el máximo real por empresa (idempotente + monótono; correr al final de cualquier carga — §Post-F9.17). En el arranque, además, **el salto al escalón redondo** de OP/OC: `--escalon-orden=<n> --escalon-orden-compra=<n>` (ensayo) + `--aplicar` — §Post-F9.36 punto 5, IRREVERSIBLE |
+| `migracion/reparar-secuencias.ts`       | **Repara TODAS las secuencias de folio** contra el máximo real por empresa (idempotente + monótono; correr al final de cualquier carga — §Post-F9.17). En el arranque, además, **el salto al escalón redondo de LAS SIETE**: `--escalon-millar` (regla: el millar siguiente al máximo real) + el número explícito que manda sobre ella (`--escalon-orden=6000 --escalon-orden-compra=10000`), ensayo por omisión + `--aplicar` — §Post-F9.36 punto 5 y §Post-F9.233, IRREVERSIBLE |
 | `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
