@@ -18,7 +18,7 @@ import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -385,6 +385,57 @@ export async function obtenerRol(
     throw new ErrorNoEncontrado('Rol', id);
   }
   return aDto(rol);
+}
+
+/** Rol en su forma MÍNIMA: lo único que necesita un selector de roles. */
+export interface RolOpcionDto {
+  id: number;
+  nombre: string;
+}
+
+/**
+ * ⭐ Reja de lectura del CATÁLOGO de roles (id + nombre), fila 0.190.
+ *
+ * Pasa con `roles.administrar` (quien gobierna el RBAC) **o** con `rc.catalogo-ver` / `rc.ruta-ver`
+ * (quien opera la Ruta Crítica). Sigue siendo deny-by-default (A4): sin ninguno de los tres, 403.
+ *
+ * 🔑 POR QUÉ SE ABRE. Configurar los responsables de un proceso de la RC exigía `roles.administrar`
+ * sólo porque el selector se poblaba de `GET /api/roles` — o sea, para repartir una responsabilidad
+ * había que llevar **la llave maestra del sistema**. Es exactamente el *«tener A implica B»* que
+ * Daniel señaló en la fila 0.120 (§Post-F9.230), pero atado al revés: no era el permiso el que
+ * regalaba poder, era la pantalla la que pedía de más.
+ *
+ * ⚠️ SÍ ENSANCHA, Y HAY QUE DECIRLO CON EL NÚMERO. Un selector para ASIGNAR roles necesita **por
+ * fuerza** los que todavía NO están asignados —ésa es su función—, así que aquí sale el CATÁLOGO
+ * COMPLETO, y eso es más de lo que hoy enseñan las pantallas de la RC: `GET /ruta-critica/procesos`
+ * y `GET /ruta-critica/ordenes/:id/ruta` proyectan la relación `ProcesoDefRol`, o sea **sólo los
+ * roles YA ASIGNADOS** a un proceso. Medido contra una base sembrada de verdad: **26 roles, 10
+ * asignados ⇒ 16 nombres que hoy no salen por ahí**, entre ellos 8 de los 9 de sistema.
+ *
+ * Y es aceptable porque **lo que se protege no es el NOMBRE de un rol sino su GOBIERNO**:
+ * `clavesPermisos` (qué puede) y `totalUsuarios` (a cuánta gente alcanza) no salen por aquí y siguen
+ * exclusivamente bajo `roles.administrar`. Un nombre suelto no concede nada; un mapa de permisos sí.
+ */
+export function exigirVerOpcionesRoles(sesion: SesionUsuario): void {
+  if (tienePermiso(sesion, 'roles.administrar') || tienePermiso(sesion, 'rc.catalogo-ver')) {
+    return;
+  }
+  verificarPermiso(sesion, 'rc.ruta-ver');
+}
+
+/**
+ * Lista los roles en forma MÍNIMA (id + nombre), ordenados por nombre, para poblar un selector.
+ * Misma fuente y mismo orden que `listarRoles`, sin el mapa de permisos ni el conteo de usuarios.
+ */
+export async function listarOpcionesRoles(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+): Promise<RolOpcionDto[]> {
+  exigirVerOpcionesRoles(sesion);
+  return clienteLectura(bd).rol.findMany({
+    select: { id: true, nombre: true },
+    orderBy: { nombre: 'asc' },
+  });
 }
 
 /**

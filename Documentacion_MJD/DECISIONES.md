@@ -15663,3 +15663,138 @@ la pantalla de Roles.
 - **Aplica en:** versión **0.147**, fila **0.120**. **Fecha:** 2026-09-11.
 
 ---
+
+#### (Post-F9.231) — VER LOS NOMBRES DE LOS ROLES NO ES ADMINISTRAR LOS ROLES (fila 0.190)
+
+**Qué se decidió.** La lista de roles se parte en dos, y cada mitad tiene su reja:
+
+- **`GET /api/roles` — el listado de GOBIERNO.** Devuelve, de cada rol, `clavesPermisos` (su mapa de
+  poder entero) y `totalUsuarios` (a cuánta gente alcanza). **Sigue exigiendo `roles.administrar`**,
+  sin cambio alguno.
+- **`GET /api/roles/opciones` — el CATÁLOGO para poblar un selector.** Devuelve **sólo `id` y
+  `nombre`**, y acepta `roles.administrar` **o** `rc.catalogo-ver` **o** `rc.ruta-ver`.
+
+**Por qué.** Para decir *quién responde por un proceso de la Ruta Crítica* había que poder
+**administrar el RBAC entero**, porque el selector de roles del editor se poblaba del listado de
+gobierno. Es la queja de Daniel de §Post-F9.230 —*«puede haber alguien que tenga el permiso A pero no
+el B»*— **atada al revés**: no era un permiso que regalara poder de más, era una pantalla que pedía
+de más. Y muerde justo el día del reparto: la 0.120 acababa de fabricar cuatro interruptores para que
+él los repartiera, y éste se los habría atado otra vez a la llave maestra.
+
+> ### 🔑 POR QUÉ UN ENDPOINT NUEVO Y NO AFLOJARLE EL PERMISO AL QUE YA EXISTÍA
+>
+> Las dos salidas estaban sobre la mesa. Se midió antes de elegir:
+> - **El listado de gobierno tiene MÁS consumidores que la RC**: la pantalla de Roles y el selector
+>   del alta de Usuarios. Aflojarle el permiso habría abierto `clavesPermisos` y `totalUsuarios`
+>   —**lo único que un rol tiene de gobierno**— a todo el que pueda abrir la Ruta Crítica, o sea a
+>   medio organigrama. Es el defecto de la 0.120 repetido con otro nombre.
+> - **La puerta nueva SÍ ensancha —y menos de lo que parece, pero hay que decirlo con el número.**
+>   Un selector para ASIGNAR roles necesita **por fuerza** los que todavía no están asignados: ésa es
+>   su función, y un catálogo recortado no serviría para nada. Las pantallas de la RC, en cambio,
+>   enseñan **sólo los roles YA ASIGNADOS** a un proceso (`GET /ruta-critica/procesos` y
+>   `GET /ruta-critica/ordenes/:id/ruta` proyectan la relación `ProcesoDefRol`). **Medido contra una
+>   base sembrada de verdad: 26 roles, 10 asignados ⇒ 16 nombres que hoy NO salen por las pantallas
+>   de la RC**, entre ellos **8 de los 9 roles de sistema**.
+> - **Y es aceptable porque lo que se protege no es el NOMBRE de un rol, sino su GOBIERNO.** Un
+>   nombre suelto no concede nada ni dice quién puede qué; `clavesPermisos` y `totalUsuarios` sí, y
+>   ésos no salen por la puerta nueva y siguen exclusivamente bajo `roles.administrar`.
+>
+> 🔴 **Este inciso decía lo contrario en la primera versión de la fila** —*«no enseña nada que esos
+> permisos no vieran ya… medido contra el árbol»*— y era **falso**: se leyó que esos endpoints traen
+> nombres de rol y se dio el salto a que traen *el catálogo*, sin medirlo. Lo cazó el reviewer
+> contando contra la base sembrada. **La decisión no cambia** —el diseño era y sigue siendo el
+> correcto—, **cambia su razón**, que además es más fuerte: no es que no se abra nada, es que **lo
+> que se abre es el mínimo que un selector necesita y no toca el gobierno de nadie**.
+>
+> ⚠️ **Y lo que NO cambia:** guardar responsables sigue exigiendo `rc.catalogo-administrar`. Lo que se
+> destrabó es **ver la lista para elegir**, no la facultad de fijarla.
+
+**SIN permiso nuevo, SIN migración, SIN semilla**: se reusan tres claves que ya existen, así que no
+hay casillas nuevas en la pantalla de Roles ni nada que activar en el despliegue.
+
+📌 **De paso, y por ser la misma puerta:** el filtro *«responsable»* del concentrado de la RC bebía
+del mismo listado de gobierno y por eso **desaparecía en silencio** para quien no administrara el
+RBAC. Queda alimentado por el catálogo nuevo.
+
+- **Aplica en:** versión **0.157**, fila **0.190**. **Fecha:** 2026-09-14.
+
+---
+
+#### (Post-F9.232) — LA FACTURA DEL MAQUILERO SE COTEJA CONTRA EL DOCUMENTO QUE EMITE FR MODA, Y CUADRA AL PESO (fila 0.117)
+
+**Cómo salió.** La fila 0.117 llevaba semanas bloqueando la V1 esperando cuatro decisiones. El lead
+se las dio a Daniel juntas, cada una con su default propuesto (regla de §6: todas de una vez, no a
+gotas), y las contestó las cuatro de corrido el 14-sep-2026.
+
+**(a) ¿Contra qué se coteja?** — *«De acuerdo con el default»*: contra **el documento que FR Moda
+emite**, no contra los recibos sueltos. Es la consecuencia directa de lo que él ya había decidido en
+§Post-F9.186(k): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene
+que facturar… no al revés»*. ⇒ El sistema no compara dos documentos nacidos por separado: compara
+**el que nosotros emitimos contra su copia**, que es justo lo que la fila 0.118 vino a simplificar.
+
+**(b) ¿Cuánta diferencia se tolera?** — *«Está bien con 1 peso de diferencia»*. ⚠️ **Se lee como UN
+PESO FIJO, sin porcentaje.** El default propuesto era 0,5 % con piso de un peso; **Daniel lo dejó más
+estricto**, y tiene sentido: si la factura sale del documento que emitimos nosotros, separarse más de
+un peso significa que algo no cuadra de verdad, no que se redondeó. El lead le dijo en el chat cómo
+lo estaba leyendo y no lo corrigió. 📌 **Si alguna vez aparece el matiz del porcentaje, se pregunta
+otra vez antes de programarlo: no se deduce.**
+
+**(c) ¿La factura que no cuadra entra o se rechaza?** — *«Ok, de acuerdo. Se queda en rojo hasta que
+atiendan el problema»*: **entra marcada, y no se puede pagar** mientras esté en rojo. Se prefirió a
+rechazarla porque la factura existe aunque esté mal, y un sistema que la escupe la manda a un Excel
+aparte — que es exactamente de lo que este módulo viene a sacar al negocio.
+
+**(d) ¿Una a una o por período?** — *«De acuerdo»* con el default: **como venga**. Una factura puede
+cubrir varias semanas de recibos, y puede haber varias facturas de una misma semana. Se coteja contra
+lo que cubra el documento emitido, sin forzar el uno a uno.
+
+🔑 **Lo que esto desbloquea:** la 0.117 era **la última fila de CÓDIGO que bloqueaba la V1**. Con
+estas cuatro respuestas ya se puede construir. Lo que sigue bloqueando el arranque son los repasos
+**0.096** (Inventarios) y **0.097** (Finanzas), que los recorre Daniel, y la **0.123**, que Gabriel
+decidió aparcar.
+
+- **Aplica en:** la fila **0.117** (y su simplificación, la 0.118). **Fecha:** 2026-09-14.
+
+---
+
+#### (Post-F9.233) — TODOS LOS FOLIOS SALTAN AL ARRANCAR, Y LA REGLA ES «EL SIGUIENTE MILLAR»
+
+**Cómo salió.** Al repasar qué faltaba decidir antes del arranque, el lead le presentó a Daniel las
+**siete** series de folio que el sistema lleva, midiendo cuáles podían saltar hoy (sólo dos) y cuáles
+arrancarían pegadas a lo que traiga la migración. Su respuesta fue ampliar el criterio a todas:
+
+> *«No… me gustaría hacer saltos en todos los conteos. Si quieres ubícate en el siguiente millar.
+> Ejemplo, una Nota de salida… si van en la 4804, ubícate en la 5000.»*
+
+**Las siete series y su arranque:**
+
+| Serie | Arranque |
+|---|---|
+| Órdenes de producción (OP) | **6000** — número dado por Daniel |
+| Órdenes de compra (OC) | **10000** — ya decidido el 25-ago, confirmado ahora |
+| Pedidos internos | **siguiente millar** |
+| Notas de salida | **siguiente millar** |
+| Etapas de producción | **siguiente millar** |
+| Auditorías de calidad | **siguiente millar** |
+| Movimientos de cuenta corriente de terceros | **siguiente millar** |
+
+**(a) La regla se programa como REGLA, no como siete números escritos a mano.** El día del ensayo el
+comando mira el máximo real de cada serie y sube al millar siguiente. Dos razones medidas: hoy nadie
+conoce esos máximos —sólo se sabrán al migrar—, y teclear a mano un número **por debajo** del máximo
+real es el error que arruinaría el arranque sin avisar. Los números explícitos de Daniel (6000 y
+10000) **mandan sobre la regla**. 📌 Y coinciden con ella: la decisión original decía *«si la última
+OP fuera 5.847 → arrancar en 6.000»*.
+
+**(b) El folio de ETAPAS es UNA SOLA serie, y sale impreso.** Medido al contestarle: el mismo
+contador numera **corte, envío a maquila, recibo de maquila y entrega a cliente**, y aparece en el
+papel del envío, el del recibo y el de la entrega ⇒ **lo tienen en la mano el maquilero y el
+cliente**. Por eso no es numeración interna y saltarlo tiene el mismo sentido que en las OC.
+
+🔴 **ES IRREVERSIBLE Y ES AHORA O NUNCA.** Los folios no se re-numeran: si se arranca con la
+numeración corrida, se queda así para siempre. Hoy `migracion/reparar-secuencias.ts` sólo sabe saltar
+en OP y OC ⇒ **falta construir las otras cinco y la regla del millar**, y esa ventana se cierra el
+día del go-live.
+
+- **Aplica en:** el go-live, y la fila **0.194** que nace de aquí. **Fecha:** 2026-09-14.
+
+---

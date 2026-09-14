@@ -287718,6 +287718,197 @@
         }
       }
     },
+    "/api/roles/opciones": {
+      "get": {
+        "summary": "Listar roles en forma mínima (id + nombre) para selectores",
+        "tags": [
+          "roles"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del rol."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre del rol."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "nombre"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Rol en forma mínima (id + nombre) para poblar un selector."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/roles/{id}": {
       "get": {
         "summary": "Obtener un rol",

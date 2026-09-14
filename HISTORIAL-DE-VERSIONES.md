@@ -71,6 +71,46 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.157 · 14-sep-2026 · **en prueba** — **Decir quién es responsable de un paso de la Ruta Crítica ya no exige poder tocar los permisos de todo el sistema**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Configurar los responsables de un proceso de la Ruta Crítica sin ser administrador del
+  sistema.** Quien administra el catálogo de la Ruta Crítica ya puede abrir un proceso, ver la lista
+  de roles y marcar quién responde por él. Hasta ahora esa lista **sólo se cargaba si la persona
+  además podía administrar los permisos de todo el sistema**: para repartir una responsabilidad
+  había que llevar la llave maestra.
+- **Y el tablero de la Ruta Crítica recupera su filtro por responsable.** En el concentrado, el
+  selector *«responsable»* simplemente **no aparecía** para casi todo el mundo, por la misma razón y
+  sin decir por qué. Ahora lo ve cualquiera que pueda abrir el tablero.
+
+### Qué cambió y puede sorprender
+
+- **No hay permisos nuevos que repartir.** No hay casillas nuevas en la pantalla de Roles, no hay
+  nada que sembrar ni que activar: se reusan tres permisos que ya existían.
+- **Lo que se abre es sólo la lista de NOMBRES de roles**, que es lo único que necesita un selector.
+  **Quién puede qué —el mapa de permisos de cada rol y a cuánta gente alcanza— sigue saliendo
+  únicamente para quien administra el sistema**, exactamente igual que antes.
+- **Sí se ven nombres de rol que antes no se veían, y conviene saberlo.** Las pantallas de la Ruta
+  Crítica enseñaban los responsables **ya asignados** a cada paso; la lista para elegir tiene que
+  traerlos **todos**, porque si no, no se podría asignar a nadie nuevo. Hoy eso son **16 nombres de
+  rol de los 26 que existen** que antes no aparecían por ahí.
+- **Nadie que no pudiera antes puede ahora guardar nada.** Marcar responsables sigue exigiendo
+  administrar el catálogo de la Ruta Crítica, igual que ayer; lo que se destrabó es poder **ver la
+  lista para elegir**.
+
+### Qué sigue pendiente o roto
+
+- **Esto es una puerta mal atada que se ata bien, no el reparto de permisos.** El reparto de verdad
+  —qué puede cada una de las 23 personas— sigue siendo la tarea del arranque, y es de Daniel.
+- 🔴 **Queda otro desajuste del mismo tipo, visto de paso y NO tocado:** el catálogo de *tipos de
+  movimiento* de inventario deja entrar a quien tenga el permiso de telas o el de avíos, pero por
+  dentro sigue exigiendo el de producto terminado, así que esa persona pasa la puerta y se topa con
+  un «no tienes permiso». Hoy no muerde porque los perfiles llevan los tres juntos; muerde el día
+  del reparto. Va como fila aparte.
+
+---
+
 ## 0.156 · 14-sep-2026 · **en prueba** — **El renglón de tela de una orden de compra ya dice de qué color se pide**
 
 ### Qué se puede hacer ahora que antes no

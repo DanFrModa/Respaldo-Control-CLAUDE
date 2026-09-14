@@ -33,6 +33,22 @@ export const esquemaRolSalida = z
 export type RolSalida = z.infer<typeof esquemaRolSalida>;
 
 /**
+ * Rol en su forma MÍNIMA: sólo id y nombre (`GET /api/roles/opciones`). Es lo único que necesita un
+ * SELECTOR de roles, y deliberadamente NO lleva `clavesPermisos` ni `totalUsuarios` —el mapa de
+ * poder de cada rol y su tamaño son información de gobierno, y sólo salen por `GET /api/roles`,
+ * que sigue exigiendo `roles.administrar` (fila 0.190).
+ */
+export const esquemaRolOpcionSalida = z
+  .object({
+    id: z.number().int().describe('Id del rol.'),
+    nombre: z.string().describe('Nombre del rol.'),
+  })
+  .describe('Rol en forma mínima (id + nombre) para poblar un selector.');
+
+/** Forma de una opción de rol tal como la devuelve la API. */
+export type RolOpcionSalida = z.infer<typeof esquemaRolOpcionSalida>;
+
+/**
  * Cuerpo de alta de un rol (`POST /api/roles`). Misma forma de captura que el
  * dominio (`esquemaCrearRol`): nombre 1..60, descripción ≤200 (default vacío) y
  * el set inicial de permisos. Las claves se validan contra el catálogo en el

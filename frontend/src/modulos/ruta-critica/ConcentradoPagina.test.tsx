@@ -23,14 +23,14 @@ const urlConcentradoExcel = vi.fn<(query: unknown) => string>(
 );
 // Los selectores de proceso/responsable llaman a catálogos; se mockean vacíos (no se ofrecen filtros).
 const useProcesosRc = vi.fn(() => ({ data: undefined }));
-const useRoles = vi.fn(() => ({ data: undefined }));
+const useOpcionesRoles = vi.fn(() => ({ data: undefined }));
 
 vi.mock('@/api/ruta-critica-programacion', () => ({
   useConcentradoRc: (query: unknown) => useConcentradoRc(query),
   urlConcentradoExcel: (query: unknown) => urlConcentradoExcel(query),
 }));
 vi.mock('@/api/ruta-critica', () => ({ useProcesosRc: () => useProcesosRc() }));
-vi.mock('@/api/roles', () => ({ useRoles: () => useRoles() }));
+vi.mock('@/api/roles', () => ({ useOpcionesRoles: () => useOpcionesRoles() }));
 
 function fila(id: number, extra: Partial<ConcentradoRcFila> = {}): ConcentradoRcFila {
   return {
@@ -91,7 +91,7 @@ describe('<ConcentradoPagina>', () => {
     useConcentradoRc.mockReset();
     urlConcentradoExcel.mockClear();
     useProcesosRc.mockReturnValue({ data: undefined });
-    useRoles.mockReturnValue({ data: undefined });
+    useOpcionesRoles.mockReturnValue({ data: undefined });
   });
 
   it('pinta cada orden con su semáforo, atraso y la tira de procesos', () => {

@@ -74,6 +74,7 @@ export {
 
 export {
   esquemaRolSalida,
+  esquemaRolOpcionSalida,
   esquemaCrearRolBody,
   esquemaActualizarRolBody,
   esquemaAsignarPermisosBody,
@@ -81,6 +82,7 @@ export {
   esquemaModuloPermisosSalida,
   esquemaCatalogoPermisosSalida,
   type RolSalida,
+  type RolOpcionSalida,
   type CrearRolBody,
   type ActualizarRolBody,
   type AsignarPermisosBody,

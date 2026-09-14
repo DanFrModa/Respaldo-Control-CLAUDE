@@ -116638,6 +116638,127 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/roles/opciones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar roles en forma mínima (id + nombre) para selectores */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del rol. */
+              id: number;
+              /** @description Nombre del rol. */
+              nombre: string;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/roles/{id}': {
     parameters: {
       query?: never;

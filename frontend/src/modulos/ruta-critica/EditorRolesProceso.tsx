@@ -2,7 +2,7 @@ import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useRoles } from '@/api/roles';
+import { useOpcionesRoles } from '@/api/roles';
 import { useFijarRolesProcesoRc } from '@/api/ruta-critica';
 import type { ProcesoRc } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * Editor de los ROLES RESPONSABLES de un proceso de la RC (N:M sobre el RBAC único, A4). Lista los
- * roles (`GET /api/roles`) como checkboxes y guarda el set COMPLETO con `PUT .../{id}/roles`. El
+ * roles (`GET /api/roles/opciones`) como checkboxes y guarda el set COMPLETO con `PUT .../{id}/roles`. El
  * backend valida y es la autoridad (A1). Solo se muestra a quien puede administrar el catálogo.
  *
- * Nota: `GET /api/roles` exige `roles.administrar`; en el seed, quien administra la RC es el admin
- * (que tiene ambos permisos). Si la lista de roles no carga, se muestra el error sin romper la UI.
+ * ⭐ Fila 0.190: el selector se puebla de `GET /api/roles/opciones` (id + nombre), que acepta
+ * `rc.catalogo-ver`. Antes usaba `GET /api/roles`, que exige `roles.administrar` ⇒ para repartir una
+ * responsabilidad de la RC había que llevar **la llave maestra del RBAC**. Si la lista no carga, se
+ * muestra el error sin romper la UI.
  */
 export function EditorRolesProceso({
   proceso,
@@ -23,7 +25,7 @@ export function EditorRolesProceso({
   proceso: ProcesoRc;
   puedeAdministrar: boolean;
 }): React.JSX.Element {
-  const consultaRoles = useRoles();
+  const consultaRoles = useOpcionesRoles();
   const fijarRoles = useFijarRolesProcesoRc();
 
   const [seleccionados, setSeleccionados] = useState<number[]>(() =>
