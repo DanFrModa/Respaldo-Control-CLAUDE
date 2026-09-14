@@ -100,9 +100,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Sigue sin escribir nada si no se le pide dos veces.** El comando ensaya por omisión: imprime el
   cuadro y no toca nada; hay que repetirlo con `--aplicar` para que escriba. Y **si el número pedido
   queda por debajo de lo que ya existe, se cae sin escribir una sola línea** y dice los dos números.
-- **Una serie sin datos no salta, y lo dice.** Si una numeración llega vacía a la migración (por
-  ejemplo la cuenta corriente de terceros, cuya carga todavía no se corre), arrancará en 1 y el
-  cuadro la nombra en una lista aparte — en vez de tumbar el comando del día del arranque.
+- **Una numeración que no tiene ni un folio no salta, y lo dice.** Si llega completamente vacía a la
+  migración (por ejemplo la cuenta corriente de terceros, cuya carga todavía no se corre), arrancará
+  en 1 y el cuadro la nombra en una lista aparte — en vez de tumbar el comando del día del arranque.
+  **Pero «sin papeles» no es lo mismo que «sin números repartidos»:** si una numeración ya repartió
+  folios aunque no haya quedado ningún documento (pasa cuando una captura se empieza y no se guarda),
+  **sí salta**, y el cuadro enseña su número. Las dos cosas se confundían en la primera versión de
+  esta entrega: el cuadro decía «arrancará en 1» cuando en realidad iba a seguir en 4,001, y esa
+  numeración se habría quedado corrida **para siempre**. Lo encontró la revisión antes de salir.
 - **No hay nada que hacer hoy en el sistema.** Esto es una herramienta del día de la migración: no
   cambia ninguna pantalla, ningún permiso y ningún dato de lo que está en prueba.
 

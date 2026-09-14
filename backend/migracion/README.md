@@ -283,14 +283,20 @@ la secuencia no puede volver atrás sin repetir números). Por eso el script tra
 - **Aborta si el escalón va POR LO BAJO** — si pides 6,000 y la última OP ya es 6,120, se cae
   nombrando los dos números **y el que diría la regla**, sin escribir nada de nada (ni las otras
   series). No se aplica "por lo que se pueda": repetiría folios. *(La regla no puede tropezar con
-  esto: siempre da un número estrictamente mayor.)*
+  esto: sube al millar siguiente **a lo ya comprometido** —el máximo de la tabla **o** el valor de la
+  secuencia, el que sea mayor—, así que siempre da un número estrictamente mayor.)*
 
 ⚠️ **`--escalon-millar` es de UNA SOLA VEZ.** Recalcula contra el máximo del MOMENTO, así que
 repetirlo **después** de empezar a capturar saltaría otra vez al millar de arriba (el número
 explícito, en cambio, aborta al repetirse porque ya está comprometido). El cuadro lo avisa.
 
-Y una serie con la **tabla vacía**: con la REGLA no salta y se dice en el cuadro (arrancará en 1);
-con un número **explícito** aborta, porque esa cifra no aterrizaría en ninguna empresa.
+Y una serie **sin ni un folio** —ni filas en la tabla **ni** secuencia viva—: con la REGLA no salta y
+se dice en el cuadro (arrancará en 1); con un número **explícito** aborta, porque esa cifra no
+aterrizaría en ninguna empresa. ⚠️ **Ojo: «tabla vacía» NO es lo mismo que «sin ni un folio».** Una
+serie puede tener la tabla vacía y la **secuencia viva** (un rollback reparte folio sin dejar fila);
+ésa **sí salta**, y el cuadro la muestra con su número. Mirar sólo la tabla era un defecto real de la
+fila 0.194, cazado por su reviewer: el cuadro decía «arrancará en 1» cuando la siguiente iba a ser la
+4,001, **y esa serie se quedaba con la numeración corrida para siempre**.
 
 Otras banderas: `--empresa=<id>` acota el escalón a una empresa (la reparación normal siempre corre
 para todas, que es inocua) · `--simular` (alias `--dry-run`) fuerza el ensayo · `--ayuda` lista todo.

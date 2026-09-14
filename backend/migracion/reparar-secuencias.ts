@@ -279,7 +279,10 @@ export interface Plan {
   /** ¿Algún renglón lleva escalón? Es lo que enciende el ensayo en seco por omisión. */
   hayEscalon: boolean;
   /**
-   * Series a las que la REGLA del millar no pudo aplicarse porque su tabla está vacía (etiquetas).
+   * Series a las que la REGLA del millar no pudo aplicarse porque no tienen NI UNA FILA NI UNA
+   * SECUENCIA VIVA en ninguna empresa (etiquetas). Las dos condiciones, no sólo la primera: una
+   * serie con folios ya repartidos y sin filas SÍ salta, y meterla aquí era mentir y dejarla
+   * corrida (defecto medido por el reviewer de la 0.194).
    * No es un error —no hay folio que saltar ni empresa a la que aplicárselo—, pero **tiene que
    * verse**: quien corre el arranque pidió que saltaran todas, y éstas no van a saltar. Con un
    * escalón EXPLÍCITO el mismo caso ABORTA (alguien tecleó una cifra y debe aterrizar en algún
@@ -341,6 +344,22 @@ export async function planificar(
   const secuencias = new Map(
     filasSecuencia.map((s) => [`${String(s.idEmpresa)}|${s.clave}`, s.valor]),
   );
+  /**
+   * Qué empresas tienen SECUENCIA VIVA de cada clave, aunque su tabla esté vacía.
+   *
+   * 🔴 Existe por un defecto medido por el reviewer de la fila 0.194: las empresas de una serie se
+   * sacaban SÓLO del `groupBy` de la tabla, mientras `comprometido` sí mira la secuencia. Una serie
+   * con folios ya repartidos y ninguna fila —el rollback que quema folio, el caso que
+   * {@link RenglonPlan.comprometido} nombra— caía por tanto en "sin datos": el cuadro decía
+   * «arrancará en 1» siendo FALSO (la siguiente salía 4,001 con la secuencia en 4,000) **y esa serie
+   * NO SALTABA**, que es exactamente el daño que esta fila viene a impedir, y para siempre.
+   */
+  const empresasConSecuencia = new Map<string, Set<number>>();
+  for (const fila of filasSecuencia) {
+    const yaVistas = empresasConSecuencia.get(fila.clave) ?? new Set<number>();
+    yaVistas.add(fila.idEmpresa);
+    empresasConSecuencia.set(fila.clave, yaVistas);
+  }
 
   // Una `--empresa` que no existe se caza AQUÍ y no al escribir: si no, la única señal sería el
   // choque de la llave foránea de `secuencias`, que no le dice nada a quien está en el arranque.
@@ -363,9 +382,15 @@ export async function planificar(
     const porRegla = explicito === undefined && opciones.millar === true;
     const pideEscalon = explicito !== undefined || porRegla;
 
-    // A qué empresas alcanza esta serie: las que tienen histórico y —si se pidió el escalón para
-    // una empresa concreta— también ésa, aunque su tabla esté vacía (arranque desde cero).
-    const ids = new Set(maximos.map((m) => m.idEmpresa));
+    // A qué empresas alcanza esta serie: la UNIÓN de las que tienen histórico en la tabla y las que
+    // tienen SECUENCIA VIVA (folios ya repartidos sin fila que los respalde), y —si se pidió el
+    // escalón para una empresa concreta— también ésa, aunque no tenga ni lo uno ni lo otro
+    // (arranque desde cero). La unión no es un adorno: sin ella una serie con secuencia y sin filas
+    // se clasificaba como "vacía", el cuadro mentía y la serie se quedaba SIN saltar.
+    const ids = new Set([
+      ...maximos.map((m) => m.idEmpresa),
+      ...(empresasConSecuencia.get(serie.clave) ?? []),
+    ]);
     if (pideEscalon && opciones.idEmpresa !== undefined) ids.add(opciones.idEmpresa);
 
     const renglones: RenglonPlan[] = [];
@@ -393,7 +418,11 @@ export async function planificar(
         hayEscalon = true;
         alcanzadas += 1;
         if (escalon <= comprometido) {
-          // Sólo alcanzable con un número EXPLÍCITO: `siguienteMillar` es siempre > comprometido.
+          // Sólo alcanzable con un número EXPLÍCITO — y eso depende de UNA cosa: que la regla reciba
+          // `comprometido` y no `maxTabla`. `siguienteMillar` es siempre mayor que SU ENTRADA, así
+          // que alimentarla con el máximo de la tabla la haría caer aquí en cuanto la secuencia
+          // fuera por delante (tabla 4,804 + secuencia 5,200 ⇒ diría 5,000 y abortaría). Lo sostiene
+          // una prueba de integración, no este comentario.
           casos.push(
             `  ✖ ${serie.clave} · empresa ${String(idEmpresa)} (${nombreEmpresa}): pediste arrancar ` +
               `en ${conMiles(escalon)}, pero el folio más alto ya comprometido es ` +
@@ -420,9 +449,10 @@ export async function planificar(
       // Ni una empresa a la que aplicárselo. (Sólo puede pasar SIN `--empresa`: con ella, esa
       // empresa siempre entra en `ids`, y que exista ya se comprobó arriba.)
       if (explicito === undefined) {
-        // Por REGLA: no es un error. La serie no tiene folios que saltar y arrancará en 1; tumbar
-        // el comando del go-live por una tabla vacía empujaría a quitar la regla, que es peor. Se
-        // informa en el cuadro, que es donde lo va a leer quien aplica.
+        // Por REGLA: no es un error. La serie no tiene NI FILAS NI SECUENCIA en ninguna empresa,
+        // así que no hay folio que saltar y arrancará en 1; tumbar el comando del go-live por eso
+        // empujaría a quitar la regla, que es peor. Se informa en el cuadro, que es donde lo lee
+        // quien aplica.
         sinDatosConRegla.push(serie.etiquetaEscalon);
       } else {
         // EXPLÍCITO: alguien tecleó una cifra y no va a aterrizar en ningún lado. Eso sí aborta,
@@ -553,7 +583,7 @@ export function formatearEscalon(plan: Plan, escrito: boolean): string {
     // Las series vacías NO saltan, y quien pidió que saltaran todas tiene que verlo aquí — no
     // deducirlo de una ausencia en el cuadro.
     p.push('');
-    p.push('  Series que NO saltan porque su tabla está VACÍA (arrancarán en 1):');
+    p.push('  Series que NO saltan porque NO TIENEN NI UN FOLIO (arrancarán en 1):');
     for (const etiqueta of plan.sinDatosConRegla) {
       p.push(`    · ${etiqueta}`);
     }

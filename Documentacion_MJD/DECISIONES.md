@@ -3949,6 +3949,11 @@ a la ÚLTIMA página, detrás de las ~7,978 migradas.
 
 ### Los folios arrancan en 10001
 
+> ⚠️ **SUPERSEDIDO por §Post-F9.233 (14-sep-2026): el arranque de OC quedó en 10000.** Lo de abajo se
+> conserva íntegro porque es lo que Daniel dijo el 20-ago y explica el porqué (el colchón desde la
+> 8082), pero **el número que manda es 10000**, que él mismo fijó el 25-ago (§Post-F9.118 (a),
+> *"empezamos en 10000… Déjalo como una regla"*) y **volvió a decir con esas palabras el 14-sep**.
+
 §Post-F9.36 punto 5 ya lo había decidido (*"me saltaría al siguiente escalón"*). Daniel fijó el número:
 *"el sistema anterior va en la **8082**. Tenemos mucho colchón antes de llegar a la 10001."*
 → **OC arranca en 10001.** ⬜ El escalón de **OP sigue sin número**.
@@ -15771,12 +15776,26 @@ arrancarían pegadas a lo que traiga la migración. Su respuesta fue ampliar el 
 | Serie | Arranque |
 |---|---|
 | Órdenes de producción (OP) | **6000** — número dado por Daniel |
-| Órdenes de compra (OC) | **10000** — ya decidido el 25-ago, confirmado ahora |
+| Órdenes de compra (OC) | **10000** — decidido el 25-ago (§Post-F9.118 (a)), confirmado ahora |
 | Pedidos internos | **siguiente millar** |
 | Notas de salida | **siguiente millar** |
 | Etapas de producción | **siguiente millar** |
 | Auditorías de calidad | **siguiente millar** |
 | Movimientos de cuenta corriente de terceros | **siguiente millar** |
+
+🔴 **EL RASTRO DEL NÚMERO DE LA OC, MEDIDO, PORQUE HAY DOS REGISTROS PREVIOS Y NO DICEN LO MISMO.**
+Al construir la fila 0.194 se buscaron mecánicamente todos los registros y salieron **dos**:
+
+| Dónde | Cuándo | Qué dice |
+|---|---|---|
+| §Post-F9.85, sub-sección *«Los folios arrancan en 10001»* (`DECISIONES.md:3950`) | **20-ago-2026** | **10001** — *"el sistema anterior va en la 8082. Tenemos mucho colchón antes de llegar a la 10001."* |
+| §Post-F9.118 (a) (`DECISIONES.md:5916`) | **25-ago-2026** | **10000** — *"Las órdenes de compra quedamos que en producción empezamos en 10000… Déjalo como una regla."* |
+
+**Manda el 10000**: es lo que Daniel dijo el 25-ago y lo que **repitió hoy**. La sub-sección del
+20-ago quedó marcada como **supersedida ahí mismo**, sin tocar sus palabras — quien la lea suelta
+(que es como se lee, buscando «10001») tiene que ver el aviso pegado a ella, no en otro documento.
+📌 *La primera redacción de esta tabla decía «ya decidido el 25-ago» y se quedaba corta: el número y
+la fecha eran correctos, pero callaba que existía un registro anterior con OTRO número.*
 
 **(a) La regla se programa como REGLA, no como siete números escritos a mano.** El día del ensayo el
 comando mira el máximo real de cada serie y sube al millar siguiente. Dos razones medidas: hoy nadie

@@ -399,10 +399,10 @@ describe('formatearEscalon', () => {
     });
   });
 
-  it('las series VACÍAS que no saltan se nombran: no se deducen de una ausencia', () => {
+  it('las series SIN NI UN FOLIO que no saltan se nombran: no se deducen de una ausencia', () => {
     const conVacias: Plan = { ...plan, sinDatosConRegla: ['notas de salida', 'auditorías'] };
     const texto = formatearEscalon(conVacias, false);
-    expect(texto).toContain('Series que NO saltan porque su tabla está VACÍA');
+    expect(texto).toContain('Series que NO saltan porque NO TIENEN NI UN FOLIO');
     expect(texto).toContain('notas de salida');
     expect(texto).toContain('auditorías');
     expect(texto).toContain('--empresa=<id>');
