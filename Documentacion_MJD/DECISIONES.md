@@ -15719,3 +15719,82 @@ RBAC. Queda alimentado por el catálogo nuevo.
 - **Aplica en:** versión **0.157**, fila **0.190**. **Fecha:** 2026-09-14.
 
 ---
+
+#### (Post-F9.232) — LA FACTURA DEL MAQUILERO SE COTEJA CONTRA EL DOCUMENTO QUE EMITE FR MODA, Y CUADRA AL PESO (fila 0.117)
+
+**Cómo salió.** La fila 0.117 llevaba semanas bloqueando la V1 esperando cuatro decisiones. El lead
+se las dio a Daniel juntas, cada una con su default propuesto (regla de §6: todas de una vez, no a
+gotas), y las contestó las cuatro de corrido el 14-sep-2026.
+
+**(a) ¿Contra qué se coteja?** — *«De acuerdo con el default»*: contra **el documento que FR Moda
+emite**, no contra los recibos sueltos. Es la consecuencia directa de lo que él ya había decidido en
+§Post-F9.186(k): *«nadie me factura si no le mando yo un documento con los datos con los que me tiene
+que facturar… no al revés»*. ⇒ El sistema no compara dos documentos nacidos por separado: compara
+**el que nosotros emitimos contra su copia**, que es justo lo que la fila 0.118 vino a simplificar.
+
+**(b) ¿Cuánta diferencia se tolera?** — *«Está bien con 1 peso de diferencia»*. ⚠️ **Se lee como UN
+PESO FIJO, sin porcentaje.** El default propuesto era 0,5 % con piso de un peso; **Daniel lo dejó más
+estricto**, y tiene sentido: si la factura sale del documento que emitimos nosotros, separarse más de
+un peso significa que algo no cuadra de verdad, no que se redondeó. El lead le dijo en el chat cómo
+lo estaba leyendo y no lo corrigió. 📌 **Si alguna vez aparece el matiz del porcentaje, se pregunta
+otra vez antes de programarlo: no se deduce.**
+
+**(c) ¿La factura que no cuadra entra o se rechaza?** — *«Ok, de acuerdo. Se queda en rojo hasta que
+atiendan el problema»*: **entra marcada, y no se puede pagar** mientras esté en rojo. Se prefirió a
+rechazarla porque la factura existe aunque esté mal, y un sistema que la escupe la manda a un Excel
+aparte — que es exactamente de lo que este módulo viene a sacar al negocio.
+
+**(d) ¿Una a una o por período?** — *«De acuerdo»* con el default: **como venga**. Una factura puede
+cubrir varias semanas de recibos, y puede haber varias facturas de una misma semana. Se coteja contra
+lo que cubra el documento emitido, sin forzar el uno a uno.
+
+🔑 **Lo que esto desbloquea:** la 0.117 era **la última fila de CÓDIGO que bloqueaba la V1**. Con
+estas cuatro respuestas ya se puede construir. Lo que sigue bloqueando el arranque son los repasos
+**0.096** (Inventarios) y **0.097** (Finanzas), que los recorre Daniel, y la **0.123**, que Gabriel
+decidió aparcar.
+
+- **Aplica en:** la fila **0.117** (y su simplificación, la 0.118). **Fecha:** 2026-09-14.
+
+---
+
+#### (Post-F9.233) — TODOS LOS FOLIOS SALTAN AL ARRANCAR, Y LA REGLA ES «EL SIGUIENTE MILLAR»
+
+**Cómo salió.** Al repasar qué faltaba decidir antes del arranque, el lead le presentó a Daniel las
+**siete** series de folio que el sistema lleva, midiendo cuáles podían saltar hoy (sólo dos) y cuáles
+arrancarían pegadas a lo que traiga la migración. Su respuesta fue ampliar el criterio a todas:
+
+> *«No… me gustaría hacer saltos en todos los conteos. Si quieres ubícate en el siguiente millar.
+> Ejemplo, una Nota de salida… si van en la 4804, ubícate en la 5000.»*
+
+**Las siete series y su arranque:**
+
+| Serie | Arranque |
+|---|---|
+| Órdenes de producción (OP) | **6000** — número dado por Daniel |
+| Órdenes de compra (OC) | **10000** — ya decidido el 25-ago, confirmado ahora |
+| Pedidos internos | **siguiente millar** |
+| Notas de salida | **siguiente millar** |
+| Etapas de producción | **siguiente millar** |
+| Auditorías de calidad | **siguiente millar** |
+| Movimientos de cuenta corriente de terceros | **siguiente millar** |
+
+**(a) La regla se programa como REGLA, no como siete números escritos a mano.** El día del ensayo el
+comando mira el máximo real de cada serie y sube al millar siguiente. Dos razones medidas: hoy nadie
+conoce esos máximos —sólo se sabrán al migrar—, y teclear a mano un número **por debajo** del máximo
+real es el error que arruinaría el arranque sin avisar. Los números explícitos de Daniel (6000 y
+10000) **mandan sobre la regla**. 📌 Y coinciden con ella: la decisión original decía *«si la última
+OP fuera 5.847 → arrancar en 6.000»*.
+
+**(b) El folio de ETAPAS es UNA SOLA serie, y sale impreso.** Medido al contestarle: el mismo
+contador numera **corte, envío a maquila, recibo de maquila y entrega a cliente**, y aparece en el
+papel del envío, el del recibo y el de la entrega ⇒ **lo tienen en la mano el maquilero y el
+cliente**. Por eso no es numeración interna y saltarlo tiene el mismo sentido que en las OC.
+
+🔴 **ES IRREVERSIBLE Y ES AHORA O NUNCA.** Los folios no se re-numeran: si se arranca con la
+numeración corrida, se queda así para siempre. Hoy `migracion/reparar-secuencias.ts` sólo sabe saltar
+en OP y OC ⇒ **falta construir las otras cinco y la regla del millar**, y esa ventana se cierra el
+día del go-live.
+
+- **Aplica en:** el go-live, y la fila **0.194** que nace de aquí. **Fecha:** 2026-09-14.
+
+---
