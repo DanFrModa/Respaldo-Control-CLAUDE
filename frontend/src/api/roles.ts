@@ -9,14 +9,14 @@ import {
 import type { paths } from './esquema.gen';
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
-import type { Rol } from './tipos';
+import type { Rol, RolOpcion } from './tipos';
 
 /**
  * Capa de datos de Roles (administración de roles y permisos, RBAC A4). Llama al
  * cliente TIPADO del OpenAPI, normaliza (`data` en éxito, `ErrorDeApi` con el
  * mensaje del backend en fallo) y expone consultas y mutaciones; las mutaciones
  * invalidan la caché de roles. CERO lógica de negocio: el backend valida, autoriza
- * (todas las rutas exigen `roles.administrar`), protege los roles de sistema y
+ * (casi todas las rutas exigen `roles.administrar`; `GET /api/roles/opciones` no), protege los roles de sistema y
  * aplica el candado anti-lockout (A1).
  *
  * `asignarPermisos` tiene semántica de REEMPLAZO: el conjunto enviado sustituye
@@ -43,6 +43,8 @@ export type PermisoCatalogo = ModuloPermisos['permisos'][number];
 
 /** Clave raiz de la cache de roles en TanStack Query. */
 export const CLAVE_ROLES = ['roles'] as const;
+/** Clave raiz de la cache del catálogo LIGERO de roles (id + nombre, para selectores). */
+export const CLAVE_ROLES_OPCIONES = [...CLAVE_ROLES, 'opciones'] as const;
 /** Clave raiz de la cache del catálogo de permisos. */
 export const CLAVE_PERMISOS = ['permisos'] as const;
 
@@ -51,6 +53,15 @@ export const CLAVE_PERMISOS = ['permisos'] as const;
 /** Pide la lista completa de roles (sin paginacion; catalogo corto). */
 async function listarRoles(): Promise<Rol[]> {
   const { data, error } = await api.GET('/api/roles');
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Pide la lista LIGERA de roles (id + nombre) para poblar un selector. */
+async function listarOpcionesRoles(): Promise<RolOpcion[]> {
+  const { data, error } = await api.GET('/api/roles/opciones');
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -116,6 +127,21 @@ export function useRoles(): UseQueryResult<Rol[], ErrorDeApi> {
   return useQuery({
     queryKey: [...CLAVE_ROLES, 'lista'],
     queryFn: listarRoles,
+  });
+}
+
+/**
+ * Lista los roles en forma MÍNIMA (id + nombre) para poblar un selector.
+ *
+ * ⭐ Fila 0.190: la usan las pantallas que sólo necesitan NOMBRAR roles —los responsables de un
+ * proceso de la Ruta Crítica, el filtro del concentrado—, porque `useRoles` pega a `GET /api/roles`,
+ * que exige `roles.administrar`: repartir una responsabilidad obligaba a llevar la llave maestra del
+ * RBAC. Esta consulta acepta también `rc.catalogo-ver` / `rc.ruta-ver`.
+ */
+export function useOpcionesRoles(): UseQueryResult<RolOpcion[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_ROLES_OPCIONES, 'lista'],
+    queryFn: listarOpcionesRoles,
   });
 }
 

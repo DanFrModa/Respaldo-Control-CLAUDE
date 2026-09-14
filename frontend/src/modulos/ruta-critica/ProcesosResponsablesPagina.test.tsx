@@ -30,7 +30,7 @@ vi.mock('@/api/ruta-critica', () => ({
 }));
 
 vi.mock('@/api/roles', () => ({
-  useRoles: () => ({ data: [], isPending: false }),
+  useOpcionesRoles: () => ({ data: [], isPending: false }),
 }));
 
 vi.mock('@/api/ruta-critica-plantillas', () => ({

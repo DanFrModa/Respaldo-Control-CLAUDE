@@ -30,7 +30,7 @@ vi.mock('@/api/ruta-critica', () => ({
 }));
 // El editor de roles lista los roles del RBAC; en estos tests no importan los datos reales.
 vi.mock('@/api/roles', () => ({
-  useRoles: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useOpcionesRoles: () => ({ data: [], isPending: false, isError: false, error: null }),
 }));
 
 function proceso(

@@ -2,7 +2,7 @@ import { FileSpreadsheet, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useRoles } from '@/api/roles';
+import { useOpcionesRoles } from '@/api/roles';
 import { useProcesosRc } from '@/api/ruta-critica';
 import { useConcentradoRc, urlConcentradoExcel } from '@/api/ruta-critica-programacion';
 import type { ConcentradoRcFila, ConcentradoRcProceso, ConcentradoRcQuery } from '@/api/tipos';
@@ -43,10 +43,12 @@ export function ConcentradoPagina(): React.JSX.Element {
   const [pagina, setPagina] = useState(1);
 
   // Catálogos para los selectores. Topan en porPagina 100 (el backend desplegado rechaza >100).
-  // Requieren permisos de catálogo/roles; si la sesión no los tiene, la consulta falla en silencio
-  // y simplemente NO se ofrece ese filtro (el tablero sigue funcionando sin él).
+  // El de roles va por `GET /api/roles/opciones` (id + nombre), que acepta `rc.ruta-ver` —el mismo
+  // permiso que abre este tablero— desde la fila 0.190; antes pedía `roles.administrar` y el filtro
+  // por responsable simplemente NO aparecía para quien no administrara el RBAC. Si alguna consulta
+  // falla, falla en silencio y no se ofrece ese filtro (el tablero sigue funcionando sin él).
   const procesos = useProcesosRc({ porPagina: 100 });
-  const roles = useRoles();
+  const roles = useOpcionesRoles();
 
   const query: ConcentradoRcQuery = {
     pagina,

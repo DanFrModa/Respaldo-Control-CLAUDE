@@ -18,7 +18,7 @@ import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -385,6 +385,52 @@ export async function obtenerRol(
     throw new ErrorNoEncontrado('Rol', id);
   }
   return aDto(rol);
+}
+
+/** Rol en su forma MÍNIMA: lo único que necesita un selector de roles. */
+export interface RolOpcionDto {
+  id: number;
+  nombre: string;
+}
+
+/**
+ * ⭐ Reja de lectura del CATÁLOGO de roles (id + nombre), fila 0.190.
+ *
+ * Pasa con `roles.administrar` (quien gobierna el RBAC) **o** con `rc.catalogo-ver` / `rc.ruta-ver`
+ * (quien opera la Ruta Crítica). Sigue siendo deny-by-default (A4): sin ninguno de los tres, 403.
+ *
+ * 🔑 POR QUÉ SE ABRE, Y POR QUÉ ESTO NO ENSANCHA NADA. Configurar los responsables de un proceso de
+ * la RC exigía `roles.administrar` sólo porque el selector se poblaba de `GET /api/roles` — o sea,
+ * para repartir una responsabilidad había que llevar **la llave maestra del sistema**. Es
+ * exactamente el *«tener A implica B»* que Daniel señaló en la fila 0.120 (§Post-F9.230), pero atado
+ * al revés: no era el permiso el que regalaba poder, era la pantalla la que pedía de más.
+ *
+ * Y lo que sale por aquí ya lo veía quien tiene esos permisos: `GET /ruta-critica/procesos`
+ * (`rc.catalogo-ver`) devuelve `roles: [{ idRol, nombre }]` de cada proceso, y
+ * `GET /ruta-critica/ordenes/:id/ruta` (`rc.ruta-ver`) devuelve `rolesResponsables`. Los NOMBRES de
+ * los roles ya están en sus pantallas; lo que NO sale por aquí —y sigue bajo `roles.administrar`—
+ * es `clavesPermisos` y `totalUsuarios`, que es lo único de gobierno que tiene un rol.
+ */
+export function exigirVerOpcionesRoles(sesion: SesionUsuario): void {
+  if (tienePermiso(sesion, 'roles.administrar') || tienePermiso(sesion, 'rc.catalogo-ver')) {
+    return;
+  }
+  verificarPermiso(sesion, 'rc.ruta-ver');
+}
+
+/**
+ * Lista los roles en forma MÍNIMA (id + nombre), ordenados por nombre, para poblar un selector.
+ * Misma fuente y mismo orden que `listarRoles`, sin el mapa de permisos ni el conteo de usuarios.
+ */
+export async function listarOpcionesRoles(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+): Promise<RolOpcionDto[]> {
+  exigirVerOpcionesRoles(sesion);
+  return clienteLectura(bd).rol.findMany({
+    select: { id: true, nombre: true },
+    orderBy: { nombre: 'asc' },
+  });
 }
 
 /**

@@ -15663,3 +15663,47 @@ la pantalla de Roles.
 - **Aplica en:** versión **0.147**, fila **0.120**. **Fecha:** 2026-09-11.
 
 ---
+
+#### (Post-F9.231) — VER LOS NOMBRES DE LOS ROLES NO ES ADMINISTRAR LOS ROLES (fila 0.190)
+
+**Qué se decidió.** La lista de roles se parte en dos, y cada mitad tiene su reja:
+
+- **`GET /api/roles` — el listado de GOBIERNO.** Devuelve, de cada rol, `clavesPermisos` (su mapa de
+  poder entero) y `totalUsuarios` (a cuánta gente alcanza). **Sigue exigiendo `roles.administrar`**,
+  sin cambio alguno.
+- **`GET /api/roles/opciones` — el CATÁLOGO para poblar un selector.** Devuelve **sólo `id` y
+  `nombre`**, y acepta `roles.administrar` **o** `rc.catalogo-ver` **o** `rc.ruta-ver`.
+
+**Por qué.** Para decir *quién responde por un proceso de la Ruta Crítica* había que poder
+**administrar el RBAC entero**, porque el selector de roles del editor se poblaba del listado de
+gobierno. Es la queja de Daniel de §Post-F9.230 —*«puede haber alguien que tenga el permiso A pero no
+el B»*— **atada al revés**: no era un permiso que regalara poder de más, era una pantalla que pedía
+de más. Y muerde justo el día del reparto: la 0.120 acababa de fabricar cuatro interruptores para que
+él los repartiera, y éste se los habría atado otra vez a la llave maestra.
+
+> ### 🔑 POR QUÉ UN ENDPOINT NUEVO Y NO AFLOJARLE EL PERMISO AL QUE YA EXISTÍA
+>
+> Las dos salidas estaban sobre la mesa. Se midió antes de elegir:
+> - **El listado de gobierno tiene MÁS consumidores que la RC**: la pantalla de Roles y el selector
+>   del alta de Usuarios. Aflojarle el permiso habría abierto `clavesPermisos` y `totalUsuarios`
+>   —**lo único que un rol tiene de gobierno**— a todo el que pueda abrir la Ruta Crítica, o sea a
+>   medio organigrama. Es el defecto de la 0.120 repetido con otro nombre.
+> - **La puerta nueva, en cambio, no enseña nada que esos permisos no vieran ya.** Medido contra el
+>   árbol: `GET /ruta-critica/procesos` (`rc.catalogo-ver`) ya devuelve `roles: [{ idRol, nombre }]`
+>   de cada proceso, y `GET /ruta-critica/ordenes/:id/ruta` (`rc.ruta-ver`) ya devuelve
+>   `rolesResponsables`. Los nombres **ya estaban en sus pantallas**; lo único que cambia es de qué
+>   endpoint los toma el selector.
+>
+> ⚠️ **Y lo que NO cambia:** guardar responsables sigue exigiendo `rc.catalogo-administrar`. Lo que se
+> destrabó es **ver la lista para elegir**, no la facultad de fijarla.
+
+**SIN permiso nuevo, SIN migración, SIN semilla**: se reusan tres claves que ya existen, así que no
+hay casillas nuevas en la pantalla de Roles ni nada que activar en el despliegue.
+
+📌 **De paso, y por ser la misma puerta:** el filtro *«responsable»* del concentrado de la RC bebía
+del mismo listado de gobierno y por eso **desaparecía en silencio** para quien no administrara el
+RBAC. Queda alimentado por el catálogo nuevo.
+
+- **Aplica en:** versión **0.157**, fila **0.190**. **Fecha:** 2026-09-14.
+
+---

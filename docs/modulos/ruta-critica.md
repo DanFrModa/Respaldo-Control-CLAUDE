@@ -79,6 +79,12 @@ del plan y el **ETL del histórico**.
   colgar de `roles.administrar` y tienen llave propia: **`rc.capturar-cualquiera`** y
   **`rc.bandeja-completa`**. Son DOS porque ver todo y capturar por otros son facultades separables;
   el badge «tú» de la ruta por orden sigue a la PRIMERA (es la misma pregunta que la captura).
+  ⭐ **Fila 0.190:** el selector de ROLES RESPONSABLES del catálogo ya no se puebla de
+  `GET /api/roles` (que exige `roles.administrar`, o sea la llave maestra del RBAC) sino del catálogo
+  ligero **`GET /api/roles/opciones`** — sólo id + nombre, aceptado con `rc.catalogo-ver` o
+  `rc.ruta-ver`. Configurar responsables deja de exigir administrar el sistema de permisos entero, y
+  el filtro por responsable del **Concentrado** —que antes desaparecía en silencio— ya aparece. Sin
+  permiso nuevo (§Post-F9.231).
 - **Frontend** `frontend/src/modulos/ruta-critica/` — catálogo de procesos (DAG, roles, checklists),
   plantillas, reglas de duración, configuración (calendario), **Programar RC**, **Bandeja de tareas**
   (PC+móvil, captura Hoy/Ayer, checklist), **RC por orden** (timeline planeado-vs-real + quién

@@ -790,6 +790,15 @@ export type RolesLista =
 /** Un rol tal como lo devuelve el API. */
 export type Rol = RolesLista[number];
 
+/**
+ * Lista LIGERA de roles (`GET /api/roles/opciones`) — sólo id + nombre, para poblar un selector.
+ * A diferencia de `GET /api/roles`, NO exige `roles.administrar` (fila 0.190).
+ */
+export type RolesOpcionesLista =
+  paths['/api/roles/opciones']['get']['responses']['200']['content']['application/json'];
+/** Un rol en forma mínima (id + nombre). */
+export type RolOpcion = RolesOpcionesLista[number];
+
 // ── Administracion F1-E1: Empresas ────────────────────────────────────────────
 // OJO: lista SIN paginacion (array plano, favorita primero), `id` = int y el flag
 // se llama `activa` (femenino). Todas las rutas exigen `empresas.administrar`.

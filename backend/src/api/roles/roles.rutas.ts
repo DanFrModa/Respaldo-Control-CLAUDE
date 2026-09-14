@@ -10,10 +10,16 @@
  * negocio aquí; el dominio reaplica el permiso, valida contra el catálogo
  * tipado, abre transacción, protege los roles de sistema y audita (A7).
  *
- * ⚠️ TODAS las rutas se protegen con `roles.administrar`: es la MISMA clave que
- * verifica el dominio (regla "el guard de la ruta usa la clave del dominio").
+ * ⚠️ Casi todas las rutas se protegen con `roles.administrar`: es la MISMA clave
+ * que verifica el dominio (regla "el guard de la ruta usa la clave del dominio").
  * En el seed, quien administra usuarios también tiene `roles.administrar`, así
  * que el selector de rol del alta de usuarios sigue funcionando.
+ *
+ * ⭐ LA EXCEPCIÓN, y está argumentada: `GET /roles/opciones` (fila 0.190) devuelve
+ * sólo id + nombre y acepta además `rc.catalogo-ver` / `rc.ruta-ver`, para que
+ * configurar los responsables de un proceso de la Ruta Crítica no obligue a
+ * llevar la llave maestra del RBAC. También ahí el guard de la ruta usa la misma
+ * reja que el dominio (`exigirVerOpcionesRoles`).
  *
  * Los roles son pocos: el listado es un arreglo (sin paginación), como el dominio.
  */
@@ -26,6 +32,7 @@ import {
   esquemaCatalogoPermisosSalida,
   esquemaCrearRolBody,
   esquemaErrorApi,
+  esquemaRolOpcionSalida,
   esquemaRolSalida,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -35,6 +42,7 @@ import {
   asignarPermisos,
   crearRol,
   eliminarRol,
+  listarOpcionesRoles,
   listarRoles,
   obtenerRol,
   type RolDto,
@@ -98,6 +106,29 @@ export const rutasRoles: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const roles = await listarRoles(sesion);
       return roles.map(aRolSalida);
+    },
+  });
+
+  // ── Catálogo LIGERO para selectores (id + nombre) ─────────────────────────
+  // ⭐ Fila 0.190: poblar el selector de "roles responsables" de un proceso de la Ruta Crítica NO
+  // debe exigir la llave maestra del RBAC. Esta ruta devuelve sólo id + nombre y acepta CUALQUIERA
+  // de los tres permisos que de verdad la necesitan; el dominio reaplica la MISMA reja
+  // (`exigirVerOpcionesRoles`), que es donde está argumentado por qué no ensancha nada.
+  // Se registra ANTES de `/roles/:id` por legibilidad (el router de Fastify da prioridad al
+  // segmento estático de todos modos).
+  app.route({
+    method: 'GET',
+    url: '/roles/opciones',
+    preHandler: app.conAlgunPermiso('roles.administrar', 'rc.catalogo-ver', 'rc.ruta-ver'),
+    schema: {
+      tags: ['roles'],
+      summary: 'Listar roles en forma mínima (id + nombre) para selectores',
+      security: SEGURIDAD_SESION,
+      response: { 200: z.array(esquemaRolOpcionSalida), ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarOpcionesRoles(sesion);
     },
   });
 
