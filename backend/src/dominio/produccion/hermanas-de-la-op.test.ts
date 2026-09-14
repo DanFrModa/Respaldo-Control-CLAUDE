@@ -484,6 +484,35 @@ describe('el COMPLEMENTO de la tela — el cárdigan que acompaña a la felpa', 
     expect(r.get(2)?.diferencias).toEqual([]);
   });
 
+  it('🔴🔴 EL GUARDIA, EN EL TEXTO: la fila se marca POR EL CUERPO y el complemento inerte NO se cuela', () => {
+    /*
+     * ⭐⭐ **Ésta es la prueba que faltaba, y cubre el agujero exacto por el que el defecto de la
+     * primera versión volvía por la puerta de atrás.** El guardia vive en DOS sitios
+     * —{@link firmaDelComplemento} y {@link conElComplemento}— y las otras pruebas del bloque sólo
+     * llegan al primero: cuando el complemento inerte es la ÚNICA razón por la que la fila podría
+     * marcarse, la firma calla y **el texto nunca se pinta**, así que quitarle el guardia al texto
+     * pasaba desapercibido con la suite entera en verde.
+     *
+     * 🔴 **Basta con que la fila se marque POR OTRO MOTIVO** —aquí el consumo del CUERPO, que es el
+     * caso más común de todos— para que el texto sí se componga. Sin el guardia en `conElComplemento`
+     * salía, medido:
+     *
+     *     «Felpa»: esta OP lleva 1.2 + 0.15 de complemento · OP 5002 lleva 2 + 0.4 de complemento.
+     *
+     * o sea, la palabra genérica inventada sobre una tela cuyo catálogo YA NO declara complemento, y
+     * con dos cifras que no se compran, ni se costean, ni se imprimen, ni se pueden editar en la
+     * pantalla de la receta. El detalle tiene que salir **pelado**.
+     */
+    const r = compararConHermanas([
+      op(1, [tela(7, 1.2, { nombre: 'Felpa', complemento: 0.15, nombreComplemento: null })]),
+      op(2, [tela(7, 2, { nombre: 'Felpa', complemento: 0.4, nombreComplemento: null })]),
+    ]);
+    // Se marca —el cuerpo SÍ difiere—, pero sólo por el cuerpo.
+    expect(r.get(1)?.diferencias[0]).toMatchObject({ que: 'cantidad', tipo: 'tela' });
+    expect(r.get(1)?.diferencias[0]?.detalle).toBe('«Felpa»: esta OP lleva 1.2 · OP 5002 lleva 2.');
+    expect(r.get(2)?.diferencias[0]?.detalle).toBe('«Felpa»: esta OP lleva 2 · OP 5001 lleva 1.2.');
+  });
+
   it('🔴 …y en cuanto el catálogo VUELVE a declararlo, el aviso habla (el silencio no es permanente)', () => {
     // El control del control: las mismas dos recetas, con el catálogo declarando el complemento.
     const r = compararConHermanas([
