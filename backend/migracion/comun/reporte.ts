@@ -24,6 +24,17 @@ export interface SeccionReporte {
 export class Reporte {
   private readonly secciones = new Map<string, SeccionReporte>();
   private readonly notas: string[] = [];
+  /**
+   * Título que encabeza el volcado. Por defecto el de la migración de Access,
+   * que es de donde nació esta clase y lo que esperan los ETL existentes; un
+   * script que NO sea esa migración pasa el suyo, para no anunciarse como algo
+   * que no es (el sembrador de datos ficticios decía «MIGRACIÓN F1-E6»).
+   */
+  private readonly titulo: string;
+
+  constructor(titulo = 'REPORTE DE LA MIGRACIÓN F1-E6 — incidencias para decisión') {
+    this.titulo = titulo;
+  }
 
   /** Agrega un renglón de detalle a una sección (la crea si no existe). */
   agregar(titulo: string, renglon: string): void {
@@ -65,7 +76,7 @@ export class Reporte {
   aTexto(): string {
     const partes: string[] = [];
     partes.push('═══════════════════════════════════════════════════════════════');
-    partes.push(' REPORTE DE LA MIGRACIÓN F1-E6 — incidencias para decisión');
+    partes.push(` ${this.titulo}`);
     partes.push('═══════════════════════════════════════════════════════════════');
     if (this.notas.length > 0) {
       partes.push('');
