@@ -180,7 +180,7 @@ export async function ejecutar(cliente: PrismaClient): Promise<number> {
     // conservan—, no un conteo aparte que después no cuadra: eso daba falsa tranquilidad.
     console.log(
       'Se borraría exactamente esto:',
-      JSON.stringify(planDeLimpieza(conjunto, ocupados), null, 2),
+      JSON.stringify(await planDeLimpieza(cliente, conjunto, ocupados), null, 2),
     );
     for (const o of ocupados) {
       console.log(

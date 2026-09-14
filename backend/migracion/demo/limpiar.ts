@@ -310,10 +310,23 @@ export async function almacenesOcupados(
 }
 
 /** Lo que se borraría, tabla por tabla (para el ensayo en seco: exactamente lo que se va a borrar). */
-export function planDeLimpieza(
+export async function planDeLimpieza(
+  cliente: PrismaClient,
   c: ConjuntoDemo,
-  ocupados: { nombre: string; motivo: string }[] = [],
-): ResultadoLimpieza {
+  ocupados: { id: number; nombre: string; motivo: string }[] = [],
+): Promise<ResultadoLimpieza> {
+  // Los renglones de mapeo que se van son TODOS los `Demo:*` menos la marca de los almacenes que se
+  // conservan. Se cuenta de verdad: prometer «exactamente lo que se va a borrar» y luego enseñar un
+  // 0 fijo es la clase de falsa tranquilidad que este ensayo en seco existe para no dar.
+  const totalMapeos = await cliente.mapeoMigracion.count({
+    where: { entidad: { in: Object.values(ENTIDAD_DEMO) } },
+  });
+  const marcasConservadas = await cliente.mapeoMigracion.count({
+    where: {
+      entidad: ENTIDAD_DEMO.almacen,
+      idNuevo: { in: ocupados.map((o) => String(o.id)) },
+    },
+  });
   return {
     movimientosTercero: c.movimientosTercero.length,
     recepciones: c.recepciones.length,
@@ -327,7 +340,7 @@ export function planDeLimpieza(
     almacenes: c.almacenes.length - ocupados.length,
     almacenesConservados: ocupados.map((o) => `${o.nombre} (${o.motivo})`),
     direcciones: c.direcciones.length,
-    mapeos: 0,
+    mapeos: totalMapeos - marcasConservadas,
   };
 }
 
@@ -343,6 +356,7 @@ export async function limpiarDemoInventarios(cliente: PrismaClient): Promise<Res
   // Los almacenes que guardan cosas de verdad NO se borran: se desactivan (ver `almacenesOcupados`).
   const ocupados = await almacenesOcupados(cliente, c);
   const idsOcupados = new Set(ocupados.map((o) => o.id));
+  const idsConservadosTexto = ocupados.map((o) => String(o.id));
   const almacenesABorrar = c.almacenes.filter((id) => !idsOcupados.has(id));
 
   // Los DERIVADOS (inversos de cancelación, correcciones) apuntan a su original con RESTRICT: van
@@ -390,8 +404,16 @@ export async function limpiarDemoInventarios(cliente: PrismaClient): Promise<Res
       });
     }
     const dir = await tx.direccionEntrega.deleteMany({ where: { id: { in: c.direcciones } } });
+    // 🔑 EL ALMACÉN QUE SE CONSERVA, CONSERVA SU MARCA. Se borra todo el mapeo `Demo:*` MENOS la
+    // fila `Demo:Almacen` de los almacenes que acabamos de decidir NO borrar. Quitársela los dejaba
+    // huérfanos: la siguiente siembra chocaba contra el unique del nombre ("Ya existe un almacén
+    // llamado …, está desactivado") **después de haber escrito**, dejando la base a medio sembrar y
+    // repitiendo el error en cada reintento; y un `--limpiar` posterior ya no los encontraba nunca.
     const map = await tx.mapeoMigracion.deleteMany({
-      where: { entidad: { in: Object.values(ENTIDAD_DEMO) } },
+      where: {
+        entidad: { in: Object.values(ENTIDAD_DEMO) },
+        NOT: { entidad: ENTIDAD_DEMO.almacen, idNuevo: { in: idsConservadosTexto } },
+      },
     });
     return {
       movimientosTercero: mt1.count + mt2.count,

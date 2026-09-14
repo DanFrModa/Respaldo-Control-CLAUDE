@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import type { PrismaClient } from '../../src/datos/index.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 
-import { crearAlmacen } from '../../src/dominio/admin/almacenes.js';
+import { crearAlmacen, reactivarAlmacen } from '../../src/dominio/admin/almacenes.js';
 import { crearAvio } from '../../src/dominio/catalogos/avios.js';
 import { crearDireccionEntrega } from '../../src/dominio/catalogos/direcciones-entrega.js';
 import { crearProveedor } from '../../src/dominio/catalogos/proveedores.js';
@@ -323,7 +323,19 @@ export async function sembrarDemoInventarios(
         cliente,
         ENTIDAD_DEMO.almacen,
         alm.clave,
-        async (id) => (await cliente.almacen.count({ where: { id } })) > 0,
+        // ⭐ Un `--limpiar` anterior pudo dejar este almacén DESACTIVADO en vez de borrarlo (porque
+        // guardaba material que no es de este script, ver `demo/limpiar.ts`). Ahí sigue, con su
+        // marca puesta: se REACTIVA y se reusa. Intentar crear otro con el mismo nombre chocaría
+        // con el unique del catálogo y dejaría la siembra a medias.
+        async (id) => {
+          const fila = await cliente.almacen.findUnique({
+            where: { id },
+            select: { activo: true },
+          });
+          if (fila === null) return false;
+          if (!fila.activo) await reactivarAlmacen(sesion, id);
+          return true;
+        },
         async () =>
           (
             await crearAlmacen(sesion, {
