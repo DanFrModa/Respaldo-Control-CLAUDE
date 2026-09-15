@@ -4,13 +4,17 @@
  *
  * Catálogo administrable por seed (los 19 tipos con su dirección); en F3-E1 solo se EXPONE para
  * que las pantallas de movimientos de E3 lo listen. No hay alta/edición por API todavía (el ABM
- * fino se difiere, mismo criterio que otros catálogos selector). Permiso `inventario-pt.ver`.
+ * fino se difiere, mismo criterio que otros catálogos selector).
+ *
+ * Permiso: `inventario-pt.ver` **O** `inventario-telas.ver` **O** `inventario-avios.ver`
+ * (ver {@link exigirVerTiposMovimiento}).
  */
 import { DIRECCIONES_MOVIMIENTO } from '../../contrato/index.js';
 import type { Prisma, TipoMovimientoInventario } from '../../datos/index.js';
 import { z } from 'zod';
 
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { ErrorPermiso } from '../../comun/errores.js';
+import { tienePermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { tipoEsCapturableAMano } from './tipos-reservados.js';
@@ -44,6 +48,38 @@ export const esquemaListarTiposMovimiento = z.object({
 export type ParametrosListarTiposMovimiento = z.input<typeof esquemaListarTiposMovimiento>;
 
 /**
+ * ⭐ Fila 0.193 — LA REJA DEL CATÁLOGO ACEPTA LAS **TRES** LLAVES DE INVENTARIO, igual que su ruta.
+ *
+ * `TipoMovimientoInventario` es un catálogo **GLOBAL**: uno solo para PT, telas y avíos (lo dice
+ * `tipos-reservados.ts` en su encabezado, y el modelo no tiene columna que lo parta por tipo de
+ * inventario). Sus tres pantallas consumidoras lo necesitan entero: «Movimientos de PT» lo pinta en
+ * el desplegable, y los dos AJUSTES de material (`AjusteTelaColorPagina`, `AjusteMaterialesPagina`)
+ * lo leen para resolver `ajuste-entrada`/`ajuste-salida` **por código**. O sea que no hay «lo suyo»
+ * que devolverle a cada quien: el conjunto correcto es el mismo para los tres.
+ *
+ * El defecto que cierra esta fila: la ruta abría con `conAlgunPermiso` de las tres claves y el
+ * dominio reaplicaba **sólo** `inventario-pt.ver` ⇒ quien llevara únicamente la de telas o la de
+ * avíos **pasaba la puerta y chocaba con un 403 adentro**, y sus pantallas de ajuste se quedaban sin
+ * poder resolver el tipo. Es la fila 0.190 al revés y en el mismo sitio (allí la reja pedía de más);
+ * las dos sólo muerden el día que los permisos se repartan de verdad — hoy los perfiles del seed
+ * llevan las tres.
+ *
+ * Misma forma que `exigirVerOpcionesRoles` (`dominio/admin/roles.ts`, fila 0.190): se acepta
+ * por cualquiera de las claves y, si no hay ninguna, se niega nombrando **una** —deny-by-default de
+ * A4, con el 403 saliendo del DOMINIO (A1), no del `preHandler`.
+ */
+export function exigirVerTiposMovimiento(sesion: SesionUsuario): void {
+  if (
+    tienePermiso(sesion, 'inventario-pt.ver') ||
+    tienePermiso(sesion, 'inventario-telas.ver') ||
+    tienePermiso(sesion, 'inventario-avios.ver')
+  ) {
+    return;
+  }
+  throw new ErrorPermiso(undefined, 'inventario-pt.ver');
+}
+
+/**
  * Lista los tipos de movimiento de inventario (lista simple ordenada por id, como el viejo
  * IPT_TiposMov). Por defecto solo activos; opcionalmente filtra por dirección.
  */
@@ -52,7 +88,7 @@ export async function listarTiposMovimiento(
   parametros: ParametrosListarTiposMovimiento = {},
   bd?: ContextoBd,
 ): Promise<TipoMovimientoConCaptura[]> {
-  verificarPermiso(sesion, 'inventario-pt.ver');
+  exigirVerTiposMovimiento(sesion);
   const filtros = validarEntrada(esquemaListarTiposMovimiento, parametros);
 
   const where: Prisma.TipoMovimientoInventarioWhereInput = {
