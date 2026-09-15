@@ -482,7 +482,10 @@ export async function registrarEntregaCliente(
     return entrega.id;
   }, bd);
 
-  const salida = await obtenerEntrega(sesion, idEntrega, bd);
+  // ⭐ Fila 0.196: el ECO va por `proyectarEntrega` (sin reja de consulta). Con `obtenerEntrega`,
+  // quien lleva `produccion.entrega` pero no `produccion.wip-ver` recibía un 403 con la entrega YA
+  // escrita (salida de PT incluida) y encima sin publicar su evento.
+  const salida = await proyectarEntrega(sesion, idEntrega, bd);
   dispararPublicacion();
   return salida;
 }
@@ -573,16 +576,51 @@ export async function cancelarEntregaCliente(
   }, bd);
 
   dispararPublicacion();
-  return obtenerEntrega(sesion, idEntrega, bd);
+  // ⭐ Fila 0.196: el ECO va por `proyectarEntrega` (sin reja de consulta), como en el alta.
+  return proyectarEntrega(sesion, idEntrega, bd);
 }
 
-/** Obtiene una entrega (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
+/**
+ * Obtiene una entrega (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
+ *
+ * Es la CONSULTA suelta: quien no lleve `produccion.wip-ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarEntrega} (ver su nota).
+ */
 export async function obtenerEntrega(
   sesion: SesionUsuario,
   idEntrega: number,
   bd?: ContextoBd,
 ): Promise<EntregaClienteSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
+  return proyectarEntrega(sesion, idEntrega, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de una entrega SIN reja de consulta propia (fila 0.196).
+ *
+ * Gemela de `proyectarEtapa` (`etapas.ts`) y `proyectarRecibo` (`recibos.ts`), y por la MISMA razón:
+ * es el cuerpo de {@link obtenerEntrega} —mismo scope por empresa activa (A9 → 404), mismo filtro por
+ * `tipo = entrega_cliente`— pero SIN `verificarPermiso('produccion.wip-ver')`, porque sirve para UN
+ * solo uso: **devolverle a quien acaba de capturar la entrega lo que acaba de dejar escrito**. La
+ * autorización ya la hizo la escritura (`produccion.entrega` / `produccion.cancelar`).
+ *
+ * 🔑 **Su particularidad frente a las otras dos proyectoras: NO lleva `opciones`.** La entrega no
+ * tiene `precioPactado` que redactar (no se le paga a un maquilero: sale mercancía al cliente), así
+ * que su firma es de tres parámetros y `aEntregaSalida` no recibe bandera alguna. Se conserva tal
+ * cual: no hay nada que parametrizar aquí.
+ *
+ * 🔴 Y muerde igual de fuerte que el recibo: la entrega da salida de PT al kardex y publica su
+ * evento de outbox, con el `dispararPublicacion()` DESPUÉS de esta proyección. Con la reja puesta,
+ * el 403 llegaba con el inventario YA descontado; reintentar sacaba la mercancía DOS veces.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerEntrega}, que sí exige `produccion.wip-ver`.
+ */
+export async function proyectarEntrega(
+  sesion: SesionUsuario,
+  idEntrega: number,
+  bd?: ContextoBd,
+): Promise<EntregaClienteSalida> {
   const entrega = await clienteLectura(bd).etapaMovimiento.findFirst({
     where: {
       id: idEntrega,

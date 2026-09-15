@@ -24,7 +24,7 @@ import type {
   Talla,
   TipoProceso,
 } from '../../datos/index.js';
-import { ErrorConflicto } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -32,6 +32,8 @@ import type { ClavePermiso } from '../../contrato/index.js';
 import {
   cancelarEntregaCliente,
   listarEntregasOrden,
+  obtenerEntrega,
+  proyectarEntrega,
   registrarEntregaCliente,
   seguimientoEntregaOrden,
 } from './entregas-cliente.js';
@@ -541,5 +543,90 @@ describe('Entrega a cliente de una orden CON packs (§Post-F9.10)', () => {
         bd(),
       ),
     ).resolves.toBeTruthy();
+  });
+});
+
+/**
+ * ⭐ Fila 0.196 — el ECO de una escritura propia NO vuelve a pedir la llave de CONSULTA.
+ *
+ * Tercera gemela (con `proyectarEtapa` y `proyectarRecibo`): `registrarEntregaCliente` y
+ * `cancelarEntregaCliente` abrían con SU permiso, movían el kardex de PT y publicaban su evento, y
+ * DESPUÉS proyectaban con `obtenerEntrega`, que exige `produccion.wip-ver` ⇒ 403 con la mercancía ya
+ * descontada del almacén. Recapturar sacaba el género DOS veces.
+ *
+ * 🔑 La particularidad de esta proyectora: NO lleva `opciones`. La entrega no tiene `precioPactado`
+ * que redactar (sale mercancía al cliente, no se le paga a un maquilero), así que su firma es de
+ * tres parámetros — y se conserva tal cual.
+ */
+describe('proyectarEntrega — el eco de una escritura propia (fila 0.196)', () => {
+  it('`obtenerEntrega` niega sin `produccion.wip-ver`; `proyectarEntrega` proyecta igual', async () => {
+    await meterAInventario(10);
+    const entrega = await entregar(6);
+
+    const capturista = sesion(['produccion.entrega']);
+    await expect(obtenerEntrega(capturista, entrega.id, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    const eco = await proyectarEntrega(capturista, entrega.id, bd());
+    expect(eco.id).toBe(entrega.id);
+    expect(eco.totalPiezas).toBe(6);
+  });
+
+  it('`proyectarEntrega` conserva el scope por empresa activa (A9): una entrega ajena "no existe"', async () => {
+    await meterAInventario(10);
+    const entrega = await entregar(6);
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA (eco entregas)');
+    const ajena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: ['produccion.entrega'] });
+    await expect(proyectarEntrega(ajena, entrega.id, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('🔴 quien ENTREGA sin `produccion.wip-ver` recibe su entrega, y lo contestado es lo escrito', async () => {
+    await meterAInventario(10);
+
+    const capturista = sesion(['produccion.entrega']);
+    const entrega = await registrarEntregaCliente(
+      capturista,
+      {
+        idOrden,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
+      },
+      bd(),
+    );
+
+    expect(entrega.totalPiezas).toBe(6);
+    const fila = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: entrega.id },
+      include: { detalles: true },
+    });
+    expect(Number(fila.folio)).toBe(entrega.folio);
+    expect(fila.detalles.reduce((s, d) => s + d.cantidad, 0)).toBe(entrega.totalPiezas);
+    // Y la existencia bajó UNA vez: el 403 empujaba a recapturar y sacaba el género dos veces.
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(4);
+    const entregas = await cliente.etapaMovimiento.count({
+      where: { idOrden, tipo: 'entrega_cliente' },
+    });
+    expect(entregas).toBe(1);
+  });
+
+  it('🔴 quien CANCELA sin `produccion.wip-ver` recibe la entrega cancelada (inverso auditado, D3)', async () => {
+    await meterAInventario(10);
+    const entrega = await entregar(6);
+
+    const cancelada = await cancelarEntregaCliente(
+      sesion(['produccion.cancelar']),
+      entrega.id,
+      { motivo: 'el cliente no la recibió' },
+      bd(),
+    );
+
+    expect(cancelada.cancelado).toBe(true);
+    expect(cancelada.motivoCancelacion).toBe('el cliente no la recibió');
+    // El inverso ya corrió: la existencia volvió a 10 (D3: nunca se edita ni se borra).
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(10);
   });
 });
