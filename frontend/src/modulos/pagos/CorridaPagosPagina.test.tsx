@@ -151,6 +151,8 @@ const detalle: CorridaDetalle = {
     },
   ],
   bloqueos: [],
+  // Fila 0.117: lo que impide EJECUTAR (facturas en rojo sin atender). Vacío = nada que frene.
+  bloqueosEjecucion: [],
 };
 
 /** La relación ejecutable tal como la manda el servidor (sólo lo que lleva monto). */
@@ -357,6 +359,51 @@ describe('⭐ la guarda fiscal', () => {
   it('sin bloqueos, cerrar está disponible', () => {
     pintar();
     expect(screen.getByTestId('corrida-cerrar')).toBeEnabled();
+  });
+});
+
+describe('⭐ la factura que no cuadra frena el pago (fila 0.117)', () => {
+  /** La misma corrida, pero CERRADA: es el único estado en el que existe el botón de ejecutar. */
+  const cerrada = {
+    ...detalle,
+    corrida: { ...detalle.corrida, estado: 'cerrada' as const },
+  };
+
+  it('el bloqueo de ejecución sale CON EL NOMBRE del proveedor', () => {
+    estado.detalle = {
+      data: {
+        ...cerrada,
+        bloqueosEjecucion: [
+          { nombre: 'TALLER NORTE', motivo: 'Su factura 44 no cuadra con los documentos.' },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    };
+    pintar();
+    const aviso = screen.getByTestId('corrida-bloqueos-ejecucion');
+    expect(within(aviso).getByText('TALLER NORTE')).toBeInTheDocument();
+  });
+
+  it('…y no deja marcar la corrida como pagada', () => {
+    estado.detalle = {
+      data: {
+        ...cerrada,
+        bloqueosEjecucion: [
+          { nombre: 'TALLER NORTE', motivo: 'Su factura 44 no cuadra con los documentos.' },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    };
+    pintar();
+    expect(screen.getByTestId('corrida-ejecutar')).toBeDisabled();
+  });
+
+  it('sin facturas en rojo, marcar como pagada está disponible', () => {
+    estado.detalle = { data: cerrada, isPending: false, isError: false };
+    pintar();
+    expect(screen.getByTestId('corrida-ejecutar')).toBeEnabled();
   });
 });
 

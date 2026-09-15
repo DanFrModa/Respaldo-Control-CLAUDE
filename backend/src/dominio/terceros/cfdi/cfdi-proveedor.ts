@@ -293,7 +293,13 @@ export async function importarCfdi(
   // activa (A9). Que la OC sea de OTRO proveedor NO es un simple aviso: ligar el cargo a la OC ajena
   // descuadraría la conciliación de CxP → ErrorValidacion (ANTES de escribir/subir). Sin liga, solo avisa.
   if (datos.refTipo === undefined) {
-    avisos.push('El cargo se registró SIN ligarse a una OC/recepción.');
+    // ⭐ FILA 0.117 — ésta es justo la factura que se coteja contra el DOCUMENTO que le emitimos
+    // (maquila, servicios): sin OC de por medio, lo que la respalda es nuestro documento de pago.
+    avisos.push(
+      'El cargo se registró SIN ligarse a una orden de compra: entra al COTEJO contra los ' +
+        'documentos que le emitimos. Hasta que se le liguen los documentos que cubre, queda en ' +
+        'rojo y a ese proveedor no se le puede ejecutar la relación con factura.',
+    );
   } else if (datos.refTipo === 'orden-compra' && datos.refId !== undefined) {
     const oc = await cliente.ordenCompra.findFirst({
       where: { id: datos.refId, idEmpresa },

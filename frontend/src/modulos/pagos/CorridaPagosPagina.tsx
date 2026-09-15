@@ -98,6 +98,9 @@ export function CorridaPagosPagina(): React.JSX.Element {
   const editable = puedeArmar && enBorrador;
   const ocupado = guardar.isPending || quitar.isPending || cerrar.isPending || ejecutar.isPending;
   const bloqueos = detalle.data?.bloqueos ?? [];
+  // ⭐ FILA 0.117 — lo que impide EJECUTAR: facturas en rojo sin atender. Es OTRA lista que la de
+  // cerrar (aquéllos se arreglan capturando una cuenta fiscal; éstos, en el cotejo de CxP).
+  const bloqueosEjecucion = detalle.data?.bloqueosEjecucion ?? [];
 
   function abrirCorrida(): void {
     crear.mutate(
@@ -296,7 +299,7 @@ export function CorridaPagosPagina(): React.JSX.Element {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={ocupado}
+                        disabled={ocupado || bloqueosEjecucion.length > 0}
                         onClick={() => setConfirmandoEjecutar(true)}
                         data-testid="corrida-ejecutar"
                       >
@@ -321,6 +324,27 @@ export function CorridaPagosPagina(): React.JSX.Element {
                   <ul className="mt-1 list-disc pl-6 text-muted-foreground">
                     {bloqueos.map((b) => (
                       <li key={`${b.nombre}-${b.motivo}`}>
+                        <strong>{b.nombre}</strong> — {b.motivo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* ⭐ FILA 0.117 — la factura que no cuadra frena el pago (§Post-F9.232 (c)). */}
+              {bloqueosEjecucion.length > 0 ? (
+                <div
+                  role="alert"
+                  className="rounded-md border border-crit/40 bg-crit/5 p-3 text-sm"
+                  data-testid="corrida-bloqueos-ejecucion"
+                >
+                  <p className="flex items-center gap-2 font-medium text-crit">
+                    <AlertTriangle className="size-4" />
+                    No se puede pagar todavía: hay facturas que no cuadran
+                  </p>
+                  <ul className="mt-1 list-disc pl-6 text-muted-foreground">
+                    {bloqueosEjecucion.map((b) => (
+                      <li key={`ejec-${b.nombre}-${b.motivo}`}>
                         <strong>{b.nombre}</strong> — {b.motivo}
                       </li>
                     ))}

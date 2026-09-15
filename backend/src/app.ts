@@ -71,6 +71,7 @@ import { rutasCxp } from './api/terceros/cxp.rutas.js';
 import { rutasConceptosPago } from './api/pagos/conceptos-pago.rutas.js';
 import { rutasCorridaPagos } from './api/pagos/corrida.rutas.js';
 import { rutasCfdi } from './api/terceros/cfdi.rutas.js';
+import { rutasCotejo } from './api/terceros/cotejo.rutas.js';
 import { rutasCxc } from './api/terceros/cxc.rutas.js';
 import { rutasCfdiVentas } from './api/terceros/cfdi-ventas.rutas.js';
 import { rutasReportesFiscales } from './api/terceros/reportes-fiscales.rutas.js';
@@ -332,6 +333,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // previsualización con conciliación (proveedor por RFC + OC por total cercano) e importación
   // transaccional (XML en R2 + cargo FISCAL de CxP por el total del CFDI). Reusa cxp.administrar.
   await app.register(rutasCfdi, { prefix: '/api' });
+  // El cotejo de la factura contra el documento que emitimos (fila 0.117).
+  await app.register(rutasCotejo, { prefix: '/api' });
   // FINANZAS (Módulo 14, F9-E4) — CxC: cuentas por cobrar de clientes (uso del motor de terceros,
   // espejo de CxP): bandeja "por cobrar" con antigüedad de saldos (aging server-side), estado de cuenta
   // (+ PDF) y captura/cancelación de movimientos (cxc.ver / cxc.administrar; la vista fiscal exige

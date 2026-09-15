@@ -58,6 +58,7 @@ import {
   MENSAJE_SIN_CAMBIOS,
   resolverCambios,
 } from '../finanzas/correccion-comun.js';
+import { recalcularCotejo } from '../pagos/cotejo.js';
 import { sumarPlazo } from './aging-comun.js';
 import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { resolverEsFiscalMotor } from './segmento-motor.js';
@@ -283,6 +284,13 @@ export async function registrarMovimientoTerceroInterno(
       },
       include: incluirTercero,
     });
+
+    // ⭐ FILA 0.117 — el veredicto del COTEJO nace CON el movimiento, en la misma transacción (A2).
+    // Va aquí, en el motor, y no en cada llamador: la factura de un proveedor entra por el
+    // importador de CFDI, por la captura a mano de CxP y por el ETL, y las tres tienen que quedar
+    // igual. Una factura sin OC y sin ninguna liga a documentos no cuadra con nada ⇒ nace en ROJO,
+    // que es la decisión (c) (entra marcada, no se rechaza). A lo que no se coteja no le hace nada.
+    await recalcularCotejo(tx, fila.id);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'MovimientoTercero',

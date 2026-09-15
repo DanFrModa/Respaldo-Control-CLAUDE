@@ -329,6 +329,24 @@ export const esquemaCorridaDetalleSalida = z
         }),
       )
       .describe('Renglones que impiden cerrar, con su nombre y el porqué.'),
+    /**
+     * ⭐ Lo que impide EJECUTAR (fila 0.117, §Post-F9.232 (c)): los proveedores con una factura EN
+     * ROJO —que no cuadra con los documentos que les emitimos— y sin atender. Vacío = se puede
+     * ejecutar.
+     *
+     * Va en su propia lista y no mezclado con `bloqueos` porque son dos momentos distintos: aquéllos
+     * frenan el CIERRE y se arreglan capturando una cuenta; éstos frenan el PAGO y se arreglan en
+     * Cuentas por pagar › Cotejo. Mezclarlos haría que la pantalla dijera «no puedes cerrar» de algo
+     * que sí se puede cerrar.
+     */
+    bloqueosEjecucion: z
+      .array(
+        z.object({
+          nombre: z.string(),
+          motivo: z.string(),
+        }),
+      )
+      .describe('Proveedores con una factura en rojo sin atender, que impiden ejecutar.'),
   })
   .describe('La pantalla de trabajo de una corrida de pagos.');
 

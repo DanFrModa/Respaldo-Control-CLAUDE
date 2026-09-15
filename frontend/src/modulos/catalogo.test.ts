@@ -74,8 +74,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // por ninguna OP, §Post-F9.193 resp. 12); −1 en la fila 0.170: se RETIRÓ «Salida a orden por
     // lote (legado)», la última captura del flujo viejo —grababa renglones SIN color y la pantalla
     // de existencias vigente no los enseña, así que descontaba tela que nadie veía moverse; su
-    // ruta quedó como redirección a la salida por color. Lo que cambia es SOLO qué se ve en el riel.
-    expect(MODULOS_MENU).toHaveLength(109);
+    // ruta quedó como redirección a la salida por color. Lo que cambia es SOLO qué se ve en el riel;
+    // +1 en la fila 0.117: «Cotejo de facturas», la factura del proveedor contra el documento que le
+    // emitimos (§Post-F9.232).
+    expect(MODULOS_MENU).toHaveLength(110);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -395,6 +397,8 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
         { clave: 'corrida-pagos', padre: false },
         { clave: 'cxc', padre: false },
         { clave: 'cxp', padre: false },
+        // Fila 0.117: el cotejo de la factura contra el documento que emitimos (gate `cxp.ver`).
+        { clave: 'cotejo-facturas', padre: false },
         { clave: 'reportes-fiscales', padre: false }, // F9-E5: reporte del contador (gate terceros.fiscal)
         { clave: 'esma', padre: false }, // desviación interina (F9): hoja directa, NO desplegable
       ],

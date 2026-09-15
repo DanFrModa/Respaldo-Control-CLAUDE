@@ -104,6 +104,65 @@ no). Quedó **una**, en `dominio/esma/formula-saldo.ts`: `whereSegmentoFactura` 
 que es `NOT NULL`. ⚠️ Efecto visible: los movimientos migrados sin el dato **entran** ahora al lado «sin
 factura» del estado de cuenta y del tablero.
 
+## 7-bis. ⭐ El COTEJO: la factura contra el documento que emitimos (fila 0.117, §Post-F9.232)
+
+Daniel revisaba a mano la factura de cada maquilero contra lo que le había mandado. El sistema tenía
+las dos mitades —importa los CFDI (F9-E3) y emite el documento para facturar (0.118)— y **no las
+unía**. Esta pieza las une.
+
+**El documento emitido por fin tiene identidad.** No nace ninguna tabla: el `RenglonCorridaPago` YA
+es el documento. Lo que le faltaba era NÚMERO, y ahora lo tiene — `folioDocumento`, la **octava
+serie** de folios del sistema (clave `documento-facturacion`, §Post-F9.233). Se reparte **al CERRAR**
+la corrida, con un solo `reservarBloqueFolios` (A3) y en el **orden de la relación**
+(`compararEnOrdenDeLaRelacion`), para que el folio más chico sea la primera hoja del fajo. Sólo lo
+reciben los renglones de una corrida **CON factura**, **con monto** y que **no** son un concepto del
+catálogo. Sale impreso en grande y la hoja le pide al proveedor que lo cite en su factura.
+⚠️ **No entra en el escalón del arranque** (`migracion/reparar-secuencias.ts`): las **siete** series
+de §Post-F9.233 saltan al siguiente millar porque vienen con pasado del sistema viejo, y ésta **nace
+en cero** el día del go-live — no hay de qué saltar. Si alguna vez se quiere, se pregunta primero.
+⚠️ El renglón gana también `idEmpresa` (copiada de la corrida): sin ella no hay dónde colgar el
+`UNIQUE (empresa, folio de documento)`, porque el folio se numera por empresa (A9/A3).
+
+**A quién le toca cotejo:** la **factura de un proveedor** (`origen = factura_proveedor`) que **NO va
+ligada a una operación de compra** (`refTipo IS NULL`). Ésa es la que nace contra un documento que
+nosotros emitimos. La ligada a una OC se coteja contra la OC, como siempre; un pago, un abono o una
+nota de crédito no se cotejan contra nada. La regla vive en UN sitio (`sujetaACotejo`).
+
+**La liga es una TABLA, no un `refTipo`.** La decisión (d) —*«como venga»*— descarta el 1:1 de forma
+explícita: una factura puede cubrir varios documentos y varias facturas pueden repartirse uno solo.
+`CotejoFacturaDocumento` (mismo patrón que `PagoAplicacion`) guarda el importe cubierto de cada
+documento. Es **la única vía**: no se dejó además el `refTipo` como segundo mecanismo para lo mismo.
+
+**El rojo vive en la FACTURA, no en la liga** (`MovimientoTercero.estadoCotejo`), porque el descuadre
+más común es la factura **sin ninguna liga** y una marca en la liga no tendría dónde ponerse. El
+veredicto es mecánico y se **recalcula** en la misma transacción cada vez que cambian las ligas; la
+decisión humana va aparte (`cotejoAtendidoEn` / `PorId` / `cotejoNota`) para que recalcular no borre
+en silencio el acto de una persona (D3/A7).
+
+**La tolerancia es UN PESO FIJO, en un solo módulo** (`dominio/pagos/cotejo-tolerancia.ts`). Daniel:
+*«está bien con 1 peso de diferencia»* — el default propuesto era 0.5 % con piso de un peso y él lo
+dejó más estricto. 🔴 **Prohibido deducir un porcentaje**: la decisión lo dice con todas sus letras.
+Los dos lados comparados son el **total CON IVA** (el que imprime el documento y el que trae el CFDI).
+
+**El bloqueo muerde al EJECUTAR**, con el patrón de `bloqueosDeCierre`: se publica en el detalle como
+`bloqueosEjecucion` para que la pantalla lo pinte, y se vuelve a consultar dentro de la transacción de
+`ejecutarCorrida` para lanzar nombrando al proveedor y el folio de su factura. **Sólo en la relación
+CON factura**: la SIN factura es otro reparto de dinero y no tiene facturas de por medio.
+
+**El veredicto nace en el MOTOR** (`terceros/cuenta-terceros.ts::registrarMovimientoTercero`) y no en
+el importador de CFDI, para que la factura importada, la del ETL y cualquier alta futura queden
+igual. ⚠️ Lo que el ETL de apertura carga por `createMany` (`terceros/migracion.ts`) **no** pasa por
+ahí y entra sin veredicto — y así debe ser: el histórico no se pone en rojo (REGLA 0-B).
+
+**Permisos: ninguno nuevo.** Leer con `cxp.ver`, ligar y atender con `cxp.administrar`
+(§Post-F9.190: cero casillas nuevas en Roles, cero seed). Pantalla: **Finanzas › Cotejo de facturas**
+(`frontend/src/modulos/cxp/CotejoFacturasPagina.tsx`). Migración aditiva
+`20260914130000_la_factura_contra_lo_que_emitimos`.
+
+⚠️ **Lo que NO alcanza, dicho a propósito:** las corridas cerradas **antes** de esta fila no tienen
+folio de documento, así que sus renglones no se pueden ligar (el dominio lo rechaza nombrándolo) y su
+impreso sigue rotulado con el folio de la corrida. No se rellena nada hacia atrás (REGLA 0-B).
+
 ## 8. Permisos y despliegue
 
 | Permiso | Quién (seed) | Para qué |
@@ -123,12 +182,15 @@ base y contrato, ya no se captura ni se muestra (deuda con nombre en `HOJA-DE-RU
 ## 9. Fuera de alcance (con fila)
 
 Cotejo contra el banco (**0.126**) · IVA explícito (**0.118**) · corte y empaque (**0.114**) · libro de caja
-chica (**0.127**) · cancelación de pagos de maquila (sin fila aún; §4).
+chica (**0.127**) · cancelación de pagos de maquila (sin fila aún; §4). El cotejo de la factura contra
+el documento emitido **ya NO está fuera de alcance**: entró con la fila **0.117** (§7-bis).
 
 ## 10. Dónde está el código
 
 `backend/src/dominio/pagos/` (corrida, ejecución, concentrado) · `backend/src/dominio/catalogos/conceptos-pago*.ts`
 y `cuentas-pago-reglas.ts` · `backend/src/dominio/esma/pagos.ts::crearPagoACuentaMaquilero` ·
-`backend/src/api/pagos/` · `backend/src/contrato/esquemas/corrida-pago.ts` · `frontend/src/modulos/pagos/`
+`backend/src/dominio/pagos/cotejo.ts` + `cotejo-tolerancia.ts` · `backend/src/api/pagos/` y
+`backend/src/api/terceros/cotejo.rutas.ts` · `backend/src/contrato/esquemas/corrida-pago.ts` y
+`cotejo-factura.ts` · `frontend/src/modulos/cxp/CotejoFacturasPagina.tsx` · `frontend/src/modulos/pagos/`
 (`CorridaPagosPagina`, `RelacionEjecutable`, `ConfirmarEjecutar`, `ConceptosPagoPagina`) ·
 `frontend/e2e/corrida-pagos.spec.ts`.

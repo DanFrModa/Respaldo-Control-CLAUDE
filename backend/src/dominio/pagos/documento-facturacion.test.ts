@@ -51,6 +51,7 @@ const RENGLON: RenglonParaFacturar = {
   monto: 11_600,
   rubro: 'maquila',
   nombre: 'TALLER EJEMPLO UNO',
+  folioDocumento: 1001,
   concepto: 'Maquila de la semana',
   referencia: '7909 y 7888',
 };

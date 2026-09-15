@@ -2035,6 +2035,33 @@ export type AjusteCiclico =
 /** Un artículo que se movió entre el alta y el cierre de la hoja (decisión 6). */
 export type CiclicoArticuloMovido = NonNullable<AjusteCiclico['aviso']>['articulos'][number];
 
+// ── El COTEJO de la factura contra el documento que emitimos (fila 0.117) ─────
+
+/** Bandeja del cotejo (`GET /api/cxp/cotejo`). */
+export type BandejaCotejo =
+  paths['/api/cxp/cotejo']['get']['responses']['200']['content']['application/json'];
+/** Una factura sujeta a cotejo, con su veredicto y sus ligas. */
+export type FacturaCotejo = BandejaCotejo['facturas'][number];
+/** Lo que una factura cubre de un documento emitido. */
+export type AplicacionCotejo = FacturaCotejo['aplicaciones'][number];
+/** Parámetros de la bandeja del cotejo (querystring). */
+export type BandejaCotejoQuery = NonNullable<
+  paths['/api/cxp/cotejo']['get']['parameters']['query']
+>;
+
+/** Documentos emitidos a un proveedor (`GET /api/cxp/cotejo/documentos/{idProveedor}`). */
+export type DocumentosEmitidos =
+  paths['/api/cxp/cotejo/documentos/{idProveedor}']['get']['responses']['200']['content']['application/json'];
+/** Un documento emitido, con lo que le falta por cubrir. */
+export type DocumentoEmitido = DocumentosEmitidos['documentos'][number];
+
+/** Cuerpo de «qué documentos cubre esta factura» (`PUT /api/cxp/cotejo/{id}/documentos`). */
+export type CotejoAplicarCuerpo =
+  paths['/api/cxp/cotejo/{id}/documentos']['put']['requestBody']['content']['application/json'];
+/** Cuerpo de «atender el descuadre» (`POST /api/cxp/cotejo/{id}/atender`). */
+export type CotejoAtenderCuerpo =
+  paths['/api/cxp/cotejo/{id}/atender']['post']['requestBody']['content']['application/json'];
+
 // ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2) ──────────────────
 
 /** Bandeja "por pagar" con aging + resumen (`GET /api/cxp/por-pagar`). */

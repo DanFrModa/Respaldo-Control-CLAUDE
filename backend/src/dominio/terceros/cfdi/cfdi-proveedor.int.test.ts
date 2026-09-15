@@ -162,7 +162,22 @@ describe('importarCfdi (factura I)', () => {
       xml: construirCfdi({ uuid: 'A0000000-0000-0000-0000-000000000002' }),
       idProveedor: proveedor.id,
     });
-    expect(res.avisos.some((a) => /SIN ligarse a una OC/i.test(a))).toBe(true);
+    // Desde la fila 0.117 el aviso dice ADEMÁS que esa factura entra al COTEJO contra los
+    // documentos que le emitimos (§Post-F9.232): sin OC de por medio, lo que la respalda es
+    // nuestro documento de pago.
+    expect(res.avisos.some((a) => /SIN ligarse a una orden de compra/i.test(a))).toBe(true);
+  });
+
+  it('⭐ …y esa factura nace EN ROJO: no cuadra con ningún documento emitido (fila 0.117)', async () => {
+    const res = await importar({
+      xml: construirCfdi({ uuid: 'A0000000-0000-0000-0000-00000000000B' }),
+      idProveedor: proveedor.id,
+    });
+    const enBase = await cliente.movimientoTercero.findUnique({
+      where: { id: res.movimiento.id },
+      select: { estadoCotejo: true },
+    });
+    expect(enBase?.estadoCotejo).toBe('descuadre');
   });
 
   it('liga la OC elegida (refTipo/refId)', async () => {
