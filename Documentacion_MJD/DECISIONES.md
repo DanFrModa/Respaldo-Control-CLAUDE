@@ -15836,14 +15836,21 @@ mergeada así, y el efecto que se documentó en el historial —que quien captur
 ser un efecto tolerado a ser **lo que Daniel quiere**.
 
 **(b) Y dice algo más grande, que es lo que hay que anotar: `rc.ruta-ver` es un permiso AMPLIO.** No
-es una llave de mando, es una ventana. **Medido**: los seis perfiles de negocio del seed ya lo llevan
-—y lo llevan como *«Default del lead — Daniel confirma»*, así que esta respuesta **confirma ese
-default** en vez de cambiarlo.
+es una llave de mando, es una ventana. **Medido ejecutando los roles del seed**: de los nueve, **ocho llevan `rc.ruta-ver`** — los dos de
+acceso total y los seis de negocio; el noveno, `Basico`, nace sin ningún permiso. ⚠️ **CORREGIDO el
+15-sep, el mismo día:** la primera redacción decía que lo llevaban marcados como *«Default del lead
+— Daniel confirma»* y **era falso** — ese comentario existe una sola vez en el seed y anota
+`ordenes.cerrar`, no esto. El lead lo dedujo de un barrido que devolvía «el comentario más cercano
+hacia arriba», que es precisamente la clase de medición que este repo tiene prohibida. La respuesta
+de Daniel **fija** el criterio; no confirma ningún default previo.
 
-🔑 **Por qué importa más allá de la fila:** el reparto de permisos del arranque es la fecha en la que
-se disparan cuatro filas de la familia «escribir y luego negar» (0.195 ✅, 0.196, 0.197, 0.198). Un
-permiso que **todos** llevan no puede faltarle a nadie ⇒ **por el lado de Ruta Crítica, esa familia
-deja de poder dispararse**. Los sitios de producción **no**, porque proyectan con
+🔑 **Por qué importa más allá de la fila — y con la razón correcta, no la que se escribió primero:**
+por el lado de Ruta Crítica esa familia **ya no se puede disparar, y no por el reparto sino porque la
+0.195 la quitó del código**: `proyectarRutaOrden` no comprueba permiso y `obtenerRutaOrden` conserva
+su reja. Lo que añade la respuesta de Daniel es que **el permiso se repartirá a todos**, lo que quita
+también el motivo. ⚠️ **No al revés:** de una intención de reparto no se sigue una garantía, porque el
+código resuelve los permisos como **unión plana de roles, sin jerarquía** (`comun/permisos.ts`) y de
+hecho `Basico` no lleva ninguno. Los sitios de producción siguen en pie: proyectan con
 `produccion.wip-ver`, que es otro permiso y otra decisión.
 
 - **Aplica en:** la fila **0.195** (confirmada), el reparto de permisos del arranque, y la
