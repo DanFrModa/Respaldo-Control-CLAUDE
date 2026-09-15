@@ -135,6 +135,9 @@ async function exigirOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<
  * Lista los hitos VIVOS (no cancelados) de una orden (`rc.ruta-ver`), en orden estable (por tipo,
  * luego id). A9: verifica que la orden sea de la empresa activa. La UI muestra un renglón por tipo de
  * hito, con su hito vivo (si existe) o "pendiente".
+ *
+ * Es la CONSULTA suelta: quien no lleve `rc.ruta-ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarHitosOrden} (ver su nota).
  */
 export async function listarHitosOrden(
   sesion: SesionUsuario,
@@ -142,6 +145,34 @@ export async function listarHitosOrden(
   bd?: ContextoBd,
 ): Promise<HitosOrdenSalida> {
   verificarPermiso(sesion, 'rc.ruta-ver');
+  return proyectarHitosOrden(sesion, idOrden, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de los hitos vivos de una orden SIN reja de consulta propia (fila 0.195).
+ *
+ * Gemela de `proyectarRutaOrden` (`rutaOrden.ts`) y por la MISMA razón: es el cuerpo de
+ * {@link listarHitosOrden} —mismo scope por empresa activa (A9 → 404), misma forma de salida— pero
+ * SIN `verificarPermiso('rc.ruta-ver')`, porque sirve para UN solo uso: **devolverle a quien acaba
+ * de escribir el estado que acaba de dejar**. La autorización de esa llamada ya la hizo la escritura
+ * (`rc.capturar`); volver a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta
+ * fila.
+ *
+ * 🔴 **Y aquí era PEOR que en la ruta**, por eso entró en la misma ronda: cuando el 403 saltaba, el
+ * hito ya estaba escrito **y su evento de outbox ya se había publicado** (`dispararPublicacion()`),
+ * así que el auto-avance del proceso de la RC **ya había ocurrido**. Quien lo reintentaba —lo natural
+ * al leer «no tienes permiso»— se llevaba encima un **409 «la orden ya tiene un hito vivo de este
+ * tipo»**: dos mensajes falsos seguidos sobre un trabajo que sí se hizo. En cancelar, igual:
+ * `canceladoEn` sellado mientras la pantalla decía que no hubo permiso.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link listarHitosOrden}, que sí exige `rc.ruta-ver`.
+ */
+export async function proyectarHitosOrden(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<HitosOrdenSalida> {
   const idEmpresa = sesion.idEmpresaActiva;
   const cliente = clienteLectura(bd);
   const orden = await cliente.orden.findFirst({
@@ -253,7 +284,10 @@ export async function registrarHito(
   }
 
   dispararPublicacion();
-  return listarHitosOrden(sesion, idOrden, bd);
+  // ⭐ Fila 0.195: el ECO va por `proyectarHitosOrden` (sin reja de consulta). Con `listarHitosOrden`
+  // aquí, quien lleva `rc.capturar` y no `rc.ruta-ver` ya tenía el hito escrito Y su evento
+  // publicado, y aun así recibía un 403 — y al reintentar, un 409 de duplicado encima.
+  return proyectarHitosOrden(sesion, idOrden, bd);
 }
 
 /**
@@ -313,5 +347,7 @@ export async function cancelarHito(
   }, bd);
 
   dispararPublicacion();
-  return listarHitosOrden(sesion, idOrden, bd);
+  // ⭐ Fila 0.195: mismo caso que el registro — el eco no vuelve a pedir `rc.ruta-ver`. Aquí el 403
+  // llegaba con `canceladoEn` ya sellado (D3), o sea con la cancelación hecha.
+  return proyectarHitosOrden(sesion, idOrden, bd);
 }

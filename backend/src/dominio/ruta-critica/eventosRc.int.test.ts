@@ -13,7 +13,7 @@ import type {
   Tela,
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
@@ -22,7 +22,12 @@ import { autorizarOC, cancelarOC, crearOC, desautorizarOC } from '../compras/ord
 import { cancelarNotaSalida, confirmarNotaSalida, crearNotaSalida } from '../notas/notas-salida.js';
 import { capturarResultado, crearAuditoria } from '../calidad/auditorias.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
-import { cancelarHito, listarHitosOrden, registrarHito } from './hitosOrden.js';
+import {
+  cancelarHito,
+  listarHitosOrden,
+  proyectarHitosOrden,
+  registrarHito,
+} from './hitosOrden.js';
 import { procesarEventoAutoAvance } from './autoAvance.js';
 
 /**
@@ -338,6 +343,37 @@ describe('hitos de la orden (post-F9)', () => {
     r = await renglon(idRuta);
     expect(r.estado).not.toBe('completado');
     expect(r.fechaReal).toBeNull();
+  });
+
+  /**
+   * ⭐ Fila 0.195 — el ECO de una escritura propia NO vuelve a pedir la llave de consulta.
+   *
+   * Es la mitad de DOMINIO de la reja: la de ruta la miden las pruebas de
+   * `api/ruta-critica/captura-sin-ver.int.test.ts`, pero ahí el 403 del `GET .../hitos` lo da el
+   * `preHandler`, así que **no mediría** que `listarHitosOrden` conserva su `verificarPermiso`. Aquí
+   * sí: la MISMA sesión, la MISMA orden, la consulta suelta niega y el eco proyecta.
+   */
+  it('`listarHitosOrden` niega sin `rc.ruta-ver`; `proyectarHitosOrden` proyecta igual', async () => {
+    await registrarHito(sesion(), idOrden, { tipo: 'fit' }, bd());
+
+    const capturista = sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['rc.capturar'],
+    });
+    await expect(listarHitosOrden(capturista, idOrden, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    const hitos = await proyectarHitosOrden(capturista, idOrden, bd());
+    expect(hitos.map((h) => h.tipo)).toContain('fit');
+  });
+
+  /** El eco conserva el scope por empresa activa (A9): una orden ajena "no existe" (404). */
+  it('`proyectarHitosOrden` conserva el scope por empresa activa (A9)', async () => {
+    await registrarHito(sesion(), idOrden, { tipo: 'fit' }, bd());
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA (hitos)');
+    const ajena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: ['rc.capturar'] });
+    await expect(proyectarHitosOrden(ajena, idOrden, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
   });
 
   it('registrar dos veces el mismo hito vivo es ErrorConflicto', async () => {

@@ -2,7 +2,8 @@
  * ⭐ Pruebas de integración de la REJA de la CAPTURA de la Ruta Crítica (fila 0.195).
  *
  * Lo que aquí se mide es UNA frase: **lo que el sistema le contesta a quien captura dice lo mismo
- * que lo que quedó escrito**. Hasta esta fila los dos `PUT` de captura abrían con `rc.capturar`,
+ * que lo que quedó escrito** — en los CINCO sitios de la Ruta Crítica que escribían y luego negaban:
+ * los dos `PUT` de captura, el `POST` de secuencia de estampado y los dos `POST` de HITOS. Hasta esta fila los dos `PUT` de captura abrían con `rc.capturar`,
  * escribían (transacción cerrada, bitácora puesta) y DESPUÉS proyectaban la respuesta con
  * `obtenerRutaOrden`, que exige `rc.ruta-ver` ⇒ quien llevara la llave de capturar pero no la de
  * consultar recibía un **403 con la captura ya guardada**. El usuario leía «no tienes permiso»,
@@ -35,6 +36,7 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { registrarManejadorErrores } from '../errores.js';
 import { rutasProgramacionRc } from './programacion.rutas.js';
+import { rutasHitosRc } from './hitos.rutas.js';
 import { registrarAuth } from '../../auth/plugin.js';
 import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -45,6 +47,12 @@ let app: FastifyInstance;
 let idEmpresa: number;
 
 const PASSWORD = 'Control.2026!';
+
+/** Forma (parcial) de un hito tal como sale por el API. */
+interface HitoSalida {
+  id: number;
+  tipo: string;
+}
 
 /** Forma (parcial) de la ruta tal como sale por el API. */
 interface RutaSalida {
@@ -210,6 +218,7 @@ beforeAll(async () => {
   registrarManejadorErrores(instancia);
   registrarAuth(instancia, {});
   await instancia.register(rutasProgramacionRc, { prefix: '/api' });
+  await instancia.register(rutasHitosRc, { prefix: '/api' });
   await instancia.ready();
   app = instancia;
 });
@@ -342,5 +351,78 @@ describe('POST /api/ruta-critica/ordenes/:id/secuencia-estampado — el tercer s
       select: { secEstampadoElegido: true },
     });
     expect(orden.secEstampadoElegido).toBe('despues');
+  });
+});
+
+describe('POST /api/ruta-critica/ordenes/:id/hitos — el cuarto y el quinto sitio (fila 0.195)', () => {
+  it('registrar un hito SIN `rc.ruta-ver` responde 200 con el hito, no 403 con el hito ya escrito', async () => {
+    const idRol = await crearUsuarioCon('capturista', ['rc.capturar']);
+    const { idOrden } = await crearOrdenConProceso(idRol);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/ruta-critica/ordenes/${String(idOrden)}/hitos`,
+      headers: { cookie: await cookieDe('capturista') },
+      payload: { tipo: 'fit' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    // La invariante: lo contestado dice lo mismo que lo escrito. Antes de la fila esto daba 403
+    // CON el hito en la base Y su evento de outbox ya publicado (el auto-avance ya había ocurrido),
+    // y el reintento natural se llevaba encima un 409 de duplicado.
+    const contestados = res.json<HitoSalida[]>();
+    const enBase = await cliente.hitoOrden.findMany({
+      where: { idOrden, canceladoEn: null },
+      select: { id: true, tipo: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(enBase).toHaveLength(1);
+    expect(contestados.map((h) => h.id)).toEqual(enBase.map((h) => h.id));
+    expect(contestados[0]?.tipo).toBe('fit');
+  });
+
+  it('cancelar un hito SIN `rc.ruta-ver` responde 200 y la lista contestada ya no lo trae', async () => {
+    const idRol = await crearUsuarioCon('capturista', ['rc.capturar']);
+    const { idOrden } = await crearOrdenConProceso(idRol);
+    const cookie = await cookieDe('capturista');
+
+    const alta = await app.inject({
+      method: 'POST',
+      url: `/api/ruta-critica/ordenes/${String(idOrden)}/hitos`,
+      headers: { cookie },
+      payload: { tipo: 'fit' },
+    });
+    expect(alta.statusCode).toBe(200);
+    const idHito = alta.json<HitoSalida[]>()[0]?.id ?? 0;
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/ruta-critica/ordenes/${String(idOrden)}/hitos/${String(idHito)}/cancelar`,
+      headers: { cookie },
+      payload: { motivo: 'Se capturó por error' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Antes de la fila: 403 con `canceladoEn` YA sellado (D3) — la pantalla decía que no hubo
+    // permiso y la cancelación estaba hecha. Ahora lo contestado y lo escrito coinciden.
+    expect(res.json<HitoSalida[]>()).toHaveLength(0);
+    const hito = await cliente.hitoOrden.findUniqueOrThrow({
+      where: { id: idHito },
+      select: { canceladoEn: true },
+    });
+    expect(hito.canceladoEn).not.toBeNull();
+  });
+
+  it('`rc.ruta-ver` sigue cerrando el `GET .../hitos` para ese mismo capturista', async () => {
+    const idRol = await crearUsuarioCon('capturista', ['rc.capturar']);
+    const { idOrden } = await crearOrdenConProceso(idRol);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/ruta-critica/ordenes/${String(idOrden)}/hitos`,
+      headers: { cookie: await cookieDe('capturista') },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json<{ codigo: string }>().codigo).toBe('PERMISO');
   });
 });
