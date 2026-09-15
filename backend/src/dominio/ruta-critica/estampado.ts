@@ -27,7 +27,7 @@ import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion
 
 import { activarProcesosListos } from './cumplimiento.js';
 import { construirGrafoSucesores, esAlcanzable } from './grafo.js';
-import { encolarRecalculo, obtenerRutaOrden, type RutaOrdenDto } from './rutaOrden.js';
+import { encolarRecalculo, proyectarRutaOrden, type RutaOrdenDto } from './rutaOrden.js';
 
 /** Datos para elegir la secuencia de estampado de una orden FLEXIBLE. */
 export interface DatosElegirSecuenciaEstampado {
@@ -184,5 +184,9 @@ export async function elegirSecuenciaEstampado(
   // Tras el commit: re-fecha la ruta en segundo plano (mismo patrón que generar/ajustar; la
   // respuesta NO espera al CPM — el panel mostrará "recalculando" hasta que el job termine).
   await encolarRecalculo(datos.idOrden, idEmpresa, 'ajustar');
-  return obtenerRutaOrden(sesion, datos.idOrden, bd);
+  // ⭐ Fila 0.195: el ECO de esta escritura va por `proyectarRutaOrden` (sin reja de consulta),
+  // NO por `obtenerRutaOrden`. Con ésta, quien reprograma con `rc.programar` pero sin
+  // `rc.ruta-ver` ya había GUARDADO la secuencia y se llevaba un 403 al proyectar la respuesta.
+  // Es el mismo patrón de `generarRutaOrden`/`ajustarRutaOrden`, las otras dos de `rc.programar`.
+  return proyectarRutaOrden(sesion, datos.idOrden, bd);
 }

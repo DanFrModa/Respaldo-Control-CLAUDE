@@ -71,6 +71,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.161 · 15-sep-2026 · **en prueba** — **En Ruta Crítica ya no pasa que el avance se guarde y la pantalla diga «no tienes permiso»**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Marcar un proceso como cumplido y que la pantalla lo confirme, sin pedir un segundo permiso.**
+  Hasta ahora, marcar un avance de la Ruta Crítica —o palomear un punto de su checklist— se abría con
+  el permiso de **capturar**, pero la respuesta que se devolvía después exigía además el de **ver la
+  ruta**. A quien se le diera uno y no el otro, el avance **se le guardaba** y acto seguido recibía un
+  *«no tienes permiso»*: creía que no se había guardado y volvía a capturarlo. Era el sistema dando
+  información equivocada sobre su propio estado. Ahora quien puede capturar recibe de vuelta la ruta
+  con su avance ya puesto.
+- **Lo mismo al elegir si el estampado va antes o después de coser** (en los modelos flexibles): se
+  guardaba la elección y, a continuación, saltaba el mismo *«no tienes permiso»*. También quedó.
+- ⭐ **Y lo mismo al registrar o cancelar un HITO de la orden** (revisión de OP, fit, tono, avíos,
+  empaque, arte) — que era **el caso más feo de todos**: el hito quedaba guardado, el proceso de la
+  Ruta Crítica **ya se había marcado solo** por el aviso interno… y la pantalla decía *«no tienes
+  permiso»*. Quien volvía a intentarlo —lo natural— se llevaba encima un segundo mensaje falso:
+  *«la orden ya tiene un hito de este tipo»*. Al cancelar pasaba lo mismo: el hito quedaba cancelado
+  y la pantalla decía que no se pudo. **Los cinco sitios quedaron parejos.**
+
+### Qué cambió y puede sorprender
+
+- **Quien captura un avance ve, de vuelta, la ruta de ESA orden**, aunque no tenga el permiso de
+  consultar rutas. Es el eco de lo que acaba de hacer, no una puerta nueva: **programar** una ruta ya
+  funcionaba así desde siempre. ⚠️ Si Daniel prefiere lo contrario —que quien no pueda ver una ruta
+  tampoco pueda capturarla—, es una decisión suya y se hace con dos líneas; se dejó así porque el
+  camino contrario **quita** una combinación de permisos que él todavía no ha repartido.
+- **El permiso de «ver la ruta» sigue valiendo para lo que siempre valió:** consultar la ruta de una
+  orden, la bandeja, el concentrado, la lista de hitos y el impreso del plan **siguen cerrados** sin
+  él. Lo único que dejó de pedirlo es la respuesta de una escritura propia.
+- ⚠️ **El efecto real, dicho completo y no a medias:** palomear un punto del checklist **con el valor
+  que ya tenía** no cambia nada… pero sí devuelve la ruta. O sea que quien tuviera «capturar» y no
+  «ver la ruta» tendría, si se lo propusiera, una forma de leerla sin dejar de tocar nada. Se midió y
+  **se aceptó a sabiendas**: está acotado a **su propia empresa** y a **procesos de los que es
+  responsable**, y cada intento **queda registrado en la bitácora** con su nombre. No es una puerta
+  abierta: es una rendija vigilada. Si algún día molesta, se cierra con el otro camino (que quien no
+  pueda ver, no capture).
+- **Hoy nadie lo estaba sufriendo, y aun así había que arreglarlo.** Los perfiles que trae el sistema
+  cargado llevan los dos permisos juntos, así que el fallo **no se veía**. Se destapaba el día que se
+  repartieran los permisos uno por uno — que es justo lo que toca al arrancar. Es el tercero de la
+  misma familia (van la 0.157 y la 0.160), y el peor, porque en éste **el dato ya había cambiado**.
+- **No hay permisos nuevos, ni nada que capturar, ni nada que activar.** El menú no cambia y quien ya
+  entraba, entra igual.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El mismo problema existe FUERA de Ruta Crítica, y es más grande de lo que esta versión
+  arregla.** Al revisar esto se buscó la misma forma por todo el sistema y aparece en **decenas de
+  sitios** —se comprobó uno leyendo el código: **registrar un corte** guarda el corte y después pide
+  el permiso de «ver producción» para contestar—. Aquí se arreglaron **los cinco de Ruta Crítica** y
+  nada más, a propósito: el resto es un repaso aparte, con su propia entrada en el plan. **Sigue sin
+  morder mientras los perfiles lleven los permisos juntos**, igual que éste.
+- Lo que queda de la Ruta Crítica es lo de siempre: el flujo del auditor (R21) espera el diseño de
+  Daniel.
+
 ## 0.160 · 15-sep-2026 · **en prueba** — **Quien sólo maneja telas o avíos ya puede ajustar su inventario: la lista de tipos de movimiento dejó de exigirle también el permiso de producto terminado**
 
 ### Qué se puede hacer ahora que antes no

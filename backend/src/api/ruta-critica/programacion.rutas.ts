@@ -30,6 +30,7 @@ import {
   ajustarRutaOrden,
   generarRutaOrden,
   obtenerRutaOrden,
+  proyectarRutaOrden,
   type RutaOrdenDto,
 } from '../../dominio/ruta-critica/rutaOrden.js';
 import {
@@ -270,7 +271,11 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
             cuerpo.fechaReal === undefined ? undefined : fechaUtc(cuerpo.fechaReal),
           )
         : await revertirProceso(sesion, request.params.idRuta);
-      return aRutaSalida(await obtenerRutaOrden(sesion, idOrden));
+      // ⭐ Fila 0.195: el ECO de la captura va por `proyectarRutaOrden` (sin reja de consulta). Con
+      // `obtenerRutaOrden` aquí, quien lleva `rc.capturar` pero no `rc.ruta-ver` ya había GUARDADO
+      // el cumplimiento y se llevaba un 403 al proyectar la respuesta: creía que no se guardó y
+      // volvía a capturar. La reja de ESTA operación se decide ANTES de escribir, en el dominio.
+      return aRutaSalida(await proyectarRutaOrden(sesion, idOrden));
     },
   });
 
@@ -290,7 +295,8 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const idOrden = await marcarChecklistItem(sesion, request.params.idItem, request.body.hecho);
-      return aRutaSalida(await obtenerRutaOrden(sesion, idOrden));
+      // ⭐ Fila 0.195: mismo caso que el cumplimiento — el eco no vuelve a pedir `rc.ruta-ver`.
+      return aRutaSalida(await proyectarRutaOrden(sesion, idOrden));
     },
   });
 
