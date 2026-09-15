@@ -149,6 +149,28 @@ Los dos lados comparados son el **total CON IVA** (el que imprime el documento y
 `ejecutarCorrida` para lanzar nombrando al proveedor y el folio de su factura. **Sólo en la relación
 CON factura**: la SIN factura es otro reparto de dinero y no tiene facturas de por medio.
 
+⭐ **Y muerde también en EsMa › Pagos** (`esma/pagos.ts::crearPagoMaquilero`), que era **la puerta de al
+lado y más ancha que la principal**: la corrida va bajo `pagos.corrida-armar` (sólo Administrador) y ese
+camino pide `esma.ver-pagos`, que en el seed tienen ocho perfiles ⇒ sin cerrarlo, lo que Daniel pidió lo
+podía saltar cualquiera pagando por el otro lado. Mismo criterio y misma función
+(`facturasQueFrenanElPago`), y **sólo cuando el pago es con factura**. Medido: las cuatro suites de
+integración de EsMa siguen en verde, porque su maquilero de pruebas es `solo_sin` — el segmento sin
+factura no se toca.
+
+⚠️ **CANCELAR una factura LIBERA su documento.** Las ligas de una factura cancelada **dejan de contar**
+(`LIGA_DE_FACTURA_VIVA`), aunque **no se borran**: siguen visibles como rastro (D3). Sin eso, cancelar y
+reexpedir un CFDI —rutina en México, y el maquilero es quien lo hace— dejaba el documento con
+`disponible = 0` para siempre y **la factura de reemplazo no se podía ligar a nada**: se quedaba en rojo,
+frenaba la corrida de ese proveedor, y la única salida habría sido marcar como «atendida» una factura
+correcta. Es además el mismo criterio que ya usaban `facturasQueFrenanElPago` y `frenaElPago` — este era
+el tercer sitio que hacía la misma pregunta y contestaba lo contrario.
+
+📏 **Los topes se DICEN, no se callan** (§Post-F9.87 punto 4). La bandeja lee 500 facturas y el cajón 300
+documentos; las dos salidas traen `hayMas` y la pantalla avisa, porque las dos van en orden descendente y
+**lo que se cae de la lista es lo VIEJO** — justo lo que una factura atrasada necesita cubrir. Y el
+número de «frenan un pago» sale de un `count()` **contra la base**, nunca del largo de la lista recortada:
+contarlo ahí haría que con 600 en rojo la pantalla afirmara «500» como si fuera el dato.
+
 **El veredicto nace en el MOTOR** (`terceros/cuenta-terceros.ts::registrarMovimientoTercero`) y no en
 el importador de CFDI, para que la factura importada, la del ETL y cualquier alta futura queden
 igual. ⚠️ Lo que el ETL de apertura carga por `createMany` (`terceros/migracion.ts`) **no** pasa por

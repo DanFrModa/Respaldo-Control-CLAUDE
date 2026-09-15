@@ -35,6 +35,7 @@ import { saldoDeMaquilero } from './saldos.js';
 import { conciliarEsMa } from './conciliacion.js';
 import { forzarOrdenPagada, obtenerOrdenPagada } from './orden-pagada.js';
 import { crearCargoEsMaMigrado } from './migracion.js';
+import { registrarMovimientoTercero } from '../terceros/cuenta-terceros.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -499,6 +500,68 @@ describe('Conciliación EsMa vs recibos (decisión: CuantasFaltan unificada)', (
     conc = await conciliarEsMa(sesion(), {}, bd());
     expect(conc.totales.numCargosSinRecibo).toBe(1);
     expect(conc.cargosSinRecibo[0]?.cantidad).toBe(5);
+  });
+});
+
+describe('⭐⭐ La factura EN ROJO frena también el pago por EsMa (fila 0.117, §Post-F9.232 (c))', () => {
+  /** Permisos de arreglo: capturar la factura del proveedor pide los de terceros. */
+  const conTerceros: ClavePermiso[] = [...PERM_TODOS, 'terceros.ver', 'terceros.administrar'];
+
+  /** Deja una factura de ese maquilero SIN orden de compra: nace en rojo (no cubre ningún documento). */
+  async function facturaEnRojo(maquilero: Proveedor): Promise<void> {
+    await registrarMovimientoTercero(
+      sesion(conTerceros),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: maquilero.id,
+        fecha: '2026-06-20',
+        origen: 'factura_proveedor',
+        importe: 11_600,
+        esFiscal: true,
+      },
+      bd(),
+    );
+  }
+
+  it('⭐ un pago CON FACTURA por EsMa se rechaza si el maquilero tiene una factura sin cuadrar', async () => {
+    // Era la puerta de al lado: el bloqueo nació en `ejecutarCorrida` (SOLO_ADMINISTRADOR) y este
+    // camino pide `esma.ver-pagos`, que tienen ocho perfiles.
+    await cliente.proveedor.update({
+      where: { id: maquileroCostura.id },
+      data: { modalidadFacturacion: 'solo_con' },
+    });
+    const idCargo = await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8);
+    await facturaEnRojo(maquileroCostura);
+
+    await expect(
+      crearPagoMaquilero(
+        sesion(),
+        {
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-22',
+          aplicaciones: [{ idCargo, cantidad: 6 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('el pago SIN FACTURA no se frena: es otro reparto de dinero (gemela negativa)', async () => {
+    // El maquilero de este archivo es `solo_sin`: su pago no lleva comprobante de por medio, así que
+    // una factura en rojo no tiene por qué tocarlo.
+    const idCargo = await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8);
+    await facturaEnRojo(maquileroCostura);
+
+    const pago = await crearPagoMaquilero(
+      sesion(),
+      {
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-22',
+        aplicaciones: [{ idCargo, cantidad: 6 }],
+      },
+      bd(),
+    );
+    expect(pago.conFactura).toBe(false);
   });
 });
 

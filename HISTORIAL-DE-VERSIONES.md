@@ -84,6 +84,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   parte el pago en dos cuentas), salían **dos hojas con el mismo número**. Ahora cada una lleva su
   folio, sale impreso en grande, y la hoja le pide al proveedor que lo anote en su factura: es con lo
   que se coteja. El número se asigna **al cerrar la relación**, que es cuando queda final.
+- **Si el maquilero cancela una factura y la vuelve a expedir, la nueva se liga sin pelear.** Al
+  cancelar, lo que aquella factura decía cubrir **deja de ocupar sitio** en el documento, y éste
+  vuelve a quedar libre para la de reemplazo. Lo que decía la cancelada no se borra: se sigue viendo,
+  para que quede claro qué pasó.
 - **Una pantalla nueva: Finanzas › Cotejo de facturas.** Ahí están las facturas que no cuadran, con
   lo que dice la factura, lo que amparan los documentos y la diferencia. Se le marcan los documentos
   que cubre —una factura puede cubrir **varios** y varias facturas pueden repartirse **uno solo**, tal
@@ -100,6 +104,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   **más estricto**: si la factura sale del documento que nosotros emitimos, separarse más de un peso
   quiere decir que algo no cuadra de verdad.
 - **La relación SIN factura no se frena.** Es otro reparto de dinero y no tiene facturas de por medio.
+- **El freno también aplica pagando por Estados de cuenta de maquileros › Pagos**, no sólo desde la
+  relación semanal: si no, bastaba con pagarle por el otro camino para saltárselo. Ahí también se
+  frena **sólo el pago con factura**.
+- **La lista avisa cuando se queda corta.** Si hay más facturas (o más documentos de un proveedor) de
+  los que caben, lo dice en vez de callarlo, y el número de «frenan un pago» es siempre el total real
+  —no el de lo que alcanzó a caber en la pantalla—.
 - **Una factura recién importada aparece EN ROJO aunque esté perfecta**, simplemente porque todavía no
   se le ha dicho qué documentos cubre. Es el estado normal de arranque: se abre, se le marcan los
   documentos, y se pone en verde.

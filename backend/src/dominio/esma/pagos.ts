@@ -31,6 +31,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { facturasQueFrenanElPago } from '../pagos/cotejo.js';
 import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
 import { WHERE_VIVO_PAGO } from './formula-saldo.js';
@@ -266,6 +267,31 @@ export async function crearPagoMaquilero(
       throw new ErrorConflicto(`El proveedor "${prov.nombre}" está desactivado.`);
     }
     const conFactura = resolverConFactura(prov.modalidadFacturacion, datos.conFactura);
+
+    // ⭐⭐ FILA 0.117 — LA FACTURA EN ROJO TAMBIÉN FRENA POR AQUÍ (§Post-F9.232 (c)).
+    //
+    // 🔴 Ésta era la PUERTA DE AL LADO, y era más ancha que la principal: el bloqueo nació en
+    // `ejecutarCorrida`, que va bajo `pagos.corrida-armar` (SOLO_ADMINISTRADOR), mientras que este
+    // camino pide `esma.ver-pagos`, que en el seed tienen OCHO perfiles. Sin esta línea, lo que
+    // Daniel pidió —*«se queda en rojo hasta que atiendan el problema»*— lo podía saltar cualquiera
+    // pagando por EsMa › Pagos en vez de por la relación semanal.
+    //
+    // ⚠️ Sólo cuando el pago es **CON factura**, exactamente como en la corrida: el segmento SIN
+    // factura es otro reparto de dinero y no tiene facturas de por medio, así que frenarlo por un
+    // CFDI que no lo toca sería castigar un pago por algo que no tiene que ver con él. Se reusa
+    // `facturasQueFrenanElPago` —el mismo criterio, no una copia— y se consulta DENTRO de la
+    // transacción.
+    if (conFactura) {
+      const enRojo = await facturasQueFrenanElPago(tx, sesion.idEmpresaActiva, [datos.idMaquilero]);
+      if (enRojo.length > 0) {
+        throw new ErrorValidacion(
+          `No se le puede pagar a "${prov.nombre}" con factura: su factura ` +
+            `${enRojo.map((f) => String(f.folio)).join(', ')} no cuadra con los documentos que le ` +
+            'emitimos y nadie la ha atendido. Revísala en Cuentas por pagar › Cotejo de facturas: ' +
+            'liga los documentos que cubre, o atiéndela explicando la diferencia.',
+        );
+      }
+    }
 
     // Serializa por maquilero: "prendas por pagar" consistente contra pagos concurrentes.
     await bloquearMaquilero(tx, sesion.idEmpresaActiva, datos.idMaquilero);

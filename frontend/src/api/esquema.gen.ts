@@ -70323,6 +70323,8 @@ export interface paths {
                 atendidaPor: string | null;
                 /** @description La explicación con la que se atendió, o null. */
                 nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
                 /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
                 frenaElPago: boolean;
                 /** @description Los documentos que dice cubrir. */
@@ -70337,8 +70339,10 @@ export interface paths {
                   importe: number | null;
                 }[];
               }[];
-              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). */
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
               enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
               /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
               toleranciaPesos: number;
             };
@@ -70479,6 +70483,8 @@ export interface paths {
                 /** @description Lo que queda por cubrir (`total − aplicado`). `null` sin ver importes. */
                 disponible: number | null;
               }[];
+              /** @description La lista se recortó: hay más documentos emitidos de los que caben (§Post-F9.87: sin topes silenciosos). Los que faltan son los MÁS VIEJOS (orden por folio descendente). */
+              hayMas: boolean;
             };
           };
         };
@@ -70645,6 +70651,8 @@ export interface paths {
                 atendidaPor: string | null;
                 /** @description La explicación con la que se atendió, o null. */
                 nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
                 /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
                 frenaElPago: boolean;
                 /** @description Los documentos que dice cubrir. */
@@ -70659,8 +70667,10 @@ export interface paths {
                   importe: number | null;
                 }[];
               }[];
-              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). */
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
               enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
               /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
               toleranciaPesos: number;
             };
@@ -70824,6 +70834,8 @@ export interface paths {
                 atendidaPor: string | null;
                 /** @description La explicación con la que se atendió, o null. */
                 nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
                 /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
                 frenaElPago: boolean;
                 /** @description Los documentos que dice cubrir. */
@@ -70838,8 +70850,10 @@ export interface paths {
                   importe: number | null;
                 }[];
               }[];
-              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). */
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
               enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
               /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
               toleranciaPesos: number;
             };

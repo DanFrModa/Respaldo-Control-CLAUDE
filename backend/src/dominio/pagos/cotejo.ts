@@ -75,6 +75,22 @@ import { redondear2 } from './totales.js';
 const NAMESPACE_LOCK_COTEJO = 20_552;
 
 /**
+ * ⭐ LOS TOPES DE LECTURA — y por qué se DICEN en vez de callarse (§Post-F9.87 punto 4: *«sin topes
+ * silenciosos… si algo se recorta, se dice»*).
+ *
+ * Las dos consultas de esta pantalla leen mucho y hay que cortarlas por algún lado, pero un corte
+ * callado miente dos veces: la bandeja ordena por fecha DESC y los documentos por folio DESC, así
+ * que **lo que desaparece es lo VIEJO** — justo lo que una factura atrasada necesita cubrir. Por eso
+ * cada salida trae su `hayMas`, y la pantalla lo dice.
+ *
+ * 🔑 Y el conteo de `enRojo` NO sale de la lista recortada: va por `count()` aparte (abajo). Contar
+ * sobre lo recortado haría que con 600 facturas en rojo la pantalla afirmara «500» **como si fuera
+ * el dato**, que es peor que no enseñar el número.
+ */
+const TOPE_BANDEJA = 500;
+const TOPE_DOCUMENTOS = 300;
+
+/**
  * Exige poder VER el cotejo. Pasa con `cxp.ver` **o** con `cxp.administrar`: quien liga y atiende
  * obviamente ve, y las dos mutaciones devuelven la bandeja de vuelta — sin esta puerta, un rol con
  * sólo `administrar` escribiría bien y recibiría un 403 **sobre su propia escritura**. Sigue siendo
@@ -124,6 +140,15 @@ export function sujetaACotejo(m: MovimientoParaCotejo): boolean {
  * ⚠️ NO toca `cotejoAtendidoEn`/`PorId`/`Nota`. Recalcular es mecánico; atender es el acto de una
  * persona, y borrarlo al recalcular haría que corregir una liga deshiciera en silencio la decisión
  * de alguien. Debe correr dentro de la transacción que cambió las ligas (A2).
+ *
+ * 📌 **Un hueco conocido, dicho a propósito: una factura de UN PESO O MENOS sin ninguna liga nace
+ * `cuadra`.** Su diferencia contra cero (su total) cabe dentro de la tolerancia, así que la regla de
+ * §Post-F9.232 (b) —un peso fijo, sin porcentaje— la deja pasar. **No se le pone una excepción**: la
+ * tolerancia vive en UN solo sitio y con UN solo criterio (`cotejo-tolerancia.ts`), y meterle aquí un
+ * «salvo que no tenga ligas» sería la segunda regla escondida que un día contradice a la primera. El
+ * daño real es nulo —una factura de maquila de un peso no existe— y la alternativa (preguntar si
+ * tiene ligas antes de comparar) cambiaría el significado del veredicto para todos los casos por un
+ * caso que no pasa. Si alguna vez importa, **se pregunta** antes de programarlo.
  */
 export async function recalcularCotejo(tx: Tx, idMovimiento: number): Promise<string | null> {
   const movimiento = await tx.movimientoTercero.findUnique({
@@ -165,6 +190,28 @@ export async function recalcularCotejo(tx: Tx, idMovimiento: number): Promise<st
   return estado;
 }
 
+/**
+ * ⭐⭐ LO QUE UNA LIGA DE FACTURA CANCELADA VALE: NADA (fila 0.117, corrección del reviewer).
+ *
+ * Cancelar y reexpedir un CFDI es rutina en México, y el maquilero es justo quien lo hace. Sin este
+ * filtro el sistema se ataba un nudo del que no se podía salir POR LA APLICACIÓN: la factura A
+ * cancelada dejaba sus ligas colgando del documento, el documento quedaba con `disponible = 0`, y
+ * la factura B —la de reemplazo, correcta— **no se podía ligar a nada** ⇒ se quedaba en rojo para
+ * siempre y frenaba la corrida de ese proveedor. Y desligar la A tampoco era salida: `aplicarCotejo`
+ * rechaza tocar una factura cancelada («ya no cobra nada y no hay qué cotejar»). La única puerta que
+ * quedaba era marcar como «descuadre atendido» una factura CORRECTA, que es exactamente mentirle al
+ * sistema.
+ *
+ * 🔑 Y era además una INCOHERENCIA INTERNA: «la cancelada no cuenta» ya se aplicaba en
+ * {@link facturasQueFrenanElPago} y en el `frenaElPago` de la bandeja. Éste era el tercer sitio que
+ * hacía la misma pregunta y contestaba lo contrario.
+ *
+ * ⚠️ Las ligas **NO se borran** al cancelar: siguen ahí, visibles en la bandeja como rastro de lo
+ * que aquella factura decía cubrir (D3 — lo guardado es inmutable; cancelar es un hecho nuevo, no un
+ * borrado). Lo que cambia es que **dejan de ocupar sitio en el documento**.
+ */
+const LIGA_DE_FACTURA_VIVA = { movimiento: { cancelado: false } } as const;
+
 /** Σ de lo que esta factura aplica a documentos (suma directa, D3). */
 async function sumaAplicadaDeFactura(tx: Tx | PrismaClient, idMovimiento: number): Promise<number> {
   const agregado = await tx.cotejoFacturaDocumento.aggregate({
@@ -174,10 +221,15 @@ async function sumaAplicadaDeFactura(tx: Tx | PrismaClient, idMovimiento: number
   return redondear2(agregado._sum.importe?.toNumber() ?? 0);
 }
 
-/** Σ de lo que TODAS las facturas aplican a un documento (suma directa, D3). */
+/**
+ * Σ de lo que TODAS las facturas VIVAS aplican a un documento (suma directa, D3).
+ *
+ * Las de las facturas canceladas no suman — ver {@link LIGA_DE_FACTURA_VIVA}: si contaran, cancelar
+ * una factura dejaría su documento ocupado para siempre.
+ */
 async function sumaAplicadaAlDocumento(tx: Tx, idRenglon: number): Promise<number> {
   const agregado = await tx.cotejoFacturaDocumento.aggregate({
-    where: { idRenglon },
+    where: { idRenglon, ...LIGA_DE_FACTURA_VIVA },
     _sum: { importe: true },
   });
   return redondear2(agregado._sum.importe?.toNumber() ?? 0);
@@ -272,14 +324,21 @@ export async function documentosEmitidosDeProveedor(
       monto: true,
       concepto: true,
       corrida: { select: { folio: true, semana: true } },
-      cotejos: { select: { importe: true } },
+      // Sólo las ligas VIVAS: lo que ocupa el documento es lo que una factura sin cancelar dice
+      // cubrir. Es el MISMO criterio con el que {@link sumaAplicadaAlDocumento} decide si cabe una
+      // liga nueva — si la pantalla enseñara un «disponible» y la guarda calculara otro, quien
+      // teclea vería un hueco que el servidor le rechaza (o al revés).
+      cotejos: { where: LIGA_DE_FACTURA_VIVA, select: { importe: true } },
     },
     orderBy: { folioDocumento: 'desc' },
-    take: 300,
+    // Uno de más: si viene, es que hay más de los que caben y la pantalla tiene que decirlo.
+    take: TOPE_DOCUMENTOS + 1,
   });
+  const hayMas = renglones.length > TOPE_DOCUMENTOS;
+  const visibles = renglones.slice(0, TOPE_DOCUMENTOS);
 
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
-  const documentos: DocumentoEmitido[] = renglones.map((r) => {
+  const documentos: DocumentoEmitido[] = visibles.map((r) => {
     const total = r.monto.toNumber();
     const aplicado = r.cotejos.reduce((s, c) => s + c.importe.toNumber(), 0);
     return {
@@ -294,7 +353,7 @@ export async function documentosEmitidosDeProveedor(
       disponible: oculto(total - aplicado),
     };
   });
-  return { documentos };
+  return { documentos, hayMas };
 }
 
 // ── La bandeja ──────────────────────────────────────────────────────────────────────────────────
@@ -320,12 +379,24 @@ export async function bandejaDeCotejo(
   const cliente = clienteLectura(bd);
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
+  // Lo que de verdad frena un pago, como condición reutilizable: es la MISMA pregunta que contesta
+  // `facturasQueFrenanElPago` al ejecutar, y por eso alimenta a la vez el filtro `pendientes` y el
+  // conteo de `enRojo`. Si fueran dos redacciones, un día dirían cosas distintas.
+  const enRojoWhere = {
+    idEmpresa: sesion.idEmpresaActiva,
+    estadoCotejo: 'descuadre',
+    cotejoAtendidoEn: null,
+    cancelado: false,
+  } as const;
+
   const filas = await cliente.movimientoTercero.findMany({
-    where: {
-      idEmpresa: sesion.idEmpresaActiva,
-      estadoCotejo: filtro === 'pendientes' ? 'descuadre' : { in: [...ESTADOS_COTEJO] },
-      ...(filtro === 'pendientes' ? { cotejoAtendidoEn: null, cancelado: false } : {}),
-    },
+    where:
+      filtro === 'pendientes'
+        ? enRojoWhere
+        : {
+            idEmpresa: sesion.idEmpresaActiva,
+            estadoCotejo: { in: [...ESTADOS_COTEJO] },
+          },
     select: {
       id: true,
       folio: true,
@@ -350,18 +421,30 @@ export async function bandejaDeCotejo(
       },
     },
     orderBy: [{ fecha: 'desc' }, { folio: 'desc' }],
-    take: 500,
+    // Uno de más para saber si se recortó (ver el TSDoc de TOPE_BANDEJA).
+    take: TOPE_BANDEJA + 1,
   });
+  const hayMas = filas.length > TOPE_BANDEJA;
+  const visibles = filas.slice(0, TOPE_BANDEJA);
+
+  // ⭐ El conteo va POR SU CUENTA, contra la base y sin tope: es el número que la pantalla enseña
+  // como «cuántas frenan un pago», y contarlo sobre la lista recortada lo volvería una mentira
+  // redonda en cuanto hubiera más de las que caben.
+  const enRojo = await cliente.movimientoTercero.count({ where: enRojoWhere });
 
   const nombres = await nombresDeUsuarios(
     cliente,
-    filas.map((f) => f.cotejoAtendidoPorId),
+    visibles.map((f) => f.cotejoAtendidoPorId),
   );
   const oculto = (v: number): number | null => (puedeVerImportes ? redondear2(v) : null);
 
-  const facturas: FacturaCotejo[] = filas.map((f) => {
+  const facturas: FacturaCotejo[] = visibles.map((f) => {
     const total = Math.abs(f.monto.toNumber());
-    const aplicado = f.cotejos.reduce((s, c) => s + c.importe.toNumber(), 0);
+    // ⚠️ Lo aplicado por una factura CANCELADA es cero, no lo que decía cubrir: sus ligas ya no
+    // ocupan nada en el documento (ver {@link LIGA_DE_FACTURA_VIVA}), así que enseñarlas como
+    // «amparado» diría en esta pantalla lo contrario de lo que dice la de documentos. Las ligas
+    // siguen listándose abajo, como rastro de lo que aquella factura decía (D3).
+    const aplicado = f.cancelado ? 0 : f.cotejos.reduce((s, c) => s + c.importe.toNumber(), 0);
     const atendida = f.cotejoAtendidoEn !== null;
     // El `?? 'descuadre'` no se alcanza: el `where` sólo trae filas con veredicto. Existe para que
     // el hueco imposible caiga del lado seguro (marcado) en vez de romper el contrato.
@@ -387,6 +470,7 @@ export async function bandejaDeCotejo(
       atendidaEn: f.cotejoAtendidoEn?.toISOString() ?? null,
       atendidaPor: nombreDeUsuario(nombres, f.cotejoAtendidoPorId),
       nota: f.cotejoNota,
+      cancelada: f.cancelado,
       // ⚠️ La CANCELADA no frena, aunque no cuadre: ya no cobra nada (su inverso la anuló, D3) y
       // `facturasQueFrenanElPago` —lo que de verdad muerde al ejecutar— también la excluye. Sin
       // esta condición, el filtro «todas» la pintaba en rojo y la corrida la dejaba pasar: dos
@@ -398,7 +482,8 @@ export async function bandejaDeCotejo(
 
   return {
     facturas,
-    enRojo: facturas.filter((f) => f.frenaElPago).length,
+    enRojo,
+    hayMas,
     toleranciaPesos: TOLERANCIA_COTEJO_PESOS,
   };
 }

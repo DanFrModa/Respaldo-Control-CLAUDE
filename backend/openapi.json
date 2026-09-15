@@ -181951,6 +181951,10 @@
                             ],
                             "description": "La explicación con la que se atendió, o null."
                           },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
                           "frenaElPago": {
                             "type": "boolean",
                             "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
@@ -182022,6 +182026,7 @@
                           "atendidaEn",
                           "atendidaPor",
                           "nota",
+                          "cancelada",
                           "frenaElPago",
                           "aplicaciones"
                         ],
@@ -182033,7 +182038,11 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe)."
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
                     },
                     "toleranciaPesos": {
                       "type": "number",
@@ -182043,6 +182052,7 @@
                   "required": [
                     "facturas",
                     "enRojo",
+                    "hayMas",
                     "toleranciaPesos"
                   ],
                   "additionalProperties": false,
@@ -182309,10 +182319,15 @@
                         "additionalProperties": false,
                         "description": "Un documento para facturar emitido a este proveedor."
                       }
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más documentos emitidos de los que caben (§Post-F9.87: sin topes silenciosos). Los que faltan son los MÁS VIEJOS (orden por folio descendente)."
                     }
                   },
                   "required": [
-                    "documentos"
+                    "documentos",
+                    "hayMas"
                   ],
                   "additionalProperties": false,
                   "description": "Documentos emitidos a un proveedor, con lo que les falta por cubrir."
@@ -182662,6 +182677,10 @@
                             ],
                             "description": "La explicación con la que se atendió, o null."
                           },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
                           "frenaElPago": {
                             "type": "boolean",
                             "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
@@ -182733,6 +182752,7 @@
                           "atendidaEn",
                           "atendidaPor",
                           "nota",
+                          "cancelada",
                           "frenaElPago",
                           "aplicaciones"
                         ],
@@ -182744,7 +182764,11 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe)."
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
                     },
                     "toleranciaPesos": {
                       "type": "number",
@@ -182754,6 +182778,7 @@
                   "required": [
                     "facturas",
                     "enRojo",
+                    "hayMas",
                     "toleranciaPesos"
                   ],
                   "additionalProperties": false,
@@ -183085,6 +183110,10 @@
                             ],
                             "description": "La explicación con la que se atendió, o null."
                           },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
                           "frenaElPago": {
                             "type": "boolean",
                             "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
@@ -183156,6 +183185,7 @@
                           "atendidaEn",
                           "atendidaPor",
                           "nota",
+                          "cancelada",
                           "frenaElPago",
                           "aplicaciones"
                         ],
@@ -183167,7 +183197,11 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe)."
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
                     },
                     "toleranciaPesos": {
                       "type": "number",
@@ -183177,6 +183211,7 @@
                   "required": [
                     "facturas",
                     "enRojo",
+                    "hayMas",
                     "toleranciaPesos"
                   ],
                   "additionalProperties": false,

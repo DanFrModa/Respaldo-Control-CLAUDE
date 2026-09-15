@@ -33,7 +33,7 @@ const { useAplicarCotejo, useAtenderCotejo } = await import('./cotejo');
 const { CLAVE_CXP } = await import('./cxp');
 const { CLAVE_CORRIDAS } = await import('./pagos');
 
-const BANDEJA = { facturas: [], enRojo: 0, toleranciaPesos: 1 };
+const BANDEJA = { facturas: [], enRojo: 0, hayMas: false, toleranciaPesos: 1 };
 
 describe('invalidación de cachés del cotejo de facturas', () => {
   beforeEach(() => {

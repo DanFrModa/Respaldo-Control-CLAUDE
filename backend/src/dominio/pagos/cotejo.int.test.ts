@@ -28,7 +28,12 @@ import {
   cancelarMovimientoTercero,
   registrarMovimientoTercero,
 } from '../terceros/cuenta-terceros.js';
-import { aplicarCotejo, atenderCotejo, bandejaDeCotejo } from './cotejo.js';
+import {
+  aplicarCotejo,
+  atenderCotejo,
+  bandejaDeCotejo,
+  documentosEmitidosDeProveedor,
+} from './cotejo.js';
 import {
   cerrarCorrida,
   crearCorrida,
@@ -586,6 +591,129 @@ describe('(f-bis) la factura cancelada', () => {
     );
     const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'todas' }, bd());
     expect(bandeja.facturas.find((f) => f.idMovimiento === idMovimiento)?.frenaElPago).toBe(false);
+  });
+
+  it('⭐⭐ CANCELAR una factura LIBERA el documento que tenía ligado', async () => {
+    // Cancelar y reexpedir un CFDI es rutina. Si las ligas de la cancelada siguieran ocupando el
+    // documento, éste quedaría en `disponible = 0` para siempre.
+    const idCorrida = await corridaCerrada([{ proveedor: taller, monto: 11_600 }]);
+    const idDocumento = await idDocumentoDe(idCorrida, taller);
+    const idFactura = await facturaSinOc(taller, 11_600);
+    await aplicarCotejo(
+      sesion(),
+      idFactura,
+      { aplicaciones: [{ idRenglon: idDocumento, importe: 11_600 }] },
+      bd(),
+    );
+    const antes = await documentosEmitidosDeProveedor(sesion(), taller.id, bd());
+    expect(antes.documentos.find((d) => d.idRenglon === idDocumento)?.disponible).toBe(0);
+
+    await cancelarMovimientoTercero(sesion(), idFactura, { motivo: 'La reexpidieron.' }, bd());
+
+    const despues = await documentosEmitidosDeProveedor(sesion(), taller.id, bd());
+    expect(despues.documentos.find((d) => d.idRenglon === idDocumento)?.disponible).toBe(11_600);
+  });
+
+  it('⭐⭐ …y la factura de REEMPLAZO se puede ligar al mismo documento', async () => {
+    const idCorrida = await corridaCerrada([{ proveedor: taller, monto: 11_600 }]);
+    const idDocumento = await idDocumentoDe(idCorrida, taller);
+    const idPrimera = await facturaSinOc(taller, 11_600);
+    await aplicarCotejo(
+      sesion(),
+      idPrimera,
+      { aplicaciones: [{ idRenglon: idDocumento, importe: 11_600 }] },
+      bd(),
+    );
+    await cancelarMovimientoTercero(sesion(), idPrimera, { motivo: 'La reexpidieron.' }, bd());
+
+    const idSegunda = await facturaSinOc(taller, 11_600);
+    const bandeja = await aplicarCotejo(
+      sesion(),
+      idSegunda,
+      { aplicaciones: [{ idRenglon: idDocumento, importe: 11_600 }] },
+      bd(),
+    );
+    expect(bandeja.facturas.find((f) => f.idMovimiento === idSegunda)?.estado).toBe('cuadra');
+  });
+
+  it('la liga de la cancelada NO se borra: sigue como rastro de lo que decía cubrir (D3)', async () => {
+    const idCorrida = await corridaCerrada([{ proveedor: taller, monto: 11_600 }]);
+    const idDocumento = await idDocumentoDe(idCorrida, taller);
+    const idFactura = await facturaSinOc(taller, 11_600);
+    await aplicarCotejo(
+      sesion(),
+      idFactura,
+      { aplicaciones: [{ idRenglon: idDocumento, importe: 11_600 }] },
+      bd(),
+    );
+    await cancelarMovimientoTercero(sesion(), idFactura, { motivo: 'La reexpidieron.' }, bd());
+
+    const ligas = await cliente.cotejoFacturaDocumento.findMany({
+      where: { idMovimiento: idFactura },
+    });
+    expect(ligas).toHaveLength(1);
+  });
+
+  it('lo APLICADO de una cancelada se pinta en cero: sus ligas ya no ocupan nada', async () => {
+    const idCorrida = await corridaCerrada([{ proveedor: taller, monto: 11_600 }]);
+    const idDocumento = await idDocumentoDe(idCorrida, taller);
+    const idFactura = await facturaSinOc(taller, 11_600);
+    await aplicarCotejo(
+      sesion(),
+      idFactura,
+      { aplicaciones: [{ idRenglon: idDocumento, importe: 11_600 }] },
+      bd(),
+    );
+    await cancelarMovimientoTercero(sesion(), idFactura, { motivo: 'La reexpidieron.' }, bd());
+
+    const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'todas' }, bd());
+    const fila = bandeja.facturas.find((f) => f.idMovimiento === idFactura);
+    expect(fila?.aplicado).toBe(0);
+    expect(fila?.cancelada).toBe(true);
+  });
+});
+
+describe('(f-ter) la bandeja no miente cuando recorta (§Post-F9.87: sin topes silenciosos)', () => {
+  /**
+   * Siembra `cuantas` facturas en rojo POR SQL, sin pasar por el dominio: lo que se mide aquí es la
+   * LECTURA de la bandeja, y capturar 600 facturas por el motor sólo haría la prueba lenta sin medir
+   * nada más. El veredicto se escribe a mano porque es justo lo que el motor habría dejado.
+   */
+  async function sembrarFacturasEnRojo(cuantas: number): Promise<void> {
+    await cliente.movimientoTercero.createMany({
+      data: Array.from({ length: cuantas }, (_, i) => ({
+        idEmpresa: empresa.id,
+        folio: BigInt(1000 + i),
+        tipoTercero: 'proveedor' as const,
+        idProveedor: taller.id,
+        fecha: new Date('2026-09-05'),
+        origen: 'factura_proveedor' as const,
+        monto: 100,
+        esFiscal: true,
+        estadoCotejo: 'descuadre' as const,
+      })),
+    });
+  }
+
+  it('⭐ el conteo de «frenan un pago» se cuenta CONTRA LA BASE, no sobre la lista recortada', async () => {
+    // Con 600 en rojo y un tope de 500, contar lo que se ve afirmaría «500» como si fuera el dato.
+    await sembrarFacturasEnRojo(600);
+    const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'pendientes' }, bd());
+    expect(bandeja.facturas.length).toBe(500);
+    expect(bandeja.enRojo).toBe(600);
+  });
+
+  it('⭐ …y avisa de que recortó (`hayMas`), en vez de callarlo', async () => {
+    await sembrarFacturasEnRojo(600);
+    const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'pendientes' }, bd());
+    expect(bandeja.hayMas).toBe(true);
+  });
+
+  it('sin recorte, `hayMas` es falso (gemela negativa)', async () => {
+    await sembrarFacturasEnRojo(3);
+    const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'pendientes' }, bd());
+    expect(bandeja.hayMas).toBe(false);
+    expect(bandeja.enRojo).toBe(3);
   });
 });
 

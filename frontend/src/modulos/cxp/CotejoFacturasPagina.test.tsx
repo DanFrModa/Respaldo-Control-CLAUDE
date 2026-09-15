@@ -30,6 +30,7 @@ const FACTURA_EN_ROJO: BandejaCotejo['facturas'][number] = {
   atendidaEn: null,
   atendidaPor: null,
   nota: null,
+  cancelada: false,
   frenaElPago: true,
   aplicaciones: [],
 };
@@ -57,11 +58,25 @@ const DOCUMENTOS: DocumentosEmitidos = {
       disponible: 11_600,
     },
   ],
+  hayMas: false,
+};
+
+/** La misma factura, pero CANCELADA: sus ligas dejaron de contar y ya no frena nada. */
+const FACTURA_CANCELADA: BandejaCotejo['facturas'][number] = {
+  ...FACTURA_EN_ROJO,
+  idMovimiento: 93,
+  folio: 46,
+  aplicado: 0,
+  diferencia: 11_600,
+  cancelada: true,
+  frenaElPago: false,
+  aplicaciones: [{ idRenglon: 501, folioDocumento: 1001, semana: '2026-09-02', importe: 11_600 }],
 };
 
 let bandeja: BandejaCotejo = {
   facturas: [FACTURA_EN_ROJO],
   enRojo: 1,
+  hayMas: false,
   toleranciaPesos: 1,
 };
 
@@ -97,7 +112,7 @@ describe('CotejoFacturasPagina (fila 0.117)', () => {
   beforeEach(() => {
     aplicarSpy.mockClear();
     atenderSpy.mockClear();
-    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 1, toleranciaPesos: 1 };
+    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 1, hayMas: false, toleranciaPesos: 1 };
   });
 
   it('sin cxp.ver la pantalla NO se monta (la cierra la capa de ruta)', () => {
@@ -127,7 +142,7 @@ describe('CotejoFacturasPagina (fila 0.117)', () => {
   });
 
   it('…y la que cuadra NO sale marcada', () => {
-    bandeja = { facturas: [FACTURA_QUE_CUADRA], enRojo: 0, toleranciaPesos: 1 };
+    bandeja = { facturas: [FACTURA_QUE_CUADRA], enRojo: 0, hayMas: false, toleranciaPesos: 1 };
     renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
     const fila = screen.getByTestId('cotejo-fila-92');
     expect(within(fila).queryByText('No cuadra')).toBeNull();
@@ -135,9 +150,39 @@ describe('CotejoFacturasPagina (fila 0.117)', () => {
   });
 
   it('⭐ la tolerancia que se enseña viene del SERVIDOR, no escrita en la pantalla', () => {
-    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 1, toleranciaPesos: 7 };
+    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 1, hayMas: false, toleranciaPesos: 7 };
     renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
     expect(screen.getByText('$7.00')).toBeInTheDocument();
+  });
+
+  it('⭐ la factura CANCELADA se pinta como cancelada, no como que cuadra', () => {
+    // Sus ligas ya no ocupan sitio en el documento, así que ni «Cuadra» ni «No cuadra» dirían de
+    // ella algo cierto.
+    bandeja = { facturas: [FACTURA_CANCELADA], enRojo: 0, hayMas: false, toleranciaPesos: 1 };
+    renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+    const fila = screen.getByTestId('cotejo-fila-93');
+    expect(within(fila).getByText('Cancelada')).toBeInTheDocument();
+    expect(within(fila).queryByText('Cuadra')).toBeNull();
+    expect(within(fila).queryByText('No cuadra')).toBeNull();
+  });
+
+  it('⭐ cuando la lista se RECORTA, la pantalla lo dice (§Post-F9.87: sin topes silenciosos)', () => {
+    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 640, hayMas: true, toleranciaPesos: 1 };
+    renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+    expect(screen.getByTestId('cotejo-hay-mas')).toBeInTheDocument();
+  });
+
+  it('…y sin recorte no enseña el aviso (gemela negativa)', () => {
+    renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+    expect(screen.queryByTestId('cotejo-hay-mas')).toBeNull();
+  });
+
+  it('⭐ el número de «frenan un pago» es el del SERVIDOR, no el largo de la lista recortada', () => {
+    // Con 640 en rojo y una sola fila visible, la pantalla tiene que decir 640: contar lo que se ve
+    // sería afirmar «1» como si fuera el dato.
+    bandeja = { facturas: [FACTURA_EN_ROJO], enRojo: 640, hayMas: true, toleranciaPesos: 1 };
+    renderConProveedores(<CotejoFacturasPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+    expect(screen.getByText('640')).toBeInTheDocument();
   });
 
   it('⭐ sin cxp.administrar no hay forma de ligar ni de atender', async () => {

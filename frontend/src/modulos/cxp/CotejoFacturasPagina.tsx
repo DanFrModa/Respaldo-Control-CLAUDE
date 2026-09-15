@@ -99,6 +99,12 @@ function CajonFactura({
         </p>
       ) : (
         <div className="overflow-x-auto">
+          {documentos.data?.hayMas === true ? (
+            <p className="mb-2 text-sm text-amber-700" data-testid="cotejo-documentos-hay-mas">
+              Se están enseñando los {lista.length} documentos más recientes de este proveedor: hay
+              más, y los que faltan son los más viejos.
+            </p>
+          ) : null}
           <TablaDensa>
             <TablaDensaEncabezado>
               <TablaDensaFila>
@@ -281,6 +287,14 @@ export function CotejoFacturasPagina(): React.JSX.Element {
             </p>
           ) : (
             <div className="overflow-x-auto">
+              {/* §Post-F9.87 punto 4: si algo se recorta, se dice — y se dice QUÉ falta, que son
+                  las más viejas (la lista va por fecha descendente). */}
+              {bandeja.data?.hayMas === true ? (
+                <p className="mb-2 text-sm text-amber-700" data-testid="cotejo-hay-mas">
+                  Se están enseñando las {facturas.length} más recientes: hay más facturas de las
+                  que caben en la lista. Usa el filtro «Frenan un pago» para ver sólo lo pendiente.
+                </p>
+              ) : null}
               <TablaDensa>
                 <TablaDensaEncabezado>
                   <TablaDensaFila>
@@ -309,7 +323,12 @@ export function CotejoFacturasPagina(): React.JSX.Element {
                           {moneda(f.diferencia)}
                         </TablaDensaCelda>
                         <TablaDensaCelda>
-                          {f.frenaElPago ? (
+                          {/* La CANCELADA va primero: ya no cobra nada y sus ligas dejaron de
+                              ocupar sitio en los documentos, así que pintarla «Cuadra» (o «No
+                              cuadra») diría de ella algo que ya no aplica. */}
+                          {f.cancelada ? (
+                            <Badge variant="outline">Cancelada</Badge>
+                          ) : f.frenaElPago ? (
                             <Badge variant="destructive" className="gap-1">
                               <AlertTriangle className="size-3" /> No cuadra
                             </Badge>

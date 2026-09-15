@@ -68,7 +68,15 @@ export type DocumentoEmitido = z.infer<typeof esquemaDocumentoEmitido>;
 
 /** La lista de documentos emitidos a un proveedor. */
 export const esquemaDocumentosEmitidosSalida = z
-  .object({ documentos: z.array(esquemaDocumentoEmitido) })
+  .object({
+    documentos: z.array(esquemaDocumentoEmitido),
+    hayMas: z
+      .boolean()
+      .describe(
+        'La lista se recortó: hay más documentos emitidos de los que caben (§Post-F9.87: sin ' +
+          'topes silenciosos). Los que faltan son los MÁS VIEJOS (orden por folio descendente).',
+      ),
+  })
   .describe('Documentos emitidos a un proveedor, con lo que les falta por cubrir.');
 
 /** Salida de la lista de documentos emitidos. */
@@ -118,6 +126,13 @@ export const esquemaFacturaCotejo = z
     atendidaEn: z.string().nullable().describe('Cuándo se atendió (ISO) o null.'),
     atendidaPor: z.string().nullable().describe('Quién la atendió, o null.'),
     nota: z.string().nullable().describe('La explicación con la que se atendió, o null.'),
+    cancelada: z
+      .boolean()
+      .describe(
+        'La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago ' +
+          'y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo ' +
+          'sigan listadas, como rastro de lo que decía cubrir.',
+      ),
     frenaElPago: z
       .boolean()
       .describe('En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta.'),
@@ -132,7 +147,19 @@ export type FacturaCotejo = z.infer<typeof esquemaFacturaCotejo>;
 export const esquemaBandejaCotejoSalida = z
   .object({
     facturas: z.array(esquemaFacturaCotejo),
-    enRojo: z.number().int().describe('Cuántas frenan un pago ahora mismo (conteo, no importe).'),
+    enRojo: z
+      .number()
+      .int()
+      .describe(
+        'Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin ' +
+          'tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato.',
+      ),
+    hayMas: z
+      .boolean()
+      .describe(
+        'La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes ' +
+          'silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente).',
+      ),
     toleranciaPesos: z
       .number()
       .describe(
