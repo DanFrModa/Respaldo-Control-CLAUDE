@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.160 · 15-sep-2026 · **en prueba** — **Quien sólo maneja telas o avíos ya puede ajustar su inventario: la lista de tipos de movimiento dejó de exigirle también el permiso de producto terminado**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Las dos pantallas de ajuste de material funcionan con SU propio permiso.** «Ajuste de telas» y
+  «Ajuste de materiales» necesitan, para guardar, la lista de **tipos de movimiento** (de ahí sacan
+  «ajuste de entrada» y «ajuste de salida»). Esa lista se dejaba pedir con el permiso de telas o el de
+  avíos, pero por dentro **volvía a exigir el de producto terminado** y contestaba *«no tienes
+  permiso»*. Resultado: a quien se le diera **sólo** el almacén de telas, o **sólo** el de avíos, la
+  pantalla se le quedaba sin poder guardar. Ahora las dos puertas piden lo mismo.
+
+### Qué cambió y puede sorprender
+
+- **Hoy nadie lo estaba sufriendo, y aun así había que arreglarlo.** Los perfiles que trae el sistema
+  cargado llevan los tres permisos de inventario juntos, así que el fallo **no se veía**. Se destapaba
+  el día que se repartieran los permisos de verdad **uno por uno** — que es justo lo que toca al
+  arrancar.
+- **La lista de tipos de movimiento es UNA SOLA para todo el inventario**, y así se queda: producto
+  terminado, telas y avíos comparten el mismo catálogo. Se valoró partirla y darle a cada quien la
+  suya, y se descartó con el sistema a la vista: no hay nada que distinga un tipo «de telas» de uno
+  «de producto terminado», y las tres pantallas que la usan la necesitan entera.
+- **No hay permisos nuevos, ni nada que capturar, ni nada que activar.** Quien ya entraba, entra
+  igual; el menú no cambia.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Queda un problema hermano, visto y anotado sin tocar: en Ruta Crítica se puede capturar sin
+  poder ver.** Marcar un proceso como cumplido —o palomear un ítem de su checklist— abre con el
+  permiso de **capturar**, pero la pantalla que se devuelve después exige el de **ver la ruta**. A
+  quien se le dé uno y no el otro, **el avance se le guarda** y acto seguido recibe un *«no tienes
+  permiso»* — o sea que parece que no se guardó, y sí se guardó. Es peor que el de esta versión,
+  porque ahí el cambio ya ocurrió. Queda apuntado como fila propia.
+
 ## 0.159 · 14-sep-2026 · **en prueba** — **La factura del maquilero ya se compara sola contra el documento que le mandamos, y la que no cuadra no se puede pagar**
 
 ### Qué se puede hacer ahora que antes no
