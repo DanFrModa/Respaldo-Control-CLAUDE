@@ -775,7 +775,9 @@ export async function registrarCorte(
 
   // Quien captura ve SU captura completa, precio incluido (desde 0.114 el corte SÍ lleva precio):
   // acaba de teclearlo, y redactárselo en la respuesta sería esconderle lo que él mismo escribió.
-  const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
+  // ⭐ Fila 0.196: el ECO va por `proyectarEtapa` (sin reja de consulta). Con `obtenerEtapa`, quien
+  // lleva `produccion.corte` pero no `produccion.wip-ver` recibía un 403 con el corte YA escrito.
+  const salida = await proyectarEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
 }
@@ -880,7 +882,8 @@ export async function registrarEmpaque(
   }, bd);
 
   // Sin `dispararPublicacion()`: esta etapa NO escribe en el outbox (ver el TSDoc de arriba).
-  return obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
+  // ⭐ Fila 0.196: el ECO va por `proyectarEtapa` (sin reja de consulta), como en el corte.
+  return proyectarEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
 }
 
 /**
@@ -1126,7 +1129,8 @@ export async function registrarEnvioMaquila(
   }, bd);
 
   // Quien capturo el envio TECLEO el precio pactado: su respuesta lo devuelve (no es fuga).
-  const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
+  // ⭐ Fila 0.196: el ECO va por `proyectarEtapa` (sin reja de consulta), como en el corte.
+  const salida = await proyectarEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion();
   return salida;
 }
@@ -1337,7 +1341,10 @@ export async function cancelarEtapaMovimiento(
   }, bd);
 
   dispararPublicacion();
-  return obtenerEtapa(sesion, idEtapa, bd);
+  // ⭐ Fila 0.196: el ECO va por `proyectarEtapa` (sin reja de consulta). SIN opciones, como antes:
+  // el cancelador NO tecleó el precio, así que su redacción sigue derivándose de su propio permiso
+  // `ordenes.ver-precio-real-maquila` —eso no cambia, sólo deja de exigirse `produccion.wip-ver`.
+  return proyectarEtapa(sesion, idEtapa, bd);
 }
 
 /** Obtiene una etapa (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
@@ -1346,6 +1353,9 @@ export async function cancelarEtapaMovimiento(
  * `precioPactado` SE DERIVA del permiso `ordenes.ver-precio-real-maquila` (lecturas y
  * cancelacion); `registrarCorte`/`registrarEnvioMaquila` pasan `false` — quien captura acaba de
  * teclear ese precio y su respuesta lo devuelve (mismo criterio que el PATCH de precios).
+ *
+ * Es la CONSULTA suelta: quien no lleve `produccion.wip-ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarEtapa} (ver su nota).
  */
 export async function obtenerEtapa(
   sesion: SesionUsuario,
@@ -1354,6 +1364,36 @@ export async function obtenerEtapa(
   opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<EtapaSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
+  return proyectarEtapa(sesion, idEtapa, bd, opciones);
+}
+
+/**
+ * ⭐ PROYECCIÓN de una etapa SIN reja de consulta propia (fila 0.196).
+ *
+ * Es el MISMO cuerpo que {@link obtenerEtapa} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de salida, MISMA firma (incluidas las `opciones`, que las capturas usan a propósito para no
+ * redactarle el precio a quien acaba de teclearlo)— pero SIN `verificarPermiso('produccion.wip-ver')`,
+ * porque está pensada para UN solo uso: **devolverle a quien acaba de capturar lo que acaba de
+ * dejar escrito**. La autorización de esa llamada ya la hizo la escritura con su propio permiso
+ * (`produccion.corte` / `.envio` / `.empaque` / `.cancelar`); volver a pedir una llave DESPUÉS del
+ * commit es lo que producía el defecto de esta fila: la captura se guardaba y el usuario recibía un
+ * 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble**, igual que en los hitos de la 0.195: el corte y el envío publican su
+ * evento de outbox, y su `dispararPublicacion()` va DESPUÉS de esta proyección ⇒ cuando saltaba el
+ * 403 la etapa ya estaba escrita **con su folio estampado** (A3, irrepetible) y su evento ya en la
+ * bandeja, pero sin publicar. Quien lo reintentaba —lo natural al leer «no tienes permiso»— dejaba
+ * una SEGUNDA etapa con un SEGUNDO evento: doble corte, doble envío, doble auto-avance de la RC.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerEtapa}, que sí exige `produccion.wip-ver`.
+ */
+export async function proyectarEtapa(
+  sesion: SesionUsuario,
+  idEtapa: number,
+  bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
+): Promise<EtapaSalida> {
   const cliente = clienteLectura(bd);
   const etapa = await cliente.etapaMovimiento.findFirst({
     where: { id: idEtapa, idEmpresa: sesion.idEmpresaActiva },

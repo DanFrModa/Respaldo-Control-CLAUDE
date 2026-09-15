@@ -71,6 +71,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.162 · 15-sep-2026 · **en prueba** — **En la captura diaria de planta ya no pasa que el corte, el envío, el recibo o la entrega se guarden y la pantalla diga «no tienes permiso»**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Capturar corte, envío a maquila, empaque, recibo y entrega a cliente sin que haga falta,
+  además, el permiso de consultar producción.** Hasta ahora cada una de esas capturas se abría con su
+  propio permiso, guardaba —con su folio estampado y su aviso interno puesto— y **la respuesta que se
+  devolvía después exigía otro permiso distinto**, el de ver el avance de producción. A quien se le
+  diera uno y no el otro, la captura **se le guardaba** y acto seguido recibía un *«no tienes
+  permiso»*. Como parecía que no se había guardado, lo volvía a capturar.
+- ⭐ **Y lo mismo al CANCELAR** una etapa de corte/envío/empaque, un recibo o una entrega: quedaban
+  canceladas y la pantalla decía que no se pudo. **Los ocho sitios quedaron parejos.**
+- 🔴 **Por qué éstos eran los peores de todos los que quedaban.** En el corte y el envío, repetir la
+  captura dejaba **dos etapas con dos folios** y **dos avisos internos**, que la Ruta Crítica usa para
+  avanzar sola: el avance se marcaba dos veces. En el **recibo** era peor todavía, porque un recibo de
+  costura **mete la mercancía al almacén y le carga al maquilero**: repetirlo metía el género **dos
+  veces** al inventario y se lo cargaba **dos veces** al taller. Y en la **entrega**, lo mismo al
+  revés: sacaba la mercancía **dos veces**. Nada de eso lo veía quien capturaba, porque su pantalla
+  sólo le decía que no tenía permiso.
+
+### Qué cambió y puede sorprender
+
+- **Quien captura ve, de vuelta, lo que acaba de capturar**, aunque no tenga el permiso de consultar
+  producción. Es el eco de su propio movimiento, no una puerta nueva. **Sólo devuelve ESA captura**:
+  ni el historial de la orden, ni los pendientes, ni el tablero.
+- **El permiso de «ver producción» sigue valiendo para lo que siempre valió:** el historial de etapas
+  de una orden, los pendientes por cortar/enviar/recibir, el seguimiento de entregas, el corte
+  semanal, los recibos semanales y los tres documentos impresos (envío, recibo y comprobante de
+  entrega) **siguen cerrados** sin él. Lo único que dejó de pedirlo es la respuesta de una escritura
+  propia.
+- **El precio se sigue tratando igual que antes, sin un ápice de cambio.** Quien captura un corte o un
+  envío recibe de vuelta el precio **que él mismo acaba de teclear** (no sería razonable
+  escondérselo), y quien cancela un recibo **sigue sin verlo** si no tiene el permiso de precios
+  reales de maquila. Eso no lo tocó esta versión.
+- **Hoy nadie lo estaba sufriendo, y aun así había que arreglarlo.** Los perfiles que trae el sistema
+  cargado llevan los permisos juntos, así que el fallo **no se veía**. Se destapaba el día que se
+  repartan los permisos uno por uno —montar un perfil de «cortador» que sólo capture cortes es
+  exactamente lo que toca al arrancar—. Es el cuarto de la misma familia (van la 0.157, la 0.160 y la
+  0.161).
+- **No hay permisos nuevos, ni nada que capturar, ni nada que activar.** El menú no cambia y quien ya
+  entraba, entra igual.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La misma forma sigue viva en otros sitios del sistema, y están contados.** De los 48 casos que
+  se midieron, esta versión cierra los **ocho de producción** —los peores, por ser captura diaria y
+  por mover inventario— y **nada más**, a propósito. Lo que queda está repartido en tres repasos del
+  plan (las filas 0.197, 0.198 y 0.199), e incluye nueve más del propio módulo de producción que
+  fallan contra un permiso distinto (el de ver órdenes), entre ellos crear y cancelar una orden.
+  **Sigue sin morder mientras los perfiles lleven los permisos juntos**, igual que éste.
+- Lo demás de producción está como estaba: no se movió ninguna regla de negocio, ninguna validación y
+  ningún número.
+
+---
+
 ## 0.161 · 15-sep-2026 · **en prueba** — **En Ruta Crítica ya no pasa que el avance se guarde y la pantalla diga «no tienes permiso»**
 
 ### Qué se puede hacer ahora que antes no
