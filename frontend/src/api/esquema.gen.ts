@@ -67414,6 +67414,11 @@ export interface paths {
                 nombre: string;
                 motivo: string;
               }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
+                nombre: string;
+                motivo: string;
+              }[];
             };
           };
         };
@@ -67662,6 +67667,11 @@ export interface paths {
               }[];
               /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
               bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
                 nombre: string;
                 motivo: string;
               }[];
@@ -68042,6 +68052,11 @@ export interface paths {
                 nombre: string;
                 motivo: string;
               }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
+                nombre: string;
+                motivo: string;
+              }[];
             };
           };
         };
@@ -68317,6 +68332,11 @@ export interface paths {
                 nombre: string;
                 motivo: string;
               }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
+                nombre: string;
+                motivo: string;
+              }[];
             };
           };
         };
@@ -68555,6 +68575,11 @@ export interface paths {
               }[];
               /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
               bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
                 nombre: string;
                 motivo: string;
               }[];
@@ -68810,6 +68835,11 @@ export interface paths {
                 nombre: string;
                 motivo: string;
               }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
+                nombre: string;
+                motivo: string;
+              }[];
             };
           };
         };
@@ -69060,6 +69090,11 @@ export interface paths {
               }[];
               /** @description Renglones que impiden cerrar, con su nombre y el porqué. */
               bloqueos: {
+                nombre: string;
+                motivo: string;
+              }[];
+              /** @description Proveedores con una factura en rojo sin atender, que impiden ejecutar. */
+              bloqueosEjecucion: {
                 nombre: string;
                 motivo: string;
               }[];
@@ -69451,6 +69486,8 @@ export interface paths {
                 idRenglon: number;
                 /** @description Folio de la corrida (por empresa). */
                 folioCorrida: number;
+                /** @description Folio PROPIO del documento (fila 0.117): el número que el proveedor cita en su factura y contra el que se coteja. Se asigna al CERRAR la corrida. `null` en las corridas cerradas antes de esa fila, que siguen rotulándose con el folio de la corrida. */
+                folioDocumento: number | null;
                 /** @description Lunes de la semana que se paga (AAAA-MM-DD). */
                 semana: string;
                 /** @description A nombre de quién se factura (la empresa activa, A9). */
@@ -70049,10 +70086,10 @@ export interface paths {
             /** @description Proveedor al que se le carga el CFDI (elegido a mano). */
             idProveedor: number;
             /**
-             * @description Tipo de operación real a ligar (orden-compra/recepcion). Con refId o ninguno.
+             * @description Tipo de operación real a ligar (orden-compra). Con refId o ninguno.
              * @enum {string}
              */
-            refTipo?: 'orden-compra' | 'recepcion';
+            refTipo?: 'orden-compra';
             /** @description Id de la operación real ligada (según refTipo). */
             refId?: number;
             /** @description Observaciones opcionales. */
@@ -70136,6 +70173,689 @@ export interface paths {
               };
               /** @description Avisos (sin OC, diferencia con la OC, RFC del proveedor…). */
               avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/cotejo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Facturas cotejadas contra los documentos que les emitimos (las que frenan el pago) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description `pendientes` = sólo las que frenan un pago · `todas` = todas las sujetas a cotejo. */
+          filtro?: 'pendientes' | 'todas';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bandeja del cotejo de facturas contra documentos emitidos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturas: {
+                /** @description Id del movimiento de CxP (la factura). */
+                idMovimiento: number;
+                /** @description Folio del movimiento (por empresa). */
+                folio: number;
+                /** @description Fecha de la factura (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Proveedor que factura. */
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                proveedor: string;
+                /** @description UUID del CFDI, si lo trae. */
+                uuidCfdi: string | null;
+                /** @description Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`. */
+                total: number | null;
+                /** @description Suma de lo aplicado a documentos. `null` sin importes. */
+                aplicado: number | null;
+                /** @description |total − aplicado|, ya redondeada. `null` sin importes. */
+                diferencia: number | null;
+                /**
+                 * @description Veredicto mecánico.
+                 * @enum {string}
+                 */
+                estado: 'cuadra' | 'descuadre';
+                /** @description ¿Alguien ya se hizo cargo del descuadre? */
+                atendida: boolean;
+                /** @description Cuándo se atendió (ISO) o null. */
+                atendidaEn: string | null;
+                /** @description Quién la atendió, o null. */
+                atendidaPor: string | null;
+                /** @description La explicación con la que se atendió, o null. */
+                nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
+                /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
+                frenaElPago: boolean;
+                /** @description Los documentos que dice cubrir. */
+                aplicaciones: {
+                  /** @description Documento cubierto. */
+                  idRenglon: number;
+                  /** @description Folio del documento cubierto. */
+                  folioDocumento: number | null;
+                  /** @description Semana del documento (YYYY-MM-DD). */
+                  semana: string;
+                  /** @description Lo que esta factura cubre de él. `null` sin importes. */
+                  importe: number | null;
+                }[];
+              }[];
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
+              enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
+              /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
+              toleranciaPesos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/cotejo/documentos/{idProveedor}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Documentos para facturar emitidos a un proveedor, con lo que les falta por cubrir */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          idProveedor: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Documentos emitidos a un proveedor, con lo que les falta por cubrir. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              documentos: {
+                /** @description Id del renglón de corrida (el documento). */
+                idRenglon: number;
+                /** @description Folio propio del documento. */
+                folioDocumento: number;
+                /** @description Folio de la corrida de la que salió. */
+                folioCorrida: number;
+                /** @description Lunes de la semana pagada (YYYY-MM-DD). */
+                semana: string;
+                /** @description Qué se le pagó (la explicación del renglón). */
+                concepto: string;
+                /** @description Total CON IVA del documento. `null` sin `consultas.ver-importes`. */
+                total: number | null;
+                /** @description Lo que ya cubren facturas (de ésta y de otras). `null` sin ver importes. */
+                aplicado: number | null;
+                /** @description Lo que queda por cubrir (`total − aplicado`). `null` sin ver importes. */
+                disponible: number | null;
+              }[];
+              /** @description La lista se recortó: hay más documentos emitidos de los que caben (§Post-F9.87: sin topes silenciosos). Los que faltan son los MÁS VIEJOS (orden por folio descendente). */
+              hayMas: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/cotejo/{id}/documentos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Dice qué documentos emitidos cubre esta factura (reemplaza las ligas) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento (la factura). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Reemplaza las ligas de una factura con los documentos que cubre. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description La lista COMPLETA de documentos que cubre esta factura. */
+            aplicaciones: {
+              /** @description Documento emitido a cubrir. */
+              idRenglon: number;
+              /** @description Lo que esta factura cubre de ese documento (con IVA). */
+              importe: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Bandeja del cotejo de facturas contra documentos emitidos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturas: {
+                /** @description Id del movimiento de CxP (la factura). */
+                idMovimiento: number;
+                /** @description Folio del movimiento (por empresa). */
+                folio: number;
+                /** @description Fecha de la factura (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Proveedor que factura. */
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                proveedor: string;
+                /** @description UUID del CFDI, si lo trae. */
+                uuidCfdi: string | null;
+                /** @description Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`. */
+                total: number | null;
+                /** @description Suma de lo aplicado a documentos. `null` sin importes. */
+                aplicado: number | null;
+                /** @description |total − aplicado|, ya redondeada. `null` sin importes. */
+                diferencia: number | null;
+                /**
+                 * @description Veredicto mecánico.
+                 * @enum {string}
+                 */
+                estado: 'cuadra' | 'descuadre';
+                /** @description ¿Alguien ya se hizo cargo del descuadre? */
+                atendida: boolean;
+                /** @description Cuándo se atendió (ISO) o null. */
+                atendidaEn: string | null;
+                /** @description Quién la atendió, o null. */
+                atendidaPor: string | null;
+                /** @description La explicación con la que se atendió, o null. */
+                nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
+                /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
+                frenaElPago: boolean;
+                /** @description Los documentos que dice cubrir. */
+                aplicaciones: {
+                  /** @description Documento cubierto. */
+                  idRenglon: number;
+                  /** @description Folio del documento cubierto. */
+                  folioDocumento: number | null;
+                  /** @description Semana del documento (YYYY-MM-DD). */
+                  semana: string;
+                  /** @description Lo que esta factura cubre de él. `null` sin importes. */
+                  importe: number | null;
+                }[];
+              }[];
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
+              enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
+              /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
+              toleranciaPesos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/cotejo/{id}/atender': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Atiende el descuadre de una factura: sigue marcada, pero deja de frenar el pago */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento (la factura). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Atiende el descuadre de una factura. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Por qué esta factura deja de frenar el pago. */
+            nota: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Bandeja del cotejo de facturas contra documentos emitidos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              facturas: {
+                /** @description Id del movimiento de CxP (la factura). */
+                idMovimiento: number;
+                /** @description Folio del movimiento (por empresa). */
+                folio: number;
+                /** @description Fecha de la factura (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Proveedor que factura. */
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                proveedor: string;
+                /** @description UUID del CFDI, si lo trae. */
+                uuidCfdi: string | null;
+                /** @description Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`. */
+                total: number | null;
+                /** @description Suma de lo aplicado a documentos. `null` sin importes. */
+                aplicado: number | null;
+                /** @description |total − aplicado|, ya redondeada. `null` sin importes. */
+                diferencia: number | null;
+                /**
+                 * @description Veredicto mecánico.
+                 * @enum {string}
+                 */
+                estado: 'cuadra' | 'descuadre';
+                /** @description ¿Alguien ya se hizo cargo del descuadre? */
+                atendida: boolean;
+                /** @description Cuándo se atendió (ISO) o null. */
+                atendidaEn: string | null;
+                /** @description Quién la atendió, o null. */
+                atendidaPor: string | null;
+                /** @description La explicación con la que se atendió, o null. */
+                nota: string | null;
+                /** @description La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir. */
+                cancelada: boolean;
+                /** @description En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta. */
+                frenaElPago: boolean;
+                /** @description Los documentos que dice cubrir. */
+                aplicaciones: {
+                  /** @description Documento cubierto. */
+                  idRenglon: number;
+                  /** @description Folio del documento cubierto. */
+                  folioDocumento: number | null;
+                  /** @description Semana del documento (YYYY-MM-DD). */
+                  semana: string;
+                  /** @description Lo que esta factura cubre de él. `null` sin importes. */
+                  importe: number | null;
+                }[];
+              }[];
+              /** @description Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato. */
+              enRojo: number;
+              /** @description La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente). */
+              hayMas: boolean;
+              /** @description La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla. */
+              toleranciaPesos: number;
             };
           };
         };

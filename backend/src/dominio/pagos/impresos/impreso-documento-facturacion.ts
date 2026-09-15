@@ -180,14 +180,25 @@ function paginaDocumento(doc: DocumentoFacturacion): ReactElement {
     EncabezadoDocumento({
       empresa: doc.receptor.razonSocial,
       titulo: 'Documento para facturar — CONTROL v2',
-      derecha: { etiqueta: 'Corrida', valor: `#${String(doc.folioCorrida)}`, grande: true },
+      // ⭐ FILA 0.117 — el número GRANDE es el del DOCUMENTO, no el de la corrida. Es el que el
+      // proveedor tiene que citar en su factura y contra el que se coteja; rotular sólo la corrida
+      // dejaba dos hojas del mismo proveedor con el mismo número y nada que las distinguiera.
+      // Las corridas cerradas antes de esa fila no tienen folio propio y siguen saliendo con el de
+      // la corrida, como hasta hoy (REGLA 0-B: se tolera lo viejo, no se rellena).
+      derecha:
+        doc.folioDocumento === null
+          ? { etiqueta: 'Corrida', valor: `#${String(doc.folioCorrida)}`, grande: true }
+          : { etiqueta: 'Documento', valor: `#${String(doc.folioDocumento)}`, grande: true },
     }),
     h(
       Text,
       { style: estilos.intro, key: 'intro' },
       'Éstos son los datos con los que debe emitirse la factura de este pago. ',
       h(Text, { style: estilos.destacado }, 'Factura exactamente por el total indicado abajo'),
-      `, con el IVA desglosado. Pago de la semana del ${doc.semana}.`,
+      `, con el IVA desglosado. Pago de la semana del ${doc.semana} (corrida #${String(doc.folioCorrida)}).`,
+      doc.folioDocumento === null
+        ? ''
+        : ` Anota el número de este documento (#${String(doc.folioDocumento)}) en tu factura: es con lo que se coteja.`,
     ),
     h(
       View,
@@ -251,7 +262,8 @@ function paginaDocumento(doc: DocumentoFacturacion): ReactElement {
     ),
     PieDocumento({
       contexto:
-        `CONTROL v2 · ${doc.receptor.razonSocial} · Documento para facturar · ` +
+        `CONTROL v2 · ${doc.receptor.razonSocial} · Documento para facturar` +
+        `${doc.folioDocumento === null ? '' : ` #${String(doc.folioDocumento)}`} · ` +
         `corrida ${doc.semana} #${String(doc.folioCorrida)} · ${doc.nombreProveedor}`,
     }),
   ];

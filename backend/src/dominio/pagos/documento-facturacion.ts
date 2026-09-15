@@ -95,6 +95,12 @@ export interface RenglonParaFacturar {
   rubro: RubroPagoClave;
   /** Nombre congelado con el que el renglón sale impreso. */
   nombre: string;
+  /**
+   * ⭐ El FOLIO PROPIO del documento (fila 0.117): el número que el proveedor cita en su factura y
+   * contra el que se coteja. Se asigna al CERRAR la corrida. `null` en las corridas cerradas antes
+   * de esa fila, que siguen saliendo rotuladas con el folio de la corrida (REGLA 0-B: se tolera).
+   */
+  folioDocumento: number | null;
   /** La explicación del pago, si se capturó. */
   concepto: string | null;
   referencia: string | null;
@@ -322,6 +328,7 @@ export function armarDocumento(entrada: EntradaDocumento): DocumentoFacturacion 
     idCorrida: entrada.idCorrida,
     idRenglon: entrada.idRenglon,
     folioCorrida: entrada.folioCorrida,
+    folioDocumento: entrada.renglon.folioDocumento,
     semana: entrada.semana,
     receptor: {
       razonSocial: presente(entrada.receptor.razonSocial),
@@ -415,6 +422,7 @@ function aRenglonParaFacturar(r: RenglonFila): RenglonParaFacturar {
     monto: r.monto.toNumber(),
     rubro: r.rubro,
     nombre: r.nombre,
+    folioDocumento: r.folioDocumento === null ? null : Number(r.folioDocumento),
     concepto: r.concepto,
     referencia: r.referencia,
   };
@@ -553,6 +561,32 @@ export interface DocumentosDeCorrida {
 }
 
 /**
+ * ⭐ EL ORDEN DE LA RELACIÓN, en un solo sitio.
+ *
+ * Por rubro (maquileros primero) y, dentro del rubro, por monto descendente; a igualdad, por
+ * nombre. Es el orden con el que Daniel lee su Excel, con el que sale el concentrado y con el que
+ * se apila el fajo de documentos.
+ *
+ * ⚠️ El rubro se ordena por la POSICIÓN en `ORDEN_RUBROS_PAGO`, **no alfabéticamente**: un
+ * `localeCompare` sobre la clave del enum daría «caja_chica, maquila, nomina…», que no es el suyo.
+ *
+ * Se EXPORTA desde la fila 0.117 porque el CIERRE de la corrida reparte los FOLIOS de documento en
+ * este mismo orden: así el folio más chico es la primera hoja del fajo. Si el comparador viviera
+ * inline aquí, el cierre tendría que copiarlo, y una copia que se desincroniza repartiría folios en
+ * un orden y las hojas en otro.
+ */
+export function compararEnOrdenDeLaRelacion(
+  a: { rubro: RubroPagoClave; monto: { toNumber(): number }; nombre: string },
+  b: { rubro: RubroPagoClave; monto: { toNumber(): number }; nombre: string },
+): number {
+  return (
+    ORDEN_RUBROS_PAGO.indexOf(a.rubro) - ORDEN_RUBROS_PAGO.indexOf(b.rubro) ||
+    b.monto.toNumber() - a.monto.toNumber() ||
+    a.nombre.localeCompare(b.nombre, 'es')
+  );
+}
+
+/**
  * ⭐ LA CORRIDA ENTERA: un documento por cada renglón facturable, y la lista de los que se quedaron
  * fuera con su motivo.
  *
@@ -572,17 +606,9 @@ export async function documentosDeCorrida(
   const cliente = clienteLectura(bd);
   const corrida = await exigirCorrida(cliente, sesion.idEmpresaActiva, idCorrida);
 
-  // ⚠️ El rubro se ordena por la POSICIÓN en `ORDEN_RUBROS_PAGO` (maquileros primero), no
-  // alfabéticamente: es el orden del Excel de Daniel y el mismo con el que sale el concentrado. Un
-  // `localeCompare` sobre la clave del enum daría «caja_chica, maquila, nomina…», que no es el suyo.
   const conMonto = corrida.renglones
     .filter((r) => tieneMonto(r.monto.toNumber()))
-    .sort(
-      (a, b) =>
-        ORDEN_RUBROS_PAGO.indexOf(a.rubro) - ORDEN_RUBROS_PAGO.indexOf(b.rubro) ||
-        b.monto.toNumber() - a.monto.toNumber() ||
-        a.nombre.localeCompare(b.nombre, 'es'),
-    );
+    .sort(compararEnOrdenDeLaRelacion);
 
   const [emisores, receptor] = await Promise.all([
     leerEmisores(cliente, conMonto),

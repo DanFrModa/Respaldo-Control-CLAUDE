@@ -991,6 +991,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         permisos: ['cxp.ver'],
       },
       {
+        clave: 'cotejo-facturas',
+        titulo: 'Cotejo de facturas',
+        descripcion:
+          'La factura del proveedor contra el documento que nosotros le emitimos: la que no cuadra al peso se queda en rojo y no se puede pagar (fila 0.117, §Post-F9.232)',
+        ruta: '/cxp/cotejo',
+        icono: 'recibo',
+        permisos: ['cxp.ver'],
+      },
+      {
         clave: 'reportes-fiscales',
         titulo: 'Reportes fiscales',
         descripcion:
@@ -1751,6 +1760,7 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
       { tipo: 'hoja', clave: 'corrida-pagos' },
       { tipo: 'hoja', clave: 'cxc' },
       { tipo: 'hoja', clave: 'cxp' },
+      { tipo: 'hoja', clave: 'cotejo-facturas' },
       { tipo: 'hoja', clave: 'reportes-fiscales' },
       // Desviación interina (viva hasta F9): EsMa como hoja directa a su portada-hub, que
       // auto-filtra por permiso. NUNCA un desplegable con sus 10 sub-vistas (esas van por ⌘K).

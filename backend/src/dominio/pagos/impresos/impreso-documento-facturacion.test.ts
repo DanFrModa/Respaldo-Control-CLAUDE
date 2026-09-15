@@ -25,6 +25,7 @@ const DOC: DocumentoFacturacion = {
   idCorrida: 7,
   idRenglon: 33,
   folioCorrida: 12,
+  folioDocumento: 1001,
   semana: '2026-08-31',
   receptor: {
     razonSocial: 'EMPRESA DEMO SA DE CV',
@@ -75,6 +76,32 @@ describe('impreso del documento para facturar (una hoja, un pago)', () => {
     // Y se distingue quién es quién.
     expect(texto).toContain('EMISOR');
     expect(texto).toContain('RECEPTOR');
+  });
+
+  it('⭐ EL FOLIO DEL DOCUMENTO SALE IMPRESO: es el número que el proveedor cita en su factura', async () => {
+    // Fila 0.117. Sin él, dos hojas del mismo proveedor en la misma corrida salían con el mismo
+    // número («Corrida #12») y nada que las distinguiera, así que el cotejo no tenía a qué amarrar.
+    // ⚠️ Se asierta el rótulo COMPLETO («DOCUMENTO #1001», el número grande de la esquina) y no un
+    // «Documento» suelto: la hoja se titula «Documento para facturar», así que la palabra sola
+    // pasaría aunque el folio no saliera impreso en ningún lado.
+    const texto = await textoDelPdf(await generarPdfDocumentoFacturacion(DOC));
+    expect(texto).toContain('DOCUMENTO #1001');
+    expect(texto).not.toContain('CORRIDA #12');
+  });
+
+  it('la hoja le PIDE al proveedor que anote ese número en su factura', async () => {
+    const texto = await textoDelPdf(await generarPdfDocumentoFacturacion(DOC));
+    expect(texto).toContain('Anota el número de este documento (#1001) en tu factura');
+  });
+
+  it('sin folio propio (corrida cerrada antes de la 0.117) sigue saliendo con el de la corrida', async () => {
+    // REGLA 0-B: lo viejo se tolera, no se rellena. La hoja no puede quedarse sin número.
+    const texto = await textoDelPdf(
+      await generarPdfDocumentoFacturacion({ ...DOC, folioDocumento: null }),
+    );
+    expect(texto).toContain('CORRIDA #12');
+    expect(texto).not.toContain('#1001');
+    expect(texto).not.toContain('Anota el número de este documento');
   });
 
   it('⭐ el IVA va EXPLÍCITO: subtotal, IVA con su tasa y total, los tres impresos', async () => {

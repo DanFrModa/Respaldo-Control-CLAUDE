@@ -48,7 +48,11 @@ auditado** (patrón kardex), jamás una edición/borrado. Toda la lógica vive e
     (A3, clave `movimiento-tercero`), signo por origen, **vencimiento derivado** del aging
     (`calcularVencimiento` = fecha + días de crédito, solo los cargos vencen), transacción + bitácora
     (A2/A7), cancelación = inverso auditado con **advisory lock + unique parcial** de
-    `idMovimientoInverso` (anti write-skew de doble cancelación).
+    `idMovimientoInverso` (anti write-skew de doble cancelación). ⭐ Desde la fila **0.117** el motor
+    calcula además, en la MISMA transacción, el **veredicto del cotejo** de la factura contra los
+    documentos que FR Moda emitió (`dominio/pagos/cotejo.ts::recalcularCotejo`): va aquí y no en cada
+    llamador para que la factura importada por CFDI, la capturada a mano y la del ETL queden igual.
+    Detalle completo en `pagos-corrida.md` §7-bis.
   - `convivencia-esma.ts` — para un PROVEEDOR, el saldo/estado de cuenta **INCLUYEN** los movimientos
     EsMa (F6) **reusando la fórmula `calcularSaldoMaquilero`** → no-regresión garantizada por
     reutilización; NO se migró ni un dato EsMa (opción **(b)**, compatibilidad de lectura).
@@ -373,4 +377,7 @@ movimiento cancelado **ni suma al saldo ni sigue apareciendo como «esperando tu
   y, más tarde, en producción. Es un **UPDATE a mano**: ninguna pantalla la reparte, ningún seed la
   siembra y ningún endpoint la escribe — que es justo lo que él pidió (§Post-F9.203).
 
-> **Ver también:** `pagos-corrida.md` — la corrida semanal de pagos (0.113) y el catálogo de conceptos de pago (0.125), que es donde los saldos de CxP y EsMa se convierten en pagos.
+> **Ver también:** `pagos-corrida.md` — la corrida semanal de pagos (0.113), el catálogo de conceptos de
+> pago (0.125) y el **cotejo de la factura contra el documento emitido** (0.117, §7-bis: la pantalla
+> *Finanzas › Cotejo de facturas* y el bloqueo del pago), que es donde los saldos de CxP y EsMa se
+> convierten en pagos.

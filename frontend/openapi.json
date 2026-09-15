@@ -173327,12 +173327,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -174217,12 +174238,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -175360,12 +175402,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -176340,12 +176403,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -177239,12 +177323,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -178129,12 +178234,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -179019,12 +179145,33 @@
                         "additionalProperties": false
                       },
                       "description": "Renglones que impiden cerrar, con su nombre y el porqué."
+                    },
+                    "bloqueosEjecucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "motivo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "nombre",
+                          "motivo"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Proveedores con una factura en rojo sin atender, que impiden ejecutar."
                     }
                   },
                   "required": [
                     "corrida",
                     "secciones",
-                    "bloqueos"
+                    "bloqueos",
+                    "bloqueosEjecucion"
                   ],
                   "additionalProperties": false,
                   "description": "La pantalla de trabajo de una corrida de pagos."
@@ -179975,6 +180122,19 @@
                               "maximum": 9007199254740991,
                               "description": "Folio de la corrida (por empresa)."
                             },
+                            "folioDocumento": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Folio PROPIO del documento (fila 0.117): el número que el proveedor cita en su factura y contra el que se coteja. Se asigna al CERRAR la corrida. `null` en las corridas cerradas antes de esa fila, que siguen rotulándose con el folio de la corrida."
+                            },
                             "semana": {
                               "type": "string",
                               "description": "Lunes de la semana que se paga (AAAA-MM-DD)."
@@ -180100,6 +180260,7 @@
                             "idCorrida",
                             "idRenglon",
                             "folioCorrida",
+                            "folioDocumento",
                             "semana",
                             "receptor",
                             "emisor",
@@ -181171,11 +181332,10 @@
                     "description": "Proveedor al que se le carga el CFDI (elegido a mano)."
                   },
                   "refTipo": {
-                    "description": "Tipo de operación real a ligar (orden-compra/recepcion). Con refId o ninguno.",
+                    "description": "Tipo de operación real a ligar (orden-compra). Con refId o ninguno.",
                     "type": "string",
                     "enum": [
-                      "orden-compra",
-                      "recepcion"
+                      "orden-compra"
                     ]
                   },
                   "refId": {
@@ -181484,6 +181644,1578 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de importar un CFDI de proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxp/cotejo": {
+      "get": {
+        "summary": "Facturas cotejadas contra los documentos que les emitimos (las que frenan el pago)",
+        "tags": [
+          "cxp"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": "pendientes",
+              "type": "string",
+              "enum": [
+                "pendientes",
+                "todas"
+              ]
+            },
+            "in": "query",
+            "name": "filtro",
+            "required": false,
+            "description": "`pendientes` = sólo las que frenan un pago · `todas` = todas las sujetas a cotejo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bandeja del cotejo de facturas contra documentos emitidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idMovimiento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del movimiento de CxP (la factura)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del movimiento (por empresa)."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha de la factura (YYYY-MM-DD)."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proveedor que factura."
+                          },
+                          "proveedor": {
+                            "type": "string",
+                            "description": "Nombre del proveedor."
+                          },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID del CFDI, si lo trae."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`."
+                          },
+                          "aplicado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de lo aplicado a documentos. `null` sin importes."
+                          },
+                          "diferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "|total − aplicado|, ya redondeada. `null` sin importes."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "cuadra",
+                              "descuadre"
+                            ],
+                            "description": "Veredicto mecánico."
+                          },
+                          "atendida": {
+                            "type": "boolean",
+                            "description": "¿Alguien ya se hizo cargo del descuadre?"
+                          },
+                          "atendidaEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se atendió (ISO) o null."
+                          },
+                          "atendidaPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién la atendió, o null."
+                          },
+                          "nota": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "La explicación con la que se atendió, o null."
+                          },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
+                          "frenaElPago": {
+                            "type": "boolean",
+                            "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
+                          },
+                          "aplicaciones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idRenglon": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Documento cubierto."
+                                },
+                                "folioDocumento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Folio del documento cubierto."
+                                },
+                                "semana": {
+                                  "type": "string",
+                                  "description": "Semana del documento (YYYY-MM-DD)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que esta factura cubre de él. `null` sin importes."
+                                }
+                              },
+                              "required": [
+                                "idRenglon",
+                                "folioDocumento",
+                                "semana",
+                                "importe"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una aplicación de la factura a un documento emitido."
+                            },
+                            "description": "Los documentos que dice cubrir."
+                          }
+                        },
+                        "required": [
+                          "idMovimiento",
+                          "folio",
+                          "fecha",
+                          "idProveedor",
+                          "proveedor",
+                          "uuidCfdi",
+                          "total",
+                          "aplicado",
+                          "diferencia",
+                          "estado",
+                          "atendida",
+                          "atendidaEn",
+                          "atendidaPor",
+                          "nota",
+                          "cancelada",
+                          "frenaElPago",
+                          "aplicaciones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una factura de proveedor cotejada contra los documentos emitidos."
+                      }
+                    },
+                    "enRojo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
+                    },
+                    "toleranciaPesos": {
+                      "type": "number",
+                      "description": "La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla."
+                    }
+                  },
+                  "required": [
+                    "facturas",
+                    "enRojo",
+                    "hayMas",
+                    "toleranciaPesos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bandeja del cotejo de facturas contra documentos emitidos."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxp/cotejo/documentos/{idProveedor}": {
+      "get": {
+        "summary": "Documentos para facturar emitidos a un proveedor, con lo que les falta por cubrir",
+        "tags": [
+          "cxp"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idProveedor",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documentos emitidos a un proveedor, con lo que les falta por cubrir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documentos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idRenglon": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de corrida (el documento)."
+                          },
+                          "folioDocumento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio propio del documento."
+                          },
+                          "folioCorrida": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la corrida de la que salió."
+                          },
+                          "semana": {
+                            "type": "string",
+                            "description": "Lunes de la semana pagada (YYYY-MM-DD)."
+                          },
+                          "concepto": {
+                            "type": "string",
+                            "description": "Qué se le pagó (la explicación del renglón)."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total CON IVA del documento. `null` sin `consultas.ver-importes`."
+                          },
+                          "aplicado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lo que ya cubren facturas (de ésta y de otras). `null` sin ver importes."
+                          },
+                          "disponible": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lo que queda por cubrir (`total − aplicado`). `null` sin ver importes."
+                          }
+                        },
+                        "required": [
+                          "idRenglon",
+                          "folioDocumento",
+                          "folioCorrida",
+                          "semana",
+                          "concepto",
+                          "total",
+                          "aplicado",
+                          "disponible"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un documento para facturar emitido a este proveedor."
+                      }
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más documentos emitidos de los que caben (§Post-F9.87: sin topes silenciosos). Los que faltan son los MÁS VIEJOS (orden por folio descendente)."
+                    }
+                  },
+                  "required": [
+                    "documentos",
+                    "hayMas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Documentos emitidos a un proveedor, con lo que les falta por cubrir."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxp/cotejo/{id}/documentos": {
+      "put": {
+        "summary": "Dice qué documentos emitidos cubre esta factura (reemplaza las ligas)",
+        "tags": [
+          "cxp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "aplicaciones": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idRenglon": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Documento emitido a cubrir."
+                        },
+                        "importe": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "description": "Lo que esta factura cubre de ese documento (con IVA)."
+                        }
+                      },
+                      "required": [
+                        "idRenglon",
+                        "importe"
+                      ]
+                    },
+                    "description": "La lista COMPLETA de documentos que cubre esta factura."
+                  }
+                },
+                "required": [
+                  "aplicaciones"
+                ],
+                "description": "Reemplaza las ligas de una factura con los documentos que cubre."
+              }
+            }
+          },
+          "description": "Reemplaza las ligas de una factura con los documentos que cubre."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento (la factura)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bandeja del cotejo de facturas contra documentos emitidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idMovimiento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del movimiento de CxP (la factura)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del movimiento (por empresa)."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha de la factura (YYYY-MM-DD)."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proveedor que factura."
+                          },
+                          "proveedor": {
+                            "type": "string",
+                            "description": "Nombre del proveedor."
+                          },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID del CFDI, si lo trae."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`."
+                          },
+                          "aplicado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de lo aplicado a documentos. `null` sin importes."
+                          },
+                          "diferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "|total − aplicado|, ya redondeada. `null` sin importes."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "cuadra",
+                              "descuadre"
+                            ],
+                            "description": "Veredicto mecánico."
+                          },
+                          "atendida": {
+                            "type": "boolean",
+                            "description": "¿Alguien ya se hizo cargo del descuadre?"
+                          },
+                          "atendidaEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se atendió (ISO) o null."
+                          },
+                          "atendidaPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién la atendió, o null."
+                          },
+                          "nota": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "La explicación con la que se atendió, o null."
+                          },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
+                          "frenaElPago": {
+                            "type": "boolean",
+                            "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
+                          },
+                          "aplicaciones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idRenglon": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Documento cubierto."
+                                },
+                                "folioDocumento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Folio del documento cubierto."
+                                },
+                                "semana": {
+                                  "type": "string",
+                                  "description": "Semana del documento (YYYY-MM-DD)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que esta factura cubre de él. `null` sin importes."
+                                }
+                              },
+                              "required": [
+                                "idRenglon",
+                                "folioDocumento",
+                                "semana",
+                                "importe"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una aplicación de la factura a un documento emitido."
+                            },
+                            "description": "Los documentos que dice cubrir."
+                          }
+                        },
+                        "required": [
+                          "idMovimiento",
+                          "folio",
+                          "fecha",
+                          "idProveedor",
+                          "proveedor",
+                          "uuidCfdi",
+                          "total",
+                          "aplicado",
+                          "diferencia",
+                          "estado",
+                          "atendida",
+                          "atendidaEn",
+                          "atendidaPor",
+                          "nota",
+                          "cancelada",
+                          "frenaElPago",
+                          "aplicaciones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una factura de proveedor cotejada contra los documentos emitidos."
+                      }
+                    },
+                    "enRojo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
+                    },
+                    "toleranciaPesos": {
+                      "type": "number",
+                      "description": "La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla."
+                    }
+                  },
+                  "required": [
+                    "facturas",
+                    "enRojo",
+                    "hayMas",
+                    "toleranciaPesos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bandeja del cotejo de facturas contra documentos emitidos."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxp/cotejo/{id}/atender": {
+      "post": {
+        "summary": "Atiende el descuadre de una factura: sigue marcada, pero deja de frenar el pago",
+        "tags": [
+          "cxp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nota": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000,
+                    "description": "Por qué esta factura deja de frenar el pago."
+                  }
+                },
+                "required": [
+                  "nota"
+                ],
+                "description": "Atiende el descuadre de una factura."
+              }
+            }
+          },
+          "description": "Atiende el descuadre de una factura."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento (la factura)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bandeja del cotejo de facturas contra documentos emitidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "facturas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idMovimiento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del movimiento de CxP (la factura)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del movimiento (por empresa)."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha de la factura (YYYY-MM-DD)."
+                          },
+                          "idProveedor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proveedor que factura."
+                          },
+                          "proveedor": {
+                            "type": "string",
+                            "description": "Nombre del proveedor."
+                          },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID del CFDI, si lo trae."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total CON IVA de la factura (positivo). `null` sin `consultas.ver-importes`."
+                          },
+                          "aplicado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de lo aplicado a documentos. `null` sin importes."
+                          },
+                          "diferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "|total − aplicado|, ya redondeada. `null` sin importes."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "cuadra",
+                              "descuadre"
+                            ],
+                            "description": "Veredicto mecánico."
+                          },
+                          "atendida": {
+                            "type": "boolean",
+                            "description": "¿Alguien ya se hizo cargo del descuadre?"
+                          },
+                          "atendidaEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se atendió (ISO) o null."
+                          },
+                          "atendidaPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién la atendió, o null."
+                          },
+                          "nota": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "La explicación con la que se atendió, o null."
+                          },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "La factura se canceló (su inverso la anuló, D3). Ya no cobra nada, no frena ningún pago y sus ligas dejaron de ocupar sitio en los documentos: su `aplicado` es 0 aunque abajo sigan listadas, como rastro de lo que decía cubrir."
+                          },
+                          "frenaElPago": {
+                            "type": "boolean",
+                            "description": "En rojo y sin atender: mientras esté así, a ese proveedor no se le ejecuta."
+                          },
+                          "aplicaciones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idRenglon": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Documento cubierto."
+                                },
+                                "folioDocumento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Folio del documento cubierto."
+                                },
+                                "semana": {
+                                  "type": "string",
+                                  "description": "Semana del documento (YYYY-MM-DD)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que esta factura cubre de él. `null` sin importes."
+                                }
+                              },
+                              "required": [
+                                "idRenglon",
+                                "folioDocumento",
+                                "semana",
+                                "importe"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Una aplicación de la factura a un documento emitido."
+                            },
+                            "description": "Los documentos que dice cubrir."
+                          }
+                        },
+                        "required": [
+                          "idMovimiento",
+                          "folio",
+                          "fecha",
+                          "idProveedor",
+                          "proveedor",
+                          "uuidCfdi",
+                          "total",
+                          "aplicado",
+                          "diferencia",
+                          "estado",
+                          "atendida",
+                          "atendidaEn",
+                          "atendidaPor",
+                          "nota",
+                          "cancelada",
+                          "frenaElPago",
+                          "aplicaciones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una factura de proveedor cotejada contra los documentos emitidos."
+                      }
+                    },
+                    "enRojo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas frenan un pago ahora mismo (conteo, no importe). Se cuenta CONTRA LA BASE y sin tope, nunca sobre la lista de arriba: es el número que la pantalla enseña como dato."
+                    },
+                    "hayMas": {
+                      "type": "boolean",
+                      "description": "La lista se recortó: hay más facturas de las que caben (§Post-F9.87: sin topes silenciosos). Las que faltan son las MÁS VIEJAS (orden por fecha descendente)."
+                    },
+                    "toleranciaPesos": {
+                      "type": "number",
+                      "description": "La tolerancia vigente, en pesos. Viaja para que la pantalla la explique sin copiarla."
+                    }
+                  },
+                  "required": [
+                    "facturas",
+                    "enRojo",
+                    "hayMas",
+                    "toleranciaPesos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bandeja del cotejo de facturas contra documentos emitidos."
                 }
               }
             }

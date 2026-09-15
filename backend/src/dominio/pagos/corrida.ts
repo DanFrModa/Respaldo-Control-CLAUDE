@@ -48,13 +48,13 @@ import {
   type RenglonCorridaSalida,
   type RubroPagoClave,
 } from '../../contrato/index.js';
-import type { Prisma } from '../../datos/index.js';
+import type { Prisma, PrismaClient } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { siguienteFolio } from '../../comun/secuencias.js';
+import { reservarBloqueFolios, siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -87,12 +87,34 @@ import {
   type CorridaConRenglones,
   type RenglonFila,
 } from './acceso-corrida.js';
-import { facturabilidadDeRenglones, SIN_FACTURACION } from './documento-facturacion.js';
+import { facturasQueFrenanElPago } from './cotejo.js';
+import {
+  compararEnOrdenDeLaRelacion,
+  facturabilidadDeRenglones,
+  SIN_FACTURACION,
+} from './documento-facturacion.js';
 import { aDateColumna, aFechaIso, lunesDeLaSemana, rangoDeLaSemana } from './semana.js';
 import { redondear2, tieneMonto, totalesDe } from './totales.js';
 
 /** Clave de la secuencia del folio (A3). Una clave por transacción. */
 const CLAVE_FOLIO_CORRIDA = 'corrida-pago';
+
+/**
+ * ⭐ Clave de la secuencia del FOLIO DEL DOCUMENTO PARA FACTURAR (fila 0.117, A3). Es la **octava
+ * serie** de folios del sistema (§Post-F9.233: las otras siete son pedidos, OP, OC, notas de
+ * salida, etapas, auditorías y movimientos de terceros) y, como todas, se numera POR EMPRESA.
+ *
+ * Es un número que sale del sistema y **acaba en manos de un tercero**: el maquilero lo cita en su
+ * factura.
+ *
+ * ⚠️ **NO entra en el escalón del arranque** (`migracion/reparar-secuencias.ts`), y es a propósito:
+ * las siete series de §Post-F9.233 saltan al siguiente millar porque **vienen con pasado** (el
+ * sistema viejo ya numeró esas notas, esas OC, esas OP) y hay que dejar hueco. Ésta **nace en cero
+ * el día del arranque**: no existía en Access, nadie tiene un documento con su número, y la regla
+ * del millar no tendría de qué saltar. Si algún día Daniel quiere que también empiece en un millar,
+ * se pregunta y se agrega ahí — no se deduce.
+ */
+export const CLAVE_FOLIO_DOCUMENTO = 'documento-facturacion';
 
 /**
  * Namespace del `pg_advisory_xact_lock` que serializa las corridas de UNA empresa. Segunda clave =
@@ -232,6 +254,8 @@ export async function crearCorrida(
       await tx.renglonCorridaPago.create({
         data: {
           idCorrida: corrida.id,
+          // La empresa se COPIA de la corrida (fila 0.117): es la dueña del folio de documento.
+          idEmpresa,
           origen: 'concepto',
           idConcepto: concepto.id,
           rubro: concepto.rubro,
@@ -552,7 +576,40 @@ export async function obtenerCorridaDetalle(
     corrida: proyectarCorrida(corrida, puedeVerImportes),
     secciones,
     bloqueos: bloqueosDeCierre(corrida),
+    bloqueosEjecucion: await bloqueosDeEjecucion(cliente, corrida),
   };
+}
+
+/**
+ * ⭐ LO QUE IMPIDE EJECUTAR: los proveedores con una factura EN ROJO y sin atender (fila 0.117,
+ * §Post-F9.232 (c) — *«se queda en rojo hasta que atiendan el problema»*).
+ *
+ * Mismo patrón que {@link bloqueosDeCierre}: una lista con NOMBRES, que la pantalla pinta y que el
+ * ejecutar vuelve a consultar para lanzar. No se confía en lo que la pantalla traía: entre que se
+ * pintó y que alguien pulsó «ejecutar» pudo importarse otra factura.
+ *
+ * ⚠️ **Sólo en la relación CON FACTURA.** Es la única que produce documentos y contra la que se
+ * emiten facturas; la relación SIN factura es otro reparto de dinero, y frenarla por un CFDI que no
+ * la toca sería castigar un pago por algo que no tiene que ver con él.
+ */
+async function bloqueosDeEjecucion(
+  cliente: Tx | PrismaClient,
+  corrida: CorridaConRenglones,
+): Promise<{ nombre: string; motivo: string }[]> {
+  if (!corrida.conFactura) {
+    return [];
+  }
+  const idsProveedor = corrida.renglones.flatMap((r) =>
+    tieneMonto(r.monto.toNumber()) && r.idProveedor !== null ? [r.idProveedor] : [],
+  );
+  const facturas = await facturasQueFrenanElPago(cliente, corrida.idEmpresa, idsProveedor);
+  return facturas.map((f) => ({
+    nombre: f.proveedor,
+    motivo:
+      `Su factura ${String(f.folio)}${f.uuidCfdi === null ? '' : ` (${f.uuidCfdi})`} no cuadra con ` +
+      'los documentos que le emitimos y nadie la ha atendido. Revísala en Cuentas por pagar › ' +
+      'Cotejo de facturas: liga los documentos que cubre, o atiéndela explicando la diferencia.',
+  }));
 }
 
 /**
@@ -789,7 +846,9 @@ export async function guardarRenglonCorrida(
 
     if (idRenglon === undefined) {
       const creado = await tx.renglonCorridaPago.create({
-        data: { idCorrida, ...datosRenglon, ...datosCreacion(sesion) },
+        // `idEmpresa` se COPIA de la corrida (fila 0.117): es la dueña del folio de documento, y la
+        // corrida ya viene comprobada de la empresa activa por `exigirCorrida` (A9).
+        data: { idCorrida, idEmpresa, ...datosRenglon, ...datosCreacion(sesion) },
       });
       await registrarBitacora(tx, sesion, {
         entidad: 'RenglonCorridaPago',
@@ -993,6 +1052,8 @@ export async function cerrarCorrida(
       );
     }
 
+    const conFolio = await repartirFoliosDeDocumento(tx, sesion, corrida, conMonto);
+
     await tx.corridaPago.update({
       where: { id: idCorrida },
       data: {
@@ -1010,12 +1071,71 @@ export async function cerrarCorrida(
         operacion: 'cerrar',
         folio: Number(corrida.folio),
         renglonesConMonto: conMonto.length,
+        documentosNumerados: conFolio,
         total: redondear2(conMonto.reduce((s, r) => s + r.monto.toNumber(), 0)),
       },
     });
   }, bd);
 
   return obtenerCorridaDetalle(sesion, idCorrida, bd);
+}
+
+/**
+ * ⭐ REPARTE LOS FOLIOS DE DOCUMENTO al cerrar (fila 0.117). Devuelve cuántos numeró.
+ *
+ * ## Por qué AL CERRAR y no al imprimir
+ * Cerrar es el momento en que la relación queda FINAL (`evaluarFacturabilidad` ni siquiera emite
+ * documento mientras la corrida esté en borrador, porque los montos todavía se mueven). Numerar al
+ * imprimir obligaría a ESCRIBIR en una lectura y haría que el número dependiera de quién abrió el
+ * PDF primero; numerar al cerrar lo deja amarrado al hecho que sí es definitivo.
+ *
+ * ## A quién le toca folio
+ * Sólo a los renglones de una corrida **CON FACTURA**, **con monto** y que **no son un concepto del
+ * catálogo**. La relación sin factura no lleva comprobante por definición, un renglón en cero no es
+ * un pago, y un concepto (caja chica, nómina por fuera) no tiene quién facture. Los renglones en
+ * EFECTIVO no hacen falta descartarlos aquí: la guarda fiscal de {@link bloqueosDeCierre} ya impide
+ * cerrar una corrida CON factura que los tenga.
+ *
+ * ## Cómo
+ * Un solo `reservarBloqueFolios` (A3: una sentencia atómica, bloques disjuntos bajo concurrencia)
+ * en vez de N llamadas a la secuencia dentro de la transacción, y el reparto se hace en el ORDEN DE
+ * LA RELACIÓN (`compararEnOrdenDeLaRelacion`), para que el folio más chico sea la primera hoja del
+ * fajo que se manda.
+ *
+ * Los que YA traen folio se saltan: cerrar ocurre una sola vez (`exigirBorrador` lo garantiza), pero
+ * si algún día se llegara aquí dos veces, renumerar un documento que un maquilero ya tiene en la
+ * mano sería mucho peor que no hacer nada.
+ */
+async function repartirFoliosDeDocumento(
+  tx: Tx,
+  sesion: SesionUsuario,
+  corrida: CorridaConRenglones,
+  conMonto: readonly RenglonFila[],
+): Promise<number> {
+  if (!corrida.conFactura) {
+    return 0;
+  }
+  const porNumerar = conMonto
+    .filter((r) => r.origen !== 'concepto' && r.folioDocumento === null)
+    .sort(compararEnOrdenDeLaRelacion);
+  if (porNumerar.length === 0) {
+    return 0;
+  }
+
+  const ultimo = await reservarBloqueFolios(
+    tx,
+    corrida.idEmpresa,
+    CLAVE_FOLIO_DOCUMENTO,
+    porNumerar.length,
+  );
+  const primero = ultimo - BigInt(porNumerar.length) + 1n;
+  for (const [i, renglon] of porNumerar.entries()) {
+    await tx.renglonCorridaPago.update({
+      where: { id: renglon.id },
+      data: { folioDocumento: primero + BigInt(i), ...datosModificacion(sesion) },
+    });
+  }
+  return porNumerar.length;
 }
 
 /**
@@ -1058,6 +1178,18 @@ export async function ejecutarCorrida(
         corrida.estado === 'borrador'
           ? `La corrida ${String(corrida.folio)} todavía está en borrador: ciérrala antes de ejecutarla.`
           : `La corrida ${String(corrida.folio)} ya se ejecutó.`,
+      );
+    }
+
+    // ⭐ FILA 0.117 — la factura en rojo FRENA el pago (§Post-F9.232 (c)). Se vuelve a consultar
+    // aquí, dentro de la transacción y bajo el lock de la corrida, y NO se confía en lo que la
+    // pantalla traía: entre que se pintó el detalle y que alguien pulsó «ejecutar» pudo importarse
+    // otra factura que no cuadra. Se nombra a cada culpable, igual que la guarda fiscal del cierre.
+    const enRojo = await bloqueosDeEjecucion(tx, corrida);
+    if (enRojo.length > 0) {
+      throw new ErrorValidacion(
+        'No se puede ejecutar: hay facturas que no cuadran con los documentos que emitimos. ' +
+          enRojo.map((b) => `${b.nombre} — ${b.motivo}`).join(' · '),
       );
     }
 

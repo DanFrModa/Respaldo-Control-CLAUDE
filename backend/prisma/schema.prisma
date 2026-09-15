@@ -158,6 +158,9 @@ model Empresa {
   /// Corridas semanales de pago de esta empresa (0.113, A9). Restrict.
   corridasPago CorridaPago[]
 
+  /// Renglones de corrida de esta empresa: los DOCUMENTOS para facturar y su folio (0.117, A9).
+  renglonesCorridaPago RenglonCorridaPago[]
+
   /// ⭐ FILA 0.103 — ubicaciones físicas ANOTADAS POR ESTA EMPRESA (A9). Restrict: la empresa no se
   /// borra físico —se desactiva—, y sus anotaciones de almacén viajan con ella.
   ubicacionesTelaColor UbicacionTelaColor[]
@@ -5503,6 +5506,25 @@ enum OrigenMovimientoTercero {
   @@map("origen_movimiento_tercero")
 }
 
+/// VEREDICTO DEL COTEJO de una factura de proveedor contra los DOCUMENTOS que FR Moda le emitio
+/// (fila 0.117, Post-F9.232 (a)/(b)). Es MECANICO y se RECALCULA en la misma transaccion cada vez
+/// que cambian sus ligas: la suma de lo aplicado contra el TOTAL CON IVA del CFDI, con UN PESO FIJO
+/// de tolerancia (`pagos/cotejo-tolerancia.ts` - Daniel: *"esta bien con 1 peso de diferencia"*, sin
+/// porcentaje). `NULL` = a esta factura no le toca cotejo (ver `MovimientoTercero.estadoCotejo`).
+///
+/// OJO: aqui NO vive la decision humana. "Atendida" es otra cosa y va en sus propias columnas
+/// (`cotejoAtendidoEn`/`PorId`/`cotejoNota`). Si viviera en este enum, recalcular al cambiar una liga
+/// borraria en silencio el acto de una persona.
+enum EstadoCotejoFactura {
+  /// Lo aplicado a documentos emitidos cuadra al peso con el total del CFDI.
+  cuadra
+  /// EN ROJO: no cuadra (o no tiene ni una liga, que es el descuadre mas comun). Mientras este
+  /// asi y NADIE la haya atendido, a ese proveedor no se le ejecuta la corrida CON factura.
+  descuadre
+
+  @@map("estado_cotejo_factura")
+}
+
 /// Movimiento de la cuenta corriente de un tercero (F9-E1, D12/D15/R10). Es el ladrillo del que
 /// se derivan CxC/CxP: `saldo(tercero) = Σ monto` (nunca una columna editable — D3). Dos ejes por
 /// movimiento: `origen` (de dónde nace + su dirección) y `esFiscal` (si entra al reporte del
@@ -5583,6 +5605,27 @@ model MovimientoTercero {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  // -- EL COTEJO CONTRA LO QUE EMITIMOS (fila 0.117, Post-F9.232) --------------------------
+  /// Veredicto MECANICO del cotejo, o `NULL` si a esta factura no le toca. Le toca solo a la
+  /// FACTURA DE UN PROVEEDOR que NO va ligada a una operacion de compra (`refTipo IS NULL`): esa es
+  /// la que nace contra un documento que nosotros emitimos (maquila, servicios). Una factura ligada
+  /// a una OC se coteja contra la OC y no contra un documento de pago, y un pago, abono o nota de
+  /// credito no se coteja contra nada. Lo recalcula el dominio, nunca se teclea.
+  estadoCotejo EstadoCotejoFactura? @map("estado_cotejo")
+
+  /// ATENDIDA: cuando, quien y con que explicacion alguien con `cxp.administrar` se hizo cargo del
+  /// descuadre. Daniel (Post-F9.232 (c)): *"se queda en rojo hasta que atiendan el problema"* - la
+  /// factura NO se rechaza, entra marcada y deja de frenar el pago cuando alguien la atiende y dice
+  /// por que. Va aparte del veredicto a proposito: el veredicto se recalcula, esto es un HECHO
+  /// auditado (D3/A7).
+  cotejoAtendidoEn    DateTime? @map("cotejo_atendido_en")
+  cotejoAtendidoPorId String?   @map("cotejo_atendido_por_id")
+  cotejoNota          String?   @map("cotejo_nota") @db.Text
+
+  /// Los documentos emitidos que esta factura dice cubrir (0.117). Puede cubrir VARIOS
+  /// (Post-F9.232 (d): *"como venga"*), y un mismo documento puede repartirse entre varias facturas.
+  cotejos CotejoFacturaDocumento[]
+
   /// Renglón de la corrida semanal que lo originó (0.113), si nació de una. Restrict.
   ///
   /// ⚠️ Relación **1-a-1 opcional**, no una lista: la FK del renglón lleva `@@unique`, así que a un
@@ -5609,7 +5652,43 @@ model MovimientoTercero {
   @@index([idArchivoCfdi])
   @@index([idEmpresa, tipoTercero, idProveedor])
   @@index([idEmpresa, tipoTercero, idCliente])
+  /// La bandeja del cotejo (fila 0.117) entra por aqui: las facturas EN ROJO de una empresa.
+  @@index([idEmpresa, estadoCotejo])
   @@map("movimientos_tercero")
+}
+
+/// LA LIGA ENTRE UNA FACTURA Y UN DOCUMENTO EMITIDO (fila 0.117, Post-F9.232 (d)).
+///
+/// Daniel: *"como venga"* - **una factura puede cubrir varios documentos y varias facturas pueden
+/// cubrir uno solo**. Por eso es una TABLA de aplicaciones y no un `refTipo`/`refId` en el
+/// movimiento: esa columna solo sabe apuntar a UNA cosa, y la decision descarta el 1:1 de forma
+/// explicita. Mismo patron que `PagoAplicacion` (el pago de maquila contra sus cargos).
+///
+/// `importe` es lo que ESA factura cubre de ESE documento (> 0). Las dos invariantes viven en el
+/// dominio (`dominio/pagos/cotejo.ts`), bajo lock y por SUMA DIRECTA (D3, jamas una columna de
+/// saldo): ninguna factura aplica mas de su total, y ningun documento recibe mas de su monto.
+model CotejoFacturaDocumento {
+  /// La FACTURA del proveedor (movimiento de CxP con su CFDI). Cascade: si el movimiento
+  /// desapareciera, su liga no significa nada. (Los movimientos no se borran -se cancelan con un
+  /// inverso, D3-, asi que en la practica es una red de seguridad.)
+  idMovimiento Int               @map("id_movimiento")
+  movimiento   MovimientoTercero @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
+
+  /// El DOCUMENTO que FR Moda emitio: el renglon de la corrida, con su `folioDocumento`. Restrict:
+  /// un documento con facturas encima no se puede hacer desaparecer por debajo.
+  idRenglon Int                @map("id_renglon")
+  renglon   RenglonCorridaPago @relation(fields: [idRenglon], references: [id], onDelete: Restrict)
+
+  /// Lo que esta factura cubre de este documento, CON IVA (> 0, CHECK en la migracion). Es la misma
+  /// unidad en los dos lados: el total que imprime el documento y el total que trae el CFDI.
+  importe Decimal @db.Decimal(14, 2)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idMovimiento, idRenglon])
+  @@index([idRenglon])
+  @@map("cotejo_factura_documento")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9902,6 +9981,27 @@ model RenglonCorridaPago {
   idCorrida Int         @map("id_corrida")
   corrida   CorridaPago @relation(fields: [idCorrida], references: [id], onDelete: Cascade)
 
+  /// Empresa duena del renglon y de su FOLIO DE DOCUMENTO (A9, fila 0.117). Es una COPIA de la
+  /// empresa de la corrida -el renglon nunca cambia de corrida- y existe por una razon concreta:
+  /// el folio del documento se numera POR EMPRESA (A3), y sin esta columna no habria donde colgar
+  /// el `@@unique([idEmpresa, folioDocumento])` que impide dos documentos con el mismo numero.
+  /// Restrict: una empresa no se borra fisico, se desactiva.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// EL FOLIO DEL DOCUMENTO QUE FR MODA EMITE (fila 0.117, Post-F9.232). El renglon YA es el
+  /// documento para facturar (`dominio/pagos/documento-facturacion.ts`); lo que le faltaba era
+  /// IDENTIDAD: el impreso solo rotulaba "Corrida #N" y una corrida puede tener N renglones del
+  /// mismo proveedor, o sea dos hojas con el mismo numero y nada que las distinga. Este es el
+  /// numero que el maquilero cita en su factura y contra el que se coteja.
+  ///
+  /// Se asigna AL CERRAR la corrida (es el momento en que la relacion queda final y el documento se
+  /// puede emitir), por SECUENCIA ATOMICA `documento-facturacion` (A3, jamas `Max()+1`), y solo a
+  /// los renglones de una corrida CON FACTURA que llevan monto y NO son un concepto del catalogo
+  /// (un concepto no tiene quien facture). NULL = este renglon no produce documento, o su corrida
+  /// se cerro antes de esta fila (REGLA 0-B: se tolera, no se rellena).
+  folioDocumento BigInt? @map("folio_documento")
+
   /// De dónde viene (discrimina cuál FK de abajo está poblada — CHECK en la migración).
   origen              OrigenRenglonPago
   /// Proveedor (maquilero o no), o NULL si el renglón es de un concepto. Restrict.
@@ -9979,13 +10079,20 @@ model RenglonCorridaPago {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  /// Las facturas del proveedor que dicen cubrir ESTE documento (fila 0.117).
+  cotejos CotejoFacturaDocumento[]
+
   /// ⭐ UNA vez y sólo una: el movimiento que nace al ejecutar es de ESTE renglón y de ningún otro.
   /// Es la defensa de la idempotencia EN LA BASE (el dominio ya la sostiene con el estado de la
   /// corrida). Los NULL son distintos entre sí en Postgres, así que los renglones sin ejecutar
   /// conviven sin estorbarse.
   @@unique([idPagoMaquilero])
   @@unique([idMovimientoTercero])
+  /// UN folio de documento por empresa (A9/A3). Los NULL son DISTINTOS entre si en Postgres, asi
+  /// que los renglones que no producen documento conviven sin estorbarse.
+  @@unique([idEmpresa, folioDocumento])
   @@index([idCorrida])
+  @@index([idEmpresa])
   @@index([idProveedor])
   @@index([idConcepto])
   /// Las FKs `Restrict` hacia las cuentas necesitan su índice: sin él, comprobar o retirar una

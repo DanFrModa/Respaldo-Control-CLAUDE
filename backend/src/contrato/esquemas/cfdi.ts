@@ -23,8 +23,16 @@ export const ETIQUETAS_TIPO_COMPROBANTE_CFDI: Record<TipoComprobanteCfdiClave, s
   E: 'Egreso (nota de crédito)',
 };
 
-/** Tipos de operación real a la que se puede ligar el CFDI (referencia polimórfica del movimiento). */
-export const REF_TIPOS_CFDI = ['orden-compra', 'recepcion'] as const;
+/**
+ * Tipos de operación real a la que se puede ligar el CFDI (referencia polimórfica del movimiento).
+ *
+ * ⚠️ Llevaba un `'recepcion'` que era LETRA MUERTA y se retiró en la fila 0.117: no lo escribía
+ * nadie ni lo leía nadie (sólo existía aquí y en el cliente generado). El valor que las recepciones
+ * SÍ usan es `'recepcion-compra'` (`dominio/terceros/cargo-de-entrada.ts`, `REF_RECEPCION_COMPRA`),
+ * que nace por otro camino y nunca pasó por este enum — así que ofrecerlo en el importador sólo
+ * podía producir una liga que ningún código sabía volver a encontrar.
+ */
+export const REF_TIPOS_CFDI = ['orden-compra'] as const;
 /** Clave de un tipo de referencia. */
 export type RefTipoCfdiClave = (typeof REF_TIPOS_CFDI)[number];
 
@@ -175,7 +183,7 @@ export const esquemaCfdiImportarEntrada = z
     refTipo: z
       .enum(REF_TIPOS_CFDI)
       .optional()
-      .describe('Tipo de operación real a ligar (orden-compra/recepcion). Con refId o ninguno.'),
+      .describe('Tipo de operación real a ligar (orden-compra). Con refId o ninguno.'),
     refId: z.coerce
       .number()
       .int()

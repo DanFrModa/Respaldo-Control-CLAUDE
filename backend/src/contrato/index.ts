@@ -1733,6 +1733,31 @@ export {
   type CfdiImportarSalida,
 } from './esquemas/cfdi.js';
 
+// ── El COTEJO de la factura contra el documento emitido (fila 0.117; §Post-F9.232) ──
+export {
+  ESTADOS_COTEJO,
+  ETIQUETAS_ESTADO_COTEJO,
+  FILTROS_COTEJO,
+  esquemaDocumentoEmitido,
+  esquemaDocumentosEmitidosSalida,
+  esquemaAplicacionCotejo,
+  esquemaFacturaCotejo,
+  esquemaBandejaCotejoSalida,
+  esquemaBandejaCotejoQuery,
+  esquemaAplicarCotejoEntrada,
+  esquemaAtenderCotejoEntrada,
+  type EstadoCotejoClave,
+  type FiltroCotejoClave,
+  type DocumentoEmitido,
+  type DocumentosEmitidosSalida,
+  type AplicacionCotejo,
+  type FacturaCotejo,
+  type BandejaCotejoSalida,
+  type BandejaCotejoQuery,
+  type DatosAplicarCotejo,
+  type DatosAtenderCotejo,
+} from './esquemas/cotejo-factura.js';
+
 // ── CxC: cuentas por cobrar de clientes (Módulo 14, F9-E4; D12/D15/R10/R12) ──
 export {
   ORIGENES_MOVIMIENTO_CXC,

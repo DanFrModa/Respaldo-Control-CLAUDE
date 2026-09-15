@@ -875,9 +875,10 @@ describe('(j) ⭐ el beneficiario: proveedor O concepto, nunca ambos ni ninguno'
     await expect(
       cliente.$executeRawUnsafe(
         `INSERT INTO "renglon_corrida_pago"
-           ("id_corrida","origen","id_proveedor","id_concepto","rubro","nombre","monto",
+           ("id_corrida","id_empresa","origen","id_proveedor","id_concepto","rubro","nombre","monto",
             "forma_pago","beneficiario","modificado_en")
-         VALUES ($1,'maquila',$2,$3,'maquila','X',100,'efectivo','X',NOW())`,
+         VALUES ($1,(SELECT "id_empresa" FROM "corrida_pago" WHERE "id" = $1),
+                 'maquila',$2,$3,'maquila','X',100,'efectivo','X',NOW())`,
         id,
         taller.id,
         concepto.id,
@@ -903,9 +904,10 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
     // que es exactamente cómo estas tres llegaron rojas al CI.
     const filas = await cliente.$queryRawUnsafe<{ id: number }[]>(
       `INSERT INTO "renglon_corrida_pago"
-         ("id_corrida","origen","id_proveedor","rubro","nombre","monto","forma_pago",
+         ("id_corrida","id_empresa","origen","id_proveedor","rubro","nombre","monto","forma_pago",
           "beneficiario","numero_cuenta","tipo_cuenta","modificado_en")
-       VALUES ($1,'maquila',$2,'maquila','X',$3,$4::"forma_de_pago",'X',$5,$6::"tipo_cuenta_pago",NOW())
+       VALUES ($1,(SELECT "id_empresa" FROM "corrida_pago" WHERE "id" = $1),
+               'maquila',$2,'maquila','X',$3,$4::"forma_de_pago",'X',$5,$6::"tipo_cuenta_pago",NOW())
        RETURNING "id"`,
       idCorrida,
       taller.id,
@@ -985,9 +987,10 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
     await expect(
       cliente.$executeRawUnsafe(
         `INSERT INTO "renglon_corrida_pago"
-           ("id_corrida","origen","id_proveedor","rubro","nombre","monto","forma_pago",
+           ("id_corrida","id_empresa","origen","id_proveedor","rubro","nombre","monto","forma_pago",
             "beneficiario","id_movimiento_tercero","modificado_en")
-         VALUES ($1,'maquila',$2,'maquila','X',100,'efectivo','X',$3,NOW())`,
+         VALUES ($1,(SELECT "id_empresa" FROM "corrida_pago" WHERE "id" = $1),
+                 'maquila',$2,'maquila','X',100,'efectivo','X',$3,NOW())`,
         id,
         taller.id,
         movimiento.id,
@@ -1013,9 +1016,10 @@ describe('(k) ⭐ los CHECK de la migración muerden de verdad', () => {
     await expect(
       cliente.$executeRawUnsafe(
         `INSERT INTO "renglon_corrida_pago"
-           ("id_corrida","origen","id_proveedor","rubro","nombre","monto","forma_pago",
+           ("id_corrida","id_empresa","origen","id_proveedor","rubro","nombre","monto","forma_pago",
             "beneficiario","numero_cuenta","tipo_cuenta","id_cuenta_concepto","modificado_en")
-         VALUES ($1,'maquila',$2,'maquila','X',100,'transferencia','X','002010055555555551',
+         VALUES ($1,(SELECT "id_empresa" FROM "corrida_pago" WHERE "id" = $1),
+                 'maquila',$2,'maquila','X',100,'transferencia','X','002010055555555551',
                  'clabe'::"tipo_cuenta_pago",$3,NOW())`,
         id,
         taller.id,

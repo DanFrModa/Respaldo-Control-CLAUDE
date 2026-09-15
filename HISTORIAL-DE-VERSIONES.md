@@ -71,6 +71,67 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.159 · 14-sep-2026 · **en prueba** — **La factura del maquilero ya se compara sola contra el documento que le mandamos, y la que no cuadra no se puede pagar**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Que el sistema haga la revisión que Daniel hacía a mano.** Cada factura de proveedor que entra
+  **sin orden de compra** —la de maquila, la de un servicio— se compara automáticamente con **los
+  documentos para facturar que nosotros le mandamos**. Antes el sistema tenía las dos mitades
+  (importaba las facturas por un lado y emitía los documentos por el otro) y **no las juntaba**.
+- ⭐ **El documento que se le manda al proveedor ya tiene NÚMERO PROPIO.** Antes la hoja sólo decía
+  «Corrida #12», y como un mismo taller puede llevar dos renglones en la misma semana (cuando se le
+  parte el pago en dos cuentas), salían **dos hojas con el mismo número**. Ahora cada una lleva su
+  folio, sale impreso en grande, y la hoja le pide al proveedor que lo anote en su factura: es con lo
+  que se coteja. El número se asigna **al cerrar la relación**, que es cuando queda final.
+- **Si el maquilero cancela una factura y la vuelve a expedir, la nueva se liga sin pelear.** Al
+  cancelar, lo que aquella factura decía cubrir **deja de ocupar sitio** en el documento, y éste
+  vuelve a quedar libre para la de reemplazo. Lo que decía la cancelada no se borra: se sigue viendo,
+  para que quede claro qué pasó.
+- **Una pantalla nueva: Finanzas › Cotejo de facturas.** Ahí están las facturas que no cuadran, con
+  lo que dice la factura, lo que amparan los documentos y la diferencia. Se le marcan los documentos
+  que cubre —una factura puede cubrir **varios** y varias facturas pueden repartirse **uno solo**, tal
+  como pidió Daniel— o se deja **atendida** explicando en una línea a qué se debe la diferencia.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Una factura que no cuadra FRENA el pago de ese proveedor.** Si al ir a marcar como pagada la
+  relación **con factura** hay un proveedor con una factura en rojo sin atender, **no deja**, y dice
+  su nombre y el folio de la factura. Es literalmente lo que pidió Daniel: *«se queda en rojo hasta
+  que atiendan el problema»*. La factura **no se rechaza**: entra igual, marcada.
+- **Se acepta hasta UN PESO de diferencia, ni un centavo más.** No es un porcentaje: da lo mismo que
+  la factura sea de mil pesos o de un millón. Se propuso un margen por porcentaje y Daniel lo dejó
+  **más estricto**: si la factura sale del documento que nosotros emitimos, separarse más de un peso
+  quiere decir que algo no cuadra de verdad.
+- **La relación SIN factura no se frena.** Es otro reparto de dinero y no tiene facturas de por medio.
+- **El freno también aplica pagando por Estados de cuenta de maquileros › Pagos**, no sólo desde la
+  relación semanal: si no, bastaba con pagarle por el otro camino para saltárselo. Ahí también se
+  frena **sólo el pago con factura**.
+- **La lista avisa cuando se queda corta.** Si hay más facturas (o más documentos de un proveedor) de
+  los que caben, lo dice en vez de callarlo, y el número de «frenan un pago» es siempre el total real
+  —no el de lo que alcanzó a caber en la pantalla—.
+- **Una factura recién importada aparece EN ROJO aunque esté perfecta**, simplemente porque todavía no
+  se le ha dicho qué documentos cubre. Es el estado normal de arranque: se abre, se le marcan los
+  documentos, y se pone en verde.
+- **Las facturas de una orden de compra siguen igual**, por su camino de siempre: ésas se cotejan
+  contra la OC y no entran a esta pantalla.
+- **Al importar un CFDI ya no se ofrece ligarlo a una «recepción».** Esa opción no la usaba nadie ni la
+  leía nadie: era una entrada muerta del menú que sólo podía producir una liga que después el sistema
+  no sabía volver a encontrar.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Sólo cuentan los documentos de las relaciones que se cierren de ahora en adelante.** Las
+  corridas cerradas antes de esta versión no tienen folio de documento y sus hojas siguen saliendo
+  rotuladas con el número de la corrida, como hasta hoy. No se puede cotejar una factura contra
+  ellas; si hace falta, se deja **atendida** con su explicación.
+- **Los importes se marcan a mano.** La pantalla propone lo que le falta por cubrir a cada documento,
+  pero quien revisa decide: no hay nada automático repartiendo dinero.
+- **Un descuadre atendido se queda atendido.** Si después se le ligan los documentos correctos y la
+  factura acaba cuadrando, el rojo desaparece solo; lo que una persona escribió no se borra nunca.
+
+---
+
 ## 0.158 · 14-sep-2026 · **en prueba** — **Al arrancar, TODOS los conteos van a saltar a un número redondo, no sólo las órdenes de producción y las de compra**
 
 ### Qué se puede hacer ahora que antes no

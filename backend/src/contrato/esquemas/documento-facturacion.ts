@@ -120,6 +120,15 @@ export const esquemaDocumentoFacturacion = z
     idCorrida: z.number().int(),
     idRenglon: z.number().int(),
     folioCorrida: z.number().int().describe('Folio de la corrida (por empresa).'),
+    folioDocumento: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Folio PROPIO del documento (fila 0.117): el número que el proveedor cita en su factura y ' +
+          'contra el que se coteja. Se asigna al CERRAR la corrida. `null` en las corridas cerradas ' +
+          'antes de esa fila, que siguen rotulándose con el folio de la corrida.',
+      ),
     semana: z.string().describe('Lunes de la semana que se paga (AAAA-MM-DD).'),
     /** El RECEPTOR: la empresa activa (A9). Quien manda el documento y va a recibir la factura. */
     receptor: esquemaParteFiscal.describe('A nombre de quién se factura (la empresa activa, A9).'),
