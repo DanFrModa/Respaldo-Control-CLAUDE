@@ -267,6 +267,9 @@ async function motivoRcAutomatica(
  * Obtiene la ruta viva de una orden (renglones, duraciones, dependencias, estado). Lectura;
  * exige `rc.ruta-ver`. Si la orden NO tiene ruta, incluye el MOTIVO de la omisión/fallo de la RC
  * automática (R3) cuando hay rastro en bitácora (R4).
+ *
+ * Es la CONSULTA suelta: quien no lleve `rc.ruta-ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarRutaOrden} (ver su nota).
  */
 export async function obtenerRutaOrden(
   sesion: SesionUsuario,
@@ -274,6 +277,32 @@ export async function obtenerRutaOrden(
   bd?: ContextoBd,
 ): Promise<RutaOrdenDto> {
   verificarPermiso(sesion, 'rc.ruta-ver');
+  return proyectarRutaOrden(sesion, idOrden, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de la ruta viva de una orden SIN reja de consulta propia (fila 0.195).
+ *
+ * Es el MISMO cuerpo que {@link obtenerRutaOrden} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de DTO— pero SIN `verificarPermiso('rc.ruta-ver')`, porque está pensada para UN solo uso:
+ * **devolverle a quien acaba de escribir la ruta que acaba de dejar**. La autorización de esa
+ * llamada ya la hizo la escritura (su propio permiso + el filtro de roles responsables); volver a
+ * pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: la captura se
+ * guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * No es una puerta nueva: es el patrón que YA seguían las otras dos escrituras de este módulo
+ * —`generarRutaOrden` y `ajustarRutaOrden` (ambas `rc.programar`)—, que arman su DTO con `armarDto`
+ * sin exigir `rc.ruta-ver`. Aquí sólo se le pone nombre para que la captura y el estampado puedan
+ * hacer lo mismo.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerRutaOrden}, que sí exige `rc.ruta-ver`.
+ */
+export async function proyectarRutaOrden(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<RutaOrdenDto> {
   const cliente = clienteLectura(bd);
   // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se lee su ruta).
   const orden = await cliente.orden.findFirst({

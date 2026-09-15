@@ -19,7 +19,12 @@ import type { Prisma, PrismaClient } from '../../datos/index.js';
 import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { ajustarRutaOrden, generarRutaOrden, obtenerRutaOrden } from './rutaOrden.js';
+import {
+  ajustarRutaOrden,
+  generarRutaOrden,
+  obtenerRutaOrden,
+  proyectarRutaOrden,
+} from './rutaOrden.js';
 
 let cliente: PrismaClient;
 let idEmpresa: number;
@@ -807,6 +812,60 @@ describe('ajustarRutaOrden (F5-E3, sin tocar la plantilla)', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('proyectarRutaOrden — el eco de una escritura propia (fila 0.195)', () => {
+  it('proyecta la ruta SIN `rc.ruta-ver`, donde `obtenerRutaOrden` niega', async () => {
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const a = await crearProceso('a', { tipoDuracion: 'fija' });
+    await crearPlantilla({ idArticulo }, [{ idProcesoDef: a, tiempoEstandar: 2 }]);
+    const idOrden = await crearOrden(1200);
+    await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idConAplic,
+      },
+      bd(),
+    );
+
+    // LA MISMA sesión, LA MISMA orden: la consulta suelta niega, el eco proyecta. Es justo la
+    // diferencia que arregla la fila — la respuesta de una escritura no vuelve a pedir la llave.
+    const capturista = sesionDePrueba({ permisos: ['rc.capturar'] });
+    await expect(obtenerRutaOrden(capturista, idOrden, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    const dto = await proyectarRutaOrden(capturista, idOrden, bd());
+    expect(dto.idOrden).toBe(idOrden);
+    expect(dto.procesos).toHaveLength(1);
+  });
+
+  it('conserva el scope por empresa activa (A9): una orden ajena "no existe" (404)', async () => {
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const a = await crearProceso('a', { tipoDuracion: 'fija' });
+    await crearPlantilla({ idArticulo }, [{ idProcesoDef: a, tiempoEstandar: 2 }]);
+    const idOrden = await crearOrden(1200);
+    await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idConAplic,
+      },
+      bd(),
+    );
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA (eco)');
+    const ajena = sesionDePrueba({ permisos: ['rc.capturar'], idEmpresaActiva: otra.id });
+    await expect(proyectarRutaOrden(ajena, idOrden, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
   });
 });
 
