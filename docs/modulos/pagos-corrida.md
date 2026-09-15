@@ -150,8 +150,10 @@ Los dos lados comparados son el **total CON IVA** (el que imprime el documento y
 CON factura**: la SIN factura es otro reparto de dinero y no tiene facturas de por medio.
 
 ⭐ **Y muerde también en EsMa › Pagos** (`esma/pagos.ts::crearPagoMaquilero`), que era **la puerta de al
-lado y más ancha que la principal**: la corrida va bajo `pagos.corrida-armar` (sólo Administrador) y ese
-camino pide `esma.ver-pagos`, que en el seed tienen ocho perfiles ⇒ sin cerrarlo, lo que Daniel pidió lo
+lado y más ancha que la principal**: la corrida va bajo `pagos.corrida-armar`, que está en
+`SOLO_ADMINISTRADOR` —ningún perfil lo otorga, sólo lo llevan `Administrador` y
+`AdministracionDireccion`, los **dos** de acceso total—, y ese camino pide `esma.ver-pagos`, que en el
+seed tienen **ocho** perfiles ⇒ sin cerrarlo, lo que Daniel pidió lo
 podía saltar cualquiera pagando por el otro lado. Mismo criterio y misma función
 (`facturasQueFrenanElPago`), y **sólo cuando el pago es con factura**. Medido: las cuatro suites de
 integración de EsMa siguen en verde, porque su maquilero de pruebas es `solo_sin` — el segmento sin

@@ -33,6 +33,7 @@ import {
   atenderCotejo,
   bandejaDeCotejo,
   documentosEmitidosDeProveedor,
+  TOPE_BANDEJA,
 } from './cotejo.js';
 import {
   cerrarCorrida,
@@ -709,11 +710,35 @@ describe('(f-ter) la bandeja no miente cuando recorta (§Post-F9.87: sin topes s
     expect(bandeja.hayMas).toBe(true);
   });
 
-  it('sin recorte, `hayMas` es falso (gemela negativa)', async () => {
-    await sembrarFacturasEnRojo(3);
+  it('⭐ EL BORDE EXACTO: con la lista JUSTO llena no falta nada, y no lo dice', async () => {
+    // El fallo que acecha aquí es de un solo puesto: `>` contra `>=`. Con `>=`, exactamente
+    // `TOPE_BANDEJA` facturas harían que la pantalla gritara «hay más, y lo que falta es lo viejo»
+    // sin faltar ni una — y una gemela negativa con 3 filas está demasiado lejos para enterarse.
+    // El tope se IMPORTA, no se teclea: así la prueba sigue midiendo el borde si un día cambia.
+    await sembrarFacturasEnRojo(TOPE_BANDEJA);
     const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'pendientes' }, bd());
+    expect(bandeja.facturas.length).toBe(TOPE_BANDEJA);
     expect(bandeja.hayMas).toBe(false);
-    expect(bandeja.enRojo).toBe(3);
+  });
+
+  it('⭐ el CONTEO y el FILTRO contestan lo mismo: la atendida y la cancelada no cuentan', async () => {
+    // `enRojo` y el filtro `pendientes` son la MISMA pregunta —«¿qué frena un pago?»— hecha dos
+    // veces. Hoy comparten la constante `enRojoWhere`, pero eso es una garantía estructural, no una
+    // medida: si mañana alguien le escribe al `count()` un `where` propio, esto se pone rojo. De las
+    // tres sembradas sólo UNA frena: la otra la atendió alguien y la tercera está cancelada.
+    await sembrarFacturasEnRojo(3);
+    await cliente.movimientoTercero.updateMany({
+      where: { idEmpresa: empresa.id, folio: 1001n },
+      data: { cotejoAtendidoEn: new Date(), cotejoNota: 'Trae un flete de más.' },
+    });
+    await cliente.movimientoTercero.updateMany({
+      where: { idEmpresa: empresa.id, folio: 1002n },
+      data: { cancelado: true },
+    });
+
+    const bandeja = await bandejaDeCotejo(sesion(), { filtro: 'pendientes' }, bd());
+    expect(bandeja.enRojo).toBe(1);
+    expect(bandeja.facturas.map((f) => f.folio)).toEqual([1000]);
   });
 });
 

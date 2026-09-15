@@ -271,8 +271,9 @@ export async function crearPagoMaquilero(
     // ⭐⭐ FILA 0.117 — LA FACTURA EN ROJO TAMBIÉN FRENA POR AQUÍ (§Post-F9.232 (c)).
     //
     // 🔴 Ésta era la PUERTA DE AL LADO, y era más ancha que la principal: el bloqueo nació en
-    // `ejecutarCorrida`, que va bajo `pagos.corrida-armar` (SOLO_ADMINISTRADOR), mientras que este
-    // camino pide `esma.ver-pagos`, que en el seed tienen OCHO perfiles. Sin esta línea, lo que
+    // `ejecutarCorrida`, que va bajo `pagos.corrida-armar` —en `SOLO_ADMINISTRADOR`: ningún perfil lo
+    // otorga y sólo lo llevan los DOS de acceso total—, mientras que este camino pide
+    // `esma.ver-pagos`, que en el seed tienen OCHO perfiles. Sin esta línea, lo que
     // Daniel pidió —*«se queda en rojo hasta que atiendan el problema»*— lo podía saltar cualquiera
     // pagando por EsMa › Pagos en vez de por la relación semanal.
     //

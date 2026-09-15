@@ -86,8 +86,13 @@ const NAMESPACE_LOCK_COTEJO = 20_552;
  * 🔑 Y el conteo de `enRojo` NO sale de la lista recortada: va por `count()` aparte (abajo). Contar
  * sobre lo recortado haría que con 600 facturas en rojo la pantalla afirmara «500» **como si fuera
  * el dato**, que es peor que no enseñar el número.
+ *
+ * `TOPE_BANDEJA` se EXPORTA para que la prueba del BORDE lo importe en vez de teclear un 500 suyo:
+ * el fallo que acecha aquí es el de un solo puesto (`>` contra `>=`, que gritaría «hay más» con la
+ * lista exactamente llena), y una prueba que no se mueva con la constante dejaría de medir el borde
+ * el día que el tope cambie.
  */
-const TOPE_BANDEJA = 500;
+export const TOPE_BANDEJA = 500;
 const TOPE_DOCUMENTOS = 300;
 
 /**
