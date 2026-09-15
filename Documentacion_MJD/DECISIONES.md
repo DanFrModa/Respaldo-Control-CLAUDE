@@ -15819,3 +15819,41 @@ cuadro de confirmación dice de dónde sale cada número). El comando del arranq
 - **Aplica en:** el go-live, y la fila **0.194** que nace de aquí. **Fecha:** 2026-09-14.
 
 ---
+
+#### (Post-F9.234) — LA RUTA CRÍTICA LA VE TODO EL MUNDO: ES UNA HERRAMIENTA, NO UN PRIVILEGIO
+
+**Cómo salió.** Al cerrar la fila 0.195 quedó una pregunta abierta: con el arreglo, quien captura
+recibe de vuelta la ruta de esa orden aunque no tenga `rc.ruta-ver`. El lead se la llevó a Daniel
+ofreciéndole el camino contrario (exigir el permiso de ver por delante, dos líneas). Su respuesta,
+textual, el 15-sep-2026:
+
+> *«Está bien que todos puedan ver la ruta crítica. Es una herramienta para todos. **Saber en qué
+> proceso va cada orden es valioso.**»*
+
+**(a) Se confirma el diseño de la fila 0.195.** «Quien escribe ve lo que escribió» se queda, y no hay
+que exigir `rc.ruta-ver` por delante. ⇒ **Nada que cambiar en el código**: la fila 0.195 ya está
+mergeada así, y el efecto que se documentó en el historial —que quien captura recibe el eco— pasa de
+ser un efecto tolerado a ser **lo que Daniel quiere**.
+
+**(b) Y dice algo más grande, que es lo que hay que anotar: `rc.ruta-ver` es un permiso AMPLIO.** No
+es una llave de mando, es una ventana. **Medido ejecutando los roles del seed**: de los nueve, **ocho llevan `rc.ruta-ver`** — los dos de
+acceso total y los seis de negocio; el noveno, `Basico`, nace sin ningún permiso. ⚠️ **CORREGIDO el
+15-sep, el mismo día:** la primera redacción decía que lo llevaban marcados como *«Default del lead
+— Daniel confirma»* y **era falso** — ese comentario existe una sola vez en el seed y anota
+`ordenes.cerrar`, no esto. El lead lo dedujo de un barrido que devolvía «el comentario más cercano
+hacia arriba», que es precisamente la clase de medición que este repo tiene prohibida. La respuesta
+de Daniel **fija** el criterio; no confirma ningún default previo.
+
+🔑 **Por qué importa más allá de la fila — y con la razón correcta, no la que se escribió primero:**
+por el lado de Ruta Crítica esa familia **ya no se puede disparar, y no por el reparto sino porque la
+0.195 la quitó del código**: `proyectarRutaOrden` no comprueba permiso y `obtenerRutaOrden` conserva
+su reja. Lo que añade la respuesta de Daniel es que **el permiso se repartirá a todos**, lo que quita
+también el motivo. ⚠️ **No al revés:** de una intención de reparto no se sigue una garantía, porque el
+código resuelve los permisos como **unión plana de roles, sin jerarquía** (`comun/permisos.ts`) y de
+hecho `Basico` no lleva ninguno. Los sitios de producción siguen en pie: proyectan con
+`produccion.wip-ver`, que es otro permiso y otra decisión.
+
+- **Aplica en:** la fila **0.195** (confirmada), el reparto de permisos del arranque, y la
+  clasificación de las filas **0.196–0.198**. **Fecha:** 2026-09-15.
+
+---
