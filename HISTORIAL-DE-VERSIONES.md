@@ -71,6 +71,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.163 · 16-sep-2026 · **en prueba** — **Ya se pueden cargar los datos de prueba de Inventarios: el programa que los siembra no lograba conectarse a la base de Railway**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Llenar `prueba` con un juego completo de datos ficticios de Inventarios** —proveedores, telas,
+  avíos, almacenes, órdenes de compra en cuatro estados distintos, entradas, traspasos y una merma—
+  para poder revisar el módulo con pantallas que tengan algo dentro. **Hasta hoy el programa que los
+  carga no terminaba nunca**: moría a los dos segundos de arrancar, siempre en el primer proveedor.
+- 🔑 **Por qué fallaba, en cristiano.** El programa hablaba con la base por un canal que **no era el
+  que tenía configurado**. Estaba puesto para esperar hasta 20 segundos a que la base le diera turno
+  —lo razonable cuando la base está lejos, por internet— pero en la práctica esperaba **2**. Y abría
+  **veinte conexiones a la vez** para crear ocho proveedores. Con la base en Railway nunca llegaba a
+  tiempo. Ahora abre **cuatro** y espera lo que debe.
+- ⭐ **Y si aun así la base va apretada, ahora lo dice en vez de esconderlo.** Al arrancar informa
+  cuántas conexiones hay ocupadas y cuántas caben, y avisa si va justo. Cuando tropieza leyendo,
+  **reintenta solo**. Y si acaba rindiéndose, en vez de un volcado técnico de quince líneas explica
+  qué pasó y qué hacer —volver a correrlo, que retoma donde se quedó sin duplicar nada, o correrlo
+  de uno en uno con `--concurrencia=1`—.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Los comprobantes fiscales ficticios ya NO se escriben dentro del proyecto.** Ahora salen a una
+  carpeta temporal del equipo y el programa **dice en pantalla dónde los dejó**. Hay una razón seria:
+  esos archivos se generan con **el RFC y la razón social de la empresa activa**, y la carpeta donde
+  caían antes se publica en un repositorio **público**. Mientras la empresa no tuviera RFC capturado
+  salían con uno genérico y no pasaba nada; **el día que se capturara el RFC de verdad, se habrían
+  publicado**. Se cerró por los dos lados: el programa ya no escribe ahí, y esa carpeta dejó de
+  formar parte del proyecto.
+- **Los seis comprobantes de ejemplo que vivían en el proyecto se retiraron de él.** No los usaba
+  ninguna prueba; eran resultado del propio programa. Quien los quiera, los genera corriéndolo.
+
+### Qué sigue pendiente o roto
+
+- **Finanzas sigue sin datos de prueba.** Su sembrador está construido y probado, pero todavía no ha
+  pasado por revisión ni ha llegado a `prueba`. Hasta entonces el repaso de Finanzas no se puede
+  hacer con números de verdad.
+- **Queda un hueco conocido y anotado** (fila 0.201): crear un dato ficticio y **marcarlo como
+  ficticio** son dos pasos, y si la conexión se corta justo entre los dos, ese dato queda sin marca
+  —invisible para el borrado, que después puede fallar—. En una corrida sin tropiezos no ocurre
+  (medido: 15 de 15 órdenes y 27 de 27 movimientos quedaron marcados, y el borrado dejó la base como
+  estaba). Se arregla aparte porque toca las fronteras de transacción de servicios con efectos
+  derivados, y eso merece su propia revisión.
+- ⚠️ **Y una advertencia sobre el reintento, para que nadie le atribuya de más:** cubre los viajes
+  de **lectura**, no la escritura. La robustez de verdad viene de haber arreglado el canal de
+  conexión, de pedir menos conexiones a la vez y de que el programa se pueda **volver a correr** sin
+  duplicar. En la primera versión de este arreglo el reintento **sí** envolvía la escritura, y la
+  revisión independiente demostró que eso **duplicaba movimientos de inventario en silencio**: el
+  programa decía «reintentando» y terminaba bien, dejando las existencias contadas dos veces. Se
+  corrigió antes de llegar aquí.
+- **Los cargos de maquila no se siembran** en ningún caso: no existe forma de crearlos sueltos, nacen
+  del recibo de producción.
+
 ## 0.162 · 15-sep-2026 · **en prueba** — **En la captura diaria de planta ya no pasa que el corte, el envío, el recibo o la entrega se guarden y la pantalla diga «no tienes permiso»**
 
 ### Qué se puede hacer ahora que antes no
