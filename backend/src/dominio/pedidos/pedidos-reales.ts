@@ -231,7 +231,9 @@ export async function crearPedidoReal(
     return real.id;
   }, bd);
 
-  return obtenerPedidoReal(sesion, idReal, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarPedidoReal` (sin reja de consulta). Con
+  // `obtenerPedidoReal`, quien escribe sin la llave de ver recibía un 403 con el dato YA escrito.
+  return proyectarPedidoReal(sesion, idReal, bd);
 }
 
 /**
@@ -363,7 +365,9 @@ export async function cancelarPedidoReal(
     });
   }, bd);
 
-  return obtenerPedidoReal(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarPedidoReal` (sin reja de consulta). Con
+  // `obtenerPedidoReal`, quien escribe sin la llave de ver recibía un 403 con el dato YA escrito.
+  return proyectarPedidoReal(sesion, id, bd);
 }
 
 /**
@@ -379,13 +383,41 @@ function exigirPedidoRealVivo(real: PedidoReal): void {
   }
 }
 
-/** Obtiene un pedido real (con su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene un pedido real (con su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `pedidos.ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarPedidoReal} (ver su nota).
+ */
 export async function obtenerPedidoReal(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<PedidoRealSalida> {
   verificarPermiso(sesion, 'pedidos.ver');
+  return proyectarPedidoReal(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un pedido real SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerPedidoReal} —mismo scope por empresa activa (A9 → 404, aquí
+ * vía el pedido padre), misma forma de DTO y mismo ocultamiento de importes derivado de
+ * `pedidos.importes`— pero SIN `verificarPermiso('pedidos.ver')`, porque está pensada para UN solo
+ * uso: **devolverle a quien acaba de escribir el pedido real que acaba de dejar**. La autorización
+ * de esa llamada ya la hizo la escritura con su propio permiso (`pedidos-reales.administrar`);
+ * volver a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: el pedido
+ * real se guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio
+ * estado — y quien lo reintentaba dejaba un SEGUNDO pedido real.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerPedidoReal}, que sí exige `pedidos.ver`.
+ */
+export async function proyectarPedidoReal(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<PedidoRealSalida> {
   const real = await clienteLectura(bd).pedidoReal.findFirst({
     where: { id, pedido: { idEmpresa: sesion.idEmpresaActiva } },
     include: incluirDetalle,

@@ -274,7 +274,9 @@ export async function crearDesarrollo(
     return desarrolloId;
   }, bd);
 
-  return obtenerDesarrollo(sesion, idNuevo, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarDesarrollo` (sin reja de consulta). Con
+  // `obtenerDesarrollo`, quien escribe sin la llave de ver recibía un 403 con el alta YA escrita.
+  return proyectarDesarrollo(sesion, idNuevo, bd);
 }
 
 /**
@@ -390,7 +392,9 @@ export async function crearDesarrolloConModeloNuevo(
     return desarrolloId;
   }, bd);
 
-  return obtenerDesarrollo(sesion, idNuevo, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarDesarrollo` (sin reja de consulta). Con
+  // `obtenerDesarrollo`, quien escribe sin la llave de ver recibía un 403 con el alta YA escrita.
+  return proyectarDesarrollo(sesion, idNuevo, bd);
 }
 
 /**
@@ -517,13 +521,43 @@ export async function reactivarDesarrollo(
   return obtenerDesarrollo(sesion, id, bd);
 }
 
-/** Obtiene un desarrollo (con su modelo + estado derivado) de la empresa activa, o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene un desarrollo (con su modelo + estado derivado) de la empresa activa, o lanza
+ * `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `desarrollo.ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarDesarrollo} (ver su nota).
+ */
 export async function obtenerDesarrollo(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<DesarrolloSalida> {
   verificarPermiso(sesion, 'desarrollo.ver');
+  return proyectarDesarrollo(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un desarrollo SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerDesarrollo} —mismo scope por empresa activa (A9 → 404, aquí
+ * vía el proyecto), misma forma de DTO— pero SIN `verificarPermiso('desarrollo.ver')`, porque está
+ * pensada para UN solo uso: **devolverle a quien acaba de dar de alta el desarrollo que acaba de
+ * dejar**. La autorización de esa llamada ya la hizo la escritura con su propio permiso
+ * (`desarrollo.administrar`, más `modelos.administrar` en el alta con modelo nuevo); volver a pedir
+ * una llave DESPUÉS del commit es lo que producía el defecto de esta fila: el desarrollo se
+ * guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio estado — y
+ * quien lo reintentaba dejaba un SEGUNDO desarrollo (y, por el camino del modelo nuevo, un SEGUNDO
+ * modelo con su código minteado).
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerDesarrollo}, que sí exige `desarrollo.ver`.
+ */
+export async function proyectarDesarrollo(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<DesarrolloSalida> {
   const desarrollo = await clienteLectura(bd).desarrollo.findFirst({
     where: { id, proyecto: { idEmpresa: sesion.idEmpresaActiva } },
     include: incluirDesarrollo,

@@ -146,13 +146,45 @@ export async function listarConceptosPago(
   };
 }
 
-/** Obtiene un concepto con sus cuentas, o lanza 404. Permiso `conceptos-pago.ver`. */
+/**
+ * Obtiene un concepto con sus cuentas, o lanza 404. Permiso `conceptos-pago.ver`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `conceptos-pago.ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarConceptoPago} (ver su nota).
+ */
 export async function obtenerConceptoPago(
   sesion: SesionUsuario,
   idConcepto: number,
   bd?: ContextoBd,
 ): Promise<ConceptoPagoSalida> {
   verificarPermiso(sesion, 'conceptos-pago.ver');
+  return proyectarConceptoPago(sesion, idConcepto, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un concepto de pago SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerConceptoPago} —mismo alcance (el catálogo de conceptos es
+ * GLOBAL, A9/ADR-0007: no lleva `idEmpresa` y esta proyectora tampoco lo inventa), misma forma de
+ * DTO— pero SIN `verificarPermiso('conceptos-pago.ver')`, porque está pensada para UN solo uso:
+ * **devolverle a quien acaba de dar de alta el concepto que acaba de dejar**. La autorización de
+ * esa llamada ya la hizo la escritura con su propio permiso (`conceptos-pago.administrar`); volver
+ * a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: el concepto se
+ * guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio estado — y
+ * quien lo reintentaba chocaba contra el único del nombre (o dejaba un segundo concepto casi igual).
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerConceptoPago}, que sí exige `conceptos-pago.ver`.
+ *
+ * La `sesion` NO se usa en el cuerpo —el catálogo es global, no hay filtro por empresa que aplicar—
+ * pero se conserva en la firma para que sea la MISMA que la de `obtenerConceptoPago` (`_sesion`, la
+ * convención de la casa para un parámetro que sólo está por uniformidad; ver `admin/empresas.ts`).
+ */
+export async function proyectarConceptoPago(
+  _sesion: SesionUsuario,
+  idConcepto: number,
+  bd?: ContextoBd,
+): Promise<ConceptoPagoSalida> {
   const concepto = await clienteLectura(bd).conceptoPago.findUnique({
     where: { id: idConcepto },
     include: incluirConcepto,
@@ -205,7 +237,9 @@ export async function crearConceptoPago(
     return creado.id;
   }, bd);
 
-  return obtenerConceptoPago(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarConceptoPago` (sin reja de consulta). Con
+  // `obtenerConceptoPago`, quien escribe sin la llave de ver recibía un 403 con el alta YA escrita.
+  return proyectarConceptoPago(sesion, id, bd);
 }
 
 /** Campos de TEXTO editables (clave del payload === clave del modelo). */

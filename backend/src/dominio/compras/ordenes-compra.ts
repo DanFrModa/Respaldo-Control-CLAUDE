@@ -1047,7 +1047,9 @@ export async function crearOC(
     return oc.id;
   }, bd);
 
-  return obtenerOC(sesion, idOC, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
+  return proyectarOC(sesion, idOC, bd);
 }
 
 /**
@@ -1228,7 +1230,9 @@ export async function autorizarOC(
   }, bd);
 
   dispararPublicacion();
-  return obtenerOC(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
+  return proyectarOC(sesion, id, bd);
 }
 
 /**
@@ -1330,7 +1334,9 @@ export async function desautorizarOC(
   }, bd);
 
   dispararPublicacion();
-  return obtenerOC(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
+  return proyectarOC(sesion, id, bd);
 }
 
 /**
@@ -1398,7 +1404,9 @@ export async function cancelarOC(
   }, bd);
 
   dispararPublicacion();
-  return obtenerOC(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
+  return proyectarOC(sesion, id, bd);
 }
 
 /**
@@ -1598,16 +1606,51 @@ export async function duplicarOC(
     return nueva.id;
   }, bd);
 
-  return obtenerOC(sesion, idNueva, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
+  return proyectarOC(sesion, idNueva, bd);
 }
 
-/** Obtiene una OC (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene una OC (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `compras.ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarOC} (ver su nota).
+ */
 export async function obtenerOC(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<CompraSalida> {
   verificarPermiso(sesion, 'compras.ver');
+  return proyectarOC(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de una OC SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerOC} —mismo scope por empresa activa (A9 → 404), misma forma
+ * de DTO, mismo `pctDesvio` de la empresa— pero SIN `verificarPermiso('compras.ver')`, porque está
+ * pensada para UN solo uso: **devolverle a quien acaba de escribir la OC que acaba de dejar**. La
+ * autorización de esa llamada ya la hizo la escritura con su propio permiso
+ * (`compras.administrar` / `.autorizar` / `.desautorizar` / `.cancelar`); volver a pedir una llave
+ * DESPUÉS del commit es lo que producía el defecto de esta fila: la OC se guardaba y el usuario
+ * recibía un 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble:** `crearOC`/`duplicarOC` estampan folio por secuencia atómica (A3,
+ * irrepetible) ⇒ reintentar —lo natural al leer «no tienes permiso»— dejaba una SEGUNDA OC; y
+ * `autorizarOC`/`desautorizarOC`/`cancelarOC` dejan su evento de outbox `oc-tela-resuelta` en la
+ * MISMA transacción y publican ANTES de esta proyección ⇒ el 403 llegaba con el cambio de estado
+ * ya sellado y su evento ya publicado (reintentar da un 409 de estado, no un duplicado).
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerOC}, que sí exige `compras.ver`.
+ */
+export async function proyectarOC(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<CompraSalida> {
   const oc = await clienteLectura(bd).ordenCompra.findFirst({
     where: { id, idEmpresa: sesion.idEmpresaActiva },
     include: incluirDetalle,
