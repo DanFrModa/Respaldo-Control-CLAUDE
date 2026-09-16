@@ -82,14 +82,22 @@
  * **53**, que es lo que cuadra con el reparto. La cifra de los documentos **no se tocó en la fila
  * 0.199** (queda dicho para quien la audite); lo que sí es auditable desde aquí es el 53.
  *
- * Y la parte que demuestra que la red **no está simplemente callada**: si se le quita la regla del
- * subconjunto (se exige coincidencia exacta de cláusula), sobre el árbol de HOY aparecen **35**
- * sitios que hoy exonera con razón — **9 escritores** detrás de las tres puertas OR (5 de
- * `pagos/corrida.ts`, 2 de `pagos/cotejo.ts`, 2 de `indicadores/inventario-ciclico.ts`, justo los 9
- * que el censo a mano tuvo que apartar) y los **22** que la ruta cubre con `preHandler` encadenado
- * (8 de listas de precios, 5 de negociación, 2 de cotizaciones y 7 de precostos: los 22 enumerados
- * en `HOJA-DE-RUTA.md`), más las tres consultas que son la puerta misma y `crearPagoMaquilero`. O
- * sea: la red **recorre** esos 35 caminos y decide; no es que no los vea.
+ * Y la parte que demuestra que la red **no está simplemente callada**: en la misma corrida cuenta
+ * las **exoneraciones** —sitios que recorre, mide y decide que están bien— y las devuelve en
+ * `Resultado.exoneradas`. Hoy son **43**, y se reparten así:
+ *  • **22** que la RUTA cubre con `preHandler` encadenado (AND): 8 de listas de precios, 7 de
+ *    precostos, 5 de negociación y 2 de cotizaciones — **los 22 enumerados uno a uno en
+ *    `HOJA-DE-RUTA.md`**, derivados aquí sin darle esa lista a la herramienta.
+ *  • **13** de las tres puertas OR: `pagos/corrida.ts` (5 escritores + la consulta),
+ *    `pagos/cotejo.ts` (2 + 1) e `indicadores/inventario-ciclico.ts` (2 + 2). Los 9 escritores que
+ *    el censo a mano tuvo que apartar salen solos.
+ *  • **8** más, de empresas, cierre de orden, importación de pedido y EsMa.
+ *
+ * ⚠️ **Por qué la cifra la da la herramienta y no un experimento**: la primera versión de esta nota
+ * decía «quitando la regla del subconjunto salen 35». El reviewer aplicó la receta y midió **12**.
+ * La sustancia era cierta —la red recorre esos caminos— pero el número no se reproducía, que es
+ * exactamente la clase de dato que el §8 de `CLAUDE.md` manda cruzar mecánicamente. Ahora se
+ * recalcula en cada corrida y la prueba lo vigila con una cota.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
  * LO QUE ESTA RED **NO** VE (dicho a propósito — una red que promete el 100 % es peor que una que
@@ -109,9 +117,15 @@
  *     datos a medias (revierte), pero sí un 403 confuso a mitad de operación. Sigue siendo un
  *     comentario en el código quien lo defiende. Y tampoco se distingue el caso de que la función
  *     llamada abra su PROPIA transacción por no recibir `bd`.
- *  d. **Indirección dinámica**: llamadas a través de variables, mapas de funciones o métodos de
- *     objetos. Sólo se resuelven llamadas a identificadores importados o declarados en el archivo.
+ *  d. **Indirección dinámica**: llamadas a través de variables, mapas de funciones, métodos de
+ *     objetos o `import * as m` + `m.obtenerX()`. Se resuelven las llamadas a un identificador
+ *     declarado en el archivo o importado por nombre —**incluido con alias**
+ *     (`import { obtenerX as leer }`) y **a través de un barril** (`export { obtenerX } from './y'`),
+ *     que la primera versión de esta red perdía en silencio.
  *  e. **Orden dentro de un mismo `enTransaccion`**: lo que pase dentro del callback no se ordena.
+ *     ⭐ En cambio un cierre **posterior** al commit SÍ se recorre —`Promise.all(ids.map(async (id)
+ *     => obtenerX(…)))` después de la transacción es un eco como cualquier otro, y se reporta—;
+ *     sólo se dejan fuera los cierres que son el cuerpo de la propia transacción.
  *  f. **Profundidad**: el recorrido corta a 12 niveles de llamada por debajo de la ruta. Medido el
  *     16-sep-2026, ninguno de los 53 sitios del árbol viejo estaba a más de 3; la cota está para que
  *     una recursión rara no cuelgue la prueba, no porque haga falta.
@@ -170,6 +184,17 @@ export interface Resultado {
   readonly rutasAnalizadas: number;
   /** Cuántas funciones se indexaron (misma sanidad). */
   readonly funcionesIndexadas: number;
+  /**
+   * ⭐ Sitios distintos que la red **recorrió y exoneró**: una reja pedida después del commit que la
+   * garantía acumulada SÍ cubre (las puertas OR, y los `preHandler` encadenados de la ruta).
+   *
+   * Es la prueba de que la red no está simplemente callada en esos caminos. Va en el resultado —y
+   * no en un experimento que haya que reproducir a mano— porque una cifra que sólo existe en un
+   * comentario no se puede volver a medir: la fila 0.199 llevaba escrito un «35» obtenido mutando
+   * `satisface`, y el reviewer, aplicando la receta, midió 12. La sustancia era cierta y el número
+   * no se reproducía. Éste lo calcula la herramienta en cada corrida.
+   */
+  readonly exoneradas: number;
 }
 
 // ── Excepciones declaradas ──────────────────────────────────────────────────────────────────────
@@ -243,13 +268,34 @@ interface Funcion {
   readonly fuente: ts.SourceFile;
 }
 
+/**
+ * De dónde viene un nombre que este archivo no declara: el archivo destino **y el nombre que tiene
+ * ALLÍ**, que no siempre es el de aquí.
+ *
+ * ⚠️ Guardar sólo el nombre local es el defecto que el reviewer de la fila 0.199 midió y bloqueó:
+ * con `import { obtenerX as leer } from './consultas.js'`, buscar `consultas.ts::leer` **nunca
+ * acierta**, así que la arista se perdía entera —ni `escribe()`, ni `exigenciaDe()`, ni `recorrer()`
+ * bajaban por ahí— y un eco escrito con alias salía VERDE. El alias es convención de la casa (357
+ * usos en `dominio`/`api`/`comun`, uno de ellos literalmente una reja:
+ * `verificarFechaCapturable as verificarFechaCapturableConPermiso`).
+ */
+interface Origen {
+  readonly archivo: string;
+  readonly nombre: string;
+}
+
 interface Archivo {
   readonly ruta: string;
   readonly fuente: ts.SourceFile;
-  /** Nombre local importado → archivo (relativo) donde vive. */
-  readonly importes: ReadonlyMap<string, string>;
+  /** Nombre LOCAL importado → dónde vive de verdad (archivo + nombre original). */
+  readonly importes: ReadonlyMap<string, Origen>;
   /** Nombre declarado en este archivo → clave de función. */
   readonly locales: ReadonlyMap<string, ClaveFuncion>;
+  /**
+   * `export { a as b } from './y.js'` — barriles. Quien importe `b` de ESTE archivo no lo encuentra
+   * declarado aquí: hay que seguir el hilo hasta donde `a` vive de verdad.
+   */
+  readonly reexportes: ReadonlyMap<string, Origen>;
 }
 
 /** Métodos de Prisma que dejan rastro: si aparecen, hubo escritura. */
@@ -547,8 +593,14 @@ export function analizar(raizBackend: string): Resultado {
       ts.ScriptKind.TS,
     );
 
-    const importes = new Map<string, string>();
+    const importes = new Map<string, Origen>();
     const locales = new Map<string, ClaveFuncion>();
+    const reexportes = new Map<string, Origen>();
+    /** `./x.js` en el código fuente es `./x.ts` en disco (NodeNext + ESM). */
+    const destinoDe = (spec: ts.Expression): string | undefined =>
+      ts.isStringLiteral(spec) && spec.text.startsWith('.')
+        ? rel(join(dirname(disco), spec.text.replace(/\.js$/, '.ts')))
+        : undefined;
 
     const registrar = (nombre: string, cuerpo: ts.Node): void => {
       const k: ClaveFuncion = `${ruta}::${nombre}`;
@@ -558,13 +610,30 @@ export function analizar(raizBackend: string): Resultado {
 
     for (const sentencia of fuente.statements) {
       if (ts.isImportDeclaration(sentencia)) {
-        const spec = sentencia.moduleSpecifier;
-        if (!ts.isStringLiteral(spec) || !spec.text.startsWith('.')) continue;
-        // `./x.js` en el código fuente es `./x.ts` en disco (NodeNext + ESM).
-        const destino = rel(join(dirname(disco), spec.text.replace(/\.js$/, '.ts')));
+        const destino = destinoDe(sentencia.moduleSpecifier);
+        if (destino === undefined) continue;
         const enlaces = sentencia.importClause?.namedBindings;
         if (enlaces !== undefined && ts.isNamedImports(enlaces)) {
-          for (const el of enlaces.elements) importes.set(el.name.text, destino);
+          // `el.name` es el nombre AQUÍ; `el.propertyName` el de ALLÁ cuando hay alias.
+          for (const el of enlaces.elements) {
+            importes.set(el.name.text, {
+              archivo: destino,
+              nombre: (el.propertyName ?? el.name).text,
+            });
+          }
+        }
+        continue;
+      }
+      if (ts.isExportDeclaration(sentencia) && sentencia.moduleSpecifier !== undefined) {
+        const destino = destinoDe(sentencia.moduleSpecifier);
+        const enlaces = sentencia.exportClause;
+        if (destino !== undefined && enlaces !== undefined && ts.isNamedExports(enlaces)) {
+          for (const el of enlaces.elements) {
+            reexportes.set(el.name.text, {
+              archivo: destino,
+              nombre: (el.propertyName ?? el.name).text,
+            });
+          }
         }
         continue;
       }
@@ -583,20 +652,29 @@ export function analizar(raizBackend: string): Resultado {
       }
     }
 
-    archivos.set(ruta, { ruta, fuente, importes, locales });
+    archivos.set(ruta, { ruta, fuente, importes, locales, reexportes });
   }
 
-  /** Resuelve `foo(...)` llamado desde `archivo` a su clave `(archivo, función)`, o `undefined`. */
+  /**
+   * Resuelve `foo(...)` llamado desde `archivo` a su `(archivo, función)`, o `undefined`.
+   *
+   * Sigue el **alias** (`import { obtenerX as leer }`) y el **barril** (`export { obtenerX } from
+   * './y.js'`), con tope de saltos por si alguien deja un ciclo de re-exportaciones.
+   */
   function resolver(archivo: string, llamada: ts.CallExpression): Funcion | undefined {
     const nombre = identificadorLlamado(llamada);
     if (nombre === undefined) return undefined;
-    const meta = archivos.get(archivo);
-    if (meta === undefined) return undefined;
-    const propio = meta.locales.get(nombre);
-    if (propio !== undefined) return funciones.get(propio);
-    const desde = meta.importes.get(nombre);
-    if (desde === undefined) return undefined;
-    return funciones.get(`${desde}::${nombre}`);
+    let donde: Origen = { archivo, nombre };
+    for (let salto = 0; salto < 8; salto += 1) {
+      const meta = archivos.get(donde.archivo);
+      if (meta === undefined) return undefined;
+      const propio = meta.locales.get(donde.nombre);
+      if (propio !== undefined) return funciones.get(propio);
+      const siguiente = meta.importes.get(donde.nombre) ?? meta.reexportes.get(donde.nombre);
+      if (siguiente === undefined) return undefined;
+      donde = siguiente;
+    }
+    return undefined;
   }
 
   // ── ¿Escribe? (transitivo) ────────────────────────────────────────────────────────────────────
@@ -760,6 +838,7 @@ export function analizar(raizBackend: string): Resultado {
   // ── El recorrido: de cada ruta hacia abajo, acumulando garantías ───────────────────────────────
 
   const crudos = new Map<string, { hallazgo: Hallazgo; rutas: Set<string> }>();
+  const exonerados = new Set<string>();
   const visitados = new Set<string>();
 
   /**
@@ -780,7 +859,9 @@ export function analizar(raizBackend: string): Resultado {
     // El ámbito se memoiza por (quién, si ya se escribió, con qué garantía). Para un manejador de
     // ruta la identidad lleva el ARCHIVO además del método+url: hay `POST /x` repetidos en módulos
     // distintos, y sin el archivo el segundo se saltaría por parecer ya visitado.
-    const quien = f?.clave ?? `ruta:${archivo}:${etiquetaRuta}`;
+    // La posición del cuerpo entra en la identidad: una misma función puede tener varios cierres
+    // anidados, y sin ella el segundo se saltaría por parecer ya visitado.
+    const quien = `${f?.clave ?? `ruta:${archivo}:${etiquetaRuta}`}@${cuerpo.pos}`;
     const memo = `${quien}|${yaEscribio ? '1' : '0'}|${garantiaEntrada.map(clave).sort().join(';')}`;
     if (visitados.has(memo)) return;
     visitados.add(memo);
@@ -797,12 +878,16 @@ export function analizar(raizBackend: string): Resultado {
       if (escribio && destino !== undefined) {
         // Ya hay rastro escrito: cualquier reja que esta llamada exija llega DESPUÉS del commit.
         const exigida = exigenciaDe(destino);
+        const donde0 = f ?? { archivo, nombre: `manejador de ${etiquetaRuta}` };
         for (const c of exigida) {
-          if (satisface(garantia, c)) continue;
+          if (satisface(garantia, c)) {
+            exonerados.add(`${donde0.archivo}::${donde0.nombre}->${destino.clave}::${clave(c)}`);
+            continue;
+          }
           const { line } = llamada
             .getSourceFile()
             .getLineAndCharacterOfPosition(llamada.getStart(llamada.getSourceFile()));
-          const donde = f ?? { archivo, nombre: `manejador de ${etiquetaRuta}` };
+          const donde = donde0;
           const k = `${donde.archivo}::${donde.nombre}->${destino.clave}::${clave(c)}`;
           const previo = crudos.get(k);
           if (previo === undefined) {
@@ -852,6 +937,20 @@ export function analizar(raizBackend: string): Resultado {
           etiquetaRuta,
           profundidad + 1,
         );
+      }
+
+      // ⭐ Y el eco escondido en un CIERRE, después del commit:
+      //     await Promise.all(ids.map(async (id) => obtenerX(sesion, id)));
+      // `llamadasDelAmbito` no entra en las funciones anidadas —y eso es deliberado, porque es lo
+      // que protege al callback de `enTransaccion` (si el 403 sale ahí, el ROLLBACK no deja nada)—
+      // pero un `.map()` DESPUÉS del commit no está en transacción ninguna y su 403 llega con el
+      // dato ya guardado. Así que en cuanto hay rastro escrito sí se entra, salvo justo en los
+      // abridores de transacción. (Medido: 182 `Promise.all` en `dominio`.)
+      if (escribio && !ABRE_TRANSACCION.has(nombreLlamado(llamada) ?? '')) {
+        for (const argumento of llamada.arguments) {
+          if (!ts.isArrowFunction(argumento) && !ts.isFunctionExpression(argumento)) continue;
+          recorrer(f, argumento.body, archivo, garantia, true, etiquetaRuta, profundidad + 1);
+        }
       }
     }
   }
@@ -905,6 +1004,7 @@ export function analizar(raizBackend: string): Resultado {
     excepcionesPodridas,
     rutasAnalizadas: rutas.length,
     funcionesIndexadas: funciones.size,
+    exoneradas: exonerados.size,
   };
 }
 

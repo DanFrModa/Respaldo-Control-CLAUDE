@@ -134,6 +134,89 @@ export async function armarPuerta(sesion: SesionUsuario): Promise<number> {
 }
 `,
   );
+  // ⭐ Las tres formas de esconder el eco que el reviewer de la fila 0.199 midió. Van en el fixture
+  // porque un arreglo sin prueba vuelve a nacer — es la misma lección del `forEachChild`.
+  escribir(
+    'src/dominio/consultas.ts',
+    `import { verificarPermiso, type SesionUsuario } from '../comun/permisos.js';
+
+export async function obtenerConAlias(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'alias.ver');
+  return id;
+}
+
+export async function obtenerEnLote(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'lote.ver');
+  return id;
+}
+
+export async function obtenerPorBarril(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'barril.ver');
+  return id;
+}
+`,
+  );
+  escribir(
+    'src/dominio/barril.ts',
+    `export { obtenerPorBarril } from './consultas.js';
+`,
+  );
+  escribir(
+    'src/dominio/escondites.ts',
+    `import { type SesionUsuario, verificarPermiso } from '../comun/permisos.js';
+import { enTransaccion, type ContextoBd } from '../comun/transaccion.js';
+
+import { obtenerConAlias as leer, obtenerEnLote } from './consultas.js';
+import { obtenerPorBarril as porBarril } from './barril.js';
+
+/** MAL, con ALIAS: el eco va por un nombre distinto del de la consulta. */
+export async function crearConAlias(sesion: SesionUsuario, bd?: ContextoBd): Promise<number> {
+  verificarPermiso(sesion, 'alias.administrar');
+  const id = await enTransaccion(async () => 1, bd);
+  return leer(sesion, id);
+}
+
+/** MAL, en un CIERRE después del commit: el 403 llega con el dato ya guardado. */
+export async function crearEnLote(sesion: SesionUsuario, bd?: ContextoBd): Promise<number[]> {
+  verificarPermiso(sesion, 'lote.administrar');
+  const ids = await enTransaccion(async () => [1, 2], bd);
+  return Promise.all(ids.map(async (id) => obtenerEnLote(sesion, id)));
+}
+
+/** MAL, por BARRIL: la consulta se re-exporta desde otro archivo. */
+export async function crearPorBarril(sesion: SesionUsuario, bd?: ContextoBd): Promise<number> {
+  verificarPermiso(sesion, 'barril.administrar');
+  const id = await enTransaccion(async () => 1, bd);
+  return porBarril(sesion, id);
+}
+`,
+  );
+  escribir(
+    'src/api/escondites.rutas.ts',
+    `import { crearConAlias, crearEnLote, crearPorBarril } from '../dominio/escondites.js';
+
+export function registrarEscondites(app: any): void {
+  app.route({
+    method: 'POST',
+    url: '/alias',
+    preHandler: app.conPermiso('alias.administrar'),
+    handler: async (request: any) => crearConAlias(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/lote',
+    preHandler: app.conPermiso('lote.administrar'),
+    handler: async (request: any) => crearEnLote(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/barril',
+    preHandler: app.conPermiso('barril.administrar'),
+    handler: async (request: any) => crearPorBarril(request.sesion),
+  });
+}
+`,
+  );
   escribir(
     'src/api/juguete.rutas.ts',
     `import { crearCosa } from '../dominio/mal.js';
@@ -173,20 +256,33 @@ describe('la red de «escribir y luego negar» mide algo', () => {
     montarFixture();
     const { hallazgos } = analizar(temporal);
 
-    // El defectuoso sale, con su función, su llamada y el permiso que pide de más.
-    expect(hallazgos.map((h) => `${h.funcion}->${h.llamada}`)).toEqual(['crearCosa->obtenerCosa']);
-    const unico = hallazgos[0];
+    // Sale el defectuoso a la vista Y las tres formas de esconderlo; NO sale ninguno de los
+    // correctos (el de `proyectarX` ni el que pasa por la puerta OR).
+    expect(hallazgos.map((h) => `${h.funcion}->${h.llamada}`).sort()).toEqual([
+      'crearConAlias->obtenerConAlias',
+      'crearCosa->obtenerCosa',
+      'crearEnLote->obtenerEnLote',
+      'crearPorBarril->obtenerPorBarril',
+    ]);
+    const unico = hallazgos.find((h) => h.funcion === 'crearCosa');
     expect(unico?.archivo).toBe('src/dominio/mal.ts');
     expect(unico?.faltante).toEqual(['cosas.ver']);
     expect(unico?.garantizados).toContain('cosas.administrar');
     expect(unico?.rutas.join(' ')).toContain('POST /cosas');
 
+    // Y cada escondite se nombra por el permiso que pide de más, no por uno genérico.
+    const porFuncion = new Map(hallazgos.map((h) => [h.funcion, h] as const));
+    expect(porFuncion.get('crearConAlias')?.faltante).toEqual(['alias.ver']);
+    expect(porFuncion.get('crearEnLote')?.faltante).toEqual(['lote.ver']);
+    expect(porFuncion.get('crearPorBarril')?.faltante).toEqual(['barril.ver']);
+
     // Y el informe explica el arreglo por su nombre, no sólo el síntoma.
     const texto = informe({
       hallazgos,
       excepcionesPodridas: [],
-      rutasAnalizadas: 3,
-      funcionesIndexadas: 9,
+      rutasAnalizadas: 6,
+      funcionesIndexadas: 15,
+      exoneradas: 1,
     });
     expect(texto).toContain('proyectarX');
     expect(texto).toContain('src/dominio/mal.ts');
@@ -215,5 +311,9 @@ describe('el dominio real no escribe y luego niega', () => {
     // que es como una avería del analizador se disfrazaría de «todo limpio».
     expect(resultado.rutasAnalizadas).toBeGreaterThan(400);
     expect(resultado.funcionesIndexadas).toBeGreaterThan(2000);
+    // Y la cota que de verdad dice que la red MIDE los caminos difíciles en vez de callarse: los
+    // sitios que recorre y exonera (43 el 16-sep-2026 — los 22 del `preHandler` encadenado, los 13
+    // de las tres puertas OR y 8 más). Si esto se desploma, la red dejó de recorrerlos.
+    expect(resultado.exoneradas).toBeGreaterThan(30);
   });
 });

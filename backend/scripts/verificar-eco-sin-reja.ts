@@ -40,6 +40,10 @@ const decir = (linea: string): void => void process.stdout.write(`${linea}\n`);
 decir(
   `Analizadas ${resultado.rutasAnalizadas} rutas y ${resultado.funcionesIndexadas} funciones de ${raiz}.`,
 );
+decir(
+  `${resultado.exoneradas} sitios recorridos y exonerados (la reja que piden DESPUÉS del commit sí la ` +
+    `cubre quien escribe: puertas OR y rutas con los dos permisos encadenados).`,
+);
 
 const texto = informe(resultado);
 if (texto === '') {
