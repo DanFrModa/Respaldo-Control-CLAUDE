@@ -71,6 +71,55 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.166 · 16-sep-2026 · **en prueba** — **Tampoco al EDITAR: cambiar una orden, una compra, un pedido, un desarrollo o el estado de resultados ya no termina en «no tienes permiso» con el cambio hecho**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Editar con sólo el permiso de editar**, sin necesitar además el de consultar. Son **19 sitios**
+  y cierran la familia: modificar una orden, su matriz de tallas, sus referencias del cliente o el
+  detalle copiado; modificar una orden de compra o una nota de salida; modificar un pedido, un pedido
+  real o su seguimiento; modificar, apagar o reactivar un desarrollo; modificar, archivar o
+  desarchivar un proyecto; modificar un concepto de pago; **generar o corregir el estado de
+  resultados del mes**; y cambiar los precios de maquila de una orden.
+- 🔑 **Aquí el daño era distinto al de las altas, y por eso iba aparte.** Repetir no dejaba un
+  duplicado —editar dos veces con el mismo dato deja el mismo resultado—, pero sí **dejaba a la
+  persona sin saber si su cambio entró**: la pantalla decía que no tenía permiso y el cambio ya
+  estaba guardado. Quien lo sufría volvía a entrar a comprobarlo… y para comprobarlo hacía falta
+  justo el permiso que no tenía.
+- ⭐ **Con esto la familia queda cerrada.** Son **48 sitios** fuera de Ruta Critíca — 5 + 8 + 21 + 19,
+  repartidos en las cuatro entregas de estos dos días. Y lo que se comprobó **cuatro veces, con
+  cuatro instrumentos distintos y por cuatro personas distintas**, es que **no queda ninguno suelto**:
+  las cuatro mediciones dieron exactamente los mismos 22 casos restantes, y los 22 son los que ya
+  estaban descartados con su razón escrita.
+
+### Qué cambió y puede sorprender
+
+- **Nada cambia para quien ya tenía los dos permisos**, que hoy son todos los perfiles. Se verificó
+  perfil por perfil contra la configuración real: ninguno lleva la llave de editar sin la de
+  consultar. Esto es preparación para el día que se reparta un perfil que sólo capture.
+- **No se aflojó ni un permiso.** Consultar sigue exigiendo exactamente lo mismo. El cambio borra
+  **19 líneas en total, una por sitio**, y ninguna de ellas es una comprobación de permiso: son la
+  llamada que pedía el eco por la puerta equivocada.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Y ahora la decisión que queda, que es del negocio y no técnica.** El sistema tiene **dos
+  formas** de resolver esto conviviendo, y una tercera que apareció en la revisión: la de esta
+  familia —te deja hacer la operación y te devuelve el resultado—; la contraria, que **exige la llave
+  de consultar por delante** y no te deja ni empezar, en **cuatro sitios** (cerrar una orden,
+  reabrirla, generar la orden de producción desde el renglón con referencias, y crear un modelo en la
+  mesa de negociación); y una **tercera, que ya se usa en Finanzas**: dejar pasar a quien trae la
+  llave de escribir **y sólo pedir la de consultar a quien no la trae**. De esa tercera dependen hoy
+  nueve operaciones de pagos e inventario cíclico, y es discutiblemente la más limpia — así que la
+  pregunta tiene tres respuestas posibles, no dos.
+  **La consecuencia hoy es real y medible:** quien pueda cerrar una orden pero no verla, **no puede
+  cerrarla en absoluto**. La pregunta, en una línea: *¿prefieres que quien tiene permiso de hacer
+  algo pueda hacerlo aunque no pueda consultarlo después, o que no pueda hacerlo si no puede
+  consultarlo?* Hoy el sistema contesta las dos cosas según por dónde entres.
+- **Falta la red que impide que esto vuelva a nacer** (fila 0.199): una comprobación automática que
+  se ponga en rojo si alguien vuelve a escribir el patrón. Sin ella, lo arreglado se puede perder en
+  cuanto el sistema crezca.
+
 ## 0.165 · 16-sep-2026 · **en prueba** — **Ya no pasa que se cree una orden, una compra, un pedido o una nota de salida, se guarde con su folio, y la pantalla diga «no tienes permiso»**
 
 ### Qué se puede hacer ahora que antes no

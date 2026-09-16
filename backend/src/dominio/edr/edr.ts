@@ -363,7 +363,9 @@ export async function generarEdrMes(
     return edr.id;
   }, bd);
 
-  return calcularEdr(sesion, idEdr, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarEdr` (sin reja de consulta). Con `calcularEdr`,
+  // quien tiene `edr.capturar` y no `edr.ver` recibía un 403 con el mes YA guardado.
+  return proyectarEdr(sesion, idEdr, bd);
 }
 
 // ── CALCULAR (leer con costo actual + cortes) ─────────────────────────────────────────────────────────
@@ -391,6 +393,9 @@ function cortesSalida(mapa: Map<number, AcumCorte>): EdrCorteSalida[] {
 /**
  * EDR CALCULADO de un mes (A4 `edr.ver`): encabezado + totales a COSTO ACTUAL (D1) + cortes por empresa
  * y por cliente derivados de las líneas. `resultado` con la fórmula legacy (Bonificaciones SUMA).
+ *
+ * Es la CONSULTA suelta: quien no lleve `edr.ver` no la obtiene. El ECO de una escritura propia va
+ * por {@link proyectarEdr} (ver su nota).
  */
 export async function calcularEdr(
   sesion: SesionUsuario,
@@ -398,6 +403,39 @@ export async function calcularEdr(
   bd?: ContextoBd,
 ): Promise<EdrCalculado> {
   verificarPermiso(sesion, 'edr.ver');
+  return proyectarEdr(sesion, idEdr, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN del EDR calculado de un mes SIN reja de consulta propia (fila 0.198).
+ *
+ * Es el MISMO cuerpo que {@link calcularEdr} —mismos totales a COSTO ACTUAL (D1), mismos cortes por
+ * empresa y por cliente, misma fórmula legacy del resultado— pero SIN
+ * `verificarPermiso('edr.ver')`, porque está pensada para UN solo uso: **devolverle a quien acaba de
+ * escribir el EDR que acaba de dejar**. La autorización de esa llamada ya la hizo la escritura con
+ * su propio permiso (`edr.capturar`); volver a pedir una llave DESPUÉS del commit es lo que producía
+ * el defecto de esta fila: el mes se generaba —o el encabezado se guardaba— y el usuario recibía un
+ * 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * 📌 **Aquí el daño era SÓLO el mensaje**, y por eso esta fila es la de «lo idempotente de verdad»:
+ * `generarEdrMes` es idempotente y re-ejecutable POR DISEÑO (reconcilia, nunca duplica) y
+ * `actualizarEncabezado` es un PATCH, así que reintentar tras el 403 no dejaba ni documento de más
+ * ni evento — pero la pantalla decía «no tienes permiso» sobre algo que sí se había guardado.
+ *
+ * ⚠️ **No hay filtro A9 que preservar, y no se inventa uno**: `Edr` es por `(anio, mes)` GLOBAL —no
+ * lleva `idEmpresa`— y el corte por empresa se DERIVA de sus líneas (`cortesEmpresa`). La `sesion` no
+ * se usa en el cuerpo, pero se conserva en la firma para que sea la MISMA que la de `calcularEdr`
+ * (`_sesion`, la convención de la casa para un parámetro que sólo está por uniformidad; mismo
+ * precedente que `proyectarConceptoPago` de la fila 0.197).
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link calcularEdr}, que sí exige `edr.ver`.
+ */
+export async function proyectarEdr(
+  _sesion: SesionUsuario,
+  idEdr: number,
+  bd?: ContextoBd,
+): Promise<EdrCalculado> {
   const cliente = clienteLectura(bd);
   const edr = await cliente.edr.findUnique({ where: { id: idEdr } });
   if (edr === null) {
@@ -890,5 +928,7 @@ export async function actualizarEncabezado(
     });
   }, bd);
 
-  return calcularEdr(sesion, idEdr, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarEdr` (sin reja de consulta). Con `calcularEdr`,
+  // quien tiene `edr.capturar` y no `edr.ver` recibía un 403 con el mes YA guardado.
+  return proyectarEdr(sesion, idEdr, bd);
 }

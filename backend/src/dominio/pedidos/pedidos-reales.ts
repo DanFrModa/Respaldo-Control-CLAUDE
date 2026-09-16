@@ -273,7 +273,9 @@ export async function actualizarPedidoReal(
     });
   }, bd);
 
-  return obtenerPedidoReal(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarPedidoReal` (sin reja de consulta). Con
+  // `obtenerPedidoReal`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarPedidoReal(sesion, id, bd);
 }
 
 /**
@@ -323,7 +325,9 @@ export async function actualizarSeguimientoPedidoReal(
     });
   }, bd);
 
-  return obtenerPedidoReal(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarPedidoReal` (sin reja de consulta). Con
+  // `obtenerPedidoReal`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarPedidoReal(sesion, id, bd);
 }
 
 /**

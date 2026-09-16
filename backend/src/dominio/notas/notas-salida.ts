@@ -709,7 +709,9 @@ export async function actualizarNotaSalida(
     });
   }, bd);
 
-  return obtenerNotaSalida(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarNotaSalida` (sin reja de consulta). Con
+  // `obtenerNotaSalida`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarNotaSalida(sesion, id, bd);
 }
 
 /**

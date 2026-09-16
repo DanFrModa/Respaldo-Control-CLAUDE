@@ -650,7 +650,9 @@ export async function actualizarPedido(
     });
   }, bd);
 
-  return obtenerPedido(sesion, datos.id, bd, archivos);
+  // ⭐ Fila 0.198: el ECO va por `proyectarPedido` (sin reja de consulta). Con `obtenerPedido`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarPedido(sesion, datos.id, bd, archivos);
 }
 
 /** Aplica una fecha al `update` solo si vino (`undefined` = no tocar; `null` = vaciar). */

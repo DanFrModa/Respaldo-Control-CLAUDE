@@ -1162,7 +1162,9 @@ export async function actualizarOC(
     });
   }, bd);
 
-  return obtenerOC(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
+  // tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarOC(sesion, id, bd);
 }
 
 /**
