@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.165 · 16-sep-2026 · **en prueba** — **Ya no pasa que se cree una orden, una compra, un pedido o una nota de salida, se guarde con su folio, y la pantalla diga «no tienes permiso»**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Crear una orden de producción, una orden de compra, un pedido, un pedido real o una nota de
+  salida con sólo el permiso de crearla** — sin necesitar además el de consultarla. Hasta ahora cada
+  alta se abría con su propio permiso, **guardaba el documento y le estampaba su folio**, y la
+  respuesta que devolvía después exigía **otro permiso distinto**. A quien tuviera uno y no el otro,
+  el documento **se le guardaba** y acto seguido recibía un *«no tienes permiso»*.
+- 🔴 **Y eso es peor aquí que en la captura de planta**, porque lo que parece no haberse guardado se
+  vuelve a capturar: el resultado eran **dos órdenes de compra con dos folios**, dos pedidos, dos
+  notas de salida. Un duplicado con su folio quemado, que después hay que cancelar a mano.
+- ⭐ **Lo mismo al autorizar, desautorizar o cancelar** una orden de compra, al confirmar o cancelar
+  una nota de salida, al cancelar una orden o un pedido, y al marcar una orden como pagada. Ahí
+  repetir no dejaba duplicado, pero sí un rechazo de estado incomprensible: *«esto ya está
+  autorizado»* después de que la pantalla dijera que no se pudo autorizar.
+- **Son 21 sitios en total**, incluidos los de desarrollo y cotización (crear un desarrollo, un
+  proyecto, un concepto de pago) y el comentario de una orden.
+
+### Qué cambió y puede sorprender
+
+- **Nada cambia para quien ya tenía los dos permisos**, que hoy son todos los perfiles. Esto es
+  preparación: el día que se arme un perfil que sólo capture —un comprador que registra órdenes pero
+  no anda viendo el resto— ya no se va a topar con la pared.
+- **No se aflojó ni un permiso.** Consultar una orden, una compra o un pedido sigue exigiendo
+  exactamente lo mismo que antes; lo único que cambió es **por dónde devuelve el eco** la propia
+  operación que acabas de hacer. Se comprobó contando una por una las comprobaciones de permiso antes
+  y después: idénticas en los nueve archivos.
+
+### Qué sigue pendiente o roto
+
+- **Quedan 19 sitios más de la misma familia** (fila 0.198): los que **modifican** algo ya existente
+  en vez de crearlo. Repetirlos no deja duplicado, así que duelen menos, pero siguen dando el mismo
+  rechazo confuso.
+- ⚠️ **Y algo que apareció midiendo y conviene decidir:** cerrar y reabrir una orden resuelven este
+  mismo problema **al revés** — piden el permiso de ver **por delante**. La consecuencia es que hoy
+  **quien pueda cerrar una orden pero no verla, sencillamente no puede cerrarla.** Son dos criterios
+  distintos conviviendo, y cuál es el correcto es una decisión del negocio, no técnica. No se tocó.
+
 ## 0.164 · 16-sep-2026 · **en prueba** — **Ya se pueden cargar los datos de prueba de Finanzas: cuentas por pagar, por cobrar, pagos, cotejo de facturas y estados de cuenta de maquileros**
 
 ### Qué se puede hacer ahora que antes no
