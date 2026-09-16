@@ -102,12 +102,16 @@ function bandera(clave: string): boolean {
 /**
  * Lee `--concurrencia=N`. Un valor ausente o sin sentido cae en el de por omisión sin avisar de
  * nada raro: quien se equivoca escribiéndolo quiere sembrar, no leer una lección sobre banderas.
+ *
+ * `porOmision` existe para que el **sembrador de finanzas** reuse esta misma función con su propio
+ * default en vez de duplicarla (los dos leen la misma bandera; tener dos copias es como se acaba
+ * arreglando una sola). Sin argumento se comporta exactamente igual que antes.
  */
-export function concurrenciaPedida(): number {
+export function concurrenciaPedida(porOmision: number = CONCURRENCIA_POR_OMISION): number {
   const crudo = flag('concurrencia');
-  if (crudo === null) return CONCURRENCIA_POR_OMISION;
+  if (crudo === null) return porOmision;
   const n = Number.parseInt(crudo, 10);
-  return Number.isFinite(n) && n >= 1 ? n : CONCURRENCIA_POR_OMISION;
+  return Number.isFinite(n) && n >= 1 ? n : porOmision;
 }
 
 /**

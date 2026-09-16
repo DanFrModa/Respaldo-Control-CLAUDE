@@ -29,7 +29,14 @@
  *
  * Banderas: `--simular` (alias `--dry-run`) · `--limpiar` · `--empresa=<id|nombre>` (por omisión la
  * empresa favorita) · `--cfdi-dir=<ruta>` (dónde escribir los XML ficticios; `--sin-cfdi` para no
- * escribirlos) · `--ayuda`.
+ * escribirlos) · `--concurrencia=<N>` · `--ayuda`.
+ *
+ * ## Si te sale un error de conexión
+ *
+ * Este script se corre contra una base REMOTA cuyo cupo de conexiones comparte con el backend
+ * desplegado. Si la base va apretada, vuelve a correrlo (es idempotente: retoma donde se quedó) y,
+ * si insiste, bájale la concurrencia: `--concurrencia=1` va de uno en uno con una sola conexión.
+ * El script te lo dice él mismo, con el estado del cupo, en vez de escupir un volcado de Prisma.
  *
  * ## Qué queda sembrado (y para qué sirve cada cosa)
  *
@@ -65,10 +72,18 @@
  *  • **Sin permisos nuevos, sin migración, sin semillas del sistema.** Usa el seed que ya está.
  */
 import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import {
+  diagnosticoConexiones,
+  esErrorDeConexion,
+  hayColgadas,
+  textoAyudaConexion,
+  textoDiagnostico,
+} from './comun/conexion.js';
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { totalCfdi } from './demo/cfdi.js';
@@ -94,11 +109,17 @@ import {
   reunirDemoFin,
 } from './demo/finanzas/limpiar.js';
 import {
+  CONCURRENCIA_FIN_POR_OMISION,
   fechaDemo,
   sembrarDemoFinanzas,
   type ResultadoSiembraFinanzas,
 } from './demo/finanzas/sembrar.js';
 import { empresaPorDefecto } from './etl-terceros-saldos.js';
+// Se REUSAN del gemelo de inventarios (fila 0.201) en vez de duplicarlos: son exactamente la misma
+// pregunta —«¿esta ruta cae dentro del repo?» y «¿qué concurrencia pidió el usuario?»— y tenerlas
+// en un solo sitio es lo que evita que una se arregle y la otra no. Importar ese módulo no ejecuta
+// nada: su arranque está guardado por `import.meta.url === argv[1]`, que aquí no casa.
+import { concurrenciaPedida, rutaDentroDe } from './sembrar-demo-inventarios.js';
 
 /** Lee un flag `--clave=valor` de argv (o null). */
 function flag(clave: string): string | null {
@@ -112,12 +133,30 @@ function bandera(clave: string): boolean {
   return process.argv.includes(`--${clave}`);
 }
 
-/** Carpeta por omisión de los XML ficticios (dentro del repo, como ejemplos versionados). */
-export const DIR_CFDI_FINANZAS_POR_OMISION = join(
-  'migracion',
-  '__fixtures__',
-  'demo-cfdi-finanzas',
-);
+/**
+ * Carpeta por omisión de los XML ficticios: **FUERA del repositorio**, en el temporal del sistema.
+ *
+ * 🔴 POR QUÉ NO VA DENTRO DEL REPO, que es donde estaba. Estos XML NO son estáticos: los **genera**
+ * el script con el **RFC y la razón social de la empresa activa** (ver `escribirCfdiFinanzas` en
+ * `demo/finanzas/sembrar.ts`), y los reescribe en cada corrida. Y en los CFDI de **VENTA** ese dato
+ * no va en el receptor, sino en el **EMISOR** — que es la propia empresa. La empresa de `prueba`
+ * **ya tiene su RFC real capturado**, así que la primera corrida que llegue al final los escribiría
+ * con el dato real… en una ruta del repositorio, que es **PÚBLICO**, donde lo que entra se queda en
+ * el historial para siempre.
+ *
+ * Es exactamente la pared contra la que se estrelló el sembrador de inventarios en la fila 0.201.
+ *
+ * ⚠️ Y `.gitignore` SOLO no basta: **medido allí** — un archivo que YA estaba rastreado se sigue
+ * mostrando como ` M` y `git add -A` lo sigue preparando, porque `.gitignore` sólo manda sobre lo
+ * que NO está en el índice. Aquí eso no llegó a pasar (estos XML **nunca** se comitearon: `git
+ * ls-files` de esa carpeta sale vacío), pero la carpeta está igualmente ignorada. Son tres capas:
+ * el default de esta constante —que es la que evita que nada vuelva a escribirse dentro—, el
+ * `.gitignore`, y el aviso de abajo cuando alguien apunta `--cfdi-dir` al repo a propósito.
+ *
+ * El nombre es DISTINTO del de inventarios (`control-cfdi-demo`) a propósito: los dos sembradores
+ * se corren por separado y ninguno debe pisar los archivos del otro.
+ */
+export const DIR_CFDI_FINANZAS_POR_OMISION = join(tmpdir(), 'control-cfdi-demo-finanzas');
 
 const AYUDA = `
 Sembrador de datos ficticios para probar FINANZAS.
@@ -127,8 +166,15 @@ Sembrador de datos ficticios para probar FINANZAS.
   --simular, --dry-run   No escribe nada: dice qué se sembraría.
   --limpiar              Borra TODO lo sembrado por este script (y sólo eso).
   --empresa=<id|nombre>  Empresa de los documentos (por omisión, la favorita).
-  --cfdi-dir=<ruta>      Dónde escribir los CFDI ficticios (por omisión ${DIR_CFDI_FINANZAS_POR_OMISION}).
+  --cfdi-dir=<ruta>      Dónde escribir los CFDI ficticios. Por omisión se escriben FUERA
+                         del repositorio, en ${DIR_CFDI_FINANZAS_POR_OMISION}
+                         (llevan el RFC de tu empresa: no deben acabar en git).
   --sin-cfdi             No escribe los CFDI ficticios.
+  --concurrencia=<N>     Cuántos catálogos crear a la vez (por omisión ${String(
+    CONCURRENCIA_FIN_POR_OMISION,
+  )}). Con 1 va de
+                         uno en uno: más lento, pero usa una sola conexión. Úsalo si la
+                         base te está dando errores de conexión.
   --ayuda                Esto.
 `;
 
@@ -187,8 +233,8 @@ function imprimirInvasores(invasores: InvasorFin[]): void {
   console.error('');
 }
 
-/** Imprime el resumen de una siembra. */
-function imprimirResumen(r: ResultadoSiembraFinanzas): void {
+/** Imprime el resumen de una siembra. `dirCfdi` es dónde quedaron los XML (null si no se escribieron). */
+function imprimirResumen(r: ResultadoSiembraFinanzas, dirCfdi: string | null): void {
   console.log('');
   console.log('── Sembrado ──────────────────────────────────────────────────');
   console.log(`  Proveedores .............. ${String(r.proveedores)}`);
@@ -206,6 +252,44 @@ function imprimirResumen(r: ResultadoSiembraFinanzas): void {
     `  Ya existían .............. ${String(r.existentes)} (idempotencia: no se duplicaron)`,
   );
   console.log(r.reporte.aTexto());
+  // Los CFDI salen FUERA del repo a propósito, así que hay que decir dónde: si no, el usuario los
+  // busca donde estaban antes y no los encuentra.
+  if (dirCfdi !== null && r.cfdiEscritos > 0) {
+    console.log('');
+    console.log(`Los ${String(r.cfdiEscritos)} CFDI ficticios quedaron en:`);
+    console.log(`  ${resolve(dirCfdi)}`);
+    console.log(
+      '  (fuera del repositorio a propósito: en los de VENTA el EMISOR lleva el RFC y el nombre ' +
+        'de tu empresa). Impórtalos desde Finanzas › Importar CFDI cuando quieras probarlo.',
+    );
+  }
+}
+
+/**
+ * Dice, ANTES de empezar, cómo está el cupo de conexiones de la base. Es lo que convierte un fallo
+ * futuro en algo entendible: si arranca diciendo «38 ocupadas de 40», el usuario ya sabe por qué se
+ * va a quejar, en vez de encontrarse un código de error a los dos minutos.
+ *
+ * Nunca estorba: si el cupo no se puede leer, la siembra sigue igual.
+ */
+async function imprimirEstadoDelCupo(cliente: PrismaClient, concurrencia: number): Promise<void> {
+  const d = await diagnosticoConexiones(cliente);
+  if (d === null) return;
+  console.log(textoDiagnostico(d));
+  const colgadas = hayColgadas(d);
+  if (colgadas > 0) {
+    console.log(
+      `  ⚠️  ${String(colgadas)} de ellas están "idle in transaction": suelen ser restos de una ` +
+        'corrida anterior que murió a media escritura, y siguen ocupando cupo.',
+    );
+  }
+  const libres = d.maximo - d.total;
+  if (libres < concurrencia + 2) {
+    console.log(
+      `  ⚠️  Quedan ~${String(libres)} conexiones libres y este script va a pedir hasta ` +
+        `${String(concurrencia + 2)}. Si falla, córrelo con --concurrencia=1.`,
+    );
+  }
 }
 
 /** Corre el sembrador contra `cliente` (expuesto para las pruebas). */
@@ -260,6 +344,7 @@ export async function ejecutar(cliente: PrismaClient): Promise<number> {
 
   const idEmpresa = await empresaPorDefecto(cliente, flag('empresa'));
   const sesion = sesionEtl(idEmpresa);
+  const concurrencia = concurrenciaPedida(CONCURRENCIA_FIN_POR_OMISION);
 
   console.log(`Sembrador de datos ficticios de FINANZAS — empresa ${String(idEmpresa)}`);
   if (simular) {
@@ -268,18 +353,39 @@ export async function ejecutar(cliente: PrismaClient): Promise<number> {
       idEmpresa,
       dirCfdi: null,
       simular: true,
+      concurrencia,
     });
     console.log(r.reporte.aTexto());
     return 0;
   }
 
+  await imprimirEstadoDelCupo(cliente, concurrencia);
+
   const dirCfdi = bandera('sin-cfdi') ? null : (flag('cfdi-dir') ?? DIR_CFDI_FINANZAS_POR_OMISION);
+  // El default ya es seguro (fuera del repo). Esto es el respaldo para el acto DELIBERADO de
+  // apuntar la salida a una ruta del repositorio: no se prohíbe —puede haber una razón—, pero no
+  // se hace en silencio. `..` desde `backend/` es la raíz del repo (este script se corre desde ahí).
+  if (dirCfdi !== null && rutaDentroDe(dirCfdi, join(process.cwd(), '..'))) {
+    console.warn('');
+    console.warn('⚠️  OJO: estás escribiendo los CFDI DENTRO del repositorio.');
+    console.warn(
+      '   Estos XML llevan el RFC y la razón social de tu empresa (en los de VENTA, como',
+    );
+    console.warn(
+      '   EMISOR), y este repositorio es PÚBLICO: si se comitean, esos datos quedan en el',
+    );
+    console.warn('   historial para siempre. Si no era lo que querías, quita --cfdi-dir y se');
+    console.warn('   escribirán en:');
+    console.warn(`     ${DIR_CFDI_FINANZAS_POR_OMISION}`);
+    console.warn('');
+  }
   const resultado = await sembrarDemoFinanzas(cliente, sesion, {
     idEmpresa,
     dirCfdi,
     simular: false,
+    concurrencia,
   });
-  imprimirResumen(resultado);
+  imprimirResumen(resultado, dirCfdi);
   console.log('');
   console.log('Para borrarlo todo:');
   console.log('  npx tsx --env-file=.env migracion/sembrar-demo-finanzas.ts -- --limpiar');
@@ -293,9 +399,13 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.error('Falta DATABASE_URL (ver backend/.env.example). ¿Corriste con --env-file=.env?');
     process.exit(1);
   }
+  const concurrencia = concurrenciaPedida(CONCURRENCIA_FIN_POR_OMISION);
   const cliente = crearClientePrisma(url, {
     transactionOptions: { maxWait: 20_000, timeout: 120_000 },
-    poolMax: 12,
+    // El pool se dimensiona a lo que la corrida va a usar de verdad: una conexión por tarea en
+    // vuelo más dos de holgura para las lecturas sueltas (mapeo, comprobaciones). Pedir 12 fijas
+    // cuando se van a usar 4 sólo le quita cupo al backend desplegado, que comparte esta base.
+    poolMax: concurrencia + 2,
     pool: { keepAlive: true, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 30_000 },
   });
   ejecutar(cliente)
@@ -304,7 +414,23 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       process.exit(codigo);
     })
     .catch(async (error: unknown) => {
-      console.error(error);
+      // Un fallo de CONEXIÓN no se le suelta al usuario como un volcado de Prisma: se le explica
+      // qué pasó y qué hacer. El volcado técnico se imprime igual, debajo, por si hay que
+      // reportarlo — pero deja de ser lo único que se ve.
+      if (esErrorDeConexion(error)) {
+        console.error(
+          textoAyudaConexion({
+            comando: 'npx tsx --env-file=.env migracion/sembrar-demo-finanzas.ts',
+            concurrencia,
+            diagnostico: await diagnosticoConexiones(cliente),
+          }),
+        );
+        console.error('   ── detalle técnico ───────────────────────────────────────────');
+        console.error(`   ${error instanceof Error ? error.message : String(error)}`);
+        console.error('');
+      } else {
+        console.error(error);
+      }
       await cliente.$disconnect();
       process.exit(1);
     });

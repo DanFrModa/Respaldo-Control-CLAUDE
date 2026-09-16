@@ -71,6 +71,51 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.164 · 16-sep-2026 · **en prueba** — **Ya se pueden cargar los datos de prueba de Finanzas: cuentas por pagar, por cobrar, pagos, cotejo de facturas y estados de cuenta de maquileros**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Llenar `prueba` con un juego de datos ficticios de Finanzas** y revisar el módulo con las
+  pantallas llenas: 6 proveedores, 4 clientes, 13 movimientos de cuentas por pagar y 10 de por
+  cobrar con **fechas escalonadas de hasta cinco meses atrás** —para que el reporte de antigüedad
+  tenga tramos de verdad y no salga todo «al corriente»—, 3 corridas de pago, 4 facturas de cotejo y
+  6 comprobantes fiscales.
+- ⭐ **Y no sólo el camino fácil.** Hay un proveedor **en negativo** por un anticipo, cobros
+  parciales, un movimiento **cancelado con su contrapartida** como manda la casa, y de las cuatro
+  facturas de cotejo **una cuadra, una está en rojo y ya atendida, y dos están en rojo frenando la
+  corrida de pago**. Esos son los casos que enseñan si el módulo aguanta.
+- 🔑 **Verás maquileros con movimientos dentro y saldo en cero, y es correcto.** En el estado de
+  cuenta de maquileros **sólo cuenta lo que ya se revisó**; lo capturado y aún sin revisar aparece
+  aparte, en «por revisar». Se siembran los dos estados a propósito, porque el renglón sin revisar es
+  justo el que alguien tiene que ir a validar.
+- Todo nace marcado `DEMO-` y **se borra de un golpe** con `--limpiar`, sin tocar nada de lo demás.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Este programa tenía los dos mismos fallos que el de Inventarios, y se cazaron antes de que
+  llegaran a nadie.** Se había escrito la noche anterior, antes de que supiéramos por qué fallaba su
+  gemelo. No conectaba bien con la base —habría muerto igual, en la primera escritura— y escribía los
+  comprobantes fiscales dentro del proyecto, con el RFC y la razón social de la empresa. Los dos
+  arreglados y comprobados **ejecutándolos**: sobre un enlace lento simulado, antes no arrancaba y
+  ahora siembra completo en 9 segundos.
+- **Los comprobantes fiscales salen a una carpeta temporal** y el programa dice en pantalla dónde los
+  dejó. En los de **venta** el RFC de la empresa va en el emisor, así que no pueden vivir dentro del
+  proyecto.
+- **Es un programa aparte del de Inventarios**, con su propia marca. Cada uno se limpia sin tocar al
+  otro, y eso se comprobó en las dos direcciones.
+
+### Qué sigue pendiente o roto
+
+- **Los cargos de maquila no se siembran**, y no es un descuido: no existe forma de crearlos sueltos.
+  Nacen del recibo de producción, que arrastra orden → corte → envío. Así que el estado de cuenta del
+  maquilero se ve con abonos, descuentos y pagos, **pero sin «prendas por pagar»**. Si hace falta
+  para juzgarlo, es otro programa.
+- **Los comprobantes fiscales hay que importarlos a mano** desde la carpeta donde queden: el programa
+  no puede hacerlo por su cuenta porque la importación guarda el archivo en la nube y eso necesita
+  credenciales que un script suelto no tiene.
+- **Queda una dependencia anotada** (fila 0.202): el programa de Finanzas reutiliza dos funciones del
+  de Inventarios. Hoy no ejecuta nada de él, pero lo limpio sería moverlas a un sitio común.
+
 ## 0.163 · 16-sep-2026 · **en prueba** — **Ya se pueden cargar los datos de prueba de Inventarios: el programa que los siembra no lograba conectarse a la base de Railway**
 
 ### Qué se puede hacer ahora que antes no

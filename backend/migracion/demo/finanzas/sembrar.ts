@@ -32,6 +32,7 @@ import { join } from 'node:path';
 
 import type { PrismaClient } from '../../../src/datos/index.js';
 import type { SesionUsuario } from '../../../src/comun/permisos.js';
+import type { ContextoBd } from '../../../src/comun/transaccion.js';
 import { ErrorConflicto } from '../../../src/comun/errores.js';
 
 import { crearCliente } from '../../../src/dominio/catalogos/clientes.js';
@@ -58,6 +59,7 @@ import {
 import { registrarMovimientoCxc } from '../../../src/dominio/terceros/cxc/cxc.js';
 
 import { Reporte } from '../../comun/reporte.js';
+import { conReintentoConexion } from '../../comun/conexion.js';
 import { construirCfdiDemo, totalCfdi } from '../cfdi.js';
 
 import { catalogoCfdiFinanzas } from './cfdi.js';
@@ -76,8 +78,24 @@ import {
   type MovimientoDemoFin,
 } from './datos.js';
 
-/** Tamaño de lote de los catálogos (se crean por bloques; cada uno en su transacción). */
-const LOTE_CATALOGOS = 10;
+/**
+ * Cuántos catálogos se crean A LA VEZ (cada uno en su propia transacción, o sea en su propia
+ * conexión). Se puede cambiar por corrida con `--concurrencia=N`; con `1` va estrictamente de uno
+ * en uno.
+ *
+ * ⭐ POR QUÉ ES BAJO — es el mismo número, y por la misma razón, que el del sembrador de
+ * inventarios (fila 0.201). Este script se corre a mano, desde un portátil, por internet, contra
+ * una base cuyo cupo de conexiones COMPARTE con el backend desplegado y su cola de eventos. Cada
+ * tarea en vuelo se lleva una conexión del cupo mientras dura su transacción, así que esto es
+ * literalmente «cuántas conexiones remotas le arranco a la base al mismo tiempo». Estaba en 10, que
+ * es exactamente lo que ahogaba al gemelo.
+ *
+ * Y no hace falta para ir rápido: son 6 proveedores, 4 clientes y un puñado de conceptos — los
+ * catálogos de esta siembra caben en dos bloques. La regla del repo de «ETL por lotes, nunca 1×1»
+ * habla de ESCRITURAS AGRUPADAS (`createMany`, chunks), no de transacciones simultáneas: bajar
+ * esto no la incumple.
+ */
+export const CONCURRENCIA_FIN_POR_OMISION = 4;
 
 /** Orígenes que CxP acepta capturar a mano (el resto va por el motor, como en la aplicación). */
 const ORIGENES_CAPTURABLES_CXP = new Set([
@@ -115,6 +133,11 @@ export interface OpcionesSiembraFinanzas {
   dirCfdi: string | null;
   /** Ensayo en seco: no escribe NADA (ni base ni archivos). */
   simular: boolean;
+  /**
+   * Cuántos catálogos crear a la vez (ver {@link CONCURRENCIA_FIN_POR_OMISION}). `1` =
+   * estrictamente de uno en uno, que es lo más resistente cuando la base va apretada de conexiones.
+   */
+  concurrencia?: number;
 }
 
 // ── Mapeo (idempotencia + inventario de lo sembrado) ─────────────────────────────────────────────
@@ -169,10 +192,58 @@ class Marcador {
   existentes = 0;
 }
 
+/** Avisa por consola de un reintento, para que una corrida lenta no parezca colgada. */
+function avisarReintento(
+  que: string,
+  info: { intento: number; maxIntentos: number; esperaMs: number },
+): void {
+  console.warn(
+    `  ⏳ ${que}: la base no dio conexión (intento ${String(info.intento)} de ` +
+      `${String(info.maxIntentos)}). Reintento en ${String(Math.round(info.esperaMs / 1000))} s…`,
+  );
+}
+
+/** El gancho de aviso de {@link conReintentoConexion}, nombrando lo que se está sembrando. */
+function avisosDe(clave: string): {
+  alReintentar: (i: { intento: number; maxIntentos: number; esperaMs: number }) => void;
+} {
+  return {
+    alReintentar: (i) => {
+      avisarReintento(clave, i);
+    },
+  };
+}
+
 /**
  * Asegura UNA fila demo: si la clave ya está mapeada **y** la fila sigue viva, la reutiliza; si el
  * mapeo apunta a algo que ya no existe (alguien lo borró a mano), vuelve a crearla y re-apunta el
  * mapeo. Esa doble comprobación es lo que hace la corrida re-ejecutable sin duplicar y sin romperse.
+ *
+ * ## 🔴 QUÉ SE REINTENTA AQUÍ, Y QUÉ NO — **en Finanzas la línea se traza más adentro**
+ *
+ * El enlace a `prueba` es remoto y se cae a ratos, así que hay reintento de CONEXIÓN. Pero
+ * reintentar lo que no es idempotente **duplica en silencio**, y en este módulo un duplicado no es
+ * una fila de más: es **un movimiento de cuenta corriente**, o sea el saldo equivocado de un
+ * proveedor. Por eso aquí se reintenta MENOS que en el sembrador de inventarios:
+ *
+ *  • ✅ **Paso 1, la comprobación** (`leerDemo` + `sigueViva`): todos los `sigueViva` de este
+ *    archivo son `count`/`findUnique` puros — no escriben, repetirlos no puede duplicar nada.
+ *    (⚠️ Si alguien mete una ESCRITURA dentro de un `sigueViva`, tiene que sacarla de aquí: no
+ *    basta con que «parezca una lectura».)
+ *  • ⛔ **Paso 2, `crear()`: FUERA DE TODO REINTENTO, sin excepción.** Detrás hay un
+ *    `registrarMovimiento*`, un `crearProveedor`, un `crearAbonoMaquilero`… y varios de ellos
+ *    **commitean y DESPUÉS leen** lo recién creado para devolverlo. Si el enlace tropieza en esa
+ *    lectura, el error llega **con la fila ya guardada**: el reintento la crearía otra vez. Los
+ *    catálogos se salvarían por su clave natural única, pero **`MovimientoTercero` sólo es único
+ *    por `@@unique([idEmpresa, folio])` y el folio lo acuña la secuencia atómica (A3)**: cada
+ *    intento estrena folio nuevo. El resultado sería un saldo contado dos veces, el primer
+ *    movimiento invisible para `--limpiar` (que trabaja contra el mapeo), y todo ello EN SILENCIO,
+ *    con el usuario leyendo «Reintento en 2 s…» y un final feliz. Si `crear()` truena, la corrida
+ *    se cae y se vuelve a correr el script, que retoma donde estaba: eso cuesta segundos.
+ *  • ✅ **Paso 3, `anotarDemo`**: `upsert` sobre la llave `(entidad, claveVieja)`, o sea
+ *    **idempotente por construcción**. Reintentarlo no duplica y encima cierra el hueco feo del
+ *    paso 2: si `crear()` salió bien y el enlace se cae al anotar, el reintento consigue dejar el
+ *    mapeo escrito en vez de abandonar una fila creada sin marca (que `--limpiar` no vería).
  */
 async function asegurar(
   cliente: PrismaClient,
@@ -182,13 +253,26 @@ async function asegurar(
   crear: () => Promise<number>,
   marcador: Marcador,
 ): Promise<{ id: number; nuevo: boolean }> {
-  const mapeado = await leerDemo(cliente, entidad, clave);
-  if (mapeado !== null && (await sigueViva(mapeado))) {
+  const avisar = avisosDe(clave);
+
+  // 1. SÓLO LECTURA (reintentable sin riesgo): ¿ya está mapeada y sigue viva?
+  const yaEsta = await conReintentoConexion(async () => {
+    const mapeado = await leerDemo(cliente, entidad, clave);
+    if (mapeado === null) return null;
+    return (await sigueViva(mapeado)) ? mapeado : null;
+  }, avisar);
+
+  if (yaEsta !== null) {
     marcador.existentes += 1;
-    return { id: mapeado, nuevo: false };
+    return { id: yaEsta, nuevo: false };
   }
+
+  // 2. LA CREACIÓN, FUERA DE TODO REINTENTO. Ver arriba: estampa folio y no es idempotente.
   const id = await crear();
-  await anotarDemo(cliente, entidad, clave, id);
+
+  // 3. La marca en el mapeo SÍ se reintenta: `upsert` sobre su llave única es idempotente.
+  await conReintentoConexion(() => anotarDemo(cliente, entidad, clave, id), avisar);
+
   marcador.creados += 1;
   return { id, nuevo: true };
 }
@@ -307,6 +391,15 @@ export async function sembrarDemoFinanzas(
 ): Promise<ResultadoSiembraFinanzas> {
   const reporte = new Reporte('DATOS FICTICIOS DE FINANZAS — resumen de la corrida');
   const m = new Marcador();
+  // 🔴 EL CONTEXTO DE BASE DE DATOS, que es lo que hace que este script sobreviva a una base
+  // REMOTA. Sin él, `enTransaccion` abre la transacción contra el SINGLETON de `src/datos`
+  // (`src/comun/transaccion.ts:89`), que nace sin opciones: `maxWait` de 2 s —que un enlace por
+  // internet se come sólo en abrir la conexión— y un pool propio, aparte del que este script
+  // afinó. Medido en el gemelo de inventarios (fila 0.201), con el enlace retardado 3 s: sin `bd`
+  // → `P2028` a los ~2150 ms y un pico de 20 conexiones; con `bd` → OK a los ~3230 ms y pico de 6.
+  // Pásalo SIEMPRE, a TODAS las llamadas de dominio de este archivo.
+  const bd: ContextoBd = { cliente };
+  const concurrencia = Math.max(1, opciones.concurrencia ?? CONCURRENCIA_FIN_POR_OMISION);
 
   if (opciones.simular) {
     reporte.nota('ENSAYO EN SECO (--simular): no se escribió nada en la base ni en disco.');
@@ -314,15 +407,18 @@ export async function sembrarDemoFinanzas(
   }
 
   // 1. Proveedores (catálogo GLOBAL, ADR-0007). Los roles se resuelven por su código.
+  // Lectura pura (`findMany`): se reintenta sin riesgo si el enlace tropieza al arrancar.
   const rolesPorCodigo = new Map(
-    (await cliente.rolProveedor.findMany({ select: { id: true, codigo: true } })).map((r) => [
-      r.codigo,
-      r.id,
-    ]),
+    (
+      await conReintentoConexion(
+        () => cliente.rolProveedor.findMany({ select: { id: true, codigo: true } }),
+        avisosDe('roles de proveedor'),
+      )
+    ).map((r) => [r.codigo, r.id]),
   );
   const idsProveedor = new Map<string, number>();
   let proveedoresNuevos = 0;
-  for (const bloque of enBloques(PROVEEDORES_DEMO_FIN, LOTE_CATALOGOS)) {
+  for (const bloque of enBloques(PROVEEDORES_DEMO_FIN, concurrencia)) {
     const hechos = await Promise.all(
       bloque.map(async (p) => {
         const roles = p.roles
@@ -340,20 +436,24 @@ export async function sembrarDemoFinanzas(
           async (x) => (await cliente.proveedor.count({ where: { id: x } })) > 0,
           async () =>
             (
-              await crearProveedor(sesion, {
-                nombre: p.nombre,
-                nombreCorto: p.nombreCorto,
-                razonSocial: p.nombre,
-                rfc: p.rfc,
-                regimenFiscalSat: p.regimenFiscalSat,
-                diasCredito: p.diasCredito,
-                modalidadFacturacion: p.modalidadFacturacion,
-                moneda: 'MXN',
-                email: p.email,
-                telefono: p.telefono,
-                direccion: p.direccion,
-                roles,
-              })
+              await crearProveedor(
+                sesion,
+                {
+                  nombre: p.nombre,
+                  nombreCorto: p.nombreCorto,
+                  razonSocial: p.nombre,
+                  rfc: p.rfc,
+                  regimenFiscalSat: p.regimenFiscalSat,
+                  diasCredito: p.diasCredito,
+                  modalidadFacturacion: p.modalidadFacturacion,
+                  moneda: 'MXN',
+                  email: p.email,
+                  telefono: p.telefono,
+                  direccion: p.direccion,
+                  roles,
+                },
+                bd,
+              )
             ).id,
           m,
         );
@@ -378,15 +478,20 @@ export async function sembrarDemoFinanzas(
         async (x) => (await cliente.proveedorCuentaPago.count({ where: { id: x } })) > 0,
         async () =>
           (
-            await crearCuentaPagoProveedor(sesion, idProveedor, {
-              beneficiario: c.beneficiario,
-              banco: c.banco,
-              tipoCuenta: c.tipoCuenta,
-              cuenta: c.cuenta,
-              alias: c.alias,
-              esFiscal: c.esFiscal,
-              notas: `${PREFIJO_DEMO_FIN}cuenta ficticia — se borra con --limpiar.`,
-            })
+            await crearCuentaPagoProveedor(
+              sesion,
+              idProveedor,
+              {
+                beneficiario: c.beneficiario,
+                banco: c.banco,
+                tipoCuenta: c.tipoCuenta,
+                cuenta: c.cuenta,
+                alias: c.alias,
+                esFiscal: c.esFiscal,
+                notas: `${PREFIJO_DEMO_FIN}cuenta ficticia — se borra con --limpiar.`,
+              },
+              bd,
+            )
           ).id,
         m,
       );
@@ -398,7 +503,7 @@ export async function sembrarDemoFinanzas(
   // 3. Clientes (catálogo GLOBAL). Sus días de crédito son la base del aging de CxC.
   const idsCliente = new Map<string, number>();
   let clientesNuevos = 0;
-  for (const bloque of enBloques(CLIENTES_DEMO_FIN, LOTE_CATALOGOS)) {
+  for (const bloque of enBloques(CLIENTES_DEMO_FIN, concurrencia)) {
     const hechos = await Promise.all(
       bloque.map(async (c) => {
         const { id, nuevo } = await asegurar(
@@ -408,16 +513,20 @@ export async function sembrarDemoFinanzas(
           async (x) => (await cliente.cliente.count({ where: { id: x } })) > 0,
           async () =>
             (
-              await crearCliente(sesion, {
-                nombre: c.nombre,
-                razonSocial: c.razonSocial,
-                contacto: c.contacto,
-                telefono: c.telefono,
-                email: c.email,
-                direccion: c.direccion,
-                diasCredito: c.diasCredito,
-                ...(c.rfc === null ? {} : { rfc: c.rfc }),
-              })
+              await crearCliente(
+                sesion,
+                {
+                  nombre: c.nombre,
+                  razonSocial: c.razonSocial,
+                  contacto: c.contacto,
+                  telefono: c.telefono,
+                  email: c.email,
+                  direccion: c.direccion,
+                  diasCredito: c.diasCredito,
+                  ...(c.rfc === null ? {} : { rfc: c.rfc }),
+                },
+                bd,
+              )
             ).id,
           m,
         );
@@ -439,13 +548,17 @@ export async function sembrarDemoFinanzas(
       async (x) => (await cliente.conceptoPago.count({ where: { id: x } })) > 0,
       async () =>
         (
-          await crearConceptoPago(sesion, {
-            nombre: c.nombre,
-            rubro: c.rubro,
-            formaPagoPreferida: c.formaPagoPreferida,
-            predeterminado: false,
-            notas: `${PREFIJO_DEMO_FIN}concepto ficticio — se borra con --limpiar.`,
-          })
+          await crearConceptoPago(
+            sesion,
+            {
+              nombre: c.nombre,
+              rubro: c.rubro,
+              formaPagoPreferida: c.formaPagoPreferida,
+              predeterminado: false,
+              notas: `${PREFIJO_DEMO_FIN}concepto ficticio — se borra con --limpiar.`,
+            },
+            bd,
+          )
         ).id,
       m,
     );
@@ -460,12 +573,14 @@ export async function sembrarDemoFinanzas(
     idsTercero: idsProveedor,
     lado: 'proveedor',
     marcador: m,
+    bd,
   });
   const movimientosCxc = await sembrarMovimientos(cliente, sesion, {
     lista: MOVIMIENTOS_CXC_DEMO,
     idsTercero: idsCliente,
     lado: 'cliente',
     marcador: m,
+    bd,
   });
 
   // 6. EsMa: el FOLD del maquilero. Estos renglones salen DENTRO del estado de cuenta de CxP del
@@ -494,8 +609,8 @@ export async function sembrarDemoFinanzas(
       async () =>
         (
           await (mv.tipo === 'abono'
-            ? crearAbonoMaquilero(sesion, cuerpo)
-            : crearDescuentoMaquilero(sesion, cuerpo))
+            ? crearAbonoMaquilero(sesion, cuerpo, bd)
+            : crearDescuentoMaquilero(sesion, cuerpo, bd))
         ).id,
       m,
     );
@@ -506,18 +621,23 @@ export async function sembrarDemoFinanzas(
     // revisión, la siguiente la completa. Y se lee el estado antes de llamar, porque `revisar` de
     // algo ya revisado lanza 409 — el sembrador no debe pelearse consigo mismo.
     if (mv.revisar) {
-      const estado =
-        mv.tipo === 'abono'
-          ? await cliente.abonoMaquilero.findUnique({
-              where: { id },
-              select: { estadoRevision: true },
-            })
-          : await cliente.descuentoMaquilero.findUnique({
-              where: { id },
-              select: { estadoRevision: true },
-            });
+      // La LECTURA del estado se reintenta (es un `findUnique` puro). La REVISIÓN de abajo, no:
+      // es una escritura del dominio y aquí no se reintenta ninguna (ver el ⛔ de `asegurar`).
+      const estado = await conReintentoConexion(
+        () =>
+          mv.tipo === 'abono'
+            ? cliente.abonoMaquilero.findUnique({
+                where: { id },
+                select: { estadoRevision: true },
+              })
+            : cliente.descuentoMaquilero.findUnique({
+                where: { id },
+                select: { estadoRevision: true },
+              }),
+        avisosDe(mv.clave),
+      );
       if (estado !== null && estado.estadoRevision === 'capturado') {
-        await revisarMovimiento(sesion, mv.tipo, id);
+        await revisarMovimiento(sesion, mv.tipo, id, bd);
       }
     }
   }
@@ -530,6 +650,7 @@ export async function sembrarDemoFinanzas(
     idsCuenta,
     marcador: m,
     reporte,
+    bd,
   });
 
   // 8. Facturas de proveedor + su COTEJO contra los documentos que emitimos.
@@ -537,14 +658,22 @@ export async function sembrarDemoFinanzas(
     idsProveedor,
     marcador: m,
     reporte,
+    bd,
   });
 
   // 9. ⭐ ANOTAR LOS DERIVADOS (inversos de cancelación, pagos nacidos al ejecutar la corrida…), para
   //    que el conjunto que `--limpiar` borra salga ENTERO del mapeo.
-  await anotarDerivados(cliente, {
-    idsProveedor: [...idsProveedor.values()],
-    idsCliente: [...idsCliente.values()],
-  });
+  // Reintentable ENTERO: son lecturas puras más un `createMany` con `skipDuplicates` cuya clave
+  // (`entidad` + `PREFIJO-<id>`) se deriva del id que se acaba de leer, no de un contador. Repetirlo
+  // no puede acuñar nada nuevo.
+  await conReintentoConexion(
+    () =>
+      anotarDerivados(cliente, {
+        idsProveedor: [...idsProveedor.values()],
+        idsCliente: [...idsCliente.values()],
+      }),
+    avisosDe('anotar los derivados'),
+  );
 
   // 10. Los CFDI ficticios (archivos; no se importan aquí — se dejan listos para probarlos a mano).
   const cfdiEscritos =
@@ -612,6 +741,8 @@ interface ContextoMovimientos {
   idsTercero: Map<string, number>;
   lado: 'proveedor' | 'cliente';
   marcador: Marcador;
+  /** El contexto del cliente afinado por el script (ver el 🔴 de `sembrarDemoFinanzas`). */
+  bd: ContextoBd;
 }
 
 /**
@@ -660,20 +791,24 @@ async function sembrarMovimientos(
             ...(mv.esFiscal === undefined ? {} : { esFiscal: mv.esFiscal }),
           };
           return ctx.lado === 'proveedor'
-            ? (await registrarMovimientoCxp(sesion, idTercero, cuerpo)).id
-            : (await registrarMovimientoCxc(sesion, idTercero, cuerpo)).id;
+            ? (await registrarMovimientoCxp(sesion, idTercero, cuerpo, ctx.bd)).id
+            : (await registrarMovimientoCxc(sesion, idTercero, cuerpo, ctx.bd)).id;
         }
         return (
-          await registrarMovimientoTercero(sesion, {
-            tipoTercero: ctx.lado,
-            idTercero,
-            fecha,
-            origen: mv.origen,
-            importe: mv.importe,
-            observaciones: mv.observaciones,
-            ...(mv.esFiscal === undefined ? {} : { esFiscal: mv.esFiscal }),
-            ...(mv.uuidCfdi === undefined ? {} : { uuidCfdi: mv.uuidCfdi }),
-          })
+          await registrarMovimientoTercero(
+            sesion,
+            {
+              tipoTercero: ctx.lado,
+              idTercero,
+              fecha,
+              origen: mv.origen,
+              importe: mv.importe,
+              observaciones: mv.observaciones,
+              ...(mv.esFiscal === undefined ? {} : { esFiscal: mv.esFiscal }),
+              ...(mv.uuidCfdi === undefined ? {} : { uuidCfdi: mv.uuidCfdi }),
+            },
+            ctx.bd,
+          )
         ).id;
       },
       ctx.marcador,
@@ -684,12 +819,20 @@ async function sembrarMovimientos(
     // corrida anterior murió entre el alta y la cancelación, la segunda la completa en vez de dejar
     // un movimiento a medias para siempre.
     if (mv.cancelarCon !== undefined) {
-      const actual = await cliente.movimientoTercero.findUnique({
-        where: { id },
-        select: { cancelado: true },
-      });
+      // La LECTURA se reintenta (`findUnique` puro). La CANCELACIÓN no: aunque va guardada por
+      // `!actual.cancelado`, es un movimiento INVERSO que estrena folio de la secuencia atómica
+      // (A3). En Finanzas un duplicado es un saldo equivocado, así que ninguna escritura del
+      // dominio entra en un reintento — ver el ⛔ de `asegurar`.
+      const actual = await conReintentoConexion(
+        () =>
+          cliente.movimientoTercero.findUnique({
+            where: { id },
+            select: { cancelado: true },
+          }),
+        avisosDe(mv.clave),
+      );
       if (actual !== null && !actual.cancelado && ctx.lado === 'proveedor') {
-        await cancelarMovimientoCxp(sesion, id, { motivo: mv.cancelarCon });
+        await cancelarMovimientoCxp(sesion, id, { motivo: mv.cancelarCon }, ctx.bd);
       }
     }
   }
@@ -704,6 +847,8 @@ interface ContextoCorridas {
   idsCuenta: Map<string, number>;
   marcador: Marcador;
   reporte: Reporte;
+  /** El contexto del cliente afinado por el script (ver el 🔴 de `sembrarDemoFinanzas`). */
+  bd: ContextoBd;
 }
 
 /** El lunes de la semana de hace `semanas` semanas, en `YYYY-MM-DD`. */
@@ -725,8 +870,13 @@ async function sembrarCorridas(
   let renglones = 0;
 
   for (const c of CORRIDAS_DEMO_FIN) {
-    const yaEsta = await leerDemo(cliente, ENTIDAD_DEMO_FIN.corrida, c.clave);
-    if (yaEsta !== null && (await cliente.corridaPago.count({ where: { id: yaEsta } })) > 0) {
+    // Comprobación de idempotencia: dos lecturas puras, reintentables sin riesgo.
+    const yaEsta = await conReintentoConexion(async () => {
+      const mapeado = await leerDemo(cliente, ENTIDAD_DEMO_FIN.corrida, c.clave);
+      if (mapeado === null) return null;
+      return (await cliente.corridaPago.count({ where: { id: mapeado } })) > 0 ? mapeado : null;
+    }, avisosDe(c.clave));
+    if (yaEsta !== null) {
       ctx.marcador.existentes += 1;
       continue;
     }
@@ -739,11 +889,15 @@ async function sembrarCorridas(
     let creada: { id: number; folio: number };
     try {
       // El detalle envuelve al encabezado (`{ corrida, secciones, bloqueos… }`): el id vive adentro.
-      const detalle = await crearCorrida(sesion, {
-        semana: semanaDe(c.semanasAtras),
-        conFactura: c.conFactura,
-        notas: c.notas,
-      });
+      const detalle = await crearCorrida(
+        sesion,
+        {
+          semana: semanaDe(c.semanasAtras),
+          conFactura: c.conFactura,
+          notas: c.notas,
+        },
+        ctx.bd,
+      );
       creada = { id: detalle.corrida.id, folio: detalle.corrida.folio };
     } catch (error) {
       if (!(error instanceof ErrorConflicto)) throw error;
@@ -758,10 +912,15 @@ async function sembrarCorridas(
       );
       continue;
     }
-    await anotarDemo(cliente, ENTIDAD_DEMO_FIN.corrida, c.clave, creada.id, {
-      clave: c.clave,
-      folio: creada.folio,
-    });
+    // `upsert` sobre la llave única `(entidad, claveVieja)`: idempotente, se reintenta.
+    await conReintentoConexion(
+      () =>
+        anotarDemo(cliente, ENTIDAD_DEMO_FIN.corrida, c.clave, creada.id, {
+          clave: c.clave,
+          folio: creada.folio,
+        }),
+      avisosDe(c.clave),
+    );
     ctx.marcador.creados += 1;
     corridas += 1;
 
@@ -778,21 +937,31 @@ async function sembrarCorridas(
       if (r.concepto !== null && idConcepto === undefined) {
         throw new Error(`${c.clave}: el concepto ${r.concepto} no está sembrado.`);
       }
-      await guardarRenglonCorrida(sesion, creada.id, {
-        ...(idProveedor === undefined ? {} : { idProveedor }),
-        ...(idConcepto === undefined ? {} : { idConcepto }),
-        monto: r.monto,
-        formaPago: r.formaPago,
-        idCuenta: idCuenta ?? null,
-        concepto: r.texto,
-        ...(r.referencia === undefined ? {} : { referencia: r.referencia }),
-      });
+      // ⚠️ `guardarRenglonCorrida` es la única de este archivo cuyo `bd` NO es el último argumento
+      // que se escribe a mano: antes va `idRenglon?`, que sirve para EDITAR un renglón existente.
+      // Aquí siempre se está creando uno nuevo, así que va `undefined` — pasar `bd` en su sitio
+      // editaría el renglón cuyo id coincidiera.
+      await guardarRenglonCorrida(
+        sesion,
+        creada.id,
+        {
+          ...(idProveedor === undefined ? {} : { idProveedor }),
+          ...(idConcepto === undefined ? {} : { idConcepto }),
+          monto: r.monto,
+          formaPago: r.formaPago,
+          idCuenta: idCuenta ?? null,
+          concepto: r.texto,
+          ...(r.referencia === undefined ? {} : { referencia: r.referencia }),
+        },
+        undefined,
+        ctx.bd,
+      );
       renglones += 1;
     }
 
     if (c.estado === 'borrador') continue;
-    await cerrarCorrida(sesion, creada.id);
-    await ejecutarCorrida(sesion, creada.id);
+    await cerrarCorrida(sesion, creada.id, ctx.bd);
+    await ejecutarCorrida(sesion, creada.id, ctx.bd);
   }
 
   return { corridas, renglones };
@@ -804,6 +973,8 @@ interface ContextoCotejo {
   idsProveedor: Map<string, number>;
   marcador: Marcador;
   reporte: Reporte;
+  /** El contexto del cliente afinado por el script (ver el 🔴 de `sembrarDemoFinanzas`). */
+  bd: ContextoBd;
 }
 
 /**
@@ -833,19 +1004,23 @@ async function sembrarCotejo(
       async (x) => (await cliente.movimientoTercero.count({ where: { id: x } })) > 0,
       async () =>
         (
-          await registrarMovimientoTercero(sesion, {
-            tipoTercero: 'proveedor',
-            idTercero: idProveedor,
-            fecha: fechaDemo(f.dias),
-            origen: 'factura_proveedor',
-            importe: f.importe,
-            // Una factura timbrada es fiscal por definición, y el UUID lo exige. Se manda explícito
-            // (la evidencia manda sobre la modalidad del catálogo, `resolverEsFiscalMotor`).
-            esFiscal: true,
-            uuidCfdi: f.uuidCfdi,
-            rfcTercero: PROVEEDORES_DEMO_FIN.find((p) => p.clave === f.proveedor)?.rfc ?? '',
-            observaciones: f.observaciones,
-          })
+          await registrarMovimientoTercero(
+            sesion,
+            {
+              tipoTercero: 'proveedor',
+              idTercero: idProveedor,
+              fecha: fechaDemo(f.dias),
+              origen: 'factura_proveedor',
+              importe: f.importe,
+              // Una factura timbrada es fiscal por definición, y el UUID lo exige. Se manda explícito
+              // (la evidencia manda sobre la modalidad del catálogo, `resolverEsFiscalMotor`).
+              esFiscal: true,
+              uuidCfdi: f.uuidCfdi,
+              rfcTercero: PROVEEDORES_DEMO_FIN.find((p) => p.clave === f.proveedor)?.rfc ?? '',
+              observaciones: f.observaciones,
+            },
+            ctx.bd,
+          )
         ).id,
       ctx.marcador,
     );
@@ -860,16 +1035,18 @@ async function sembrarCotejo(
       continue;
     }
 
-    const idCorrida = await leerDemo(cliente, ENTIDAD_DEMO_FIN.corrida, f.aplicaA.corrida);
     const idProveedorDoc = ctx.idsProveedor.get(f.aplicaA.proveedor);
-    const documento =
-      idCorrida === null || idProveedorDoc === undefined
-        ? null
-        : await cliente.renglonCorridaPago.findFirst({
-            where: { idCorrida, idProveedor: idProveedorDoc, folioDocumento: { not: null } },
-            select: { id: true, folioDocumento: true },
-            orderBy: { folioDocumento: 'asc' },
-          });
+    const aplicaA = f.aplicaA;
+    // Buscar el documento contra el que cotejar son dos lecturas puras: reintentables.
+    const documento = await conReintentoConexion(async () => {
+      const idCorrida = await leerDemo(cliente, ENTIDAD_DEMO_FIN.corrida, aplicaA.corrida);
+      if (idCorrida === null || idProveedorDoc === undefined) return null;
+      return cliente.renglonCorridaPago.findFirst({
+        where: { idCorrida, idProveedor: idProveedorDoc, folioDocumento: { not: null } },
+        select: { id: true, folioDocumento: true },
+        orderBy: { folioDocumento: 'asc' },
+      });
+    }, avisosDe(f.clave));
     // Si su corrida no se pudo sembrar (arriba), la factura se queda SIN liga: en rojo y sin
     // explicación, que es un estado legítimo de la bandeja. Se dice, y se sigue — no se inventa un
     // documento ni se tira la siembra entera por una dependencia que ya quedó escrita.
@@ -882,13 +1059,16 @@ async function sembrarCotejo(
       continue;
     }
 
-    await aplicarCotejo(sesion, id, {
-      aplicaciones: [{ idRenglon: documento.id, importe: f.aplicaA.importe }],
-    });
+    await aplicarCotejo(
+      sesion,
+      id,
+      { aplicaciones: [{ idRenglon: documento.id, importe: f.aplicaA.importe }] },
+      ctx.bd,
+    );
     cotejos += 1;
 
     if (f.atenderCon !== undefined) {
-      await atenderCotejo(sesion, id, { nota: f.atenderCon });
+      await atenderCotejo(sesion, id, { nota: f.atenderCon }, ctx.bd);
     }
 
     const diferencia = f.importe - f.aplicaA.importe;
@@ -914,10 +1094,14 @@ async function escribirCfdiFinanzas(
   dir: string,
   reporte: Reporte,
 ): Promise<number> {
-  const empresa = await cliente.empresa.findUnique({
-    where: { id: idEmpresa },
-    select: { nombre: true, rfc: true },
-  });
+  const empresa = await conReintentoConexion(
+    () =>
+      cliente.empresa.findUnique({
+        where: { id: idEmpresa },
+        select: { nombre: true, rfc: true },
+      }),
+    avisosDe('datos fiscales de la empresa'),
+  );
   const rfcCapturado = empresa?.rfc?.trim() ?? '';
   const rfcEmpresa = rfcCapturado === '' ? 'XAXX010101000' : rfcCapturado;
   // Mientras la empresa no tenga RFC, se usa el genérico del público en general Y un nombre NEUTRO:
