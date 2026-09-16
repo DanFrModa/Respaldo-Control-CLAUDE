@@ -80,6 +80,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   alta se abría con su propio permiso, **guardaba el documento y le estampaba su folio**, y la
   respuesta que devolvía después exigía **otro permiso distinto**. A quien tuviera uno y no el otro,
   el documento **se le guardaba** y acto seguido recibía un *«no tienes permiso»*.
+  ⚠️ **Una excepción, para no prometer de más:** al generar la orden de producción **desde el
+  renglón del pedido y con referencias del cliente**, todavía hace falta el permiso de consultar
+  órdenes. Ahí el rechazo llega **antes** de que nada quede guardado —la operación se deshace
+  entera—, así que **no deja documento ni quema folio**; es molesto, no destructivo. Se trata en la
+  fila 0.198.
 - 🔴 **Y eso es peor aquí que en la captura de planta**, porque lo que parece no haberse guardado se
   vuelve a capturar: el resultado eran **dos órdenes de compra con dos folios**, dos pedidos, dos
   notas de salida. Un duplicado con su folio quemado, que después hay que cancelar a mano.
