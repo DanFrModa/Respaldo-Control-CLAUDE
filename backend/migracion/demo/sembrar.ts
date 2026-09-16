@@ -257,23 +257,56 @@ async function anotarDerivados(cliente: PrismaClient, raices: RaicesDemo): Promi
   }
 }
 
-/** Contador de lo creado vs. lo que ya estaba. */
-class Marcador {
+/** Contador de lo creado vs. lo que ya estaba. (Exportado sólo para las pruebas de `asegurar`.) */
+export class Marcador {
   creados = 0;
   existentes = 0;
 }
 
 /**
  * Asegura UNA fila demo: si la clave ya está mapeada **y** la fila sigue viva, la reutiliza; si el
- * mapeo apunta a algo que ya no existe (alguien lo borró a mano), vuelve a crearla y re-apunta el
- * mapeo. Esa doble comprobación es lo que hace la corrida re-ejecutable sin duplicar y sin romperse.
+ * mapeo apunta a algo que ya no existe (alguien lo borró a mano), la crea y re-apunta el mapeo. Esa
+ * doble comprobación es lo que hace la corrida re-ejecutable sin duplicar y sin romperse.
  *
- * ⭐ Y por eso mismo la unidad entera se puede REINTENTAR ante un tropiezo de conexión: el reintento
- * vuelve a leer el mapeo, así que si el intento anterior sí alcanzó a crear y anotar, el segundo lo
- * reconoce y NO duplica. El contador se toca una sola vez, al final, para que un reintento no
- * infle el resumen.
+ * ## 🔴 POR QUÉ `crear()` ESTÁ FUERA DEL REINTENTO (no lo metas dentro)
+ *
+ * Esto son **tres viajes separados** a la base, no una unidad atómica:
+ * `leerDemo` → `crear()` → `anotarDemo`. Envolver los tres en el reintento parece natural —«si ya
+ * se creó, la relectura del mapeo lo reconoce»— y **es falso**, porque hay dos ventanas en las que
+ * el error llega con el trabajo YA ESCRITO y el mapeo todavía vacío:
+ *
+ *  • **W1 — dentro de `crear()`, después de su COMMIT.** Los cuatro servicios de movimientos
+ *    (`ajustarInventarioTelaColor`, `traspasarTelaColor`, `ajustarInventarioAvio`, `traspasarAvio`)
+ *    cierran su transacción y *luego* leen lo creado para devolverlo (`obtenerMovimiento…`), una
+ *    lectura FUERA de la transacción. Un `P2028`/`P2037` ahí llega con el movimiento ya guardado.
+ *    Es el mismo patrón que `crearOC`, documentado más abajo en la sección de órdenes de compra.
+ *  • **W2 — en `anotarDemo`**, con `crear()` ya devuelto.
+ *
+ * En ambas, el reintento re-lee el mapeo, lo encuentra vacío y **vuelve a crear**. Medido sobre
+ * esta misma función: `crear()` llamado **4 veces** (el presupuesto entero de reintentos).
+ *
+ * ⚠️ **Y los movimientos no tienen red.** Los cinco catálogos se salvarían por su **llave única en
+ * la clave natural** —`Proveedor.nombre`, `Tela.nombre`, `Avio.clave`,
+ * `Almacen @@unique([idEmpresa, nombre])`, `DireccionEntrega.nombre`—: el segundo `crear()`
+ * reventaría con P2002 y se oiría. **`Movimiento` sólo es único por `@@unique([idEmpresa, folio])`,
+ * y el folio lo acuña la secuencia atómica (A3): cada reintento genera uno nuevo.** El resultado
+ * sería existencia contada dos veces, el primer movimiento invisible para `--limpiar` (que trabaja
+ * contra el mapeo), y todo ello **en silencio**, con el usuario leyendo «Reintento en 2 s…» y un
+ * final feliz. Falla callando, que es la peor forma de fallar.
+ *
+ * ## Lo que SÍ se reintenta, y por qué es seguro
+ *
+ *  • **Las lecturas** (`leerDemo`, `sigueViva`): no escriben nada, repetirlas no puede duplicar.
+ *  • **`anotarDemo`**: es un `upsert` sobre la llave `(entidad, claveVieja)`, o sea **idempotente
+ *    por construcción**. Reintentarlo no duplica y además cierra parte de W2: si `crear()` salió
+ *    bien y el enlace tropieza al anotar, el reintento consigue dejar el mapeo escrito en vez de
+ *    abandonar la fila creada sin marca.
+ *
+ * `crear()` queda en medio, a pelo y **llamado como mucho una vez**. Si truena, la corrida se cae y
+ * se vuelve a correr el script, que retoma donde estaba. Eso cuesta segundos; un movimiento de
+ * kardex duplicado, no. Lo fija `demo/asegurar.test.ts`.
  */
-async function asegurar(
+export async function asegurar(
   cliente: PrismaClient,
   entidad: EntidadDemo,
   clave: string,
@@ -281,51 +314,34 @@ async function asegurar(
   crear: () => Promise<number>,
   marcador: Marcador,
 ): Promise<number> {
-  const { id, nuevo } = await conReintentoConexion(
-    async () => {
-      const mapeado = await leerDemo(cliente, entidad, clave);
-      if (mapeado !== null && (await sigueViva(mapeado))) {
-        return { id: mapeado, nuevo: false };
-      }
-      const creado = await crear();
-      await anotarDemo(cliente, entidad, clave, creado);
-      return { id: creado, nuevo: true };
+  const avisar = {
+    alReintentar: (i: { intento: number; maxIntentos: number; esperaMs: number }) => {
+      avisarReintento(clave, i);
     },
-    {
-      alReintentar: (i) => {
-        avisarReintento(clave, i);
-      },
-    },
-  );
-  if (nuevo) marcador.creados += 1;
-  else marcador.existentes += 1;
+  };
+
+  // 1. SÓLO LECTURA (reintentable sin riesgo): ¿ya está mapeada y sigue viva?
+  const yaEsta = await conReintentoConexion(async () => {
+    const mapeado = await leerDemo(cliente, entidad, clave);
+    if (mapeado === null) return null;
+    return (await sigueViva(mapeado)) ? mapeado : null;
+  }, avisar);
+
+  if (yaEsta !== null) {
+    marcador.existentes += 1;
+    return yaEsta;
+  }
+
+  // 2. LA CREACIÓN, FUERA DE TODO REINTENTO. Ver la explicación de arriba: no es idempotente y un
+  //    segundo intento duplicaría un movimiento de kardex sin que nadie se entere.
+  const id = await crear();
+
+  // 3. La marca en el mapeo SÍ se reintenta: `upsert` sobre su llave única es idempotente.
+  await conReintentoConexion(() => anotarDemo(cliente, entidad, clave, id), avisar);
+
+  marcador.creados += 1;
   return id;
 }
-
-/**
- * ⛔ AQUÍ NO VA UN REINTENTO, Y ESTO ES LO QUE COSTÓ APRENDERLO.
- *
- * La sección de órdenes de compra llama a `crearOC`, `autorizarOC`, `recibirCompra`,
- * `crearEntradaTela` y `confirmarEntradaTela`. Ninguna es idempotente: cada una consume folio de
- * una secuencia atómica (A3) y no se puede re-chequear por mapeo antes de existir.
- *
- * La tentación es reintentarlas «sólo cuando el error prueba que la transacción ni siquiera llegó a
- * abrirse» (`P2028`, `P2037`, `P1001`…). **Esa premisa es FALSA, y se midió que lo es.** Mira cómo
- * termina `crearOC` (`src/dominio/compras/ordenes-compra.ts`): abre su transacción, la **commitea**,
- * y DESPUÉS llama a `obtenerOC` para construir lo que devuelve — una lectura FUERA de la
- * transacción. Si el cupo de conexiones se agota justo en esa lectura, el error que sale es
- * `P2037`… con la orden ya guardada. Un reintento crea otra.
- *
- * Medido el 16-sep-2026 contra un Postgres con `max_connections=6`: una versión de este archivo que
- * reintentaba `crearOC` dejó **cuatro órdenes de compra duplicadas** (ids 16 a 19, con sus cuatro
- * folios quemados) y sólo la última quedó anotada en el mapeo. Las otras tres se volvieron
- * invisibles para `--limpiar`, que después reventó con un fallo de llave foránea al intentar borrar
- * las telas que esas órdenes huérfanas seguían referenciando.
- *
- * 🔑 Y no hace falta: el script YA es re-ejecutable. Las órdenes ya anotadas se saltan (el
- * `leerDemo` del principio del bucle), así que volver a correrlo continúa desde la que faltaba. Un
- * re-run cuesta segundos; una orden de compra duplicada, no.
- */
 
 /** Avisa por consola de un reintento, para que una corrida lenta no parezca colgada. */
 function avisarReintento(

@@ -36,11 +36,15 @@
 > para que se reescriban con él, o el importador los rechaza por ir dirigidos a otro.
 >
 > 🔴 **Y por eso NO se escriben dentro del repo, que es el default que tenían**: en cuanto la empresa
-> tiene RFC, esos XML llevan **su RFC y su razón social**, y `migracion/__fixtures__/demo-cfdi/` está
-> **rastreada por git** en un repositorio **PÚBLICO** — un `git add -A` los publicaba para siempre.
-> `.gitignore` no lo arreglaba: **medido**, un archivo que ya está en el índice se sigue estadiando
-> aunque su carpeta esté ignorada. Los seis XML que siguen versionados ahí son **ejemplos estáticos**
-> con el RFC genérico, ninguna prueba los lee, y el sembrador ya no los toca.
+> tiene RFC, esos XML llevan **su RFC y su razón social**, y `migracion/__fixtures__/demo-cfdi/`
+> **estaba rastreada por git** en un repositorio **PÚBLICO** — un `git add -A` los publicaba para
+> siempre. `.gitignore` solo no lo arreglaba: **medido**, un archivo que ya está en el índice se
+> sigue estadiando aunque su carpeta esté ignorada.
+>
+> ✅ **Hoy son tres capas**: (1) el sembrador escribe fuera del repo; (2) los seis XML **se sacaron
+> del índice** (`git rm --cached`), así que **ya no están versionados**; (3) la carpeta **está
+> ignorada**. Ninguna prueba los leía. Si los quieres, **corre el script y los genera** — te imprime
+> dónde los dejó.
 >
 > 📌 **No insertes movimientos con SQL a pelo** para preparar un escenario: te saltas la secuencia
 > atómica de folios (A3) y la dejas desfasada — el reviewer se topó con eso montando sus pruebas y los

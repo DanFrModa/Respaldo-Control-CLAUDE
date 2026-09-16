@@ -106,6 +106,19 @@ export interface OpcionesReintentoConexion {
  * 🔴 `accion` DEBE SER IDEMPOTENTE: se puede ejecutar dos veces sin duplicar nada. Ver el aviso de
  * {@link esErrorDeConexion} — un error de conexión NO prueba que la escritura no haya ocurrido.
  *
+ * ## Por qué esto no es `conReintentoTransitorio` (`comun/reintentos.ts`)
+ *
+ * Aquel **sí se reusa**: es el que aporta los patrones de texto (`ECONNRESET`, *socket hang up*…) a
+ * {@link esErrorDeConexion}. Lo que no sirve es su función de reintento, por tres motivos:
+ *  • **No reconoce los códigos de Prisma.** Casa por TEXTO del mensaje, y `P2028` —el error de esta
+ *    fila— no dice nada parecido a «connection reset»: su mensaje es *«Unable to start a transaction
+ *    in the given time»*. Se le escaparía justo el caso que hay que atrapar.
+ *  • **Su espera es demasiado corta** para esto: 3 intentos con 500 ms × intento (1.5 s en total),
+ *    pensados para un corte de socket en una corrida larga. Un pico de ocupación del cupo de
+ *    conexiones tarda más en pasar; aquí son 4 intentos con 2 s × intento (12 s).
+ *  • **No avisa.** No tiene gancho para decirle al usuario que se está reintentando, y sin eso una
+ *    corrida lenta parece colgada.
+ *
  * Con los valores por omisión son 4 intentos con esperas de 2 s, 4 s y 6 s (12 s de margen en
  * total), que es justo lo que hace falta para sobrevivir a un pico de ocupación del cupo sin dejar
  * al usuario mirando una pantalla quieta durante minutos.

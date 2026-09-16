@@ -122,14 +122,16 @@ export function concurrenciaPedida(): number {
  * en una ruta **rastreada por git**, en un repositorio **PÚBLICO**, donde lo que entra se queda en
  * el historial para siempre.
  *
- * ⚠️ Y `.gitignore` NO arregla eso: **medido** el 16-sep-2026 — con la carpeta añadida a
- * `.gitignore`, modificar uno de los XML ya rastreados lo sigue mostrando como ` M` y `git add -A`
- * lo sigue estadiando. `.gitignore` sólo manda sobre archivos que NO están en el índice. La única
- * guarda que de verdad funciona es que el script **no escriba ahí**, que es lo que hace esta línea.
+ * ⚠️ Y `.gitignore` SOLO no arreglaba eso: **medido** — con la carpeta ya añadida a `.gitignore`,
+ * modificar uno de los XML **que estaban rastreados** lo seguía mostrando como ` M` y `git add -A`
+ * lo seguía estadiando, porque `.gitignore` sólo manda sobre archivos que NO están en el índice.
+ * Hizo falta sacarlos del índice *además* de ignorarlos.
  *
- * Los seis XML que siguen versionados en `migracion/__fixtures__/demo-cfdi/` se quedan donde están,
- * intactos y con el RFC genérico: ninguna prueba los lee (comprobado), son ejemplos para mirar el
- * formato, y a partir de ahora **nada los reescribe**.
+ * ✅ **Cómo quedó:** los seis XML **ya no están versionados** (`git rm --cached`) y la carpeta
+ * `migracion/__fixtures__/demo-cfdi/` **está ignorada**. Siguen en disco en la copia de quien ya la
+ * tenía, pero para git no existen. Quien los quiera, los genera corriendo este script — que los
+ * escribe en la ruta de esta constante, fuera del repo. Son tres capas, y la de esta línea es la
+ * que evita que nada vuelva a escribirlos dentro.
  */
 export const DIR_CFDI_POR_OMISION = join(tmpdir(), 'control-cfdi-demo');
 
