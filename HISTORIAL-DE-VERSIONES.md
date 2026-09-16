@@ -86,9 +86,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   persona sin saber si su cambio entró**: la pantalla decía que no tenía permiso y el cambio ya
   estaba guardado. Quien lo sufría volvía a entrar a comprobarlo… y para comprobarlo hacía falta
   justo el permiso que no tenía.
-- ⭐ **Con esto la familia queda cerrada.** Se barrió el sistema entero **tres veces, con tres
-  instrumentos distintos y por tres personas distintas**, y las tres dieron el mismo resultado: **44
-  sitios, todos clasificados**. No queda ninguno suelto.
+- ⭐ **Con esto la familia queda cerrada.** Son **48 sitios** fuera de Ruta Critíca — 5 + 8 + 21 + 19,
+  repartidos en las cuatro entregas de estos dos días. Y lo que se comprobó **cuatro veces, con
+  cuatro instrumentos distintos y por cuatro personas distintas**, es que **no queda ninguno suelto**:
+  las cuatro mediciones dieron exactamente los mismos 22 casos restantes, y los 22 son los que ya
+  estaban descartados con su razón escrita.
 
 ### Qué cambió y puede sorprender
 
@@ -102,10 +104,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué sigue pendiente o roto
 
 - ⚠️ **Y ahora la decisión que queda, que es del negocio y no técnica.** El sistema tiene **dos
-  formas opuestas** de resolver esto conviviendo: la de esta familia —te deja hacer la operación y te
-  devuelve el resultado— y la contraria, que **exige la llave de consultar por delante** y no te deja
-  ni empezar. Están en **cuatro sitios**: cerrar una orden, reabrirla, generar la orden de producción
-  desde el renglón con referencias, y crear un modelo en la mesa de negociación.
+  formas** de resolver esto conviviendo, y una tercera que apareció en la revisión: la de esta
+  familia —te deja hacer la operación y te devuelve el resultado—; la contraria, que **exige la llave
+  de consultar por delante** y no te deja ni empezar, en **cuatro sitios** (cerrar una orden,
+  reabrirla, generar la orden de producción desde el renglón con referencias, y crear un modelo en la
+  mesa de negociación); y una **tercera, que ya se usa en Finanzas**: dejar pasar a quien trae la
+  llave de escribir **y sólo pedir la de consultar a quien no la trae**. De esa tercera dependen hoy
+  nueve operaciones de pagos e inventario cíclico, y es discutiblemente la más limpia — así que la
+  pregunta tiene tres respuestas posibles, no dos.
   **La consecuencia hoy es real y medible:** quien pueda cerrar una orden pero no verla, **no puede
   cerrarla en absoluto**. La pregunta, en una línea: *¿prefieres que quien tiene permiso de hacer
   algo pueda hacerlo aunque no pueda consultarlo después, o que no pueda hacerlo si no puede

@@ -347,11 +347,22 @@ export async function crearModeloEnLista(
   verificarPermiso(sesion, 'desarrollo.administrar');
   verificarPermiso(sesion, 'modelos.administrar');
   verificarPermiso(sesion, 'desarrollo.precostear');
-  // ⚠️ `desarrollo.ver` NO es un adorno: `crearProyecto` y `generarPrecosto` terminan proyectando su
-  // salida con `obtenerProyecto`/`obtenerPrecosto`, que lo exigen. Sin comprobarlo aquí, a quien le
-  // faltara le reventaría A MITAD de la transacción con un 403 que no explica nada (la escritura se
+  // ⚠️ `desarrollo.ver` NO es un adorno: `generarPrecosto` (`precostos.ts:811`) termina proyectando
+  // su salida con `obtenerPrecosto` (`:886`), que lo exige. Sin comprobarlo aquí, a quien le faltara
+  // le reventaría A MITAD de la transacción con un 403 que no explica nada (la escritura se
   // revierte, pero el mensaje llega tarde y en el lugar equivocado). Todo rol que administra
   // desarrollos lo tiene; se verifica igual, por delante, como manda «mutar implica leer».
+  //
+  // 🔴 Y ESTA REJA ES LO ÚNICO QUE PROTEGE ESA VÍA — no la quites creyendo que la ruta ya lo cubre.
+  // `generarPrecosto` está en la lista de los 22 que la familia «escribir y luego negar» descartó
+  // porque su RUTA exige los dos permisos encadenados (`preHandler: [a, b]`, que es AND). Cierto por
+  // HTTP — pero aquí la llamada es dominio→dominio (`:449`) y **no pasa por ningún `preHandler`**.
+  // Medido por el reviewer de la fila 0.198: de los 22, `generarPrecosto` es el ÚNICO alcanzable
+  // desde el dominio, y este `verificarPermiso` es su única guarda.
+  //
+  // 📌 CORREGIDO el 16-sep (fila 0.198): este comentario nombraba también a `crearProyecto`, y esa
+  // mitad dejó de ser cierta con la fila 0.197 — hoy `crearProyecto` sólo exige
+  // `desarrollo.administrar` y cierra con `return proyectarProyecto(...)`, sin reja de lectura.
   verificarPermiso(sesion, 'desarrollo.ver');
   const datos: DatosModeloNuevoEnLista = validarEntrada(esquemaModeloNuevoEnLista, entrada);
 
