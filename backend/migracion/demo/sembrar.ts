@@ -1155,9 +1155,12 @@ async function escribirCfdiDemo(
   const receptorRfc = empresa?.rfc?.trim() ?? '';
   const rfc = receptorRfc === '' ? 'XAXX010101000' : receptorRfc;
   // Mientras la empresa no tenga RFC, el receptor va con el RFC genérico del público en general Y
-  // con un nombre NEUTRO: estos archivos se versionan en el repo, que es PÚBLICO, y ahí no tiene por
-  // qué quedar el nombre de nadie. En cuanto la empresa capture su RFC, el archivo se reescribe con
-  // sus datos reales, que es lo que el importador exige para no rechazarlo por receptor ajeno.
+  // con un nombre NEUTRO. ⚠️ Por omisión estos archivos YA NO van al repo: salen a `tmpdir()` (ver
+  // `DIR_CFDI_POR_OMISION`) y la carpeta de fixtures está ignorada, y los seis que estaban
+  // versionados se desrastrearon en la fila 0.201. Pero alguien puede apuntar `--cfdi-dir` al
+  // repositorio, que es PÚBLICO, y ahí no tiene por qué quedar el nombre de nadie. En cuanto la
+  // empresa capture su RFC, el archivo se reescribe con sus datos reales, que es lo que el
+  // importador exige para no rechazarlo por receptor ajeno.
   const nombreReceptor =
     receptorRfc === '' ? 'Empresa receptora (datos de prueba)' : (empresa?.nombre ?? 'Empresa');
   if (receptorRfc === '') {

@@ -58,9 +58,11 @@ backend/medicion-orden-de-tallas-*.txt
 # Generado por backend/migracion/analisis/proveedores-depuracion.ts (no se versiona: se regenera)
 backend/proveedores-a-corregir.csv
 
-# Los CFDI ficticios del sembrador: los GENERA el script con el RFC y la razón social
-# de la empresa activa. Son artefactos, no fixtures (ninguna prueba los lee). Ver la fila 0.201.
-# ⚠️ Ignora la carpeta ENTERA: un fixture de verdad que alguien deje aquí se ignoraría EN SILENCIO
-#    (`git add` lo rechaza sin ruido). Si algún día hace falta uno versionado, ponlo en otra carpeta
-#    o añade su excepción con `!` debajo de esta línea.
+# Los CFDI ficticios de los sembradores de demo: los GENERA el script con el RFC y la razón
+# social de la empresa activa (y en los de VENTA va en el EMISOR). Son artefactos, no fixtures
+# (ninguna prueba los lee). Ver la fila 0.201: nunca deben quedar rastreados en un repo público.
+# ⚠️ Ignora las carpetas ENTERAS; un fixture de verdad que alguien deje aquí se ignoraría
+#    EN SILENCIO (`git add` lo rechaza sin ruido). Si algún día hace falta uno versionado, ponlo en
+#    otra carpeta o añade su excepción con `!` debajo de estas líneas.
 backend/migracion/__fixtures__/demo-cfdi/
+backend/migracion/__fixtures__/demo-cfdi-finanzas/
