@@ -57,3 +57,8 @@ backend/medicion-orden-de-tallas-*.txt
 
 # Generado por backend/migracion/analisis/proveedores-depuracion.ts (no se versiona: se regenera)
 backend/proveedores-a-corregir.csv
+
+# Los CFDI ficticios del sembrador de finanzas: los GENERA el script con el RFC y la razón
+# social de la empresa activa (en los de VENTA va en el EMISOR). Artefactos, no fixtures.
+# Ver la fila 0.201: nunca deben quedar rastreados en un repo público.
+backend/migracion/__fixtures__/demo-cfdi-finanzas/
