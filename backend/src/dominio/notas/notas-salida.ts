@@ -639,7 +639,9 @@ export async function crearNotaSalida(
     return nota.id;
   }, bd);
 
-  return obtenerNotaSalida(sesion, idNota, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarNotaSalida` (sin reja de consulta). Con
+  // `obtenerNotaSalida`, quien escribe sin la llave de ver recibía un 403 con la nota YA escrita.
+  return proyectarNotaSalida(sesion, idNota, bd);
 }
 
 /**
@@ -854,7 +856,9 @@ export async function confirmarNotaSalida(
   }, bd);
 
   dispararPublicacion();
-  return obtenerNotaSalida(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarNotaSalida` (sin reja de consulta). Con
+  // `obtenerNotaSalida`, quien escribe sin la llave de ver recibía un 403 con la nota YA escrita.
+  return proyectarNotaSalida(sesion, id, bd);
 }
 
 /**
@@ -939,18 +943,52 @@ export async function cancelarNotaSalida(
   }, bd);
 
   dispararPublicacion();
-  return obtenerNotaSalida(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarNotaSalida` (sin reja de consulta). Con
+  // `obtenerNotaSalida`, quien escribe sin la llave de ver recibía un 403 con la nota YA escrita.
+  return proyectarNotaSalida(sesion, id, bd);
 }
 
 // ── Consultas ────────────────────────────────────────────────────────────────────────────────────
 
-/** Obtiene una nota (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene una nota (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `notas.ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarNotaSalida} (ver su nota).
+ */
 export async function obtenerNotaSalida(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<NotaSalidaSalida> {
   verificarPermiso(sesion, 'notas.ver');
+  return proyectarNotaSalida(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de una nota de salida SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerNotaSalida} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de DTO— pero SIN `verificarPermiso('notas.ver')`, porque está pensada para UN solo uso:
+ * **devolverle a quien acaba de escribir la nota que acaba de dejar**. La autorización de esa
+ * llamada ya la hizo la escritura con su propio permiso (`notas.administrar` / `notas.cancelar`);
+ * volver a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: la nota se
+ * guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble:** `crearNotaSalida` estampa folio por secuencia atómica (A3,
+ * irrepetible) ⇒ reintentar dejaba una SEGUNDA nota; y `confirmarNotaSalida`/`cancelarNotaSalida`
+ * mueven INVENTARIO de avíos y dejan su evento `surtidoAvios` en la MISMA transacción, con el
+ * `dispararPublicacion()` ANTES de esta proyección ⇒ el 403 llegaba con la mercancía ya movida y el
+ * evento ya publicado.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerNotaSalida}, que sí exige `notas.ver`.
+ */
+export async function proyectarNotaSalida(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<NotaSalidaSalida> {
   const nota = await clienteLectura(bd).notaSalida.findFirst({
     where: { id, idEmpresa: sesion.idEmpresaActiva },
     include: incluirDetalle,

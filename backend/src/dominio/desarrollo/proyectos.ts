@@ -366,7 +366,10 @@ export async function crearProyecto(
     return proyecto.id;
   }, bd);
 
-  return obtenerProyecto(sesion, idNuevo, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarProyecto` (sin reja de consulta). Con
+  // `obtenerProyecto`, quien escribe sin la llave de ver recibía un 403 con el proyecto YA
+  // escrito y su folio quemado.
+  return proyectarProyecto(sesion, idNuevo, bd);
 }
 
 /**
@@ -496,13 +499,43 @@ export async function desarchivarProyecto(
   return obtenerProyecto(sesion, id, bd);
 }
 
-/** Obtiene un proyecto (con sus desarrollos y estado derivado) de la empresa activa, o lanza. */
+/**
+ * Obtiene un proyecto (con sus desarrollos y estado derivado) de la empresa activa, o lanza.
+ *
+ * Es la CONSULTA suelta: quien no lleve `desarrollo.ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarProyecto} (ver su nota).
+ */
 export async function obtenerProyecto(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<ProyectoDetalleSalida> {
   verificarPermiso(sesion, 'desarrollo.ver');
+  return proyectarProyecto(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un proyecto SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerProyecto} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de DTO— pero SIN `verificarPermiso('desarrollo.ver')`, porque está pensada para UN solo
+ * uso: **devolverle a quien acaba de dar de alta el proyecto que acaba de dejar**. La autorización
+ * de esa llamada ya la hizo la escritura con su propio permiso (`desarrollo.administrar`); volver a
+ * pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: el proyecto se
+ * guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble:** `crearProyecto` toma su número de la SECUENCIA ATÓMICA (A3,
+ * irrepetible) ⇒ quien reintentaba —lo natural al leer «no tienes permiso»— dejaba un SEGUNDO
+ * proyecto con OTRO folio quemado.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerProyecto}, que sí exige `desarrollo.ver`.
+ */
+export async function proyectarProyecto(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<ProyectoDetalleSalida> {
   const proyecto = await clienteLectura(bd).proyecto.findFirst({
     where: { id, idEmpresa: sesion.idEmpresaActiva },
     include: incluirProyectoDetalle,

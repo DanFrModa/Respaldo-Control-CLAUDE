@@ -1067,7 +1067,9 @@ export async function crearOrden(
   // no las ve hasta el commit; el barrido las recoge después).
   dispararPublicacion();
 
-  return obtenerOrden(sesion, idOrden, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con la orden YA escrita.
+  return proyectarOrden(sesion, idOrden, bd);
 }
 
 /**
@@ -1309,7 +1311,9 @@ export async function cancelarOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con la orden YA escrita.
+  return proyectarOrden(sesion, id, bd);
 }
 
 /**
@@ -1463,16 +1467,52 @@ export async function agregarComentarioOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, id, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con la orden YA escrita.
+  return proyectarOrden(sesion, id, bd);
 }
 
-/** Obtiene una orden (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene una orden (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `ordenes.ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarOrden} (ver su nota).
+ */
 export async function obtenerOrden(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
 ): Promise<OrdenSalida> {
   verificarPermiso(sesion, 'ordenes.ver');
+  return proyectarOrden(sesion, id, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN de una orden SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerOrden} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de DTO y misma redacción del precio real de maquila (derivada de
+ * `ordenes.ver-precio-real-maquila`)— pero SIN `verificarPermiso('ordenes.ver')`, porque está
+ * pensada para UN solo uso: **devolverle a quien acaba de escribir la orden que acaba de dejar**.
+ * La autorización de esa llamada ya la hizo la escritura con su propio permiso
+ * (`ordenes.administrar` / `ordenes.cancelar`); volver a pedir una llave DESPUÉS del commit es lo
+ * que producía el defecto de esta fila: la orden se guardaba y el usuario recibía un 403, o sea el
+ * sistema informando mal sobre su propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble:** `crearOrden` estampa su folio por secuencia atómica (A3,
+ * irrepetible) y deja su evento `orden-creada` en el outbox DENTRO de la transacción, con el
+ * `dispararPublicacion()` justo ANTES de esta proyección ⇒ cuando saltaba el 403 la orden ya
+ * existía, con su folio quemado y su evento ya publicado. Quien lo reintentaba —lo natural al leer
+ * «no tienes permiso»— dejaba una SEGUNDA orden con un SEGUNDO evento.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerOrden}, que sí exige `ordenes.ver`.
+ */
+export async function proyectarOrden(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<OrdenSalida> {
   const orden = await clienteLectura(bd).orden.findFirst({
     where: { id, idEmpresa: sesion.idEmpresaActiva },
     include: incluirDetalle,

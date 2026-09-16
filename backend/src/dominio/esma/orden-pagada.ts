@@ -119,13 +119,44 @@ async function proyectarEstatus(
   };
 }
 
-/** Consulta el estatus "pagada" de una orden de la empresa activa (A9). Permiso `esma.ver-pagos`. */
+/**
+ * Consulta el estatus "pagada" de una orden de la empresa activa (A9). Permiso `esma.ver-pagos`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `esma.ver-pagos` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarOrdenPagada} (ver su nota).
+ */
 export async function obtenerOrdenPagada(
   sesion: SesionUsuario,
   idOrden: number,
   bd?: ContextoBd,
 ): Promise<OrdenPagadaSalida> {
   verificarPermiso(sesion, 'esma.ver-pagos');
+  return proyectarOrdenPagada(sesion, idOrden, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN del estatus "pagada" SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerOrdenPagada} —mismo scope por empresa activa (A9 → 404),
+ * misma forma de DTO— pero SIN `verificarPermiso('esma.ver-pagos')`, porque está pensada para UN
+ * solo uso: **devolverle a quien acaba de forzar el estatus el estatus que acaba de dejar**. La
+ * autorización de esa llamada ya la hizo la escritura con su propio permiso (`esma.modificar`);
+ * volver a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta fila: el
+ * override se guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su propio
+ * estado.
+ *
+ * 🔴 **Y aquí el par de llaves ni siquiera es el mismo que en el resto de la familia:** la
+ * escritura pide `esma.modificar` y la proyección pedía `esma.ver-pagos` —otro permiso, de otro
+ * submódulo—, así que basta un perfil que administre EsMa sin ver sus pagos para que el 403 salte.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerOrdenPagada}, que sí exige `esma.ver-pagos`.
+ */
+export async function proyectarOrdenPagada(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<OrdenPagadaSalida> {
   const cliente = clienteLectura(bd);
   const orden = await cliente.orden.findFirst({
     where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
@@ -185,5 +216,8 @@ export async function forzarOrdenPagada(
     });
   }, bd);
 
-  return obtenerOrdenPagada(sesion, idOrden, bd);
+  // ⭐ Fila 0.197: el ECO va por `proyectarOrdenPagada` (sin reja de consulta). Con
+  // `obtenerOrdenPagada`, quien tiene `esma.modificar` y no `esma.ver-pagos` recibía un 403 con el
+  // override YA escrito.
+  return proyectarOrdenPagada(sesion, idOrden, bd);
 }

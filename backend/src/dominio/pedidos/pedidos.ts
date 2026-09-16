@@ -567,7 +567,9 @@ export async function crearPedido(
     return pedido.id;
   }, bd);
 
-  return obtenerPedido(sesion, idPedido, bd, archivos);
+  // ⭐ Fila 0.197: el ECO va por `proyectarPedido` (sin reja de consulta). Con `obtenerPedido`,
+  // quien escribe sin la llave de ver recibía un 403 con el pedido YA escrito.
+  return proyectarPedido(sesion, idPedido, bd, archivos);
 }
 
 /**
@@ -740,7 +742,9 @@ export async function copiarPedido(
     return nuevo.id;
   }, bd);
 
-  return obtenerPedido(sesion, idNuevo, bd, archivos);
+  // ⭐ Fila 0.197: el ECO va por `proyectarPedido` (sin reja de consulta). Con `obtenerPedido`,
+  // quien escribe sin la llave de ver recibía un 403 con el pedido YA escrito.
+  return proyectarPedido(sesion, idNuevo, bd, archivos);
 }
 
 /**
@@ -908,7 +912,9 @@ export async function cancelarPedido(
     return { canceladas, conservadas };
   }, bd);
 
-  const pedido = await obtenerPedido(sesion, id, bd, archivos);
+  // ⭐ Fila 0.197: el ECO va por `proyectarPedido` (sin reja de consulta). Con `obtenerPedido`,
+  // quien escribe sin la llave de ver recibía un 403 con el pedido YA escrito.
+  const pedido = await proyectarPedido(sesion, id, bd, archivos);
   return {
     pedido,
     foliosOrdenesCanceladas: desenlace.canceladas,
@@ -939,7 +945,12 @@ function avisoOrdenesConservadas(
   );
 }
 
-/** Obtiene un pedido (con cliente, renglones y fotos de modelo) o lanza `ErrorNoEncontrado`. */
+/**
+ * Obtiene un pedido (con cliente, renglones y fotos de modelo) o lanza `ErrorNoEncontrado`.
+ *
+ * Es la CONSULTA suelta: quien no lleve `pedidos.ver` no la obtiene. El ECO de una escritura propia
+ * va por {@link proyectarPedido} (ver su nota).
+ */
 export async function obtenerPedido(
   sesion: SesionUsuario,
   id: number,
@@ -947,6 +958,36 @@ export async function obtenerPedido(
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<PedidoSalida> {
   verificarPermiso(sesion, 'pedidos.ver');
+  return proyectarPedido(sesion, id, bd, archivos);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un pedido SIN reja de consulta propia (fila 0.197).
+ *
+ * Es el MISMO cuerpo que {@link obtenerPedido} —mismo scope por empresa activa (A9 → 404), misma
+ * forma de DTO, MISMA firma (incluido el puerto `archivos`, que las pantallas y las pruebas
+ * inyectan) y mismo ocultamiento de importes derivado de `pedidos.importes`— pero SIN
+ * `verificarPermiso('pedidos.ver')`, porque está pensada para UN solo uso: **devolverle a quien
+ * acaba de escribir el pedido que acaba de dejar**. La autorización de esa llamada ya la hizo la
+ * escritura con su propio permiso (`pedidos.administrar`, más `ordenes.cancelar` en la cascada de
+ * la cancelación); volver a pedir una llave DESPUÉS del commit es lo que producía el defecto de esta
+ * fila: el pedido se guardaba y el usuario recibía un 403, o sea el sistema informando mal sobre su
+ * propio estado.
+ *
+ * 🔴 **Y aquí muerde el doble:** `crearPedido`/`copiarPedido` estampan folio por secuencia atómica
+ * (A3, irrepetible) ⇒ reintentar dejaba un SEGUNDO pedido con su folio quemado; y `cancelarPedido`
+ * arrastra en cascada las órdenes de producción del pedido ⇒ el 403 llegaba con la cancelación ya
+ * sellada.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerPedido}, que sí exige `pedidos.ver`.
+ */
+export async function proyectarPedido(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
+): Promise<PedidoSalida> {
   const cliente = clienteLectura(bd);
   const pedido = await cliente.pedido.findFirst({
     where: { id, idEmpresa: sesion.idEmpresaActiva },
