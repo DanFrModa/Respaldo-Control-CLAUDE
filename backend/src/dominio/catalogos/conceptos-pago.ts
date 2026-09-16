@@ -325,5 +325,7 @@ export async function actualizarConceptoPago(
     });
   }, bd);
 
-  return obtenerConceptoPago(sesion, idConcepto, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarConceptoPago` (sin reja de consulta). Con
+  // `obtenerConceptoPago`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarConceptoPago(sesion, idConcepto, bd);
 }

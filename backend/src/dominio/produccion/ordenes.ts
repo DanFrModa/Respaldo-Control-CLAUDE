@@ -1151,7 +1151,9 @@ export async function actualizarOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, datos.id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarOrden(sesion, datos.id, bd);
 }
 
 /**
@@ -1196,7 +1198,9 @@ export async function guardarMatrizOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarOrden(sesion, id, bd);
 }
 
 /**
@@ -1258,7 +1262,9 @@ export async function copiarDetalleOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarOrden(sesion, id, bd);
 }
 
 /**
@@ -1357,7 +1363,9 @@ export async function guardarReferenciasOrden(
     });
   }, bd);
 
-  return obtenerOrden(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarOrden` (sin reja de consulta). Con `obtenerOrden`,
+  // quien tiene la llave de escribir y no la de ver recibía un 403 con el cambio YA guardado.
+  return proyectarOrden(sesion, id, bd);
 }
 
 /**

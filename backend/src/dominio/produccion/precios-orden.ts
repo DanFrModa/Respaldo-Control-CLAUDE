@@ -101,6 +101,9 @@ function aUltimoEvento(
  * RESUMEN de precios de una orden para el panel de detalle (R2 §4.2): venta (del renglón del
  * pedido, null sin `pedidos.importes`), maquila referencia (del modelo) y los REALES capturados
  * (null sin `ordenes.ver-precio-real-maquila`), cada uno con el resumen de su último evento.
+ *
+ * Es la CONSULTA suelta: quien no lleve `ordenes.ver` no la obtiene. El ECO de una captura propia va
+ * por {@link proyectarPreciosOrden} (ver su nota).
  */
 export async function obtenerPreciosOrden(
   sesion: SesionUsuario,
@@ -108,6 +111,33 @@ export async function obtenerPreciosOrden(
   bd?: ContextoBd,
 ): Promise<OrdenPreciosSalida> {
   verificarPermiso(sesion, 'ordenes.ver');
+  return proyectarPreciosOrden(sesion, idOrden, bd);
+}
+
+/**
+ * ⭐ PROYECCIÓN del resumen de precios de una orden SIN reja de consulta propia (fila 0.198).
+ *
+ * Es el MISMO cuerpo que {@link obtenerPreciosOrden} —mismo scope por empresa activa (A9 → 404),
+ * misma forma de DTO y las MISMAS dos redacciones blandas (`pedidos.importes` para el precio de
+ * venta y `ordenes.ver-precio-real-maquila` para los reales)— pero SIN
+ * `verificarPermiso('ordenes.ver')`, porque está pensada para UN solo uso: **devolverle a quien
+ * acaba de capturar el precio el resumen que acaba de dejar**. La autorización de esa llamada ya la
+ * hizo la escritura con su propio permiso (`ordenes.precio-maquila`); volver a pedir una llave
+ * DESPUÉS del commit es lo que producía el defecto de esta fila: el precio quedaba capturado —con su
+ * `OrdenPrecioEvento` inmutable ya insertado (D3/A7)— y el usuario recibía un 403.
+ *
+ * 🔑 **Las dos redacciones blandas NO son la reja y se quedan exactamente igual**: `tienePermiso` no
+ * niega, tapa un monto. Quien captura sigue sin ver los montos que NO capturó — eso lo resuelve
+ * {@link actualizarPreciosOrden} sobreescribiendo ÚNICAMENTE el campo que acaba de teclear.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una captura propia va por
+ * {@link obtenerPreciosOrden}, que sí exige `ordenes.ver`.
+ */
+export async function proyectarPreciosOrden(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<OrdenPreciosSalida> {
   const cliente = clienteLectura(bd);
 
   const orden = await cliente.orden.findFirst({
@@ -240,7 +270,11 @@ export async function actualizarPreciosOrden(
     });
   }, bd);
 
-  const resumen = await obtenerPreciosOrden(sesion, idOrden, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarPreciosOrden` (sin reja de consulta). Con
+  // `obtenerPreciosOrden`, quien tiene `ordenes.precio-maquila` y no `ordenes.ver` recibía un 403
+  // con el precio YA capturado y su evento inmutable ya insertado. Se sustituye la LLAMADA INTERNA,
+  // no el `return`: esta función no devuelve el DTO tal cual (lo re-redacta abajo).
+  const resumen = await proyectarPreciosOrden(sesion, idOrden, bd);
   if (resumen.puedeVerReales) {
     return resumen;
   }

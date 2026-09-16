@@ -440,7 +440,9 @@ export async function actualizarDesarrollo(
     });
   }, bd);
 
-  return obtenerDesarrollo(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarDesarrollo` (sin reja de consulta). Con
+  // `obtenerDesarrollo`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarDesarrollo(sesion, id, bd);
 }
 
 /**
@@ -480,7 +482,9 @@ export async function apagarDesarrollo(
     });
   }, bd);
 
-  return obtenerDesarrollo(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarDesarrollo` (sin reja de consulta). Con
+  // `obtenerDesarrollo`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarDesarrollo(sesion, id, bd);
 }
 
 /**
@@ -518,7 +522,9 @@ export async function reactivarDesarrollo(
     });
   }, bd);
 
-  return obtenerDesarrollo(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarDesarrollo` (sin reja de consulta). Con
+  // `obtenerDesarrollo`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarDesarrollo(sesion, id, bd);
 }
 
 /**

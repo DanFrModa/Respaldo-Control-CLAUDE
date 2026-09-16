@@ -439,7 +439,9 @@ export async function actualizarProyecto(
     });
   }, bd);
 
-  return obtenerProyecto(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarProyecto` (sin reja de consulta). Con
+  // `obtenerProyecto`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarProyecto(sesion, id, bd);
 }
 
 /**
@@ -469,7 +471,9 @@ export async function archivarProyecto(
     });
   }, bd);
 
-  return obtenerProyecto(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarProyecto` (sin reja de consulta). Con
+  // `obtenerProyecto`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarProyecto(sesion, id, bd);
 }
 
 /** Desarchiva un proyecto (operación inversa): `archivado=false` + bitácora. Requiere `desarrollo.administrar`. */
@@ -496,7 +500,9 @@ export async function desarchivarProyecto(
     });
   }, bd);
 
-  return obtenerProyecto(sesion, id, bd);
+  // ⭐ Fila 0.198: el ECO va por `proyectarProyecto` (sin reja de consulta). Con
+  // `obtenerProyecto`, quien escribe sin la llave de ver recibía un 403 con el cambio YA guardado.
+  return proyectarProyecto(sesion, id, bd);
 }
 
 /**
