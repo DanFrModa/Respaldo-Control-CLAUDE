@@ -26,8 +26,15 @@
  * veces — en silencio, con el usuario viendo «Reintento en 2 s…» y un final feliz.
  *
  * ⇒ **La regla que fijan estas pruebas: el reintento NUNCA puede ejecutar `crear()` dos veces.**
- * Se reintentan sólo las LECTURAS (`leerDemo`/`sigueViva`), que no pueden escribir nada.
  * Si alguien vuelve a meter `crear()` dentro del reintento, estas pruebas se ponen rojas.
+ *
+ * ⚠️ Lo que sí se reintenta son las lecturas **y dos escrituras idempotentes** — no «sólo lecturas»:
+ *  • `anotarDemo`, que es un `upsert` por su llave única (lo fija la prueba de más abajo, que cuenta
+ *    DOS llamadas al upsert y UNA sola a `crear()`);
+ *  • el `sigueViva` de los almacenes, el único que escribe (`reactivarAlmacen`), porque su escritura
+ *    va guardada por un `if (!fila.activo)` que se re-lee en cada intento y que ella misma invierte.
+ * Los otros cinco `sigueViva` sí son consultas puras. Si mañana alguien mete otra escritura en un
+ * `sigueViva`, tiene que ser idempotente o salir de ahí.
  */
 import { describe, expect, it, vi } from 'vitest';
 

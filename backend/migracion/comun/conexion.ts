@@ -71,7 +71,8 @@ function codigoPrisma(error: unknown): string | null {
  * > `crearOC` (`src/dominio/compras/ordenes-compra.ts`) abre su transacción, la **commitea**, y
  * > DESPUÉS lee la orden recién creada para devolverla. Si el cupo se agota en ESA lectura, el
  * > error es `P2037` — con la orden ya guardada. Se midió: reintentar ahí dejó **cuatro órdenes de
- * > compra duplicadas**, con cuatro folios quemados (ver la nota larga en `migracion/demo/sembrar.ts`).
+ * > compra duplicadas**, con cuatro folios quemados (ver el ⛔ de la sección 6 —órdenes de compra—
+ * > en `migracion/demo/sembrar.ts`).
  *
  * ⇒ Usa {@link conReintentoConexion} **sólo sobre unidades de trabajo IDEMPOTENTES**: las que
  * vuelven a comprobar por mapeo (o por índice único) si lo suyo ya existe, ANTES de crearlo. Para

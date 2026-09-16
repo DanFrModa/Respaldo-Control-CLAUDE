@@ -279,7 +279,8 @@ export class Marcador {
  *    (`ajustarInventarioTelaColor`, `traspasarTelaColor`, `ajustarInventarioAvio`, `traspasarAvio`)
  *    cierran su transacción y *luego* leen lo creado para devolverlo (`obtenerMovimiento…`), una
  *    lectura FUERA de la transacción. Un `P2028`/`P2037` ahí llega con el movimiento ya guardado.
- *    Es el mismo patrón que `crearOC`, documentado más abajo en la sección de órdenes de compra.
+ *    Es el mismo patrón que `crearOC`: ver el ⛔ de la sección 6 (órdenes de compra), más abajo en
+ *    este mismo archivo, con las cifras de lo que costó medirlo.
  *  • **W2 — en `anotarDemo`**, con `crear()` ya devuelto.
  *
  * En ambas, el reintento re-lee el mapeo, lo encuentra vacío y **vuelve a crear**. Medido sobre
@@ -294,13 +295,28 @@ export class Marcador {
  * contra el mapeo), y todo ello **en silencio**, con el usuario leyendo «Reintento en 2 s…» y un
  * final feliz. Falla callando, que es la peor forma de fallar.
  *
- * ## Lo que SÍ se reintenta, y por qué es seguro
+ * ## Lo que SÍ se reintenta, y **la razón exacta** de que aguante
  *
- *  • **Las lecturas** (`leerDemo`, `sigueViva`): no escriben nada, repetirlas no puede duplicar.
- *  • **`anotarDemo`**: es un `upsert` sobre la llave `(entidad, claveVieja)`, o sea **idempotente
- *    por construcción**. Reintentarlo no duplica y además cierra parte de W2: si `crear()` salió
- *    bien y el enlace tropieza al anotar, el reintento consigue dejar el mapeo escrito en vez de
- *    abandonar la fila creada sin marca.
+ * ⚠️ Ojo, porque la razón NO es «son lecturas»: **se reintentan las lecturas Y DOS ESCRITURAS**, y
+ * cada una aguanta por un motivo distinto. Escribirlo mal aquí es justo lo que regenera el bug.
+ *
+ *  • **`leerDemo` y cinco de los seis `sigueViva`**: consultas puras (`count`/`findUnique`). No
+ *    escriben, repetirlas no puede duplicar.
+ *  • **El `sigueViva` de los ALMACENES sí escribe**: llama a `reactivarAlmacen` cuando se topa con
+ *    un almacén que un `--limpiar` anterior dejó desactivado. Aguanta el reintento porque la
+ *    escritura va **guardada por una condición que se vuelve a leer de la base en cada intento**
+ *    (`if (!fila.activo)`) **y que la propia escritura invierte**: en el segundo intento el almacén
+ *    ya está activo y no se vuelve a tocar — ni la fila ni la bitácora. (Si aun así se llamara,
+ *    `reactivarAlmacen` lanza `ErrorConflicto`; pero eso sería un FALLO de la corrida, no la
+ *    garantía: lo que nos mantiene fuera de ahí es la relectura.)
+ *  • **`anotarDemo`**: `upsert` sobre la llave `(entidad, claveVieja)`, o sea **idempotente por
+ *    construcción**. Reintentarlo no duplica y además cierra parte de W2: si `crear()` salió bien y
+ *    el enlace tropieza al anotar, el reintento consigue dejar el mapeo escrito en vez de abandonar
+ *    la fila creada sin marca.
+ *
+ * 🔑 **REGLA PARA EL FUTURO:** si alguien mete otra escritura dentro de un `sigueViva`, tiene que
+ * ser idempotente —o ir guardada por una condición que ella misma invierta, como la de arriba— **o
+ * salir de ahí**. No basta con que «parezca una lectura».
  *
  * `crear()` queda en medio, a pelo y **llamado como mucho una vez**. Si truena, la corrida se cae y
  * se vuelve a correr el script, que retoma donde estaba. Eso cuesta segundos; un movimiento de
@@ -601,6 +617,21 @@ export async function sembrarDemoInventarios(
 
   // 6. Órdenes de compra + recepciones. En SERIE a propósito: cada documento toma su folio de una
   //    secuencia atómica (A3) y locks por OC (B2); en paralelo sólo se estorbarían.
+  //
+  // ⛔ NO ENVUELVAS ESTAS LLAMADAS EN UN REINTENTO. Van a pelo a propósito.
+  //    `crearOC`, `autorizarOC`, `recibirCompra`, `crearEntradaTela` y `confirmarEntradaTela` NO son
+  //    idempotentes: cada una quema folio de una secuencia atómica (A3) y no hay forma de
+  //    re-chequear por mapeo si ya existe, porque el mapeo se escribe DESPUÉS.
+  //    La tentación es reintentar «sólo cuando el error prueba que la transacción ni se abrió»
+  //    (`P2028`, `P2037`, `P1001`…). **Esa premisa es FALSA y está medido que lo es:** `crearOC`
+  //    commitea y LUEGO llama a `obtenerOC` para construir lo que devuelve — una lectura fuera de la
+  //    transacción. Si el cupo de conexiones se agota ahí, sale `P2037`… con la orden ya guardada.
+  //    Medido contra un Postgres con `max_connections=6`: reintentar aquí dejó **cuatro órdenes de
+  //    compra duplicadas** (cuatro folios quemados), sólo la última anotada en el mapeo, las otras
+  //    tres invisibles para `--limpiar` — que después reventó con un fallo de llave foránea.
+  //    🔑 Y no hace falta: el script YA es re-ejecutable. El `leerDemo` del principio del bucle salta
+  //    las órdenes ya anotadas, así que volver a correrlo continúa desde la que faltaba. Un re-run
+  //    cuesta segundos; una orden de compra duplicada, no. (Mismo razonamiento que en `asegurar`.)
   let entradasTela = 0;
   let recepciones = 0;
   const precioDe = (clave: string): number =>
