@@ -20,7 +20,12 @@ import type {
   Talla,
   TipoProceso,
 } from '../../datos/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -28,8 +33,11 @@ import {
   cancelarEtapaMovimiento,
   corteSemanalPorCortador,
   listarEtapasOrden,
+  obtenerEtapa,
   pendientesPorOrden,
+  proyectarEtapa,
   registrarCorte,
+  registrarEmpaque,
   registrarEnvioMaquila,
   sugerirCaptura,
 } from './etapas.js';
@@ -1085,5 +1093,127 @@ describe('Corte y envío por PACK (§Post-F9.10)', () => {
         bd(),
       ),
     ).rejects.toThrow(ErrorConflicto);
+  });
+});
+
+/**
+ * ⭐ Fila 0.196 — el ECO de una escritura propia NO vuelve a pedir la llave de CONSULTA.
+ *
+ * Hasta esta fila, las cuatro escrituras de este archivo (`registrarCorte`, `registrarEnvioMaquila`,
+ * `registrarEmpaque` y `cancelarEtapaMovimiento`) abrían con SU permiso, escribían —transacción
+ * cerrada, folio A3 estampado, evento de outbox puesto— y DESPUÉS proyectaban la respuesta con
+ * `obtenerEtapa`, que exige `produccion.wip-ver` ⇒ quien llevara la llave de capturar pero no la de
+ * consultar recibía un **403 con la captura ya guardada**. Leía «no tienes permiso», concluía que no
+ * se guardó y volvía a capturar: doble corte, doble envío, doble evento.
+ *
+ * 🔑 **Por qué estas pruebas son de DOMINIO y no bastan las de la puerta**: en una prueba por HTTP el
+ * 403 del `GET .../etapas` lo da el `preHandler`, así que **no mediría** que `obtenerEtapa` conserva
+ * su `verificarPermiso` — se le podría quitar la reja y la prueba seguiría verde. Aquí sí se mide:
+ * la MISMA sesión, la MISMA etapa, la consulta suelta niega y el eco proyecta.
+ */
+describe('proyectarEtapa — el eco de una escritura propia (fila 0.196)', () => {
+  /** Datos de un corte de 10 piezas Rojo/CH sobre la orden de siempre, con precio pactado. */
+  const datosCorte = () => ({
+    idOrden,
+    idCortador: cortador.id,
+    fecha: '2026-06-18',
+    precioPactado: 3.75,
+    lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+  });
+
+  it('`obtenerEtapa` niega sin `produccion.wip-ver`; `proyectarEtapa` proyecta igual', async () => {
+    const corte = await registrarCorte(sesion(), datosCorte(), bd());
+
+    // LA MISMA sesión, LA MISMA etapa: la consulta suelta niega, el eco proyecta. Es justo la
+    // diferencia que arregla la fila — la respuesta de una escritura no vuelve a pedir la llave.
+    const capturista = sesion(['produccion.corte']);
+    await expect(obtenerEtapa(capturista, corte.id, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    const eco = await proyectarEtapa(capturista, corte.id, bd());
+    expect(eco.id).toBe(corte.id);
+    expect(eco.totalPiezas).toBe(10);
+  });
+
+  it('`proyectarEtapa` conserva el scope por empresa activa (A9): una etapa ajena "no existe"', async () => {
+    const corte = await registrarCorte(sesion(), datosCorte(), bd());
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA (eco etapas)');
+    const ajena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: ['produccion.corte'] });
+    await expect(proyectarEtapa(ajena, corte.id, bd())).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('🔴 quien CORTA sin `produccion.wip-ver` recibe su corte, y lo contestado es lo escrito', async () => {
+    const capturista = sesion(['produccion.corte']);
+    const corte = await registrarCorte(capturista, datosCorte(), bd());
+
+    expect(corte.totalPiezas).toBe(10);
+    // `ocultarPrecio: false` sigue puesto en el eco del corte (0.114): quien lo tecleó lo recibe.
+    expect(corte.precioPactado).toBe(3.75);
+    const fila = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: corte.id },
+      include: { detalles: true },
+    });
+    expect(Number(fila.folio)).toBe(corte.folio);
+    expect(fila.detalles.reduce((s, d) => s + d.cantidad, 0)).toBe(corte.totalPiezas);
+    // Y no hay una SEGUNDA etapa: el defecto empujaba al usuario a recapturar.
+    expect(await cliente.etapaMovimiento.count({ where: { idOrden } })).toBe(1);
+  });
+
+  it('🔴 quien ENVÍA sin `produccion.wip-ver` recibe su envío, con el precio que tecleó', async () => {
+    await registrarCorte(sesion(), datosCorte(), bd());
+
+    const capturista = sesion(['produccion.envio']);
+    const envio = await registrarEnvioMaquila(
+      capturista,
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        precioPactado: 12.5,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
+      },
+      bd(),
+    );
+
+    expect(envio.totalPiezas).toBe(6);
+    // `ocultarPrecio: false` sigue puesto en el eco: quien tecleó el precio lo recibe de vuelta,
+    // aunque no lleve `ordenes.ver-precio-real-maquila` (no es fuga, es su propia captura).
+    expect(envio.precioPactado).toBe(12.5);
+  });
+
+  it('🔴 quien EMPACA sin `produccion.wip-ver` recibe su empaque', async () => {
+    const empacador = await crearProveedorConRol('Empaques SA', 'empaque');
+    const capturista = sesion(['produccion.empaque']);
+    const empaque = await registrarEmpaque(
+      capturista,
+      {
+        idOrden,
+        idEmpacador: empacador.id,
+        fecha: '2026-06-20',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+
+    expect(empaque.tipo).toBe('empaque');
+    expect(empaque.totalPiezas).toBe(4);
+  });
+
+  it('🔴 quien CANCELA sin `produccion.wip-ver` recibe la etapa ya cancelada', async () => {
+    const corte = await registrarCorte(sesion(), datosCorte(), bd());
+
+    const cancelador = sesion(['produccion.cancelar']);
+    const cancelada = await cancelarEtapaMovimiento(
+      cancelador,
+      corte.id,
+      { motivo: 'se cortó de más' },
+      bd(),
+    );
+
+    expect(cancelada.cancelado).toBe(true);
+    expect(cancelada.motivoCancelacion).toBe('se cortó de más');
+    // Sin opciones: el cancelador NO tecleó el precio, así que su redacción sigue derivándose de
+    // `ordenes.ver-precio-real-maquila` (que esta sesión no lleva). Eso NO cambió con la fila.
+    expect(cancelada.precioPactado).toBeNull();
   });
 });

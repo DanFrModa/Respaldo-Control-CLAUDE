@@ -29,10 +29,22 @@
 >   borrado entero** nombrando los ids, sin tocar nada.
 > - `--simular` enseña **exactamente** lo que se va a borrar, marcas incluidas.
 >
-> ⚠️ **Los CFDI no se importan solos**: quedan como XML en `migracion/__fixtures__/demo-cfdi/` para
-> capturarlos a mano (que es lo que se quiere probar) o con `etl-cfdi-masivo.ts -- --dir=…`. Y llevan un
-> receptor genérico **mientras la empresa no tenga RFC capturado**: si ya lo tiene, hay que volver a
-> sembrar para que se reescriban con él, o el importador los rechaza por ir dirigidos a otro.
+> ⚠️ **Los CFDI no se importan solos**: quedan como XML **fuera del repositorio**, en el temporal del
+> sistema (el script imprime la ruta exacta al terminar; `--cfdi-dir=…` la cambia), para capturarlos a
+> mano (que es lo que se quiere probar) o con `etl-cfdi-masivo.ts -- --dir=…`. Llevan un receptor
+> genérico **mientras la empresa no tenga RFC capturado**: si ya lo tiene, hay que volver a sembrar
+> para que se reescriban con él, o el importador los rechaza por ir dirigidos a otro.
+>
+> 🔴 **Y por eso NO se escriben dentro del repo, que es el default que tenían**: en cuanto la empresa
+> tiene RFC, esos XML llevan **su RFC y su razón social**, y `migracion/__fixtures__/demo-cfdi/`
+> **estaba rastreada por git** en un repositorio **PÚBLICO** — un `git add -A` los publicaba para
+> siempre. `.gitignore` solo no lo arreglaba: **medido**, un archivo que ya está en el índice se
+> sigue estadiando aunque su carpeta esté ignorada.
+>
+> ✅ **Hoy son tres capas**: (1) el sembrador escribe fuera del repo; (2) los seis XML **se sacaron
+> del índice** (`git rm --cached`), así que **ya no están versionados**; (3) la carpeta **está
+> ignorada**. Ninguna prueba los leía. Si los quieres, **corre el script y los genera** — te imprime
+> dónde los dejó.
 >
 > 📌 **No insertes movimientos con SQL a pelo** para preparar un escenario: te saltas la secuencia
 > atómica de folios (A3) y la dejas desfasada — el reviewer se topó con eso montando sus pruebas y los

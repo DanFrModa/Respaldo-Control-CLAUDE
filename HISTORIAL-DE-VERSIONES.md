@@ -71,6 +71,113 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.163 · 16-sep-2026 · **en prueba** — **Ya se pueden cargar los datos de prueba de Inventarios: el programa que los siembra no lograba conectarse a la base de Railway**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Llenar `prueba` con un juego completo de datos ficticios de Inventarios** —proveedores, telas,
+  avíos, almacenes, órdenes de compra en cuatro estados distintos, entradas, traspasos y una merma—
+  para poder revisar el módulo con pantallas que tengan algo dentro. **Hasta hoy el programa que los
+  carga no terminaba nunca**: moría a los dos segundos de arrancar, siempre en el primer proveedor.
+- 🔑 **Por qué fallaba, en cristiano.** El programa hablaba con la base por un canal que **no era el
+  que tenía configurado**. Estaba puesto para esperar hasta 20 segundos a que la base le diera turno
+  —lo razonable cuando la base está lejos, por internet— pero en la práctica esperaba **2**. Y abría
+  **veinte conexiones a la vez** para crear ocho proveedores. Con la base en Railway nunca llegaba a
+  tiempo. Ahora abre **cuatro** y espera lo que debe.
+- ⭐ **Y si aun así la base va apretada, ahora lo dice en vez de esconderlo.** Al arrancar informa
+  cuántas conexiones hay ocupadas y cuántas caben, y avisa si va justo. Cuando tropieza leyendo,
+  **reintenta solo**. Y si acaba rindiéndose, en vez de un volcado técnico de quince líneas explica
+  qué pasó y qué hacer —volver a correrlo, que retoma donde se quedó sin duplicar nada, o correrlo
+  de uno en uno con `--concurrencia=1`—.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Los comprobantes fiscales ficticios ya NO se escriben dentro del proyecto.** Ahora salen a una
+  carpeta temporal del equipo y el programa **dice en pantalla dónde los dejó**. Hay una razón seria:
+  esos archivos se generan con **el RFC y la razón social de la empresa activa**, y la carpeta donde
+  caían antes se publica en un repositorio **público**. Mientras la empresa no tuviera RFC capturado
+  salían con uno genérico y no pasaba nada; **el día que se capturara el RFC de verdad, se habrían
+  publicado**. Se cerró por los dos lados: el programa ya no escribe ahí, y esa carpeta dejó de
+  formar parte del proyecto.
+- **Los seis comprobantes de ejemplo que vivían en el proyecto se retiraron de él.** No los usaba
+  ninguna prueba; eran resultado del propio programa. Quien los quiera, los genera corriéndolo.
+
+### Qué sigue pendiente o roto
+
+- **Finanzas sigue sin datos de prueba.** Su sembrador está construido y probado, pero todavía no ha
+  pasado por revisión ni ha llegado a `prueba`. Hasta entonces el repaso de Finanzas no se puede
+  hacer con números de verdad.
+- **Queda un hueco conocido y anotado** (fila 0.201): crear un dato ficticio y **marcarlo como
+  ficticio** son dos pasos, y si la conexión se corta justo entre los dos, ese dato queda sin marca
+  —invisible para el borrado, que después puede fallar—. En una corrida sin tropiezos no ocurre
+  (medido: 15 de 15 órdenes y 27 de 27 movimientos quedaron marcados, y el borrado dejó la base como
+  estaba). Se arregla aparte porque toca las fronteras de transacción de servicios con efectos
+  derivados, y eso merece su propia revisión.
+- ⚠️ **Y una advertencia sobre el reintento, para que nadie le atribuya de más:** cubre los viajes
+  de **lectura**, no la escritura. La robustez de verdad viene de haber arreglado el canal de
+  conexión, de pedir menos conexiones a la vez y de que el programa se pueda **volver a correr** sin
+  duplicar. En la primera versión de este arreglo el reintento **sí** envolvía la escritura, y la
+  revisión independiente demostró que eso **duplicaba movimientos de inventario en silencio**: el
+  programa decía «reintentando» y terminaba bien, dejando las existencias contadas dos veces. Se
+  corrigió antes de llegar aquí.
+- **Los cargos de maquila no se siembran** en ningún caso: no existe forma de crearlos sueltos, nacen
+  del recibo de producción.
+
+## 0.162 · 15-sep-2026 · **en prueba** — **En la captura diaria de planta ya no pasa que el corte, el envío, el recibo o la entrega se guarden y la pantalla diga «no tienes permiso»**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Capturar corte, envío a maquila, empaque, recibo y entrega a cliente sin que haga falta,
+  además, el permiso de consultar producción.** Hasta ahora cada una de esas capturas se abría con su
+  propio permiso, guardaba —con su folio estampado y su aviso interno puesto— y **la respuesta que se
+  devolvía después exigía otro permiso distinto**, el de ver el avance de producción. A quien se le
+  diera uno y no el otro, la captura **se le guardaba** y acto seguido recibía un *«no tienes
+  permiso»*. Como parecía que no se había guardado, lo volvía a capturar.
+- ⭐ **Y lo mismo al CANCELAR** una etapa de corte/envío/empaque, un recibo o una entrega: quedaban
+  canceladas y la pantalla decía que no se pudo. **Los ocho sitios quedaron parejos.**
+- 🔴 **Por qué éstos eran los peores de todos los que quedaban.** En el corte y el envío, repetir la
+  captura dejaba **dos etapas con dos folios** y **dos avisos internos**, que la Ruta Crítica usa para
+  avanzar sola: el avance se marcaba dos veces. En el **recibo** era peor todavía, porque un recibo de
+  costura **mete la mercancía al almacén y le carga al maquilero**: repetirlo metía el género **dos
+  veces** al inventario y se lo cargaba **dos veces** al taller. Y en la **entrega**, lo mismo al
+  revés: sacaba la mercancía **dos veces**. Nada de eso lo veía quien capturaba, porque su pantalla
+  sólo le decía que no tenía permiso.
+
+### Qué cambió y puede sorprender
+
+- **Quien captura ve, de vuelta, lo que acaba de capturar**, aunque no tenga el permiso de consultar
+  producción. Es el eco de su propio movimiento, no una puerta nueva. **Sólo devuelve ESA captura**:
+  ni el historial de la orden, ni los pendientes, ni el tablero.
+- **El permiso de «ver producción» sigue valiendo para lo que siempre valió:** el historial de etapas
+  de una orden, los pendientes por cortar/enviar/recibir, el seguimiento de entregas, el corte
+  semanal, los recibos semanales y los tres documentos impresos (envío, recibo y comprobante de
+  entrega) **siguen cerrados** sin él. Lo único que dejó de pedirlo es la respuesta de una escritura
+  propia.
+- **El precio se sigue tratando igual que antes, sin un ápice de cambio.** Quien captura un corte o un
+  envío recibe de vuelta el precio **que él mismo acaba de teclear** (no sería razonable
+  escondérselo), y quien cancela un recibo **sigue sin verlo** si no tiene el permiso de precios
+  reales de maquila. Eso no lo tocó esta versión.
+- **Hoy nadie lo estaba sufriendo, y aun así había que arreglarlo.** Los perfiles que trae el sistema
+  cargado llevan los permisos juntos, así que el fallo **no se veía**. Se destapaba el día que se
+  repartan los permisos uno por uno —montar un perfil de «cortador» que sólo capture cortes es
+  exactamente lo que toca al arrancar—. Es el cuarto de la misma familia (van la 0.157, la 0.160 y la
+  0.161).
+- **No hay permisos nuevos, ni nada que capturar, ni nada que activar.** El menú no cambia y quien ya
+  entraba, entra igual.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La misma forma sigue viva en otros sitios del sistema, y están contados.** De los 48 casos que
+  se midieron, esta versión cierra los **ocho de producción** —los peores, por ser captura diaria y
+  por mover inventario— y **nada más**, a propósito. Lo que queda está repartido en tres repasos del
+  plan (las filas 0.197, 0.198 y 0.199), e incluye nueve más del propio módulo de producción que
+  fallan contra un permiso distinto (el de ver órdenes), entre ellos crear y cancelar una orden.
+  **Sigue sin morder mientras los perfiles lleven los permisos juntos**, igual que éste.
+- Lo demás de producción está como estaba: no se movió ninguna regla de negocio, ninguna validación y
+  ningún número.
+
+---
+
 ## 0.161 · 15-sep-2026 · **en prueba** — **En Ruta Crítica ya no pasa que el avance se guarde y la pantalla diga «no tienes permiso»**
 
 ### Qué se puede hacer ahora que antes no

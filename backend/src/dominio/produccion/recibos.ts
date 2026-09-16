@@ -1100,7 +1100,10 @@ export async function registrarReciboMaquila(
     return recibo.id;
   }, bd);
 
-  const salida = await obtenerRecibo(sesion, idRecibo, bd);
+  // ⭐ Fila 0.196: el ECO va por `proyectarRecibo` (sin reja de consulta). Con `obtenerRecibo`, quien
+  // lleva `produccion.recibo` pero no `produccion.wip-ver` recibía un 403 con el recibo YA escrito
+  // (WIP + kardex PT + cargo EsMa incluidos) y encima sin publicar su evento.
+  const salida = await proyectarRecibo(sesion, idRecibo, bd);
   dispararPublicacion();
   return salida;
 }
@@ -1250,7 +1253,9 @@ export async function cancelarReciboMaquila(
   dispararPublicacion();
   // Triage del lead (R2 §4.4.3): el cancelador NO tecleó el precio pactado — sin el permiso de
   // ver precios reales, la respuesta lo redacta (la de captura sí lo devuelve a quien lo tecleó).
-  return obtenerRecibo(sesion, idRecibo, bd, {
+  // ⭐ Fila 0.196: el ECO va por `proyectarRecibo` (sin reja de consulta). El `tienePermiso` de
+  // abajo se queda TAL CUAL: es una bandera blanda que redacta un campo, no una reja que niegue.
+  return proyectarRecibo(sesion, idRecibo, bd, {
     ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
   });
 }
@@ -1259,6 +1264,9 @@ export async function cancelarReciboMaquila(
  * Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
  * `opciones.ocultarPrecio`: el llamador decide si redactar `precioPactado` (lo usa la cancelación
  * para quien no puede ver precios reales; la captura y el impreso lo conservan).
+ *
+ * Es la CONSULTA suelta: quien no lleve `produccion.wip-ver` no la obtiene. El ECO de una escritura
+ * propia va por {@link proyectarRecibo} (ver su nota).
  */
 export async function obtenerRecibo(
   sesion: SesionUsuario,
@@ -1267,6 +1275,34 @@ export async function obtenerRecibo(
   opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<ReciboSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
+  return proyectarRecibo(sesion, idRecibo, bd, opciones);
+}
+
+/**
+ * ⭐ PROYECCIÓN de un recibo SIN reja de consulta propia (fila 0.196).
+ *
+ * Gemela de `proyectarEtapa` (`etapas.ts`) y por la MISMA razón: es el cuerpo de
+ * {@link obtenerRecibo} —mismo scope por empresa activa (A9 → 404), mismo filtro por
+ * `tipo = recibo_maquila`, MISMA firma (las `opciones` siguen decidiendo la redacción del precio)—
+ * pero SIN `verificarPermiso('produccion.wip-ver')`, porque sirve para UN solo uso: **devolverle a
+ * quien acaba de capturar el recibo lo que acaba de dejar escrito**. La autorización ya la hizo la
+ * escritura (`produccion.recibo` / `produccion.cancelar`).
+ *
+ * 🔴 **Es el peor de los ocho de la fila**: el recibo escribe WIP + entrada a PT (kardex) + cargo
+ * EsMa + evento de outbox en UNA transacción, y su `dispararPublicacion()` va DESPUÉS de esta
+ * proyección. Con la reja puesta, el 403 llegaba con el inventario YA movido y el cargo al maquilero
+ * YA hecho; reintentar —lo natural al leer «no tienes permiso»— metía la mercancía DOS veces al
+ * almacén y le cargaba DOS veces al maquilero.
+ *
+ * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
+ * {@link obtenerRecibo}, que sí exige `produccion.wip-ver`.
+ */
+export async function proyectarRecibo(
+  sesion: SesionUsuario,
+  idRecibo: number,
+  bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
+): Promise<ReciboSalida> {
   const recibo = await clienteLectura(bd).etapaMovimiento.findFirst({
     where: {
       id: idRecibo,
