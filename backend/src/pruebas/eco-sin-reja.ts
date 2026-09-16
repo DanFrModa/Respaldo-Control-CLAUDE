@@ -108,6 +108,10 @@
  *     caminos no se ve.
  *  b. **Permisos calculados**: `verificarPermiso(sesion, clave)` con una variable en vez de un
  *     literal. No se puede leer sin resolver tipos; se ignora.
+ *  b-bis. **Escritura que no se ve como tal**: los métodos de escritura de Prisma, `enTransaccion`/
+ *     `$transaction` y el SQL crudo con `INSERT`/`UPDATE`/`DELETE`. Una escritura por cualquier otra
+ *     vía (un cliente distinto, una llamada externa que persiste) no marca el punto del commit, y
+ *     entonces nada de lo que venga después se mide.
  *  c. **Llamadas DENTRO de la transacción**: se consideran protegidas, porque lo son — si el 403
  *     sale, el `ROLLBACK` no deja nada escrito, y ése es justo el motivo por el que el censo a mano
  *     descartó 4 sitios (`importarCfdi`, `importarCfdiVenta`, `salidaAProduccion`…). ⚠️ **El precio
@@ -124,11 +128,20 @@
  *     que la primera versión de esta red perdía en silencio.
  *  e. **Orden dentro de un mismo `enTransaccion`**: lo que pase dentro del callback no se ordena.
  *     ⭐ En cambio un cierre **posterior** al commit SÍ se recorre —`Promise.all(ids.map(async (id)
- *     => obtenerX(…)))` después de la transacción es un eco como cualquier otro, y se reporta—;
- *     sólo se dejan fuera los cierres que son el cuerpo de la propia transacción.
+ *     => obtenerX(…)))` después de la transacción es un eco como cualquier otro, y se reporta—.
+ *     Quedan fuera exactamente dos: el cierre que es argumento de `enTransaccion`/`$transaction`, y
+ *     el que es argumento de **cualquier función que escriba** (un envoltorio transaccional como
+ *     `enRecetaEditable`, cuyo callback es el cuerpo de una transacción aunque la llamada no se
+ *     llame así). En los dos casos el `ROLLBACK` cubre lo que pase dentro.
  *  f. **Profundidad**: el recorrido corta a 12 niveles de llamada por debajo de la ruta. Medido el
  *     16-sep-2026, ninguno de los 53 sitios del árbol viejo estaba a más de 3; la cota está para que
  *     una recursión rara no cuelgue la prueba, no porque haga falta.
+ *
+ * ✅ **Y lo que SÍ ve, porque se sondeó una a una** (las sondas viven en el fixture de la prueba, no
+ * en esta lista, para que no se puedan pudrir): el eco dentro de un `for`, de un `try/catch`, de un
+ * `if`, de un objeto literal, de un `.map()` —incluso anidado a dos niveles—, la reja escrita a pelo
+ * tras el commit tanto en el cuerpo como dentro de un cierre, el alias de importación, el barril a
+ * dos saltos con alias en el re-export, y la escritura por SQL crudo.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────────
  * VIVE EN `src/pruebas/` A PROPÓSITO
@@ -167,6 +180,12 @@ export interface Hallazgo {
   readonly llamada: string;
   /** Archivo donde vive esa función. */
   readonly archivoLlamada: string;
+  /**
+   * ¿La reja está escrita **a pelo** (`verificarPermiso(sesion, 'x')` después del commit) en vez de
+   * venir dentro de una consulta? Es la forma más literal del defecto y hay que nombrarla distinto:
+   * el arreglo no es partir nada en `proyectarX`, es **mover la reja delante de la escritura**.
+   */
+  readonly directa: boolean;
   /** Permisos que la escritura ya cobró (lo que quien llama trae garantizado). */
   readonly garantizados: readonly string[];
   /** La cláusula que nadie satisface: hay que traer alguno de estos y no se trae ninguno. */
@@ -313,6 +332,50 @@ const METODOS_ESCRITURA = new Set([
 
 /** Llamadas que ABREN Y CIERRAN una transacción: lo que venga después ya está comiteado. */
 const ABRE_TRANSACCION = new Set(['enTransaccion', '$transaction']);
+
+/**
+ * ⭐ La escritura por SQL CRUDO, que no es una llamada sino una **plantilla etiquetada**:
+ * `` tx.$executeRaw`UPDATE "lista_precios_linea" …` ``. Hay 4 sitios así en producción
+ * (`desarrollo/listas-precios.ts`, `indicadores/ciclico/{tela,avio,pt}.ts`) y ninguno se veía: el
+ * recorrido sólo mira `CallExpression`, así que una función cuya ÚNICA escritura fuera ésta no
+ * contaba como escritora y todo lo que pidiera después quedaba fuera de la regla.
+ *
+ * 🔑 Se exige que la plantilla diga `INSERT`/`UPDATE`/`DELETE`: los otros 39 `$executeRaw` del
+ * dominio son `SELECT pg_advisory_xact_lock(…)`, que **no escriben nada**, y tomarlos por escritura
+ * pondría en rojo lecturas que sólo se serializan.
+ */
+function esEscrituraCruda(n: ts.Node): boolean {
+  if (!ts.isTaggedTemplateExpression(n)) return false;
+  const etiqueta = n.tag;
+  const nombre = ts.isPropertyAccessExpression(etiqueta) ? etiqueta.name.text : undefined;
+  if (nombre !== '$executeRaw' && nombre !== '$executeRawUnsafe') return false;
+  return /\b(insert\s+into|update\s|delete\s+from)/i.test(n.template.getText(n.getSourceFile()));
+}
+
+/** Posición de la primera escritura cruda del ámbito (sin entrar en funciones anidadas). */
+function primeraEscrituraCruda(cuerpo: ts.Node): number | undefined {
+  let pos: number | undefined;
+  const visitar = (n: ts.Node): void => {
+    if (esFuncion(n)) return;
+    if (esEscrituraCruda(n)) {
+      const inicio = n.getStart(n.getSourceFile());
+      if (pos === undefined || inicio < pos) pos = inicio;
+    }
+    ts.forEachChild(n, visitar);
+  };
+  visitar(cuerpo);
+  return pos;
+}
+
+/** ¿Hay alguna escritura cruda en TODO el subárbol (incluidas las funciones anidadas)? */
+function hayEscrituraCruda(n: ts.Node): boolean {
+  if (esEscrituraCruda(n)) return true;
+  let hay = false;
+  ts.forEachChild(n, (h) => {
+    if (!hay && hayEscrituraCruda(h)) hay = true;
+  });
+  return hay;
+}
 
 function listarTs(raiz: string, salida: string[] = []): string[] {
   for (const entrada of readdirSync(raiz)) {
@@ -700,8 +763,8 @@ export function analizar(raizBackend: string): Resultado {
     if (memo !== undefined) return memo;
     if (enCursoEscribe.has(f.clave)) return false; // ciclo: no aporta
     enCursoEscribe.add(f.clave);
-    let resultado = false;
-    for (const llamada of todasLasLlamadas(f.cuerpo)) {
+    let resultado = hayEscrituraCruda(f.cuerpo);
+    for (const llamada of resultado ? [] : todasLasLlamadas(f.cuerpo)) {
       if (esLlamadaDeEscritura(f, llamada)) {
         resultado = true;
         break;
@@ -854,6 +917,16 @@ export function analizar(raizBackend: string): Resultado {
     yaEscribio: boolean,
     etiquetaRuta: string,
     profundidad: number,
+    /**
+     * ¿`cuerpo` es un CIERRE de la misma función que ya escribió, en vez de otra función?
+     *
+     * Distingue los dos motivos por los que se entra con `yaEscribio = true`, que piden trato
+     * distinto para la reja A PELO: dentro de un cierre propio (`ids.map(async (id) => {
+     * verificarPermiso(…) … })` tras el commit) la reja suelta SÍ es el defecto; dentro de OTRA
+     * función, no, porque ahí la reja suelta puede ser la mitad de una puerta OR cuyo atajo vive en
+     * `exigenciaDe` y no en este recorrido (`exigirVerCorrida` y `exigirVerCotejo`, medidos).
+     */
+    esCierrePropio = false,
   ): void {
     if (profundidad > 12) return;
     // El ámbito se memoiza por (quién, si ya se escribió, con qué garantía). Para un manejador de
@@ -862,16 +935,25 @@ export function analizar(raizBackend: string): Resultado {
     // La posición del cuerpo entra en la identidad: una misma función puede tener varios cierres
     // anidados, y sin ella el segundo se saltaría por parecer ya visitado.
     const quien = `${f?.clave ?? `ruta:${archivo}:${etiquetaRuta}`}@${cuerpo.pos}`;
-    const memo = `${quien}|${yaEscribio ? '1' : '0'}|${garantiaEntrada.map(clave).sort().join(';')}`;
+    const memo = `${quien}|${yaEscribio ? '1' : '0'}${esCierrePropio ? 'c' : ''}|${garantiaEntrada
+      .map(clave)
+      .sort()
+      .join(';')}`;
     if (visitados.has(memo)) return;
     visitados.add(memo);
 
     const ciertas = llamadasCiertas(cuerpo);
+    const posCruda = primeraEscrituraCruda(cuerpo);
     let garantia = garantiaEntrada;
     let escribio = yaEscribio;
     let escrituraEn: ts.CallExpression | undefined;
 
     for (const llamada of llamadasDelAmbito(cuerpo)) {
+      // Una escritura por SQL crudo no es una llamada, así que no está en la lista: se mira por
+      // posición. Todo lo que venga después de ella ya tiene rastro escrito.
+      if (posCruda !== undefined && llamada.getStart(llamada.getSourceFile()) > posCruda) {
+        escribio = true;
+      }
       const destino = resolver(archivo, llamada);
       const esEscritura = escrituraDeAmbito(archivo, llamada);
 
@@ -900,6 +982,58 @@ export function analizar(raizBackend: string): Resultado {
                 archivoLlamada: destino.archivo,
                 garantizados: garantizadosPlanos(garantia),
                 faltante: c,
+                directa: false,
+                rutas: [],
+              },
+              rutas: new Set([etiquetaRuta]),
+            });
+          } else {
+            previo.rutas.add(etiquetaRuta);
+          }
+        }
+      }
+
+      // ⭐⭐ PARCHE DE LA 3ª RONDA — la forma MÁS LITERAL del defecto, y la que se escapaba:
+      //
+      //     verificarPermiso(sesion, 'ordenes.administrar');
+      //     const idOrden = await enTransaccion(…);
+      //     verificarPermiso(sesion, 'ordenes.ver');     // ← aquí, a pelo, después del commit
+      //     return proyectarOrden(sesion, idOrden, bd);
+      //
+      // El bloque de arriba sólo mira la `exigenciaDe` de las llamadas RESUELTAS, y una reja suelta
+      // no es «una llamada con reja»; además `exigenciaDe` corta en el primer rastro escrito, a
+      // propósito. Era una asimetría por descuido, no por diseño: la acumulación de garantía de
+      // abajo SÍ trata `verificarPermiso` como caso especial. Una red que caza el defecto envuelto
+      // en tres capas de helper y no lo caza escrito a pelo sería difícil de explicar.
+      //
+      // 🔴 La guarda `!yaEscribio` NO es adorno: sin ella salen DOS falsos positivos. Al descender a
+      // `exigirVerCorrida`/`exigirVerCotejo` con `yaEscribio = true` se ve su `verificarPermiso`
+      // suelto **sin el ensanche del atajo**, que es lo que vive en `exigenciaDe` y no aquí. Con la
+      // guarda sólo se mide la escritura ocurrida EN ESTE MISMO ámbito, que es de lo que habla la
+      // regla. Medido: 0 falsos positivos en los dos árboles.
+      if (
+        escribio &&
+        (!yaEscribio || esCierrePropio) &&
+        identificadorLlamado(llamada) === 'verificarPermiso'
+      ) {
+        const permiso = literalEnPosicion(llamada, 1);
+        if (permiso !== undefined && !satisface(garantia, [permiso])) {
+          const donde = f ?? { archivo, nombre: `manejador de ${etiquetaRuta}` };
+          const sf = llamada.getSourceFile();
+          const { line } = sf.getLineAndCharacterOfPosition(llamada.getStart(sf));
+          const k = `${donde.archivo}::${donde.nombre}->reja-directa::${permiso}`;
+          const previo = crudos.get(k);
+          if (previo === undefined) {
+            crudos.set(k, {
+              hallazgo: {
+                archivo: donde.archivo,
+                funcion: donde.nombre,
+                linea: line + 1,
+                llamada: 'verificarPermiso',
+                archivoLlamada: donde.archivo,
+                garantizados: garantizadosPlanos(garantia),
+                faltante: [permiso],
+                directa: true,
                 rutas: [],
               },
               rutas: new Set([etiquetaRuta]),
@@ -944,12 +1078,25 @@ export function analizar(raizBackend: string): Resultado {
       // `llamadasDelAmbito` no entra en las funciones anidadas —y eso es deliberado, porque es lo
       // que protege al callback de `enTransaccion` (si el 403 sale ahí, el ROLLBACK no deja nada)—
       // pero un `.map()` DESPUÉS del commit no está en transacción ninguna y su 403 llega con el
-      // dato ya guardado. Así que en cuanto hay rastro escrito sí se entra, salvo justo en los
-      // abridores de transacción. (Medido: 182 `Promise.all` en `dominio`.)
-      if (escribio && !ABRE_TRANSACCION.has(nombreLlamado(llamada) ?? '')) {
+      // dato ya guardado. Así que en cuanto hay rastro escrito sí se entra, con DOS excepciones:
+      //
+      //  1. los abridores de transacción por su nombre (`enTransaccion`, `$transaction`);
+      //  2. 🔴 **cualquier función que ESCRIBA y reciba el cierre como argumento** — o sea, un
+      //     ENVOLTORIO transaccional. `enRecetaEditable` (`produccion/receta-orden.ts:1799`) es el
+      //     caso real: verifica el permiso y devuelve `enTransaccion(async (tx) => … accion(tx) …)`,
+      //     así que el cuerpo que le pasan sus diez llamadores **es el cuerpo de una transacción**
+      //     aunque la llamada no se llame `enTransaccion`. Sin esta segunda condición se descendía
+      //     ahí con `yaEscribio = true` y el día que uno de esos callbacks llamara a una consulta
+      //     con reja propia el CI se pondría **rojo sobre código correcto**, recomendando partir en
+      //     `proyectarX` algo que no tiene nada que arreglar.
+      //
+      // Medido sobre el árbol real: 249 sitios de descenso, de los que estos 10 son los envoltorios
+      // escritores ⇒ se conservan 239, toda la cobertura que motivó el cambio.
+      const envoltorioEscritor = destino !== undefined && escribe(destino);
+      if (escribio && !ABRE_TRANSACCION.has(nombreLlamado(llamada) ?? '') && !envoltorioEscritor) {
         for (const argumento of llamada.arguments) {
           if (!ts.isArrowFunction(argumento) && !ts.isFunctionExpression(argumento)) continue;
-          recorrer(f, argumento.body, archivo, garantia, true, etiquetaRuta, profundidad + 1);
+          recorrer(f, argumento.body, archivo, garantia, true, etiquetaRuta, profundidad + 1, true);
         }
       }
     }
@@ -1025,8 +1172,12 @@ export function informe(resultado: Resultado): string {
     for (const h of resultado.hallazgos) {
       lineas.push(
         `  • ${h.archivo}:${h.linea}`,
-        `      ${h.funcion}  ESCRIBE y DESPUÉS llama a  ${h.llamada}()`,
-        `      ${h.llamada}() vive en ${h.archivoLlamada} y exige: ${h.faltante.join(' ó ')}`,
+        h.directa
+          ? `      ${h.funcion}  ESCRIBE y DESPUÉS exige  verificarPermiso(sesion, '${h.faltante.join("' / '")}')`
+          : `      ${h.funcion}  ESCRIBE y DESPUÉS llama a  ${h.llamada}()`,
+        h.directa
+          ? `      la reja está escrita a pelo, después del commit ⇒ el arreglo es MOVERLA delante de la escritura`
+          : `      ${h.llamada}() vive en ${h.archivoLlamada} y exige: ${h.faltante.join(' ó ')}`,
         `      quien llega hasta aquí sólo trae garantizado: ${
           h.garantizados.length > 0 ? h.garantizados.join(', ') : '(ningún permiso)'
         }`,

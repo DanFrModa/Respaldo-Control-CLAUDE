@@ -154,11 +154,62 @@ export async function obtenerPorBarril(sesion: SesionUsuario, id: number): Promi
   verificarPermiso(sesion, 'barril.ver');
   return id;
 }
+
+export async function obtenerDosSaltos(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'dossaltos.ver');
+  return id;
+}
+
+export async function obtenerAnidado(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'anidado.ver');
+  return id;
+}
+
+export async function obtenerEnvuelto(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'envoltorio.ver');
+  return id;
+}
+
+export async function obtenerCrudo(sesion: SesionUsuario, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.ver');
+  return id;
+}
 `,
   );
   escribir(
     'src/dominio/barril.ts',
     `export { obtenerPorBarril } from './consultas.js';
+export { obtenerDosSaltos as reexportado } from './consultas.js';
+`,
+  );
+  escribir(
+    'src/dominio/barril2.ts',
+    `export { reexportado } from './barril.js';
+`,
+  );
+  // El envoltorio transaccional que NO se llama `enTransaccion`: su callback ES el cuerpo de una
+  // transacción, y por eso lo que pase dentro NO es «escribir y luego negar» (el ROLLBACK cubre).
+  // Es el caso real de `produccion/receta-orden.ts:1799` (`enRecetaEditable`), con sus 10 llamadores.
+  escribir(
+    'src/dominio/envoltorio.ts',
+    `import { verificarPermiso, type SesionUsuario } from '../comun/permisos.js';
+import { enTransaccion, type ContextoBd } from '../comun/transaccion.js';
+
+import { obtenerEnvuelto } from './consultas.js';
+
+export async function enCosaEditable<T>(
+  sesion: SesionUsuario,
+  accion: () => Promise<T>,
+  bd?: ContextoBd,
+): Promise<T> {
+  verificarPermiso(sesion, 'envoltorio.administrar');
+  return enTransaccion(async () => accion(), bd);
+}
+
+/** BIEN: la consulta con reja vive DENTRO de la transacción del envoltorio ⇒ no se reporta. */
+export async function mutarConEnvoltorio(sesion: SesionUsuario, bd?: ContextoBd): Promise<number> {
+  return enCosaEditable(sesion, async () => obtenerEnvuelto(sesion, 1), bd);
+}
 `,
   );
   escribir(
@@ -166,8 +217,14 @@ export async function obtenerPorBarril(sesion: SesionUsuario, id: number): Promi
     `import { type SesionUsuario, verificarPermiso } from '../comun/permisos.js';
 import { enTransaccion, type ContextoBd } from '../comun/transaccion.js';
 
-import { obtenerConAlias as leer, obtenerEnLote } from './consultas.js';
+import {
+  obtenerAnidado,
+  obtenerConAlias as leer,
+  obtenerCrudo,
+  obtenerEnLote,
+} from './consultas.js';
 import { obtenerPorBarril as porBarril } from './barril.js';
+import { reexportado as porDosSaltos } from './barril2.js';
 
 /** MAL, con ALIAS: el eco va por un nombre distinto del de la consulta. */
 export async function crearConAlias(sesion: SesionUsuario, bd?: ContextoBd): Promise<number> {
@@ -189,11 +246,78 @@ export async function crearPorBarril(sesion: SesionUsuario, bd?: ContextoBd): Pr
   const id = await enTransaccion(async () => 1, bd);
   return porBarril(sesion, id);
 }
+
+/** MAL, por barril de DOS saltos y con alias en el re-export. */
+export async function crearPorDosSaltos(sesion: SesionUsuario, bd?: ContextoBd): Promise<number> {
+  verificarPermiso(sesion, 'dossaltos.administrar');
+  const id = await enTransaccion(async () => 1, bd);
+  return porDosSaltos(sesion, id);
+}
+
+/** MAL, en un cierre anidado a DOS niveles después del commit. */
+export async function crearAnidado(sesion: SesionUsuario, bd?: ContextoBd): Promise<number[][]> {
+  verificarPermiso(sesion, 'anidado.administrar');
+  const grupos = await enTransaccion(async () => [[1, 2]], bd);
+  return Promise.all(
+    grupos.map(async (g) => Promise.all(g.map(async (id) => obtenerAnidado(sesion, id)))),
+  );
+}
+
+/** MAL, reja A PELO dentro de un CIERRE posterior al commit (sonda s1 de la 3ª ronda). */
+export async function crearRejaEnCierre(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+): Promise<number[]> {
+  verificarPermiso(sesion, 'cierre.administrar');
+  const ids = await enTransaccion(async () => [1, 2], bd);
+  return Promise.all(
+    ids.map(async (id) => {
+      verificarPermiso(sesion, 'cierre.ver');
+      return id;
+    }),
+  );
+}
+
+/** MAL, cuya ÚNICA escritura es SQL CRUDO: no es una llamada, es una plantilla etiquetada. */
+export async function crearConSqlCrudo(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.administrar');
+  await tx.$executeRaw\`UPDATE "cosa" SET "x" = 1\`;
+  return obtenerCrudo(sesion, id);
+}
+
+/** BIEN: un $executeRaw que sólo serializa (advisory lock) NO es una escritura. */
+export async function soloSerializa(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.administrar');
+  await tx.$executeRaw\`SELECT pg_advisory_xact_lock(1, 2)\`;
+  return obtenerCrudo(sesion, id);
+}
+
+/** MAL, con la reja escrita A PELO después del commit: la forma más literal del defecto. */
+export async function crearConRejaDirecta(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+): Promise<number> {
+  verificarPermiso(sesion, 'directa.administrar');
+  const id = await enTransaccion(async () => 1, bd);
+  verificarPermiso(sesion, 'directa.ver');
+  return id;
+}
 `,
   );
   escribir(
     'src/api/escondites.rutas.ts',
-    `import { crearConAlias, crearEnLote, crearPorBarril } from '../dominio/escondites.js';
+    `import {
+  crearAnidado,
+  crearConAlias,
+  crearConRejaDirecta,
+  crearConSqlCrudo,
+  crearEnLote,
+  crearPorBarril,
+  crearPorDosSaltos,
+  crearRejaEnCierre,
+  soloSerializa,
+} from '../dominio/escondites.js';
+import { mutarConEnvoltorio } from '../dominio/envoltorio.js';
 
 export function registrarEscondites(app: any): void {
   app.route({
@@ -213,6 +337,48 @@ export function registrarEscondites(app: any): void {
     url: '/barril',
     preHandler: app.conPermiso('barril.administrar'),
     handler: async (request: any) => crearPorBarril(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/dos-saltos',
+    preHandler: app.conPermiso('dossaltos.administrar'),
+    handler: async (request: any) => crearPorDosSaltos(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/anidado',
+    preHandler: app.conPermiso('anidado.administrar'),
+    handler: async (request: any) => crearAnidado(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/reja-directa',
+    preHandler: app.conPermiso('directa.administrar'),
+    handler: async (request: any) => crearConRejaDirecta(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/envoltorio',
+    preHandler: app.conPermiso('envoltorio.administrar'),
+    handler: async (request: any) => mutarConEnvoltorio(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/reja-en-cierre',
+    preHandler: app.conPermiso('cierre.administrar'),
+    handler: async (request: any) => crearRejaEnCierre(request.sesion),
+  });
+  app.route({
+    method: 'POST',
+    url: '/sql-crudo',
+    preHandler: app.conPermiso('crudo.administrar'),
+    handler: async (request: any) => crearConSqlCrudo(request.sesion, null, 1),
+  });
+  app.route({
+    method: 'POST',
+    url: '/solo-serializa',
+    preHandler: app.conPermiso('crudo.administrar'),
+    handler: async (request: any) => soloSerializa(request.sesion, null, 1),
   });
 }
 `,
@@ -259,11 +425,23 @@ describe('la red de «escribir y luego negar» mide algo', () => {
     // Sale el defectuoso a la vista Y las tres formas de esconderlo; NO sale ninguno de los
     // correctos (el de `proyectarX` ni el que pasa por la puerta OR).
     expect(hallazgos.map((h) => `${h.funcion}->${h.llamada}`).sort()).toEqual([
+      'crearAnidado->obtenerAnidado',
       'crearConAlias->obtenerConAlias',
+      'crearConRejaDirecta->verificarPermiso',
+      'crearConSqlCrudo->obtenerCrudo',
       'crearCosa->obtenerCosa',
       'crearEnLote->obtenerEnLote',
       'crearPorBarril->obtenerPorBarril',
+      'crearPorDosSaltos->obtenerDosSaltos',
+      'crearRejaEnCierre->verificarPermiso',
     ]);
+    // Y `soloSerializa` NO está: su `$executeRaw` es un advisory lock, que no escribe nada. Tomarlo
+    // por escritura pondría en rojo lecturas que sólo se serializan (39 así en el dominio).
+    expect(hallazgos.map((h) => h.funcion)).not.toContain('soloSerializa');
+    // ⭐ Y `mutarConEnvoltorio` NO está: su consulta con reja vive dentro de la transacción de un
+    // envoltorio que no se llama `enTransaccion` (el caso de `enRecetaEditable`, 10 llamadores
+    // reales). Reportarla sería poner el CI en rojo sobre código correcto.
+    expect(hallazgos.map((h) => h.funcion)).not.toContain('mutarConEnvoltorio');
     const unico = hallazgos.find((h) => h.funcion === 'crearCosa');
     expect(unico?.archivo).toBe('src/dominio/mal.ts');
     expect(unico?.faltante).toEqual(['cosas.ver']);
@@ -275,17 +453,29 @@ describe('la red de «escribir y luego negar» mide algo', () => {
     expect(porFuncion.get('crearConAlias')?.faltante).toEqual(['alias.ver']);
     expect(porFuncion.get('crearEnLote')?.faltante).toEqual(['lote.ver']);
     expect(porFuncion.get('crearPorBarril')?.faltante).toEqual(['barril.ver']);
+    expect(porFuncion.get('crearPorDosSaltos')?.faltante).toEqual(['dossaltos.ver']);
+    expect(porFuncion.get('crearAnidado')?.faltante).toEqual(['anidado.ver']);
+    // La reja a pelo se marca aparte, porque su arreglo NO es partir nada en `proyectarX`.
+    expect(porFuncion.get('crearConRejaDirecta')?.faltante).toEqual(['directa.ver']);
+    expect(porFuncion.get('crearConRejaDirecta')?.directa).toBe(true);
+    expect(porFuncion.get('crearCosa')?.directa).toBe(false);
+    expect(porFuncion.get('crearRejaEnCierre')?.faltante).toEqual(['cierre.ver']);
+    expect(porFuncion.get('crearRejaEnCierre')?.directa).toBe(true);
+    expect(porFuncion.get('crearConSqlCrudo')?.faltante).toEqual(['crudo.ver']);
 
     // Y el informe explica el arreglo por su nombre, no sólo el síntoma.
-    const texto = informe({
-      hallazgos,
-      excepcionesPodridas: [],
-      rutasAnalizadas: 6,
-      funcionesIndexadas: 15,
-      exoneradas: 1,
-    });
-    expect(texto).toContain('proyectarX');
-    expect(texto).toContain('src/dominio/mal.ts');
+    const texto = (): string =>
+      informe({
+        hallazgos,
+        excepcionesPodridas: [],
+        rutasAnalizadas: 14,
+        funcionesIndexadas: 30,
+        exoneradas: 1,
+      });
+    expect(texto()).toContain('proyectarX');
+    expect(texto()).toContain('src/dominio/mal.ts');
+    // Y la reja a pelo se explica DISTINTO: ahí no hay nada que partir en `proyectarX`.
+    expect(texto()).toContain('MOVERLA delante de la escritura');
   });
 });
 
