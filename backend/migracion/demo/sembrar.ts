@@ -19,6 +19,7 @@ import { join } from 'node:path';
 
 import type { PrismaClient } from '../../src/datos/index.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
+import type { ContextoBd } from '../../src/comun/transaccion.js';
 
 import { crearAlmacen, reactivarAlmacen } from '../../src/dominio/admin/almacenes.js';
 import { crearAvio } from '../../src/dominio/catalogos/avios.js';
@@ -38,6 +39,7 @@ import {
 } from '../../src/dominio/inventarios/partidas-telas.js';
 
 import { Reporte } from '../comun/reporte.js';
+import { conReintentoConexion } from '../comun/conexion.js';
 
 import {
   ALMACENES_DEMO,
@@ -54,8 +56,22 @@ import {
 } from './datos.js';
 import { construirCfdiDemo, totalCfdi, type CfdiDemo } from './cfdi.js';
 
-/** Tamaño de lote de los catálogos (se crean en paralelo por bloques; cada uno en su transacción). */
-const LOTE_CATALOGOS = 10;
+/**
+ * Cuántos catálogos se crean A LA VEZ (cada uno en su propia transacción, o sea en su propia
+ * conexión). Se puede cambiar por corrida con `--concurrencia=N`; con `1` va estrictamente de uno
+ * en uno.
+ *
+ * ⭐ POR QUÉ ES BAJO. Este script se corre a mano, desde un portátil, por internet, contra una base
+ * cuyo cupo de conexiones COMPARTE con el backend desplegado y su cola de eventos. Cada tarea en
+ * vuelo se lleva una conexión del cupo mientras dura su transacción, así que la concurrencia es
+ * literalmente "cuántas conexiones remotas le arranco a la base al mismo tiempo". Estaba en 10 y
+ * eso es lo que la ahogaba.
+ *
+ * Y no hace falta para ir rápido: son 8 proveedores, 20 telas y 30 avíos — 58 altas. La regla del
+ * repo de «ETL por lotes, nunca 1×1» habla de ESCRITURAS AGRUPADAS (`createMany`, chunks), no de
+ * transacciones simultáneas: bajar esto no la incumple.
+ */
+export const CONCURRENCIA_POR_OMISION = 4;
 
 /** Cuántos días atrás nacen los documentos ficticios (la OC más vieja). */
 const DIAS_ATRAS_BASE = 45;
@@ -85,6 +101,11 @@ export interface OpcionesSiembra {
   dirCfdi: string | null;
   /** Ensayo en seco: no escribe NADA (ni base ni archivos). */
   simular: boolean;
+  /**
+   * Cuántos catálogos crear a la vez (ver {@link CONCURRENCIA_POR_OMISION}). `1` = estrictamente
+   * de uno en uno, que es lo más resistente cuando la base va apretada de conexiones.
+   */
+  concurrencia?: number;
 }
 
 // ── Mapeo (idempotencia + inventario de lo sembrado) ─────────────────────────────────────────────
@@ -246,6 +267,11 @@ class Marcador {
  * Asegura UNA fila demo: si la clave ya está mapeada **y** la fila sigue viva, la reutiliza; si el
  * mapeo apunta a algo que ya no existe (alguien lo borró a mano), vuelve a crearla y re-apunta el
  * mapeo. Esa doble comprobación es lo que hace la corrida re-ejecutable sin duplicar y sin romperse.
+ *
+ * ⭐ Y por eso mismo la unidad entera se puede REINTENTAR ante un tropiezo de conexión: el reintento
+ * vuelve a leer el mapeo, así que si el intento anterior sí alcanzó a crear y anotar, el segundo lo
+ * reconoce y NO duplica. El contador se toca una sola vez, al final, para que un reintento no
+ * infle el resumen.
  */
 async function asegurar(
   cliente: PrismaClient,
@@ -255,15 +281,61 @@ async function asegurar(
   crear: () => Promise<number>,
   marcador: Marcador,
 ): Promise<number> {
-  const mapeado = await leerDemo(cliente, entidad, clave);
-  if (mapeado !== null && (await sigueViva(mapeado))) {
-    marcador.existentes += 1;
-    return mapeado;
-  }
-  const id = await crear();
-  await anotarDemo(cliente, entidad, clave, id);
-  marcador.creados += 1;
+  const { id, nuevo } = await conReintentoConexion(
+    async () => {
+      const mapeado = await leerDemo(cliente, entidad, clave);
+      if (mapeado !== null && (await sigueViva(mapeado))) {
+        return { id: mapeado, nuevo: false };
+      }
+      const creado = await crear();
+      await anotarDemo(cliente, entidad, clave, creado);
+      return { id: creado, nuevo: true };
+    },
+    {
+      alReintentar: (i) => {
+        avisarReintento(clave, i);
+      },
+    },
+  );
+  if (nuevo) marcador.creados += 1;
+  else marcador.existentes += 1;
   return id;
+}
+
+/**
+ * ⛔ AQUÍ NO VA UN REINTENTO, Y ESTO ES LO QUE COSTÓ APRENDERLO.
+ *
+ * La sección de órdenes de compra llama a `crearOC`, `autorizarOC`, `recibirCompra`,
+ * `crearEntradaTela` y `confirmarEntradaTela`. Ninguna es idempotente: cada una consume folio de
+ * una secuencia atómica (A3) y no se puede re-chequear por mapeo antes de existir.
+ *
+ * La tentación es reintentarlas «sólo cuando el error prueba que la transacción ni siquiera llegó a
+ * abrirse» (`P2028`, `P2037`, `P1001`…). **Esa premisa es FALSA, y se midió que lo es.** Mira cómo
+ * termina `crearOC` (`src/dominio/compras/ordenes-compra.ts`): abre su transacción, la **commitea**,
+ * y DESPUÉS llama a `obtenerOC` para construir lo que devuelve — una lectura FUERA de la
+ * transacción. Si el cupo de conexiones se agota justo en esa lectura, el error que sale es
+ * `P2037`… con la orden ya guardada. Un reintento crea otra.
+ *
+ * Medido el 16-sep-2026 contra un Postgres con `max_connections=6`: una versión de este archivo que
+ * reintentaba `crearOC` dejó **cuatro órdenes de compra duplicadas** (ids 16 a 19, con sus cuatro
+ * folios quemados) y sólo la última quedó anotada en el mapeo. Las otras tres se volvieron
+ * invisibles para `--limpiar`, que después reventó con un fallo de llave foránea al intentar borrar
+ * las telas que esas órdenes huérfanas seguían referenciando.
+ *
+ * 🔑 Y no hace falta: el script YA es re-ejecutable. Las órdenes ya anotadas se saltan (el
+ * `leerDemo` del principio del bucle), así que volver a correrlo continúa desde la que faltaba. Un
+ * re-run cuesta segundos; una orden de compra duplicada, no.
+ */
+
+/** Avisa por consola de un reintento, para que una corrida lenta no parezca colgada. */
+function avisarReintento(
+  que: string,
+  info: { intento: number; maxIntentos: number; esperaMs: number },
+): void {
+  console.warn(
+    `  ⏳ ${que}: la base no dio conexión (intento ${String(info.intento)} de ` +
+      `${String(info.maxIntentos)}). Reintento en ${String(Math.round(info.esperaMs / 1000))} s…`,
+  );
 }
 
 /** Parte una lista en bloques de `tam` (para crear los catálogos por lotes, no uno por uno). */
@@ -290,6 +362,14 @@ export async function sembrarDemoInventarios(
 ): Promise<ResultadoSiembra> {
   const reporte = new Reporte('DATOS FICTICIOS DE INVENTARIOS — resumen de la corrida');
   const m = new Marcador();
+  // 🔴 EL CONTEXTO DE BASE DE DATOS, que es lo que hace que este script sobreviva a una base
+  // REMOTA. Sin él, `enTransaccion` abre la transacción contra el SINGLETON de `src/datos`
+  // (`src/comun/transaccion.ts:89`), que nace sin opciones: `maxWait` de 2 s —que un enlace por
+  // internet se come sólo en abrir la conexión— y un pool propio, aparte del de este script.
+  // Medido: sin `bd` el script abría 20 conexiones simultáneas contra la misma base (dos pools) y
+  // moría con `P2028` a los 2149 ms; con `bd`, la misma llamada pasa. Pásalo SIEMPRE.
+  const bd: ContextoBd = { cliente };
+  const concurrencia = Math.max(1, opciones.concurrencia ?? CONCURRENCIA_POR_OMISION);
 
   if (opciones.simular) {
     reporte.nota('ENSAYO EN SECO (--simular): no se escribió nada en la base ni en disco.');
@@ -304,12 +384,16 @@ export async function sembrarDemoInventarios(
     async (id) => (await cliente.direccionEntrega.count({ where: { id } })) > 0,
     async () =>
       (
-        await crearDireccionEntrega(sesion, {
-          nombre: DIRECCION_DEMO.nombre,
-          direccion: DIRECCION_DEMO.direccion,
-          contacto: DIRECCION_DEMO.contacto,
-          telefono: DIRECCION_DEMO.telefono,
-        })
+        await crearDireccionEntrega(
+          sesion,
+          {
+            nombre: DIRECCION_DEMO.nombre,
+            direccion: DIRECCION_DEMO.direccion,
+            contacto: DIRECCION_DEMO.contacto,
+            telefono: DIRECCION_DEMO.telefono,
+          },
+          bd,
+        )
       ).id,
     m,
   );
@@ -333,16 +417,20 @@ export async function sembrarDemoInventarios(
             select: { activo: true },
           });
           if (fila === null) return false;
-          if (!fila.activo) await reactivarAlmacen(sesion, id);
+          if (!fila.activo) await reactivarAlmacen(sesion, id, bd);
           return true;
         },
         async () =>
           (
-            await crearAlmacen(sesion, {
-              nombre: alm.nombre,
-              tipo: alm.tipo,
-              idEmpresa: opciones.idEmpresa,
-            })
+            await crearAlmacen(
+              sesion,
+              {
+                nombre: alm.nombre,
+                tipo: alm.tipo,
+                idEmpresa: opciones.idEmpresa,
+              },
+              bd,
+            )
           ).id,
         m,
       ),
@@ -357,7 +445,7 @@ export async function sembrarDemoInventarios(
     ]),
   );
   const idsProveedor = new Map<string, number>();
-  for (const bloque of enBloques(PROVEEDORES_DEMO, LOTE_CATALOGOS)) {
+  for (const bloque of enBloques(PROVEEDORES_DEMO, concurrencia)) {
     const hechos = await Promise.all(
       bloque.map(async (p) => {
         const roles = p.roles
@@ -375,20 +463,24 @@ export async function sembrarDemoInventarios(
           async (x) => (await cliente.proveedor.count({ where: { id: x } })) > 0,
           async () =>
             (
-              await crearProveedor(sesion, {
-                nombre: p.nombre,
-                nombreCorto: p.nombreCorto,
-                razonSocial: p.nombre,
-                rfc: p.rfc,
-                regimenFiscalSat: p.regimenFiscalSat,
-                diasCredito: p.diasCredito,
-                modalidadFacturacion: p.modalidadFacturacion,
-                moneda: 'MXN',
-                email: p.email,
-                telefono: p.telefono,
-                direccion: p.direccion,
-                roles,
-              })
+              await crearProveedor(
+                sesion,
+                {
+                  nombre: p.nombre,
+                  nombreCorto: p.nombreCorto,
+                  razonSocial: p.nombre,
+                  rfc: p.rfc,
+                  regimenFiscalSat: p.regimenFiscalSat,
+                  diasCredito: p.diasCredito,
+                  modalidadFacturacion: p.modalidadFacturacion,
+                  moneda: 'MXN',
+                  email: p.email,
+                  telefono: p.telefono,
+                  direccion: p.direccion,
+                  roles,
+                },
+                bd,
+              )
             ).id,
           m,
         );
@@ -401,7 +493,7 @@ export async function sembrarDemoInventarios(
   // 4. Telas con sus colores (el color es HIJO de la tela, §Post-F9.11).
   const idsTela = new Map<string, number>();
   const idsTelaColor = new Map<string, number>();
-  for (const bloque of enBloques(TELAS_DEMO, LOTE_CATALOGOS)) {
+  for (const bloque of enBloques(TELAS_DEMO, concurrencia)) {
     await Promise.all(
       bloque.map(async (t) => {
         const idProveedor = idsProveedor.get(t.proveedor);
@@ -413,23 +505,27 @@ export async function sembrarDemoInventarios(
           async (x) => (await cliente.tela.count({ where: { id: x } })) > 0,
           async () =>
             (
-              await crearTela(sesion, {
-                nombre: t.nombre,
-                idProveedor,
-                unidadMedida: t.unidadMedida,
-                tipoComponente: 'OTRO',
-                precioSugerido: t.precioSugerido,
-                nombreCuerpo: t.nombreCuerpo,
-                ...(t.nombreComplemento === null
-                  ? {}
-                  : {
-                      nombreComplemento: t.nombreComplemento,
-                      ...(t.precioSugeridoComplemento === undefined
-                        ? {}
-                        : { precioSugeridoComplemento: t.precioSugeridoComplemento }),
-                    }),
-                colores: t.colores,
-              })
+              await crearTela(
+                sesion,
+                {
+                  nombre: t.nombre,
+                  idProveedor,
+                  unidadMedida: t.unidadMedida,
+                  tipoComponente: 'OTRO',
+                  precioSugerido: t.precioSugerido,
+                  nombreCuerpo: t.nombreCuerpo,
+                  ...(t.nombreComplemento === null
+                    ? {}
+                    : {
+                        nombreComplemento: t.nombreComplemento,
+                        ...(t.precioSugeridoComplemento === undefined
+                          ? {}
+                          : { precioSugeridoComplemento: t.precioSugeridoComplemento }),
+                      }),
+                  colores: t.colores,
+                },
+                bd,
+              )
             ).id,
           m,
         );
@@ -452,7 +548,7 @@ export async function sembrarDemoInventarios(
 
   // 5. Avíos, cada uno con su proveedor habitual y su precio (R1).
   const idsAvio = new Map<string, number>();
-  for (const bloque of enBloques(AVIOS_DEMO, LOTE_CATALOGOS)) {
+  for (const bloque of enBloques(AVIOS_DEMO, concurrencia)) {
     const hechos = await Promise.all(
       bloque.map(async (a) => {
         const idProveedor = idsProveedor.get(a.proveedor);
@@ -464,16 +560,20 @@ export async function sembrarDemoInventarios(
           async (x) => (await cliente.avio.count({ where: { id: x } })) > 0,
           async () =>
             (
-              await crearAvio(sesion, {
-                clave: a.clave,
-                descripcion: a.descripcion,
-                unidad: a.unidad,
-                presentacion: a.presentacion,
-                precioReferencia: a.precio,
-                esGenerico: a.esGenerico ?? false,
-                seCompraSinColor: a.seCompraSinColor ?? false,
-                proveedores: [{ idProveedor, precio: a.precio, habitual: true }],
-              })
+              await crearAvio(
+                sesion,
+                {
+                  clave: a.clave,
+                  descripcion: a.descripcion,
+                  unidad: a.unidad,
+                  presentacion: a.presentacion,
+                  precioReferencia: a.precio,
+                  esGenerico: a.esGenerico ?? false,
+                  seCompraSinColor: a.seCompraSinColor ?? false,
+                  proveedores: [{ idProveedor, precio: a.precio, habitual: true }],
+                },
+                bd,
+              )
             ).id,
           m,
         );
@@ -527,14 +627,18 @@ export async function sembrarDemoInventarios(
       return { idAvio, cantidad: l.cantidad, precio: precioDe(l.material) };
     });
 
-    const creada = await crearOC(sesion, {
-      idProveedor,
-      idDireccionEntrega: idDireccion,
-      fechaEntrega: fecha(oc.diasEntrega),
-      correspondeA: `${PREFIJO_DEMO}datos de prueba de inventarios`,
-      observaciones: `${PREFIJO_DEMO}orden ficticia ${oc.clave} — se borra con --limpiar.`,
-      lineas,
-    });
+    const creada = await crearOC(
+      sesion,
+      {
+        idProveedor,
+        idDireccionEntrega: idDireccion,
+        fechaEntrega: fecha(oc.diasEntrega),
+        correspondeA: `${PREFIJO_DEMO}datos de prueba de inventarios`,
+        observaciones: `${PREFIJO_DEMO}orden ficticia ${oc.clave} — se borra con --limpiar.`,
+        lineas,
+      },
+      bd,
+    );
     await anotarDemo(cliente, ENTIDAD_DEMO.ordenCompra, oc.clave, creada.id, {
       clave: oc.clave,
       folio: creada.numCompra,
@@ -542,7 +646,7 @@ export async function sembrarDemoInventarios(
     m.creados += 1;
 
     if (oc.plan === 'borrador') continue;
-    await autorizarOC(sesion, creada.id);
+    await autorizarOC(sesion, creada.id, bd);
     if (oc.plan === 'ninguna') continue;
 
     const fechaRecepcion = fecha(-DIAS_ATRAS_BASE + i * 2);
@@ -551,46 +655,54 @@ export async function sembrarDemoInventarios(
 
     if (oc.tipo === 'avio') {
       // El avío sí se recibe por la recepción de compra (la tela ya no, §Post-F9.14).
-      const rec = await recibirCompra(sesion, {
-        idOrdenCompra: creada.id,
-        idAlmacen,
-        fecha: fechaRecepcion,
-        factura: `${PREFIJO_DEMO}F-${oc.clave}`,
-        observaciones: `${PREFIJO_DEMO}recepción ficticia`,
-        lineas: creada.lineas.map((l) => ({
-          idOrdenCompraLinea: l.id,
-          cantidad: cantidadRecibida(l.cantidad),
-        })),
-      });
+      const rec = await recibirCompra(
+        sesion,
+        {
+          idOrdenCompra: creada.id,
+          idAlmacen,
+          fecha: fechaRecepcion,
+          factura: `${PREFIJO_DEMO}F-${oc.clave}`,
+          observaciones: `${PREFIJO_DEMO}recepción ficticia`,
+          lineas: creada.lineas.map((l) => ({
+            idOrdenCompraLinea: l.id,
+            cantidad: cantidadRecibida(l.cantidad),
+          })),
+        },
+        bd,
+      );
       await anotarDemo(cliente, ENTIDAD_DEMO.recepcion, `REC-${oc.clave}`, rec.id);
       recepciones += 1;
       continue;
     }
 
     // TELA: documento de entrada por factura/remisión, contra los renglones de la OC.
-    const entrada = await crearEntradaTela(sesion, {
-      tipoDocumento: 'remision',
-      numeroDocumento: `${PREFIJO_DEMO}R-${oc.clave}`,
-      idProveedor,
-      fecha: fechaRecepcion,
-      idAlmacen,
-      observaciones: `${PREFIJO_DEMO}entrada ficticia de ${oc.clave}`,
-      lineas: creada.lineas.map((l, j) => {
-        const spec = oc.lineas[j];
-        const llevaComplemento = l.nombreComplementoTela !== null;
-        return {
-          idTelaColor: l.idTelaColor ?? 0,
-          idOrdenCompraLinea: l.id,
-          cantidad: cantidadRecibida(l.cantidad),
-          ...(llevaComplemento
-            ? { cantidadComplemento: cantidadRecibida(spec?.cantidadComplemento ?? 0) }
-            : {}),
-          precioUnit: l.precio,
-          loteProveedor: `${PREFIJO_DEMO}L-${oc.clave}-${String(j + 1)}`,
-        };
-      }),
-    });
-    const confirmada = await confirmarEntradaTela(sesion, entrada.id);
+    const entrada = await crearEntradaTela(
+      sesion,
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: `${PREFIJO_DEMO}R-${oc.clave}`,
+        idProveedor,
+        fecha: fechaRecepcion,
+        idAlmacen,
+        observaciones: `${PREFIJO_DEMO}entrada ficticia de ${oc.clave}`,
+        lineas: creada.lineas.map((l, j) => {
+          const spec = oc.lineas[j];
+          const llevaComplemento = l.nombreComplementoTela !== null;
+          return {
+            idTelaColor: l.idTelaColor ?? 0,
+            idOrdenCompraLinea: l.id,
+            cantidad: cantidadRecibida(l.cantidad),
+            ...(llevaComplemento
+              ? { cantidadComplemento: cantidadRecibida(spec?.cantidadComplemento ?? 0) }
+              : {}),
+            precioUnit: l.precio,
+            loteProveedor: `${PREFIJO_DEMO}L-${oc.clave}-${String(j + 1)}`,
+          };
+        }),
+      },
+      bd,
+    );
+    const confirmada = await confirmarEntradaTela(sesion, entrada.id, bd);
     await anotarDemo(cliente, ENTIDAD_DEMO.entradaTela, `ENT-${oc.clave}`, confirmada.id);
     entradasTela += 1;
     // La entrada confirmada genera la recepción contra la OC: se anota para poder limpiarla.
@@ -694,6 +806,8 @@ async function sembrarMovimientos(
   sesion: SesionUsuario,
   ctx: ContextoMovimientos,
 ): Promise<number> {
+  // El mismo contexto que en la siembra: todo el dominio escribe por el cliente de ESTE script.
+  const bd: ContextoBd = { cliente };
   const tipos = new Map(
     (await cliente.tipoMovimientoInventario.findMany({ select: { id: true, codigo: true } })).map(
       (t) => [t.codigo, t.id],
@@ -749,32 +863,40 @@ async function sembrarMovimientos(
     'MOV-AJ-TELA-01',
     async () =>
       (
-        await ajustarInventarioTelaColor(sesion, {
-          idTipoMov: idAjusteEntrada,
-          idAlmacen: telaS,
-          fecha: fecha(-DIAS_ATRAS_BASE),
-          motivo: `${PREFIJO_DEMO}conteo físico inicial (datos de prueba)`,
-          factura: `${PREFIJO_DEMO}CONTEO-1`,
-          lineas: [
-            {
-              idTelaColor: color('TELA-05#0'),
-              cantidad: 180,
-              loteProveedor: `${PREFIJO_DEMO}L-C1`,
-            },
-            { idTelaColor: color('TELA-09#1'), cantidad: 95, loteProveedor: `${PREFIJO_DEMO}L-C2` },
-            {
-              idTelaColor: color('TELA-12#0'),
-              cantidad: 240,
-              loteProveedor: `${PREFIJO_DEMO}L-C3`,
-            },
-            {
-              idTelaColor: color('TELA-15#1'),
-              cantidad: 120,
-              cantidadComplemento: 18,
-              loteProveedor: `${PREFIJO_DEMO}L-C4`,
-            },
-          ],
-        })
+        await ajustarInventarioTelaColor(
+          sesion,
+          {
+            idTipoMov: idAjusteEntrada,
+            idAlmacen: telaS,
+            fecha: fecha(-DIAS_ATRAS_BASE),
+            motivo: `${PREFIJO_DEMO}conteo físico inicial (datos de prueba)`,
+            factura: `${PREFIJO_DEMO}CONTEO-1`,
+            lineas: [
+              {
+                idTelaColor: color('TELA-05#0'),
+                cantidad: 180,
+                loteProveedor: `${PREFIJO_DEMO}L-C1`,
+              },
+              {
+                idTelaColor: color('TELA-09#1'),
+                cantidad: 95,
+                loteProveedor: `${PREFIJO_DEMO}L-C2`,
+              },
+              {
+                idTelaColor: color('TELA-12#0'),
+                cantidad: 240,
+                loteProveedor: `${PREFIJO_DEMO}L-C3`,
+              },
+              {
+                idTelaColor: color('TELA-15#1'),
+                cantidad: 120,
+                cantidadComplemento: 18,
+                loteProveedor: `${PREFIJO_DEMO}L-C4`,
+              },
+            ],
+          },
+          bd,
+        )
       ).id,
   );
 
@@ -783,17 +905,21 @@ async function sembrarMovimientos(
     'MOV-AJ-AVIO-01',
     async () =>
       (
-        await ajustarInventarioAvio(sesion, {
-          idTipoMov: idAjusteEntrada,
-          idAlmacen: avioS,
-          fecha: fecha(-DIAS_ATRAS_BASE),
-          motivo: `${PREFIJO_DEMO}conteo físico inicial de genéricos (datos de prueba)`,
-          lineas: [
-            { idAvio: avio(`${PREFIJO_DEMO}AV-014`), cantidad: 40 },
-            { idAvio: avio(`${PREFIJO_DEMO}AV-015`), cantidad: 35 },
-            { idAvio: avio(`${PREFIJO_DEMO}AV-026`), cantidad: 6000 },
-          ],
-        })
+        await ajustarInventarioAvio(
+          sesion,
+          {
+            idTipoMov: idAjusteEntrada,
+            idAlmacen: avioS,
+            fecha: fecha(-DIAS_ATRAS_BASE),
+            motivo: `${PREFIJO_DEMO}conteo físico inicial de genéricos (datos de prueba)`,
+            lineas: [
+              { idAvio: avio(`${PREFIJO_DEMO}AV-014`), cantidad: 40 },
+              { idAvio: avio(`${PREFIJO_DEMO}AV-015`), cantidad: 35 },
+              { idAvio: avio(`${PREFIJO_DEMO}AV-026`), cantidad: 6000 },
+            ],
+          },
+          bd,
+        )
       ).id,
   );
 
@@ -802,29 +928,37 @@ async function sembrarMovimientos(
     'MOV-TR-TELA-01',
     async () =>
       (
-        await traspasarTelaColor(sesion, {
-          idAlmacenOrigen: telaN,
-          idAlmacenDestino: telaS,
-          fecha: fecha(-20),
-          motivo: `${PREFIJO_DEMO}traspaso de prueba entre bodegas`,
-          lineas: [
-            { idTelaColor: color('TELA-01#0'), cantidad: 60, cantidadComplemento: 8 },
-            { idTelaColor: color('TELA-02#0'), cantidad: 40 },
-          ],
-        })
+        await traspasarTelaColor(
+          sesion,
+          {
+            idAlmacenOrigen: telaN,
+            idAlmacenDestino: telaS,
+            fecha: fecha(-20),
+            motivo: `${PREFIJO_DEMO}traspaso de prueba entre bodegas`,
+            lineas: [
+              { idTelaColor: color('TELA-01#0'), cantidad: 60, cantidadComplemento: 8 },
+              { idTelaColor: color('TELA-02#0'), cantidad: 40 },
+            ],
+          },
+          bd,
+        )
       ).salida.id,
   );
   await unaVez(
     'MOV-TR-TELA-02',
     async () =>
       (
-        await traspasarTelaColor(sesion, {
-          idAlmacenOrigen: telaN,
-          idAlmacenDestino: telaS,
-          fecha: fecha(-12),
-          motivo: `${PREFIJO_DEMO}segundo traspaso de prueba`,
-          lineas: [{ idTelaColor: color('TELA-05#1'), cantidad: 120 }],
-        })
+        await traspasarTelaColor(
+          sesion,
+          {
+            idAlmacenOrigen: telaN,
+            idAlmacenDestino: telaS,
+            fecha: fecha(-12),
+            motivo: `${PREFIJO_DEMO}segundo traspaso de prueba`,
+            lineas: [{ idTelaColor: color('TELA-05#1'), cantidad: 120 }],
+          },
+          bd,
+        )
       ).salida.id,
   );
 
@@ -833,16 +967,20 @@ async function sembrarMovimientos(
     'MOV-TR-AVIO-01',
     async () =>
       (
-        await traspasarAvio(sesion, {
-          idAlmacenOrigen: avioN,
-          idAlmacenDestino: avioS,
-          fecha: fecha(-18),
-          motivo: `${PREFIJO_DEMO}traspaso de avíos de prueba`,
-          lineas: [
-            { idAvio: avio(`${PREFIJO_DEMO}AV-001`), cantidad: 500 },
-            { idAvio: avio(`${PREFIJO_DEMO}AV-005`), cantidad: 1200 },
-          ],
-        })
+        await traspasarAvio(
+          sesion,
+          {
+            idAlmacenOrigen: avioN,
+            idAlmacenDestino: avioS,
+            fecha: fecha(-18),
+            motivo: `${PREFIJO_DEMO}traspaso de avíos de prueba`,
+            lineas: [
+              { idAvio: avio(`${PREFIJO_DEMO}AV-001`), cantidad: 500 },
+              { idAvio: avio(`${PREFIJO_DEMO}AV-005`), cantidad: 1200 },
+            ],
+          },
+          bd,
+        )
       ).salida.id,
   );
 
@@ -851,13 +989,17 @@ async function sembrarMovimientos(
     'MOV-AJ-AVIO-02',
     async () =>
       (
-        await ajustarInventarioAvio(sesion, {
-          idTipoMov: idAjusteSalida,
-          idAlmacen: avioN,
-          fecha: fecha(-6),
-          motivo: `${PREFIJO_DEMO}merma de prueba`,
-          lineas: [{ idAvio: avio(`${PREFIJO_DEMO}AV-005`), cantidad: 150 }],
-        })
+        await ajustarInventarioAvio(
+          sesion,
+          {
+            idTipoMov: idAjusteSalida,
+            idAlmacen: avioN,
+            fecha: fecha(-6),
+            motivo: `${PREFIJO_DEMO}merma de prueba`,
+            lineas: [{ idAvio: avio(`${PREFIJO_DEMO}AV-005`), cantidad: 150 }],
+          },
+          bd,
+        )
       ).id,
   );
 
