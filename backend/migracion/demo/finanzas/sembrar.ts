@@ -1104,10 +1104,12 @@ async function escribirCfdiFinanzas(
   );
   const rfcCapturado = empresa?.rfc?.trim() ?? '';
   const rfcEmpresa = rfcCapturado === '' ? 'XAXX010101000' : rfcCapturado;
-  // Mientras la empresa no tenga RFC, se usa el genérico del público en general Y un nombre NEUTRO:
-  // estos archivos se versionan en el repo, que es PÚBLICO, y ahí no tiene por qué quedar el nombre
-  // de nadie. En cuanto la empresa capture su RFC, el archivo se reescribe con sus datos, que es lo
-  // que el importador exige para no rechazarlo por receptor (o emisor) ajeno.
+  // Mientras la empresa no tenga RFC, se usa el genérico del público en general Y un nombre NEUTRO.
+  // ⚠️ Por omisión estos archivos YA NO van al repo: salen a `tmpdir()` (ver
+  // `DIR_CFDI_FINANZAS_POR_OMISION`) y la carpeta de fixtures está ignorada. Pero alguien puede
+  // apuntar `--cfdi-dir` al repositorio, que es PÚBLICO, y ahí no tiene por qué quedar el nombre de
+  // nadie. En cuanto la empresa capture su RFC, el archivo se reescribe con sus datos, que es lo que
+  // el importador exige para no rechazarlo por receptor (o emisor) ajeno.
   const nombreEmpresa =
     rfcCapturado === '' ? 'Empresa de prueba' : (empresa?.nombre ?? 'Empresa de prueba');
   if (rfcCapturado === '') {

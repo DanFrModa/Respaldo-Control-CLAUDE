@@ -80,7 +80,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   cobrar con **fechas escalonadas de hasta cinco meses atrás** —para que el reporte de antigüedad
   tenga tramos de verdad y no salga todo «al corriente»—, 3 corridas de pago, 4 facturas de cotejo y
   6 comprobantes fiscales.
-- ⭐ **Y no sólo el camino fácil.** Hay un proveedor **en negativo** por un anticipo, cobros
+- ⭐ **Y no sólo el camino fácil.** Hay un proveedor que queda **en negativo** porque se le pagó sin cargo detrás —en pantalla se lee como un anticipo—, cobros
   parciales, un movimiento **cancelado con su contrapartida** como manda la casa, y de las cuatro
   facturas de cotejo **una cuadra, una está en rojo y ya atendida, y dos están en rojo frenando la
   corrida de pago**. Esos son los casos que enseñan si el módulo aguanta.
@@ -88,7 +88,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   cuenta de maquileros **sólo cuenta lo que ya se revisó**; lo capturado y aún sin revisar aparece
   aparte, en «por revisar». Se siembran los dos estados a propósito, porque el renglón sin revisar es
   justo el que alguien tiene que ir a validar.
-- Todo nace marcado `DEMO-` y **se borra de un golpe** con `--limpiar`, sin tocar nada de lo demás.
+- Todo nace marcado `DEMO-FIN` y **se borra de un golpe** con `--limpiar`, sin tocar nada de lo demás.
 
 ### Qué cambió y puede sorprender
 

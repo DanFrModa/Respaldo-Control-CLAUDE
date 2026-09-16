@@ -853,7 +853,7 @@ export interface FacturaCotejoDemoFin {
  *  3. **En rojo, atendida** — cobra 3,500 de más, pero alguien escribió por qué y deja de frenar.
  *  4. **En rojo, sin ninguna liga** — llegó una factura que no corresponde a ningún documento.
  *
- * ⚠️ Ninguna es de `FPROV-01`salvo la que cuadra, y es a propósito: una factura en rojo de un
+ * ⚠️ Ninguna es de `FPROV-01` salvo la que cuadra, y es a propósito: una factura en rojo de un
  * proveedor **impide EJECUTAR** cualquier corrida donde ese proveedor tenga renglón (§Post-F9.232
  * (c)), y la corrida en borrador `FCOR-03` es suya. Si se le colgara una factura en rojo, Daniel no
  * podría ejecutarla y parecería un defecto del sistema en vez de la regla funcionando.
