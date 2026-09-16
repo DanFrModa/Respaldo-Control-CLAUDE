@@ -23,13 +23,15 @@ import type {
   Talla,
   TipoProceso,
 } from '../../datos/index.js';
-import { ErrorConflicto } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { CargoEsMaSalida, ClavePermiso } from '../../contrato/index.js';
 import {
   cancelarReciboMaquila,
+  obtenerRecibo,
   pendientesPorRecibir,
+  proyectarRecibo,
   recibosSemanalesPorMaquilero,
   registrarReciboMaquila,
 } from './recibos.js';
@@ -2078,5 +2080,106 @@ describe('Recibo por PACK (§Post-F9.10)', () => {
     expect(recibo.totalPiezas).toBe(10);
     expect(recibo.lineas[0]?.pack).toBe('');
     await expect(recibir(idOrden, undefined, 1, '2026-06-21')).rejects.toThrow(ErrorConflicto);
+  });
+});
+
+/**
+ * ⭐ Fila 0.196 — el ECO de una escritura propia NO vuelve a pedir la llave de CONSULTA.
+ *
+ * Gemela de la batería de `etapas.int.test.ts` y por la misma razón, pero aquí el defecto era el más
+ * caro de los ocho: `registrarReciboMaquila` escribe WIP + entrada a PT (kardex) + cargo EsMa +
+ * evento de outbox en UNA transacción, y DESPUÉS proyectaba con `obtenerRecibo`, que exige
+ * `produccion.wip-ver`. Quien llevara `produccion.recibo` sin la llave de consulta recibía un 403
+ * con la mercancía YA en el almacén y el cargo YA hecho al maquilero; recapturar —lo natural al leer
+ * «no tienes permiso»— metía el género DOS veces y le cargaba DOS veces.
+ *
+ * La mitad de DOMINIO se mide aquí y no por HTTP: en una prueba por la puerta el 403 lo daría el
+ * `preHandler`, y no se vería que `obtenerRecibo` conserva su reja.
+ */
+describe('proyectarRecibo — el eco de una escritura propia (fila 0.196)', () => {
+  /** Corta 30, envía 10 a costura y recibe `cantidad` con la sesión dada. */
+  async function recibir(sesionCaptura: ReturnType<typeof sesion>, cantidad: number) {
+    return registrarReciboMaquila(
+      sesionCaptura,
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+  }
+
+  beforeEach(async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+  });
+
+  it('`obtenerRecibo` niega sin `produccion.wip-ver`; `proyectarRecibo` proyecta igual', async () => {
+    const recibo = await recibir(sesion(), 10);
+
+    const capturista = sesion(['produccion.recibo']);
+    await expect(obtenerRecibo(capturista, recibo.id, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    const eco = await proyectarRecibo(capturista, recibo.id, bd());
+    expect(eco.id).toBe(recibo.id);
+    expect(eco.totalPiezas).toBe(10);
+  });
+
+  it('`proyectarRecibo` conserva el scope por empresa activa (A9): un recibo ajeno "no existe"', async () => {
+    const recibo = await recibir(sesion(), 10);
+
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA (eco recibos)');
+    const ajena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: ['produccion.recibo'] });
+    await expect(proyectarRecibo(ajena, recibo.id, bd())).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('🔴 quien RECIBE sin `produccion.wip-ver` recibe su recibo, y lo contestado es lo escrito', async () => {
+    const capturista = sesion(['produccion.recibo']);
+    const recibo = await recibir(capturista, 10);
+
+    expect(recibo.totalPiezas).toBe(10);
+    expect(recibo.idMovimientoEntrada).not.toBeNull();
+    const fila = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: recibo.id },
+      include: { detalles: true },
+    });
+    expect(Number(fila.folio)).toBe(recibo.folio);
+    expect(fila.detalles.reduce((s, d) => s + d.cantidad, 0)).toBe(recibo.totalPiezas);
+    // Y NO hay un segundo recibo: el 403 empujaba a recapturar y duplicaba la entrada a PT.
+    const recibos = await cliente.etapaMovimiento.count({
+      where: { idOrden, tipo: 'recibo_maquila' },
+    });
+    expect(recibos).toBe(1);
+  });
+
+  it('🔴 quien CANCELA sin `produccion.wip-ver` recibe el recibo cancelado, y la bandera del precio sigue viva', async () => {
+    const primero = await recibir(sesion(), 5);
+    const segundo = await recibir(sesion(), 5);
+
+    // Sin `ordenes.ver-precio-real-maquila`: el eco llega (ya no hay 403) con el precio REDACTADO.
+    const cancelado = await cancelarReciboMaquila(
+      sesion(['produccion.cancelar']),
+      primero.id,
+      { motivo: 'llegó incompleto' },
+      bd(),
+    );
+    expect(cancelado.cancelado).toBe(true);
+    expect(cancelado.precioPactado).toBeNull();
+
+    // ⚠️ Con la llave, el MISMO camino devuelve el precio: el `tienePermiso` de la cancelación se
+    // conserva TAL CUAL —es una bandera BLANDA que redacta un campo, no una reja que niegue— y esta
+    // pareja demuestra que no quedó decorativa al quitar la reja.
+    const conLlave = await cancelarReciboMaquila(
+      sesion(['produccion.cancelar', 'ordenes.ver-precio-real-maquila']),
+      segundo.id,
+      { motivo: 'llegó incompleto' },
+      bd(),
+    );
+    expect(conLlave.cancelado).toBe(true);
+    expect(conLlave.precioPactado).toBe(8);
   });
 });
