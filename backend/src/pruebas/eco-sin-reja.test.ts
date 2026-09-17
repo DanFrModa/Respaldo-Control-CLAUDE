@@ -285,10 +285,44 @@ export async function crearConSqlCrudo(sesion: SesionUsuario, tx: any, id: numbe
   return obtenerCrudo(sesion, id);
 }
 
+/** MAL, SQL crudo en forma de LLAMADA con Prisma.sql: la forma de los 3 sitios de ciclico. */
+export async function crearConPrismaSql(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.administrar');
+  await tx.$executeRaw(
+    Prisma.sql\`
+      UPDATE "cosa" AS c
+      SET "x" = 1
+    \`,
+  );
+  return obtenerCrudo(sesion, id);
+}
+
+/** MAL, minteo de folio con $queryRaw: la forma de comun/secuencias.ts (A3). */
+export async function crearConFolio(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.administrar');
+  await tx.$queryRaw<{ valor: bigint }[]>\`
+    INSERT INTO "secuencias" ("clave", "valor") VALUES (\${'x'}, 1)
+    ON CONFLICT ("clave") DO UPDATE SET "valor" = "secuencias"."valor" + 1
+    RETURNING "valor"
+  \`;
+  return obtenerCrudo(sesion, id);
+}
+
 /** BIEN: un $executeRaw que sólo serializa (advisory lock) NO es una escritura. */
 export async function soloSerializa(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
   verificarPermiso(sesion, 'crudo.administrar');
   await tx.$executeRaw\`SELECT pg_advisory_xact_lock(1, 2)\`;
+  return obtenerCrudo(sesion, id);
+}
+
+/** BIEN: un SELECT … FOR UPDATE sólo serializa una LECTURA. No escribe nada. */
+export async function soloBloqueaFila(sesion: SesionUsuario, tx: any, id: number): Promise<number> {
+  verificarPermiso(sesion, 'crudo.administrar');
+  await tx.$queryRaw<{ id: number }[]>\`
+    SELECT "id" FROM "cosa"
+    WHERE "id" = \${id}
+    FOR UPDATE
+  \`;
   return obtenerCrudo(sesion, id);
 }
 
@@ -310,11 +344,14 @@ export async function crearConRejaDirecta(
   crearAnidado,
   crearConAlias,
   crearConRejaDirecta,
+  crearConFolio,
+  crearConPrismaSql,
   crearConSqlCrudo,
   crearEnLote,
   crearPorBarril,
   crearPorDosSaltos,
   crearRejaEnCierre,
+  soloBloqueaFila,
   soloSerializa,
 } from '../dominio/escondites.js';
 import { mutarConEnvoltorio } from '../dominio/envoltorio.js';
@@ -380,6 +417,24 @@ export function registrarEscondites(app: any): void {
     preHandler: app.conPermiso('crudo.administrar'),
     handler: async (request: any) => soloSerializa(request.sesion, null, 1),
   });
+  app.route({
+    method: 'POST',
+    url: '/prisma-sql',
+    preHandler: app.conPermiso('crudo.administrar'),
+    handler: async (request: any) => crearConPrismaSql(request.sesion, null, 1),
+  });
+  app.route({
+    method: 'POST',
+    url: '/folio',
+    preHandler: app.conPermiso('crudo.administrar'),
+    handler: async (request: any) => crearConFolio(request.sesion, null, 1),
+  });
+  app.route({
+    method: 'POST',
+    url: '/bloquea-fila',
+    preHandler: app.conPermiso('crudo.administrar'),
+    handler: async (request: any) => soloBloqueaFila(request.sesion, null, 1),
+  });
 }
 `,
   );
@@ -427,6 +482,8 @@ describe('la red de «escribir y luego negar» mide algo', () => {
     expect(hallazgos.map((h) => `${h.funcion}->${h.llamada}`).sort()).toEqual([
       'crearAnidado->obtenerAnidado',
       'crearConAlias->obtenerConAlias',
+      'crearConFolio->obtenerCrudo',
+      'crearConPrismaSql->obtenerCrudo',
       'crearConRejaDirecta->verificarPermiso',
       'crearConSqlCrudo->obtenerCrudo',
       'crearCosa->obtenerCosa',
@@ -438,6 +495,10 @@ describe('la red de «escribir y luego negar» mide algo', () => {
     // Y `soloSerializa` NO está: su `$executeRaw` es un advisory lock, que no escribe nada. Tomarlo
     // por escritura pondría en rojo lecturas que sólo se serializan (39 así en el dominio).
     expect(hallazgos.map((h) => h.funcion)).not.toContain('soloSerializa');
+    // Ni `soloBloqueaFila`: `SELECT … FOR UPDATE` serializa una LECTURA. ⚠️ Este negativo es el que
+    // el de arriba NO cubre —un advisory lock no lleva la palabra `update`— y es la trampa exacta
+    // que reconocer `$queryRaw` habría abierto sin anclar la regex (`inventario-ciclico.ts:519, 906`).
+    expect(hallazgos.map((h) => h.funcion)).not.toContain('soloBloqueaFila');
     // ⭐ Y `mutarConEnvoltorio` NO está: su consulta con reja vive dentro de la transacción de un
     // envoltorio que no se llama `enTransaccion` (el caso de `enRecetaEditable`, 10 llamadores
     // reales). Reportarla sería poner el CI en rojo sobre código correcto.
@@ -468,8 +529,8 @@ describe('la red de «escribir y luego negar» mide algo', () => {
       informe({
         hallazgos,
         excepcionesPodridas: [],
-        rutasAnalizadas: 14,
-        funcionesIndexadas: 30,
+        rutasAnalizadas: 17,
+        funcionesIndexadas: 34,
         exoneradas: 1,
       });
     expect(texto()).toContain('proyectarX');

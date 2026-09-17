@@ -104,14 +104,33 @@
  * cubre el 80 % y lo dice)
  * ────────────────────────────────────────────────────────────────────────────────────────────────
  *  a. **Entradas que no son rutas HTTP**: consumidores de la cola (pg-boss), ETL de `migracion/` y
- *     scripts. Ahí no hay `preHandler` del que partir. Un defecto que SÓLO sea alcanzable por esos
- *     caminos no se ve.
+ *     scripts. Ahí no hay `preHandler` del que partir, e **inventar una garantía sería peor que no
+ *     medir**. ⭐ **Pero el hueco está ACOTADO con números, para que nadie sobreinterprete el verde**
+ *     (medido el 17-sep-2026): de **584** funciones de dominio que escriben, **413 se alcanzan desde
+ *     rutas** y **171 quedan fuera (29 %)**. Tomando esas 171 como entradas **con garantía VACÍA**
+ *     —el supuesto más duro posible— salen **2** candidatos, y los dos se explican:
+ *      • `pedidos/importacion-pdf.ts::crearOrdenDesdePdf` es **artefacto del supuesto**: su único
+ *        llamador, `confirmarImportacionPdf` (misma unidad, línea 1097), sí entra por
+ *        `POST /pedidos/importacion-pdf/confirmar`, y además la llamada va dentro de la transacción.
+ *      • `ruta-critica/rcAutomatica.ts::procesarOrdenCreada` es **la vía pg-boss de verdad, y es
+ *        correcta por construcción**: `rcAutomatica.ts:61-68` arma su sesión de sistema con
+ *        `permisos: new Set(['rc.programar'])`, **exactamente** la llave que `generarRutaOrden`
+ *        exige. Y es **la única sesión sintética del repositorio** (`grep "permisos: new Set"` en
+ *        `src/**` fuera de pruebas → 1).
+ *     ⇒ el «0 hallazgos» vale bastante más de lo que ese 29 % sugiere por sí solo.
+ *  a-bis. **Persistencia FUERA de la base de datos**: subir un archivo a R2 y después pedir una reja
+ *     deja el objeto subido y devuelve 403 — el mismo daño, en otro almacén. Esta red sólo conoce
+ *     como «rastro escrito» lo que toca Postgres. No se encontró ningún sitio así, pero el día que
+ *     exista no lo verá.
  *  b. **Permisos calculados**: `verificarPermiso(sesion, clave)` con una variable en vez de un
  *     literal. No se puede leer sin resolver tipos; se ignora.
- *  b-bis. **Escritura que no se ve como tal**: los métodos de escritura de Prisma, `enTransaccion`/
- *     `$transaction` y el SQL crudo con `INSERT`/`UPDATE`/`DELETE`. Una escritura por cualquier otra
- *     vía (un cliente distinto, una llamada externa que persiste) no marca el punto del commit, y
- *     entonces nada de lo que venga después se mide.
+ *  b-bis. **Escritura que no se reconoce como tal**: se ven los métodos de escritura de Prisma,
+ *     `enTransaccion`/`$transaction` y el SQL crudo con DML por las cuatro etiquetas
+ *     (`$executeRaw`, `$executeRawUnsafe`, `$queryRaw`, `$queryRawUnsafe`) en sus dos formas
+ *     (plantilla etiquetada y llamada con `Prisma.sql`). Cualquier OTRA forma de persistir no marca
+ *     el punto del commit, y entonces nada de lo que venga después se mide. Es el modo de fallo que
+ *     ya se arregló dos veces —el SQL crudo en la 3ª ronda, `$queryRaw` y la forma de llamada en la
+ *     4ª—: si aparece una tercera, será de esta misma familia.
  *  c. **Llamadas DENTRO de la transacción**: se consideran protegidas, porque lo son — si el 403
  *     sale, el `ROLLBACK` no deja nada escrito, y ése es justo el motivo por el que el censo a mano
  *     descartó 4 sitios (`importarCfdi`, `importarCfdiVenta`, `salidaAProduccion`…). ⚠️ **El precio
@@ -333,23 +352,73 @@ const METODOS_ESCRITURA = new Set([
 /** Llamadas que ABREN Y CIERRAN una transacción: lo que venga después ya está comiteado. */
 const ABRE_TRANSACCION = new Set(['enTransaccion', '$transaction']);
 
+/** Los cuatro métodos de Prisma por los que puede colarse SQL a mano. */
+const CRUDOS = new Set(['$executeRaw', '$executeRawUnsafe', '$queryRaw', '$queryRawUnsafe']);
+
 /**
- * ⭐ La escritura por SQL CRUDO, que no es una llamada sino una **plantilla etiquetada**:
- * `` tx.$executeRaw`UPDATE "lista_precios_linea" …` ``. Hay 4 sitios así en producción
- * (`desarrollo/listas-precios.ts`, `indicadores/ciclico/{tela,avio,pt}.ts`) y ninguno se veía: el
- * recorrido sólo mira `CallExpression`, así que una función cuya ÚNICA escritura fuera ésta no
- * contaba como escritora y todo lo que pidiera después quedaba fuera de la regla.
+ * ¿El SQL de este texto ESCRIBE? El ancla del principio (arranque de línea, `;`, comilla o backtick)
+ * es lo que separa un `UPDATE` de verdad de un `SELECT … FOR UPDATE`, que sólo serializa una lectura
+ * y **no escribe nada** — el repo tiene tres (`inventario-ciclico.ts:531` y `:917`,
+ * `arte-modelo.ts:879`). Y los comentarios `--` se quitan antes, para que la palabra en una nota no
+ * cuente. ⚠️ Sin esas dos cosas, reconocer `$queryRaw` —que es lo que hace falta para ver el minteo
+ * de folios— convertiría esas tres lecturas en escrituras.
+ */
+function diceDml(texto: string): boolean {
+  return /(^|[;`'"])[ \t]*(insert\s+into|update\s|delete\s+from)/im.test(
+    texto.replace(/--[^\n]*/g, ''),
+  );
+}
+
+/**
+ * ⭐ La escritura por SQL CRUDO, que el recorrido normal no ve porque **no siempre es una llamada**.
+ * Hay que reconocer las DOS formas que el repo usa, y con las dos etiquetas:
  *
- * 🔑 Se exige que la plantilla diga `INSERT`/`UPDATE`/`DELETE`: los otros 39 `$executeRaw` del
- * dominio son `SELECT pg_advisory_xact_lock(…)`, que **no escriben nada**, y tomarlos por escritura
- * pondría en rojo lecturas que sólo se serializan.
+ * ```ts
+ * await tx.$executeRaw`UPDATE "lista_precios_linea" …`;          // plantilla etiquetada
+ * await tx.$executeRaw(Prisma.sql`UPDATE "inventario_ciclico_det_tela" …`);   // LLAMADA
+ * const filas = await tx.$queryRaw<…>`INSERT INTO "secuencias" … DO UPDATE … RETURNING "valor"`;
+ * ```
+ *
+ * 🔴 **CIFRAS MEDIDAS** (17-sep-2026, barriendo `src/**` sin pruebas): hay **139 nodos** de SQL
+ * crudo, de los que **8 son DML** —`desarrollo/listas-precios.ts:1202`,
+ * `indicadores/ciclico/{tela:244, avio:174, pt:259}` y `comun/secuencias.ts:{62,117,171,227}`— y los
+ * **131 restantes son lectura** (`SELECT pg_advisory_xact_lock(…)`, consultas y tres
+ * `SELECT … FOR UPDATE`). Este predicado reconoce **los 8 y ninguno de los 131**.
+ *
+ * ⚠️ **La versión anterior reconocía 2 de los 8**, y su docstring afirmaba que los veía todos. Se le
+ * escapaban los tres de `ciclico` (forma de LLAMADA, etiquetados con `Prisma.sql`) y tres de
+ * `secuencias.ts`, que son `$queryRaw`. Estos últimos son **el minteo atómico de folios (A3)** — y
+ * «su folio ya quemado» es literalmente la frase con la que esta familia describe el daño, así que
+ * una función cuya única escritura fuera mintear un folio tenía que contar como escritora.
+ *
+ * 🔑 **Y los dos arreglos van juntos, no por orden sino por necesidad**: la regex anterior no llevaba
+ * ancla, y `update\s` casaba con el `FOR UPDATE` de `inventario-ciclico.ts:519` y `:906`. Hoy no
+ * mordían **por casualidad** —usan `$queryRaw`, que la etiqueta vieja no miraba—, así que reconocer
+ * `$queryRaw` sin anclar la regex habría convertido dos lecturas serializadas en escrituras.
+ *
+ * 📌 Hoy **ninguno de los 8 cambia por sí solo la clasificación de su función**: todos viven dentro
+ * de la transacción de un llamador que ya es escritor por otra vía. La regla está para cuando eso no
+ * sea así — y para que el día que alguien mintee un folio fuera de una transacción y lea después, se
+ * vea.
+ *
+ * 🔑 Se exige DML **anclado** (ver {@link diceDml}): los demás `$executeRaw` del dominio son
+ * `SELECT pg_advisory_xact_lock(…)` y hay tres `SELECT … FOR UPDATE`; ninguno escribe, y tomarlos por
+ * escritura pondría en rojo lecturas que sólo se serializan.
  */
 function esEscrituraCruda(n: ts.Node): boolean {
-  if (!ts.isTaggedTemplateExpression(n)) return false;
-  const etiqueta = n.tag;
-  const nombre = ts.isPropertyAccessExpression(etiqueta) ? etiqueta.name.text : undefined;
-  if (nombre !== '$executeRaw' && nombre !== '$executeRawUnsafe') return false;
-  return /\b(insert\s+into|update\s|delete\s+from)/i.test(n.template.getText(n.getSourceFile()));
+  const nombreDe = (e: ts.Expression): string | undefined =>
+    ts.isPropertyAccessExpression(e) ? e.name.text : ts.isIdentifier(e) ? e.text : undefined;
+  const sf = n.getSourceFile();
+  if (ts.isTaggedTemplateExpression(n)) {
+    const nombre = nombreDe(n.tag);
+    return nombre !== undefined && CRUDOS.has(nombre) && diceDml(n.template.getText(sf));
+  }
+  if (ts.isCallExpression(n)) {
+    const nombre = nombreDe(n.expression);
+    if (nombre === undefined || !CRUDOS.has(nombre)) return false;
+    return n.arguments.some((a) => diceDml(a.getText(sf)));
+  }
+  return false;
 }
 
 /** Posición de la primera escritura cruda del ámbito (sin entrar en funciones anidadas). */
@@ -1090,8 +1159,14 @@ export function analizar(raizBackend: string): Resultado {
       //     con reja propia el CI se pondría **rojo sobre código correcto**, recomendando partir en
       //     `proyectarX` algo que no tiene nada que arreglar.
       //
-      // Medido sobre el árbol real: 249 sitios de descenso, de los que estos 10 son los envoltorios
-      // escritores ⇒ se conservan 239, toda la cobertura que motivó el cambio.
+      // Medido sobre el árbol real, con el número CORREGIDO (la primera cuenta decía 239 y estaba
+      // mal): sin esta guarda hay **249** sitios de descenso; con ella quedan **179**. No es
+      // 249 − 10: los envoltorios son 10 SITIOS, pero al no entrar en ellos se pierde también **su
+      // subárbol**, o sea **70 descensos** — 54 dentro de `receta-orden.ts` y 16 en lo que llama
+      // desde dentro de esa transacción (`bom-modelo`, `receta-avios`, `aviso-ya-comprado`,
+      // `comprometido-en-oc`, `resolucion-precios`, `ultimo-precio-compra`). Los 70 se revisaron uno
+      // a uno: son `.map`/`.sort`/`.find`/`.reduce` de pura forma de datos, ninguno con reja, y todos
+      // dentro de la transacción ⇒ no se pierde cobertura, pero el número que hay que escribir es 179.
       const envoltorioEscritor = destino !== undefined && escribe(destino);
       if (escribio && !ABRE_TRANSACCION.has(nombreLlamado(llamada) ?? '') && !envoltorioEscritor) {
         for (const argumento of llamada.arguments) {
