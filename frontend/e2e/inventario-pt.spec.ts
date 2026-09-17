@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirPrimeroEnCombobox, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del INVENTARIO de PRODUCTO TERMINADO (F3-E3) contra el stack real. Cubre el flujo de la ficha:
@@ -45,7 +45,7 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     // de la lista, tras el placeholder).
     await page.getByTestId('mov-tipo').selectOption({ index: 1 });
     await page.getByTestId('mov-almacen').selectOption({ label: 'Primeras' });
-    await page.getByTestId('mov-matriz-agregar-color').selectOption({ index: 1 });
+    await elegirPrimeroEnCombobox(page, page.locator('body'), 'mov-matriz-agregar-color');
     const agregarTalla = page.getByTestId('mov-matriz-agregar-talla');
     if (await agregarTalla.isEnabled()) {
       await agregarTalla.selectOption({ index: 1 });
@@ -64,7 +64,7 @@ test.describe('Inventario PT operable (F3-E3)', () => {
 
     await page.getByTestId('traspaso-origen').selectOption({ label: 'Primeras' });
     await page.getByTestId('traspaso-destino').selectOption({ label: 'Segundas' });
-    await page.getByTestId('traspaso-matriz-agregar-color').selectOption({ index: 1 });
+    await elegirPrimeroEnCombobox(page, page.locator('body'), 'traspaso-matriz-agregar-color');
     const agregarTallaT = page.getByTestId('traspaso-matriz-agregar-talla');
     if (await agregarTallaT.isEnabled()) {
       await agregarTallaT.selectOption({ index: 1 });

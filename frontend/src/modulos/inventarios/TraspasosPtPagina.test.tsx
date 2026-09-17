@@ -1,10 +1,10 @@
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApiInventarios from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { hoy } from './fecha-captura-pt';
 import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
@@ -121,6 +121,31 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(screen.getByTestId('traspaso-guardar')).toBeDisabled();
   });
 
+  /**
+   * ⭐ FILA 0.192 — EL COLOR QUE YA ES FILA NO SE VUELVE A OFRECER.
+   *
+   * Al cambiar el `<select>` de la matriz por un BUSCADOR, quien esconde el color ya capturado dejó
+   * de ser la matriz y pasó a ser el `excluirIds` que esta pantalla le pasa. Sin él, el buscador
+   * invita a agregar dos veces el mismo color y el servidor lo rechaza al guardar: un callejón sin
+   * salida. 🔑 Y hace falta decirlo: **quitar ese `excluirIds` no rompía NINGUNA prueba** —medido—
+   * hasta que existió ésta.
+   */
+  it('el color YA capturado desaparece del buscador (no se puede repetir la fila)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+    await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
+
+    // La lista se vuelve a abrir contra el MISMO catálogo del servidor (el mock siempre trae
+    // "Rojo"): si el color capturado siguiera ofreciéndose, aquí habría una opción.
+    const input = screen.getByTestId('traspaso-matriz-agregar-color-busqueda');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Rojo' } });
+    expect(await screen.findByText('No hay colores que coincidan.')).toBeInTheDocument();
+  });
+
   it('habilita guardar con origen≠destino y una captura, y envía al servicio', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
@@ -128,7 +153,7 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
     await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
@@ -158,7 +183,7 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
 
     await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
     await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
@@ -205,12 +230,14 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
 
-    const selectorColor = screen.getByTestId('traspaso-matriz-agregar-color');
-    const textos = [...selectorColor.querySelectorAll('option')].map((o) => o.textContent ?? '');
+    await usuario.click(screen.getByTestId('traspaso-matriz-agregar-color-busqueda'));
+    const textos = (await screen.findAllByTestId('traspaso-matriz-agregar-color-opcion')).map(
+      (o) => o.textContent ?? '',
+    );
     expect(textos).toContain('Blanco Hueso (retirado)');
     expect(textos).toContain('Rojo'); // el catálogo vivo sigue ahí, y sin marca
 
-    await usuario.selectOptions(selectorColor, '9');
+    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Blanco', 'Blanco Hueso (retirado)');
     await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
@@ -230,7 +257,7 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
     await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
@@ -304,7 +331,7 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       await elegirModelo(usuario);
       await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
       await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-      await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-color'), '7');
+      await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
       await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
       const celda = screen.getByTestId('traspaso-matriz-celda');
       await usuario.clear(celda);

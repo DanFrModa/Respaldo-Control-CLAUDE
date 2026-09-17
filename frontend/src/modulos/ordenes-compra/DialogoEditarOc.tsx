@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
-import { useColores } from '@/api/colores';
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
@@ -90,12 +89,6 @@ export function DialogoEditarOc({
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
   const avios = useAvios({ pagina: 1, porPagina: 100 });
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    incluirInactivos: 'false',
-  });
   const tallas = useTallasActivas();
   // Órdenes de producción no canceladas para ligar por línea (R7).
   const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
@@ -394,7 +387,6 @@ export function DialogoEditarOc({
               }
               avios={avios.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
-              colores={colores.data?.datos ?? []}
               tallas={tallas.data?.datos ?? []}
               soloLectura={soloLectura}
             />

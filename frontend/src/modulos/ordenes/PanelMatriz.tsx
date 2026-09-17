@@ -3,7 +3,6 @@ import { CopyIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api } from '@/api/cliente';
-import { useColores } from '@/api/colores';
 import { ErrorDeApi } from '@/api/errores';
 import { useFichaModelo } from '@/api/modelos';
 import { useGuardarMatriz } from '@/api/ordenes';
@@ -39,15 +38,6 @@ function useCurva(idCurva: number | null | undefined) {
     enabled: idCurva !== null && idCurva !== undefined,
   });
 }
-
-/** Tope alto: trae el catálogo de colores activos para el selector de filas. */
-const QUERY_COLORES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
 
 /**
  * Construye las filas iniciales de la matriz a partir de las líneas que ya trae la orden. Una fila
@@ -215,7 +205,6 @@ export function PanelMatriz({
 
   const ficha = useFichaModelo(orden.idModelo);
   const curva = useCurva(ficha.data?.idCurvaTalla ?? null);
-  const colores = useColores(QUERY_COLORES);
   const tallas = useTallasActivas();
   const guardar = useGuardarMatriz();
 
@@ -249,10 +238,6 @@ export function PanelMatriz({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveReset, reinicioBloqueado]);
 
-  const coloresDisponibles = useMemo(
-    () => (colores.data?.datos ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
-    [colores.data],
-  );
   /**
    * ⭐ ¿ESTA orden se fabrica por TENDIDOS? (§Post-F9.10). Basta con que un renglón traiga pack —la
    * MISMA pregunta que hace el servidor (`packs.ts::ordenManejaPacks`)—. Gobierna DOS cosas: que el
@@ -340,7 +325,6 @@ export function PanelMatriz({
       <MatrizColorTalla
         tallas={columnas}
         lineas={lineas}
-        coloresDisponibles={coloresDisponibles}
         tallasDisponibles={tallasDisponibles}
         onLineasChange={setLineas}
         onTallasChange={setColumnas}

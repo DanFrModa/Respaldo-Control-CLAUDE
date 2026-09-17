@@ -1,9 +1,8 @@
 import { ArrowLeftRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useColores } from '@/api/colores';
 import { useCrearMovimientoPt, useExistenciasPt, useTiposMovimiento } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 import {
   MatrizColorTalla,
   type MatrizLinea,
@@ -27,7 +27,7 @@ import {
   SIN_ORDEN,
   aIdOrden,
   aLineasApi,
-  coloresOpciones,
+  coloresRetiradosConExistencia,
   ordenesConExistencia,
   tallasColumnas,
   totalMatriz,
@@ -83,6 +83,10 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
+  // Fila 0.192 — contador de colores AGREGADOS. Es la `key` del buscador de color: lo REMONTA tras
+  // cada alta para que el texto tecleado no quede pegado en el siguiente uso (mismo recurso que la
+  // matriz de la OP).
+  const [vecesAgregado, setVecesAgregado] = useState(0);
 
   // Solo entrada/salida (los `traspaso` van por la otra pantalla), y NUNCA los dos rótulos que la
   // fila 0.104 reservó a la dirección: «Devolución a Proveedor» y «Venta de Material» nacieron para
@@ -102,13 +106,6 @@ export function MovimientosPtPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
     tipo: 'PT',
-  });
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
   });
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
 
@@ -158,26 +155,27 @@ export function MovimientosPtPagina(): React.JSX.Element {
     ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
   const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
 
-  // Fila 0.164 — al catálogo VIVO se le suman los colores RETIRADOS que tienen mercancía en este
-  // contexto (el mismo `existencias` del que salen los buckets de orden, ya elegido por modo).
-  // Sin esto, las piezas que entraron con un color luego fusionado (§Post-F9.222) se quedaban sin
-  // forma de ajustarse a mano.
-  const coloresDisponibles = useMemo(
-    () => coloresOpciones(colores.data?.datos ?? [], existencias.data?.filas ?? []),
-    [colores.data, existencias.data],
+  // Fila 0.164 — los colores RETIRADOS que tienen mercancía en este contexto (el mismo
+  // `existencias` del que salen los buckets de orden, ya elegido por modo). Sin esto, las piezas
+  // que entraron con un color luego fusionado (§Post-F9.222) se quedaban sin forma de ajustarse a
+  // mano. El catálogo VIVO ya no se pre-carga: lo busca el servidor (fila 0.192).
+  const coloresRetirados = useMemo(
+    () => coloresRetiradosConExistencia(existencias.data?.filas ?? []),
+    [existencias.data],
   );
+  // Colores que YA son fila de la matriz: el buscador no los vuelve a ofrecer (el servidor rechaza
+  // el color repetido).
+  const coloresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
   const tallasDisponibles = useMemo(
     () => tallasColumnas(tallasCat.data?.datos ?? []),
     [tallasCat.data],
   );
 
   // Aviso reintentable si falla algún catálogo de la captura.
-  const catalogoError =
-    tiposMov.isError || almacenes.isError || colores.isError || tallasCat.isError;
+  const catalogoError = tiposMov.isError || almacenes.isError || tallasCat.isError;
   function reintentarCatalogos(): void {
     void tiposMov.refetch();
     void almacenes.refetch();
-    void colores.refetch();
     void tallasCat.refetch();
   }
 
@@ -193,6 +191,23 @@ export function MovimientosPtPagina(): React.JSX.Element {
     motivoOk &&
     total > 0 &&
     !crear.isPending;
+
+  /**
+   * Agrega la fila del color elegido en el buscador (fila 0.192: el catálogo lo busca el SERVIDOR,
+   * así que la fila la pone la pantalla y no la matriz).
+   *
+   * 🔑 Aquí NO se vuelve a comprobar que el color no esté ya: quien lo impide es `excluirIds`, que
+   * el buscador aplica ANTES de ofrecer nada (y es lo que vigila su propia prueba). Un segundo
+   * guardián sin prueba propia sería código que nadie mide; y el color repetido lo rechaza además
+   * el dominio (A1).
+   */
+  const agregarColor = useCallback((color: { id: number; nombre: string }): void => {
+    setLineas((previas) => [
+      ...previas,
+      { idColor: color.id, color: color.nombre, cantidades: {} },
+    ]);
+    setVecesAgregado((n) => n + 1);
+  }, []);
 
   function limpiarMatriz(): void {
     setLineas([]);
@@ -402,11 +417,25 @@ export function MovimientosPtPagina(): React.JSX.Element {
                   testid="mov-matriz"
                   tallas={tallas}
                   lineas={lineas}
-                  coloresDisponibles={coloresDisponibles}
                   tallasDisponibles={tallasDisponibles}
                   onLineasChange={setLineas}
                   onTallasChange={setTallas}
                   soloLectura={!puedeMover}
+                  slotAgregarColor={
+                    <div className="w-60">
+                      <SelectorColor
+                        key={vecesAgregado}
+                        idSeleccionado={undefined}
+                        alSeleccionar={agregarColor}
+                        excluirIds={coloresUsados}
+                        opcionesExtra={coloresRetirados}
+                        deshabilitado={!puedeMover}
+                        etiqueta="Agregar color"
+                        placeholder="Agregar color…"
+                        testid="mov-matriz-agregar-color"
+                      />
+                    </div>
+                  }
                 />
               </div>
             </>

@@ -14,7 +14,7 @@ El componente es **controlado en dos ejes independientes**: el padre es dueño d
 | -------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tallas`             | `MatrizTalla[]` (`{ idTalla, etiqueta }`)                           | Columnas, en orden. Estado controlado del padre.                                                                                                |
 | `lineas`             | `MatrizLinea[]` (`{ idColor, color, cantidades, pantone?, pack? }`) | Filas (valor controlado). `cantidades` = `{ [idTalla]: number }`; ausente = 0.                                                                  |
-| `coloresDisponibles` | `MatrizColorOpcion[]` (`{ id, nombre }`)                            | Catálogo para agregar una fila. Los colores ya usados se **ocultan**, salvo cuando la matriz maneja tendidos (ver el bullet del PACK).          |
+| `coloresDisponibles?` | `MatrizColorOpcion[]` (`{ id, nombre }`)                           | Catálogo del `<select>` nativo de "agregar color". Los colores ya usados se **ocultan**, salvo cuando la matriz maneja tendidos (ver el bullet del PACK). **Opcional desde la fila 0.192**: un flujo con `slotAgregarColor` busca el color en el servidor y agrega la fila él mismo, así que no pasa lista (pasarla era lo que lo ataba al tope de 100 del contrato de paginación). |
 | `tallasDisponibles`  | `MatrizTalla[]`                                                     | Catálogo para agregar columnas fuera de curva. Las presentes se **ocultan**.                                                                    |
 | `onLineasChange`     | `(lineas) => void`                                                  | Emite el nuevo set de filas (editar celda, agregar/quitar color).                                                                               |
 | `onTallasChange`     | `(tallas) => void`                                                  | Emite el nuevo set de columnas (agregar/quitar talla).                                                                                          |
@@ -56,7 +56,16 @@ const [lineas, setLineas] = useState<MatrizLinea[]>(filasIniciales);
 <MatrizColorTalla
   tallas={tallas}
   lineas={lineas}
-  coloresDisponibles={colores.map((c) => ({ id: c.id, nombre: c.nombre }))}
+  // El catálogo de colores NO se pre-carga: el buscador del slot lo pide al servidor (fila 0.192).
+  slotAgregarColor={
+    <SelectorColor
+      key={vecesAgregado}
+      idSeleccionado={undefined}
+      alSeleccionar={agregarFilaDeColor}
+      excluirIds={new Set(lineas.map((l) => l.idColor))}
+      placeholder="Agregar color…"
+    />
+  }
   tallasDisponibles={catalogoTallas.map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta }))}
   onTallasChange={setTallas}
   onLineasChange={setLineas}

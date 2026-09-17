@@ -71,6 +71,49 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.169 · 17-sep-2026 · **en prueba** — **Los colores ya se buscan escribiendo: aunque el catálogo crezca a miles, ninguno se queda escondido**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Agregar un artículo de producto terminado a un conteo cíclico.** Esto estaba **roto hoy, no
+  «por romperse»**: la pantalla pedía doscientos colores al servidor cuando el máximo que acepta son
+  cien, así que el servidor le contestaba con un error y **la lista de colores salía vacía, sin decir
+  nada**. Se elegía almacén y modelo, se llegaba al color… y no había ninguno que elegir.
+- ⭐ **Encontrar cualquier color, en los seis sitios donde se elige uno**, escribiendo dos o tres
+  letras: el sistema lo busca en el catálogo completo, no en una lista ya cargada. Los seis sitios
+  son: los **movimientos manuales** y los **traspasos** de producto terminado, los **filtros de
+  existencias** de producto terminado y de telas, el **detalle por talla y color de una orden de
+  compra**, y el **alta de artículo de un conteo cíclico**.
+
+### Qué cambió y puede sorprender
+
+- **Esos seis desplegables ya no son desplegables: son campos donde se escribe.** Se teclea parte del
+  nombre y aparecen las coincidencias; se elige con el mouse o con las flechas y Enter. Es el mismo
+  campo que ya se usa para elegir cliente, proveedor, tela, avío o modelo — ahora también para color.
+- **Lo que ya está capturado deja de ofrecerse.** En las pantallas que capturan por color y talla, un
+  color que ya tiene su renglón desaparece del buscador: antes se podía elegir dos veces y el sistema
+  rechazaba el guardado al final, sin salida.
+- ✅ **Los colores retirados que todavía tienen mercancía siguen apareciendo, rotulados
+  «(retirado)»**, exactamente como desde la versión anterior que lo arregló: fusionar dos colores no
+  deja sus piezas sin forma de ajustarse ni de traspasarse.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Buscar sin acentos no encuentra el color con acento.** Escribir `ambar` **no** saca «Ámbar»
+  (escribir `mbar` sí). Le pasa a todos los buscadores del sistema —cliente, proveedor, tela, avío—,
+  no sólo al de color, pero en colores molesta más porque el catálogo está lleno de acentos: Ámbar,
+  Café, Marrón, Añil. **No se arregló aquí a propósito**: el arreglo es del buscador de todos los
+  catálogos, y hacerlo sólo para color lo dejaría a medias en los otros cinco. Queda anotado como
+  pendiente propio.
+- ⚠️ **Queda un séptimo sitio con el mismo tope de cien: el diálogo para fusionar colores
+  duplicados** (Catálogos › Colores). Son dos controles distintos en la misma pantalla: el de
+  «color que se conserva» es de los fáciles —es elegir uno—, pero la lista de duplicados se marca
+  con casillas y pasarla al buscador es rediseñar esa parte. **No se tocó a propósito** y queda
+  anotado como pendiente propio. Hoy no estorba porque hay bastantes menos de cien colores.
+- **A la vista no cambió ninguna otra pantalla**, y no hace falta hacer nada para estrenarlo. Por
+  dentro sí se quitó una consulta que ya no servía: la matriz de la orden de producción pedía el
+  catálogo de colores entero cada vez que se abría, aunque su buscador dejó de usarlo hace meses.
+
 ## 0.168 · 17-sep-2026 · **en prueba** — **El proyecto recuerda a su compradora, su género y su año — y los modelos nuevos ya no te los vuelven a preguntar**
 
 ### Qué se puede hacer ahora que antes no
@@ -111,6 +154,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   y el proyecto a la vez, el proyecto nace **sin género** *(hoy: se queda así)*.
 - **Esta versión lleva un cambio en la base de datos**, aditivo: se aplica solo al desplegar y no
   toca nada de lo que ya hay.
+
 
 ## 0.167 · 16-sep-2026 · **en prueba** — **Una red automática impide que vuelva a aparecer el fallo de «se guardó, pero te digo que no tienes permiso»**
 

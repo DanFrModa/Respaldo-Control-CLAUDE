@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirPrimeroEnCombobox, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de los CAMPOS NUMÉRICOS sin incremento automático (petición de Daniel, 28-jul-2026:
@@ -42,7 +42,7 @@ test.describe('Campos numéricos sin incremento automático', () => {
     await expect(page.getByRole('heading', { name: 'Movimientos de inventario' })).toBeVisible();
     await page.getByTestId('selector-modelo-busqueda').fill(codigoModelo);
     await page.getByTestId('selector-modelo-opcion').first().click();
-    await page.getByTestId('mov-matriz-agregar-color').selectOption({ index: 1 });
+    await elegirPrimeroEnCombobox(page, page.locator('body'), 'mov-matriz-agregar-color');
     const agregarTalla = page.getByTestId('mov-matriz-agregar-talla');
     if (await agregarTalla.isEnabled()) {
       await agregarTalla.selectOption({ index: 1 });

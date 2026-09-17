@@ -7,7 +7,6 @@ import {
   useCapturarConteo,
   useConteoCiclico,
 } from '@/api/inventario-ciclico';
-import { useColores } from '@/api/colores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTela } from '@/api/telas';
 import type { CiclicoRenglonAgregar, ConteoCiclico, ConteoCiclicoRenglon } from '@/api/tipos';
@@ -24,6 +23,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 import { SelectorAvio } from '@/modulos/inventarios/SelectorAvio';
 import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 import { SelectorTela } from '@/modulos/inventarios/SelectorTela';
@@ -366,7 +366,11 @@ function DialogoAgregar({
   const agregar = useAgregarRenglonCiclico();
   const [idModelo, setIdModelo] = useState<number | undefined>(undefined);
   const [etiquetaModelo, setEtiquetaModelo] = useState('');
-  const [idColor, setIdColor] = useState('');
+  // Fila 0.192 — el color se BUSCA en el servidor. Antes esta pantalla pedía `porPagina: 200`
+  // contra un tope de contrato de 100 (`contrato/esquemas/color.ts`) ⇒ el backend respondía **400**
+  // y el desplegable salía VACÍO, sin decir por qué: no era «el día que el catálogo crezca», ya
+  // estaba roto.
+  const [color, setColor] = useState<{ id: number; nombre: string } | null>(null);
   const [idTalla, setIdTalla] = useState('');
   const [idTela, setIdTela] = useState<number | undefined>(undefined);
   const [etiquetaTela, setEtiquetaTela] = useState('');
@@ -374,14 +378,13 @@ function DialogoAgregar({
   const [idAvio, setIdAvio] = useState<number | undefined>(undefined);
   const [etiquetaAvio, setEtiquetaAvio] = useState('');
 
-  const colores = useColores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre', direccion: 'asc' });
   const tallas = useTallasActivas();
   const tela = useTela(dimension === 'TELA' ? idTela : undefined);
 
   function limpiar(): void {
     setIdModelo(undefined);
     setEtiquetaModelo('');
-    setIdColor('');
+    setColor(null);
     setIdTalla('');
     setIdTela(undefined);
     setEtiquetaTela('');
@@ -394,11 +397,11 @@ function DialogoAgregar({
     e.preventDefault();
     let cuerpo: CiclicoRenglonAgregar;
     if (dimension === 'PT') {
-      if (idModelo === undefined || idColor === '' || idTalla === '') {
+      if (idModelo === undefined || color === null || idTalla === '') {
         toast.error('Elige modelo, color y talla.');
         return;
       }
-      cuerpo = { idModelo, idColor: Number(idColor), idTalla: Number(idTalla) };
+      cuerpo = { idModelo, idColor: color.id, idTalla: Number(idTalla) };
     } else if (dimension === 'TELA') {
       if (idTelaColor === '') {
         toast.error('Elige la tela y su color.');
@@ -454,19 +457,16 @@ function DialogoAgregar({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="cc-ag-color">Color</FieldLabel>
-                  <SelectNativo
-                    id="cc-ag-color"
-                    value={idColor}
-                    onChange={(e) => setIdColor(e.target.value)}
-                    data-testid="cc-ag-color"
-                  >
-                    <option value="">Selecciona…</option>
-                    {(colores.data?.datos ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
+                  <SelectorColor
+                    idInput="cc-ag-color"
+                    idSeleccionado={color?.id}
+                    {...(color === null ? {} : { nombreSeleccionado: color.nombre })}
+                    alSeleccionar={setColor}
+                    alLimpiar={() => setColor(null)}
+                    etiqueta="Color"
+                    placeholder="Selecciona…"
+                    testid="cc-ag-color"
+                  />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="cc-ag-talla">Talla</FieldLabel>

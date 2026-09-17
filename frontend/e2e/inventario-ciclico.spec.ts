@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-import { crearColorYTalla, elegirEnSelectPorPrefijo, entrarComoAdmin } from './ayudas';
+import {
+  crearColorYTalla,
+  elegirEnSelectPorPrefijo,
+  elegirPrimeroEnCombobox,
+  entrarComoAdmin,
+} from './ayudas';
 
 /**
  * E2E del INVENTARIO CÍCLICO (F7-E5) contra el stack real. Cubre el flujo de la ficha:
@@ -40,7 +45,7 @@ test.describe('Inventario cíclico (F7-E5)', () => {
     await page.getByTestId('selector-modelo-opcion').first().click();
     await page.getByTestId('mov-tipo').selectOption({ index: 1 });
     await page.getByTestId('mov-almacen').selectOption({ label: 'Primeras' });
-    await page.getByTestId('mov-matriz-agregar-color').selectOption({ index: 1 });
+    await elegirPrimeroEnCombobox(page, page.locator('body'), 'mov-matriz-agregar-color');
     const agregarTalla = page.getByTestId('mov-matriz-agregar-talla');
     if (await agregarTalla.isEnabled()) {
       await agregarTalla.selectOption({ index: 1 });
