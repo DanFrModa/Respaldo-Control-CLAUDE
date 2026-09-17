@@ -12851,6 +12851,59 @@ prueba nueva fija lo que **sí** es alcanzable y nadie cubría: por esta puerta 
 **(j) ✂️ Y una que era adorno: el tablero R7 dejó de canonizar.** Ver el párrafo *«dónde NO se
 resuelve»* de (c). Un no-op que **aparenta ser una guarda** es peor que no tener nada: cuesta una
 consulta y le miente al siguiente lector sobre lo que el tablero sabe.
+
+---
+
+### 🔁 CIERRE TARDÍO — **fila 0.168 / v0.171 (17-sep-2026): la llave se leía en canónico y se escribía en crudo**
+
+**(k) 🔴 LA ASIMETRÍA QUE DEJÓ ESTA MISMA FILA, y que su ronda 3 no podía cerrar.** El párrafo (i) de
+arriba cuenta que la **descripción** del hijo se arma con el color canónico. Lo que no se vio entonces
+es que **la LLAVE no.** El camino de reuso de `obtenerODerivarModeloDeProduccion` canoniza el color al
+entrar y **busca** con esa llave (*«¿este color ya tiene modelo?»*), pero cuando no encontraba nada
+pasaba los datos **tal cual** a `derivarModeloDeProduccion` ⇒ **el modelo que nacía se escribía con el
+`idColor` crudo**. Se leía en canónico y se escribía en crudo.
+
+**El daño, si alguna vez se alcanzara:** el hijo queda colgado del color que la fusión absorbió, así
+que la búsqueda —que mira el canónico— **no lo reconoce**, y la OC siguiente del color bueno estrena
+**otro de los 999 números de la serie para la misma prenda**. Silencioso y de identidad: un número de
+modelo no se corrige después (D3).
+
+✅ **Estaba LATENTE y se volvió a medir antes de tocar nada** (17-sep): el único camino de producción
+hasta ahí es `salidaAProduccion`, y sus **tres** puertas —la ruta REST, el importador de Excel y el de
+PDF— pasan todas por `crearOrden` → `sincronizarMatriz`, que en una orden **nueva** no tiene renglones
+previos que perdonar y por tanto **rechaza cualquier color apagado**. Como `colorCanonico` sólo desvía
+a los apagados, la guarda de arriba es estrictamente más ancha que el hueco. Nada se había escrito mal.
+
+📌 **El arreglo: una resolución, dos usos.** Se pasa el `idColor` ya resuelto (`{ ...datos, idColor }`).
+Se descartó, con razón escrita, canonizar **dentro** de `derivarModeloDeProduccion`: serían **dos**
+resoluciones independientes que en `READ COMMITTED` podrían contestar distinto si una fusión se
+confirmara entre ambas, o sea la misma asimetría por otro camino. Una sola resolución, usada por la
+búsqueda y por la escritura, es literalmente la invariante que la fila pedía.
+
+⚠️ **Y lo que (i) declaraba imposible sí se pudo probar, porque se probó UN NIVEL MÁS ABAJO.** La ronda
+3 concluyó *«no se puede escribir la prueba»* mirando el caso desde la OP, donde la guarda de la matriz
+tumba la transacción. Pero la puerta del dominio se puede llamar directo: con una fusión real en
+Postgres, el hijo nace y se comprueba que la fila guardada cuelga del **canónico** y que la OC
+siguiente del color bueno lo **reusa**. 🔑 **La lección: «no es medible» casi siempre quiere decir «no
+es medible por la puerta por la que estoy mirando».**
+
+**Lo que NO se hizo (REGLA 0-B):** ningún backfill, ninguna auditoría de los modelos ya escritos,
+ninguna pantalla para corregirlos. Se arregló **la entrada**. Sin migración, sin permisos, sin
+semillas y **sin tocar el contrato**.
+
+📌 **Y un caso HERMANO que se midió de paso y se deja escrito, no arreglado — fila 0.207.**
+`colorDeIdentidad` (`produccion/salida-produccion.ts:128`) decide **qué identidad tiene el hijo**
+antes de buscarla, y deduplica por el `idColor` **crudo**: una matriz que traiga a la vez el
+absorbido y su canónico ve **dos** colores y hace nacer un hijo **MULTICOLOR**, que por la frontera
+declarada en ese mismo docblock **no cubre** las OC de un solo color ⇒ el color acaba bajo dos
+números. **No es la llave —eso es lo que cierra (k)— sino la elección de identidad.** Está
+**doblemente** latente: hacen falta los dos ids en la matriz **y** que llegue por captura a mano,
+porque los dos importadores ya entregan la matriz en canónico (`importacion-pdf.ts:306`,
+`importacion.ts:409`). No se arregló porque deduplicar por el canónico vuelve **`async`** una función
+hoy **pura**, y eso ya es otro alcance. ⚠️ **`OrdenLinea` NO se toca**: guarda el color crudo a
+propósito (`ordenes.ts:648`), porque es lo que el cliente pidió (D7/D3). ⏳ Su prioridad depende de un
+dato que **sólo Daniel tiene** —*¿cada cuánto se fusionan colores?*—, que es **la misma pregunta que
+ya espera la fila 0.189**; por §7.5 se pregunta, no se supone.
 #### (Post-F9.219) — ⭐⭐ CÓMO SE PIDE EL CÁRDIGAN: la receta guarda un NÚMERO PROPIO y la compra lo aplica como RAZÓN (fila 0.156 / v0.129, 7-sep-2026)
 
 Es la **ejecución** de lo que Daniel ya decidió en **§Post-F9.210·6** (*«Número propio, pero hoy no se ve

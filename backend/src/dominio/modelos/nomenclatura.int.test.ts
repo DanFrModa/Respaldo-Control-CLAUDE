@@ -2204,3 +2204,67 @@ describe('⭐⭐ fila 0.159 — la llave del linaje se arma con el color CANÓNI
     expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(1);
   });
 });
+
+/**
+ * ⭐⭐ **fila 0.168 (§Post-F9.222) — LA LLAVE SE LEE EN CANÓNICO Y SE ESCRIBE EN CANÓNICO.**
+ *
+ * El bloque de arriba (0.159) prueba el camino de REUSO. Éste prueba el que faltaba: el de **NACER**.
+ * La 0.159 canonizó la búsqueda y dejó la escritura en crudo, así que un hijo que naciera con el id
+ * absorbido quedaba **invisible para la búsqueda que lo tiene que reusar** — y la siguiente OC del
+ * color bueno estrenaba OTRO número de 5 dígitos para la misma prenda, en silencio.
+ *
+ * Lo que sólo Postgres puede demostrar, y por eso está aquí: que la fila que queda en `Modelo`
+ * apunta al canónico de verdad, y que la puerta **reusa** ese mismo modelo cuando después le entra
+ * el color bueno — que es la prueba de que las dos mitades de `modelos_linaje_color_unico` casan.
+ */
+describe('⭐⭐ fila 0.168 — el hijo que NACE con un color absorbido queda colgado del canónico', () => {
+  it('nace con el canónico, y la OC siguiente del color bueno lo REUSA en vez de estrenar número', async () => {
+    const idDesarrollo = (
+      await cliente.modelo.create({
+        data: {
+          codigo: 'CYA-0168-A',
+          codigoDesarrollo: 'CYA-0168-A',
+          origen: 'desarrollo',
+          idTipoProducto: pantalon.id,
+          idGenero: caballero.id,
+        },
+        select: { id: true },
+      })
+    ).id;
+    const canonico = await cliente.color.create({ data: { nombre: 'Azul Marino 0168' } });
+    const duplicado = await cliente.color.create({
+      data: { nombre: 'Azul Marino Pantone 19-4027 Tcx 0168' },
+    });
+
+    // Se limpia el catálogo PRIMERO: aquí el duplicado ya está absorbido cuando llega la OP.
+    await fusionarColores(
+      sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: ['colores.administrar'] }),
+      { idDestino: canonico.id, origenes: [duplicado.id] },
+      bd(),
+    );
+
+    // Una OP capturada con el id VIEJO (el que trae un papel anterior a la fusión): nace el hijo.
+    const nacido = await enTx((tx) =>
+      obtenerODerivarModeloDeProduccion(tx, sesion(), idDesarrollo, { idColor: duplicado.id }),
+    );
+    expect(nacido.reusado).toBe(false);
+
+    // 🔴 LA ASERCIÓN DE LA FILA: la fila guardada cuelga del CANÓNICO, no del absorbido.
+    expect(
+      await cliente.modelo.findUniqueOrThrow({
+        where: { id: nacido.idModelo },
+        select: { idColor: true },
+      }),
+    ).toEqual({ idColor: canonico.id });
+
+    // Y la consecuencia que de verdad importa: la OC de mañana, con el color bueno, REUSA.
+    const porElCanonico = await enTx((tx) =>
+      obtenerODerivarModeloDeProduccion(tx, sesion(), idDesarrollo, { idColor: canonico.id }),
+    );
+    expect(porElCanonico.reusado).toBe(true);
+    expect(porElCanonico.idModelo).toBe(nacido.idModelo);
+
+    // Un solo modelo, un solo número quemado.
+    expect(await cliente.modelo.count({ where: { idModeloDesarrollo: idDesarrollo } })).toBe(1);
+  });
+});

@@ -973,6 +973,13 @@ export interface DatosDerivarModelo {
    * `null`/ausente = el hijo **no es de un color**: nace de una salida con matriz MULTICOLOR (el
    * importador por Excel agrupa por modelo, no por color). Ese hijo cubre varios colores a la vez,
    * exactamente como se comportaba el sistema antes de esta etapa.
+   *
+   * 🔴 **DEBE VENIR YA CANONIZADO** (fila 0.168). Esta función lo ESCRIBE tal como llega: quien la
+   * llame con el id de un color que una fusión absorbió dejará el modelo colgado de un color que ya
+   * no existe para nadie, y la OC siguiente del color bueno estrenará otro número. Quien resuelve el
+   * rastro es {@link obtenerODerivarModeloDeProduccion} —la ÚNICA puerta de producción a esta
+   * función—, y lo hace **una sola vez** para buscar y para escribir. Si algún día aparece otro
+   * llamador, pasa por esa puerta o canoniza antes (`colorCanonico`).
    */
   idColor?: number | null | undefined;
 }
@@ -1379,7 +1386,23 @@ export async function obtenerODerivarModeloDeProduccion(
     };
   }
 
-  const nacido = await derivarModeloDeProduccion(tx, sesion, idModeloDesarrollo, datos);
+  // 🔴🔴 fila 0.168 (§Post-F9.222) — **SE ESCRIBE CON LA MISMA LLAVE CON LA QUE SE BUSCÓ.**
+  //
+  // `datos.idColor` es el color **CRUDO**, el que vino del papel; la búsqueda de arriba usó su
+  // **CANÓNICO** (`idColor`, resuelto al entrar). Pasar `datos` tal cual hacía que el hijo NACIERA
+  // colgado del color ABSORBIDO: se leía en canónico y se escribía en crudo. La siguiente OC del
+  // color bueno no encontraría ese modelo —busca por el canónico— y estrenaría **otro número de 5
+  // dígitos para la misma prenda**, que es exactamente lo que la llave `modelos_linaje_color_unico`
+  // existe para impedir. Y un número no se puede corregir después (D3).
+  //
+  // ⚠️ Se reusa **la misma variable**, no una segunda llamada a `colorCanonico` aquí abajo: una
+  // resolución sola, usada por las dos mitades, es lo único que garantiza que digan lo mismo. Dos
+  // resoluciones independientes podrían contestar distinto si una fusión se confirmara entre las
+  // dos (`READ COMMITTED`), y volveríamos a tener la asimetría por otro camino.
+  const nacido = await derivarModeloDeProduccion(tx, sesion, idModeloDesarrollo, {
+    ...datos,
+    idColor,
+  });
   return { ...nacido, reusado: false };
 }
 

@@ -124,6 +124,20 @@ interface ModeloDeLaOp {
  *
  * ⚠️ Y la frontera se estrecha sola: el camino que Daniel usa —el PDF de C&A— trae **un color por
  * OP**, así que el multicolor sólo aparece por el importador de Excel.
+ *
+ * ---
+ * ## 🔴 PENDIENTE MEDIDO — **fila 0.207**: aquí se deduplica por el color CRUDO
+ *
+ * El `Set` de abajo agrupa por `idColor` **tal como viene**. Si la matriz trae a la vez un color
+ * **absorbido por una fusión** y su **canónico** —que son el MISMO color real— cuenta **dos**, y
+ * este hijo nace MULTICOLOR en vez de ser el hijo de ese color ⇒ cae en la frontera de arriba y el
+ * color acaba produciéndose **bajo dos números**. No es la llave (eso lo cerró la fila 0.168, que
+ * canoniza en `obtenerODerivarModeloDeProduccion`): es **qué identidad se elige antes de buscarla**.
+ *
+ * ✅ Hoy está doblemente tapado —las dos puertas automáticas ya entregan la matriz en canónico
+ * (`importacion-pdf.ts`, `importacion.ts`), así que sólo la captura a mano puede traer los dos ids—
+ * pero **si vas a tocar esta función, ése es el arreglo**: deduplicar por el canónico. Ojo: la
+ * vuelve `async` y con `tx`, y hoy es **pura**.
  */
 export function colorDeIdentidad(lineas: DatosSalidaProduccion['lineas']): number | null {
   const conPiezas = new Set(
@@ -335,6 +349,13 @@ async function resolverModeloDeLaOp(
     // decir ESE nombre; si no, el modelo del color «Blanco Hueso» se llamaría «Blanco Hueso Pantone
     // 14-0002 Tcx Pumice Stone» — el nombre largo que la fusión vino a retirar, pegado a un modelo
     // nuevo.
+    //
+    // 🔑 **fila 0.168 — esa frase de arriba era una PROMESA A MEDIAS hasta hoy, y conviene saberlo.**
+    // El canónico mandaba en la BÚSQUEDA del modelo, sí, pero el que NACÍA se escribía con el color
+    // crudo (`nomenclatura.ts`, camino de nacer): el nombre salía bien y la llave mal. Ya no — la
+    // misma resolución sirve para las dos mitades. El `idColor` que se manda abajo puede seguir
+    // siendo el CRUDO: canonizarlo es trabajo de esa puerta, y hacerlo también aquí serían dos
+    // resoluciones que podrían discrepar.
     //
     // ⚠️ **Hoy esto NO se puede observar desde fuera, y conviene saberlo antes de tocarlo**: una OP
     // NUEVA con un color absorbido no llega a nacer, porque `sincronizarMatriz` la rechaza unas
