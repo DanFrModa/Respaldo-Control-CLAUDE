@@ -71,6 +71,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.171 · 17-sep-2026 · **en prueba** — **Cuando se limpian colores repetidos del catálogo, la prenda que nazca después ya no puede quedarse con dos números de modelo**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Nada nuevo en pantalla: esto es un seguro, y hay que decirlo así.** El sistema ya sabía que
+  *«Blanco Hueso Pantone 14-0002 Tcx Pumice Stone»* y *«Blanco Hueso»* son el mismo color cuando se
+  unifican desde el catálogo. Lo que se arregló es que, **al dar de alta el modelo de producción de
+  ese color**, el programa lo apuntaba al nombre viejo —el que se acababa de retirar— en vez de al
+  que quedó. El resultado habría sido el peor de este módulo: **la misma prenda con dos números de
+  modelo de cinco dígitos**, uno por cada nombre, sin que nadie se enterara. Un número de modelo **no
+  se puede corregir después**, así que el daño habría sido permanente.
+
+### Qué cambió y puede sorprender
+
+- 🔑 **Hoy no había ningún modelo mal: se comprobó camino por camino antes de tocar nada.** Otra
+  validación, la que revisa la matriz de colores de la orden, estaba frenando el caso antes de que
+  llegara — y se midió que lo frena por **las tres** vías por las que puede entrar una orden (la
+  captura a mano, la importación por Excel y la de los PDF de C&A). Se arregló igual porque **ese
+  freno es de otro módulo**: el día que alguien lo mueva, o aparezca una cuarta vía, el error volvería
+  en silencio.
+- 📌 **Ningún dato existente se tocó, ni hacía falta.** No se revisó la base buscando modelos mal
+  apuntados, ni se corrigió nada de lo ya capturado: el arreglo está en la **entrada**, para lo que se
+  dé de alta de aquí en adelante.
+
+### Qué sigue pendiente o roto
+
+- Lo de siempre de esta familia: **el freno que hoy tapa el caso vive en otro módulo**. Ahora las dos
+  mitades están de acuerdo, así que aunque el freno cambie el número seguirá saliendo bien — pero
+  conviene saber que esa dependencia existió.
+- 🔩 **Se arregló un candado de la revisión automática que estaba puesto al revés.** La entrega
+  anterior añadió una comprobación para que una versión que **no cierra nada** del plan lo tenga que
+  decir por escrito. Estaba bien pensada, pero preguntaba mirando **el historial entero** en vez de
+  la entrada de la versión — y como esa declaración se queda escrita para siempre, **la primera
+  entrega posterior que sí cerrara algo (ésta) hacía saltar la alarma sin que nada estuviera mal**.
+  Ya pregunta sólo por la entrada que le toca.
+- 🔧 **Y de paso, un ajuste de taller que no toca el sistema:** a la revisión automática que corre
+  antes de cada entrega se le **amplió el tiempo máximo** (de 70 a 82 minutos). La entrega anterior
+  ya lo había subido, pero **con la cuenta hecha a medias**: se calculó con las corridas que habían
+  terminado hasta ese momento, y poco después acabó otra más lenta que dejaba el margen corto otra
+  vez. Ahora está calculado sobre la corrida lenta de verdad. **No hace el sistema más rápido ni
+  cambia nada de lo que ves**: sólo evita que la revisión se corte sola y parezca que alguien la
+  canceló.
+- 📌 **Queda apuntado un caso hermano, que NO se arregló y se dice a propósito** (fila 0.207): si en
+  una misma orden se capturan **a mano** el color viejo y el que quedó —los dos, en la misma matriz—,
+  el programa los ve como dos colores distintos y da de alta un modelo «de varios colores» en vez del
+  modelo de ese color. Hace falta que pasen **dos cosas a la vez**, y las dos importaciones
+  automáticas ya lo evitan solas, así que no corre prisa; queda escrito para que se arregle cuando
+  alguien vuelva a tocar esa parte.
+- Sin cambios de permisos, sin datos nuevos que sembrar y sin nada que capturar a mano después del
+  despliegue.
+
+---
 ## 0.170 · 17-sep-2026 · **en prueba** — **Se tacha la segunda sospecha del fallo intermitente de las pruebas automáticas (y se dice claro que todavía no sabemos cuál es)**
 
 > **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** Toca sólo las pruebas

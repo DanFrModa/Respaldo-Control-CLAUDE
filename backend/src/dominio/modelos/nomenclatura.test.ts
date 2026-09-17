@@ -829,6 +829,13 @@ function txDerivacion(
    * derivara siempre: el `create` es lo único que las separa.
    */
   hijoExistente: Record<string, unknown> | null = null,
+  /**
+   * ⭐⭐ fila 0.168 — el RASTRO de la fusión de colores: `{ absorbido: canónico }`. Un color que
+   * aparece como clave se devuelve **apagado y apuntando** a su canónico, que es como lo deja
+   * `fusionarColores`; el resto son su propio canónico. Sin esto el doble no puede distinguir
+   * "busca en canónico" de "escribe en crudo", porque los dos ids valdrían lo mismo.
+   */
+  fusiones: Record<number, number> = {},
 ): {
   tx: Tx;
   llamadas: { metodo: string; args: unknown }[];
@@ -883,7 +890,7 @@ function txDerivacion(
     curvaTalla: { findUnique: (args: unknown) => reg('curvaTalla.findUnique', args, activo) },
     proveedor: { findFirst: (args: unknown) => reg('proveedor.findFirst', args, activo) },
     // ⭐ fila 0.159 — el rastro de la fusión de colores: la llave `(desarrollo, color)` se arma con
-    // el CANÓNICO. Aquí no hay ninguna fusión, así que cada color es su propio canónico.
+    // el CANÓNICO. Sin `fusiones` no hay ninguna, así que cada color es su propio canónico.
     color: {
       findMany: (args: unknown) =>
         reg(
@@ -891,9 +898,10 @@ function txDerivacion(
           args,
           ((args as { where: { id: { in: number[] } } }).where.id.in ?? []).map((id) => ({
             id,
-            nombre: 'Rojo',
-            activo: true,
-            idFusionadoEn: null,
+            nombre: fusiones[id] === undefined ? 'Rojo' : 'Rojo Viejo',
+            // Fusionado = apagado y con rastro, que es como lo deja `fusionarColores`.
+            activo: fusiones[id] === undefined,
+            idFusionadoEn: fusiones[id] ?? null,
           })),
         ),
     },
@@ -1297,5 +1305,111 @@ describe('obtenerODerivarModeloDeProduccion — reusa el modelo del color, y si 
     await expect(
       obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 }),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+// ── 🔴🔴 fila 0.168 · LA LLAVE SE LEE Y SE ESCRIBE IGUAL ──────────────────────────────────────
+
+/**
+ * ⭐⭐ **fila 0.168 (§Post-F9.222) — el modelo que NACE se escribe con la MISMA llave con la que se
+ * buscó.**
+ *
+ * La fila 0.159 puso el color CANÓNICO en la búsqueda del reuso (*«¿este color ya tiene modelo?»*)
+ * y dejó el camino de NACER pasando el color CRUDO: se leía en canónico y se escribía en crudo. El
+ * daño es de identidad y silencioso — el hijo quedaba colgado del color que la fusión absorbió, así
+ * que la OC siguiente del color bueno **no lo reconocería** y estrenaría otro de los 999 números de
+ * la serie para la MISMA prenda. Y un número de modelo no se corrige después (D3).
+ *
+ * ⚠️ **Por qué estas pruebas viven aquí y no en el camino de la OP:** desde fuera el caso no se
+ * puede construir. `sincronizarMatriz` rechaza aguas arriba una orden NUEVA con un color apagado
+ * (*«se fusionó en X: captura la orden con X»*) y tumba la transacción entera antes de que nadie
+ * mire el modelo. Esta puerta del dominio sí se puede llamar directo, que es justo lo que la vuelve
+ * medible — y lo que la vuelve peligrosa el día que el tapón de arriba se mueva.
+ */
+describe('⭐⭐ fila 0.168 — el hijo NACE con el color CANÓNICO, no con el que vino del papel', () => {
+  /** El absorbido es el 8; el que de verdad sobrevivió a la fusión es el 9. */
+  const FUSION = { 8: 9 };
+
+  it('🔴 escribe el CANÓNICO en el modelo que nace, no el color absorbido', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, null, FUSION);
+
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 });
+
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    // Si aquí saliera un 8, la llave `modelos_linaje_color_unico` quedaría apuntando a un color que
+    // ya no se puede capturar, y el modelo sería invisible para la búsqueda que lo tiene que reusar.
+    expect(create.data).toMatchObject({ idModeloDesarrollo: 42, idColor: 9 });
+  });
+
+  it('🔴 busca y escribe con el MISMO id: lo que dice el `findFirst` es lo que acaba en la fila', async () => {
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, null, FUSION);
+
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 });
+
+    // La invariante de la fila, dicha tal cual: las dos mitades de la llave, comparadas entre sí.
+    const busqueda = llamadas.find(
+      (l) =>
+        l.metodo === 'modelo.findFirst' &&
+        (l.args as { where?: { idModeloDesarrollo?: number } }).where?.idModeloDesarrollo !==
+          undefined,
+    )?.args as { where: { idColor: number | null } };
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: { idColor: number | null };
+    };
+    expect(create.data.idColor).toBe(busqueda.where.idColor);
+  });
+
+  it('la bitácora del alta anota el color con el que el modelo QUEDÓ, no el del papel', async () => {
+    // A7: la bitácora contesta *"¿por qué el 71004 y el 71005 salieron del mismo desarrollo?"*. Si
+    // dijera el absorbido, señalaría un color distinto del que lleva la fila — y el que capturó el
+    // papel sigue guardado, intacto, en la matriz de la orden (D7).
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, null, FUSION);
+
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 });
+
+    // Se busca POR LA OPERACIÓN: el alta del núcleo (`crearModeloNucleo`) escribe su propia
+    // entrada antes que ésta, así que "la primera bitácora" sería la equivocada.
+    const bitacora = llamadas.find(
+      (l) =>
+        l.metodo === 'bitacora.create' &&
+        (l.args as { data?: { datos?: { operacion?: string } } }).data?.datos?.operacion ===
+          'derivar-modelo-de-produccion',
+    )?.args as { data: { datos: { idColor: number | null } } } | undefined;
+    expect(bitacora).toBeDefined();
+    expect(bitacora!.data.datos.idColor).toBe(9);
+  });
+
+  it('⭐ y el RESTO de `datos` llega intacto al hijo que nace (nº capturado y descripción)', async () => {
+    // El arreglo reemplaza UNA clave de `datos`; el resto tiene que seguir viajando. Sin esta
+    // prueba, quedarse con `{ idColor }` a secas dejaría la llave bien y tiraría en silencio el
+    // número que tecleó la persona y el nombre del color en la descripción.
+    const { tx, llamadas } = txDerivacion(paraDerivar(), null, null, FUSION);
+
+    const salida = await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, {
+      idColor: 8,
+      numeroCapturado: 71_050,
+      descripcion: 'Playera · Rojo',
+    });
+
+    expect(salida).toMatchObject({ numeroProduccion: 71_050, numeroCapturado: true });
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    expect(create.data).toMatchObject({ descripcion: 'Playera · Rojo', idColor: 9 });
+  });
+
+  it('sin fusión de por medio no cambia nada: el color entra y sale igual', async () => {
+    // La otra mitad de la garantía — el 100 % de los colores del catálogo. Si la canonización se
+    // colara donde no toca, este camino es el que lo grita.
+    const { tx, llamadas } = txDerivacion(paraDerivar());
+
+    await obtenerODerivarModeloDeProduccion(tx, SESION_PROMOCION, 42, { idColor: 8 });
+
+    const create = llamadas.find((l) => l.metodo === 'modelo.create')?.args as {
+      data: Record<string, unknown>;
+    };
+    expect(create.data).toMatchObject({ idColor: 8 });
   });
 });

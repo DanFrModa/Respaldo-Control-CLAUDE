@@ -133,6 +133,25 @@ function mutar(arbol: string, relativa: string, viejo: string | RegExp, nuevo: s
   writeFileSync(ruta, partes.join(nuevo), 'utf8');
 }
 
+/**
+ * El trozo del historial que pertenece a UNA versión: desde su encabezado `## 0.xxx ·` hasta el
+ * siguiente `## `.
+ *
+ * 🔴 **Existe por un defecto medido al rebasar la v0.171 sobre la v0.170 (fila 0.168).** La
+ * declaración *«no cierra ninguna fila»* de una versión **se queda en el archivo para siempre**, así
+ * que preguntarle al historial ENTERO por esa frase contesta por TODAS las versiones a la vez.
+ * Acotar a la entrada es lo que hace que la pregunta sea sobre la versión que se está midiendo.
+ */
+function entradaDe(historial: string, version: string): string {
+  const desde = historial.indexOf(`## ${version} ·`);
+  expect(desde, `no encontré la entrada de la v${version} en el historial`).toBeGreaterThanOrEqual(
+    0,
+  );
+  const resto = historial.slice(desde + 3);
+  const hasta = resto.indexOf('\n## ');
+  return hasta === -1 ? resto : resto.slice(0, hasta);
+}
+
 describe('una versión que NO cierra ninguna fila tiene que DECIRLO', () => {
   let arbol: string;
   let version: string;
@@ -159,7 +178,14 @@ describe('una versión que NO cierra ninguna fila tiene que DECIRLO', () => {
     if (!historial.includes(declaracion)) {
       // Esta versión SÍ cierra fila: la rama nueva no aplica y no hay nada que medir aquí.
       // (No se salta la prueba: se afirma el hecho, para que el día que cambie se vea.)
-      expect(historial).not.toContain('no cierra ninguna fila del programa');
+      //
+      // 🔴 **LA ASERCIÓN VA CONTRA LA ENTRADA DE ESTA VERSIÓN, NO CONTRA EL ARCHIVO ENTERO** — y
+      // así nació el arreglo: mirando todo el archivo, la declaración de CUALQUIER versión pasada
+      // ponía esto en rojo. La v0.170 se declaró «sin fila», y **la primera versión posterior que SÍ
+      // cerrara una (la v0.171) reventaba aquí sin que nada estuviera mal**. O sea: este candado, el
+      // día que se escribió, ya estaba abocado a fallar en la entrega siguiente. Medido al rebasar
+      // la v0.171 sobre la v0.170 (fila 0.168).
+      expect(entradaDe(historial, version)).not.toContain('no cierra ninguna fila del programa');
       return;
     }
     mutar(copia, 'HISTORIAL-DE-VERSIONES.md', declaracion, '(declaración retirada por la prueba)');

@@ -50,18 +50,27 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # 70 (17-sep-2026). ⚠️⚠️ TERCERA VEZ. Las notas de abajo se conservan enteras porque cuentan
-    # las dos anteriores y son IDÉNTICAS a ésta: la suite crece, el techo se queda, y el fallo NO
-    # se ve como lo que es.
+    # 82 (17-sep-2026, MISMO DÍA que el 70 de abajo). ⚠️⚠️ TERCERA VEZ —y la corrección de la
+    # tercera—. Las notas de abajo se conservan enteras porque cuentan las dos anteriores y son
+    # IDÉNTICAS a ésta: la suite crece, el techo se queda, y el fallo NO se ve como lo que es.
     #
-    # 🔴 LO MEDIDO HOY, antes de tocar nada (que es justo lo que la nota de abajo manda hacer):
+    # 🔴🔴 POR QUÉ EL 70 DURÓ UNAS HORAS: **SE CALCULÓ CON DATOS INCOMPLETOS.** Se aplicó la regla
+    # sobre la corrida sana más larga que se conocía **en ese momento** (38.7 min ⇒ 66 ⇒ 70). Poco
+    # después terminó otra, sana y más lenta: **48.1 min**. Las cuatro del día:
+    # **38.7 · 32.3 · 45.3 (cortada por el reloj) · 48.1**.
+    # ⇒ Con la peor SANA de verdad: **48.1 × 1.7 ≈ 82**. Un techo de 70 sobre 48.1 deja **45 %**,
+    # por debajo del 70 % que la regla pide, y la 48.1 ya se habría comido el techo viejo de 45.
+    #
+    # 📌 LA LECCIÓN, que es la MISMA de las tres veces anteriores en otra forma: no basta con
+    # aplicar la regla, hay que aplicarla sobre la **medición completa**. Dejar el techo «justo lo
+    # suficiente» con lo que se sabía a esa hora es exactamente cómo se llega a la cuarta vez.
+    # **Antes de recalcular este número, espera a que terminen las corridas en vuelo.**
+    #
+    # 🔴 LO MEDIDO ESE DÍA, antes de tocar nada (que es justo lo que la nota de abajo manda hacer):
     # el `backend` del PR #374 salió `cancelled` tras **45.3 min** contra un techo de 45 ⇒ el
     # reloj, no interferencia. Nadie empujó a esa rama y el PR **ni siquiera toca `backend/`**.
-    # Las dos corridas verdes del mismo día: **38.7 min** (#372) y **32.3 min** (#373).
-    # ⇒ margen sobre la peor sana: **16 %** — *la misma cifra que el 25-ago*, cuando la nota de
-    # abajo la llamó «demasiado estrecho». La suite pasó de ~3.900 pruebas y el techo se quedó.
     #
-    # Aplicando la regla escrita abajo (**tope ≈ 1.7× la duración sana**): 38.7 × 1.7 ≈ **66** ⇒ 70.
+    # Aplicando la regla escrita abajo (**tope ≈ 1.7× la duración sana**): 48.1 × 1.7 ≈ **82**.
     #
     # ⚠️ Y CUMPLIENDO SU PROPIA ADVERTENCIA: subir el tope NO arregla nada, **destapa**. Hay que
     # volver a mirar la corrida COMPLETA y en qué PASO muere, no darla por verde. La deuda real
@@ -104,7 +113,7 @@ jobs:
     # 305 archivos y 4,241 pruebas**, y la muerte fue DOS PASOS después, en `npm run build`. Se
     # perdió tiempo buscando fugas de memoria en las pruebas de integración —que no tenían
     # ninguna— porque se leyó el fallo del job sin mirar en qué paso ocurrió.
-    timeout-minutes: 70
+    timeout-minutes: 82
     defaults:
       run:
         working-directory: backend
