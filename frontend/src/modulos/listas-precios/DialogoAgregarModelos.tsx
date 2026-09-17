@@ -1,5 +1,5 @@
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useTiposProductoActivos } from '@/api/calidad';
@@ -130,19 +130,63 @@ export function DialogoAgregarModelos({
 
   // ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — al elegir un PROYECTO, su género y su año de entrega
   // precargan los campos del modelo nuevo: *«que no vuelva a preguntar»*. Se pueden cambiar aquí
-  // mismo (*«con opción a cambiarla»*), y si el proyecto no los trae —los anteriores a esta fila no
-  // los tienen, REGLA 0-B— no se toca nada y se capturan como siempre.
+  // mismo (*«con opción a cambiarla»*).
+  //
+  // 🔴 RONDA 2 — **SE ESCRIBEN LOS DOS SIEMPRE, y el efecto depende del ID del proyecto.**
+  //
+  // La primera versión sólo escribía *cuando el proyecto nuevo TRAÍA el dato*, y eso dejaba pegado
+  // lo del proyecto anterior: elegir «Primavera 27» (Niño/2027), darse cuenta del error y elegir
+  // «Otoño 26» —que no tiene ninguno de los dos— dejaba los campos diciendo **Niño / 2027**, y se
+  // enviaban así. Sale un código con el género y el año **de otro proyecto**, y un código acuñado
+  // **no se puede corregir** (D3).
+  //
+  // ⚠️ Y el agravante es la promesa de esta misma fila: *«que no vuelva a preguntar»* **entrena al
+  // usuario a no mirar estos dos campos**. Un valor obsoleto en un campo que el sistema acaba de
+  // enseñar a ignorar es peor que un campo vacío.
+  //
+  // ⚠️ La versión anterior justificaba el «no tocar nada» citando la REGLA 0-B, y **ahí la cita no
+  // aplicaba**: la 0-B habla de no reparar DATOS viejos, no de dejar ESTADO viejo en un formulario.
+  //
+  // Depender del **id** (y no de los valores) es lo que hace que volver a un proyecto sin datos
+  // dispare el efecto: si dependiera de los valores, pasar de `1/2027` a `null/null` tampoco
+  // volvería a correr con la guarda quitada. Con `PROYECTO_NUEVO` o sin elegir nada no se toca: no
+  // hay proyecto del que heredar y lo tecleado es del usuario.
+  // 🔑 Y lo que hace que el barrido no se lleve por delante lo que el usuario TECLEÓ: se recuerda
+  // qué valor dejó la precarga, y al cambiar de proyecto sólo se limpia el campo **si sigue
+  // teniendo ese valor**. Si la persona lo cambió a mano, manda ella.
+  //
+  // ⚠️ Esto no es un adorno: sin ello el arreglo rompía el camino más normal de la pantalla
+  // —elegir tipo y género PRIMERO y el proyecto DESPUÉS—, borrando el género recién elegido. Lo
+  // cazó una prueba que ya existía.
+  const precargado = useRef<{ genero: string; anio: string } | null>(null);
   const proyectoElegido = proyectosVivos.find((p) => String(p.id) === idProyecto);
-  const idGeneroDelProyecto = proyectoElegido?.idGenero ?? null;
-  const anioDelProyecto = proyectoElegido?.anioEntrega ?? null;
+  const idProyectoElegido = proyectoElegido?.id ?? null;
   useEffect(() => {
-    if (idGeneroDelProyecto !== null) {
-      setIdGenero(String(idGeneroDelProyecto));
+    if (idProyectoElegido === null) {
+      return;
     }
-    if (anioDelProyecto !== null) {
-      setAnio(String(anioDelProyecto));
-    }
-  }, [idGeneroDelProyecto, anioDelProyecto]);
+    const elegido = proyectosVivos.find((p) => p.id === idProyectoElegido);
+    const generoDelProyecto = elegido?.idGenero == null ? null : String(elegido.idGenero);
+    const anioDelProyecto = elegido?.anioEntrega == null ? null : String(elegido.anioEntrega);
+    const anterior = precargado.current;
+
+    setIdGenero((actual) => {
+      if (generoDelProyecto !== null) return generoDelProyecto; // el proyecto nuevo manda
+      // No trae género: se limpia SÓLO lo que había puesto la precarga anterior.
+      return anterior !== null && actual === anterior.genero ? '' : actual;
+    });
+    setAnio((actual) => {
+      if (anioDelProyecto !== null) return anioDelProyecto;
+      return anterior !== null && actual === anterior.anio
+        ? String(new Date().getFullYear())
+        : actual;
+    });
+
+    precargado.current = { genero: generoDelProyecto ?? '', anio: anioDelProyecto ?? '' };
+    // Sólo el ID manda. `proyectosVivos` se relee dentro a propósito: su identidad cambia en cada
+    // render y ponerlo como dependencia volvería a disparar el efecto pisando lo recién tecleado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idProyectoElegido]);
   // ⭐ La comprobación que evita que truene enfrente del cliente (ver el encabezado).
   // ⚠️ Se compara contra la CADENA VACÍA además del null: el dominio rechaza las dos
   // (`nomenclatura.ts`, «no tiene ABREVIATURA capturada»). Hoy la columna nunca guarda '' —el Zod

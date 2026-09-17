@@ -588,6 +588,119 @@ describe('crearModeloEnLista — cotizar en la cita un modelo que no existe', ()
       expect(creado.codigoModelo).toMatch(/^CYA-27-71-\d{3}$/);
     });
 
+    // 🔴 RONDA 2 — LA BITÁCORA TIENE QUE DECIR DE DÓNDE SALIÓ EL CÓDIGO.
+    //
+    // Esta puerta acuñaba `CYA-27-71-001` con el año HEREDADO del proyecto y después registraba el
+    // año **crudo** de la petición, que en ese camino vale `undefined` ⇒ la clave ni siquiera
+    // llegaba al renglón: el código decía `27` y la auditoría no decía por qué.
+    //
+    // 🔑 Es una REGRESIÓN de esta fila, no deuda vieja: antes el esquema exigía `anioEntrega`
+    // siempre, así que el crudo SIEMPRE era un número. Volverlo opcional —que es el punto de la
+    // fila— lo dejó vacío **exactamente en el camino nuevo**. Y la puerta gemela
+    // (`desarrollos.ts`) ya lo hacía bien, que es lo que lo vuelve indefendible.
+    it('🔴 la BITÁCORA registra el año y el género RESUELTOS, y de dónde salieron', async () => {
+      const { idLista } = await listaConUnModelo();
+      const proyecto = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto con memoria',
+          idGenero: caballero.id,
+          anioEntrega: 2027,
+        },
+        bd(),
+      );
+
+      const creado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        { idTipoProducto: pantalon.id, idProyecto: proyecto.id },
+        bd(),
+      );
+      expect(creado.codigoModelo).toMatch(/^CYA-27-71-\d{3}$/);
+
+      const renglon = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Desarrollo', idEntidad: String(creado.idDesarrollo), accion: 'CREAR' },
+      });
+      const anotado = renglon.datos as Record<string, unknown>;
+      // El `27` del código sale de aquí: sin esto, la auditoría no explica el código que acuñó.
+      expect(anotado['anioEntrega']).toBe(2027);
+      expect(anotado['idGenero']).toBe(caballero.id);
+      expect(anotado['heredadoDelProyecto']).toEqual({ genero: true, anioEntrega: true });
+      expect(anotado['origenGenero']).toBe('proyecto');
+    });
+
+    // ⭐ El tercer origen que SÓLO tiene esta puerta: el género del modelo COPIADO. La puerta
+    // gemela no lo tiene (allí no se copia), así que un booleano «heredado del proyecto» sí/no
+    // sería mentira a medias: diría `false` tanto para lo tecleado como para lo copiado.
+    it('🔴 la BITÁCORA distingue los TRES orígenes del género (tecleado / copiado / proyecto)', async () => {
+      const { idLista } = await listaConUnModelo();
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+      const proyecto = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto de caballero',
+          idGenero: caballero.id,
+          anioEntrega: 2026,
+        },
+        bd(),
+      );
+      const origen = await cliente.modelo.create({
+        data: {
+          codigo: 'MOD-DAMA-BITACORA',
+          maquilaBase: 10,
+          idTipoProducto: pantalon.id,
+          idGenero: dama.id,
+        },
+      });
+
+      const copiado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        { idModeloOrigen: origen.id, idProyecto: proyecto.id },
+        bd(),
+      );
+      const renglonCopiado = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Desarrollo', idEntidad: String(copiado.idDesarrollo), accion: 'CREAR' },
+      });
+      const anotadoCopiado = renglonCopiado.datos as Record<string, unknown>;
+      expect(anotadoCopiado['idGenero']).toBe(dama.id);
+      expect(anotadoCopiado['origenGenero']).toBe('modelo-copiado');
+      // El año SÍ vino del proyecto aunque el género no: los dos se anotan por separado.
+      expect(anotadoCopiado['anioEntrega']).toBe(2026);
+      expect(anotadoCopiado['heredadoDelProyecto']).toEqual({
+        genero: false,
+        anioEntrega: true,
+      });
+
+      const tecleado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        {
+          idTipoProducto: pantalon.id,
+          idGenero: dama.id,
+          anioEntrega: 2029,
+          idProyecto: proyecto.id,
+        },
+        bd(),
+      );
+      const renglonTecleado = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Desarrollo', idEntidad: String(tecleado.idDesarrollo), accion: 'CREAR' },
+      });
+      const anotadoTecleado = renglonTecleado.datos as Record<string, unknown>;
+      expect(anotadoTecleado['origenGenero']).toBe('capturado');
+      expect(anotadoTecleado['anioEntrega']).toBe(2029);
+      expect(anotadoTecleado['heredadoDelProyecto']).toEqual({
+        genero: false,
+        anioEntrega: false,
+      });
+    });
+
     it('el MODELO COPIADO gana al proyecto (copiar es un acto sobre una prenda concreta)', async () => {
       const { idLista } = await listaConUnModelo();
       const dama = await cliente.genero.create({

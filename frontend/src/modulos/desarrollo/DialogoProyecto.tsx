@@ -172,9 +172,16 @@ export function DialogoProyecto({
   // ⭐ fila 0.155 — `useContactosCliente` ya pide sólo los ACTIVOS. El proyecto viejo cuyo
   // comprador se archivó conservaría un id que no está en la lista: se muestra su nombre igual
   // (abajo) para que editar el nombre del proyecto no lo borre sin avisar.
+  //
+  // 🟡 RONDA 2 — **`!contactos.isPending` no es cosmética: sin ella la etiqueta MIENTE.**
+  // Mientras la consulta está en vuelo, `contactos.data` es `undefined` ⇒ la lista está vacía ⇒
+  // «no está entre los activos» es cierto para TODOS, y cualquier proyecto con comprador pintaba
+  // «Ana Ruiz (archivado)» hasta que resolvía. Es transitorio, pero es una etiqueta afirmando algo
+  // falso sobre una persona, y quien la lea de reojo se lo cree.
   const contactosActivos = contactos.data ?? [];
   const idCompradorActual = formulario.watch('idClienteContacto');
   const compradorArchivado =
+    !contactos.isPending &&
     idCompradorActual !== '' &&
     !contactosActivos.some((c) => String(c.id) === idCompradorActual) &&
     proyecto?.comprador !== null &&

@@ -1384,6 +1384,64 @@ describe('crearDesarrolloConModeloNuevo', () => {
       expect(segundo.codigoModelo).toBe('CYA-26-71-002');
     });
 
+    // ⭐ RONDA 2 — LA RED QUE A ESTA PUERTA LE FALTABA.
+    //
+    // La bitácora de ESTA puerta ya registraba el año y el género RESUELTOS y de dónde salieron;
+    // la de la mesa no, y por eso perdía el año justo al heredarlo. Al arreglar aquella se midió
+    // lo obvio: **a ésta nadie la estaba cuidando tampoco** —ninguna prueba leía su renglón—, así
+    // que estaba a un descuido de repetir el mismo defecto. Las dos puertas quedan medidas.
+    it('la BITÁCORA registra el año y el género RESUELTOS, y que se heredaron', async () => {
+      const idProyecto = await proyectoConHerencia(2027);
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id },
+        bd(),
+      );
+      expect(desarrollo.codigoModelo).toBe('CYA-27-71-001');
+
+      const renglon = await cliente.bitacora.findFirstOrThrow({
+        where: {
+          entidad: 'Desarrollo',
+          idEntidad: String(desarrollo.id),
+          accion: 'CREAR',
+        },
+      });
+      const anotado = renglon.datos as Record<string, unknown>;
+      // El `27` del código sale de aquí.
+      expect(anotado['anioEntrega']).toBe(2027);
+      expect(anotado['idGenero']).toBe(caballero.id);
+      expect(anotado['heredadoDelProyecto']).toEqual({ genero: true, anioEntrega: true });
+    });
+
+    it('la BITÁCORA distingue lo TECLEADO de lo heredado', async () => {
+      const idProyecto = await proyectoConHerencia(2026);
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id, idGenero: dama.id },
+        bd(),
+      );
+
+      const renglon = await cliente.bitacora.findFirstOrThrow({
+        where: {
+          entidad: 'Desarrollo',
+          idEntidad: String(desarrollo.id),
+          accion: 'CREAR',
+        },
+      });
+      const anotado = renglon.datos as Record<string, unknown>;
+      expect(anotado['idGenero']).toBe(dama.id);
+      // El género lo puso quien capturó; el año sí vino del proyecto. Se anotan por separado.
+      expect(anotado['heredadoDelProyecto']).toEqual({ genero: false, anioEntrega: true });
+      expect(anotado['anioEntrega']).toBe(2026);
+    });
+
     // REGLA 0-B: un proyecto anterior a esta fila no tiene género ni año, y eso NO es un defecto.
     // Lo que el sistema NO puede hacer es inventarlos: rechaza diciendo dónde capturarlos.
     it('si NI la llamada NI el proyecto traen género, rechaza y no crea nada', async () => {

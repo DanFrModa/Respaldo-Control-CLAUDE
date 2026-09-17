@@ -174,6 +174,16 @@ async function exigirMesaAbierta(tx: Tx, idLista: number, idEmpresa: number): Pr
 }
 
 /** El proyecto donde queda el desarrollo (uno existente, o el que se acaba de crear). */
+/**
+ * ⭐ RONDA 2 de la fila 0.155 — DE DÓNDE SALIÓ EL GÉNERO del modelo nuevo, para la bitácora.
+ *
+ * Esta puerta tiene **TRES** orígenes posibles (la gemela `crearDesarrolloConModeloNuevo` sólo
+ * tiene dos, porque allí no se copia), así que un booleano «¿lo heredó del proyecto?» sería una
+ * verdad a medias: diría `false` tanto para lo que alguien tecleó como para lo que vino del modelo
+ * copiado, que son actos distintos y con responsables distintos.
+ */
+type OrigenGenero = 'capturado' | 'modelo-copiado' | 'proyecto';
+
 interface ProyectoDeLaMesa {
   id: number;
   folio: number;
@@ -352,7 +362,7 @@ function resolverDosDigitos(
   datos: DatosModeloNuevoEnLista,
   origen: ModeloOrigen | null,
   proyecto: ProyectoDeLaMesa,
-): { idTipoProducto: number; idGenero: number } {
+): { idTipoProducto: number; idGenero: number; origenGenero: OrigenGenero } {
   const idTipoProducto = datos.idTipoProducto ?? origen?.idTipoProducto ?? null;
   const idGenero = datos.idGenero ?? origen?.idGenero ?? proyecto.idGenero ?? null;
   if (idTipoProducto === null || idGenero === null) {
@@ -364,7 +374,16 @@ function resolverDosDigitos(
             `Elígelo aquí (o captúraselo a él en su ficha).`,
     );
   }
-  return { idTipoProducto, idGenero };
+  // ⭐ El ORIGEN se decide AQUÍ, con la misma cadena que eligió el valor, y no se recalcula en el
+  // llamador: dos copias de esta precedencia acabarían diciendo cosas distintas, que es justo el
+  // modo de fallo que la bitácora tiene que evitar.
+  const origenGenero: OrigenGenero =
+    datos.idGenero !== undefined
+      ? 'capturado'
+      : origen?.idGenero != null
+        ? 'modelo-copiado'
+        : 'proyecto';
+  return { idTipoProducto, idGenero, origenGenero };
 }
 
 /**
@@ -411,7 +430,7 @@ export async function crearModeloEnLista(
 
     const origen =
       datos.idModeloOrigen === undefined ? null : await leerModeloOrigen(tx, datos.idModeloOrigen);
-    const { idTipoProducto, idGenero } = resolverDosDigitos(datos, origen, proyecto);
+    const { idTipoProducto, idGenero, origenGenero } = resolverDosDigitos(datos, origen, proyecto);
 
     // ⭐ fila 0.155 — el año: lo tecleado gana; si no, el del proyecto. El esquema ya exige teclearlo
     // cuando el proyecto se crea aquí mismo (no habría de quién heredarlo), así que llegar sin uno
@@ -498,7 +517,25 @@ export async function crearModeloEnLista(
         proyectoCreado: proyecto.creado,
         idModelo: modelo.id,
         codigoDesarrollo: codigo,
-        anioEntrega: datos.anioEntrega,
+        // 🔴 RONDA 2 — EL AÑO Y EL GÉNERO **RESUELTOS**, no los crudos de la petición.
+        //
+        // Aquí decía `datos.anioEntrega`, el crudo. Mientras el esquema lo exigía siempre eso daba
+        // igual; esta fila lo volvió OPCIONAL —su punto entero— y entonces vale `undefined`
+        // **exactamente en el camino nuevo, el de heredar**: el código salía `CYA-27-71-001` y el
+        // renglón de auditoría ni siquiera traía la clave `anioEntrega`. O sea: el sistema acuñaba
+        // un número irrepetible y no dejaba escrito de dónde salió el `27`.
+        //
+        // 🔑 La puerta gemela (`desarrollos.ts`) ya registraba el resuelto + `idGenero` +
+        // `heredadoDelProyecto`. Esto la alcanza, y añade lo que sólo esta puerta necesita
+        // ({@link OrigenGenero}): aquí el género puede venir del MODELO COPIADO, un tercer origen
+        // que allá no existe.
+        anioEntrega,
+        idGenero,
+        heredadoDelProyecto: {
+          genero: origenGenero === 'proyecto',
+          anioEntrega: datos.anioEntrega === undefined,
+        },
+        origenGenero,
         copiadoDeIdModelo: origen?.id ?? null,
         copiadoDeCodigo: origen?.codigo ?? null,
         receta: aJsonBitacora(receta),
