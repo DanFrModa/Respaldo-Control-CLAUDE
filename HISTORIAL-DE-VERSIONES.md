@@ -71,6 +71,44 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.167 · 16-sep-2026 · **en prueba** — **Una red automática impide que vuelva a aparecer el fallo de «se guardó, pero te digo que no tienes permiso»**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Nada nuevo se puede hacer: lo que esta versión hace es que lo arreglado no se pierda.** Los
+  **53 sitios** donde el sistema guardaba algo y a continuación decía «no tienes permiso» quedaron
+  arreglados en las cuatro versiones anteriores. Pero nada impedía que el fallo volviera a colarse en
+  la siguiente función que alguien escribiera — **que es exactamente como nacieron los 53, todos
+  escritos de buena fe**.
+- ⭐ **Desde hoy hay una comprobación automática que lo caza sola**, en cada revisión del código,
+  antes de que llegue a nadie. Si alguien vuelve a escribir el patrón, el sistema **se pone en rojo y
+  le dice qué función es, en qué archivo, qué permisos están en conflicto y cómo se arregla**. Tarda
+  dos segundos y nadie tiene que acordarse de lanzarla.
+- 🔑 **Y la prueba de que sirve no es una opinión**: se corrió contra el sistema **tal como estaba
+  antes de los arreglos** y **cazó los 53**, repartidos exactamente como las cuatro entregas los
+  describen. Contra el sistema de hoy sale limpia.
+
+### Qué cambió y puede sorprender
+
+- **No cambia ninguna pantalla ni ningún comportamiento.** Es una herramienta de control de calidad;
+  el usuario del sistema no la ve nunca. Sólo la ve quien programa, y sólo cuando se equivoca.
+- ⚠️ **Sabe distinguir los casos que PARECEN el fallo y no lo son.** Hay nueve operaciones de pagos e
+  inventario cíclico que dejan pasar a quien trae la llave de escribir; a simple vista parecen tener
+  el defecto. La red las reconoce y **no las marca**. Eso importa: una alarma que suena cuando no
+  pasa nada acaba desconectada, y entonces no protege de nada.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **La red tiene límites, y están escritos a propósito** en vez de callados. No vigila lo que
+  entra por fuera de las pantallas (procesos de fondo, cargas de datos), ni las llamadas que ocurren
+  **dentro** de una operación que se deshace entera si algo falla. Esa última es deliberada: ahí no
+  hay daño, porque no queda nada guardado. **El precio es que un caso concreto** —una comprobación
+  que protege la creación de un modelo en la mesa de negociación— **no queda vigilada por la red**, y
+  sigue dependiendo de que nadie borre el aviso que tiene escrito al lado.
+- **Sigue pendiente la decisión sobre los permisos** (ver la versión anterior): el sistema tiene tres
+  formas distintas de resolver este mismo asunto conviviendo, y cuál debe valer es una decisión del
+  negocio.
+
 ## 0.166 · 16-sep-2026 · **en prueba** — **Tampoco al EDITAR: cambiar una orden, una compra, un pedido, un desarrollo o el estado de resultados ya no termina en «no tienes permiso» con el cambio hecho**
 
 ### Qué se puede hacer ahora que antes no
@@ -86,8 +124,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   persona sin saber si su cambio entró**: la pantalla decía que no tenía permiso y el cambio ya
   estaba guardado. Quien lo sufría volvía a entrar a comprobarlo… y para comprobarlo hacía falta
   justo el permiso que no tenía.
-- ⭐ **Con esto la familia queda cerrada.** Son **48 sitios** fuera de Ruta Critíca — 5 + 8 + 21 + 19,
-  repartidos en las cuatro entregas de estos dos días. Y lo que se comprobó **cuatro veces, con
+- ⭐ **Con esto la familia queda cerrada.** Son **53 sitios** en total, repartidos en las cuatro
+  entregas de estos dos días: 5 de Ruta Crítica + 8 de producción + 21 de altas + 19 de ediciones.
+  *(El censo que se cita como «48» son los mismos **sin** los de Ruta Crítica, porque se midió
+  después de cerrarlos: 8 + 21 + 19 = 48, y 48 + 26 descartados = los 74 candidatos de partida.)* Y lo que se comprobó **cuatro veces, con
   cuatro instrumentos distintos y por cuatro personas distintas**, es que **no queda ninguno suelto**:
   las cuatro mediciones dieron exactamente los mismos 22 casos restantes, y los 22 son los que ya
   estaban descartados con su razón escrita.
