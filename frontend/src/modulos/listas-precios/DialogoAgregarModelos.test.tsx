@@ -28,7 +28,15 @@ vi.mock('@/api/calidad', () => ({
   useTiposProductoActivos: () => ({ data: { datos: [{ id: 7, nombre: 'Pantalón' }] } }),
 }));
 vi.mock('@/api/modelos', () => ({
-  useGeneros: () => ({ data: [{ id: 1, nombre: 'Caballero' }] }),
+  // ⭐ RONDA 3 — el segundo género no es adorno: con UNO SOLO no se puede escribir la prueba que
+  // mide la rama del GÉNERO (hace falta que la persona lo cambie a un valor DISTINTO del que dejó
+  // la precarga), y sin esa prueba la mutación de esa rama sobrevivía. Medido, no supuesto.
+  useGeneros: () => ({
+    data: [
+      { id: 1, nombre: 'Caballero' },
+      { id: 2, nombre: 'Dama' },
+    ],
+  }),
 }));
 vi.mock('@/api/proyectos', () => ({
   useProyectos: () => ({
@@ -266,6 +274,74 @@ describe('<DialogoAgregarModelos> — la mesa abierta (§Post-F9.152)', () => {
 
     expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
     expect(screen.getByTestId('agregar-anio')).toHaveValue('2030');
+  });
+
+  // ⭐ El caso de en medio: PRECARGA, la persona lo cambia A MANO, y luego cambia de proyecto.
+  // Lo suyo manda. Es el único camino donde la comparación contra el valor precargado decide.
+  //
+  // 🔑 RONDA 3 — **esta rama sobrevivía a todas las mutaciones.** Las dos pruebas de al lado tocan
+  // los EXTREMOS (nunca hubo precarga · el valor sigue siendo el de la precarga); ninguna medía el
+  // de en medio, que es justo lo que la condición `actual === anterior.X` existe para resolver —y
+  // el que el primer intento de arreglo rompió—. Mutar `return anterior !== null ? '' : actual`
+  // dejaba las 13 pruebas en verde.
+  //
+  // ⚠️ Ésta mide sólo el AÑO. Su gemela de abajo mide el GÉNERO, y hacen falta LAS DOS: son dos
+  // `setX` con dos condiciones distintas, así que una sola prueba deja la otra rama sin red. Se
+  // midió: con sólo ésta, mutar la condición del género daba 15/15 EN VERDE.
+  it('⭐ lo tecleado DESPUÉS de una precarga sobrevive al cambio de proyecto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+
+    await usuario.clear(screen.getByTestId('agregar-anio'));
+    await usuario.type(screen.getByTestId('agregar-anio'), '2031');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2031');
+  });
+
+  // ⭐ RONDA 3, la GEMELA — la misma rama de en medio, pero en el campo de GÉNERO.
+  //
+  // 🔑 No es una copia por simetría: la rama del género es un `setIdGenero` aparte, con su propia
+  // condición. Mutarla mientras sólo existía la prueba del año dejaba la suite entera **en verde**
+  // (15/15). Una prueba por condición.
+  it('⭐ el género elegido DESPUÉS de una precarga también sobrevive al cambio de proyecto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+
+    // La persona corrige el género que dejó la precarga.
+    await usuario.selectOptions(screen.getByTestId('agregar-genero'), '2');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('2');
+  });
+
+  // ⭐ RONDA 3 — la guarda `if (idProyectoElegido === null) return;` tampoco la medía nadie, y el
+  // comentario del código afirma explícitamente lo contrario de lo que pasaría sin ella: una
+  // decisión escrita que nada verificaba. Con «➕ Proyecto nuevo…» no hay proyecto del que heredar,
+  // así que lo que ya esté puesto es del usuario y NO se toca.
+  it('⭐ pasar a «proyecto nuevo» NO borra lo que la precarga dejó puesto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), 'nuevo');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
   });
 
   it('🔴 un cliente SIN ABREVIATURA se avisa ANTES y el botón queda apagado (no truena en la cita)', async () => {

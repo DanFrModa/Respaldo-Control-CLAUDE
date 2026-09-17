@@ -173,7 +173,6 @@ async function exigirMesaAbierta(tx: Tx, idLista: number, idEmpresa: number): Pr
   };
 }
 
-/** El proyecto donde queda el desarrollo (uno existente, o el que se acaba de crear). */
 /**
  * ⭐ RONDA 2 de la fila 0.155 — DE DÓNDE SALIÓ EL GÉNERO del modelo nuevo, para la bitácora.
  *
@@ -184,6 +183,7 @@ async function exigirMesaAbierta(tx: Tx, idLista: number, idEmpresa: number): Pr
  */
 type OrigenGenero = 'capturado' | 'modelo-copiado' | 'proyecto';
 
+/** El proyecto donde queda el desarrollo (uno existente, o el que se acaba de crear). */
 interface ProyectoDeLaMesa {
   id: number;
   folio: number;
