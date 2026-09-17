@@ -50,9 +50,22 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # 45 (25-ago-2026). ⚠️ ES LA SEGUNDA VEZ QUE PASA ESTO — la nota de abajo se conserva porque
-    # cuenta la primera, idéntica: la suite crece, el techo se queda, y el fallo NO se ve como lo
-    # que es.
+    # 70 (17-sep-2026). ⚠️⚠️ TERCERA VEZ. Las notas de abajo se conservan enteras porque cuentan
+    # las dos anteriores y son IDÉNTICAS a ésta: la suite crece, el techo se queda, y el fallo NO
+    # se ve como lo que es.
+    #
+    # 🔴 LO MEDIDO HOY, antes de tocar nada (que es justo lo que la nota de abajo manda hacer):
+    # el `backend` del PR #374 salió `cancelled` tras **45.3 min** contra un techo de 45 ⇒ el
+    # reloj, no interferencia. Nadie empujó a esa rama y el PR **ni siquiera toca `backend/`**.
+    # Las dos corridas verdes del mismo día: **38.7 min** (#372) y **32.3 min** (#373).
+    # ⇒ margen sobre la peor sana: **16 %** — *la misma cifra que el 25-ago*, cuando la nota de
+    # abajo la llamó «demasiado estrecho». La suite pasó de ~3.900 pruebas y el techo se quedó.
+    #
+    # Aplicando la regla escrita abajo (**tope ≈ 1.7× la duración sana**): 38.7 × 1.7 ≈ **66** ⇒ 70.
+    #
+    # ⚠️ Y CUMPLIENDO SU PROPIA ADVERTENCIA: subir el tope NO arregla nada, **destapa**. Hay que
+    # volver a mirar la corrida COMPLETA y en qué PASO muere, no darla por verde. La deuda real
+    # —que el backend tarde 30-40 min— sigue anotada en `HOJA-DE-RUTA.md` §4.
     #
     # 🔴 CÓMO SE VE, Y POR QUÉ ENGAÑA: al agotarse `timeout-minutes`, GitHub marca el job como
     # **`cancelled`**, exactamente igual que si alguien hubiera matado la corrida a mano o la
@@ -91,7 +104,7 @@ jobs:
     # 305 archivos y 4,241 pruebas**, y la muerte fue DOS PASOS después, en `npm run build`. Se
     # perdió tiempo buscando fugas de memoria en las pruebas de integración —que no tenían
     # ninguna— porque se leyó el fallo del job sin mirar en qué paso ocurrió.
-    timeout-minutes: 45
+    timeout-minutes: 70
     defaults:
       run:
         working-directory: backend

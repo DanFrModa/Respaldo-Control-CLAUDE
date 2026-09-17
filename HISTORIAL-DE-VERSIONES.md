@@ -71,6 +71,72 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.170 · 17-sep-2026 · **en prueba** — **Se tacha la segunda sospecha del fallo intermitente de las pruebas automáticas (y se dice claro que todavía no sabemos cuál es)**
+
+> **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** Toca sólo las pruebas
+> automáticas que corren antes de cada entrega. Está aquí porque **cada entrega sube de versión**.
+>
+> 📌 **La v0.170 no cierra ninguna fila del programa**, y es a propósito: arregla un defecto de una
+> prueba automática **sin** dar por resuelto el fallo intermitente al que ese defecto pertenece (la
+> fila **0.169** sigue abierta, porque su causa sigue sin medirse). *Esta frase no es adorno: el
+> verificador de documentos la exige. Antes daba por hecho que toda versión cierra una fila, y una
+> versión que no cierra ninguna tiene que **decirlo**, no callarlo.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Ninguna función del sistema cambia con esta versión: ni catálogos, ni
+  pedidos, ni producción, ni finanzas.
+- **Lo que mejora es la fiabilidad de la revisión automática.** Una de las pruebas del flujo de
+  pedidos cerraba un panel deslizante y **se iba a la siguiente pantalla sin esperar a que el panel
+  terminara de cerrarse**. Eso estaba mal por sí solo —era pedirle a la prueba que corriera sobre una
+  pantalla a medio cerrar— y ahora **espera**, usando la misma forma de esperar que ya usaban las
+  pruebas de modelos y de proveedores.
+- **Y no era la única: se buscaron todas las de su clase y se arreglaron las que lo eran.** Se
+  revisaron **los nueve** sitios de las pruebas que cierran una ventana con la tecla Escape; **seis
+  ya esperaban bien** y **tres no** (los tres en la prueba de listas de precios). Uno de ellos era
+  peor que el del pedido: cerraba la ventana de arriba y **seguía tecleando en la de abajo**, con la
+  de arriba aún encima. Los tres esperan ya.
+- **El aviso que revisa los documentos aprendió un caso que no sabía manejar.** Daba por hecho que
+  **toda** versión cierra algún pendiente del plan, y ésta no cierra ninguno a propósito. Ahora
+  acepta ese caso **pero exige decirlo con todas las letras en la entrada de la versión** — si se
+  calla, sigue en rojo, y el mensaje te dice exactamente qué escribir.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Lo importante de esta versión es lo que NO afirma.** Ese arreglo **no se está presentando como
+  la causa** del fallo intermitente. **No se puede afirmar**: la evidencia de la última caída (la
+  grabación que guarda el servidor de pruebas) **caducó el 15 de septiembre** y ya no existe. Se
+  arregla porque estaba mal, no porque sepamos que era eso.
+- 🔑 **Y por eso vale la pena contarlo:** este fallo lleva semanas y **ya iba con una explicación
+  escrita en el código que resultó ser falsa** (se creía que era la sesión, que mandaba al usuario a
+  la pantalla de entrar; cuando por fin cayó, la pantalla se había quedado en otro sitio, no en la de
+  entrar). Ahora queda tachada **la segunda** explicación posible. **Cada vuelta descarta una
+  sospecha y la deja escrita**, para que nadie la vuelva a investigar desde cero.
+- 🕒 **Y de paso se le dio más tiempo al servidor de pruebas**, porque se quedó corto **en esta misma
+  versión**: la revisión automática tiene un límite de tiempo, y la batería de pruebas ha crecido
+  tanto que lo rozó y se cortó a la mitad. Engaña, porque cortarse por tiempo **se ve igual que si
+  alguien la hubiera parado a mano**. Ya había pasado dos veces antes, y el propio archivo lo tenía
+  escrito: *lo primero ante ese aviso es mirar cuánto tardó*. Tardó 45.3 minutos contra un tope de
+  45; las dos revisiones verdes del mismo día tardaron 38.7 y 32.3. Se subió el tope a 70.
+  ⚠️ **Subir un tope no arregla nada, sólo destapa lo que había detrás** — así que la próxima
+  revisión hay que mirarla entera, no darla por buena.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **El fallo intermitente PUEDE VOLVER, y si vuelve no es una sorpresa.** No se ha encontrado su
+  causa; lo único que se ha hecho es descartar dos explicaciones. Cuando vuelva a caer, se captura la
+  grabación **antes de que caduque** —ése es hoy el paso que falta— y con ella se busca la tercera.
+- **El pendiente sigue abierto** en el plan (fila **0.169**), **sin darse por resuelto**. Mientras
+  tanto, cuando esa prueba cae, la entrega se reintenta y pasa; el costo es tiempo de espera, no un
+  error en el sistema.
+- ⚠️ **Y sale a la luz un problema DE VERDAD que estaba escondido como nota al pie de éste** (fila
+  nueva **0.206**, pendiente de tu palabra): **si la red parpadea mientras trabajas, el sistema te
+  saca a la pantalla de entrar y pierdes lo que estabas capturando.** No sabe distinguir *«no has
+  entrado»* de *«no pude preguntar si entraste»*. Llevaba desde agosto escrito como la supuesta
+  explicación del fallo de las pruebas; cuando se midió que **no** lo explicaba, se quedó sin dueño.
+  Ahora tiene ficha propia. **No se arregló en esta versión a propósito**: es un cambio que toca a
+  todo el mundo y merece su propia medición, no un arreglo de paso.
+
 ## 0.169 · 17-sep-2026 · **en prueba** — **Los colores ya se buscan escribiendo: aunque el catálogo crezca a miles, ninguno se queda escondido**
 
 ### Qué se puede hacer ahora que antes no

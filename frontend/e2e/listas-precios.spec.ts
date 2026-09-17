@@ -105,7 +105,12 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(
       page.getByText(/Precosto v1 congelado: ya puede incluirse en una lista de precios/),
     ).toBeVisible();
+    // ⚠️ 17-sep-2026 (fila 0.169): el `Escape` iba SOLO y enseguida se navegaba. `press` resuelve
+    // cuando la tecla se DESPACHA, no cuando el diálogo se cierra ⇒ precondición sin esperar. Se
+    // espera al diálogo, no al cajón: esto es un `Dialog` de Radix (`DialogoPrecosto.tsx`), NO un
+    // `CajonDetalle`, así que `cerrarCajon()` no aplica aquí.
     await page.keyboard.press('Escape');
+    await expect(dialogoPrecosto).toHaveCount(0);
 
     // ── Crear la lista desde los candidatos ─────────────────────────────────────
     await page.goto('/listas-precios');
@@ -215,7 +220,12 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(
       page.getByText(/Precosto v2 congelado: ya puede incluirse en una lista de precios/),
     ).toBeVisible();
+    // ⚠️ 17-sep-2026 (fila 0.169): aquí el `Escape` sin esperar era el caso PELIGROSO del archivo —
+    // el editor es el diálogo SUPERIOR y debajo sigue abierto `panel-negociacion`, con el que se
+    // interactúa acto seguido (`formRonda`). Mientras el overlay del superior no se desmonta, un
+    // clic al fondo no se estabiliza. También es un `Dialog`, no un `CajonDetalle`.
     await page.keyboard.press('Escape'); // cierra el editor (dialog superior)
+    await expect(editor).toHaveCount(0);
 
     // Elige la v2 congelada + escribe el acuerdo + confirma la ronda. La opción trae el costo en el
     // texto —hoy "v2 · $82.20" (maquila 80 + corte 0 + empaque 2.20), no "$80.00"—, y JUSTO POR ESO
@@ -270,7 +280,12 @@ test.describe('Listas de precios (F8-E4)', () => {
     await page.getByTestId('acuerdo-texto').fill('Intento con lista cerrada');
     await page.getByTestId('confirmar-acuerdo').click();
     await expect(page.getByText(/lista está cerrada/i)).toBeVisible();
+    // ⚠️ 17-sep-2026 (fila 0.169): los dos `Escape` iban SEGUIDOS. El final sí se afirma, pero el
+    // primero no: si el segundo se despacha antes de que el diálogo de acuerdo se haya desmontado,
+    // se lo vuelve a comer el superior y el panel se queda abierto ⇒ la aserción de abajo cae por
+    // una carrera, no por el código. Se espera entre uno y otro.
     await page.keyboard.press('Escape'); // cierra el diálogo de acuerdo (dialog superior)
+    await expect(page.getByTestId('form-acuerdo')).toHaveCount(0);
     await page.keyboard.press('Escape'); // cierra el panel de negociación
     await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
 

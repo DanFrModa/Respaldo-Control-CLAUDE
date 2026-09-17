@@ -1,8 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * EL CRUCE MECÁNICO DE LOS DOCUMENTOS, ENGANCHADO AL CI.
@@ -58,5 +66,136 @@ describe('cruce mecánico de los documentos (herramientas/verificar-documentos.m
         { cause: error },
       );
     }
+  });
+});
+
+/**
+ * ⭐ **LA RAMA «una versión puede no cerrar ninguna fila» (v0.170), PROBADA DE VERDAD.**
+ *
+ * La prueba de arriba corre el script contra el repo REAL, así que sólo puede comprobar el camino
+ * que el repo tiene hoy. Para medir que el candado **muerde** hace falta poder romperlo, y para eso
+ * se monta una COPIA del repo en un directorio temporal —el script deduce la raíz de su propia
+ * ubicación (`dirname(import.meta.url)/..`), así que copiar el script y los documentos a un árbol
+ * aparte basta— y se mutan los documentos ahí.
+ *
+ * 🔑 **Por qué esto no es decorado:** `verificar-documentos.mjs` es una COMPUERTA. Si se rompe en
+ * silencio deja de servir, y nadie lo notaría — seguiría imprimiendo «✅ Todo cuadra». La rama nueva
+ * relaja el cruce cuando una versión se declara «sin fila», y una relajación sin prueba es una puerta
+ * trasera: lo que estas tres pruebas fijan es que **olvidarse sigue siendo rojo**, que **declarar y
+ * cerrar fila a la vez es rojo** (son afirmaciones incompatibles) y que **una declaración de una
+ * versión inexistente no excusa a nadie**.
+ */
+const ARCHIVOS_DEL_CRUCE = [
+  'HOJA-DE-RUTA.md',
+  'HISTORIAL-DE-VERSIONES.md',
+  'CLAUDE.md',
+  'Documentacion_MJD/DECISIONES.md',
+  'frontend/src/version.ts',
+  'herramientas/verificar-documentos.mjs',
+];
+
+/** Copia el script y los documentos que cruza a un árbol temporal, para poder mutarlos sin tocar el repo. */
+function copiaDelRepo(): string {
+  const raiz = raizDelRepo();
+  const destino = mkdtempSync(join(tmpdir(), 'cruce-documentos-'));
+  for (const relativa of ARCHIVOS_DEL_CRUCE) {
+    const salida = join(destino, relativa);
+    mkdirSync(dirname(salida), { recursive: true });
+    copyFileSync(join(raiz, relativa), salida);
+  }
+  return destino;
+}
+
+/** Corre el script en un árbol dado y devuelve su código de salida y su salida completa. */
+function correr(arbol: string): { codigo: number; salida: string } {
+  try {
+    const salida = execFileSync(
+      process.execPath,
+      [join(arbol, 'herramientas', 'verificar-documentos.mjs')],
+      { cwd: arbol, encoding: 'utf8' },
+    );
+    return { codigo: 0, salida };
+  } catch (error) {
+    const e = error as { status?: number; stdout?: string; stderr?: string };
+    return { codigo: e.status ?? -1, salida: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+  }
+}
+
+/** Reescribe un archivo del árbol temporal aplicando un reemplazo único (y exige que sea único). */
+function mutar(arbol: string, relativa: string, viejo: string | RegExp, nuevo: string): void {
+  const ruta = join(arbol, relativa);
+  const texto = readFileSync(ruta, 'utf8');
+  const partes = texto.split(viejo as string);
+  expect(
+    partes.length,
+    `el ancla de la mutación no aparece EXACTAMENTE una vez en ${relativa}`,
+  ).toBe(2);
+  writeFileSync(ruta, partes.join(nuevo), 'utf8');
+}
+
+describe('una versión que NO cierra ninguna fila tiene que DECIRLO', () => {
+  let arbol: string;
+  let version: string;
+
+  beforeAll(() => {
+    arbol = copiaDelRepo();
+    version =
+      readFileSync(join(arbol, 'frontend/src/version.ts'), 'utf8').match(
+        /VERSION = '([^']+)'/,
+      )?.[1] ?? '';
+    expect(version, 'no se pudo leer la versión de la copia').toMatch(/^\d+\.\d{3}$/);
+  });
+
+  it('la copia del repo, sin tocar, sale en VERDE (control positivo del montaje)', () => {
+    const { codigo, salida } = correr(arbol);
+    expect(codigo, salida).toBe(0);
+    expect(salida).toContain('✅ Todo cuadra');
+  });
+
+  it('🔴 si se QUITA la declaración y ninguna fila la reclama, sale ROJO y dice qué escribir', () => {
+    const copia = copiaDelRepo();
+    const declaracion = `**La v${version} no cierra ninguna fila del programa**`;
+    const historial = readFileSync(join(copia, 'HISTORIAL-DE-VERSIONES.md'), 'utf8');
+    if (!historial.includes(declaracion)) {
+      // Esta versión SÍ cierra fila: la rama nueva no aplica y no hay nada que medir aquí.
+      // (No se salta la prueba: se afirma el hecho, para que el día que cambie se vea.)
+      expect(historial).not.toContain('no cierra ninguna fila del programa');
+      return;
+    }
+    mutar(copia, 'HISTORIAL-DE-VERSIONES.md', declaracion, '(declaración retirada por la prueba)');
+    const { codigo, salida } = correr(copia);
+    expect(codigo, salida).not.toBe(0);
+    expect(salida).toContain('no dicen lo mismo');
+    // El mensaje tiene que DECIR QUÉ HACER, no sólo que algo no cuadra.
+    expect(salida).toContain('no cierra ninguna fila del programa');
+    expect(salida).toContain('CERRADA');
+  });
+
+  it('🔴 declararse «sin fila» Y tener una fila que la reclame es ROJO: son incompatibles', () => {
+    const copia = copiaDelRepo();
+    const historial = readFileSync(join(copia, 'HISTORIAL-DE-VERSIONES.md'), 'utf8');
+    if (!historial.includes(`**La v${version} no cierra ninguna fila del programa**`)) return;
+    // Se le cuelga la marca de entrega a la PRIMERA fila del tablero, sea cual sea.
+    const hoja = readFileSync(join(copia, 'HOJA-DE-RUTA.md'), 'utf8');
+    const primera = hoja.match(/^> \| \*\*(0\.\d{3})\*\* \S+ \|/m)?.[0];
+    expect(primera, 'no se encontró ninguna fila del tablero').toBeDefined();
+    mutar(copia, 'HOJA-DE-RUTA.md', primera ?? '', `${primera ?? ''} ✅ CERRADA — v${version}.`);
+    const { codigo, salida } = correr(copia);
+    expect(codigo, salida).not.toBe(0);
+    expect(salida).toContain('Una de las dos afirmaciones es falsa');
+  });
+
+  it('🔴 una declaración de una versión que NO existe en el historial es ROJO', () => {
+    const copia = copiaDelRepo();
+    mutar(
+      copia,
+      'HISTORIAL-DE-VERSIONES.md',
+      '# CONTROL v2 — Historial de versiones',
+      '# CONTROL v2 — Historial de versiones\n\n> **La v9.999 no cierra ninguna fila del programa**',
+    );
+    const { codigo, salida } = correr(copia);
+    expect(codigo, salida).not.toBe(0);
+    expect(salida).toContain('9.999');
+    expect(salida).toContain('NO tiene entrada');
   });
 });

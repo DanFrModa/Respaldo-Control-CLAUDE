@@ -28,6 +28,11 @@
  *  2. **El número de versión, que vive en CUATRO sitios**: la fila que la entrega en
  *     `HOJA-DE-RUTA.md`, la línea «versión en `prueba`» del mismo archivo, la primera entrada de
  *     `HISTORIAL-DE-VERSIONES.md` y la constante `VERSION` de `frontend/src/version.ts`.
+ *     ⭐ **Con una salida, y sólo una (v0.170):** una versión puede **no cerrar ninguna fila** —es
+ *     el caso de un arreglo que no da nada por resuelto—, y entonces el primero de esos cuatro
+ *     sitios no existe. Para que ese hueco no se cuele en silencio, la entrada del historial tiene
+ *     que decirlo con la frase exacta **«La v0.xxx no cierra ninguna fila del programa»**. Callarlo
+ *     sigue siendo ROJO; declararlo Y cerrar fila a la vez, también (son incompatibles).
  *  3. **Que las entradas del historial vayan en orden estrictamente descendente** — la misma regla
  *     que `frontend/src/version.test.ts` exige, comprobada también aquí para poder correr la
  *     verificación A MANO sobre los documentos, sin montar el suite entero. En el CI la ejecuta
@@ -245,19 +250,88 @@ if (filasQueEntregan.length === 0) {
   versionDeLaFila = mayor.version;
 }
 
+const versionDeTs = versionTs.match(/VERSION = '([^']+)'/)?.[1];
+
+/**
+ * ⭐ **UNA VERSIÓN PUEDE NO CERRAR NINGUNA FILA — pero tiene que DECIRLO (17-sep-2026, v0.170).**
+ *
+ * El bloque de arriba daba por hecho que **toda** versión cierra al menos una fila del tablero: el
+ * cuarto «sitio» de la versión no está escrito en ninguna parte, se **deduce** del `CERRADA … v0.xxx`
+ * más alto. Esa premisa no es cierta y este archivo ya lo sabía: su propio comentario (arriba) mide
+ * que *«toda versión del historial debe tener fila que la reclame» daría **97 falsas alarmas de
+ * 134***. Una versión puede ser un arreglo que no cierra nada — la v0.170 lo es: arregla una
+ * precondición sin esperar en un e2e y deja su fila (la 0.169) **abierta a propósito**, porque la
+ * causa del fallo sigue sin medirse.
+ *
+ * 🔑 **El candado NO se afloja: cambia de «tiene que haber una fila que la reclame» a «tiene que
+ * haber una fila que la reclame, O decir por qué no».** El silencio sigue siendo ROJO. Lo único que
+ * se acepta es una declaración **explícita y nominal**, con el número de la versión dentro, para que
+ * no pueda quedarse puesta de una versión anterior y excusar a la siguiente en silencio.
+ *
+ * 📌 **Por qué la declaración vive en `HISTORIAL-DE-VERSIONES.md` y no aquí ni en un fichero aparte**
+ * (cicatriz de `CLAUDE.md` §8: *el aviso que importa es el que está pegado a la cosa*): la entrada
+ * del historial es **el sitio al que va quien pregunta «¿y qué trajo la v0.170?»**. Ponerlo en el
+ * tablero de `HOJA-DE-RUTA.md` era imposible sin inventar un sitio —el tablero habla de FILAS, y el
+ * caso es justo que no hay fila—, y un archivo de excepciones aparte es exactamente lo que nadie
+ * abre.
+ *
+ * ⚠️ **Y la declaración tiene que ser de una versión que EXISTA en el historial**, para que un
+ * copiar-pegar no pre-autorice en silencio a la versión siguiente.
+ */
+const DECLARA_SIN_FILA = /\*\*La v(\d+\.\d{3}) no cierra ninguna fila del programa\*\*/g;
+const declaradasSinFila = [...historial.matchAll(DECLARA_SIN_FILA)].map((m) => m[1]);
+for (const declarada of declaradasSinFila) {
+  if (!entradas.includes(declarada)) {
+    problemas.push(
+      `El historial declara que «La v${declarada} no cierra ninguna fila del programa», pero la v${declarada} NO tiene entrada en HISTORIAL-DE-VERSIONES.md. Una declaración de una versión que no existe no excusa a nadie: bórrala o escribe su entrada.`,
+    );
+  }
+}
+const declaraSinFila = versionDeTs !== undefined && declaradasSinFila.includes(versionDeTs);
+
+// Declararse «sin fila» y tener una fila que te reclame son afirmaciones INCOMPATIBLES: una de las
+// dos miente, y callarlo sería justo lo que este archivo vino a impedir.
+if (declaraSinFila) {
+  const reclaman = filasQueEntregan.filter((f) => f.version === versionDeTs);
+  if (reclaman.length > 0) {
+    problemas.push(
+      `La v${versionDeTs} se declara «no cierra ninguna fila del programa» en el historial, pero la(s) fila(s) ${reclaman.map((f) => f.fila).join(', ')} de HOJA-DE-RUTA.md dicen entregarla. Una de las dos afirmaciones es falsa: quita la declaración o quita el «CERRADA … v${versionDeTs}».`,
+    );
+  }
+}
+
 const sitios = {
+  // Cuando la versión se declara SIN fila, este sitio no existe y no se cruza — pero se imprime para
+  // que la salida diga POR QUÉ son tres y no cuatro, en vez de que uno desaparezca calladamente.
   [`HOJA-DE-RUTA · fila ${filaQueEntrega ?? '?'}`]: versionDeLaFila,
   'HOJA-DE-RUTA · línea «versión en prueba»': hoja.match(/versión en `prueba` `(\d+\.\d+)`/)?.[1],
   'HISTORIAL · primera entrada': entradas[0],
-  'frontend/src/version.ts': versionTs.match(/VERSION = '([^']+)'/)?.[1],
+  'frontend/src/version.ts': versionDeTs,
 };
 decir('\nversión por sitio:');
 for (const [sitio, valor] of Object.entries(sitios))
   decir(`  ${sitio}: ${valor ?? '(no encontrado)'}`);
-const distintas = new Set(Object.values(sitios));
+if (declaraSinFila) {
+  decir(`  ⇒ la v${versionDeTs} se declara SIN fila en el historial: ese sitio no se cruza.`);
+}
+const aCruzar = Object.entries(sitios).filter(
+  ([sitio]) => !(declaraSinFila && sitio.startsWith('HOJA-DE-RUTA · fila')),
+);
+const distintas = new Set(aCruzar.map(([, valor]) => valor));
 if (distintas.size !== 1 || distintas.has(undefined)) {
+  // El mensaje DICE QUÉ HACER. La forma más común de llegar aquí es haber subido la versión sin
+  // cerrar fila y sin declararlo: sin esta pista, el script sólo dice «no cuadran» y deja a quien lo
+  // lee adivinando entre dos arreglos opuestos.
+  const olvidoLaDeclaracion =
+    !declaraSinFila &&
+    versionDeTs !== undefined &&
+    versionDeLaFila !== undefined &&
+    Number(versionDeLaFila) < Number(versionDeTs);
+  const pista = olvidoLaDeclaracion
+    ? ` Ninguna fila del tablero declara «CERRADA … v${versionDeTs}». Si la v${versionDeTs} SÍ cierra una fila, escribe esa marca en la fila que entrega; si NO cierra ninguna, dilo en su entrada de HISTORIAL-DE-VERSIONES.md con la frase exacta «**La v${versionDeTs} no cierra ninguna fila del programa**» y la razón.`
+    : '';
   problemas.push(
-    `Los cuatro sitios de la versión no dicen lo mismo: ${[...distintas].join(', ')}.`,
+    `Los ${String(aCruzar.length)} sitios de la versión no dicen lo mismo: ${[...distintas].join(', ')}.${pista}`,
   );
 }
 
