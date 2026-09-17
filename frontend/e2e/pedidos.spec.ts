@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 import { generarAbreviaturaCliente } from './abreviatura';
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { cerrarCajon, crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del FLUJO NUEVO de Pedidos (rediseño R3, §4.1) contra el stack real:
@@ -258,8 +258,21 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
       page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
     ).toBeVisible();
     await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible();
-    // Cierra el panel (modal) para que el siguiente paso pueda interactuar con la página.
-    await page.keyboard.press('Escape');
+    // Cierra el panel (modal) y ESPERA a que se haya desmontado, antes de seguir.
+    //
+    // ⚠️ 17-sep-2026 (fila 0.169). Antes esto era un `page.keyboard.press('Escape')` a secas, y eso
+    // es una PRECONDICIÓN SIN ESPERAR: `press` resuelve cuando la tecla se DESPACHA, no cuando el
+    // diálogo termina de cerrarse ⇒ el `goto` de abajo podía salir con el cajón (Radix Sheet modal,
+    // con su overlay y su scroll-lock) todavía montado. Es un defecto del test POR SÍ MISMO, se
+    // arregle lo que se arregle.
+    //
+    // 🔴 Y lo que NO se afirma: **esto NO se ha medido como la causa del flaky de abajo**, y no se
+    // puede medir — la traza del CI que lo cazó (corrida 34269838020) expiró el 15-sep. Se arregla
+    // porque está mal, no porque se sepa que era eso. Si el flaky VUELVE a caer con esta espera
+    // puesta, entonces la hipótesis de la carrera Escape↔goto queda DESCARTADA, igual que quedó
+    // descartada la de la sesión (`ProveedorSesion.tsx`) cuando la página acabó en
+    // `/produccion/ordenes` y no en `/login`.
+    await cerrarCajon(page);
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');
@@ -270,9 +283,14 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     // 🔴 8-sep-2026: y lo dijo. Al caer en el CI del PR #330 la página se había quedado en
     // `/produccion/ordenes` —la pantalla anterior, 62 sondeos con el mismo valor—, NO en `/login`.
     // ⇒ la sospecha que este comentario traía antes (que la causa era la sesión, `retry: false` de
-    // `ProveedorSesion.tsx`) **queda descartada para este caso**. La causa real está SIN MEDIR: se
-    // descartó de paso que la devolviera una redirección de `App.tsx`, y queda por comprobar una
-    // carrera entre el `keyboard.press('Escape')` de arriba y este `goto`. Fila **0.169**.
+    // `ProveedorSesion.tsx`) **queda descartada para este caso**. La causa real sigue SIN MEDIR: se
+    // descartó de paso que la devolviera una redirección de `App.tsx`, y la traza del CI que lo cazó
+    // (corrida 34269838020) EXPIRÓ el 15-sep, así que ya no hay de dónde sacarla.
+    //
+    // 17-sep-2026: se cerró arriba la única precondición sin esperar que quedaba (el `Escape` que no
+    // aguardaba a que el cajón se desmontara). **No se afirma que fuera la causa.** Si esto vuelve a
+    // caer, la hipótesis de esa carrera queda descartada también, y la fila **0.169** —que sigue
+    // ABIERTA— tendrá que atacar lo siguiente con una traza fresca.
     await expect(page).toHaveURL(/\/pedidos\/administrar$/, { timeout: 30_000 });
     // `exact`: el matcher por nombre es substring y el panel de detalle trae un <h3>"Pedidos
     // reales"</h3> que aparece al auto-seleccionar un pedido (async) → sin exact, doble match flaky.
