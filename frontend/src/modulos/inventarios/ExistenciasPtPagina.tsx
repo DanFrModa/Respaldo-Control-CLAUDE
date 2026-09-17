@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useColores } from '@/api/colores';
 import { useExistenciasPt } from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
 import { useTallas } from '@/api/tallas';
@@ -18,6 +17,7 @@ import {
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 import { useSesion } from '@/sesion/useSesion';
 
 import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
@@ -54,18 +54,15 @@ export function ExistenciasPtPagina(): React.JSX.Element {
   const puedeMover = tienePermiso('inventario-pt.mover');
 
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
-  const [idColor, setIdColor] = useState<string>(TODOS);
+  // Fila 0.192 — el color se BUSCA en el servidor (antes era un `<select>` con las primeras 100 del
+  // catálogo, y el tope del contrato es 100: pasando de cien colores activos los del final del
+  // alfabeto no salían y el filtro decía «ese color no tiene nada»). Se guarda también el NOMBRE
+  // porque el combobox trae una página: sin él, el campo se vería vacío con el filtro puesto.
+  const [color, setColor] = useState<{ id: number; nombre: string } | null>(null);
   const [idTalla, setIdTalla] = useState<string>(TODOS);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [incluirCeros, setIncluirCeros] = useState(false);
 
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
-  });
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
   const almacenes = useAlmacenes({
     pagina: 1,
@@ -76,7 +73,7 @@ export function ExistenciasPtPagina(): React.JSX.Element {
 
   const consulta = useExistenciasPt({
     ...(modelo !== undefined ? { idModelo: modelo.id } : {}),
-    ...(idColor !== TODOS ? { idColor: Number(idColor) } : {}),
+    ...(color !== null ? { idColor: color.id } : {}),
     ...(idTalla !== TODOS ? { idTalla: Number(idTalla) } : {}),
     ...(idAlmacen !== TODOS ? { idAlmacen: Number(idAlmacen) } : {}),
     // El querystring espera stringbool ("true"/"false"); solo se manda cuando se piden los ceros.
@@ -175,23 +172,20 @@ export function ExistenciasPtPagina(): React.JSX.Element {
               {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
             </span>
           ) : null}
-          {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
-              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
-              queda huérfano a la derecha). */}
-          <SelectNativo
-            className="w-40 h-8 text-sm"
-            aria-label="Filtrar por color"
-            value={idColor}
-            onChange={(e) => setIdColor(e.target.value)}
-            data-testid="exist-color"
-          >
-            <option value={TODOS}>Todos los colores</option>
-            {(colores.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* Fila 0.192 — el color pasó de `<select>` a combobox con búsqueda en el servidor. Va en
+              caja de ancho FIJO (el envoltorio interno es w-full y, suelto en un toolbar flex-wrap,
+              se roba el renglón entero) y con el alto del toolbar, igual que el buscador de tela. */}
+          <div className="w-44 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorColor
+              idSeleccionado={color?.id}
+              {...(color === null ? {} : { nombreSeleccionado: color.nombre })}
+              alSeleccionar={setColor}
+              alLimpiar={() => setColor(null)}
+              etiqueta="Filtrar por color"
+              placeholder="Todos los colores"
+              testid="exist-color"
+            />
+          </div>
           <SelectNativo
             className="w-40 h-8 text-sm"
             aria-label="Filtrar por talla"

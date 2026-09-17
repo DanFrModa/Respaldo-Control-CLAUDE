@@ -8,7 +8,7 @@ import type { MatrizLinea } from '@/componentes/matriz-color-talla/MatrizColorTa
 
 import {
   aLineasApi,
-  coloresOpciones,
+  coloresRetiradosConExistencia,
   ordenesConExistencia,
   SUFIJO_COLOR_RETIRADO,
   totalMatriz,
@@ -98,47 +98,47 @@ describe('totalMatriz', () => {
 });
 
 /**
- * ⭐ FILA 0.164 — el catálogo vivo MÁS los colores retirados que tienen mercancía aquí. Nace de la
- * fusión de duplicados (§Post-F9.222): el color absorbido se apaga y sus piezas siguen en el
- * almacén, así que sin esto no había forma de ajustarlas ni de traspasarlas.
+ * ⭐ FILA 0.164 — los colores retirados que tienen mercancía en ESTE contexto. Nace de la fusión de
+ * duplicados (§Post-F9.222): el color absorbido se apaga y sus piezas siguen en el almacén, así que
+ * sin esto no había forma de ajustarlas ni de traspasarlas.
+ *
+ * 📌 FILA 0.192 — la función ya NO recibe el catálogo vivo (lo busca el servidor vía
+ * `SelectorColor`): aquí sólo queda el extra que el servidor no puede devolver.
  */
-describe('coloresOpciones (fila 0.164)', () => {
-  const CATALOGO = [
-    { id: 7, nombre: 'Rojo' },
-    { id: 8, nombre: 'Marino' },
-  ];
+describe('coloresRetiradosConExistencia (filas 0.164 / 0.192)', () => {
   const retirado = (idColor: number, color: string) => ({ idColor, color, colorActivo: false });
 
-  it('sin filas de existencia devuelve EXACTAMENTE el catálogo (lo de siempre)', () => {
-    expect(coloresOpciones(CATALOGO)).toEqual(CATALOGO);
-    expect(coloresOpciones(CATALOGO, [])).toEqual(CATALOGO);
+  it('sin filas de existencia no ofrece NADA (el catálogo vivo lo pone el servidor)', () => {
+    expect(coloresRetiradosConExistencia()).toEqual([]);
+    expect(coloresRetiradosConExistencia([])).toEqual([]);
   });
 
-  it('agrega el color RETIRADO con mercancía, rotulado y AL FINAL', () => {
-    expect(coloresOpciones(CATALOGO, [retirado(9, 'Blanco Hueso')])).toEqual([
-      ...CATALOGO,
+  it('ofrece el color RETIRADO con mercancía, ROTULADO', () => {
+    expect(coloresRetiradosConExistencia([retirado(9, 'Blanco Hueso')])).toEqual([
       { id: 9, nombre: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}` },
     ]);
   });
 
-  it('no duplica: ni el color repetido en varias filas ni el que ya está en el catálogo', () => {
+  it('no duplica el color repetido en varias filas', () => {
     expect(
-      coloresOpciones(CATALOGO, [
-        retirado(9, 'Blanco Hueso'),
-        retirado(9, 'Blanco Hueso'),
-        { idColor: 7, color: 'Rojo', colorActivo: true },
-      ]),
-    ).toEqual([...CATALOGO, { id: 9, nombre: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}` }]);
+      coloresRetiradosConExistencia([retirado(9, 'Blanco Hueso'), retirado(9, 'Blanco Hueso')]),
+    ).toEqual([{ id: 9, nombre: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}` }]);
+  });
+
+  it('ordena los retirados por nombre', () => {
+    expect(coloresRetiradosConExistencia([retirado(9, 'Zafiro'), retirado(4, 'Ámbar')])).toEqual([
+      { id: 4, nombre: `Ámbar${SUFIJO_COLOR_RETIRADO}` },
+      { id: 9, nombre: `Zafiro${SUFIJO_COLOR_RETIRADO}` },
+    ]);
   });
 
   /**
    * La puerta se abre por el color RETIRADO, no por «todo lo que tenga existencia»: un color ACTIVO
-   * que no venga en la página del catálogo no se cuela por aquí (ese hueco es otro problema, y
-   * ofrecerlo sin marca lo escondería).
+   * ya lo ofrece la búsqueda del servidor, y colarlo aquí lo rotularía «(retirado)» siendo mentira.
    */
-  it('un color ACTIVO que no está en el catálogo NO se agrega', () => {
-    expect(coloresOpciones(CATALOGO, [{ idColor: 9, color: 'Verde', colorActivo: true }])).toEqual(
-      CATALOGO,
-    );
+  it('un color ACTIVO con existencia NO se agrega', () => {
+    expect(
+      coloresRetiradosConExistencia([{ idColor: 7, color: 'Rojo', colorActivo: true }]),
+    ).toEqual([]);
   });
 });

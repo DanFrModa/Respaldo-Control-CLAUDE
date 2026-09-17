@@ -2,16 +2,16 @@ import { Grid3x3, Trash2Icon } from 'lucide-react';
 
 import type { Avio } from '@/api/avios';
 import { etiquetaUnidadTela, type Tela } from '@/api/telas';
-import type { Color, OrdenLigera, Talla } from '@/api/tipos';
+import type { OrdenLigera, Talla } from '@/api/tipos';
 import {
   MatrizColorTalla,
-  type MatrizColorOpcion,
   type MatrizLinea,
   type MatrizTalla,
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 import { formatearMoneda } from '@/lib/formato';
 
 import {
@@ -42,7 +42,6 @@ export function EditorLineasOc({
   mensajeSinTelas,
   avios,
   ordenes,
-  colores,
   tallas,
   soloLectura = false,
 }: {
@@ -53,15 +52,30 @@ export function EditorLineasOc({
   mensajeSinTelas: string;
   avios: readonly Avio[];
   ordenes: readonly OrdenLigera[];
-  colores: readonly Color[];
   tallas: readonly Talla[];
   soloLectura?: boolean;
 }): React.JSX.Element {
-  const coloresOpc: MatrizColorOpcion[] = colores.map((c) => ({ id: c.id, nombre: c.nombre }));
   const tallasOpc: MatrizTalla[] = tallas.map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta }));
 
   function actualizar(clave: string, cambios: Partial<RenglonOcCaptura>): void {
     alCambiar(renglones.map((r) => (r.clave === clave ? { ...r, ...cambios } : r)));
+  }
+
+  /**
+   * Agrega la fila del color elegido a la matriz de ESE renglón (fila 0.192: el catálogo lo busca
+   * el SERVIDOR, así que la fila la pone el editor y no la matriz).
+   *
+   * 🔑 El color repetido lo impide `excluirIds` del buscador (que ni siquiera lo ofrece) y, al
+   * guardar, el dominio (A1): aquí no se duplica esa guarda.
+   */
+  function agregarColorMatriz(
+    clave: string,
+    matriz: readonly MatrizLinea[],
+    color: { id: number; nombre: string },
+  ): void {
+    actualizar(clave, {
+      matriz: [...matriz, { idColor: color.id, color: color.nombre, cantidades: {} }],
+    });
   }
 
   function quitar(clave: string): void {
@@ -524,13 +538,33 @@ export function EditorLineasOc({
                     testid={`matriz-oc-${String(indice)}`}
                     tallas={tallasOpc}
                     lineas={renglon.matriz}
-                    coloresDisponibles={coloresOpc}
                     tallasDisponibles={tallasOpc}
                     soloLectura={soloLectura}
                     onLineasChange={(matriz: MatrizLinea[]) =>
                       actualizar(renglon.clave, { matriz })
                     }
                     onTallasChange={() => undefined}
+                    slotAgregarColor={
+                      // Fila 0.192 — el color se BUSCA en el servidor. Antes el diálogo pre-cargaba
+                      // `useColores({ porPagina: 100 })` y 100 es el tope del contrato: pasando de
+                      // cien colores activos, los del final del alfabeto no salían en la matriz de
+                      // la OC. El `key` REMONTA el buscador tras agregar para que el texto tecleado
+                      // no quede pegado.
+                      <div className="w-60">
+                        <SelectorColor
+                          key={renglon.matriz.length}
+                          idSeleccionado={undefined}
+                          alSeleccionar={(color) =>
+                            agregarColorMatriz(renglon.clave, renglon.matriz, color)
+                          }
+                          excluirIds={new Set(renglon.matriz.map((l) => l.idColor))}
+                          deshabilitado={soloLectura}
+                          etiqueta="Agregar color"
+                          placeholder="Agregar color…"
+                          testid={`matriz-oc-${String(indice)}-agregar-color`}
+                        />
+                      </div>
+                    }
                   />
                 ) : null}
               </div>

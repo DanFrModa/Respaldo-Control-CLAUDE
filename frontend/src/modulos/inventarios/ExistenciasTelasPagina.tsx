@@ -3,7 +3,6 @@ import { useState } from 'react';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useExistenciasTela } from '@/api/inventario-materiales';
-import { useColores } from '@/api/colores';
 import type { Tela } from '@/api/telas';
 import type { ExistenciaTelaFila } from '@/api/tipos';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
@@ -18,6 +17,7 @@ import {
 import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 
 import { SelectorTela } from './SelectorTela';
 
@@ -55,18 +55,15 @@ function claveFila(f: ExistenciaTelaFila): string {
  */
 export function ExistenciasTelasPagina(): React.JSX.Element {
   const [tela, setTela] = useState<Tela | undefined>(undefined);
-  const [idColor, setIdColor] = useState<string>(TODOS);
+  // Fila 0.192 — el color se BUSCA en el servidor (antes, un `<select>` con las primeras 100 del
+  // catálogo contra un tope de contrato de 100: los colores del final del alfabeto no salían y el
+  // filtro se leía como «ese color no tiene tela»). Se guarda el NOMBRE junto al id porque el
+  // combobox trae una página: sin él, el campo se vería vacío con el filtro puesto.
+  const [color, setColor] = useState<{ id: number; nombre: string } | null>(null);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [incluirCeros, setIncluirCeros] = useState(false);
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
 
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
-  });
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,
@@ -76,7 +73,7 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
 
   const filtros = {
     ...(tela !== undefined ? { idTela: tela.id } : {}),
-    ...(idColor !== TODOS ? { idColor: Number(idColor) } : {}),
+    ...(color !== null ? { idColor: color.id } : {}),
     ...(idAlmacen !== TODOS ? { idAlmacen: Number(idAlmacen) } : {}),
     ...(incluirCeros ? { incluirCeros: 'true' as const } : {}),
   };
@@ -138,23 +135,20 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
               alLimpiar={() => setTela(undefined)}
             />
           </div>
-          {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
-              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
-              queda huérfano a la derecha). */}
-          <SelectNativo
-            className="w-40 h-8 text-sm"
-            aria-label="Filtrar por color"
-            value={idColor}
-            onChange={(e) => setIdColor(e.target.value)}
-            data-testid="telas-color"
-          >
-            <option value={TODOS}>Todos los colores</option>
-            {(colores.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* Fila 0.192 — el color pasó de `<select>` a combobox con búsqueda en el servidor. Va en
+              caja de ancho FIJO (el envoltorio interno es w-full y, suelto en un toolbar flex-wrap,
+              se roba el renglón entero) y con el alto del toolbar, igual que el buscador de tela. */}
+          <div className="w-44 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorColor
+              idSeleccionado={color?.id}
+              {...(color === null ? {} : { nombreSeleccionado: color.nombre })}
+              alSeleccionar={setColor}
+              alLimpiar={() => setColor(null)}
+              etiqueta="Filtrar por color"
+              placeholder="Todos los colores"
+              testid="telas-color"
+            />
+          </div>
           <SelectNativo
             className="w-44 h-8 text-sm"
             aria-label="Filtrar por almacén"

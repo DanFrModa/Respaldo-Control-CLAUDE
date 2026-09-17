@@ -1,9 +1,8 @@
 import { Printer } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useColores } from '@/api/colores';
 import { urlImpresoTraspasoPt, useCrearTraspasoPt, useExistenciasPt } from '@/api/inventarios';
 import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorColor } from '@/components/dominio/SelectorColor';
 import {
   MatrizColorTalla,
   type MatrizLinea,
@@ -27,7 +27,7 @@ import {
   SIN_ORDEN,
   aIdOrden,
   aLineasApi,
-  coloresOpciones,
+  coloresRetiradosConExistencia,
   ordenesConExistencia,
   tallasColumnas,
   totalMatriz,
@@ -75,6 +75,9 @@ export function TraspasosPtPagina(): React.JSX.Element {
   const [motivo, setMotivo] = useState('');
   const [lineas, setLineas] = useState<MatrizLinea[]>([]);
   const [tallas, setTallas] = useState<MatrizTalla[]>([]);
+  // Fila 0.192 — contador de colores AGREGADOS: es la `key` del buscador de color, que lo REMONTA
+  // tras cada alta para que el texto tecleado no quede pegado en el siguiente uso.
+  const [vecesAgregado, setVecesAgregado] = useState(0);
   // §Post-F9.40 — de qué ORDEN salen las piezas que se traspasan. `SIN_ORDEN` = bucket «sin orden».
   const [ordenBucket, setOrdenBucket] = useState<string>(SIN_ORDEN);
   // Fila 0.100 — el traspaso recién guardado, para imprimir la hoja que va con las prendas. NO es
@@ -90,13 +93,6 @@ export function TraspasosPtPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
     tipo: 'PT',
-  });
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
   });
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
   const crear = useCrearTraspasoPt();
@@ -148,13 +144,33 @@ export function TraspasosPtPagina(): React.JSX.Element {
     [disponiblePorArticulo],
   );
 
-  // Fila 0.164 — al catálogo VIVO se le suman los colores RETIRADOS con existencia en el ORIGEN
-  // (la misma consulta que alimenta el «disponible»): un color absorbido por una fusión
-  // (§Post-F9.222) conserva sus piezas, y sin esto no había forma de traspasarlas.
-  const coloresDisponibles = useMemo(
-    () => coloresOpciones(colores.data?.datos ?? [], existencias.data?.filas ?? []),
-    [colores.data, existencias.data],
+  // Fila 0.164 — los colores RETIRADOS con existencia en el ORIGEN (la misma consulta que alimenta
+  // el «disponible»): un color absorbido por una fusión (§Post-F9.222) conserva sus piezas, y sin
+  // esto no había forma de traspasarlas. El catálogo VIVO ya no se pre-carga: lo busca el servidor
+  // (fila 0.192).
+  const coloresRetirados = useMemo(
+    () => coloresRetiradosConExistencia(existencias.data?.filas ?? []),
+    [existencias.data],
   );
+  // Colores que YA son fila de la matriz: el buscador no los vuelve a ofrecer (el servidor rechaza
+  // el color repetido).
+  const coloresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
+  /**
+   * Agrega la fila del color elegido en el buscador (fila 0.192: el catálogo lo busca el SERVIDOR,
+   * así que la fila la pone la pantalla y no la matriz).
+   *
+   * 🔑 Aquí NO se vuelve a comprobar que el color no esté ya: quien lo impide es `excluirIds`, que
+   * el buscador aplica ANTES de ofrecer nada (y es lo que vigila su propia prueba). Un segundo
+   * guardián sin prueba propia sería código que nadie mide; y el color repetido lo rechaza además
+   * el dominio (A1).
+   */
+  const agregarColor = useCallback((color: { id: number; nombre: string }): void => {
+    setLineas((previas) => [
+      ...previas,
+      { idColor: color.id, color: color.nombre, cantidades: {} },
+    ]);
+    setVecesAgregado((n) => n + 1);
+  }, []);
   const tallasDisponibles = useMemo(
     () => tallasColumnas(tallasCat.data?.datos ?? []),
     [tallasCat.data],
@@ -386,11 +402,25 @@ export function TraspasosPtPagina(): React.JSX.Element {
                   testid="traspaso-matriz"
                   tallas={tallas}
                   lineas={lineas}
-                  coloresDisponibles={coloresDisponibles}
                   tallasDisponibles={tallasDisponibles}
                   onLineasChange={setLineas}
                   onTallasChange={setTallas}
                   soloLectura={!puedeMover}
+                  slotAgregarColor={
+                    <div className="w-60">
+                      <SelectorColor
+                        key={vecesAgregado}
+                        idSeleccionado={undefined}
+                        alSeleccionar={agregarColor}
+                        excluirIds={coloresUsados}
+                        opcionesExtra={coloresRetirados}
+                        deshabilitado={!puedeMover}
+                        etiqueta="Agregar color"
+                        placeholder="Agregar color…"
+                        testid="traspaso-matriz-agregar-color"
+                      />
+                    </div>
+                  }
                 />
                 {idAlmacenOrigen !== '' ? (
                   <p className="mt-2 text-xs text-muted-foreground">

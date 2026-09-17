@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExistenciasPt } from '@/api/tipos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ExistenciasPtPagina } from './ExistenciasPtPagina';
 
@@ -40,7 +40,9 @@ const useExistenciasMock = vi.fn();
 vi.mock('@/api/inventarios', () => ({
   useExistenciasPt: (...args: unknown[]) => useExistenciasMock(...args) as unknown,
 }));
-vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
+vi.mock('@/api/colores', () => ({
+  useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] }, isPending: false }),
+}));
 vi.mock('@/api/tallas', () => ({ useTallas: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/modelos', () => ({
@@ -57,6 +59,22 @@ beforeEach(() => {
 });
 
 describe('ExistenciasPtPagina (F3-E3)', () => {
+  /**
+   * ⭐ FILA 0.192 — el filtro de color pasó de un `<select>` con las primeras 100 del catálogo (y
+   * 100 es el tope del contrato: los del final del alfabeto no salían) a un buscador que pregunta
+   * al SERVIDOR. Lo que esta prueba vigila es la otra mitad: que lo elegido en el buscador llegue
+   * de verdad al API como `idColor` — sin eso el filtro se ve puesto y no filtra nada.
+   */
+  it('manda al API el color elegido en el buscador', async () => {
+    renderConProveedores(<ExistenciasPtPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-pt.ver']),
+    });
+    await elegirEnCombobox('exist-color', 'Rojo');
+
+    const ultima = useExistenciasMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(ultima['idColor']).toBe(7);
+  });
+
   it('muestra la fila de existencia y el total (tabla de escritorio + tarjetas móvil)', () => {
     renderConProveedores(<ExistenciasPtPagina />, {
       sesion: estadoSesionDePrueba(['inventario-pt.ver']),

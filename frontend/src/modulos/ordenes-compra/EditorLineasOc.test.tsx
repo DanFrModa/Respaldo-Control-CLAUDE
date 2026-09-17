@@ -2,9 +2,14 @@ import { fireEvent, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, renderConProveedores } from '@/pruebas/utilidades';
 
 import { EditorLineasOc } from './EditorLineasOc';
+
+// El buscador de color de la matriz (fila 0.192) consulta el catálogo en el SERVIDOR.
+vi.mock('@/api/colores', () => ({
+  useColores: () => ({ data: { datos: [{ id: 55, nombre: 'Rojo Cereza' }] }, isPending: false }),
+}));
 import { renglonVacio, type RenglonOcCaptura } from './captura';
 
 /**
@@ -60,7 +65,6 @@ function montarConColor() {
         mensajeSinTelas="sin telas"
         avios={[]}
         ordenes={[]}
-        colores={[]}
         tallas={[]}
       />
     );
@@ -132,7 +136,6 @@ describe('<EditorLineasOc> · el color de la tela (§Post-F9.89)', () => {
         mensajeSinTelas="sin telas"
         avios={[]}
         ordenes={[]}
-        colores={[]}
         tallas={[]}
         soloLectura
       />,
@@ -171,7 +174,6 @@ describe('<EditorLineasOc> · fila 0.160 — elegir el color del renglón', () =
           mensajeSinTelas="sin telas"
           avios={[]}
           ordenes={[]}
-          colores={[]}
           tallas={[]}
         />
       );
@@ -230,7 +232,6 @@ describe('<EditorLineasOc> · fila 0.160 — elegir el color del renglón', () =
         mensajeSinTelas="sin telas"
         avios={[]}
         ordenes={[]}
-        colores={[]}
         tallas={[]}
       />,
     );
@@ -247,11 +248,44 @@ describe('<EditorLineasOc> · fila 0.160 — elegir el color del renglón', () =
         mensajeSinTelas="sin telas"
         avios={[]}
         ordenes={[]}
-        colores={[]}
         tallas={[]}
       />,
     );
     expect(screen.queryByTestId('selector-color-tela-oc')).toBeNull();
     expect(screen.getByTestId('color-renglon-oc')).toHaveTextContent('Arena');
+  });
+});
+
+/**
+ * ⭐ FILA 0.192 — LA MATRIZ TALLA × COLOR DE LA OC BUSCA EL COLOR EN EL SERVIDOR.
+ *
+ * Antes el diálogo pre-cargaba `useColores({ porPagina: 100 })` y se lo pasaba a la matriz, y **100
+ * es el tope del contrato** (`contrato/esquemas/color.ts`): con más de cien colores activos, los del
+ * final del alfabeto no aparecían en el desplegable y la compra no se podía desglosar por ellos.
+ */
+describe('<EditorLineasOc> · el color de la matriz (fila 0.192)', () => {
+  it('agrega la fila del color elegido en el buscador', async () => {
+    montarConColor();
+    fireEvent.click(screen.getByTestId('alternar-matriz-oc'));
+
+    await elegirEnCombobox('matriz-oc-0-agregar-color', 'Rojo Cereza');
+
+    expect(screen.getByTestId('matriz-oc-0-fila')).toHaveTextContent('Rojo Cereza');
+  });
+
+  /**
+   * El color que ya es fila no se vuelve a ofrecer: quien lo esconde dejó de ser el `<select>` de la
+   * matriz y pasó a ser el `excluirIds` que este editor le pasa al buscador. Sin él, el editor
+   * invita a capturar dos veces el mismo color y el servidor rechaza la OC al guardar.
+   */
+  it('el color YA capturado desaparece del buscador (no se puede repetir la fila)', async () => {
+    montarConColor();
+    fireEvent.click(screen.getByTestId('alternar-matriz-oc'));
+    await elegirEnCombobox('matriz-oc-0-agregar-color', 'Rojo Cereza');
+
+    const input = screen.getByTestId('matriz-oc-0-agregar-color-busqueda');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Rojo' } });
+    expect(await screen.findByText('No hay colores que coincidan.')).toBeInTheDocument();
   });
 });

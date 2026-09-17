@@ -120,6 +120,25 @@ export async function elegirEnCombobox(
 }
 
 /**
+ * Elige la PRIMERA opción que ofrece un combobox, sin teclear nada: el equivalente al viejo
+ * `selectOption({ index: 1 })` de un `<select>` cuando al spec le da igual cuál sea (p. ej. «un
+ * color cualquiera del catálogo» en la captura de inventario).
+ *
+ * Nace con la fila 0.192, que cambió los selectores de color por comboboxes con búsqueda en el
+ * servidor: los specs que elegían por índice se quedaron sin `<option>` que seleccionar. Enfocar el
+ * input ABRE la lista (comportamiento normal del kit), y el `click` de Playwright espera a que la
+ * opción exista, así que absorbe el viaje al servidor sin esperas explícitas.
+ */
+export async function elegirPrimeroEnCombobox(
+  page: Page,
+  contenedor: Locator,
+  testid: string,
+): Promise<void> {
+  await contenedor.getByTestId(`${testid}-busqueda`).click();
+  await page.getByTestId(`${testid}-opcion`).first().click();
+}
+
+/**
  * Elige una opción de un `<select>` nativo buscándola por el **PREFIJO** de su texto, no por su
  * etiqueta completa.
  *

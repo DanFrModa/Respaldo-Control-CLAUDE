@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConteoCiclico } from '@/api/tipos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ConteoCiclicoPagina } from './ConteoCiclicoPagina';
 
@@ -28,7 +28,7 @@ vi.mock('@/api/inventario-ciclico', () => ({
 // Los catálogos del diálogo «Agregar artículo» y los combobox no son el objeto de esta prueba:
 // se sustituyen por lo mínimo para que la pantalla monte.
 vi.mock('@/api/colores', () => ({
-  useColores: () => ({ data: { datos: [{ id: 3, nombre: 'Rojo' }] } }),
+  useColores: () => ({ data: { datos: [{ id: 3, nombre: 'Rojo' }] }, isPending: false }),
 }));
 vi.mock('@/api/tallas', () => ({
   useTallasActivas: () => ({ data: { datos: [{ id: 4, etiqueta: 'CH' }] } }),
@@ -192,6 +192,34 @@ describe('<ConteoCiclicoPagina>', () => {
     render({ data: conteoTela({ renglones: [] }), isPending: false, isError: false, error: null });
     expect(screen.getByText(/la hoja está vacía/i)).toBeInTheDocument();
     expect(screen.getByTestId('cc-agregar')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ FILA 0.192 — el desplegable de color de esta pantalla estaba ROTO, no «por romperse»: pedía
+   * `porPagina: 200` contra el tope de 100 del contrato ⇒ el backend respondía **400** y la lista
+   * salía VACÍA, sin decir por qué. Agregar un artículo de PT era imposible. Hoy el color se busca
+   * en el servidor; esta prueba vigila que lo elegido llegue al API.
+   */
+  it('⭐ agrega un artículo de PT con el color elegido en el buscador (fila 0.192)', async () => {
+    const usuario = userEvent.setup();
+    render({
+      data: conteoTela({ dimension: 'PT', renglones: [] }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+
+    await usuario.click(screen.getByTestId('cc-agregar'));
+    await usuario.click(screen.getByText('elegir modelo'));
+    await elegirEnCombobox('cc-ag-color', 'Rojo');
+    await usuario.selectOptions(screen.getByTestId('cc-ag-talla'), '4');
+    await usuario.click(screen.getByTestId('cc-ag-guardar'));
+
+    expect(agregar).toHaveBeenCalledTimes(1);
+    expect(agregar.mock.calls[0]?.[0]).toEqual({
+      id: 5,
+      cuerpo: { idModelo: 2, idColor: 3, idTalla: 4 },
+    });
   });
 
   it('⭐ agrega un artículo que el sistema cree que no tiene (avíos)', async () => {

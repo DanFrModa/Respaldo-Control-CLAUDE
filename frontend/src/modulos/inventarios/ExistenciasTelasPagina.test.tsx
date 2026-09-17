@@ -2,7 +2,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExistenciasTela } from '@/api/tipos';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ExistenciasTelasPagina } from './ExistenciasTelasPagina';
 
@@ -30,10 +30,18 @@ const existencias: ExistenciasTela = {
   totalExistencia: 100,
 };
 
+/** Guarda la QUERY con la que la pantalla pide existencias (para medir qué filtros manda). */
+const useExistenciasTelaMock = vi.fn();
+
 vi.mock('@/api/inventario-materiales', () => ({
-  useExistenciasTela: () => ({ data: existencias, isPending: false, isError: false, error: null }),
+  useExistenciasTela: (query: unknown) => {
+    useExistenciasTelaMock(query);
+    return { data: existencias, isPending: false, isError: false, error: null };
+  },
 }));
-vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
+vi.mock('@/api/colores', () => ({
+  useColores: () => ({ data: { datos: [{ id: 3, nombre: 'Rojo' }] }, isPending: false }),
+}));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
 // El filtro de tela del toolbar (SelectorTela, combobox popover) consulta el catálogo de telas.
 vi.mock('@/api/telas', () => ({
@@ -41,6 +49,21 @@ vi.mock('@/api/telas', () => ({
 }));
 
 describe('ExistenciasTelasPagina (F4-E1)', () => {
+  /**
+   * ⭐ FILA 0.192 — el filtro de color pasó de un `<select>` con las primeras 100 del catálogo (y
+   * 100 es el tope del contrato) a un buscador que pregunta al SERVIDOR. Aquí se vigila la otra
+   * mitad: que lo elegido llegue al API como `idColor`, o el filtro se vería puesto sin filtrar.
+   */
+  it('manda al API el color elegido en el buscador', async () => {
+    renderConProveedores(<ExistenciasTelasPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver']),
+    });
+    await elegirEnCombobox('telas-color', 'Rojo');
+
+    const ultima = useExistenciasTelaMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(ultima['idColor']).toBe(3);
+  });
+
   it('muestra la fila + total con tabla (escritorio) y tarjetas (móvil)', () => {
     renderConProveedores(<ExistenciasTelasPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver']),

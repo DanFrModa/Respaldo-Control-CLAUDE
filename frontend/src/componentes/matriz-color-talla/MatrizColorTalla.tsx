@@ -66,8 +66,15 @@ export interface PropsMatrizColorTalla {
   tallas: readonly MatrizTalla[];
   /** Valor controlado: las filas (colores con sus cantidades). */
   lineas: readonly MatrizLinea[];
-  /** Colores del catálogo para elegir el color de una fila nueva (los ya usados se ocultan). */
-  coloresDisponibles: readonly MatrizColorOpcion[];
+  /**
+   * Colores del catálogo para el `<select>` nativo de "agregar color" (los ya usados se ocultan).
+   *
+   * 📌 OPCIONAL desde la fila 0.192: un flujo que trae su propio {@link PropsMatrizColorTalla.slotAgregarColor}
+   * busca el color EN EL SERVIDOR y agrega la fila él mismo, así que no tiene ninguna lista que
+   * pasar — y obligarlo a pasar una era justamente lo que ataba esas pantallas al tope de 100 del
+   * contrato de paginación. Sin `slotAgregarColor` sigue siendo lo que alimenta el desplegable.
+   */
+  coloresDisponibles?: readonly MatrizColorOpcion[];
   /** Tallas del catálogo para agregar columnas fuera de la curva (las ya presentes se ocultan). */
   tallasDisponibles: readonly MatrizTalla[];
   /** Emite el nuevo set de filas tras editar una celda o agregar/quitar un color. */
@@ -142,7 +149,7 @@ function seleccionarTodo(input: HTMLInputElement): void {
 function MatrizColorTallaBase({
   tallas,
   lineas,
-  coloresDisponibles,
+  coloresDisponibles = [],
   tallasDisponibles,
   onLineasChange,
   onTallasChange,
