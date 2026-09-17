@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.168 · 17-sep-2026 · **en prueba** — **El proyecto recuerda a su compradora, su género y su año — y los modelos nuevos ya no te los vuelven a preguntar**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ponerle la compradora a un proyecto.** El catálogo de contactos del cliente ya existía; lo que
+  faltaba era poder decir *«este proyecto va dirigido a ella»*. Ahora se elige al crear o editar el
+  proyecto, y se ve en su ficha con su puesto («Ana Ruiz · compradora»). **Es opcional**: un proyecto
+  sin compradora funciona exactamente igual que antes.
+- ⭐ **Que el género y el año de entrega vivan en el proyecto, y que cada modelo nuevo los herede.**
+  Como pediste: *«que no vuelva a preguntar»*. Y **se pueden cambiar** en el modelo cuando haga falta,
+  sin tocar el proyecto.
+- 🔑 **Y esto vale más de lo que parece, por una razón que no era obvia:** **un modelo sin género no se
+  puede numerar**, y hasta ahora el sistema **no te avisaba al crearlo** — te lo avisaba al pulsar
+  «Generar OP», *después* de que hubieras tecleado la matriz de colores y tallas completa. Heredarlo
+  del proyecto **cierra ese agujero por arriba**: ya no puedes llegar tan lejos con el dato faltando.
+- **El tipo de prenda NO se hereda, y es a propósito**: dentro de un mismo proyecto hay pantalón,
+  playera y sudadera, así que preguntarlo cada vez es lo correcto.
+
+### Qué cambió y puede sorprender
+
+- **Al dar de alta un modelo desde un proyecto, el género y el año vienen ya puestos.** Si los
+  cambias, manda lo que tú pongas. Si ni el modelo ni el proyecto los traen, el sistema te lo dice
+  **nombrando el proyecto** —«no tiene género capturado, así que no hay de dónde heredarlo»— en vez
+  de inventarse uno.
+- **Los tres campos son opcionales por ahora.** Un proyecto que ya existía sigue igual, sin nada que
+  rellenar. ⚠️ **El costo de esa decisión**: si alguien crea un proyecto **sin** género, el agujero
+  de arriba sigue abierto para ese proyecto. Volverlos obligatorios lo cerraría del todo y es un
+  cambio de una línea — **está esperando tu palabra** (ver abajo).
+- **La compradora se muestra aunque se haya dado de baja**, marcada como «(archivado)», para no
+  borrártela en silencio de un proyecto viejo.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Tres cosas que decides tú**, y las tres ya funcionan con el valor conservador: **(1)** ¿género y
+  año **obligatorios** al crear un proyecto? *(hoy: no)*. **(2)** ¿quieres ver la compradora también
+  en la lista de proyectos y en la cotización impresa? *(hoy: sólo en la ficha; la tabla ya va
+  apretada y la cotización no tiene campo de contacto)*. **(3)** al crear un modelo **copiando otro**
+  y el proyecto a la vez, el proyecto nace **sin género** *(hoy: se queda así)*.
+- **Esta versión lleva un cambio en la base de datos**, aditivo: se aplica solo al desplegar y no
+  toca nada de lo que ya hay.
+
 ## 0.167 · 16-sep-2026 · **en prueba** — **Una red automática impide que vuelva a aparecer el fallo de «se guardó, pero te digo que no tienes permiso»**
 
 ### Qué se puede hacer ahora que antes no

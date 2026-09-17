@@ -557,6 +557,146 @@ describe('crearModeloEnLista — cotizar en la cita un modelo que no existe', ()
       ),
     ).rejects.toThrow(ErrorConflicto);
   });
+
+  // ══ ⭐ fila 0.155 (§Post-F9.210 punto 2) — LA MESA ES LA OTRA PUERTA AL MISMO ALTA ════════════
+  //
+  // La herencia se construyó en las DOS puertas a propósito. Dejar una preguntando lo que la otra
+  // ya sabe es la cicatriz de §Post-F9.210(3): *«la casilla estaba en DOS sitios, no en uno»*.
+  describe('herencia del proyecto (fila 0.155)', () => {
+    it('elegido un PROYECTO con género y año, el modelo nuevo los hereda sin mandarlos', async () => {
+      const { idLista } = await listaConUnModelo();
+      const proyecto = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto con memoria',
+          idGenero: caballero.id,
+          anioEntrega: 2027,
+        },
+        bd(),
+      );
+
+      const creado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        { idTipoProducto: pantalon.id, idProyecto: proyecto.id },
+        bd(),
+      );
+
+      // `27` del año del proyecto, `71` = pantalón(7) + caballero(1) heredado del proyecto.
+      expect(creado.codigoModelo).toMatch(/^CYA-27-71-\d{3}$/);
+    });
+
+    it('el MODELO COPIADO gana al proyecto (copiar es un acto sobre una prenda concreta)', async () => {
+      const { idLista } = await listaConUnModelo();
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+      const proyecto = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto de caballero',
+          idGenero: caballero.id,
+          anioEntrega: 2026,
+        },
+        bd(),
+      );
+      const origen = await cliente.modelo.create({
+        data: {
+          codigo: 'MOD-DAMA',
+          maquilaBase: 10,
+          idTipoProducto: pantalon.id,
+          idGenero: dama.id,
+        },
+      });
+
+      const creado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        { idModeloOrigen: origen.id, idProyecto: proyecto.id },
+        bd(),
+      );
+
+      // `72` = pantalón + DAMA (la del modelo copiado), no el caballero del proyecto.
+      expect(creado.codigoModelo).toMatch(/^CYA-26-72-\d{3}$/);
+    });
+
+    it('el PROYECTO NUEVO creado aquí se queda con el género y el año tecleados', async () => {
+      const { idLista } = await listaConUnModelo();
+
+      const creado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        {
+          anioEntrega: 2026,
+          idTipoProducto: pantalon.id,
+          idGenero: caballero.id,
+          nombreProyectoNuevo: 'Cita que recuerda',
+        },
+        bd(),
+      );
+
+      expect(creado.proyectoCreado).toBe(true);
+      const proyecto = await cliente.proyecto.findFirstOrThrow({
+        where: { nombre: 'Cita que recuerda' },
+      });
+      expect(proyecto.idGenero).toBe(caballero.id);
+      expect(proyecto.anioEntrega).toBe(2026);
+    });
+
+    it('un proyecto SIN año (los anteriores a la fila) sigue funcionando: se teclea y ya', async () => {
+      const { idLista } = await listaConUnModelo();
+      const viejo = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto de antes',
+        },
+        bd(),
+      );
+
+      const creado = await crearModeloEnLista(
+        sesion(),
+        idLista,
+        {
+          anioEntrega: 2026,
+          idTipoProducto: pantalon.id,
+          idGenero: caballero.id,
+          idProyecto: viejo.id,
+        },
+        bd(),
+      );
+      expect(creado.codigoModelo).toMatch(/^CYA-26-71-\d{3}$/);
+    });
+
+    it('un proyecto SIN año y sin año tecleado se rechaza nombrando el proyecto', async () => {
+      const { idLista } = await listaConUnModelo();
+      const viejo = await crearProyecto(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          nombre: 'Proyecto de antes',
+        },
+        bd(),
+      );
+      const modelosAntes = await cliente.modelo.count();
+
+      await expect(
+        crearModeloEnLista(
+          sesion(),
+          idLista,
+          { idTipoProducto: pantalon.id, idGenero: caballero.id, idProyecto: viejo.id },
+          bd(),
+        ),
+      ).rejects.toThrow(/no tiene año de entrega capturado/);
+      expect(await cliente.modelo.count()).toBe(modelosAntes);
+    });
+  });
 });
 
 describe('editarEncabezadoLista — el lugar de la cita', () => {

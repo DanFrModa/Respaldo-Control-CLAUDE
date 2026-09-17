@@ -102229,6 +102229,18 @@ export interface paths {
                 idTemporada: number | null;
                 /** @description Nombre de la temporada, o null. */
                 temporada: string | null;
+                /** @description Comprador del proyecto, o null. */
+                idClienteContacto: number | null;
+                /** @description Nombre del comprador (para la UI), o null. */
+                comprador: string | null;
+                /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+                compradorPuesto: string | null;
+                /** @description Género del proyecto, o null. */
+                idGenero: number | null;
+                /** @description Nombre del género (para la UI), o null. */
+                genero: string | null;
+                /** @description Año de entrega del proyecto, o null. */
+                anioEntrega: number | null;
                 /** @description Notas del proyecto, o null. */
                 notas: string | null;
                 /** @description Archivado (borrado suave reversible). */
@@ -102376,6 +102388,12 @@ export interface paths {
             nombre: string;
             /** @description Temporada del proyecto (opcional). */
             idTemporada?: number;
+            /** @description Comprador del cliente al que va dirigido el proyecto (opcional). */
+            idClienteContacto?: number;
+            /** @description Género del proyecto; lo heredan los modelos nuevos (opcional). */
+            idGenero?: number;
+            /** @description Año de ENTREGA del proyecto; lo heredan los modelos nuevos (opcional). */
+            anioEntrega?: number;
             /** @description Notas del proyecto (opcional). */
             notas?: string;
           };
@@ -102409,6 +102427,18 @@ export interface paths {
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
               temporada: string | null;
+              /** @description Comprador del proyecto, o null. */
+              idClienteContacto: number | null;
+              /** @description Nombre del comprador (para la UI), o null. */
+              comprador: string | null;
+              /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+              compradorPuesto: string | null;
+              /** @description Género del proyecto, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género (para la UI), o null. */
+              genero: string | null;
+              /** @description Año de entrega del proyecto, o null. */
+              anioEntrega: number | null;
               /** @description Notas del proyecto, o null. */
               notas: string | null;
               /** @description Archivado (borrado suave reversible). */
@@ -102634,6 +102664,18 @@ export interface paths {
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
               temporada: string | null;
+              /** @description Comprador del proyecto, o null. */
+              idClienteContacto: number | null;
+              /** @description Nombre del comprador (para la UI), o null. */
+              comprador: string | null;
+              /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+              compradorPuesto: string | null;
+              /** @description Género del proyecto, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género (para la UI), o null. */
+              genero: string | null;
+              /** @description Año de entrega del proyecto, o null. */
+              anioEntrega: number | null;
               /** @description Notas del proyecto, o null. */
               notas: string | null;
               /** @description Archivado (borrado suave reversible). */
@@ -102831,6 +102873,12 @@ export interface paths {
             nombre?: string;
             /** @description Temporada (null para vaciarla; omitir para no tocar). */
             idTemporada?: number | null;
+            /** @description Comprador (null para quitarlo; omitir para no tocar). */
+            idClienteContacto?: number | null;
+            /** @description Género del proyecto (null para quitarlo; omitir para no tocar). */
+            idGenero?: number | null;
+            /** @description Año de entrega (null para quitarlo; omitir para no tocar). */
+            anioEntrega?: number | null;
             /** @description Notas (null para vaciarlas; omitir para no tocar). */
             notas?: string | null;
           };
@@ -102864,6 +102912,18 @@ export interface paths {
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
               temporada: string | null;
+              /** @description Comprador del proyecto, o null. */
+              idClienteContacto: number | null;
+              /** @description Nombre del comprador (para la UI), o null. */
+              comprador: string | null;
+              /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+              compradorPuesto: string | null;
+              /** @description Género del proyecto, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género (para la UI), o null. */
+              genero: string | null;
+              /** @description Año de entrega del proyecto, o null. */
+              anioEntrega: number | null;
               /** @description Notas del proyecto, o null. */
               notas: string | null;
               /** @description Archivado (borrado suave reversible). */
@@ -103087,6 +103147,18 @@ export interface paths {
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
               temporada: string | null;
+              /** @description Comprador del proyecto, o null. */
+              idClienteContacto: number | null;
+              /** @description Nombre del comprador (para la UI), o null. */
+              comprador: string | null;
+              /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+              compradorPuesto: string | null;
+              /** @description Género del proyecto, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género (para la UI), o null. */
+              genero: string | null;
+              /** @description Año de entrega del proyecto, o null. */
+              anioEntrega: number | null;
               /** @description Notas del proyecto, o null. */
               notas: string | null;
               /** @description Archivado (borrado suave reversible). */
@@ -103314,6 +103386,18 @@ export interface paths {
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
               temporada: string | null;
+              /** @description Comprador del proyecto, o null. */
+              idClienteContacto: number | null;
+              /** @description Nombre del comprador (para la UI), o null. */
+              comprador: string | null;
+              /** @description Puesto del comprador tal como lo captura su ficha («compradora»), o null. */
+              compradorPuesto: string | null;
+              /** @description Género del proyecto, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género (para la UI), o null. */
+              genero: string | null;
+              /** @description Año de entrega del proyecto, o null. */
+              anioEntrega: number | null;
               /** @description Notas del proyecto, o null. */
               notas: string | null;
               /** @description Archivado (borrado suave reversible). */
@@ -103697,12 +103781,12 @@ export interface paths {
       requestBody: {
         content: {
           'application/json': {
-            /** @description Año de ENTREGA del modelo (el que se congela en el código, no el de creación). */
-            anioEntrega: number;
+            /** @description Año de ENTREGA del modelo (el que se congela en el código, no el de creación). Omitir = heredar el del proyecto. */
+            anioEntrega?: number;
             /** @description Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura. */
             idTipoProducto: number;
-            /** @description Género: de él sale el 2º dígito de la nomenclatura. */
-            idGenero: number;
+            /** @description Género: de él sale el 2º dígito. Omitir = heredar el del proyecto. */
+            idGenero?: number;
             /** @description Descripción del modelo (opcional). */
             descripcion?: string;
             /** @description Curva de tallas del modelo (opcional). */
@@ -111746,8 +111830,8 @@ export interface paths {
           'application/json': {
             /** @description Modelo del que se COPIA la ficha + la receta. Omitir = armarlo desde cero. */
             idModeloOrigen?: number;
-            /** @description Año de ENTREGA (el que se congela en el código del modelo). */
-            anioEntrega: number;
+            /** @description Año de ENTREGA (el que se congela en el código del modelo). Omitir = heredar el del proyecto elegido (fila 0.155). */
+            anioEntrega?: number;
             /** @description Tipo de prenda (1er dígito). Obligatorio desde cero; al copiar se hereda. */
             idTipoProducto?: number;
             /** @description Género (2º dígito). Obligatorio desde cero; al copiar se hereda. */

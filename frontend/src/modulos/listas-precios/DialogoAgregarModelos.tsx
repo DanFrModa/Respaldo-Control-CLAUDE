@@ -1,5 +1,5 @@
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useTiposProductoActivos } from '@/api/calidad';
@@ -127,6 +127,22 @@ export function DialogoAgregarModelos({
   const listaCandidatos = candidatos.data?.datos ?? [];
   const descartados = candidatos.data?.descartados ?? [];
   const proyectosVivos = (proyectos.data?.datos ?? []).filter((p) => !p.archivado);
+
+  // ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — al elegir un PROYECTO, su género y su año de entrega
+  // precargan los campos del modelo nuevo: *«que no vuelva a preguntar»*. Se pueden cambiar aquí
+  // mismo (*«con opción a cambiarla»*), y si el proyecto no los trae —los anteriores a esta fila no
+  // los tienen, REGLA 0-B— no se toca nada y se capturan como siempre.
+  const proyectoElegido = proyectosVivos.find((p) => String(p.id) === idProyecto);
+  const idGeneroDelProyecto = proyectoElegido?.idGenero ?? null;
+  const anioDelProyecto = proyectoElegido?.anioEntrega ?? null;
+  useEffect(() => {
+    if (idGeneroDelProyecto !== null) {
+      setIdGenero(String(idGeneroDelProyecto));
+    }
+    if (anioDelProyecto !== null) {
+      setAnio(String(anioDelProyecto));
+    }
+  }, [idGeneroDelProyecto, anioDelProyecto]);
   // ⭐ La comprobación que evita que truene enfrente del cliente (ver el encabezado).
   // ⚠️ Se compara contra la CADENA VACÍA además del null: el dominio rechaza las dos
   // (`nomenclatura.ts`, «no tiene ABREVIATURA capturada»). Hoy la columna nunca guarda '' —el Zod

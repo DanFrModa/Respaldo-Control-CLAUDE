@@ -351,3 +351,207 @@ describe('Proyectos de desarrollo (F8-E2)', () => {
     });
   });
 });
+
+// ══ ⭐⭐ fila 0.155 (§Post-F9.210) — EL PROYECTO RECUERDA ════════════════════════════════════════
+//
+// Dos peticiones de Daniel, ya decididas:
+//  (1) *«ese catálogo debe de tener la opción de seleccionar al comprador… normalmente un proyecto
+//      va dirigido a un solo comprador»* ⇒ FK OPCIONAL al contacto del cliente.
+//  (2) *«el género y el año van en el proyecto y cada modelo hereda esa información (con opción a
+//      cambiarla)»* ⇒ dos columnas más, que el alta de modelo nuevo precarga.
+//
+// ⚠️ Lo que estas pruebas cuidan por encima de todo es que los tres son **OPCIONALES DE VERDAD**:
+// un proyecto sin ellos —o sea, TODOS los anteriores a esta fila, REGLA 0-B— tiene que seguir
+// creándose, editándose, listándose y archivándose sin una sola diferencia.
+
+describe('el comprador, el género y el año del proyecto (fila 0.155)', () => {
+  /** Da de alta un contacto del cliente del proyecto. */
+  async function contactoDe(
+    idCliente: number,
+    nombre: string,
+    extras: { puesto?: string; activo?: boolean } = {},
+  ): Promise<{ id: number }> {
+    return cliente.clienteContacto.create({
+      data: {
+        idCliente,
+        nombre,
+        ...(extras.puesto === undefined ? {} : { puesto: extras.puesto }),
+        ...(extras.activo === undefined ? {} : { activo: extras.activo }),
+      },
+      select: { id: true },
+    });
+  }
+
+  it('un proyecto SIN comprador, SIN género y SIN año se crea igual y los devuelve en null', async () => {
+    const p = await crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd());
+    expect(p).toMatchObject({
+      idClienteContacto: null,
+      comprador: null,
+      compradorPuesto: null,
+      idGenero: null,
+      genero: null,
+      anioEntrega: null,
+    });
+  });
+
+  it('un proyecto SIN esos datos se edita, se archiva y se lista sin diferencia', async () => {
+    const p = await crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd());
+    const editado = await actualizarProyecto(sesion(PERM_TODOS), p.id, { nombre: 'Otro' }, bd());
+    expect(editado.nombre).toBe('Otro');
+    expect(editado.comprador).toBeNull();
+    const archivado = await archivarProyecto(sesion(PERM_TODOS), p.id, bd());
+    expect(archivado.archivado).toBe(true);
+    const pagina = await listarProyectos(sesion(PERM_TODOS), { incluirArchivados: true }, bd());
+    expect(pagina.datos[0]).toMatchObject({ comprador: null, genero: null, anioEntrega: null });
+  });
+
+  it('liga al comprador y lo devuelve con su NOMBRE y su PUESTO', async () => {
+    const ana = await contactoDe(clienteNegocio.id, 'Ana Ruiz', { puesto: 'compradora' });
+    const p = await crearProyecto(
+      sesion(PERM_TODOS),
+      { ...entradaProyecto(), idClienteContacto: ana.id },
+      bd(),
+    );
+    expect(p).toMatchObject({
+      idClienteContacto: ana.id,
+      comprador: 'Ana Ruiz',
+      compradorPuesto: 'compradora',
+    });
+  });
+
+  it('RECHAZA un contacto de OTRO cliente (A1: el comprador es del cliente del proyecto)', async () => {
+    const otroCliente = await cliente.cliente.create({ data: { nombre: 'Walmart' } });
+    const ajeno = await contactoDe(otroCliente.id, 'Compradora de Walmart');
+    await expect(
+      crearProyecto(
+        sesion(PERM_TODOS),
+        { ...entradaProyecto(), idClienteContacto: ajeno.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('RECHAZA un contacto ARCHIVADO (no se dirige trabajo nuevo a quien ya no está)', async () => {
+    const jubilada = await contactoDe(clienteNegocio.id, 'Rosa Vega', { activo: false });
+    await expect(
+      crearProyecto(
+        sesion(PERM_TODOS),
+        { ...entradaProyecto(), idClienteContacto: jubilada.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('RECHAZA un contacto inexistente', async () => {
+    await expect(
+      crearProyecto(sesion(PERM_TODOS), { ...entradaProyecto(), idClienteContacto: 999_999 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('A9 — un proyecto de otra empresa no se puede ligar a NINGÚN comprador (ni verse)', async () => {
+    const ana = await contactoDe(clienteNegocio.id, 'Ana Ruiz');
+    const p = await crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd());
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra empresa');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otraEmpresa.id, permisos: PERM_TODOS });
+    await expect(
+      actualizarProyecto(sesionOtra, p.id, { idClienteContacto: ana.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    // Y la liga no se escribió a medias.
+    const enBase = await cliente.proyecto.findUniqueOrThrow({ where: { id: p.id } });
+    expect(enBase.idClienteContacto).toBeNull();
+  });
+
+  it('el comprador se CAMBIA y se QUITA con null (M1), y queda en bitácora (A7)', async () => {
+    const ana = await contactoDe(clienteNegocio.id, 'Ana Ruiz');
+    const luis = await contactoDe(clienteNegocio.id, 'Luis Mora');
+    const p = await crearProyecto(
+      sesion(PERM_TODOS),
+      { ...entradaProyecto(), idClienteContacto: ana.id },
+      bd(),
+    );
+
+    const cambiado = await actualizarProyecto(
+      sesion(PERM_TODOS),
+      p.id,
+      { idClienteContacto: luis.id },
+      bd(),
+    );
+    expect(cambiado.comprador).toBe('Luis Mora');
+
+    const quitado = await actualizarProyecto(
+      sesion(PERM_TODOS),
+      p.id,
+      { idClienteContacto: null },
+      bd(),
+    );
+    expect(quitado.idClienteContacto).toBeNull();
+    expect(quitado.comprador).toBeNull();
+
+    const cambios = await cliente.bitacora.count({
+      where: { entidad: 'Proyecto', idEntidad: String(p.id), accion: 'MODIFICAR' },
+    });
+    expect(cambios).toBe(2);
+  });
+
+  it('guarda el GÉNERO y el AÑO, y los devuelve con el nombre del género', async () => {
+    const dama = await cliente.genero.create({ data: { nombre: 'Dama' } });
+    const p = await crearProyecto(
+      sesion(PERM_TODOS),
+      { ...entradaProyecto(), idGenero: dama.id, anioEntrega: 2026 },
+      bd(),
+    );
+    expect(p).toMatchObject({ idGenero: dama.id, genero: 'Dama', anioEntrega: 2026 });
+  });
+
+  it('RECHAZA un género DESACTIVADO (mismo criterio que el catálogo de modelos)', async () => {
+    const viejo = await cliente.genero.create({ data: { nombre: 'Unisex', activo: false } });
+    await expect(
+      crearProyecto(sesion(PERM_TODOS), { ...entradaProyecto(), idGenero: viejo.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('el género y el año se CAMBIAN y se QUITAN con null (M1)', async () => {
+    const dama = await cliente.genero.create({ data: { nombre: 'Dama' } });
+    const nino = await cliente.genero.create({ data: { nombre: 'Niño' } });
+    const p = await crearProyecto(
+      sesion(PERM_TODOS),
+      { ...entradaProyecto(), idGenero: dama.id, anioEntrega: 2026 },
+      bd(),
+    );
+    const cambiado = await actualizarProyecto(
+      sesion(PERM_TODOS),
+      p.id,
+      { idGenero: nino.id, anioEntrega: 2027 },
+      bd(),
+    );
+    expect(cambiado).toMatchObject({ genero: 'Niño', anioEntrega: 2027 });
+
+    const vaciado = await actualizarProyecto(
+      sesion(PERM_TODOS),
+      p.id,
+      { idGenero: null, anioEntrega: null },
+      bd(),
+    );
+    expect(vaciado).toMatchObject({ idGenero: null, genero: null, anioEntrega: null });
+  });
+
+  it('un PATCH que repite los mismos valores no deja bitácora (idempotencia)', async () => {
+    const dama = await cliente.genero.create({ data: { nombre: 'Dama' } });
+    const ana = await contactoDe(clienteNegocio.id, 'Ana Ruiz');
+    const p = await crearProyecto(
+      sesion(PERM_TODOS),
+      { ...entradaProyecto(), idGenero: dama.id, anioEntrega: 2026, idClienteContacto: ana.id },
+      bd(),
+    );
+    await actualizarProyecto(
+      sesion(PERM_TODOS),
+      p.id,
+      { idGenero: dama.id, anioEntrega: 2026, idClienteContacto: ana.id },
+      bd(),
+    );
+    const cambios = await cliente.bitacora.count({
+      where: { entidad: 'Proyecto', idEntidad: String(p.id), accion: 'MODIFICAR' },
+    });
+    expect(cambios).toBe(0);
+  });
+});

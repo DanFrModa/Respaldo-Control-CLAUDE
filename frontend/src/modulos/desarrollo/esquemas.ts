@@ -7,12 +7,23 @@ import { z } from 'zod';
  * convierten a número al enviar.
  */
 
-/** Formulario de alta/edición de un proyecto (cliente + departamento + nombre + temporada + notas). */
+/**
+ * Formulario de alta/edición de un proyecto (cliente + departamento + nombre + temporada + notas).
+ *
+ * ⭐ fila 0.155 (§Post-F9.210) — más el **comprador**, el **género** y el **año de entrega**. Los
+ * tres son opcionales: un proyecto sin ellos funciona igual que hasta hoy. El año se valida aquí
+ * sólo por UX (cuatro dígitos); el rango real (2020–2100) lo manda el servidor.
+ */
 export const esquemaProyectoFormulario = z.object({
   idCliente: z.string().min(1, { error: 'Elige un cliente' }),
   idClienteDepartamento: z.string().min(1, { error: 'Elige un departamento' }),
   nombre: z.string().trim().min(1, { error: 'El nombre es obligatorio' }),
   idTemporada: z.string(),
+  idClienteContacto: z.string(),
+  idGenero: z.string(),
+  anioEntrega: z.string().refine((valor) => valor.trim() === '' || /^\d{4}$/.test(valor.trim()), {
+    error: 'El año de entrega va con 4 dígitos (o déjalo vacío)',
+  }),
   notas: z.string(),
 });
 

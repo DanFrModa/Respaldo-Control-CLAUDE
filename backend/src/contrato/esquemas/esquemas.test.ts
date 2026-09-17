@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { esquemaAlmacenCrear, esquemaAlmacenEditar } from './almacen.js';
 import { esquemaEmpresaCrear, esquemaEmpresaEditar } from './empresa.js';
 import { esquemaEtiquetaMarcaCrear, esquemaEtiquetaMarcaEditar } from './etiqueta-marca.js';
+import { esquemaDesarrolloModeloNuevoCuerpo } from './desarrollo.js';
+import { esquemaModeloNuevoEnLista } from './lista-precios.js';
 import { esquemaLogin } from './login.js';
+import { esquemaProyectoCrear, esquemaProyectoEditar } from './proyecto.js';
 import {
   esquemaProveedorCrear,
   esquemaProveedorEditar,
@@ -406,5 +409,73 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
   it('edición: vaciar el RFC se permite (la regla que lo ataba murió en la fila 0.124)', () => {
     const r = esquemaProveedorEditar.parse({ id: 1, rfc: null, regimenFiscalSat: '601' });
     expect(r.rfc).toBeNull();
+  });
+});
+
+// ══ ⭐⭐ fila 0.155 (§Post-F9.210) — EL PROYECTO RECUERDA, y el contrato lo refleja ═════════════
+
+describe('esquemaProyecto — comprador, género y año (fila 0.155)', () => {
+  const base = { idCliente: 1, idClienteDepartamento: 2, nombre: 'Joggers' };
+
+  it('los tres son OPCIONALES: un alta sin ellos sigue siendo válida', () => {
+    const datos = esquemaProyectoCrear.parse(base);
+    expect(datos.idClienteContacto).toBeUndefined();
+    expect(datos.idGenero).toBeUndefined();
+    expect(datos.anioEntrega).toBeUndefined();
+  });
+
+  it('acepta los tres cuando vienen', () => {
+    const datos = esquemaProyectoCrear.parse({
+      ...base,
+      idClienteContacto: 7,
+      idGenero: 3,
+      anioEntrega: 2026,
+    });
+    expect(datos).toMatchObject({ idClienteContacto: 7, idGenero: 3, anioEntrega: 2026 });
+  });
+
+  it('el año fuera del rango 2020–2100 se rechaza', () => {
+    expect(esquemaProyectoCrear.safeParse({ ...base, anioEntrega: 1999 }).success).toBe(false);
+    expect(esquemaProyectoCrear.safeParse({ ...base, anioEntrega: 2200 }).success).toBe(false);
+  });
+
+  it('en la EDICIÓN los tres aceptan `null` para vaciarlos (M1)', () => {
+    const datos = esquemaProyectoEditar.parse({
+      idClienteContacto: null,
+      idGenero: null,
+      anioEntrega: null,
+    });
+    expect(datos).toMatchObject({ idClienteContacto: null, idGenero: null, anioEntrega: null });
+  });
+});
+
+describe('alta de modelo nuevo — qué se hereda y qué no (fila 0.155)', () => {
+  it('el género y el año se pueden OMITIR (los pone el proyecto)', () => {
+    const datos = esquemaDesarrolloModeloNuevoCuerpo.parse({ idTipoProducto: 4 });
+    expect(datos.idGenero).toBeUndefined();
+    expect(datos.anioEntrega).toBeUndefined();
+  });
+
+  it('🔑 el TIPO DE PRENDA sigue siendo OBLIGATORIO: un proyecto no tiene uno que prestar', () => {
+    const resultado = esquemaDesarrolloModeloNuevoCuerpo.safeParse({});
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues.map((i) => i.message)).toContain(
+      'El tipo de producto es obligatorio',
+    );
+  });
+
+  it('desde la MESA, con proyecto existente, género y año se pueden omitir', () => {
+    const resultado = esquemaModeloNuevoEnLista.safeParse({ idTipoProducto: 4, idProyecto: 9 });
+    expect(resultado.success).toBe(true);
+  });
+
+  it('desde la MESA, creando el proyecto en la misma alta, el año SÍ se exige (no hay de quién heredarlo)', () => {
+    const resultado = esquemaModeloNuevoEnLista.safeParse({
+      idTipoProducto: 4,
+      idGenero: 2,
+      nombreProyectoNuevo: 'Cita de hoy',
+    });
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues.map((i) => i.path.join('.'))).toContain('anioEntrega');
   });
 });

@@ -79,26 +79,46 @@ export type DatosDesarrolloCrear = z.infer<typeof esquemaDesarrolloCrear>;
  * Alta de un desarrollo CON UN MODELO NUEVO (§Post-F9.34, V1-E3n). El código del modelo **NO se
  * captura**: lo arma el sistema entero (`CYA-26-71-001` = abreviatura del cliente del proyecto +
  * año de ENTREGA + concepto/género + consecutivo), porque es mecánico y no tiene criterio de
- * negocio. Por eso el tipo de producto y el género son OBLIGATORIOS aquí: de ellos salen los dos
- * dígitos que después heredará el número de producción.
+ * negocio. El tipo de prenda sigue siendo OBLIGATORIO: cambia modelo a modelo y de él sale el 1er
+ * dígito.
+ *
+ * ⭐⭐ **fila 0.155 (§Post-F9.210 punto 2) — el GÉNERO y el AÑO se HEREDAN DEL PROYECTO.** Daniel:
+ * *«un proyecto nace con un género o departamento definido… todos los modelos nuevos deberían jalar
+ * el género desde ahí. **Que no vuelva a preguntar**… lo mismo el año de entrega»*, y cerró que van
+ * *«en el proyecto y cada modelo hereda esa información (con opción a cambiarla)»*.
+ *
+ * Por eso los dos pasaron de obligatorios a **opcionales**: mandarlos los PISA (esa es la «opción a
+ * cambiarla»), omitirlos toma los del proyecto. Si el proyecto tampoco los tiene —los anteriores a
+ * esa fila no los traen, REGLA 0-B— el dominio rechaza el alta **diciendo dónde capturarlos**, que
+ * es infinitamente mejor que dejar nacer un modelo sin género: uno así **no se puede numerar** y el
+ * error aparece hasta «Generar OP», después de teclear la matriz color×talla entera
+ * (`dominio/modelos/nomenclatura.ts`, `digitosDelModelo`).
+ *
+ * ⚠️ Relajar un campo obligatorio NO rompe a ningún cliente del contrato: lo que ya mandaba los dos
+ * sigue funcionando igual, y pisando lo mismo que antes.
  */
 export const esquemaDesarrolloModeloNuevoCuerpo = z.object({
   anioEntrega: z
-    .number({ error: 'El año de entrega es obligatorio' })
+    .number({ error: 'El año de entrega debe ser un número' })
     .int({ error: 'El año de entrega debe ser entero' })
     .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
     .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' })
-    .describe('Año de ENTREGA del modelo (el que se congela en el código, no el de creación).'),
+    .optional()
+    .describe(
+      'Año de ENTREGA del modelo (el que se congela en el código, no el de creación). Omitir = ' +
+        'heredar el del proyecto.',
+    ),
   idTipoProducto: z
     .number({ error: 'El tipo de producto es obligatorio' })
     .int({ error: 'El id del tipo de producto debe ser entero' })
     .positive({ error: 'El id del tipo de producto debe ser positivo' })
     .describe('Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura.'),
   idGenero: z
-    .number({ error: 'El género es obligatorio' })
+    .number({ error: 'El género debe ser un número' })
     .int({ error: 'El id del género debe ser entero' })
     .positive({ error: 'El id del género debe ser positivo' })
-    .describe('Género: de él sale el 2º dígito de la nomenclatura.'),
+    .optional()
+    .describe('Género: de él sale el 2º dígito. Omitir = heredar el del proyecto.'),
   descripcion: z
     .string()
     .trim()

@@ -48,6 +48,33 @@ const VALORES_INICIALES: DatosDesarrolloFormulario = {
 };
 
 /**
+ * ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — los valores de arranque CON lo que el PROYECTO ya sabe.
+ *
+ * Daniel: *«todos los modelos nuevos deberían jalar el género desde ahí. **Que no vuelva a
+ * preguntar**… lo mismo el año de entrega»*. Aquí eso es precargar los dos selectores; si el
+ * proyecto no los tiene (los anteriores a esta fila no los traen, REGLA 0-B) se cae al
+ * comportamiento de siempre: género en blanco y el año actual.
+ *
+ * ⚠️ Esto es SÓLO la pantalla. La herencia de verdad vive en el dominio
+ * (`crearDesarrolloConModeloNuevo`), que toma los del proyecto cuando el cuerpo los omite — si
+ * viviera nada más aquí, cualquier otra puerta al mismo alta volvería a exigirlos en blanco (A1).
+ */
+function valoresConProyecto(
+  idGeneroProyecto: number | null | undefined,
+  anioEntregaProyecto: number | null | undefined,
+): DatosDesarrolloFormulario {
+  return {
+    ...VALORES_INICIALES,
+    idGeneroNuevo:
+      idGeneroProyecto === null || idGeneroProyecto === undefined ? '' : String(idGeneroProyecto),
+    anioEntregaNuevo:
+      anioEntregaProyecto === null || anioEntregaProyecto === undefined
+        ? VALORES_INICIALES.anioEntregaNuevo
+        : String(anioEntregaProyecto),
+  };
+}
+
+/**
  * Diálogo para AGREGAR un desarrollo a un proyecto (F8-E2). Dos caminos:
  *  • "modelo existente" — se elige un modelo del catálogo (`idModelo`) y se crea el desarrollo.
  *  • "modelo nuevo" — UNA sola llamada al backend (`.../desarrollos/modelo-nuevo`), que crea el
@@ -57,15 +84,25 @@ const VALORES_INICIALES: DatosDesarrolloFormulario = {
  * (`CYA-26-71-001` = abreviatura del cliente del proyecto + año de ENTREGA + tipo de prenda y
  * género + consecutivo). Antes el frontend orquestaba dos llamadas y el usuario inventaba el
  * código; eso metía los modelos de desarrollo en la misma serie que los de producción.
+ *
+ * ⭐ **fila 0.155 (§Post-F9.210 punto 2)** — el **género** y el **año de entrega** llegan
+ * PRECARGADOS con los del proyecto (*«que no vuelva a preguntar»*) y se pueden cambiar aquí mismo
+ * (*«con opción a cambiarla»*), que es exactamente lo que Daniel pidió.
  */
 export function DialogoDesarrollo({
   abierto,
   alCambiarAbierto,
   idProyecto,
+  idGeneroProyecto,
+  anioEntregaProyecto,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
   idProyecto: number;
+  /** ⭐ fila 0.155 — género del proyecto: precarga el selector del modelo nuevo (editable). */
+  idGeneroProyecto?: number | null;
+  /** ⭐ fila 0.155 — año de entrega del proyecto: precarga la casilla del año (editable). */
+  anioEntregaProyecto?: number | null;
 }): React.JSX.Element {
   const crearDesarrollo = useCrearDesarrollo();
   const crearConModeloNuevo = useCrearDesarrolloModeloNuevo();
@@ -88,9 +125,11 @@ export function DialogoDesarrollo({
 
   useEffect(() => {
     if (abierto) {
-      formulario.reset(VALORES_INICIALES);
+      // ⭐ fila 0.155 — se re-arma en CADA apertura, no una sola vez: así el diálogo refleja el
+      // proyecto que se está viendo aunque sus datos hayan cambiado mientras la pantalla vivía.
+      formulario.reset(valoresConProyecto(idGeneroProyecto, anioEntregaProyecto));
     }
-  }, [abierto, formulario]);
+  }, [abierto, formulario, idGeneroProyecto, anioEntregaProyecto]);
 
   const modo = formulario.watch('modo');
   const idModeloElegido = formulario.watch('idModelo');

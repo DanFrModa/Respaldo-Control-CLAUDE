@@ -56,6 +56,8 @@ vi.mock('@/api/liga-orden', () => ({
 vi.mock('@/api/clientes', () => ({
   useClientes: () => ({ data: { datos: [] }, isPending: false }),
   useDepartamentosCliente: () => ({ data: [], isPending: false }),
+  // ⭐ fila 0.155 — el selector de COMPRADOR del diálogo de proyecto (§Post-F9.210 punto 1).
+  useContactosCliente: () => ({ data: [], isPending: false }),
 }));
 vi.mock('@/api/temporadas', () => ({
   useTemporadas: () => ({ data: { datos: [] }, isPending: false }),
@@ -163,6 +165,14 @@ function proyecto(id: number, folio: number, nombre: string, archivado = false):
     nombre,
     idTemporada: null,
     temporada: null,
+    // ⭐ fila 0.155 — el proyecto de ejemplo nace SIN comprador, SIN género y SIN año: es el caso
+    // que la fila tiene que seguir soportando (un proyecto anterior a la fila, REGLA 0-B).
+    idClienteContacto: null,
+    comprador: null,
+    compradorPuesto: null,
+    idGenero: null,
+    genero: null,
+    anioEntrega: null,
     notas: null,
     archivado,
     conteos: {

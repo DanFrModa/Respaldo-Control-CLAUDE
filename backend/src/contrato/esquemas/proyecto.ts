@@ -29,6 +29,38 @@ const notasProyecto = z
   .trim()
   .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' });
 
+/**
+ * ⭐ fila 0.155 (§Post-F9.210 punto 1) — **el COMPRADOR** del proyecto: una persona del catálogo
+ * `ClienteContacto` (§Post-F9.152), que ya trae puesto libre («compradora») y alta/baja. Daniel:
+ * *«normalmente un proyecto va dirigido a un solo comprador»*. **OPCIONAL de verdad**: un proyecto
+ * sin comprador se crea, se edita y se usa exactamente igual. El dominio exige (A1) que el contacto
+ * sea DEL CLIENTE del proyecto y esté activo.
+ */
+const idClienteContactoCampo = z
+  .number({ error: 'El id del comprador debe ser un número' })
+  .int({ error: 'El id del comprador debe ser entero' })
+  .positive({ error: 'El id del comprador debe ser positivo' });
+
+/**
+ * ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — el **GÉNERO del proyecto**, que los modelos nuevos
+ * HEREDAN como valor inicial editable. Opcional: los proyectos anteriores no lo traen y el alta de
+ * modelo vuelve a preguntarlo (REGLA 0-B).
+ */
+const idGeneroCampo = z
+  .number({ error: 'El id del género debe ser un número' })
+  .int({ error: 'El id del género debe ser entero' })
+  .positive({ error: 'El id del género debe ser positivo' });
+
+/**
+ * ⭐ fila 0.155 (§Post-F9.210 punto 2) — el **AÑO DE ENTREGA del proyecto** (el `26` de
+ * `CYA-26-71-001`). Mismo rango que el del alta de modelo nuevo, que es quien lo hereda.
+ */
+const anioEntregaCampo = z
+  .number({ error: 'El año de entrega debe ser un número' })
+  .int({ error: 'El año de entrega debe ser entero' })
+  .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
+  .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' });
+
 // ── Alta / edición ─────────────────────────────────────────────────────────────────
 
 /**
@@ -53,6 +85,15 @@ export const esquemaProyectoCrear = z.object({
     .positive({ error: 'El id de la temporada debe ser positivo' })
     .optional()
     .describe('Temporada del proyecto (opcional).'),
+  idClienteContacto: idClienteContactoCampo
+    .optional()
+    .describe('Comprador del cliente al que va dirigido el proyecto (opcional).'),
+  idGenero: idGeneroCampo
+    .optional()
+    .describe('Género del proyecto; lo heredan los modelos nuevos (opcional).'),
+  anioEntrega: anioEntregaCampo
+    .optional()
+    .describe('Año de ENTREGA del proyecto; lo heredan los modelos nuevos (opcional).'),
   notas: notasProyecto.optional().describe('Notas del proyecto (opcional).'),
 });
 
@@ -80,6 +121,18 @@ export const esquemaProyectoEditar = z.object({
     .nullable()
     .optional()
     .describe('Temporada (null para vaciarla; omitir para no tocar).'),
+  idClienteContacto: idClienteContactoCampo
+    .nullable()
+    .optional()
+    .describe('Comprador (null para quitarlo; omitir para no tocar).'),
+  idGenero: idGeneroCampo
+    .nullable()
+    .optional()
+    .describe('Género del proyecto (null para quitarlo; omitir para no tocar).'),
+  anioEntrega: anioEntregaCampo
+    .nullable()
+    .optional()
+    .describe('Año de entrega (null para quitarlo; omitir para no tocar).'),
   notas: notasProyecto
     .nullable()
     .optional()
@@ -123,6 +176,15 @@ export const esquemaProyectoSalida = z
     nombre: z.string().describe('Nombre/tema del proyecto.'),
     idTemporada: z.number().int().nullable().describe('Temporada del proyecto, o null.'),
     temporada: z.string().nullable().describe('Nombre de la temporada, o null.'),
+    idClienteContacto: z.number().int().nullable().describe('Comprador del proyecto, o null.'),
+    comprador: z.string().nullable().describe('Nombre del comprador (para la UI), o null.'),
+    compradorPuesto: z
+      .string()
+      .nullable()
+      .describe('Puesto del comprador tal como lo captura su ficha («compradora»), o null.'),
+    idGenero: z.number().int().nullable().describe('Género del proyecto, o null.'),
+    genero: z.string().nullable().describe('Nombre del género (para la UI), o null.'),
+    anioEntrega: z.number().int().nullable().describe('Año de entrega del proyecto, o null.'),
     notas: z.string().nullable().describe('Notas del proyecto, o null.'),
     archivado: z.boolean().describe('Archivado (borrado suave reversible).'),
     conteos: esquemaConteosDesarrollo,

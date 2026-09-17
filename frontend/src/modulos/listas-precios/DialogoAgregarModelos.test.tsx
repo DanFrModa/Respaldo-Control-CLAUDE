@@ -32,7 +32,21 @@ vi.mock('@/api/modelos', () => ({
 }));
 vi.mock('@/api/proyectos', () => ({
   useProyectos: () => ({
-    data: { datos: [{ id: 30, folio: 12, nombre: 'Otoño 26', archivado: false }] },
+    data: {
+      datos: [
+        // El proyecto «de antes» (fila 0.155): sin género ni año, como todos los anteriores a ella.
+        { id: 30, folio: 12, nombre: 'Otoño 26', archivado: false },
+        // ⭐ fila 0.155 — el proyecto que SÍ recuerda: su género y su año precargan el alta.
+        {
+          id: 31,
+          folio: 13,
+          nombre: 'Primavera 27',
+          archivado: false,
+          idGenero: 1,
+          anioEntrega: 2027,
+        },
+      ],
+    },
   }),
 }));
 // El selector de modelo tiene su propia prueba; aquí sólo hace falta poder elegir uno.
@@ -174,6 +188,29 @@ describe('<DialogoAgregarModelos> — la mesa abierta (§Post-F9.152)', () => {
     const cuerpo = crearModeloMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
     expect(cuerpo.cuerpo).toMatchObject({ nombreProyectoNuevo: 'Cita septiembre' });
     expect(cuerpo.cuerpo['idProyecto']).toBeUndefined();
+  });
+
+  // ══ ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — elegir un PROYECTO precarga género y año ════════
+  it('elegir un proyecto CON género y año los precarga en el alta', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+  });
+
+  it('un proyecto SIN género ni año no toca nada (REGLA 0-B): se captura como siempre', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(new Date().getFullYear()));
   });
 
   it('🔴 un cliente SIN ABREVIATURA se avisa ANTES y el botón queda apagado (no truena en la cita)', async () => {

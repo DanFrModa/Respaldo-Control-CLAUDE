@@ -748,11 +748,15 @@ export const esquemaModeloNuevoEnLista = z
       .optional()
       .describe('Modelo del que se COPIA la ficha + la receta. Omitir = armarlo desde cero.'),
     anioEntrega: z
-      .number({ error: 'El año de entrega es obligatorio' })
+      .number({ error: 'El año de entrega debe ser un número' })
       .int({ error: 'El año de entrega debe ser entero' })
       .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
       .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' })
-      .describe('Año de ENTREGA (el que se congela en el código del modelo).'),
+      .optional()
+      .describe(
+        'Año de ENTREGA (el que se congela en el código del modelo). Omitir = heredar el del ' +
+          'proyecto elegido (fila 0.155).',
+      ),
     idTipoProducto: z
       .number({ error: 'El id del tipo de prenda debe ser un número' })
       .int({ error: 'El id del tipo de prenda debe ser entero' })
@@ -823,13 +827,27 @@ export const esquemaModeloNuevoEnLista = z
           message: 'El tipo de prenda es obligatorio (o copia un modelo que ya lo tenga).',
         });
       }
-      if (datos.idGenero === undefined) {
+      // ⭐ fila 0.155 — el género se puede OMITIR si se cuelga de un proyecto EXISTENTE: puede
+      // traerlo él (§Post-F9.210 punto 2). Con `nombreProyectoNuevo` no hay de quién heredar —el
+      // proyecto nace en esta misma llamada— así que ahí se sigue exigiendo aquí, donde el error
+      // llega antes y señala el campo. Si el proyecto elegido tampoco lo tiene, lo rechaza el
+      // dominio (`resolverDosDigitos`) nombrando qué falta.
+      if (datos.idGenero === undefined && datos.idProyecto === undefined) {
         ctx.addIssue({
           code: 'custom',
           path: ['idGenero'],
           message: 'El género es obligatorio (o copia un modelo que ya lo tenga).',
         });
       }
+    }
+    // ⭐ fila 0.155 — el AÑO se hereda del proyecto elegido; si el proyecto se está creando aquí
+    // mismo, no hay de quién heredarlo y se exige.
+    if (datos.anioEntrega === undefined && datos.idProyecto === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['anioEntrega'],
+        message: 'El año de entrega es obligatorio cuando el proyecto se crea en esta misma alta.',
+      });
     }
   })
   .describe('Alta de un modelo NUEVO (desde cero o copiando otro) desde la mesa de negociación.');
