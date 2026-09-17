@@ -112,6 +112,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   la pantalla de entrar; cuando por fin cayó, la pantalla se había quedado en otro sitio, no en la de
   entrar). Ahora queda tachada **la segunda** explicación posible. **Cada vuelta descarta una
   sospecha y la deja escrita**, para que nadie la vuelva a investigar desde cero.
+- 🕒 **Y de paso se le dio más tiempo al servidor de pruebas**, porque se quedó corto **en esta misma
+  versión**: la revisión automática tiene un límite de tiempo, y la batería de pruebas ha crecido
+  tanto que lo rozó y se cortó a la mitad. Engaña, porque cortarse por tiempo **se ve igual que si
+  alguien la hubiera parado a mano**. Ya había pasado dos veces antes, y el propio archivo lo tenía
+  escrito: *lo primero ante ese aviso es mirar cuánto tardó*. Tardó 45.3 minutos contra un tope de
+  45; las dos revisiones verdes del mismo día tardaron 38.7 y 32.3. Se subió el tope a 70.
+  ⚠️ **Subir un tope no arregla nada, sólo destapa lo que había detrás** — así que la próxima
+  revisión hay que mirarla entera, no darla por buena.
 
 ### Qué sigue pendiente o roto
 
