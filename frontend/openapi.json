@@ -253518,6 +253518,78 @@
                             ],
                             "description": "Nombre de la temporada, o null."
                           },
+                          "idClienteContacto": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Comprador del proyecto, o null."
+                          },
+                          "comprador": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del comprador (para la UI), o null."
+                          },
+                          "compradorPuesto": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                          },
+                          "idGenero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Género del proyecto, o null."
+                          },
+                          "genero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del género (para la UI), o null."
+                          },
+                          "anioEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Año de entrega del proyecto, o null."
+                          },
                           "notas": {
                             "anyOf": [
                               {
@@ -253630,6 +253702,12 @@
                           "nombre",
                           "idTemporada",
                           "temporada",
+                          "idClienteContacto",
+                          "comprador",
+                          "compradorPuesto",
+                          "idGenero",
+                          "genero",
+                          "anioEntrega",
                           "notas",
                           "archivado",
                           "conteos",
@@ -253864,6 +253942,24 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "idClienteContacto": {
+                    "description": "Comprador del cliente al que va dirigido el proyecto (opcional).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idGenero": {
+                    "description": "Género del proyecto; lo heredan los modelos nuevos (opcional).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "anioEntrega": {
+                    "description": "Año de ENTREGA del proyecto; lo heredan los modelos nuevos (opcional).",
+                    "type": "integer",
+                    "minimum": 2020,
+                    "maximum": 2100
+                  },
                   "notas": {
                     "description": "Notas del proyecto (opcional).",
                     "type": "string",
@@ -253957,6 +254053,78 @@
                         }
                       ],
                       "description": "Nombre de la temporada, o null."
+                    },
+                    "idClienteContacto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Comprador del proyecto, o null."
+                    },
+                    "comprador": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del comprador (para la UI), o null."
+                    },
+                    "compradorPuesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Género del proyecto, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género (para la UI), o null."
+                    },
+                    "anioEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Año de entrega del proyecto, o null."
                     },
                     "notas": {
                       "anyOf": [
@@ -254274,6 +254442,12 @@
                     "nombre",
                     "idTemporada",
                     "temporada",
+                    "idClienteContacto",
+                    "comprador",
+                    "compradorPuesto",
+                    "idGenero",
+                    "genero",
+                    "anioEntrega",
                     "notas",
                     "archivado",
                     "conteos",
@@ -254535,6 +254709,78 @@
                       ],
                       "description": "Nombre de la temporada, o null."
                     },
+                    "idClienteContacto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Comprador del proyecto, o null."
+                    },
+                    "comprador": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del comprador (para la UI), o null."
+                    },
+                    "compradorPuesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Género del proyecto, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género (para la UI), o null."
+                    },
+                    "anioEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Año de entrega del proyecto, o null."
+                    },
                     "notas": {
                       "anyOf": [
                         {
@@ -254851,6 +255097,12 @@
                     "nombre",
                     "idTemporada",
                     "temporada",
+                    "idClienteContacto",
+                    "comprador",
+                    "compradorPuesto",
+                    "idGenero",
+                    "genero",
+                    "anioEntrega",
                     "notas",
                     "archivado",
                     "conteos",
@@ -255050,6 +255302,45 @@
                       }
                     ]
                   },
+                  "idClienteContacto": {
+                    "description": "Comprador (null para quitarlo; omitir para no tocar).",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idGenero": {
+                    "description": "Género del proyecto (null para quitarlo; omitir para no tocar).",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "anioEntrega": {
+                    "description": "Año de entrega (null para quitarlo; omitir para no tocar).",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 2020,
+                        "maximum": 2100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "notas": {
                     "description": "Notas (null para vaciarlas; omitir para no tocar).",
                     "anyOf": [
@@ -255158,6 +255449,78 @@
                         }
                       ],
                       "description": "Nombre de la temporada, o null."
+                    },
+                    "idClienteContacto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Comprador del proyecto, o null."
+                    },
+                    "comprador": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del comprador (para la UI), o null."
+                    },
+                    "compradorPuesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Género del proyecto, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género (para la UI), o null."
+                    },
+                    "anioEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Año de entrega del proyecto, o null."
                     },
                     "notas": {
                       "anyOf": [
@@ -255475,6 +255838,12 @@
                     "nombre",
                     "idTemporada",
                     "temporada",
+                    "idClienteContacto",
+                    "comprador",
+                    "compradorPuesto",
+                    "idGenero",
+                    "genero",
+                    "anioEntrega",
                     "notas",
                     "archivado",
                     "conteos",
@@ -255736,6 +256105,78 @@
                       ],
                       "description": "Nombre de la temporada, o null."
                     },
+                    "idClienteContacto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Comprador del proyecto, o null."
+                    },
+                    "comprador": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del comprador (para la UI), o null."
+                    },
+                    "compradorPuesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Género del proyecto, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género (para la UI), o null."
+                    },
+                    "anioEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Año de entrega del proyecto, o null."
+                    },
                     "notas": {
                       "anyOf": [
                         {
@@ -256052,6 +256493,12 @@
                     "nombre",
                     "idTemporada",
                     "temporada",
+                    "idClienteContacto",
+                    "comprador",
+                    "compradorPuesto",
+                    "idGenero",
+                    "genero",
+                    "anioEntrega",
                     "notas",
                     "archivado",
                     "conteos",
@@ -256313,6 +256760,78 @@
                       ],
                       "description": "Nombre de la temporada, o null."
                     },
+                    "idClienteContacto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Comprador del proyecto, o null."
+                    },
+                    "comprador": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del comprador (para la UI), o null."
+                    },
+                    "compradorPuesto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Puesto del comprador tal como lo captura su ficha («compradora»), o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Género del proyecto, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género (para la UI), o null."
+                    },
+                    "anioEntrega": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Año de entrega del proyecto, o null."
+                    },
                     "notas": {
                       "anyOf": [
                         {
@@ -256629,6 +257148,12 @@
                     "nombre",
                     "idTemporada",
                     "temporada",
+                    "idClienteContacto",
+                    "comprador",
+                    "compradorPuesto",
+                    "idGenero",
+                    "genero",
+                    "anioEntrega",
                     "notas",
                     "archivado",
                     "conteos",
@@ -257217,10 +257742,10 @@
                 "type": "object",
                 "properties": {
                   "anioEntrega": {
+                    "description": "Año de ENTREGA del modelo (el que se congela en el código, no el de creación). Omitir = heredar el del proyecto.",
                     "type": "integer",
                     "minimum": 2020,
-                    "maximum": 2100,
-                    "description": "Año de ENTREGA del modelo (el que se congela en el código, no el de creación)."
+                    "maximum": 2100
                   },
                   "idTipoProducto": {
                     "type": "integer",
@@ -257229,10 +257754,10 @@
                     "description": "Tipo de prenda: de él sale el 1er dígito (concepto) de la nomenclatura."
                   },
                   "idGenero": {
+                    "description": "Género: de él sale el 2º dígito. Omitir = heredar el del proyecto.",
                     "type": "integer",
                     "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991,
-                    "description": "Género: de él sale el 2º dígito de la nomenclatura."
+                    "maximum": 9007199254740991
                   },
                   "descripcion": {
                     "description": "Descripción del modelo (opcional).",
@@ -257257,9 +257782,7 @@
                   }
                 },
                 "required": [
-                  "anioEntrega",
-                  "idTipoProducto",
-                  "idGenero"
+                  "idTipoProducto"
                 ]
               }
             }
@@ -277864,10 +278387,10 @@
                     "maximum": 9007199254740991
                   },
                   "anioEntrega": {
+                    "description": "Año de ENTREGA (el que se congela en el código del modelo). Omitir = heredar el del proyecto elegido (fila 0.155).",
                     "type": "integer",
                     "minimum": 2020,
-                    "maximum": 2100,
-                    "description": "Año de ENTREGA (el que se congela en el código del modelo)."
+                    "maximum": 2100
                   },
                   "idTipoProducto": {
                     "description": "Tipo de prenda (1er dígito). Obligatorio desde cero; al copiar se hereda.",
@@ -277910,9 +278433,6 @@
                     "maxLength": 200
                   }
                 },
-                "required": [
-                  "anioEntrega"
-                ],
                 "description": "Alta de un modelo NUEVO (desde cero o copiando otro) desde la mesa de negociación."
               }
             }

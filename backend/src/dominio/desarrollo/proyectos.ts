@@ -16,6 +16,21 @@
  *
  * Varios proyectos del MISMO cliente+departamento+temporada con tema distinto SE PERMITEN (no hay
  * unique sobre eso; sólo el folio es único por empresa).
+ *
+ * ---
+ * ## ⭐⭐ fila 0.155 (§Post-F9.210) — EL PROYECTO RECUERDA TRES COSAS MÁS
+ *
+ *  • **El COMPRADOR** (`idClienteContacto`) — *«normalmente un proyecto va dirigido a un solo
+ *    comprador»*. Sale del catálogo `ClienteContacto` (§Post-F9.152), que ya existía completo.
+ *  • **El GÉNERO** (`idGenero`) y **el AÑO DE ENTREGA** (`anioEntrega`) — *«en el proyecto y cada
+ *    modelo hereda esa información (con opción a cambiarla)»*. Quien los usa es
+ *    `crearDesarrolloConModeloNuevo` (y el alta desde la mesa): los toma de aquí cuando el alta no
+ *    los manda, para no volver a preguntarlos modelo por modelo.
+ *
+ * ⚠️ **Los tres son OPCIONALES de verdad.** Un proyecto sin ellos se crea, se edita, se lista y se
+ * archiva exactamente igual que antes, y los que ya existen nacen con los tres en `NULL` **sin
+ * rellenarse** (REGLA 0-B). Lo que el sistema NO hace es inventarlos: si el alta de un modelo los
+ * necesita y el proyecto no los tiene, se rechaza **diciendo dónde capturarlos**.
  */
 import {
   esquemaProyectoCrear,
@@ -79,11 +94,16 @@ export type ParametrosListarProyectos = z.input<typeof esquemaListarProyectosDom
 
 // ── Includes + proyecciones ─────────────────────────────────────────────────────────
 
-/** Selección del nombre de cliente/departamento/temporada (para la UI). */
+/**
+ * Selección del nombre de cliente/departamento/temporada (para la UI) y —fila 0.155— del
+ * COMPRADOR y del GÉNERO del proyecto (§Post-F9.210 puntos 1 y 2).
+ */
 const seleccionNombres = {
   cliente: { select: { nombre: true } },
   clienteDepartamento: { select: { nombre: true } },
   temporada: { select: { nombre: true } },
+  clienteContacto: { select: { nombre: true, puesto: true } },
+  genero: { select: { nombre: true } },
 } satisfies Prisma.ProyectoInclude;
 
 /**
@@ -173,6 +193,13 @@ function aProyectoBase(
     nombre: proyecto.nombre,
     idTemporada: proyecto.idTemporada,
     temporada: proyecto.temporada?.nombre ?? null,
+    // ⭐ fila 0.155 — el comprador y el género/año que los modelos nuevos heredan.
+    idClienteContacto: proyecto.idClienteContacto,
+    comprador: proyecto.clienteContacto?.nombre ?? null,
+    compradorPuesto: proyecto.clienteContacto?.puesto ?? null,
+    idGenero: proyecto.idGenero,
+    genero: proyecto.genero?.nombre ?? null,
+    anioEntrega: proyecto.anioEntrega,
     notas: proyecto.notas,
     archivado: proyecto.archivado,
     conteos,
@@ -217,6 +244,9 @@ async function exigirProyecto(
   idClienteDepartamento: number;
   nombre: string;
   idTemporada: number | null;
+  idClienteContacto: number | null;
+  idGenero: number | null;
+  anioEntrega: number | null;
   notas: string | null;
   archivado: boolean;
   folio: bigint;
@@ -229,6 +259,9 @@ async function exigirProyecto(
       idClienteDepartamento: true,
       nombre: true,
       idTemporada: true,
+      idClienteContacto: true,
+      idGenero: true,
+      anioEntrega: true,
       notas: true,
       archivado: true,
       folio: true,
@@ -314,12 +347,71 @@ async function exigirTemporada(tx: Tx, idTemporada: number): Promise<void> {
   }
 }
 
+/**
+ * ⭐ fila 0.155 (§Post-F9.210 punto 1) — exige que el COMPRADOR pertenezca al cliente del proyecto
+ * y esté activo. Es la guarda GEMELA de {@link exigirDepartamentoDeCliente}, palabra por palabra:
+ * un contacto de OTRO cliente es una combinación inválida (`ErrorValidacion`) y uno dado de baja es
+ * un conflicto (`ErrorConflicto`).
+ *
+ * ⚠️ **Y es A1 puro, no adorno de UI:** el diálogo sólo ofrece los contactos del cliente elegido,
+ * pero eso es una pantalla — una llamada directa al API, o una pestaña abierta desde antes de que
+ * alguien archivara al contacto, atraviesan el filtro del frontend sin despeinarse. Sin esta guarda
+ * un proyecto de C&A podía quedar dirigido a la compradora de Walmart, **sin error y sin aviso**.
+ *
+ * ⚠️ **Va GATEADA al CAMBIO, como su gemela**: editar el nombre de un proyecto viejo cuyo comprador
+ * ya se jubiló (`activo=false`) sigue funcionando. Lo que no se puede es dirigir trabajo NUEVO a
+ * alguien que ya no está.
+ */
+async function exigirContactoDeCliente(
+  tx: Tx,
+  idCliente: number,
+  idClienteContacto: number,
+): Promise<void> {
+  const contacto = await tx.clienteContacto.findUnique({
+    where: { id: idClienteContacto },
+    select: { idCliente: true, activo: true, nombre: true },
+  });
+  if (contacto === null) {
+    throw new ErrorNoEncontrado('Contacto del cliente', idClienteContacto);
+  }
+  if (contacto.idCliente !== idCliente) {
+    throw new ErrorValidacion('El comprador no pertenece al cliente del proyecto.');
+  }
+  if (!contacto.activo) {
+    throw new ErrorConflicto(
+      `El contacto "${contacto.nombre}" está archivado; reactívalo para dirigirle un proyecto.`,
+    );
+  }
+}
+
+/**
+ * ⭐ fila 0.155 (§Post-F9.210 punto 2) — exige que el GÉNERO del proyecto exista y esté ACTIVO.
+ * Misma forma de mensaje que {@link exigirGeneroValido} del catálogo de modelos
+ * (`dominio/modelos/modelos.ts`), que es a donde va a parar este valor cuando el modelo lo hereda:
+ * los dos sitios tienen que decir lo mismo o el proyecto guardaría un género que el modelo rechaza.
+ */
+async function exigirGeneroDelProyecto(tx: Tx, idGenero: number): Promise<void> {
+  const genero = await tx.genero.findUnique({
+    where: { id: idGenero },
+    select: { nombre: true, activo: true },
+  });
+  if (genero === null) {
+    throw new ErrorNoEncontrado('Género', idGenero);
+  }
+  if (!genero.activo) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" está desactivado y no se puede asignar.`,
+    );
+  }
+}
+
 // ── Operaciones ─────────────────────────────────────────────────────────────────────
 
 /**
  * Crea un proyecto de desarrollo (D13/R16) en UNA transacción (A2). Toma el folio de la secuencia
  * atómica `"proyecto"` de la empresa activa (A3/A9). Valida cliente activo, departamento del cliente
- * y (si viene) temporada. Auditoría + bitácora en la tx. Requiere `desarrollo.administrar`.
+ * y (si vienen) temporada, **comprador y género** (⭐ fila 0.155). Auditoría + bitácora en la tx.
+ * Requiere `desarrollo.administrar`.
  */
 export async function crearProyecto(
   sesion: SesionUsuario,
@@ -335,6 +427,13 @@ export async function crearProyecto(
     if (datos.idTemporada !== undefined) {
       await exigirTemporada(tx, datos.idTemporada);
     }
+    // ⭐ fila 0.155 — los tres datos nuevos son OPCIONALES: sólo se validan si vienen.
+    if (datos.idClienteContacto !== undefined) {
+      await exigirContactoDeCliente(tx, datos.idCliente, datos.idClienteContacto);
+    }
+    if (datos.idGenero !== undefined) {
+      await exigirGeneroDelProyecto(tx, datos.idGenero);
+    }
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_PROYECTO);
 
     const proyecto = await tx.proyecto.create({
@@ -345,6 +444,11 @@ export async function crearProyecto(
         idClienteDepartamento: datos.idClienteDepartamento,
         nombre: datos.nombre,
         ...(datos.idTemporada === undefined ? {} : { idTemporada: datos.idTemporada }),
+        ...(datos.idClienteContacto === undefined
+          ? {}
+          : { idClienteContacto: datos.idClienteContacto }),
+        ...(datos.idGenero === undefined ? {} : { idGenero: datos.idGenero }),
+        ...(datos.anioEntrega === undefined ? {} : { anioEntrega: datos.anioEntrega }),
         ...(datos.notas === undefined ? {} : { notas: datos.notas }),
         ...datosCreacion(sesion),
       },
@@ -360,6 +464,11 @@ export async function crearProyecto(
         idCliente: datos.idCliente,
         idClienteDepartamento: datos.idClienteDepartamento,
         nombre: datos.nombre,
+        ...(datos.idClienteContacto === undefined
+          ? {}
+          : { idClienteContacto: datos.idClienteContacto }),
+        ...(datos.idGenero === undefined ? {} : { idGenero: datos.idGenero }),
+        ...(datos.anioEntrega === undefined ? {} : { anioEntrega: datos.anioEntrega }),
       },
     });
 
@@ -373,9 +482,11 @@ export async function crearProyecto(
 }
 
 /**
- * Actualiza un proyecto: nombre/departamento/temporada/notas (el cliente NO se cambia). Si cambia el
- * departamento, valida que el nuevo pertenezca al MISMO cliente del proyecto. PATCH parcial (M1).
- * UNA transacción (A2) con auditoría + bitácora. Requiere `desarrollo.administrar`.
+ * Actualiza un proyecto: nombre/departamento/temporada/notas y —⭐ fila 0.155— **comprador, género
+ * y año de entrega** (el cliente NO se cambia). Si cambia el departamento, valida que el nuevo
+ * pertenezca al MISMO cliente del proyecto; lo mismo el comprador. PATCH parcial (M1): omitir = no
+ * tocar, `null` = vaciar. UNA transacción (A2) con auditoría + bitácora. Requiere
+ * `desarrollo.administrar`.
  */
 export async function actualizarProyecto(
   sesion: SesionUsuario,
@@ -398,8 +509,21 @@ export async function actualizarProyecto(
     const cambiaTemporada =
       datos.idTemporada !== undefined && datos.idTemporada !== actual.idTemporada;
     const cambiaNotas = datos.notas !== undefined && datos.notas !== actual.notas;
+    // ⭐ fila 0.155 — comprador / género / año de entrega (M1: omitir = no tocar; null = vaciar).
+    const cambiaComprador =
+      datos.idClienteContacto !== undefined && datos.idClienteContacto !== actual.idClienteContacto;
+    const cambiaGenero = datos.idGenero !== undefined && datos.idGenero !== actual.idGenero;
+    const cambiaAnio = datos.anioEntrega !== undefined && datos.anioEntrega !== actual.anioEntrega;
 
-    if (!cambiaNombre && !cambiaDepartamento && !cambiaTemporada && !cambiaNotas) {
+    if (
+      !cambiaNombre &&
+      !cambiaDepartamento &&
+      !cambiaTemporada &&
+      !cambiaNotas &&
+      !cambiaComprador &&
+      !cambiaGenero &&
+      !cambiaAnio
+    ) {
       return; // idempotente: nada que guardar, sin bitácora vacía
     }
 
@@ -408,6 +532,17 @@ export async function actualizarProyecto(
     }
     if (cambiaTemporada && datos.idTemporada !== undefined && datos.idTemporada !== null) {
       await exigirTemporada(tx, datos.idTemporada);
+    }
+    // Quitar el comprador (`null`) no valida nada: no hay a quién exigirle pertenencia.
+    if (
+      cambiaComprador &&
+      datos.idClienteContacto !== undefined &&
+      datos.idClienteContacto !== null
+    ) {
+      await exigirContactoDeCliente(tx, actual.idCliente, datos.idClienteContacto);
+    }
+    if (cambiaGenero && datos.idGenero !== undefined && datos.idGenero !== null) {
+      await exigirGeneroDelProyecto(tx, datos.idGenero);
     }
 
     const cambios: Prisma.ProyectoUpdateInput = { ...datosModificacion(sesion) };
@@ -424,6 +559,19 @@ export async function actualizarProyecto(
     if (cambiaNotas && datos.notas !== undefined) {
       cambios.notas = datos.notas;
     }
+    if (cambiaComprador && datos.idClienteContacto !== undefined) {
+      cambios.clienteContacto =
+        datos.idClienteContacto === null
+          ? { disconnect: true }
+          : { connect: { id: datos.idClienteContacto } };
+    }
+    if (cambiaGenero && datos.idGenero !== undefined) {
+      cambios.genero =
+        datos.idGenero === null ? { disconnect: true } : { connect: { id: datos.idGenero } };
+    }
+    if (cambiaAnio && datos.anioEntrega !== undefined) {
+      cambios.anioEntrega = datos.anioEntrega;
+    }
 
     await tx.proyecto.update({ where: { id }, data: cambios });
 
@@ -435,6 +583,9 @@ export async function actualizarProyecto(
         ...(cambiaNombre ? { nombre: datos.nombre } : {}),
         ...(cambiaDepartamento ? { idClienteDepartamento: datos.idClienteDepartamento } : {}),
         ...(cambiaTemporada ? { idTemporada: datos.idTemporada ?? null } : {}),
+        ...(cambiaComprador ? { idClienteContacto: datos.idClienteContacto ?? null } : {}),
+        ...(cambiaGenero ? { idGenero: datos.idGenero ?? null } : {}),
+        ...(cambiaAnio ? { anioEntrega: datos.anioEntrega ?? null } : {}),
       },
     });
   }, bd);

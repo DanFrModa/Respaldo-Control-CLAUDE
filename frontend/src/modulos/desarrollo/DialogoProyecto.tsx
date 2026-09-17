@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useDepartamentosCliente } from '@/api/clientes';
+import { useContactosCliente, useDepartamentosCliente } from '@/api/clientes';
+import { useGeneros } from '@/api/modelos';
 import { useActualizarProyecto, useCrearProyecto } from '@/api/proyectos';
 import type { Proyecto, ProyectoCrear, ProyectoEditar } from '@/api/proyectos';
 import { useTemporadas } from '@/api/temporadas';
@@ -18,7 +19,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldLabel, LeyendaObligatorios } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -40,6 +47,9 @@ const VALORES_INICIALES: DatosProyectoFormulario = {
   idClienteDepartamento: '',
   nombre: '',
   idTemporada: '',
+  idClienteContacto: '',
+  idGenero: '',
+  anioEntrega: '',
   notas: '',
 };
 
@@ -48,6 +58,14 @@ const VALORES_INICIALES: DatosProyectoFormulario = {
  * elige al DAR DE ALTA (en edición queda fijo: un proyecto es de un cliente). El departamento se
  * filtra por el cliente elegido. La validación de captura es sólo UX: el backend re-valida (A1),
  * incluido que el departamento pertenezca al cliente.
+ *
+ * ⭐ **fila 0.155 (§Post-F9.210)** — tres campos más, los tres OPCIONALES:
+ *  • **Comprador**: la persona del cliente a la que va dirigido el proyecto (*«normalmente un
+ *    proyecto va dirigido a un solo comprador»*). Sale del catálogo de contactos del cliente, que
+ *    ya existía completo (§Post-F9.152); se filtra por el cliente elegido, igual que el
+ *    departamento, y se vacía si el cliente cambia.
+ *  • **Género** y **Año de entrega**: lo que los modelos nuevos del proyecto HEREDAN para no
+ *    volver a preguntarlo. Se pueden dejar en blanco (el alta de modelo los pedirá como antes).
  */
 export function DialogoProyecto({
   abierto,
@@ -65,6 +83,7 @@ export function DialogoProyecto({
   const guardando = crear.isPending || actualizar.isPending;
 
   const temporadas = useTemporadas(QUERY_TEMPORADAS);
+  const generos = useGeneros();
 
   const formulario = useForm<DatosProyectoFormulario>({
     resolver: zodResolver(esquemaProyectoFormulario),
@@ -74,6 +93,9 @@ export function DialogoProyecto({
   const idClienteElegido = formulario.watch('idCliente');
   const idClienteNum = idClienteElegido === '' ? undefined : Number(idClienteElegido);
   const departamentos = useDepartamentosCliente(idClienteNum);
+  // ⭐ fila 0.155 — los contactos del cliente elegido (el comprador). Mismo patrón que los
+  // departamentos: la consulta se queda apagada mientras no haya cliente.
+  const contactos = useContactosCliente(idClienteNum);
 
   useEffect(() => {
     if (!abierto) {
@@ -86,6 +108,10 @@ export function DialogoProyecto({
             idClienteDepartamento: String(proyecto.idClienteDepartamento),
             nombre: proyecto.nombre,
             idTemporada: proyecto.idTemporada === null ? '' : String(proyecto.idTemporada),
+            idClienteContacto:
+              proyecto.idClienteContacto === null ? '' : String(proyecto.idClienteContacto),
+            idGenero: proyecto.idGenero === null ? '' : String(proyecto.idGenero),
+            anioEntrega: proyecto.anioEntrega === null ? '' : String(proyecto.anioEntrega),
             notas: proyecto.notas ?? '',
           }
         : VALORES_INICIALES,
@@ -98,6 +124,11 @@ export function DialogoProyecto({
         idClienteDepartamento: Number(datos.idClienteDepartamento),
         nombre: datos.nombre,
         idTemporada: datos.idTemporada === '' ? null : Number(datos.idTemporada),
+        // ⭐ fila 0.155 — M1: `null` vacía el campo; nunca se omite en la edición, porque quitar
+        // el comprador (o el género, o el año) tiene que poder hacerse desde aquí.
+        idClienteContacto: datos.idClienteContacto === '' ? null : Number(datos.idClienteContacto),
+        idGenero: datos.idGenero === '' ? null : Number(datos.idGenero),
+        anioEntrega: datos.anioEntrega.trim() === '' ? null : Number(datos.anioEntrega.trim()),
         notas: datos.notas.trim() === '' ? null : datos.notas,
       };
       actualizar.mutate(
@@ -117,6 +148,11 @@ export function DialogoProyecto({
       idClienteDepartamento: Number(datos.idClienteDepartamento),
       nombre: datos.nombre,
       ...(datos.idTemporada === '' ? {} : { idTemporada: Number(datos.idTemporada) }),
+      ...(datos.idClienteContacto === ''
+        ? {}
+        : { idClienteContacto: Number(datos.idClienteContacto) }),
+      ...(datos.idGenero === '' ? {} : { idGenero: Number(datos.idGenero) }),
+      ...(datos.anioEntrega.trim() === '' ? {} : { anioEntrega: Number(datos.anioEntrega.trim()) }),
       ...(datos.notas.trim() === '' ? {} : { notas: datos.notas }),
     };
     crear.mutate(cuerpo, {
@@ -133,6 +169,23 @@ export function DialogoProyecto({
   const departamentosActivos = (departamentos.data ?? []).filter(
     (d) => d.activo || String(d.id) === formulario.getValues('idClienteDepartamento'),
   );
+  // ⭐ fila 0.155 — `useContactosCliente` ya pide sólo los ACTIVOS. El proyecto viejo cuyo
+  // comprador se archivó conservaría un id que no está en la lista: se muestra su nombre igual
+  // (abajo) para que editar el nombre del proyecto no lo borre sin avisar.
+  //
+  // 🟡 RONDA 2 — **`!contactos.isPending` no es cosmética: sin ella la etiqueta MIENTE.**
+  // Mientras la consulta está en vuelo, `contactos.data` es `undefined` ⇒ la lista está vacía ⇒
+  // «no está entre los activos» es cierto para TODOS, y cualquier proyecto con comprador pintaba
+  // «Ana Ruiz (archivado)» hasta que resolvía. Es transitorio, pero es una etiqueta afirmando algo
+  // falso sobre una persona, y quien la lea de reojo se lo cree.
+  const contactosActivos = contactos.data ?? [];
+  const idCompradorActual = formulario.watch('idClienteContacto');
+  const compradorArchivado =
+    !contactos.isPending &&
+    idCompradorActual !== '' &&
+    !contactosActivos.some((c) => String(c.id) === idCompradorActual) &&
+    proyecto?.comprador !== null &&
+    proyecto?.comprador !== undefined;
 
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
@@ -230,6 +283,68 @@ export function DialogoProyecto({
                   </option>
                 ))}
               </SelectNativo>
+            </Field>
+
+            {/* ⭐ fila 0.155 — el COMPRADOR (§Post-F9.210 punto 1). */}
+            <Field>
+              <FieldLabel htmlFor="proyecto-comprador">Comprador</FieldLabel>
+              <SelectNativo
+                id="proyecto-comprador"
+                disabled={guardando || idClienteNum === undefined}
+                {...registrar('idClienteContacto')}
+              >
+                <option value="">
+                  {idClienteNum === undefined ? 'Elige primero un cliente…' : 'Sin comprador'}
+                </option>
+                {compradorArchivado ? (
+                  <option value={idCompradorActual}>{proyecto.comprador} (archivado)</option>
+                ) : null}
+                {contactosActivos.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                    {c.puesto === null || c.puesto === '' ? '' : ` · ${c.puesto}`}
+                  </option>
+                ))}
+              </SelectNativo>
+              <FieldDescription>
+                La persona del cliente a la que va dirigido el proyecto. Se captura en la ficha del
+                cliente.
+              </FieldDescription>
+            </Field>
+
+            {/* ⭐⭐ fila 0.155 — GÉNERO y AÑO: lo que heredan los modelos nuevos (§Post-F9.210
+                punto 2). */}
+            <Field>
+              <FieldLabel htmlFor="proyecto-genero">Género</FieldLabel>
+              <SelectNativo id="proyecto-genero" disabled={guardando} {...registrar('idGenero')}>
+                <option value="">Sin género</option>
+                {(generos.data ?? []).map((g) => (
+                  <option key={g.id} value={String(g.id)}>
+                    {g.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+              <FieldDescription>
+                Los modelos nuevos de este proyecto lo toman de aquí y no lo vuelven a preguntar (se
+                puede cambiar modelo por modelo).
+              </FieldDescription>
+            </Field>
+
+            <Field data-invalid={Boolean(errors.anioEntrega)}>
+              <FieldLabel htmlFor="proyecto-anio">Año de entrega</FieldLabel>
+              <Input
+                id="proyecto-anio"
+                inputMode="numeric"
+                placeholder="Ej. 2026"
+                disabled={guardando}
+                aria-invalid={Boolean(errors.anioEntrega)}
+                {...registrar('anioEntrega')}
+              />
+              <FieldDescription>
+                El año que va en el código del modelo (el 26 de CYA-26-71-001). También lo heredan
+                los modelos nuevos.
+              </FieldDescription>
+              <FieldError errors={[errors.anioEntrega]} />
             </Field>
 
             <Field>

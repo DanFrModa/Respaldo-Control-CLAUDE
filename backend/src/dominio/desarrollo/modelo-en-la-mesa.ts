@@ -173,12 +173,26 @@ async function exigirMesaAbierta(tx: Tx, idLista: number, idEmpresa: number): Pr
   };
 }
 
+/**
+ * ⭐ RONDA 2 de la fila 0.155 — DE DÓNDE SALIÓ EL GÉNERO del modelo nuevo, para la bitácora.
+ *
+ * Esta puerta tiene **TRES** orígenes posibles (la gemela `crearDesarrolloConModeloNuevo` sólo
+ * tiene dos, porque allí no se copia), así que un booleano «¿lo heredó del proyecto?» sería una
+ * verdad a medias: diría `false` tanto para lo que alguien tecleó como para lo que vino del modelo
+ * copiado, que son actos distintos y con responsables distintos.
+ */
+type OrigenGenero = 'capturado' | 'modelo-copiado' | 'proyecto';
+
 /** El proyecto donde queda el desarrollo (uno existente, o el que se acaba de crear). */
 interface ProyectoDeLaMesa {
   id: number;
   folio: number;
   nombre: string;
   creado: boolean;
+  /** ⭐ fila 0.155 — género del proyecto, que el modelo nuevo HEREDA si no se manda (§Post-F9.210). */
+  idGenero: number | null;
+  /** ⭐ fila 0.155 — año de entrega del proyecto, que el modelo nuevo HEREDA si no se manda. */
+  anioEntrega: number | null;
 }
 
 /**
@@ -206,7 +220,15 @@ async function resolverProyecto(
         idCliente: mesa.idCliente,
         idClienteDepartamento: mesa.idClienteDepartamento,
       },
-      select: { id: true, folio: true, nombre: true, archivado: true },
+      select: {
+        id: true,
+        folio: true,
+        nombre: true,
+        archivado: true,
+        // ⭐ fila 0.155 — lo que el modelo nuevo hereda si no se manda.
+        idGenero: true,
+        anioEntrega: true,
+      },
     });
     if (proyecto === null) {
       throw new ErrorValidacion(
@@ -223,21 +245,37 @@ async function resolverProyecto(
       folio: Number(proyecto.folio),
       nombre: proyecto.nombre,
       creado: false,
+      idGenero: proyecto.idGenero,
+      anioEntrega: proyecto.anioEntrega,
     };
   }
 
   // El esquema garantiza que, sin `idProyecto`, viene el nombre del nuevo.
   const nombre = datos.nombreProyectoNuevo as string;
+  // ⭐ fila 0.155 — el proyecto que nace AQUÍ se queda con el género y el año que se capturaron para
+  // este modelo, para que el SIGUIENTE modelo que se le cuelgue ya no los pregunte (§Post-F9.210
+  // punto 2). No es adivinar: son los datos que la persona acaba de teclear para este mismo
+  // proyecto. El género puede venir sin capturar (al COPIAR se hereda del modelo origen, que se
+  // resuelve después); en ese caso el proyecto nace sin él, como cualquier proyecto anterior.
   const creado = await crearProyecto(
     sesion,
     {
       idCliente: mesa.idCliente,
       idClienteDepartamento: mesa.idClienteDepartamento,
       nombre,
+      ...(datos.idGenero === undefined ? {} : { idGenero: datos.idGenero }),
+      ...(datos.anioEntrega === undefined ? {} : { anioEntrega: datos.anioEntrega }),
     },
     { tx },
   );
-  return { id: creado.id, folio: creado.folio, nombre: creado.nombre, creado: true };
+  return {
+    id: creado.id,
+    folio: creado.folio,
+    nombre: creado.nombre,
+    creado: true,
+    idGenero: creado.idGenero,
+    anioEntrega: creado.anioEntrega,
+  };
 }
 
 /** El modelo que se copia, con su ficha y lo mínimo para nombrarlo en los errores. */
@@ -304,18 +342,29 @@ async function leerModeloOrigen(tx: Tx, idModelo: number): Promise<ModeloOrigen>
 }
 
 /**
- * Los DOS DÍGITOS del modelo nuevo: lo que se mandó gana; si no se mandó, se hereda del copiado.
+ * Los DOS DÍGITOS del modelo nuevo: lo que se mandó gana; si no se mandó, se hereda del copiado y,
+ * en último lugar, **del PROYECTO** (⭐ fila 0.155, §Post-F9.210 punto 2 — *«cada modelo hereda esa
+ * información, con opción a cambiarla»*).
  *
- * ⚠️ Si no hay ni lo uno ni lo otro, se **rechaza nombrando el modelo** en vez de inventar un valor.
+ * ⚠️ El orden importa y es el que Daniel describió: **lo tecleado > el modelo que se copia > el
+ * proyecto**. El modelo copiado va ANTES que el proyecto porque copiar es un acto explícito sobre
+ * una prenda concreta: si alguien copia una playera de DAMA dentro de un proyecto de NIÑO, lo que
+ * quiere es la playera de dama.
+ *
+ * ⚠️ El TIPO DE PRENDA no se hereda del proyecto, sólo el género: un proyecto lleva pantalones,
+ * playeras y sudaderas, así que el proyecto no tiene un tipo que prestar.
+ *
+ * ⚠️ Si no hay ninguno de los tres, se **rechaza nombrando qué falta** en vez de inventar un valor.
  * Es el caso REAL de los ~4,987 modelos migrados de Access, que no traen género: la REGLA 0-B dice
  * que el código tolere el dato ausente **sin rellenarlo**, y esto es exactamente eso.
  */
 function resolverDosDigitos(
   datos: DatosModeloNuevoEnLista,
   origen: ModeloOrigen | null,
-): { idTipoProducto: number; idGenero: number } {
+  proyecto: ProyectoDeLaMesa,
+): { idTipoProducto: number; idGenero: number; origenGenero: OrigenGenero } {
   const idTipoProducto = datos.idTipoProducto ?? origen?.idTipoProducto ?? null;
-  const idGenero = datos.idGenero ?? origen?.idGenero ?? null;
+  const idGenero = datos.idGenero ?? origen?.idGenero ?? proyecto.idGenero ?? null;
   if (idTipoProducto === null || idGenero === null) {
     const falta = idTipoProducto === null ? 'tipo de prenda' : 'género';
     throw new ErrorValidacion(
@@ -325,7 +374,16 @@ function resolverDosDigitos(
             `Elígelo aquí (o captúraselo a él en su ficha).`,
     );
   }
-  return { idTipoProducto, idGenero };
+  // ⭐ El ORIGEN se decide AQUÍ, con la misma cadena que eligió el valor, y no se recalcula en el
+  // llamador: dos copias de esta precedencia acabarían diciendo cosas distintas, que es justo el
+  // modo de fallo que la bitácora tiene que evitar.
+  const origenGenero: OrigenGenero =
+    datos.idGenero !== undefined
+      ? 'capturado'
+      : origen?.idGenero != null
+        ? 'modelo-copiado'
+        : 'proyecto';
+  return { idTipoProducto, idGenero, origenGenero };
 }
 
 /**
@@ -372,12 +430,23 @@ export async function crearModeloEnLista(
 
     const origen =
       datos.idModeloOrigen === undefined ? null : await leerModeloOrigen(tx, datos.idModeloOrigen);
-    const { idTipoProducto, idGenero } = resolverDosDigitos(datos, origen);
+    const { idTipoProducto, idGenero, origenGenero } = resolverDosDigitos(datos, origen, proyecto);
+
+    // ⭐ fila 0.155 — el año: lo tecleado gana; si no, el del proyecto. El esquema ya exige teclearlo
+    // cuando el proyecto se crea aquí mismo (no habría de quién heredarlo), así que llegar sin uno
+    // ni otro sólo es posible con un proyecto viejo sin año capturado: se rechaza nombrándolo.
+    const anioEntrega = datos.anioEntrega ?? proyecto.anioEntrega;
+    if (anioEntrega === null) {
+      throw new ErrorValidacion(
+        `El proyecto ${String(proyecto.folio)} no tiene año de entrega capturado, así que no hay ` +
+          `de dónde heredarlo. Captúralo aquí, o en el proyecto para que todos sus modelos lo tomen.`,
+      );
+    }
 
     const digitos = await digitosDeNomenclatura(tx, idTipoProducto, idGenero);
     const { codigo } = await mintearCodigoDesarrollo(tx, {
       idCliente: mesa.idCliente,
-      anioEntrega: datos.anioEntrega,
+      anioEntrega,
       ...digitos,
     });
 
@@ -448,7 +517,25 @@ export async function crearModeloEnLista(
         proyectoCreado: proyecto.creado,
         idModelo: modelo.id,
         codigoDesarrollo: codigo,
-        anioEntrega: datos.anioEntrega,
+        // 🔴 RONDA 2 — EL AÑO Y EL GÉNERO **RESUELTOS**, no los crudos de la petición.
+        //
+        // Aquí decía `datos.anioEntrega`, el crudo. Mientras el esquema lo exigía siempre eso daba
+        // igual; esta fila lo volvió OPCIONAL —su punto entero— y entonces vale `undefined`
+        // **exactamente en el camino nuevo, el de heredar**: el código salía `CYA-27-71-001` y el
+        // renglón de auditoría ni siquiera traía la clave `anioEntrega`. O sea: el sistema acuñaba
+        // un número irrepetible y no dejaba escrito de dónde salió el `27`.
+        //
+        // 🔑 La puerta gemela (`desarrollos.ts`) ya registraba el resuelto + `idGenero` +
+        // `heredadoDelProyecto`. Esto la alcanza, y añade lo que sólo esta puerta necesita
+        // ({@link OrigenGenero}): aquí el género puede venir del MODELO COPIADO, un tercer origen
+        // que allá no existe.
+        anioEntrega,
+        idGenero,
+        heredadoDelProyecto: {
+          genero: origenGenero === 'proyecto',
+          anioEntrega: datos.anioEntrega === undefined,
+        },
+        origenGenero,
         copiadoDeIdModelo: origen?.id ?? null,
         copiadoDeCodigo: origen?.codigo ?? null,
         receta: aJsonBitacora(receta),

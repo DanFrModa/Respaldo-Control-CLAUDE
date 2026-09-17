@@ -1289,6 +1289,187 @@ describe('crearDesarrolloConModeloNuevo', () => {
     ).rejects.toThrow(/"Ropa interior"/);
     expect(await cliente.modelo.count()).toBe(0);
   });
+
+  // ══ ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — EL GÉNERO Y EL AÑO SE HEREDAN DEL PROYECTO ═══════
+  //
+  // Daniel: *«todos los modelos nuevos deberían jalar el género desde ahí. **Que no vuelva a
+  // preguntar**… lo mismo el año de entrega»*, y cerró: *«en el proyecto y cada modelo hereda esa
+  // información (**con opción a cambiarla**)»*.
+  //
+  // 🔑 Lo que estas pruebas cementan no es la comodidad: es que un modelo **no pueda nacer sin
+  // género**. Uno así no se puede numerar y el error salta hasta «Generar OP», después de teclear
+  // la matriz color×talla entera.
+  describe('herencia del proyecto (fila 0.155)', () => {
+    /** Un proyecto CON género y año capturados. */
+    async function proyectoConHerencia(anio = 2026): Promise<number> {
+      const id = await proyectoDePrueba();
+      await cliente.proyecto.update({
+        where: { id },
+        data: { idGenero: caballero.id, anioEntrega: anio },
+      });
+      return id;
+    }
+
+    it('omitiendo género y año, los toma del PROYECTO', async () => {
+      const idProyecto = await proyectoConHerencia(2027);
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id },
+        bd(),
+      );
+
+      // `27` = el año del proyecto; `1` (el 2º dígito del par) = su género.
+      expect(desarrollo.codigoModelo).toBe('CYA-27-71-001');
+      const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: desarrollo.idModelo } });
+      expect(modelo.idGenero).toBe(caballero.id);
+    });
+
+    it('lo que se MANDA pisa lo del proyecto («con opción a cambiarla»)', async () => {
+      const idProyecto = await proyectoConHerencia(2026);
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id, idGenero: dama.id, anioEntrega: 2028 },
+        bd(),
+      );
+
+      expect(desarrollo.codigoModelo).toBe('CYA-28-72-001');
+      const modelo = await cliente.modelo.findUniqueOrThrow({ where: { id: desarrollo.idModelo } });
+      expect(modelo.idGenero).toBe(dama.id);
+    });
+
+    it('cambiarlos en el modelo NO toca el proyecto', async () => {
+      const idProyecto = await proyectoConHerencia(2026);
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+
+      await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id, idGenero: dama.id, anioEntrega: 2028 },
+        bd(),
+      );
+
+      const proyecto = await cliente.proyecto.findUniqueOrThrow({ where: { id: idProyecto } });
+      expect(proyecto.idGenero).toBe(caballero.id);
+      expect(proyecto.anioEntrega).toBe(2026);
+    });
+
+    it('el SIGUIENTE modelo del mismo proyecto vuelve a heredar (no se queda con lo pisado)', async () => {
+      const idProyecto = await proyectoConHerencia(2026);
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+
+      await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id, idGenero: dama.id },
+        bd(),
+      );
+      const segundo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id },
+        bd(),
+      );
+
+      expect(segundo.codigoModelo).toBe('CYA-26-71-002');
+    });
+
+    // ⭐ RONDA 2 — LA RED QUE A ESTA PUERTA LE FALTABA.
+    //
+    // La bitácora de ESTA puerta ya registraba el año y el género RESUELTOS y de dónde salieron;
+    // la de la mesa no, y por eso perdía el año justo al heredarlo. Al arreglar aquella se midió
+    // lo obvio: **a ésta nadie la estaba cuidando tampoco** —ninguna prueba leía su renglón—, así
+    // que estaba a un descuido de repetir el mismo defecto. Las dos puertas quedan medidas.
+    it('la BITÁCORA registra el año y el género RESUELTOS, y que se heredaron', async () => {
+      const idProyecto = await proyectoConHerencia(2027);
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id },
+        bd(),
+      );
+      expect(desarrollo.codigoModelo).toBe('CYA-27-71-001');
+
+      const renglon = await cliente.bitacora.findFirstOrThrow({
+        where: {
+          entidad: 'Desarrollo',
+          idEntidad: String(desarrollo.id),
+          accion: 'CREAR',
+        },
+      });
+      const anotado = renglon.datos as Record<string, unknown>;
+      // El `27` del código sale de aquí.
+      expect(anotado['anioEntrega']).toBe(2027);
+      expect(anotado['idGenero']).toBe(caballero.id);
+      expect(anotado['heredadoDelProyecto']).toEqual({ genero: true, anioEntrega: true });
+    });
+
+    it('la BITÁCORA distingue lo TECLEADO de lo heredado', async () => {
+      const idProyecto = await proyectoConHerencia(2026);
+      const dama = await cliente.genero.create({
+        data: { nombre: 'Dama', digitoNomenclatura: 2 },
+      });
+
+      const desarrollo = await crearDesarrolloConModeloNuevo(
+        sesion(PERM_DESARROLLO),
+        idProyecto,
+        { idTipoProducto: pantalon.id, idGenero: dama.id },
+        bd(),
+      );
+
+      const renglon = await cliente.bitacora.findFirstOrThrow({
+        where: {
+          entidad: 'Desarrollo',
+          idEntidad: String(desarrollo.id),
+          accion: 'CREAR',
+        },
+      });
+      const anotado = renglon.datos as Record<string, unknown>;
+      expect(anotado['idGenero']).toBe(dama.id);
+      // El género lo puso quien capturó; el año sí vino del proyecto. Se anotan por separado.
+      expect(anotado['heredadoDelProyecto']).toEqual({ genero: false, anioEntrega: true });
+      expect(anotado['anioEntrega']).toBe(2026);
+    });
+
+    // REGLA 0-B: un proyecto anterior a esta fila no tiene género ni año, y eso NO es un defecto.
+    // Lo que el sistema NO puede hacer es inventarlos: rechaza diciendo dónde capturarlos.
+    it('si NI la llamada NI el proyecto traen género, rechaza y no crea nada', async () => {
+      const idProyecto = await proyectoDePrueba();
+      await expect(
+        crearDesarrolloConModeloNuevo(
+          sesion(PERM_DESARROLLO),
+          idProyecto,
+          { idTipoProducto: pantalon.id, anioEntrega: 2026 },
+          bd(),
+        ),
+      ).rejects.toThrow(/no tiene género capturado/);
+      expect(await cliente.modelo.count()).toBe(0);
+    });
+
+    it('si NI la llamada NI el proyecto traen año, rechaza y no crea nada', async () => {
+      const idProyecto = await proyectoDePrueba();
+      await expect(
+        crearDesarrolloConModeloNuevo(
+          sesion(PERM_DESARROLLO),
+          idProyecto,
+          { idTipoProducto: pantalon.id, idGenero: caballero.id },
+          bd(),
+        ),
+      ).rejects.toThrow(/no tiene año de entrega capturado/);
+      expect(await cliente.modelo.count()).toBe(0);
+    });
+  });
 });
 
 // ── (e) Catálogo: filtro de origen y búsqueda por los DOS números ──────────────────

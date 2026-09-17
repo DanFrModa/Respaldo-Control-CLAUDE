@@ -230,6 +230,68 @@ describe('<DialogoDesarrollo>', () => {
     expect(screen.queryByTestId('aviso-tipo-sin-digito')).not.toBeInTheDocument();
   });
 
+  // ══ ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — LA PRECARGA DESDE EL PROYECTO ═══════════════════
+  describe('hereda el género y el año del proyecto', () => {
+    it('llegan PRECARGADOS con los del proyecto (*que no vuelva a preguntar*)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoDesarrollo
+          abierto
+          alCambiarAbierto={() => {}}
+          idProyecto={1}
+          idGeneroProyecto={3}
+          anioEntregaProyecto={2027}
+        />,
+        { sesion: estadoSesionDePrueba(['desarrollo.administrar']) },
+      );
+      await usuario.selectOptions(screen.getByLabelText('Modelo'), 'nuevo');
+
+      expect(screen.getByTestId('desarrollo-genero')).toHaveValue('3');
+      expect(screen.getByTestId('desarrollo-anio-entrega')).toHaveValue('2027');
+    });
+
+    it('se pueden CAMBIAR aquí mismo (*con opción a cambiarla*)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoDesarrollo
+          abierto
+          alCambiarAbierto={() => {}}
+          idProyecto={1}
+          idGeneroProyecto={3}
+          anioEntregaProyecto={2027}
+        />,
+        { sesion: estadoSesionDePrueba(['desarrollo.administrar']) },
+      );
+      await usuario.selectOptions(screen.getByLabelText('Modelo'), 'nuevo');
+      await usuario.clear(screen.getByTestId('desarrollo-anio-entrega'));
+      await usuario.type(screen.getByTestId('desarrollo-anio-entrega'), '2029');
+      await usuario.selectOptions(screen.getByTestId('desarrollo-tipo-producto'), '4');
+      await usuario.click(screen.getByTestId('guardar-desarrollo'));
+
+      await vi.waitFor(() =>
+        // El año se tecleó encima (2029) y el GÉNERO viajó tal cual venía precargado del proyecto.
+        expect(crearModeloNuevoMutate).toHaveBeenCalledWith({
+          idProyecto: 1,
+          cuerpo: { anioEntrega: 2029, idTipoProducto: 4, idGenero: 3 },
+        }),
+      );
+    });
+
+    it('un proyecto SIN género ni año deja el formulario como siempre (REGLA 0-B)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoDesarrollo abierto alCambiarAbierto={() => {}} idProyecto={1} />,
+        { sesion: estadoSesionDePrueba(['desarrollo.administrar']) },
+      );
+      await usuario.selectOptions(screen.getByLabelText('Modelo'), 'nuevo');
+
+      expect(screen.getByTestId('desarrollo-genero')).toHaveValue('');
+      expect(screen.getByTestId('desarrollo-anio-entrega')).toHaveValue(
+        String(new Date().getFullYear()),
+      );
+    });
+  });
+
   it('si NINGÚN tipo está sin dígito, no hay aviso ni puerta (la gemela: no se regaña de más)', async () => {
     const usuario = userEvent.setup();
     tiposConDigitoCompleto = true;

@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Shirt,
   Trash2,
+  User,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -617,9 +618,25 @@ function PaginaProyecto({
           </h1>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">
             #{proyecto.folio}
-            {proyecto.temporada === null ? '' : ` · Temporada ${proyecto.temporada}`} ·{' '}
+            {proyecto.temporada === null ? '' : ` · Temporada ${proyecto.temporada}`}
+            {/* ⭐ fila 0.155 — género y año: lo que heredan los modelos nuevos (§Post-F9.210). */}
+            {proyecto.genero === null ? '' : ` · ${proyecto.genero}`}
+            {proyecto.anioEntrega === null ? '' : ` · Entrega ${proyecto.anioEntrega}`} ·{' '}
             {proyecto.conteos.total} modelos · abierto {formatearFecha(proyecto.creadoEn)}
           </p>
+          {/* ⭐ fila 0.155 — el COMPRADOR, la persona a la que va dirigido el proyecto. */}
+          {proyecto.comprador === null ? null : (
+            <p
+              className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground"
+              data-testid="proyecto-comprador"
+            >
+              <User className="size-3.5 shrink-0" aria-hidden />
+              {proyecto.comprador}
+              {proyecto.compradorPuesto === null || proyecto.compradorPuesto === ''
+                ? ''
+                : ` · ${proyecto.compradorPuesto}`}
+            </p>
+          )}
           {proyecto.notas === null || proyecto.notas === '' ? null : (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <FileText className="size-3.5 shrink-0" aria-hidden />
@@ -791,10 +808,13 @@ function PaginaProyecto({
       </div>
 
       {/* Diálogos del proyecto */}
+      {/* ⭐ fila 0.155 — el modelo nuevo nace con el género y el año del PROYECTO (§Post-F9.210). */}
       <DialogoDesarrollo
         abierto={agregarAbierto}
         alCambiarAbierto={setAgregarAbierto}
         idProyecto={proyecto.id}
+        idGeneroProyecto={proyecto.idGenero}
+        anioEntregaProyecto={proyecto.anioEntrega}
       />
       <DialogoApagarDesarrollo
         abierto={aApagar !== null}

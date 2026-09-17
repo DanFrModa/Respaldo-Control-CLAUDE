@@ -28,11 +28,33 @@ vi.mock('@/api/calidad', () => ({
   useTiposProductoActivos: () => ({ data: { datos: [{ id: 7, nombre: 'Pantalón' }] } }),
 }));
 vi.mock('@/api/modelos', () => ({
-  useGeneros: () => ({ data: [{ id: 1, nombre: 'Caballero' }] }),
+  // ⭐ RONDA 3 — el segundo género no es adorno: con UNO SOLO no se puede escribir la prueba que
+  // mide la rama del GÉNERO (hace falta que la persona lo cambie a un valor DISTINTO del que dejó
+  // la precarga), y sin esa prueba la mutación de esa rama sobrevivía. Medido, no supuesto.
+  useGeneros: () => ({
+    data: [
+      { id: 1, nombre: 'Caballero' },
+      { id: 2, nombre: 'Dama' },
+    ],
+  }),
 }));
 vi.mock('@/api/proyectos', () => ({
   useProyectos: () => ({
-    data: { datos: [{ id: 30, folio: 12, nombre: 'Otoño 26', archivado: false }] },
+    data: {
+      datos: [
+        // El proyecto «de antes» (fila 0.155): sin género ni año, como todos los anteriores a ella.
+        { id: 30, folio: 12, nombre: 'Otoño 26', archivado: false },
+        // ⭐ fila 0.155 — el proyecto que SÍ recuerda: su género y su año precargan el alta.
+        {
+          id: 31,
+          folio: 13,
+          nombre: 'Primavera 27',
+          archivado: false,
+          idGenero: 1,
+          anioEntrega: 2027,
+        },
+      ],
+    },
   }),
 }));
 // El selector de modelo tiene su propia prueba; aquí sólo hace falta poder elegir uno.
@@ -174,6 +196,152 @@ describe('<DialogoAgregarModelos> — la mesa abierta (§Post-F9.152)', () => {
     const cuerpo = crearModeloMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
     expect(cuerpo.cuerpo).toMatchObject({ nombreProyectoNuevo: 'Cita septiembre' });
     expect(cuerpo.cuerpo['idProyecto']).toBeUndefined();
+  });
+
+  // ══ ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — elegir un PROYECTO precarga género y año ════════
+  it('elegir un proyecto CON género y año los precarga en el alta', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+  });
+
+  it('un proyecto SIN género ni año no toca nada (REGLA 0-B): se captura como siempre', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(new Date().getFullYear()));
+  });
+
+  // 🔴 RONDA 2 — LA QUE FALTABA: CAMBIAR de proyecto no puede dejar pegado lo del anterior.
+  //
+  // El camino real que rompía: elijo «Primavera 27» (Niño/2027), me equivoqué, elijo «Otoño 26»
+  // —que no tiene ninguno de los dos— y los campos seguían diciendo Niño/2027. Se enviaban así y
+  // salía un código con el género y el año DE OTRO PROYECTO, que ya no se puede corregir (D3).
+  it('🔴 al CAMBIAR a un proyecto SIN esos datos, los campos se limpian (no se queda lo del anterior)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+
+    // Me equivoqué de proyecto: el que elijo ahora NO trae género ni año.
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(new Date().getFullYear()));
+  });
+
+  it('🔴 y lo que se envía tras ese cambio NO lleva el género del proyecto anterior', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+    await usuario.selectOptions(screen.getByTestId('agregar-tipo'), '7');
+    await usuario.click(screen.getByTestId('confirmar-modelo-nuevo'));
+
+    // Sin género elegido, la pantalla PARA y lo dice: nunca manda el del otro proyecto.
+    expect(crearModeloMutate).not.toHaveBeenCalled();
+    expect(screen.getByText(/tipo de prenda y el género/i)).toBeInTheDocument();
+  });
+
+  // ⭐ La otra mitad de la regla, y la que el primer intento de arreglo ROMPIÓ: barrer lo que dejó
+  // la precarga no puede llevarse por delante lo que TECLEÓ la persona. Es el camino más normal de
+  // esta pantalla: elegir tipo y género primero, el proyecto después.
+  it('⭐ lo que el usuario eligió A MANO sobrevive al cambio de proyecto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-genero'), '1');
+    await usuario.clear(screen.getByTestId('agregar-anio'));
+    await usuario.type(screen.getByTestId('agregar-anio'), '2030');
+
+    // Elijo un proyecto SIN género ni año: lo mío no se toca.
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2030');
+  });
+
+  // ⭐ El caso de en medio: PRECARGA, la persona lo cambia A MANO, y luego cambia de proyecto.
+  // Lo suyo manda. Es el único camino donde la comparación contra el valor precargado decide.
+  //
+  // 🔑 RONDA 3 — **esta rama sobrevivía a todas las mutaciones.** Las dos pruebas de al lado tocan
+  // los EXTREMOS (nunca hubo precarga · el valor sigue siendo el de la precarga); ninguna medía el
+  // de en medio, que es justo lo que la condición `actual === anterior.X` existe para resolver —y
+  // el que el primer intento de arreglo rompió—. Mutar `return anterior !== null ? '' : actual`
+  // dejaba las 13 pruebas en verde.
+  //
+  // ⚠️ Ésta mide sólo el AÑO. Su gemela de abajo mide el GÉNERO, y hacen falta LAS DOS: son dos
+  // `setX` con dos condiciones distintas, así que una sola prueba deja la otra rama sin red. Se
+  // midió: con sólo ésta, mutar la condición del género daba 15/15 EN VERDE.
+  it('⭐ lo tecleado DESPUÉS de una precarga sobrevive al cambio de proyecto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+
+    await usuario.clear(screen.getByTestId('agregar-anio'));
+    await usuario.type(screen.getByTestId('agregar-anio'), '2031');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2031');
+  });
+
+  // ⭐ RONDA 3, la GEMELA — la misma rama de en medio, pero en el campo de GÉNERO.
+  //
+  // 🔑 No es una copia por simetría: la rama del género es un `setIdGenero` aparte, con su propia
+  // condición. Mutarla mientras sólo existía la prueba del año dejaba la suite entera **en verde**
+  // (15/15). Una prueba por condición.
+  it('⭐ el género elegido DESPUÉS de una precarga también sobrevive al cambio de proyecto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+
+    // La persona corrige el género que dejó la precarga.
+    await usuario.selectOptions(screen.getByTestId('agregar-genero'), '2');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('2');
+  });
+
+  // ⭐ RONDA 3 — la guarda `if (idProyectoElegido === null) return;` tampoco la medía nadie, y el
+  // comentario del código afirma explícitamente lo contrario de lo que pasaría sin ella: una
+  // decisión escrita que nada verificaba. Con «➕ Proyecto nuevo…» no hay proyecto del que heredar,
+  // así que lo que ya esté puesto es del usuario y NO se toca.
+  it('⭐ pasar a «proyecto nuevo» NO borra lo que la precarga dejó puesto', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+
+    await usuario.click(screen.getByTestId('modo-modelo-nuevo'));
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '31');
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
+
+    await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), 'nuevo');
+
+    expect(screen.getByTestId('agregar-genero')).toHaveValue('1');
+    expect(screen.getByTestId('agregar-anio')).toHaveValue('2027');
   });
 
   it('🔴 un cliente SIN ABREVIATURA se avisa ANTES y el botón queda apagado (no truena en la cita)', async () => {

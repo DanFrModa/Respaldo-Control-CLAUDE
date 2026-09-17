@@ -26,7 +26,7 @@ import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
@@ -294,6 +294,33 @@ export async function crearDesarrollo(
  * encima; lo propio de este camino es que el código lo ARMA el sistema (`mintearCodigoDesarrollo`)
  * en vez de teclearlo el usuario. Exige los DOS permisos porque hace las dos cosas:
  * `desarrollo.administrar` y —vía `crearModelo`— `modelos.administrar`.
+ *
+ * ---
+ * ## ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — EL GÉNERO Y EL AÑO SE HEREDAN DEL PROYECTO
+ *
+ * Daniel: *«un proyecto nace con un género o departamento definido… todos los modelos nuevos
+ * deberían jalar el género desde ahí. **Que no vuelva a preguntar**… lo mismo el año de entrega»*,
+ * y lo cerró así: *«en el proyecto y cada modelo hereda esa información (**con opción a
+ * cambiarla**)»*.
+ *
+ * La herencia vive **AQUÍ, en el dominio, y no en la pantalla**. La pantalla también precarga los
+ * campos —eso es lo que el usuario ve— pero si viviera sólo ahí, cualquier otra puerta al mismo alta
+ * (el API directo, un script, la pantalla de mañana) volvería a exigirlos en blanco. Es A1 al pie de
+ * la letra: *omitir* el género significa **«el que diga el proyecto»**, y eso es una regla de
+ * negocio.
+ *
+ * 🔑 **Y vale más que la comodidad.** Un modelo sin género **no se puede numerar**
+ * (`modelos/nomenclatura.ts`, `digitosDelModelo`) y ese error salta hasta «Generar OP», **después**
+ * de que alguien tecleó la matriz color×talla completa. Heredarlo al nacer cierra el agujero por
+ * arriba, donde cuesta cero.
+ *
+ * ⚠️ **El tipo de prenda NO se hereda, a propósito**: cambia de modelo a modelo (un proyecto de
+ * niño lleva pantalón, playera y sudadera), así que precargarlo sería adivinar. Daniel pidió el
+ * género y el año, y son exactamente esos dos.
+ *
+ * ⚠️ **REGLA 0-B:** los proyectos anteriores a esta fila no traen ni género ni año y **no se les
+ * rellena**. Si no los traen, el alta los pide igual que siempre; y si tampoco vienen en la llamada,
+ * se rechaza **diciendo dónde capturarlos**, en vez de dejar nacer un modelo que no se puede numerar.
  */
 export async function crearDesarrolloConModeloNuevo(
   sesion: SesionUsuario,
@@ -308,7 +335,14 @@ export async function crearDesarrolloConModeloNuevo(
   const idNuevo = await enTransaccion(async (tx) => {
     const proyecto = await tx.proyecto.findFirst({
       where: { id: idProyecto, idEmpresa: sesion.idEmpresaActiva },
-      select: { archivado: true, folio: true, idCliente: true },
+      // ⭐ fila 0.155 — `idGenero`/`anioEntrega` son lo que el modelo nuevo HEREDA.
+      select: {
+        archivado: true,
+        folio: true,
+        idCliente: true,
+        idGenero: true,
+        anioEntrega: true,
+      },
     });
     if (proyecto === null) {
       throw new ErrorNoEncontrado('Proyecto', idProyecto);
@@ -319,6 +353,24 @@ export async function crearDesarrolloConModeloNuevo(
       );
     }
 
+    // ⭐ fila 0.155 — lo que se MANDA gana (la «opción a cambiarla»); si no se manda, lo pone el
+    // proyecto. Si no hay ni lo uno ni lo otro se rechaza NOMBRANDO dónde capturarlo, nunca se
+    // inventa un valor (REGLA 0-B).
+    const idGenero = datos.idGenero ?? proyecto.idGenero;
+    if (idGenero === null) {
+      throw new ErrorValidacion(
+        `El proyecto ${Number(proyecto.folio)} no tiene género capturado, así que no hay de dónde ` +
+          `heredarlo. Elígelo aquí, o captúraselo al proyecto para que todos sus modelos lo tomen.`,
+      );
+    }
+    const anioEntrega = datos.anioEntrega ?? proyecto.anioEntrega;
+    if (anioEntrega === null) {
+      throw new ErrorValidacion(
+        `El proyecto ${Number(proyecto.folio)} no tiene año de entrega capturado, así que no hay ` +
+          `de dónde heredarlo. Captúralo aquí, o en el proyecto para que todos sus modelos lo tomen.`,
+      );
+    }
+
     // Los dos dígitos salen del CATÁLOGO (tipo de prenda + género), que es de donde los toma
     // después el número de producción: así los dos códigos del modelo dicen lo mismo.
     //
@@ -326,11 +378,11 @@ export async function crearDesarrolloConModeloNuevo(
     // `digitosDeNomenclatura` (`modelos/nomenclatura.ts`), COMPARTIDO con el alta desde la mesa de
     // negociación (§Post-F9.152). Eran la misma comprobación palabra por palabra; copiarla habría
     // sido la enésima copia reducida que después deriva.
-    const digitos = await digitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
+    const digitos = await digitosDeNomenclatura(tx, datos.idTipoProducto, idGenero);
 
     const { codigo } = await mintearCodigoDesarrollo(tx, {
       idCliente: proyecto.idCliente,
-      anioEntrega: datos.anioEntrega,
+      anioEntrega,
       ...digitos,
     });
 
@@ -339,7 +391,7 @@ export async function crearDesarrolloConModeloNuevo(
       {
         codigo,
         idTipoProducto: datos.idTipoProducto,
-        idGenero: datos.idGenero,
+        idGenero,
         ...(datos.descripcion === undefined || datos.descripcion === ''
           ? {}
           : { descripcion: datos.descripcion }),
@@ -385,7 +437,13 @@ export async function crearDesarrolloConModeloNuevo(
         idModelo: modelo.id,
         operacion: 'modelo-nuevo',
         codigoDesarrollo: codigo,
-        anioEntrega: datos.anioEntrega,
+        anioEntrega,
+        idGenero,
+        // ⭐ fila 0.155 — queda escrito si el dato lo puso quien capturó o lo heredó el proyecto.
+        heredadoDelProyecto: {
+          genero: datos.idGenero === undefined,
+          anioEntrega: datos.anioEntrega === undefined,
+        },
       },
     });
 

@@ -2501,6 +2501,9 @@ model Genero {
 
   /// Modelos de este género (F1-E4, FK nullable Restrict).
   modelos Modelo[]
+  /// ⭐ fila 0.155 — proyectos de desarrollo con este género (FK nullable Restrict). Es el valor
+  /// que heredan los modelos nuevos del proyecto (§Post-F9.210 punto 2).
+  proyectos Proyecto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -8577,6 +8580,9 @@ model ClienteContacto {
   /// Borrado SUAVE (D3): quien se fue se archiva, no se borra.
   activo Boolean @default(true)
 
+  /// ⭐ fila 0.155 — proyectos dirigidos a esta persona (el comprador del proyecto). Restrict.
+  proyectos Proyecto[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -8699,6 +8705,44 @@ model Proyecto {
   nombre                String
   idTemporada           Int?                @map("id_temporada")
   temporada             Temporada?          @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+
+  /// ⭐ fila 0.155 (§Post-F9.210 punto 1) — **EL COMPRADOR**, la persona del cliente a la que va
+  /// dirigido ESTE proyecto. Daniel: *«normalmente un proyecto va dirigido a un solo comprador»*.
+  /// **OPCIONAL de verdad**: un proyecto sin comprador funciona igual que hasta hoy y los
+  /// proyectos que ya existen nacen con `NULL` a propósito (REGLA 0-B: no se rellena el pasado).
+  /// El dominio exige que el contacto sea DEL CLIENTE del proyecto y esté activo (gateado al
+  /// cambio, como el departamento). `Restrict` como sus tres hermanas: al contacto se le da de
+  /// baja con `activo=false` (D3), nunca se borra, así que nada choca — y si alguien lo borrara,
+  /// el proyecto no puede quedarse sin saber a quién iba.
+  idClienteContacto     Int?                @map("id_cliente_contacto")
+  clienteContacto       ClienteContacto?    @relation(fields: [idClienteContacto], references: [id], onDelete: Restrict)
+
+  /// ⭐⭐ fila 0.155 (§Post-F9.210 punto 2) — **GÉNERO DEL PROYECTO**, que cada modelo nuevo
+  /// HEREDA como valor inicial y puede cambiar. Daniel: *«un proyecto nace con un género o
+  /// departamento definido… todos los modelos nuevos deberían jalar el género desde ahí. Que no
+  /// vuelva a preguntar»*.
+  ///
+  /// 🔑 **No es comodidad: es la guarda por arriba.** Un modelo sin género NO SE PUEDE NUMERAR, y
+  /// hoy el error salta hasta «Generar OP» (`dominio/modelos/nomenclatura.ts`, `digitosDelModelo`)
+  /// — después de que alguien tecleó la matriz color×talla completa. Precargarlo al nacer el
+  /// modelo cierra el agujero donde se abre.
+  ///
+  /// ⚠️ **Por qué AQUÍ y no en `ClienteDepartamento` ni en `Temporada`** (las dos alternativas que
+  /// se midieron): `ClienteDepartamento` no tiene FK a `Genero` y colgarla ahí obligaría a mapear
+  /// a mano cada departamento de cada cliente —muchos son temas («Disney», «básicos») o abarcan
+  /// varios géneros—, y eso es rellenar catálogo existente. `Temporada` es un catálogo **global**
+  /// con `nombre @unique` («Primavera-Verano»), que se repite cada año: meterle el año obligaría a
+  /// una fila por año y rompería las que ya existen. El proyecto es el único sitio donde los dos
+  /// datos son ciertos sin tocar nada de lo que ya hay.
+  idGenero              Int?                @map("id_genero")
+  genero                Genero?             @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+
+  /// ⭐ fila 0.155 (§Post-F9.210 punto 2) — **AÑO DE ENTREGA** del proyecto: el `26` de
+  /// `CYA-26-71-001`. Lo hereda el alta de modelo nuevo en vez de pedirlo en blanco cada vez. Es
+  /// el año de ENTREGA, no el de captura (por eso no se deriva de `creadoEn`). Nullable: los
+  /// proyectos que ya existen no lo traen y el sistema lo tolera (vuelve a preguntarlo).
+  anioEntrega           Int?                @map("anio_entrega")
+
   notas                 String?             @db.Text
   archivado             Boolean             @default(false)
 
@@ -8713,6 +8757,8 @@ model Proyecto {
   @@index([idCliente])
   @@index([idClienteDepartamento])
   @@index([idTemporada])
+  @@index([idClienteContacto])
+  @@index([idGenero])
   @@map("proyectos")
 }
 
