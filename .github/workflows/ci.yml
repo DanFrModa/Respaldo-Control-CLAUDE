@@ -50,13 +50,45 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
+    # 90 (18-sep-2026, decisión de Gabriel). ⭐ CUARTA subida por la MISMA causa —20 → 30 → 45 →
+    # 70 → 82 (la tercera y su corrección, el mismo día) → 90— y **LA PRIMERA QUE SE CALCULA SOBRE
+    # UNA MUESTRA** en vez de sobre la última corrida que alguien tenía a mano.
+    #
+    # LA CUENTA, entera y comprobable:
+    #   · MEDICIÓN: **20 corridas SANAS del 16-18 sep-2026**, leídas de la API de GitHub
+    #     (`/actions/runs` + `/actions/runs/{id}/jobs`; job = `started_at` → `completed_at`).
+    #     Job `backend`: **32.3 min** el más rápido · **43.3** la mediana · **53.15** el más lento.
+    #     ⚠️ FUERA de la muestra las dos corridas `cancelled` del 17-sep (45.3): son truncamientos
+    #     del reloj, no duraciones — meterlas en un rango de duraciones lo falsea.
+    #   · REGLA DE LA CASA (la de siempre, escrita más abajo): **tope ≈ 1.7× la duración sana**.
+    #   · ⇒ **53.15 × 1.7 = 90.4 ⇒ 90.** El 82 que regía dejaba **54 %** de margen sobre esa misma
+    #     corrida (`82 ÷ 53.15 = 1.543`), por debajo del 70 % que la regla pide.
+    #
+    # 🔴 EL MODO DE FALLO, QUE ES LO QUE HAY QUE RECORDAR — NO EL NÚMERO: **las TRES veces
+    # anteriores el techo se fijó sobre la corrida más lenta CONOCIDA EN ESE MOMENTO**, no sobre la
+    # más lenta que hubo. Por eso 45 se comió una sana de 45.3, por eso el 70 duró unas horas, y
+    # por eso el 82 nació ya corto: se calculó con 48.1 cuando esa misma noche, a las 20:15, una
+    # corrida sana dio **53.15** (run 35269747322, verde). El número cambiaba; la falta era la
+    # misma las tres veces.
+    #
+    # ⭐⭐ LA REGLA OPERATIVA QUE SALE DE AQUÍ, Y ES EL ENTREGABLE DE VERDAD:
+    #   **ANTES DE RECALCULAR ESTE TECHO, MIDE LA MUESTRA COMPLETA CON LA API — NO LA ÚLTIMA
+    #   CORRIDA QUE TENGAS A MANO.** Y espera a que terminen las corridas en vuelo antes de
+    #   cerrar la cuenta. Sin esta línea, se vuelve aquí en dos semanas por QUINTA vez.
+    #
+    # 📌 Y el número, como toda cifra de este repo, vale **con su fecha y su N**: 90 sale de las 20
+    # corridas del 16-18 sep-2026. Si la suite crece, la cuenta se REHACE sobre una muestra nueva
+    # (y se anota), nunca se estira «un poquito más» sobre la corrida del día.
+    #
+    # ── HISTORIA (se conserva entera: cuenta las tres veces anteriores y son IDÉNTICAS entre sí —
+    #    la suite crece, el techo se queda, y el fallo NO se ve como lo que es) ──────────────────
+    #
     # 82 (17-sep-2026, MISMO DÍA que el 70 de abajo). ⚠️⚠️ TERCERA VEZ —y la corrección de la
-    # tercera—. Las notas de abajo se conservan enteras porque cuentan las dos anteriores y son
-    # IDÉNTICAS a ésta: la suite crece, el techo se queda, y el fallo NO se ve como lo que es.
+    # tercera—.
     #
     # 🔴🔴 POR QUÉ EL 70 DURÓ UNAS HORAS: **SE CALCULÓ CON DATOS INCOMPLETOS.** Se aplicó la regla
     # sobre la corrida sana más larga que se conocía **en ese momento** (38.7 min ⇒ 66 ⇒ 70). Poco
-    # después terminó otra, sana y más lenta: **48.1 min**. Las cuatro del día:
+    # después terminó otra, sana y más lenta: **48.1 min**. Las cuatro CONOCIDAS A ESA HORA:
     # **38.7 · 32.3 · 45.3 (cortada por el reloj) · 48.1**.
     # ⇒ Con la peor SANA de verdad: **48.1 × 1.7 ≈ 82**. Un techo de 70 sobre 48.1 deja **45 %**,
     # por debajo del 70 % que la regla pide, y la 48.1 ya se habría comido el techo viejo de 45.
@@ -65,6 +97,8 @@ jobs:
     # aplicar la regla, hay que aplicarla sobre la **medición completa**. Dejar el techo «justo lo
     # suficiente» con lo que se sabía a esa hora es exactamente cómo se llega a la cuarta vez.
     # **Antes de recalcular este número, espera a que terminen las corridas en vuelo.**
+    # ⇒ Se llegó a la cuarta vez (el 90 de arriba), y por eso esa frase ya no basta sola: la
+    # versión que sirve es **medir la MUESTRA completa con la API**, no esperar a una corrida más.
     #
     # 🔴 LO MEDIDO ESE DÍA, antes de tocar nada (que es justo lo que la nota de abajo manda hacer):
     # el `backend` del PR #374 salió `cancelled` tras **45.3 min** contra un techo de 45 ⇒ el
@@ -74,7 +108,9 @@ jobs:
     #
     # ⚠️ Y CUMPLIENDO SU PROPIA ADVERTENCIA: subir el tope NO arregla nada, **destapa**. Hay que
     # volver a mirar la corrida COMPLETA y en qué PASO muere, no darla por verde. La deuda real
-    # —que el backend tarde 30-40 min— sigue anotada en `HOJA-DE-RUTA.md` §4.
+    # —que el job `backend` tarde **32.3-53.2 min**, medido en las 20 corridas sanas del 16-18
+    # sep-2026— sigue anotada en `HOJA-DE-RUTA.md` §4. (Antes aquí decía «30-40 min»: falso, y es
+    # el motivo de que ahora las duraciones se escriban con su FECHA y su N, no como «tarda X».)
     #
     # 🔴 CÓMO SE VE, Y POR QUÉ ENGAÑA: al agotarse `timeout-minutes`, GitHub marca el job como
     # **`cancelled`**, exactamente igual que si alguien hubiera matado la corrida a mano o la
@@ -130,8 +166,13 @@ jobs:
     #
     # ⚠️ **NO CONFUNDIR EL JOB CON LA CORRIDA, que es de donde salen las falsas regresiones.** Todas
     # las cifras de arriba son del **job `backend`**. Las CORRIDAS completas de esos mismos dos runs
-    # duraron **54.82** y **61.20** min, y las once del 17-sep fueron de **41.1 a 61.2**. Quien mida
-    # una corrida de 61 min contra un «45-53» de job concluirá una regresión que no existe.
+    # duraron **54.82** y **61.20** min. MEDIDO EN LAS 20 CORRIDAS SANAS DEL 16-18 SEP-2026 (API de
+    # GitHub): corrida **41.1-61.2** (mediana 51.6) · job `backend` **32.3-53.2** (mediana 43.3).
+    # Las dos `cancelled` del 17-sep (45.3) NO entran: son truncamientos del reloj, no duraciones.
+    # Quien mida una corrida de 61 min contra un «32-53» de JOB concluirá una regresión que no
+    # existe. ⚠️ Y las cifras van con FECHA y con N a propósito: el 18-sep este bloque afirmaba un
+    # rango de job («45.6-53.2») que **la corrida de esa misma entrega desmintió** (40.55 min).
+    # «Tarda X» envejece y se vuelve falso solo; «medido en N corridas del día D» no puede.
     #
     # 🔴 Y LO QUE SE APRENDIÓ AL SUBIRLO (mismo 25-ago, horas después): **un tope de tiempo puede
     # estar TAPANDO un fallo de verdad.** Al pasar de 30 a 45 la corrida por fin llegó al final…
@@ -150,7 +191,7 @@ jobs:
     # 305 archivos y 4,241 pruebas**, y la muerte fue DOS PASOS después, en `npm run build`. Se
     # perdió tiempo buscando fugas de memoria en las pruebas de integración —que no tenían
     # ninguna— porque se leyó el fallo del job sin mirar en qué paso ocurrió.
-    timeout-minutes: 82
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: backend
@@ -186,7 +227,8 @@ jobs:
       #     4096 Y con 5120 — el costo no está en el número de archivos, está en el
       #     grafo de tipos que cada archivo obliga a cargar entero;
       #   • `eslint.config.js` YA usa `parserOptions.projectService` y YA ignora el
-      #     cliente generado de Prisma (`src/datos/generated/`, 22 MB / 181 .ts).
+      #     cliente generado de Prisma (`src/datos/generated/`: 22 MB / 181 .ts el 5-sep-2026,
+      #     23 MB / 186 .ts el 18-sep — crece con el esquema, por eso va fechado).
       # Medido a 8192: pasa, con un pico de 7034 MiB (~14 % de margen).
       #
       # 🔴 POR QUÉ SÓLO AQUÍ, y no en los otros tres sitios (decisión de Gabriel,

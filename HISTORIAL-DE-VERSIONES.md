@@ -71,6 +71,69 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.173 · 18-sep-2026 · **en prueba** — **Un número que se desmintió a sí mismo, y el reloj que cortaba revisiones sanas**
+
+> **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni
+> pedidos, ni producción, ni finanzas. Corrige **documentación** —unos números que se habían escrito
+> como si describieran el sistema para siempre— y **amplía el tiempo máximo que se le da a la
+> revisión automática antes de cortarla** (de 82 a 90 minutos), porque estaba cortando revisiones
+> **sanas**. Está aquí porque **cada entrega sube de versión**.
+>
+> 📌 **La v0.173 no cierra ninguna fila del programa**, y es a propósito: sólo corrige lo escrito. La
+> lentitud de la revisión automática sigue
+> exactamente igual y su pendiente sigue abierto (fila **0.208**). *Esta frase no es adorno: el
+> verificador de documentos la exige.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Ninguna función del sistema cambia.
+- **Lo que se gana es una cifra en la que se puede confiar dentro de seis meses.** Ahora está escrito
+  cuánto tarda la revisión automática que corre antes de cada entrega, **con la fecha en que se
+  cronometró y cuántas veces se cronometró**: *entre 41 y 61 minutos la revisión completa* y *entre
+  32 y 53 la parte más pesada*, **medido en las 20 revisiones sanas del 16 al 18 de septiembre**.
+- **Y una entrega ya no se cae sola por culpa del reloj.** El corte estaba en 82 minutos y la
+  revisión más lenta **que funcionó bien** tardó 53: demasiado justo. Sube a **90**, que es lo que
+  manda la regla de la casa (tope = 1.7 veces la más lenta sana). En cristiano: **si vuelve a salir
+  «cancelada», ya no será el reloj.**
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La entrega de ayer escribió un número que su propia revisión desmintió el mismo día.** La
+  v0.172 dejó dicho que la parte pesada *«tarda entre 45.6 y 53.2 minutos»*. La revisión que llevaba
+  esa frase encima **tardó 40.5**: por debajo del mínimo que la propia frase declaraba. El número no
+  estaba inventado —se había cronometrado— pero salía de **dos** mediciones y se escribió como si
+  fuera el comportamiento del sistema. Al cronometrar **veinte**, el mínimo real es **32.3**: trece
+  minutos más abajo.
+- ✅ **Por eso cambia la FORMA de escribirlo, no sólo el número.** Antes se decía *«tarda X»*; ahora
+  se dice *«medido en 20 revisiones del 16 al 18 de septiembre: X»*. La diferencia es la que importa:
+  *«tarda X»* **se vuelve falso solo** con el tiempo, mientras que una medición con su fecha **sigue
+  siendo cierta para siempre** — y quien cronometre 70 minutos el mes que viene sabrá que tiene una
+  medición nueva, no una contradicción. **Cambiar 45.6 por 40.5 sólo habría aplazado el problema dos
+  semanas.**
+- ⚠️ **Y lo que tiene guasa, dicho sin adornos:** la v0.172 existió precisamente para enseñar que *un
+  número cierto pegado a la cosa equivocada hace daño*… y cayó en la versión pequeña del mismo error.
+  Queda escrito así a propósito, porque es la única forma de que no vuelva.
+- 📌 **De paso se revisaron las demás cifras del mismo tipo** —las que envejecen solas— en los tres
+  documentos donde viven. Una estaba pasada de fecha y se corrigió con su fecha nueva: el tamaño de
+  un archivo que el sistema genera solo y que **crece cada vez que crece la base de datos**.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **La revisión automática sigue tardando lo mismo.** Esta entrega sólo cambia lo que está escrito.
+  El pendiente sigue siendo la fila **0.208**, con los tres caminos posibles que la v0.172 dejó
+  mapeados.
+- ⚠️ **Subir el reloj a 90 NO hace la revisión más rápida: sólo deja de cortar las buenas.** Sigue
+  tardando lo mismo.
+- 📌 **Lo que se aprendió de ese reloj, que vale más que el número:** se había movido **tres veces**
+  (45 → 70 → 82) y **las tres se calculó sobre la revisión más lenta que se conocía en ese momento**,
+  no sobre la más lenta que hubo — por eso las tres nacieron cortas. Ésta es **la primera vez que se
+  calcula sobre una muestra de veinte**. Queda escrito, con todas las letras, que **antes de volver a
+  moverlo hay que medir la muestra completa**, no la última revisión que uno tenga a mano.
+- 🟡 **Y queda apuntado un cabo suelto que nadie había notado:** sobre cuánta memoria necesita una de
+  las herramientas de revisión hay **tres cifras distintas escritas en el proyecto**, y **una de ellas
+  no dice de dónde salió**. No se midió aquí (hace falta una máquina parecida a la del servidor); se
+  deja **escrito** para que quien lo mida algún día no tenga que elegir una al azar.
+
 ## 0.172 · 18-sep-2026 · **en prueba** — **La explicación de por qué la revisión automática tarda casi una hora llevaba un mes escrita… y era falsa**
 
 > **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni
