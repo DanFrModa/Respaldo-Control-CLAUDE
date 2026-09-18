@@ -93,8 +93,45 @@ jobs:
     #
     # LA REGLA, para no repetirlo una tercera vez: **el tope se mantiene en ~1.7× la duración sana**
     # (25 min → 45). Subirlo NO hace la suite más rápida — eso es deuda aparte, anotada en
-    # `HOJA-DE-RUTA.md` §4: 25 min de backend es mucho, y la culpa está en el arranque repetido de
-    # testcontainers.
+    # `HOJA-DE-RUTA.md` §4.
+    #
+    # 🔴🔴 CORREGIDO EL 18-SEP-2026 (fila 0.208). AQUÍ DECÍA, DESDE AGOSTO: «la culpa está en el
+    # **arranque repetido de testcontainers**». **ES FALSO**, y como la MISMA frase estaba escrita
+    # en `HOJA-DE-RUTA.md` §4 —cada una citando a la otra— parecía verificada. **Nunca se midió**
+    # (allá se llamaba a sí misma «el sospechoso MEDIDO»). Se mide ahora, y el propio repo la
+    # desmiente en tres comandos:
+    #   · `new PostgreSqlContainer` aparece **UNA sola vez en el CÓDIGO** del repo
+    #     (`backend/src/pruebas/entorno-global.ts:30`; un `git grep` devuelve más porque estas notas
+    #     también lo nombran);
+    #   · hay **un solo** `globalSetup` (`backend/vitest.config.ts:40`), y un `globalSetup` de
+    #     Vitest corre **una vez por corrida**, no por archivo;
+    #   · `backend/vitest.config.ts:44` fija `fileParallelism: false`, y el comentario de su línea 7
+    #     YA LO DECÍA: *«Comparten un solo contenedor, por eso los archivos corren en serie»*.
+    #   ⇒ **el contenedor arranca UNA vez.** No hay nada repetido que atacar por ahí.
+    #
+    # ✅ DÓNDE SE VA EL TIEMPO DE VERDAD (medido de los timestamps de los pasos vía la API; run
+    # 35264284032, job `backend` verde de 45.62 min): **el paso «Tests» se lleva 36.87 min = el
+    # 81 %**. El resto es menudeo: lint 3.67 · typecheck 2.03 · build 1.73 · npm ci 0.45 · formato
+    # 0.38 · cliente PostgreSQL 0.18 · checkout+node 0.14 · openapi 0.08. Y dentro de «Tests» casi
+    # todo es INTEGRACIÓN: el proyecto `unit` entero (260 archivos / 3,914 pruebas) tarda **1.7 min**
+    # medido en local. El mecanismo real, leído del código: `backend/src/pruebas/contexto.ts:37` hace
+    # `TRUNCATE TABLE <178 tablas> RESTART IDENTITY CASCADE` —**178 exactas**: 183 `CREATE TABLE` − 5
+    # `DROP TABLE` en las migraciones, y 178 `model` en `schema.prisma`— y **181 de los 183 archivos de
+    # integración lo llaman en `beforeEach`** ⇒ **≲3,877** TRUNCATE por corrida, en serie (es un TECHO:
+    # 3,877 es el total de pruebas de integración y dos archivos no limpian, así que el real es menor).
+    # ⚠️ **Lo que sigue SIN medir es cuánto cuesta cada TRUNCATE**, así que el ahorro de atacarlo va
+    # como RANGO, nunca como cifra. Los tres caminos posibles y su orden viven en la **fila 0.208**.
+    #
+    # 📌 Y un dato del mismo día, por si alguien vuelve a recalcular el techo: el job `backend` del
+    # **merge** de ese mismo PR (run 35269747322, también verde) tardó **53.15 min** — un **16.5 %**
+    # más que los 45.62 del PR (53.15 ÷ 45.617 = 1.1651). Y «el mismo contenido» es LITERAL:
+    # `git rev-parse 0dc7ac48^{tree} a0e98a7f^{tree}` devuelve el mismo objeto (4b98981…) ⇒ la
+    # diferencia es enteramente del runner.
+    #
+    # ⚠️ **NO CONFUNDIR EL JOB CON LA CORRIDA, que es de donde salen las falsas regresiones.** Todas
+    # las cifras de arriba son del **job `backend`**. Las CORRIDAS completas de esos mismos dos runs
+    # duraron **54.82** y **61.20** min, y las once del 17-sep fueron de **41.1 a 61.2**. Quien mida
+    # una corrida de 61 min contra un «45-53» de job concluirá una regresión que no existe.
     #
     # 🔴 Y LO QUE SE APRENDIÓ AL SUBIRLO (mismo 25-ago, horas después): **un tope de tiempo puede
     # estar TAPANDO un fallo de verdad.** Al pasar de 30 a 45 la corrida por fin llegó al final…
