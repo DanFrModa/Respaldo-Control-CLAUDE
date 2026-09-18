@@ -71,6 +71,76 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.172 · 18-sep-2026 · **en prueba** — **La explicación de por qué la revisión automática tarda casi una hora llevaba un mes escrita… y era falsa**
+
+> **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni
+> pedidos, ni producción, ni finanzas. Corrige **documentación**: una explicación equivocada sobre por
+> qué tarda tanto la revisión automática que corre antes de cada entrega. Está aquí porque **cada
+> entrega sube de versión**.
+>
+> 📌 **La v0.172 no cierra ninguna fila del programa**, y es a propósito: **no arregla la lentitud, sólo
+> averigua de dónde viene**. El pendiente nace abierto (fila **0.208**). *Esta frase no es adorno: el
+> verificador de documentos la exige.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Ninguna función del sistema cambia.
+- **Lo que se gana es saber la verdad sobre un costo que pagamos todos los días.** Cada vez que se
+  entrega algo, una revisión automática comprueba el sistema entero antes de subirlo. Esa revisión
+  completa tarda **entre 41 y 61 minutos**, y el 17 de septiembre hubo **once** — la primera a la 1 de
+  la madrugada y la última terminando a las 9 de la noche, con nueve de ellas apretadas en **6 horas y
+  media seguidas** y dos cortándose solas por pasarse de tiempo. Desde agosto
+  había escrita una explicación de por qué tarda tanto; ahora sabemos que era la equivocada, y **sí
+  sabemos dónde se va el tiempo**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La explicación que llevaba un mes escrita era falsa, y encima se llamaba a sí misma «medida».**
+  Decía que la culpa era de que el sistema **levanta una y otra vez la base de datos de pruebas**. Se
+  comprobó, y **la levanta UNA sola vez por revisión** — el propio código lo decía por escrito desde
+  siempre, en un comentario que nadie cruzó. **Nunca se había medido.**
+- ⚠️ **Y lo que explica por qué duró tanto: la frase estaba en DOS archivos y cada uno remitía al
+  otro.** Dos copias que se apuntan mutuamente **parecen una comprobación cruzada, y son la misma
+  afirmación repetida**. Quien la leyera en un sitio iba al otro y la encontraba igual, así que la daba
+  por buena. Los dos sitios quedan corregidos, **diciendo qué decían antes** — que es lo que impide que
+  vuelva.
+- ✅ **Dónde se va el tiempo de verdad, ahora sí medido:** la revisión tiene cuatro partes y **una se
+  lleva casi todo**. Esa parte —la del motor— duró **45.6 minutos** en la entrega que se midió, y de
+  ellos **36.9 son las pruebas: el 81 %**. Y de esas 36.9, casi todas son las pruebas que usan **base
+  de datos de verdad**; las que no la usan tardan menos de **dos minutos entre todas**. El motivo
+  concreto: antes de **cada una** de las casi 3,900 pruebas con base de datos, el sistema **vacía las
+  178 tablas** para que ninguna dependa de otra — y eso lo hace casi 3,900 veces, una detrás de otra.
+- ⚠️ **Dos relojes distintos, y conviene no mezclarlos:** los **45.6 minutos** son sólo esa parte; la
+  **revisión entera** de esa misma entrega tardó **54.8**, y la de la entrega siguiente **61.2**. Quien
+  dentro de unos meses cronometre una de 61 y la compare con un «45» pensará que algo empeoró, y no
+  será verdad. Por eso los dos números quedan escritos con su nombre en todos los sitios.
+- 📌 **Se aprovechó el viaje para traer una corrección de texto que estaba esperando** (sobre el
+  pendiente de seguir añadiendo pedidos por PDF a un pedido ya hecho): se había medido el 17-sep y no
+  valía una entrega para ella sola.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Nada de esto se arregló: la revisión sigue tardando lo mismo.** Esta entrega sólo cambia lo que
+  está escrito. El pendiente queda anotado como fila **0.208**, **con tres caminos posibles** y el orden
+  recomendado: primero **partir la revisión en dos** (para que el aviso de que algo se rompió llegue en
+  ~9 minutos en vez de 46, aunque el total no baje), después **repartirla entre varias máquinas**, y
+  **sólo al final** tocar el vaciado de tablas — que es el que más podría ahorrar y también el único que
+  puede **romper las garantías de inventario y de dinero** si se hace mal.
+- 🚫 **Y se dice con todas las letras lo que NO se midió:** cuánto cuesta cada vaciado de tablas. Sin
+  ese dato, el ahorro del tercer camino sólo se puede dar como **rango** (entre 6 y 20 minutos), no como
+  cifra. **Se deja escrito como estimación, no como medición** — que es exactamente el error que esta
+  entrega vino a corregir.
+- 📌 **Hay una parte del registro de la revisión que no se puede leer desde aquí**: el archivo completo
+  vive en un servidor que nuestra salida a internet rechaza. Es el mismo muro que ya bloqueó otra
+  investigación (fila 0.169). Por eso el reparto entre los dos tipos de prueba está **deducido**, no
+  leído.
+- ⏳ **Falta la palabra de Daniel** sobre si este pendiente entra en la primera versión. La
+  recomendación es **«duele pero se aguanta»**: no da información equivocada ni impide operar, y el
+  rodeo es esperar.
+- Sin cambios de permisos, sin datos nuevos que sembrar y sin nada que capturar a mano después del
+  despliegue.
+
+---
 ## 0.171 · 17-sep-2026 · **en prueba** — **Cuando se limpian colores repetidos del catálogo, la prenda que nazca después ya no puede quedarse con dos números de modelo**
 
 ### Qué se puede hacer ahora que antes no
