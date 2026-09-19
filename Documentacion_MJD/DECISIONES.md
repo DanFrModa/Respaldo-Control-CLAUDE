@@ -818,6 +818,29 @@ Se lee de corrido: **Felpa · Alsatex · Felpa Suiza**. **Consecuencia:** la tel
 **4. Partidas.** Se identifican con **folio propio consecutivo** del sistema (secuencia atómica, A3) + el **número de lote/teñido del proveedor** como campo aparte, opcional y buscable (ese SÍ puede repetirse entre proveedores). Hoy la `clave` es texto único global y el auto-generado es ilegible (`LOTE-1-20260806-m1x2p3-a7f2`) — se corrige en A2. Daniel eligió explícitamente la opción de **partidas por lote** (con proveedor y factura) sobre la de "crear colores Negro/Negro 2".
 
 **5. MIGRACIÓN — inventario desde cero.** *"Lo ideal va a ser partir de un inventario físico desde cero… hay muchos errores en el inventario."*
+
+> ⚠️ **MATIZADO por §Post-F9.36 punto 4 (DANIEL, 13-ago-2026, `DECISIONES.md:1609-1634`): se decidió
+> arrancar SIN conteo físico.** Lo de arriba y lo de abajo se conservan íntegros porque es lo que Daniel dijo
+> el 6-ago y explica el porqué (*"hay muchos errores en el inventario"*), pero de esa frase **lo que manda es
+> el «desde cero»; lo que cayó es el «FÍSICO»**: una semana después él mismo pidió arrancar sin el conteo
+> —*"el conteo físico nos llevará tiempo… ¿Podríamos meter las telas con las que estamos trabajando?"*— y el
+> inventario se carga **sobre la marcha**, capturando un color **la primera vez que se va a usar**. Con eso
+> **el importador Excel de conteo físico dejó de ser bloqueante del go-live**.
+>
+> 📌 **Los dos registros, con su fecha, para que se vean LOS DOS** (mismo patrón que la fila 0.194 usó con el
+> folio de la OC, `DECISIONES.md:3973`: el aviso se pega a la sección vieja y **sus palabras no se tocan**):
+>
+> | Dónde | Cuándo | Qué dice |
+> |---|---|---|
+> | §Post-F9.11 punto 5 — **esta sub-sección** (`DECISIONES.md:820`) | **6-ago-2026** | *"partir de un **inventario físico** desde cero"*; el arranque es el **conteo físico** que capture la empresa |
+> | §Post-F9.36 punto 4 (`DECISIONES.md:1609-1634`) | **13-ago-2026** | ***"SE ARRANCA SIN CONTEO FÍSICO. El inventario se carga sobre la marcha"*** |
+>
+> ✅ **Y lo que NO cambia, para que el matiz no se lea como un vuelco:** las existencias de tela **siguen
+> arrancando en CERO**, **no se migra ni un movimiento** y `etl-telas` **sigue sin correrse en el go-live**
+> (`backend/migracion/README.md`, *«Regla 2»*). Cambia **cómo se llena el almacén**, no de dónde parte.
+>
+> *(Marcador puesto el 19-sep-2026, al encontrar que el instructivo del día del corte seguía dando el conteo
+> físico como motivo. **No se editó ni una palabra del registro del 6-ago.**)*
 - **Existencias: CERO.** No se migra ni un movimiento de tela. El arranque es el **conteo físico** que capture FR Moda; el conteo YA trae el consumo adentro (lo que queda en el anaquel es lo que queda).
 - **Catálogo: SE CONSERVA, sucio y depurable.** Borrarlo dejaría sin receta de telas al BOM de los modelos migrados y mudo al histórico de compras/notas. Las telas viejas se desactivan conforme dejen de usarse; las nuevas se dan de alta bien hechas.
 - **Consumos históricos: SÍ se cargan** (2025-2026, ~400 órdenes), como **dato de la orden**: sin crear partidas y **sin tocar existencias** (mismo patrón anti-doble-conteo del histórico de producción de F3-E6). Las telas viejas quedan "solo para leer consumos viejos"; lo nuevo usa el catálogo nuevo.
@@ -10815,12 +10838,12 @@ opuestas**, y nadie había zanjado cuál manda:
 | Dónde | Qué decía |
 |---|---|
 | `DECISIONES.md:736` | *«Entradas: permitir **las dos** vías (con orden de compra y por factura/remisión **sin OC**)»* |
-| `DECISIONES.md:5252` | *«el color se define en la OC, y **no se recibe nada sin OC previa**»* |
+| `DECISIONES.md:5295` | *«el color se define en la OC, y **no se recibe nada sin OC previa**»* |
 
 ⇒ **DECIDIDO: se IMPIDE. Bloqueo, no aviso.** Y con un argumento que no admite vuelta: no es una
 preferencia operativa, es que **no puede ocurrir físicamente** — *«¿de quién recibiríamos sin OC?»*.
 ⚠️ **La línea 736 queda SUPERADA** (venía de la propuesta original de Finanzas/proveedores, anterior a que
-la cadena de compras se construyera): **prevalece 5252 y esta decisión**. Al construir el letrero de
+la cadena de compras se construyera): **prevalece 5295 y esta decisión**. Al construir el letrero de
 `CapturaRenglonesTelaColor`, el camino «sin OC» **no se advierte: se cierra**.
 
 > ✅ **CONSTRUIDO en la versión 0.080** (1-sep-2026, ficha `V1-E9l`), **no en la 0.072 como decía esta
@@ -15841,8 +15864,8 @@ Al construir la fila 0.194 se buscaron mecánicamente todos los registros y sali
 
 | Dónde | Cuándo | Qué dice |
 |---|---|---|
-| §Post-F9.85, sub-sección *«Los folios arrancan en 10001»* (`DECISIONES.md:3950`) | **20-ago-2026** | **10001** — *"el sistema anterior va en la 8082. Tenemos mucho colchón antes de llegar a la 10001."* |
-| §Post-F9.118 (a) (`DECISIONES.md:5916`) | **25-ago-2026** | **10000** — *"Las órdenes de compra quedamos que en producción empezamos en 10000… Déjalo como una regla."* |
+| §Post-F9.85, sub-sección *«Los folios arrancan en 10001»* (`DECISIONES.md:3973`) | **20-ago-2026** | **10001** — *"el sistema anterior va en la 8082. Tenemos mucho colchón antes de llegar a la 10001."* |
+| §Post-F9.118 (a) (`DECISIONES.md:5939`) | **25-ago-2026** | **10000** — *"Las órdenes de compra quedamos que en producción empezamos en 10000… Déjalo como una regla."* |
 
 **Manda el 10000**: es lo que Daniel dijo el 25-ago y lo que **repitió hoy**. La sub-sección del
 20-ago quedó marcada como **supersedida ahí mismo**, sin tocar sus palabras — quien la lea suelta

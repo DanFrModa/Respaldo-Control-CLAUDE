@@ -71,6 +71,73 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.176 · 19-sep-2026 · **en prueba** — **El guion del día del arranque decía que faltaban seis cosas cuando faltan tres, y mandaba a leer el renglón equivocado**
+
+> **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca catálogos, ni
+> pedidos, ni producción, ni finanzas. Corrige **la lista con la que se decide arrancar** y **el
+> instructivo que se sigue el día del corte**, que llevaban semanas dando por pendientes cosas que ya
+> están resueltas. Está aquí porque **cada entrega sube de versión**.
+>
+> 📌 **La v0.176 no cierra ninguna fila del programa**, y es a propósito: no construye nada, sólo pone
+> al día lo escrito. *Esta frase no es adorno: el verificador de documentos la exige.*
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Se puede confiar en la lista del arranque para decidir si se arranca.** Decía que faltaban
+  **seis** cosas para poder salir a producción; se volvieron a contar una por una y **son tres**. Las
+  otras tres ya se habían resuelto y nadie lo había anotado ahí: la factura del maquilero que no se
+  comparaba contra lo recibido, el permiso que regalaba otros cinco de propina, y el costo que no veía
+  el complemento de la tela. **Quedan escritas como resueltas, con el mes en que se resolvieron**, para
+  que se vea que se avanzó y no parezca que desaparecieron.
+- ⭐ **Y se puede leer de un vistazo qué es lo que de verdad frena el arranque, que no es el programa.**
+  De las tres que faltan, **dos son que tú las mires** —inventarios y finanzas— y la tercera la hace
+  Gabriel. **Ni una sola es código pendiente.** Lo que falta es de otra clase: el sistema de verdad
+  todavía no existe (hoy sólo está el de pruebas), el respaldo nunca se ha restaurado para comprobar
+  que sirve, las fotos y los datos del sistema viejo no se han conseguido, y el ensayo no está en el
+  calendario. Eso se agenda, no se programa.
+- **Está dicho, con todas sus letras, el atajo para arrancar antes:** con tres personas y **sin
+  finanzas**. Y su consecuencia, que es la que ahorra semanas: **si finanzas no entra el primer día, tu
+  repaso de finanzas deja de frenar el arranque** y se va a la semana siguiente, junto con el corte de
+  SINUBE que todavía no tienes. Con eso, del primer día queda **un solo pendiente tuyo: el repaso de
+  inventarios**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **El instructivo del día del corte mandaba a leer un tramo donde ya no estaban los comandos**, y
+  uno de esos avisos **se saltaba justo la parte que dice qué NO hay que correr**. En cristiano: quien
+  lo hubiera seguido esa mañana habría **cargado los inventarios viejos de producto terminado y de
+  telas**, que arrancan a cero a propósito. Habría quedado sumado el histórico con lo que el almacén
+  vaya capturando, y cuadrarlo después no es fácil. **Ya apunta al sitio correcto y completo.**
+- 🔴 **Y ese mismo instructivo daba un motivo que ya no era el vigente:** decía que los inventarios
+  arrancan del **conteo físico**, cuando tú decidiste en agosto **arrancar sin conteo físico** y cargar
+  las telas y avíos con los que se está trabajando, capturando cada color la primera vez que se usa.
+  **Lo que se hace no cambia** —esos dos cargadores siguen sin correrse—, pero ahora el motivo escrito
+  es el de verdad, que es lo que alguien va a leer a las seis de la mañana con la empresa parada.
+- **En el registro de decisiones, la nota de agosto sobre el inventario lleva ahora un aviso al lado**
+  que dice qué quedó matizado y por cuál decisión posterior, **con las dos fechas y sin cambiar ni una
+  palabra de lo que dijiste entonces**. Quien la lea suelta ve las dos versiones del asunto, no una
+  corregida en silencio.
+- **Varias referencias internas apuntaban a renglones equivocados** porque los documentos habían
+  crecido por debajo. Se volvieron a medir y se corrigieron; y donde antes iba sólo un número, ahora va
+  también el nombre de la sección, que es lo único que no se estropea cuando el documento vuelve a
+  crecer.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Lo que de verdad falta para arrancar sigue siendo lo mismo, y no lo arregla esta entrega:** tus
+  dos repasos (inventarios y finanzas), el asunto que lleva Gabriel, y **los pasos a mano**: crear el
+  sistema de verdad aparte del de pruebas, restaurar un respaldo y comprobar que sirve, conseguir las
+  fotos y los datos del sistema viejo, y apartar la media mañana del ensayo.
+- ⚠️ **De la lista del arranque sólo se volvió a comprobar una parte.** El recuento y las referencias
+  sí; **el inventario de lo que ya está construido** —los cargadores, los reportes de cuadre y lo de
+  seguridad— **sigue siendo la revisión del 10 de septiembre** y así está rotulado dentro del propio
+  documento. No se da por medido lo que no se midió.
+- ⬜ **Quedan diez referencias en otros dos documentos** que apuntan a renglones que esta entrega movió.
+  Están localizadas una por una y se arreglan de un tirón cuando se junte con la otra entrega en curso;
+  **no se tocaron aquí a propósito**, para no chocar con ella.
+- ⬜ **Un documento interno que se cita dos veces y nunca se escribió** sigue sin existir. No estorba
+  para arrancar; queda anotado para que no se busque en vano.
+
 ## 0.175 · 19-sep-2026 · **en prueba** — **Al capturar un pedido a mano ya se puede buscar cualquier modelo: antes sólo salían 100, y eran justo los que ya no se usan**
 
 > **Qué se puede hacer ahora que antes no.** En la pantalla de capturar un pedido a mano
