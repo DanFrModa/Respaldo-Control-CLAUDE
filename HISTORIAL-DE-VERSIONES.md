@@ -71,6 +71,78 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.174 · 18-sep-2026 · **en prueba** — **La revisión automática se pasaba el rato vaciando la base de pruebas: ahora la vacía de otra manera**
+
+> **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni
+> pedidos, ni producción, ni finanzas. Cambia **una sola pieza del taller**: la rutina que deja la
+> base de pruebas en blanco **antes de cada una de las ~3,900 comprobaciones** que corren en cada
+> entrega. Esa rutina era, con mucho, lo que más tardaba de toda la revisión automática.
+>
+> ⏳ **Cuánto se gana: todavía no se sabe con exactitud, y se dice así a propósito.** La estimación es
+> **entre 12 y 23 minutos menos por revisión**, y **la primera corrida de esta misma entrega es la
+> primera medición de verdad**. Lo medido hasta aquí está hecho en la máquina de la sesión, que **no
+> es el servidor** donde corre la revisión.
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Ninguna función del sistema cambia.
+- **Lo que se gana es tiempo de espera.** Cada cambio que se entrega pasa por una revisión automática
+  que, **medida en las 20 revisiones sanas del 16 al 18 de septiembre, tarda entre 41 y 61 minutos**.
+  La parte más pesada de esa revisión son las comprobaciones que hablan con la base de datos, y
+  **antes de cada una** el sistema vaciaba las 178 tablas de golpe. Vaciarlas costaba, **medido el
+  18-sep en la máquina de la sesión, entre 1.0 y 1.1 segundos**; ahora cuesta **entre 0.06 y 0.12**.
+- **Cómo se estimó el ahorro, para que se pueda discutir:** un lote de **32 archivos y 896
+  comprobaciones** pasó de **18.2 a 5.9 minutos** en esta máquina (**−68 %**). Si el servidor se
+  comportara igual, el bloque pesado bajaría unos **23 minutos**; si bajara **la mitad de eso**,
+  **12**. De ahí el rango: **12 el suelo y 23 el techo, los dos salidos de esa misma cuenta.** Si
+  algún día se publica un número mayor, tendrá que venir con la cuenta que lo sostenga.
+- ⚠️ **Y hay una razón más para llamarlo estimación y no promesa: dos cronómetros de ESTA MISMA
+  máquina no dieron lo mismo.** El vaciado viejo se midió dos veces el 18-sep: **1.0-1.1 segundos**
+  en una tanda y **0.73 segundos** en otra (entre 0.55 y 1.09). El vaciado nuevo dio **0.06-0.12** y
+  **0.061**. **La proporción aguanta —unas 12 veces más rápido en las dos— pero los absolutos no
+  coinciden**, y cuando dos relojes de la misma máquina discrepan, el número del servidor no se
+  anuncia como un hecho.
+
+### Qué cambió y puede sorprender
+
+- 🔑 **La causa ya estaba señalada desde ayer; lo que faltaba era el número, y el camino bueno era
+  otro.** La versión anterior dejó escrito **dónde** se iba el tiempo y propuso tres caminos. El que
+  parecía obvio —**limpiar una vez por archivo en vez de una vez por comprobación**— **se probó y
+  rompe 16 de cada 20 comprobaciones** de un archivo de referencia: cada una vuelve a crear sus
+  datos y choca con la anterior. No era quitar una línea: era reescribir las pruebas y perder
+  justamente la garantía de que **ninguna comprobación depende de otra**.
+- ✅ **El camino que sí funcionó no estaba en la lista:** vaciar las tablas **una por una** en vez de
+  «de golpe». Suena más lento y **es entre diez y quince veces más rápido**, porque el vaciado «de
+  golpe» de PostgreSQL rehace el archivo de cada una de las 178 tablas aunque estén casi vacías.
+- ⚠️ **Lo delicado del cambio, dicho claro.** Para poder vaciar las tablas en cualquier orden hay que
+  pedirle a la base que **durante ese instante** no revise las relaciones entre ellas. Si esa
+  instrucción se quedara puesta, **las comprobaciones siguientes dejarían de revisar esas relaciones
+  sin avisar** — o sea, la revisión automática seguiría saliendo verde sin comprobar nada. Por eso la
+  instrucción es de las que **la propia base deshace sola** al terminar, salga bien o mal, y hay
+  **cinco comprobaciones nuevas** que lo verifican, **incluida una que hace reventar el vaciado a
+  propósito a mitad de camino** para ver que la red aguanta también ahí.
+- 📌 **De regalo, un agujero viejo queda tapado.** Había unos contadores internos (los que dan los
+  números consecutivos) que el vaciado anterior **no reiniciaba del todo**: un número que en solitario
+  salía `1` podía salir `68` en la revisión completa, y eso hacía fallar comprobaciones que aisladas
+  pasaban. Ahora se reinician **los 155**, sin excepciones.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **No sabemos todavía cuánto se ahorra de verdad.** Está estimado, no medido en el servidor. **La
+  corrida de esta entrega es la primera medición real**, y en cuanto exista habrá que escribirla
+  **con su fecha**, como manda la lección de la versión anterior.
+- 📌 **Quedan sin usar los otros dos caminos** que la versión anterior dejó mapeados —partir la
+  revisión en dos avisos (uno rápido y otro lento) y repartir la parte pesada entre varios
+  servidores—. **Siguen disponibles** si con esto no basta.
+- ⚠️ **Una comprobación que no llegó a hacerse, y se dice en vez de callarse.** Dentro del arreglo hay
+  un cinturón de seguridad (envolver el vaciado en una transacción propia) que **hoy no cambia nada
+  si se quita**: se probó quitarlo y las cinco comprobaciones nuevas **siguieron en verde**. Se deja
+  puesto igualmente, **con la razón escrita en el propio código**, porque sin él la garantía delicada
+  de arriba dependería de un detalle sutil que el día de mañana alguien podría romper sin enterarse.
+- 🟡 **Y un apunte para dentro de un año:** vaciar tabla por tabla es más rápido **porque las pruebas
+  dejan decenas de registros, no millones**. Si algún día una comprobación cargara cientos de miles
+  de renglones, habría que volver a medir. Queda escrito junto al código, con las cifras y su fecha.
+
 ## 0.173 · 18-sep-2026 · **en prueba** — **Un número que se desmintió a sí mismo, y el reloj que cortaba revisiones sanas**
 
 > **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni
