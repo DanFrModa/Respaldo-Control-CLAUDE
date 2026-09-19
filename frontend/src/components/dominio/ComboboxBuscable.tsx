@@ -98,6 +98,17 @@ export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox
    * manda. Sin esto, `valor` sin opción en la página dejaba el input en blanco.
    */
   etiquetaSeleccion?: string | undefined;
+  /**
+   * Marca el campo como inválido para lectores de pantalla (`aria-invalid`). **Apagada por default**:
+   * sólo la enciende quien ya pinta un error para ese campo.
+   *
+   * Nace con la fila 0.209: el renglón del pedido elegía modelo con un `<select>` nativo que **sí**
+   * llevaba `aria-invalid`, y al migrarlo al combobox esa marca se habría perdido en silencio — el
+   * error se sigue anunciando con `role="alert"`, pero el campo dejaba de estar asociado a él. ⚠️ El
+   * resto de comboboxes de la app **tampoco** la tenían nunca; esto no se los añade, sólo abre la
+   * puerta para quien la pida (deuda del kit anotada en `HOJA-DE-RUTA.md` §4).
+   */
+  invalido?: boolean;
   /** Emite el id elegido (o null al limpiar). */
   onChange: (id: number | null) => void;
   /**
@@ -177,6 +188,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   opciones,
   valor,
   etiquetaSeleccion,
+  invalido = false,
   onChange,
   alCambiarTexto,
   busquedaServidor = false,
@@ -430,6 +442,7 @@ export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
         onKeyDown={alTeclado}
         placeholder={placeholder}
         aria-label={etiqueta ?? placeholder}
+        {...(invalido ? { 'aria-invalid': true } : {})}
         aria-expanded={abierto}
         aria-controls={idLista}
         autoComplete="off"

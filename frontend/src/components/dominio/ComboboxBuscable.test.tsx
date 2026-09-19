@@ -64,6 +64,41 @@ function Arnes({
 }
 
 describe('<ComboboxBuscable>', () => {
+  /**
+   * 🔴 **EL CANDADO DEL DEFAULT `invalido` (fila 0.209, ronda 3) — y va AQUÍ, en el kit, a propósito.**
+   *
+   * La prop `invalido` nace apagada: sólo la enciende quien ya pinta un error para ese campo. Estaba
+   * probada… pero **por el consumidor**: las pruebas del renglón del pedido entran por
+   * `SelectorModelo`, que pasa `invalido={invalido}` **siempre**, con su propio default `false`. Ese
+   * default de aguas abajo **blindaba al del kit**, así que la línea del default de aquí **no la
+   * ejecutaba ninguna prueba de la suite**: invertirla a `true` dejaba las **2523** en verde.
+   *
+   * 🔑 **Es el mismo error un nivel más arriba que el de `CopiarBomDialogo`:** el candado estaba en el
+   * CONSUMIDOR y no en el COMPONENTE COMPARTIDO. Si alguien invierte ese default, **trece pantallas**
+   * empiezan a anunciarse como inválidas a un lector de pantalla sin que nada se ponga rojo.
+   */
+  it('sin `invalido` NO emite aria-invalid (el default del kit, no el del consumidor)', () => {
+    render(<Arnes />);
+
+    expect(screen.getByTestId('combo-input')).not.toHaveAttribute('aria-invalid');
+  });
+
+  /** Y encendida SÍ lo emite: un paso que no pasa nada es una prop muerta. */
+  it('con `invalido` sí lo emite', () => {
+    render(
+      <ComboboxBuscable
+        opciones={OSCARES}
+        valor={null}
+        invalido
+        onChange={() => {}}
+        placeholder="Escribe el maquilero…"
+        testid="combo-inv"
+      />,
+    );
+
+    expect(screen.getByTestId('combo-inv-input')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('teclear "her" filtra la lista a Hernández y Enter lo selecciona', async () => {
     const usuario = userEvent.setup();
     const alCambiar = vi.fn();

@@ -15910,3 +15910,160 @@ hecho `Basico` no lleva ninguno. Los sitios de producción siguen en pie: proyec
   clasificación de las filas **0.196–0.198**. **Fecha:** 2026-09-15.
 
 ---
+
+#### (Post-F9.235) — CUÁNTO HAY DE CADA COSA, Y QUÉ SE REPITE: LOS NÚMEROS DEL CATÁLOGO, DICHOS POR DANIEL
+
+**Cómo salió.** Varias filas abiertas dependían de datos que **sólo el dueño del negocio tiene** —
+`CLAUDE.md` §7.5 es explícita en que la frecuencia *se pregunta, no se supone*. El lead juntó las
+preguntas y Daniel las contestó todas el **19-sep-2026**. Se anotan **textuales y fechadas**, porque
+un catálogo crece: dentro de un año estas cifras serán otras, y lo que seguirá siendo cierto es *qué
+dijo Daniel el 19-sep-2026*, no *«hay 60 telas»*.
+
+---
+
+**(a) EL TAMAÑO DE LOS CATÁLOGOS.** Textual:
+
+> *«unas 60 telas con un promedio de 4 colores por tela. Muy mas o menos. Modelos hay casi igual que
+> OP... vamos como en la 5400 o algo asi.»*
+
+⇒ **~60 telas** (~4 colores cada una) y **~5,400 modelos**, al 19-sep-2026.
+
+**Qué decide, medido contra el código:**
+- **Las telas no son problema.** Están muy por debajo del tope de 100 del contrato
+  (`comun/paginacion.ts`), así que cualquier pantalla que pida 100 telas las trae todas.
+- 🔴 **Los modelos SÍ lo eran, y no como se creyó al principio.** Ver §(d): el mismo día se midió que
+  el selector de renglón del pedido no sólo enseñaba 100 de 5,400 — enseñaba **los 100 inservibles**.
+
+---
+
+**(b) CUÁNTAS TAREAS SE ACUMULAN EN LA BANDEJA DE RUTA CRÍTICA.** Textual:
+
+> *«¿te refieres en la ruta critica? no.... es muchisimo... no creo que se le acumule mas de 10-20
+> pendientes»*
+
+⇒ **10-20 pendientes por persona**, no más.
+
+**Qué decide:** el tope de 100 de la bandeja (`MisPendientesPagina.tsx`) **nunca se alcanza**, y
+además la pantalla **ya avisa** si se alcanzara (*«Mostrando 100 de N pendientes (los más urgentes
+primero); los conteos de arriba cubren el total»*) con los conteos cubriendo el total. ⇒ **no era un
+defecto, ni siquiera latente**, y no hay nada que construir. Se anota para que nadie vuelva a
+abrirlo.
+
+---
+
+**(c) CADA CUÁNTO SE FUSIONAN COLORES.** Textual:
+
+> *«no es tan comun. No se bien como planteaste el tema de la fusion de colores. Hoy es algo que no
+> sucede.»*
+
+⇒ **Hoy no sucede.**
+
+**Qué decide:** las **tres** filas abiertas que dependen de la fusión de colores bajan a 🟢 *«puede
+esperar a después de arrancar»* — **0.189** (una marca de «cubierto» puede quedar contada y no
+cancelable tras una fusión), **0.204** (el diálogo de fusión topa en 100) y **0.207** (la identidad
+del modelo se decide con el color crudo). Las tres estaban esperando **exactamente este dato**: la
+0.189 y la 0.207 lo dicen con todas sus letras en su ficha.
+
+> ⏳ **PENDIENTE DE DANIEL — y es lo que más lejos llega de esta respuesta.** La fusión de colores
+> **existe y está construida**: permite unir dos colores duplicados del catálogo, uno absorbe al otro
+> y lo viejo sigue apuntando al que queda. Daniel dice que **hoy no sucede** y que **no sabe bien
+> cómo se planteó**. Que el dueño del negocio no reconozca una función que el sistema ya tiene no es
+> una clasificación: es una pregunta. **Si no le sirve, hay 3 filas abiertas que no vale la pena
+> mantener** (0.189, 0.204, 0.207) más el código que las sostiene. ⇒ **Preguntar si se retira o se
+> conserva.**
+
+---
+
+**(d) ⭐ LOS MODELOS NO SE REPITEN PASADOS ~6 MESES — Y ESTO ES UN PRINCIPIO, NO UNA NOTA DE UNA
+FILA.** Textual:
+
+> *«todos los modelos que ya están dados de alta no se van a volver a repetir… Un modelo que se
+> repite, usualmente se repite en un lapso máximo de unos 6 meses. Pasado ese tiempo, el modelo no
+> vuelve a repetirse nunca más.»*
+
+**Qué decide:** **cualquier pantalla que ofrezca «elige un modelo» para producir hereda el criterio**
+— lo que alguien va a querer elegir es **lo reciente**. Se aplicó ya en el renglón del pedido
+(fila 0.209, `recientesPrimero`).
+
+⛔ **PERO SE ORDENA, NUNCA SE FILTRA.** Daniel dijo *«usualmente»* y *«máximo unos 6 meses»*: eso es
+una **tendencia**, no una regla del sistema. Un corte duro por antigüedad escondería modelos
+legítimos. **Ordenar por reciente sí; ocultar no.** Si algún día hiciera falta un corte, es pregunta
+para Daniel, no decisión del lead.
+
+⛔ **Y LA FRONTERA QUE EL SIGUIENTE LECTOR VA A APLICAR DE MÁS — Daniel la puso el mismo día, y dice
+lo contrario para el otro caso:**
+
+> *«creo que es importante **siempre poder jalar un modelo de desarrollo aunque sea muy viejo** para
+> un nuevo desarrollo… para copiar su receta. Pero al final se va a generar uno nuevo… todos los
+> modelos que generemos acá de desarrollo deberían de tener la posibilidad de poder copiarlos **en
+> cualquier momento del futuro**.»*
+
+🔑 **Son dos cosas distintas y confundirlas rompe el requisito:**
+
+| | Reusar un modelo de **producción** tal cual | **Copiar la receta** de uno de desarrollo |
+|---|---|---|
+| Regla | Caduca: pasados ~6 meses ya no vuelve | **NO caduca nunca** — «en cualquier momento del futuro» |
+| En el sistema | El renglón del pedido ordena por reciente | `CopiarBomDialogo` **NO lleva ese orden ni filtro de antigüedad** |
+
+⇒ Quien lea *«los modelos caducan a los 6 meses»* y lo aplique a copiar-receta estará rompiendo un
+requisito explícito de Daniel. **`CopiarBomDialogo` se mide y se deja como está** (`porPagina: 20` +
+`busqueda` con debounce + `origen: 'todos'` = buscador server-side real, sin corte por antigüedad).
+
+---
+
+**(e) RECICLAR UN MODELO DE DESARROLLO — pero para COPIARLO, no para usarlo.** Textual:
+
+> *«Podría reciclar un modelo de desarrollo… eso creo que sí podría pasar pero **para copiarlo a uno
+> nuevo. No para usar un modelo viejo como tal**.»*
+
+⇒ Nace la fila **0.210**: partir de un modelo existente para crear uno **nuevo**. ⚠️ La distinción es
+de Daniel y hay que conservarla con sus palabras: es **copiar para crear uno nuevo**, **NO** reabrir
+ni reutilizar el modelo viejo tal cual.
+
+**Estado medido:** la capacidad **ya existe, partida en dos pasos** — `copiarBom`
+(`dominio/modelos/bom-modelo.ts`) clona la receta en una transacción, y `CopiarBomDialogo` la ofrece
+con buscador propio. Hoy se crea el modelo nuevo y **luego** se le copia la receta. Lo que falta es
+**unir los dos pasos en un acto**, no la capacidad. ⇒ **🟢 puede esperar a después de arrancar**
+(recomendación del lead; ⏳ pendiente de que Daniel lo confirme, §7.5).
+
+---
+
+**(f) LOS PEDIDOS ENTRAN POR IMPORTACIÓN; LA CAPTURA MANUAL ES LA RED DE SEGURIDAD.** Textual:
+
+> *«podemos hacer que siempre lleguen por importación, pero habría que importar para nuevos clientes.
+> O incluso poder importar desde un excel.»*
+
+**Medido, y su preocupación ya está resuelta:** el importador de **Excel**
+(`dominio/pedidos/importacion.ts`) **ya es genérico por cliente** — se le enseña una vez cómo mapear
+sus columnas (**plantilla por cliente, versionada**) y las siguientes veces se importa solo ⇒
+*«habría que importar para nuevos clientes»* está construido. Además reconoce el modelo del cliente
+contra el **desarrollo** por `Desarrollo.numeroCliente`, y lo que no casa se liga con
+`useCandidatosDesarrollo`, **buscador server-side y filtrado por cliente**. *(El importador de **PDF**
+es otra cosa: va sobre la plantilla de C&A con `camposVariables`. El genérico es el de Excel.)*
+
+**Qué decide:** la captura manual de pedidos **no se quita** —Daniel fue explícito— pero deja de ser
+el camino principal y pasa a ser **la red de seguridad**, para el día que un archivo no se deje
+importar. ⇒ por eso la fila 0.209 es **🔶 duele pero se aguanta** y no 🔴, **confirmado por Daniel**
+(*«sí, déjalo en duele pero se aguanta»*). ⚠️ **Lo que bajó es la URGENCIA, no la severidad técnica**:
+el defecto sigue siendo el mismo, y *una red de seguridad rota no avisa hasta que la necesitas*.
+
+---
+
+🔑 **LO QUE ESTAS RESPUESTAS ENSEÑAN SOBRE EL MÉTODO, que es reutilizable:**
+
+**(1) Una conclusión del lead resultó FALSA, y se descubrió por medirla.** Con la cifra de (a) el lead
+concluyó que *«los ~5,400 modelos no rompen nada: el único sitio con tope 100 busca en el servidor»* y
+mandó **bajar** la prioridad de esa fila. Al medirlo apareció `EditorRenglones.tsx`, un `<select>`
+nativo **sin buscador** con una consulta fija de 100 ⇒ **la fila no bajaba: subía**. Se paró antes de
+escribirlo en el tablero. *Enterrar un defecto vivo con la autoridad de una medición es el peor
+desenlace posible.*
+
+**(2) Un código que LLEVA el año adentro no está ordenado por año, y todo el mundo supone que sí.**
+Daniel corrigió al lead diciendo *«al revés, esos 100 son los últimos»* y **su razonamiento era
+correcto**; falló sólo el supuesto de que el código va en orden de tiempo. **La discusión se cerró
+midiendo** (un `sort` sobre códigos de ejemplo), no argumentando.
+
+**(3) Un `grep` que no encuentra nada NO prueba ausencia: prueba que no se adivinó el vocabulario de
+la casa.** Se buscó `duplicar|clonar|copiarModelo` y se concluyó que no existía función de copiar
+modelo. **Existe: se llama «copiar receta»** (`copiarBom`). Esa falsa ausencia estuvo a punto de
+fundar una recomendación equivocada en (e).
