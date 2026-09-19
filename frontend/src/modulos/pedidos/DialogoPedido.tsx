@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -118,6 +118,19 @@ export function DialogoPedido({
         : VALORES_INICIALES,
     );
   }, [abierto, pedido, formulario]);
+
+  /**
+   * Código de cada modelo ya guardado en el pedido (fila 0.209).
+   *
+   * El selector de renglón busca contra el SERVIDOR y su primera página son 8 códigos, así que al
+   * reabrir un pedido el modelo guardado casi nunca viene en ella: sin esta etiqueta el campo se
+   * vería VACÍO aunque el renglón sí tenga modelo. El dato ya viaja en el detalle del pedido
+   * (`codigoModelo` del contrato), así que no cuesta una consulta extra.
+   */
+  const codigosPorModelo = useMemo(
+    () => new Map((pedido?.lineas ?? []).map((l) => [l.idModelo, l.codigoModelo])),
+    [pedido],
+  );
 
   const enviar = formulario.handleSubmit((datos) => {
     const lineas = datos.renglones.map((r) => aRenglonCuerpo(r, puedeVerImportes));
@@ -290,6 +303,7 @@ export function DialogoPedido({
               errores={errors}
               puedeVerImportes={puedeVerImportes}
               deshabilitado={guardando}
+              codigosPorModelo={codigosPorModelo}
             />
           </div>
 

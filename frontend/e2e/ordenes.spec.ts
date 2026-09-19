@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, elegirEnCombobox, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del módulo ÓRDENES (rediseño R2/R3) contra el stack real:
@@ -60,9 +60,7 @@ async function crearPedidoF2(
   for (let i = 0; i < renglones; i++) {
     await dialogoPedido.getByTestId('agregar-renglon').click();
     const filaRenglon = dialogoPedido.getByTestId('fila-renglon').nth(i);
-    await filaRenglon
-      .getByLabel('Modelo del renglón')
-      .selectOption({ label: nombres.codigoModelo });
+    await elegirEnCombobox(page, filaRenglon, nombres.codigoModelo, `renglon-modelo-${i}`);
     await filaRenglon.getByLabel('Cantidad del renglón').fill('50');
   }
   await page.getByTestId('guardar-pedido').click();

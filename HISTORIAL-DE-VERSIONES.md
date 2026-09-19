@@ -71,6 +71,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.175 · 19-sep-2026 · **en prueba** — **Al capturar un pedido a mano ya se puede buscar cualquier modelo: antes sólo salían 100, y eran justo los que ya no se usan**
+
+> **Qué se puede hacer ahora que antes no.** En la pantalla de capturar un pedido a mano
+> (*Pedidos › Administrar*), el campo **Modelo** de cada renglón **ya es un buscador**: escribes parte
+> del código o de la descripción y el sistema lo busca **entre todos los modelos**, tengas 60 o 5,400.
+>
+> **Antes era una lista desplegable que enseñaba 100 modelos y nada más.** Y lo importante no es que
+> fueran «100 de 5,400»: es **cuáles 100**. La lista venía ordenada por código, y como los modelos
+> viejos que trajimos del sistema anterior tienen código de números (12345) y los nuevos de desarrollo
+> tienen letras (CYA-26-71-001), **los números iban primero y se comían los 100 lugares**. Resultado:
+> **ningún modelo de desarrollo aparecía nunca en esa lista** —ni uno—, y los de producción que se
+> veían eran los más antiguos. Si el modelo que buscabas no estaba, no había manera de llegar a él:
+> se leía como *«ese modelo no existe»*.
+>
+> Ahora, además, **la lista que ves sin escribir nada arranca por los modelos más recientes**. Es una
+> decisión tuya, Daniel: nos dijiste que *«un modelo que se repite, usualmente se repite en un lapso
+> máximo de unos 6 meses; pasado ese tiempo no vuelve a repetirse nunca más»*. ⚠️ **Ordenamos por
+> reciente, pero no escondemos nada**: los modelos viejos siguen ahí y se encuentran escribiendo.
+>
+> **Qué cambió y puede sorprender.**
+> - El campo Modelo **ya no es un desplegable**: hay que **escribir** para que aparezcan las opciones
+>   (igual que el buscador de cliente que ya usabas ahí mismo).
+> - **Copiar la receta de otro modelo NO cambió**, y es a propósito. Ahí pediste lo contrario —*«es
+>   importante siempre poder jalar un modelo de desarrollo aunque sea muy viejo… para copiar su
+>   receta»*—, así que esa pantalla **no ordena por reciente ni esconde los antiguos**.
+> - **Nada más del sistema cambió**: ni catálogos, ni producción, ni inventarios, ni finanzas.
+>
+> **Qué sigue pendiente o roto.**
+> - **Los pedidos van a entrar normalmente por importación**, como decidiste; la captura a mano queda
+>   como **red de seguridad** para cuando un archivo no se deje importar. Por eso esto no se trató como
+>   urgente — pero **sí se arregló**, porque una red de seguridad rota no avisa hasta que la necesitas.
+> - **Falta una respuesta tuya sobre la «fusión de colores»**: nos dijiste que hoy no sucede y que no
+>   sabes bien cómo se planteó. Esa función existe y sirve para **unir dos colores repetidos del
+>   catálogo** en uno solo. **Si no te sirve, la quitamos** y con ella se van tres pendientes que hoy
+>   estamos manteniendo. Dinos si la conservamos o la retiramos.
+> - Queda anotado, para cuando quieras: **crear un modelo nuevo partiendo de uno que ya existe en un
+>   solo paso**. Hoy se puede hacer, pero en dos: primero creas el modelo y después le copias la
+>   receta.
+
 ## 0.174 · 18-sep-2026 · **en prueba** — **La revisión automática se pasaba el rato vaciando la base de pruebas: ahora la vacía de otra manera**
 
 > **Esta versión no cambia nada de lo que tú ves ni de lo que puedes hacer.** No toca catálogos, ni

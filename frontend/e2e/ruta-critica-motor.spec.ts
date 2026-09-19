@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, elegirCliente, elegirEnCombobox, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del MOTOR de la Ruta Crítica por orden (F5-E5; pantalla R4 "Mis pendientes") contra el stack
@@ -119,7 +119,7 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await elegirCliente(page, dialogoPedido, cliente, 'pedido-cliente');
     await dialogoPedido.getByTestId('agregar-renglon').click();
     const filaRenglon = dialogoPedido.getByTestId('fila-renglon').first();
-    await filaRenglon.getByLabel('Modelo del renglón').selectOption({ label: codigoModelo });
+    await elegirEnCombobox(page, filaRenglon, codigoModelo, 'renglon-modelo-0');
     await filaRenglon.getByLabel('Cantidad del renglón').fill('50');
     await page.getByTestId('guardar-pedido').click();
     await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();

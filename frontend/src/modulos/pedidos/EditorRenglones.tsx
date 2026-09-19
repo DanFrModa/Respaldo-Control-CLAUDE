@@ -1,35 +1,17 @@
 import { Trash2Icon } from 'lucide-react';
 import {
+  Controller,
   useFieldArray,
   type Control,
   type FieldErrors,
   type UseFormRegister,
 } from 'react-hook-form';
 
-import { useModelos, type Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 import type { DatosPedidoFormulario } from './esquemas';
-
-/**
- * Tope alto: trae los modelos activos para el selector de renglón.
- *
- * ⚠️ `origen: 'todos'` (V1-E3n): sin esto un modelo de DESARROLLO no se podría poner en un pedido, y
- * con ello quedaría INALCANZABLE por captura manual el camino que la etapa construye — que generar la
- * OP de ese renglón es lo que lo hace entrar a producción. ⭐ V1-E3 (§Post-F9.172(b)) precisa CÓMO:
- * el renglón se queda con su modelo de desarrollo (no se transforma) y la OP hace **nacer** un
- * modelo de producción por COLOR, con su nº de 5 dígitos y compartiendo la receta del desarrollo.
- */
-const QUERY_MODELOS = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'codigo',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-  origen: 'todos',
-} as const;
 
 /**
  * Editor del GRID de renglones de un pedido (modelo + cantidad + precio), montado dentro del
@@ -39,6 +21,33 @@ const QUERY_MODELOS = {
  * el precio NO viaja (el backend lo conserva/0 según corresponda).
  *
  * No tiene lógica de negocio: solo captura; el backend valida y es la autoridad (A1).
+ *
+ * ⭐ **FILA 0.209 — el modelo se BUSCA en el servidor; antes se elegía de una lista de 100.**
+ * Este selector era un `<select>` nativo alimentado por una consulta FIJA de `porPagina: 100` **sin
+ * `busqueda`**, y 100 es el tope REAL del contrato (`comun/paginacion.ts` → `.max(100)`), así que no
+ * había forma de pedir más: sólo se alcanzaban los primeros 100 códigos y el resto era
+ * **inalcanzable, sin aviso** — se leía como «ese modelo no existe». El docblock de esa consulta
+ * decía *«Tope alto»*, y **era razonable cuando se escribió**: lo caducó el dato del negocio, no un
+ * cambio de código. ⇒ Pasa al patrón que la casa ya tiene (`SelectorModelo` sobre
+ * `ComboboxBuscable`, igual que hizo la fila 0.192 con los colores): con **~5,400 modelos (Daniel,
+ * 19-sep-2026)** se teclea y aparece. Es la CUARTA vez que el mismo tope muerde en este proyecto
+ * (proveedores, colores, el conteo cíclico y ahora los modelos).
+ *
+ * ⭐ **Y por eso arranca con `recientesPrimero`:** aquí el orden por código no era neutral. Los
+ * modelos de PRODUCCIÓN son 5 dígitos y los de DESARROLLO llevan letras (`CYA-26-71-001`), y en
+ * orden de texto los dígitos van **antes** ⇒ los ~4,987 migrados de Access agotaban la página de 100
+ * **antes de la primera letra**, así que **ningún modelo de desarrollo llegaba nunca** a este
+ * selector. Eso rompía de raíz lo que `origen-buscadores.test.tsx` dice proteger —que haya manera
+ * manual de llegar a «generar la OP»— mientras esa prueba seguía en verde, porque medía que el
+ * modelo estuviera INVITADO (`origen: 'todos'`) y no que fuera ALCANZABLE.
+ *
+ * ⚠️ `origen: 'todos'` (V1-E3n) se mantiene EXPLÍCITO en la llamada, aunque hoy sea el default del
+ * selector: sin esto un modelo de DESARROLLO no se podría poner en un pedido, y con ello quedaría
+ * INALCANZABLE por captura manual el camino que la etapa construye — que generar la OP de ese
+ * renglón es lo que lo hace entrar a producción. ⭐ V1-E3 (§Post-F9.172(b)) precisa CÓMO: el renglón
+ * se queda con su modelo de desarrollo (no se transforma) y la OP hace **nacer** un modelo de
+ * producción por COLOR, con su nº de 5 dígitos y compartiendo la receta del desarrollo. Lo fija
+ * `origen-buscadores.test.tsx`.
  */
 export function EditorRenglones({
   control,
@@ -46,16 +55,26 @@ export function EditorRenglones({
   errores,
   puedeVerImportes,
   deshabilitado,
+  codigosPorModelo,
 }: {
   control: Control<DatosPedidoFormulario>;
   registrar: UseFormRegister<DatosPedidoFormulario>;
   errores: FieldErrors<DatosPedidoFormulario>;
   puedeVerImportes: boolean;
   deshabilitado: boolean;
+  /**
+   * Código de cada modelo YA GUARDADO en el pedido que se edita (id → código), que el padre conoce
+   * por `pedido.lineas[].codigoModelo`.
+   *
+   * 🔑 **Para qué**: con búsqueda server-side la primera página son 8 códigos, y el modelo de un
+   * renglón guardado casi nunca está entre ellos ⇒ al reabrir el pedido el campo se vería **VACÍO
+   * aunque por dentro sí haya modelo elegido**, y guardar lo dejaría igual de vacío a la vista. Es
+   * la trampa clásica de estos selectores. Sólo hace falta al MONTAR: en cuanto el usuario elige,
+   * el combobox persiste la etiqueta por su cuenta.
+   */
+  codigosPorModelo?: ReadonlyMap<number, string> | undefined;
 }): React.JSX.Element {
   const { fields, append, remove } = useFieldArray({ control, name: 'renglones' });
-  const modelos = useModelos(QUERY_MODELOS);
-  const listaModelos: Modelo[] = modelos.data?.datos ?? [];
 
   return (
     <div className="space-y-3" data-testid="editor-renglones">
@@ -87,28 +106,43 @@ export function EditorRenglones({
                 className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-[1fr_6rem_7rem_auto] sm:items-end"
                 data-testid="fila-renglon"
               >
-                <label className="block text-xs">
+                {/* Contenedor `div`, no `label`: el combobox es un widget con popover propio, y
+                    envolverlo en un `<label>` le daría dos veces el foco. Su nombre accesible lo
+                    pone `etiqueta` (aria-label), igual que en las pantallas de inventario. */}
+                <div className="block text-xs">
                   <span className="mb-1 block text-muted-foreground">Modelo</span>
-                  <SelectNativo
-                    disabled={deshabilitado}
-                    aria-invalid={Boolean(errorFila?.idModelo)}
-                    aria-label="Modelo del renglón"
-                    {...registrar(`renglones.${indice}.idModelo` as const)}
-                  >
-                    <option value="">Elige un modelo…</option>
-                    {listaModelos.map((m) => (
-                      <option key={m.id} value={String(m.id)}>
-                        {m.codigo}
-                        {m.descripcion ? ` — ${m.descripcion}` : ''}
-                      </option>
-                    ))}
-                  </SelectNativo>
+                  <Controller
+                    control={control}
+                    name={`renglones.${indice}.idModelo` as const}
+                    render={({ field }) => {
+                      // El formulario guarda el id como TEXTO ('' = sin elegir); el selector habla
+                      // de números. La conversión vive aquí y no toca el esquema ni el submit.
+                      const idElegido = field.value === '' ? undefined : Number(field.value);
+                      const codigoGuardado =
+                        idElegido === undefined ? undefined : codigosPorModelo?.get(idElegido);
+                      return (
+                        <SelectorModelo
+                          idSeleccionado={idElegido}
+                          {...(codigoGuardado === undefined
+                            ? {}
+                            : { codigoSeleccionado: codigoGuardado })}
+                          alSeleccionar={(m) => field.onChange(String(m.id))}
+                          deshabilitado={deshabilitado}
+                          invalido={Boolean(errorFila?.idModelo)}
+                          recientesPrimero
+                          origen="todos"
+                          etiqueta="Modelo del renglón"
+                          testid={`renglon-modelo-${indice}`}
+                        />
+                      );
+                    }}
+                  />
                   {errorFila?.idModelo ? (
                     <span role="alert" className="mt-1 block text-destructive">
                       {errorFila.idModelo.message}
                     </span>
                   ) : null}
-                </label>
+                </div>
 
                 <label className="block text-xs">
                   <span className="mb-1 block text-muted-foreground">Cantidad</span>
