@@ -74,12 +74,29 @@ Y por si la regla se rompiera, el código ahora **avisa** en vez de callar: ver 
 
 ### Regla 2 — `etl-ipt` y `etl-telas` NO se corren en el go-live
 
-El **inventario de producto terminado** y el **de telas** arrancan del **CONTEO FÍSICO** que captura Daniel, no del histórico:
+El **inventario de producto terminado** y el **de telas** **arrancan EN CERO y se cargan SOBRE LA MARCHA**, no del histórico:
 
 - PT → `DECISIONES.md §Post-F9.25` (*"el almacén de PT empieza también desde cero"*).
 - Telas → `DECISIONES.md §Post-F9.11` punto 5 (*"partir de un inventario físico desde cero"*).
+- **Y cómo se llena, que es la parte que cambió:** **§Post-F9.36 punto 4** (DANIEL, **13-ago-2026**, `DECISIONES.md:1609-1634`) — ***"SE ARRANCA SIN
+  CONTEO FÍSICO. El inventario se carga sobre la marcha"***. Se capturan **las telas y avíos con los que se
+  está trabajando**, y **un color se captura la primera vez que se va a usar**; si se intenta descargar tela
+  no cargada, el sistema la rechaza — ése es el recordatorio.
 
-Por eso `etl-ipt.ts` y `etl-telas.ts` **están fuera del orden de corrida de abajo**. ⚠️ **Correrlos DESPUÉS del conteo físico lo PISA**: meten movimientos históricos al mismo kardex, y como existencia = Σ movimientos (D3), el conteo capturado queda sumado con historia vieja. (Con `ETL_DESDE=2025` ambos cargan cero de todas formas — desde el 11-ago-2026 `etl-ipt` **sí** obedece la ventana; antes la ignoraba —, pero la regla no depende de eso: simplemente no se corren.)
+> 🔄 **CORREGIDO EL 19-sep-2026 — el MOTIVO que daba esta regla ya no es el vigente (la regla sí lo es).**
+> Decía: *«arrancan del **CONTEO FÍSICO** que captura Daniel, no del histórico»*. **Ese conteo físico se
+> decidió NO hacer**: **§Post-F9.36 punto 4** (**13-ago-2026**, `DECISIONES.md:1609-1634`) recoge que Daniel pidió arrancar sin él —*«el
+> conteo físico nos llevará tiempo… ¿podríamos meter las telas con las que estamos trabajando?»*— y con esa
+> decisión **el importador Excel de conteo físico dejó de ser bloqueante del go-live**.
+>
+> ✅ **Lo que NO cambia: `etl-ipt` y `etl-telas` siguen SIN correrse en el go-live.** Cambia sólo el porqué:
+> ya no es *«no pises el conteo que Daniel capturó»*, sino *«no pises lo que el almacén vaya capturando»*.
+>
+> 📌 **Y se corrige AQUÍ, no en otro documento, a propósito:** éste es el instructivo que se ejecuta el día
+> del corte (paso 11 de `docs/ARRANQUE.md`). Un motivo equivocado en las instrucciones del día del corte es
+> peor que un motivo ausente, porque quien las lea a las seis de la mañana **decide con él**.
+
+Por eso `etl-ipt.ts` y `etl-telas.ts` **están fuera del orden de corrida de abajo**. ⚠️ **Correrlos DESPUÉS de que el almacén empiece a capturar lo PISA**: meten movimientos históricos al mismo kardex, y como existencia = Σ movimientos (D3), lo capturado queda sumado con historia vieja. (Con `ETL_DESDE=2025` ambos cargan cero de todas formas — desde el 11-ago-2026 `etl-ipt` **sí** obedece la ventana; antes la ignoraba —, pero la regla no depende de eso: simplemente no se corren.)
 
 ### Regla 3 — orden de corrida del go-live, con `ETL_DESDE=2025` desde el PRIMER comando
 
@@ -129,7 +146,7 @@ npx tsx --env-file=.env migracion/cuadre-f5.ts   # ruta crítica ⏸️ ver avis
 npx tsx --env-file=.env migracion/cuadre-f6.ts   # calidad + EsMa (saldo por maquilero)
 npx tsx --env-file=.env migracion/cuadre-f7.ts   # costos + indicadores
 #    ⚠️ En f3 y f4 el kardex de PT y el de telas saldrán en CERO contra el viejo: es lo ESPERADO
-#    (Regla 2 — arrancan del conteo físico, no del histórico). Lo demás sí debe cuadrar.
+#    (Regla 2 — arrancan en cero y se cargan sobre la marcha, no del histórico). Lo demás sí debe cuadrar.
 
 # ❌ NO se corren: etl-ipt (PT) ni etl-telas (telas) — ver la Regla 2.
 # ⏸️ RUTA CRÍTICA SALE DE V1 (Daniel, 10-sep, §Post-F9.226(a): «la ruta crítica completa va después de
@@ -179,12 +196,12 @@ npx tsx --env-file=.env migracion/cuadre-f2.ts             # F2: solo el reporte
 
 # F3 (producción + inventario PT) — EN ESTE ORDEN:
 npx tsx --env-file=.env migracion/etl-produccion.ts        # F3: corte/envío/recibo/EsMa (SIN kardex)
-npx tsx --env-file=.env migracion/etl-ipt.ts               # F3: kardex histórico de IPT ❌ NO EN EL GO-LIVE (Regla 2: el PT arranca del conteo físico; correrlo lo PISA)
+npx tsx --env-file=.env migracion/etl-ipt.ts               # F3: kardex histórico de IPT ❌ NO EN EL GO-LIVE (Regla 2: el PT arranca en cero y se carga sobre la marcha; correrlo lo PISA)
 npx tsx --env-file=.env migracion/cuadre-f3.ts             # F3: solo el reporte de cuadre de toda la fase
 
 # F4 (compras / MRP / telas) — EN ESTE ORDEN:
 npx tsx --env-file=.env migracion/etl-compras-notas.ts     # F4: OC + notas legacy (texto libre, SIN kardex)
-npx tsx --env-file=.env migracion/etl-telas.ts             # F4: kardex de tela ❌ NO EN EL GO-LIVE (Regla 2: las telas arrancan del conteo físico; correrlo lo PISA)
+npx tsx --env-file=.env migracion/etl-telas.ts             # F4: kardex de tela ❌ NO EN EL GO-LIVE (Regla 2: las telas arrancan en cero y se cargan sobre la marcha; correrlo lo PISA)
 npx tsx --env-file=.env migracion/cuadre-f4.ts             # F4: cuadre TelasColAlm v1 vs Σ movimientos v2
 npx tsx --env-file=.env migracion/_progreso.ts             # F4: chequeo rápido de conteos (local, gitignored)
 
@@ -418,8 +435,9 @@ dejaron de cumplir. El script hace **las dos direcciones** —degrada y también
 >   (`ETL_PROVEEDORES_DESDE`, §Post-F9.23); y el **archivo histórico** lo ignora a propósito.
 >
 > **⚠️ Con el corte, `IPT_Movs` (última de 2023) queda en CERO → el inventario de PT arranca vacío.**
-> Ya está DECIDIDO (**§Post-F9.25**: arranca del conteo físico) y por eso `etl-ipt` **no se corre en el
-> go-live** (Regla 2). Igual pasa con `CC_Auditorias` (2017) y `PedidosReales` (2010): sus módulos
+> Ya está DECIDIDO (**§Post-F9.25**: arranca desde cero — y **sin conteo físico**, **§Post-F9.36 punto 4**, 13-ago-2026, `DECISIONES.md:1609-1634`,
+> corregido el 19-sep-2026: este renglón decía *«arranca del conteo físico»*) y por eso `etl-ipt` **no se
+> corre en el go-live** (Regla 2). Igual pasa con `CC_Auditorias` (2017) y `PedidosReales` (2010): sus módulos
 > arrancan vacíos, y es lo esperado.
 >
 > **⚠️ EsMa entero recorta por la fecha de su CABECERA, en los CUATRO conceptos.** Es deliberado: los
