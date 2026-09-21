@@ -71,6 +71,51 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.177 · 19-sep-2026 · **en prueba** — **Diez referencias entre documentos mandaban a leer el renglón equivocado**
+
+> **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca catálogos, ni
+> pedidos, ni producción, ni finanzas. Arregla **referencias internas**: cuando un documento decía
+> «esto se decidió aquí», el «aquí» apuntaba a un renglón que ya no era ése. Está aquí porque **cada
+> entrega sube de versión**.
+>
+> 📌 **La v0.177 no cierra ninguna fila del programa**, y es a propósito: no construye nada, sólo
+> deja las referencias apuntando donde deben. *Esta frase no es adorno: el verificador de documentos
+> la exige.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Ninguna función del sistema cambia.
+- **Lo que se gana es poder seguir una referencia y llegar a la decisión correcta.** Diez lugares de
+  los documentos de trabajo decían «esto se decidió en tal renglón» y ese renglón ya no era el
+  correcto: los documentos habían crecido por debajo y todo lo de abajo se había corrido. Quien las
+  siguiera acababa leyendo **la decisión de al lado**, que trata de otra cosa. Ahora llevan a la
+  decisión que dicen llevar; se comprobó una por una.
+- ⭐ **Y ahora aguantan el próximo crecimiento.** Junto al número, cada referencia lleva **el nombre
+  de lo que cita** —la decisión, la regla, el título de la sección—. Así, el día que un documento
+  vuelva a crecer y el número caduque, **el nombre sigue sirviendo** y se encuentra igual.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Una de las diez estaba mal desde el día que se escribió, y no por el crecimiento:** el tramo
+  que señalaba **empezaba a media decisión y terminaba ya dentro de la siguiente**, que habla de otro
+  asunto. Se corrigió apuntándolo a la decisión completa, de su primera línea a su última.
+- ⚠️ **Y ahí está lo que conviene recordar:** arreglar esas referencias **sumándoles el mismo
+  desplazamiento a todas** habría dejado a ésa **igual de mal, con números nuevos** — habría seguido
+  terminando dentro de la decisión de al lado. Por eso las diez se volvieron a medir una por una, y
+  se comprobó además **dónde empieza y dónde acaba** cada tramo, no sólo que el número cuadrara.
+- **Una referencia que parecía rota no lo estaba**, y se dejó como estaba: apunta a un renglón que
+  queda **por encima** del punto donde entraron las líneas nuevas, así que no se movió. Se comprobó
+  antes de tocarla.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Nada de esto afecta al arranque.** Lo que falta para arrancar sigue siendo lo mismo que dice la
+  versión anterior: los dos repasos, el asunto que lleva Gabriel y los pasos a mano.
+- ⚠️ **Sólo se revisaron esos dos documentos.** Si en otros sitios hay referencias con el mismo
+  problema, no se buscaron aquí; se sabe que el tipo de defecto existe y queda dicho.
+- ⚠️ **Referencias por número siguen siendo frágiles por naturaleza.** El nombre que ahora las
+  acompaña es la red; el número, cuando un documento crece, vuelve a caducar solo.
+
 ## 0.176 · 19-sep-2026 · **en prueba** — **El guion del día del arranque decía que faltaban seis cosas cuando faltan tres, y mandaba a leer el renglón equivocado**
 
 > **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca catálogos, ni

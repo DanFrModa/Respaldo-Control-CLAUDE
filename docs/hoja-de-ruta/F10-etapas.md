@@ -5,12 +5,12 @@
 > **Sus 7 etapas siguen marcadas ⬜ y eso ya no es cierto.** Medido el 10-sep-2026 contra el
 > repositorio: entre **E2** y **E3** hay ~**90 %** construido —**16 cargadores y 9 reportes de
 > cuadre**— y **existe el instructivo del día del corte con los comandos en orden**
-> (`backend/migracion/README.md:34-80`), que es en la práctica lo que E1/E2/E3 pedían construir.
+> (`backend/migracion/README.md:101-161`, *«Regla 3 — orden de corrida del go-live»* — la cita decía `34-80` y se corrigió el 19-sep-2026), que es en la práctica lo que E1/E2/E3 pedían construir.
 >
 > **Y hay etapas enteras que ya no hacen falta, porque el problema se resolvió de otra forma:**
 > - **E4 (frontera de 10 años):** sustituida por «sólo 2025-2026 vivo, el resto como archivo plano»
 >   (`backend/migracion/comun/ventana.ts:8-11`), que **ya tiene cargador y pantalla**.
-> - **El conteo físico de inventario:** lo canceló Daniel (`DECISIONES.md:1586-1611`) — se arranca en
+> - **El conteo físico de inventario:** lo canceló Daniel (`DECISIONES.md:1609-1634`, **§Post-F9.36 punto 4** *«SE ARRANCA SIN CONTEO FÍSICO»* — la cita decía `:1586-1611` y se corrigió el 19-sep-2026) — se arranca en
 >   cero y se carga la tela conforme se usa. *Era el mayor consumidor de tiempo humano del arranque.*
 > - **La Ruta Crítica entera sale de V1** (§Post-F9.226(a)) ⇒ su ETL no se corre el día uno.
 >
