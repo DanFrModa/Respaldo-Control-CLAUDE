@@ -100,8 +100,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   orden hacía que el sistema creyera que ya habías comprado el doble, **y dejaba de proponerte comprar
   lo que de verdad falta. Sin avisar.**
 - **Lo tenían casi todos.** Ocho de los nueve perfiles, incluidos Ventas, Asistente y Secretarial.
-- **Y no lo había pedido nadie**: no existe ninguna decisión tuya que lo mencione. Lo agregó el equipo,
-  como los botones que ya quitamos en su momento.
+- **Sobre de dónde salió: sí estaba en el registro, y conviene decirlo bien.** En una tanda de
+  decisiones de junio de 2026 aparece *«Duplicar a nueva OC»*, apuntada como cerrada contigo. Pero ahí
+  iba **de acompañante**: lo que esa decisión justificaba era **bloquear la edición de una orden ya
+  autorizada**, y el duplicado se coló con un *«sirve para cambiar un detallito sin rehacerla»*. Hoy tú
+  dices que esa necesidad no existe, y se retira. **La decisión de junio queda enmendada en su sitio**,
+  para que quien la lea no crea que el botón sigue ahí.
 - **Se quitó entero, no escondido.** Esconderlo habría dejado el problema vivo para quien lo
   encontrara. De paso se cerró un tercer hueco que el propio código tenía anotado: duplicar **se
   saltaba la firma de la receta** que sí se exige al capturar a mano.

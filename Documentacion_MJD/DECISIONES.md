@@ -214,8 +214,8 @@ Estrategia de migración del histórico. Decisión de Gabriel, 2026-06-20. Detal
 
 Reglas de Órdenes de Compra, recepción, explosión MRP, notas de salida y migración de la fase. Cerradas con **Daniel** (dueño / experto del negocio), relayed por Gabriel, 2026-06-20. Detalle operativo en la ficha `docs/hoja-de-ruta/F4-etapas.md`.
 
-#### (a) — Edición de una OC autorizada: bloqueada salvo admin + "Duplicar a nueva OC" (E2)
-- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. La **puede editar quien tenga el permiso `compras.editar-autorizada`**, ⚠️ **(actualizado el 11-sep-2026, fila 0.120: hasta entonces esto decía «el administrador», porque la facultad colgaba de `roles.administrar` — el interruptor que esa fila desmontó)**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.
+#### (a) — Edición de una OC autorizada: bloqueada salvo admin + ~~"Duplicar a nueva OC"~~ (E2)
+- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. La **puede editar quien tenga el permiso `compras.editar-autorizada`**, ⚠️ **(actualizado el 11-sep-2026, fila 0.120: hasta entonces esto decía «el administrador», porque la facultad colgaba de `roles.administrar` — el interruptor que esa fila desmontó)**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). ⛔ ~~Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.~~ **(RETIRADO el 23-sep-2026 a petición de Daniel — §Post-F9.237(a), fila 0.212: *«quita el botón»*. No era sólo de más: la copia arrastraba `idOrden`, nacía en `borrador`, y el borrador cuenta como «ya comprado», así que duplicar inflaba en silencio lo comprado de esa OP. La primera mitad de esta decisión —el bloqueo de la OC autorizada— sigue VIGENTE.)**
 - **Por qué:** preserva el rastro de auditoría (no se reescriben a la ligera documentos ya autorizados) y resuelve la necesidad real de "cambiar un detallito sin rehacer".
 - **Aplica en:** F4-E2.
 
@@ -16242,8 +16242,15 @@ información equivocada que lleva a decisiones equivocadas (dinero, compras)»*.
 **Quién lo tenía:** medido sobre `definirRoles()` — **8 de los 9 perfiles**, todos menos `Basico`;
 entre ellos `Ventas`, `Asistente` y `Secretarial`.
 
-**De dónde salió el botón:** de nadie. **Cero decisiones de Daniel lo piden** (barrido del registro
-completo). Lo agregó el equipo, como los botones que se retiraron en la **0.007**.
+**De dónde salió el botón** ⚠️ *(corregido tras el rechazo del reviewer; la primera redacción decía
+«de nadie, cero decisiones lo piden» y **era falsa**)*: de la **segunda mitad de la decisión (a) de F4**
+(`DECISIONES.md:217`, 20-jun-2026, registrada como *cerrada con Daniel*), que lo nombra por su nombre.
+Lo que **sí** es cierto y es lo que importa: **su *«Por qué»* sólo justifica el bloqueo de la OC
+autorizada**; el duplicado viajaba de acompañante, con la frase *«resuelve la necesidad real de cambiar
+un detallito sin rehacer»* — y hoy el dueño del negocio dice que esa necesidad no es real. 🔑 **La
+lección del barrido fallido: se buscó `duplicar (una|la) (oc|orden de compra)` y el registro lo llamaba
+«Duplicar a nueva OC».** Un grep que no encuentra nada no prueba ausencia: prueba que no se adivinó el
+vocabulario — la misma cicatriz que la fila **0.210**.
 
 ⚖️ **POR QUÉ SE RETIRA ENTERO Y NO SE ESCONDE.** Esconderlo deja el endpoint vivo y el defecto
 intacto para quien lo encuentre — y este repo ya tiene la fila **0.175** sobre que *una capacidad que

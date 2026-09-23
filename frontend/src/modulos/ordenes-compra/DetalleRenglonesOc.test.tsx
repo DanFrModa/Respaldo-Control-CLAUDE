@@ -296,6 +296,33 @@ describe('DetalleRenglonesOc — el avance de recepción por renglón (23-sep-20
     expect(complemento).toHaveTextContent('falta 12');
   });
 
+  it('🔴 un complemento ANUNCIADO pero SIN cantidad capturada tampoco gana la coletilla', () => {
+    // El caso DE EN MEDIO, que es el que faltaba: no es «sin complemento» ni «complemento completo»,
+    // sino uno que existe por nombre y al que nadie le puso cantidad. Sin la sub-condición
+    // `cantidadComplemento !== null`, aquí se imprimiría «recibido 0 · falta 0» sobre algo que nadie
+    // pidió. Lo cazó el reviewer mutando la condición (quitándola, no rompiendo el camino feliz).
+    const base = ocDePrueba();
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={{
+          ...base,
+          estatus: 'recibida_parcial' as const,
+          lineas: base.lineas.map((l) => ({
+            ...l,
+            nombreComplementoTela: 'Cardigan',
+            cantidadComplemento: null,
+            precioComplemento: null,
+          })),
+        }}
+        recepcion={{ porLinea: avance(), cargando: false, error: false }}
+      />,
+    );
+    expect(screen.getByTestId('complemento-detalle-oc')).toHaveTextContent(
+      'falta capturar la cantidad',
+    );
+    expect(screen.queryByTestId('complemento-avance-oc')).not.toBeInTheDocument();
+  });
+
   it('un renglón SIN complemento no gana esa coletilla', () => {
     renderConProveedores(
       <DetalleRenglonesOc
