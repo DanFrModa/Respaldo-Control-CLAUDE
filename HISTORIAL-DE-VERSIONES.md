@@ -71,6 +71,55 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.179 · 23-sep-2026 · **en prueba** — **Se quita el botón de duplicar órdenes de compra, que estaba inflando en silencio lo que el sistema creía ya comprado, y la orden por fin dice qué llegó y qué falta**
+
+> Las dos salieron de que Daniel estuviera **usando el sistema**, no de un plan. Y la primera resultó
+> ser bastante más que un botón de más.
+>
+> 📌 **La v0.179 cierra las filas 0.212 y 0.213.**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **La orden de compra ya te dice, renglón por renglón, cuánto pediste, cuánto llegó y cuánto
+  falta.** Antes, al abrir una orden a medio recibir, lo único que te decía era la palabra «recibida
+  parcial» — para saber *qué* faltaba tenías que irte a la pantalla de recepción. Ahora está donde lo
+  buscaste.
+- **Y cuando un renglón se da por cerrado con menos de lo pedido, te dice por qué.** Hay una tolerancia
+  —tú mismo dijiste que *«la cantidad que se recibe nunca va a coincidir exacto con la OC»*—, así que un
+  renglón puede quedar surtido con 96 de 100. Sale **«Ya surtido»** y una nota al pie que lo explica,
+  para que ese cero no se lea como un error de captura.
+- **Si el dato no se puede consultar en ese momento, te lo dice y deja las celdas en «—».** No se
+  inventa una resta: daría un número distinto del que manda el estatus.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Desapareció el botón de «duplicar» de las órdenes de compra, y no era sólo estética.** Tú lo
+  viste raro —*«no es común duplicar una OC... y aparte casi siempre va ligada a una OP»*— y debajo
+  había un defecto de verdad: **la copia se llevaba la liga a la orden de producción**, nacía como
+  borrador, y **el sistema cuenta los borradores como material ya comprado**. Resultado: duplicar una
+  orden hacía que el sistema creyera que ya habías comprado el doble, **y dejaba de proponerte comprar
+  lo que de verdad falta. Sin avisar.**
+- **Lo tenían casi todos.** Ocho de los nueve perfiles, incluidos Ventas, Asistente y Secretarial.
+- **Y no lo había pedido nadie**: no existe ninguna decisión tuya que lo mencione. Lo agregó el equipo,
+  como los botones que ya quitamos en su momento.
+- **Se quitó entero, no escondido.** Esconderlo habría dejado el problema vivo para quien lo
+  encontrara. De paso se cerró un tercer hueco que el propio código tenía anotado: duplicar **se
+  saltaba la firma de la receta** que sí se exige al capturar a mano.
+- **Quien podía crear y editar órdenes lo sigue pudiendo**: el permiso no se tocó. Lo que sí se corrigió
+  es su descripción, que prometía la capacidad de duplicar y habría quedado mintiendo en la pantalla de
+  perfiles.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Queda una pregunta tuya sin contestar, y decide si algo se adelanta: ¿con qué frecuencia llega la
+  mercancía antes que la factura?** Al capturar una entrada de tela, el XML de la factura **sí se sube
+  y se guarda** —eso lo decidiste en agosto—, pero **sólo durante la captura**: si guardas la entrada
+  sin él, ya no hay forma de agregarlo después y queda archivado sólo el PDF, que es la foto y no el
+  documento que vale. Si lo normal es que el material llegue antes que la factura, eso se adelanta.
+- **El avance de recepción se ve en el cajón de la orden, pero todavía no en «Compras por orden»** —la
+  pantalla donde miras cuando preguntas por una orden de producción—. Es el mismo dato y encajaría
+  igual; no se hizo por no ampliar el encargo sin decirlo.
+
 ## 0.178 · 23-sep-2026 · **en prueba** — **Queda escrito que ninguna prenda debe salir del almacén sin una factura o una remisión, y qué tan lejos está eso de lo que ya hay**
 
 > **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca inventarios, ni
