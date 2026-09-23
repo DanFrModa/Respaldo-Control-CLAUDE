@@ -101,9 +101,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   lo que de verdad falta. Sin avisar.**
 - **Lo tenían casi todos.** Ocho de los nueve perfiles, incluidos Ventas, Asistente y Secretarial.
 - **Sobre de dónde salió: sí estaba en el registro, y conviene decirlo bien.** En una tanda de
-  decisiones de junio de 2026 aparece *«Duplicar a nueva OC»*, apuntada como cerrada contigo. Pero ahí
-  iba **de acompañante**: lo que esa decisión justificaba era **bloquear la edición de una orden ya
-  autorizada**, y el duplicado se coló con un *«sirve para cambiar un detallito sin rehacerla»*. Hoy tú
+  decisiones de junio de 2026 aparece *«Duplicar a nueva OC»*, apuntada como cerrada contigo. Pero esa
+  decisión traía **dos razones**: dejar rastro de lo que se toca en una orden ya firmada —que sigue en
+  pie— y *«resolver la necesidad de cambiar un detallito sin rehacerla»*. **El duplicado se colgó de la
+  segunda**, y es la única que cae. Hoy tú
   dices que esa necesidad no existe, y se retira. **La decisión de junio queda enmendada en su sitio**,
   para que quien la lea no crea que el botón sigue ahí.
 - **Se quitó entero, no escondido.** Esconderlo habría dejado el problema vivo para quien lo
