@@ -23,7 +23,6 @@ import {
   cancelarOC,
   crearOC,
   desautorizarOC,
-  duplicarOC,
   listarOC,
   obtenerOC,
 } from './ordenes-compra.js';
@@ -34,7 +33,7 @@ import {
  * matriz talla×color suma=cantidad (decisión c), XOR catálogo/libre, autorización (permiso propio +
  * bloqueo de edición sin `compras.editar-autorizada` / permitida con ella, decisión a),
  * cancelación suave con
- * rastro, y duplicado a un borrador nuevo. NO corre en local (usa Docker): el CI.
+ * rastro. NO corre en local (usa Docker): el CI.
  */
 
 let cliente: PrismaClient;
@@ -509,65 +508,6 @@ describe('OC (F4-E2) — cancelación suave', () => {
   });
 });
 
-describe('OC (F4-E2) — duplicar', () => {
-  it('duplica encabezado + líneas a un borrador nuevo con folio nuevo, sin autorización', async () => {
-    const original = await crearOC(
-      sesion(PERM_ADMIN_OC),
-      {
-        ...encabezadoOc(),
-        idProveedor: proveedor.id,
-        observaciones: 'original',
-        lineas: [{ idTela: tela.id, cantidad: 5, precio: 10 }],
-      },
-      bd(),
-    );
-    await autorizarOC(sesion(PERM_AUTORIZAR), original.id, bd());
-
-    const copia = await duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd());
-    expect(copia.id).not.toBe(original.id);
-    expect(copia.numCompra).toBe(original.numCompra + 1);
-    expect(copia.estatus).toBe('borrador');
-    expect(copia.idUsuAutorizado).toBeNull();
-    expect(copia.observaciones).toBe('original');
-    expect(copia.lineas).toHaveLength(1);
-    expect(copia.lineas[0]?.cantidad).toBe(5);
-  });
-
-  /**
-   * ⭐⭐ **V1-E4f (§Post-F9.103) — DUPLICAR NO PUEDE PARIR UNA OC SIN FECHA.** Daniel: *"tiene que
-   * tener fecha de entrega a fuerzas"*. `crearOC` y la explosión ya lo cumplían; **duplicar era la
-   * puerta abierta**: copiaba `fechaEntrega` tal cual, así que cualquiera de las 7,978 OC migradas
-   * de Access —que no la traen— podía engendrar hoy una OC nueva muda sobre el *cuándo*.
-   *
-   * 🔴 La OC vieja se queda como está (decisión (e): la regla es prospectiva). Lo que se corta es
-   * la propagación. Esta prueba es la que se pone roja si alguien quita la llamada a
-   * `motivoNoDuplicarOc` de `duplicarOC` — el unit de la función pura, por sí solo, no la alcanza.
-   */
-  it('🔴 una OC SIN fecha de entrega (las migradas) NO se puede duplicar', async () => {
-    const original = await crearOC(
-      sesion(PERM_ADMIN_OC),
-      {
-        ...encabezadoOc(),
-        idProveedor: proveedor.id,
-        lineas: [{ idTela: tela.id, cantidad: 5, precio: 10 }],
-      },
-      bd(),
-    );
-    // Así viven las migradas. Se escribe directo porque el contrato ya NO deja capturar una así:
-    // el único camino para tenerla es haberla heredado de Access.
-    await cliente.ordenCompra.update({
-      where: { id: original.id },
-      data: { fechaEntrega: null },
-    });
-
-    await expect(duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd())).rejects.toBeInstanceOf(
-      ErrorValidacion,
-    );
-    // Y no dejó nada a medias: NO nació una segunda OC (el rechazo llega ANTES del folio nuevo).
-    expect(await cliente.ordenCompra.count({ where: { idEmpresa: empresa.id } })).toBe(1);
-  });
-});
-
 describe('OC (F4-E2) — obtener respeta empresa (A9)', () => {
   it('una OC de otra empresa no existe para la sesión', async () => {
     const oc = await crearOC(
@@ -803,21 +743,6 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
       expect(oc.fecha, 'la fecha de emisión es el día del negocio, no el día UTC').toBe(dia);
     },
   );
-
-  it('⭐ 0.179: DUPLICAR también emite con el día de México (es una OC nueva)', async () => {
-    const original = await crearOC(
-      sesion(PERM_ADMIN_OC),
-      { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
-      bd(),
-    );
-    // 19:00 del 9 de septiembre en México = 10 de septiembre en UTC. La copia se emite HOY
-    // (§Post-F9.18), y ese «hoy» es el del negocio: si aquí quedara el día UTC, duplicar por la
-    // tarde seguiría pariendo OC fechadas mañana.
-    const copia = await conElRelojEn('2026-09-10T01:00:00.000Z', () =>
-      duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd()),
-    );
-    expect(copia.fecha).toBe('2026-09-09');
-  });
 
   it('la FECHA DE ENTREGA es obligatoria al crear y no se puede vaciar al editar', async () => {
     await expect(
@@ -1068,7 +993,7 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
  *
  * La REGLA del desglose (Σ = cantidad, etiquetas sin repetir) vive pura y probada en
  * `desglose-por-medida.test.ts`; aquí se prueba que la OC **la aplica de verdad** y que lo guardado
- * sobrevive al viaje completo (alta → lectura → duplicado).
+ * sobrevive al viaje completo (alta → lectura).
  *
  * ⚠️ Necesita Postgres (testcontainers): corre en CI.
  */
@@ -1188,39 +1113,5 @@ describe('⭐⭐ OC (V1-E8c) — color de prenda + desglose por medida en el av�
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
-  });
-
-  /**
-   * 🔴 **Y DE PASO, EL DEFECTO QUE V1-E3u DEJÓ ABIERTO**: `duplicarOC` copiaba `idTela` pero **no
-   * `idTelaColor`**, así que duplicar una OC devolvía una compra "de la misma tela" SIN TONO — el
-   * dato que la recepción cruza y que el proveedor lee. No es de esta etapa; se arregla al pasar
-   * porque un defecto conocido no es "menor".
-   */
-  it('🔴 duplicar CONSERVA el color (de tela y de avío) y el desglose por medida', async () => {
-    const telaColor = await cliente.telaColor.create({
-      data: { idTela: tela.id, nombre: 'Marino', precio: 90 },
-    });
-    const original = await crearOC(
-      sesion(PERM_ADMIN_OC),
-      {
-        ...encabezadoOc(),
-        idProveedor: proveedor.id,
-        lineas: [
-          { idTela: tela.id, idTelaColor: telaColor.id, cantidad: 5, precio: 10 },
-          lineaCierre(),
-        ],
-      },
-      bd(),
-    );
-
-    const copia = await duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd());
-    const deTela = copia.lineas.find((l) => l.idTela !== null);
-    const deAvio = copia.lineas.find((l) => l.idAvio !== null);
-    // 🔴 El valor que la pone roja: `null` — que es lo que devolvía antes de este arreglo.
-    expect(deTela?.idTelaColor).toBe(telaColor.id);
-    expect(deAvio?.idColorPrenda).toBe(colorRojo.id);
-    expect(deAvio?.colorAvio).toBe('Rojo');
-    expect(deAvio?.medidas.map((m) => m.etiqueta)).toEqual(['53 cm', '60 cm']);
-    expect(deAvio?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(deAvio?.cantidad);
   });
 });

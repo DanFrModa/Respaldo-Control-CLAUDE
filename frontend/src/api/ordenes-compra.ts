@@ -133,17 +133,6 @@ async function desautorizarOc(id: number, cuerpo: OrdenCompraDesautorizar): Prom
   return data;
 }
 
-/** Duplica una OC a un borrador nuevo (`POST /api/ordenes-compra/{id}/duplicar`, sin cuerpo). */
-async function duplicarOc(id: number): Promise<OrdenCompra> {
-  const { data, error } = await api.POST('/api/ordenes-compra/{id}/duplicar', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 // ── Hooks de lectura ────────────────────────────────────────────────────────────
 
 /** Lista OC con los filtros dados (mantiene la página previa al paginar/filtrar). */
@@ -256,15 +245,6 @@ export function useDesautorizarOc(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsDesautorizarOc) => desautorizarOc(id, cuerpo),
     onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
-  });
-}
-
-/** Duplica una OC a un borrador nuevo e invalida la lista. */
-export function useDuplicarOc(): UseMutationResult<OrdenCompra, ErrorDeApi, number> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: duplicarOc,
-    onSuccess: () => invalidar(queryClient),
   });
 }
 

@@ -577,10 +577,10 @@ export function PanelRecetaOrden({
             <DialogTitle>Abrir la receta para corregirla</DialogTitle>
             <DialogDescription>
               Mientras esté abierta <strong>no se podrá comprar nada de esta orden</strong>: ni
-              explotar el MRP, ni generar, capturar, duplicar o autorizar órdenes de compra. Las
-              firmas de Desarrollo <strong>se conservan</strong>, así que al terminar sólo hay que
-              volver a firmar los renglones que hayas tocado. Las órdenes de compra ya autorizadas
-              no se tocan, y cortar y producir siguen sin bloquearse.
+              explotar el MRP, ni generar, capturar o autorizar órdenes de compra. Las firmas de
+              Desarrollo <strong>se conservan</strong>, así que al terminar sólo hay que volver a
+              firmar los renglones que hayas tocado. Las órdenes de compra ya autorizadas no se
+              tocan, y cortar y producir siguen sin bloquearse.
             </DialogDescription>
           </DialogHeader>
           {/* ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **EL AVISO LLEGA ANTES DE CONFIRMAR.**

@@ -3,20 +3,19 @@
  * (telas/avíos) a un proveedor (doc `Documentacion_MJD/03-Produccion.md` §OC; ex `OrdCompra`/
  * `OrdCompraDet`). CRUD de la `OrdenCompra` + sus líneas (`OrdenCompraLinea`) con su matriz
  * opcional talla×color (`OrdenCompraLineaTalla`, decisión (c)) + sus órdenes de producción
- * ligadas (`OrdenCompraOrden`, derivadas de las líneas). Autorización, cancelación suave y
- * duplicado a un borrador nuevo.
+ * ligadas (`OrdenCompraOrden`, derivadas de las líneas). Autorización y cancelación suave.
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica vive aquí; las rutas solo validan permiso + Zod y delegan.
  *  • A2 — encabezado + líneas + matriz + ligas N:N en UNA transacción (`enTransaccion`): crear/
- *    editar/autorizar/cancelar/duplicar son atómicos.
+ *    editar/autorizar/cancelar son atómicos.
  *  • A3/A9 — el folio `numCompra` sale de la secuencia atómica `"orden-compra"` POR EMPRESA
  *    (`siguienteFolio`); NUNCA `Max()+1`. El folio es por empresa de la sesión activa.
  *  • A4 — permisos verificados aquí (defensa en profundidad): `compras.ver`/`.administrar`/
  *    `.cancelar`/`.autorizar`. Editar una OC YA autorizada exige su llave propia,
  *    `compras.editar-autorizada` (fila 0.120).
  *  • A7 — auditoría uniforme: `creadoPorId`/`modificadoPorId` + `Bitacora` en la misma tx (la OC
- *    es entidad crítica: alta, edición, autorización, cancelación y duplicado quedan registrados).
+ *    es entidad crítica: alta, edición, autorización y cancelación quedan registradas).
  *  • A9 — todo se filtra/sella por `idEmpresa` de la sesión activa (una OC de otra empresa, para
  *    esta sesión, no existe).
  *  • D1 — el `precio` de cada línea es el precio ACTUAL (unitario) que se guarda en la línea.
@@ -26,8 +25,10 @@
  * DECISIONES DE NEGOCIO (DECISIONES.md §"Decisiones de diseño F4"):
  *  • (a) Una OC AUTORIZADA (o más allá) queda BLOQUEADA salvo con `compras.editar-autorizada`
  *    (llave propia desde la fila 0.120; antes se preguntaba por `roles.administrar` «como marcador
- *    de admin»), registrando cada cambio en Bitácora. `duplicarOC` (para todos) copia la
- *    OC a una nueva en `borrador` para ajustar sin recapturar; la copia sigue su propio ciclo.
+ *    de admin»), registrando cada cambio en Bitácora. La segunda mitad de esta decisión —«duplicar
+ *    a una OC nueva para ajustar sin recapturar»— se RETIRÓ por petición de DANIEL (23-sep-2026):
+ *    *"no debería de existir… casi siempre va ligada a una OP, está raro que haya dos OC
+ *    idénticas"*. Una compra nueva se captura en «Nueva orden de compra».
  *  • (c) Sin Excel: el renglón que lo requiera lleva matriz talla×color NATIVA; la suma de la
  *    matriz = la `cantidad` del renglón (se valida). Renglones que no la usen = cantidad simple.
  */
@@ -195,7 +196,7 @@ const incluirDetalle = {
 
 /**
  * Busca una OC de la EMPRESA ACTIVA por id, o lanza `ErrorNoEncontrado` (una OC de otra empresa,
- * para esta sesión, no existe — A9). La usan obtener/editar/autorizar/cancelar/duplicar.
+ * para esta sesión, no existe — A9). La usan obtener/editar/autorizar/cancelar.
  */
 async function exigirOC(tx: Tx, id: number, idEmpresa: number): Promise<OrdenCompra> {
   const oc = await tx.ordenCompra.findFirst({ where: { id, idEmpresa } });
@@ -1258,7 +1259,7 @@ export async function autorizarOC(
  *  • Una OC que no está `autorizada` (borrador, pendiente o cancelada) — no hay sello que quitar.
  *
  * **A dónde vuelve: `borrador`.** No es un capricho: es el estatus con el que NACEN todas las OC
- * (`crearOC`/`duplicarOC`/la explosión MRP) y el ÚNICO que en la práctica precede a la firma
+ * (`crearOC`/la explosión MRP) y el ÚNICO que en la práctica precede a la firma
  * —`pendiente_autorizacion` no lo escribe nada en todo el sistema, y por eso la bandeja de
  * autorización pide `borrador`—. Así la OC des-autorizada reaparece exactamente donde estaba antes
  * de firmarse, lista para corregirse y volver a autorizarse.
@@ -1412,208 +1413,6 @@ export async function cancelarOC(
 }
 
 /**
- * ⭐⭐ **V1-E4f (§Post-F9.103) — POR QUÉ ESTA OC NO SE PUEDE DUPLICAR, o `null` si sí.**
- *
- * Daniel: *"tiene que tener fecha de entrega a fuerzas"*, y la decisión lo dice sin rodeos: **sin
- * fecha de entrega no se genera la OC**. El alta manual y la explosión ya lo cumplían —el contrato
- * exige la fecha en `crearOC`, y `planearCompra` devuelve la falta como bloqueo—, pero **duplicar
- * era la puerta que quedaba abierta**: copiaba `fechaEntrega` tal cual, así que duplicar una de las
- * 7,978 OC migradas sin fecha **paría hoy una OC nueva sin fecha**. Y una OC nueva sin fecha no es
- * histórico: es un documento que nace mudo sobre el *cuándo*.
- *
- * ⚠️ **Esto NO toca a la OC vieja** (decisión (e): las existentes se quedan como están, la regla es
- * prospectiva). Sólo impide que su defecto se propague a una nueva — y dice el camino: *"si una
- * vieja se edita, ahí sí se pide"*, o sea capturarle la fecha al original y volver a duplicar.
- *
- * 🔴 **Y POR ESO EL MENSAJE MIRA EL ESTATUS.** El camino que ofrece —*captúrasela al original*— está
- * CERRADO para buena parte de las que lo necesitan: el ETL les hereda el estatus que traían del
- * sistema viejo —`cancelada` > `autorizada` > `borrador`, ver `estatusOCMigrada` en el loader—, y
- * sobre una OC que ya no está en {@link ESTATUS_EDITABLES_NORMAL} sólo puede editar quien tenga
- * `compras.editar-autorizada`. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del
- * volcado no están aquí.)
- * Mandar al comprador por una puerta cerrada es **peor** que no ofrecerle ninguna: da la vuelta
- * completa para toparse con otro "no", y el sistema acaba echándole la culpa de algo que no lo dejó
- * hacer. Cuando el original ya no es editable, el mensaje lo dice — nombrando la FACULTAD y no un
- * rol (fila 0.120), porque la llave puede llevarla alguien que no administra nada más.
- *
- * 🔴🔴 **Y HAY UN TERCER CASO, QUE ESTA FUNCIÓN LLEGÓ A MENTIR (hallazgo del reviewer, V1-E4f).**
- * La `cancelada` NO la edita nadie —**tampoco quien tenga `compras.editar-autorizada`**—: en
- * `actualizarOC` la línea
- * *"La orden de compra está cancelada; no se puede modificar"* rechaza ANTES de mirar quién eres, y
- * `cancelada` es terminal (el dominio no des-cancela). Prometerle ahí a alguien que pueda manda al
- * comprador por la MISMA puerta cerrada que este mensaje existe para evitar — y no es teórico: el
- * ETL produce canceladas en su PRIMERA rama y les escribe `fechaEntrega: null` con el CSV en blanco,
- * y `duplicarOC` no tiene guarda de estatus, así que *"rehacer esa compra que se canceló"* es un
- * flujo legítimo.
- *
- * ⚠️ **La RAÍZ del defecto, escrita para que no se repita:** en `actualizarOC` el predicado
- * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo con la llave se edita"* **ÚNICAMENTE
- * porque la línea de arriba ya sacó `cancelada` del camino**. Aquí se copió el predicado **sin la
- * guarda que lo hacía cierto**: no eran dos listas parecidas, era la MISMA lista despojada de su
- * guarda. Por eso `cancelada` se mira **primero y aparte**, igual que allá.
- *
- * ⚠️ **A propósito se mira el ESTATUS y no la sesión** (no se consulta `puedeEditarOcAutorizada`
- * aquí): con el estatus basta para decir la verdad, y así la función sigue siendo pura y sin base de
- * datos. Que quien SÍ tiene la llave lea "la tiene que hacer alguien con permiso para editar
- * órdenes ya autorizadas" es inofensivo; que un comprador NO lo lea es el callejón sin salida.
- *
- * Pura y exportada para que una prueba unitaria pueda verla sin base de datos.
- */
-export function motivoNoDuplicarOc(origen: {
-  fechaEntrega: Date | null;
-  estatus: string;
-}): string | null {
-  if (origen.fechaEntrega !== null) return null;
-  const falta =
-    'Esta orden de compra no tiene fecha de entrega, y toda orden de compra nueva la necesita. ';
-  // 🔴 Primero la cancelada, EXACTAMENTE como en `actualizarOC`: a ésta no la corrige nadie, así que
-  // el único camino que de verdad existe es capturar la orden nueva a mano.
-  if (origen.estatus === 'cancelada') {
-    return (
-      falta +
-      'Ésta ya está cancelada, y una orden cancelada ya no se modifica: su fecha no se puede ' +
-      'capturar. Levanta la compra en Compras › Nueva orden de compra, con su fecha de entrega.'
-    );
-  }
-  // 🔴 Fila 0.120: el mensaje nombra la FACULTAD, no un rol. Decía «la tiene que hacer un
-  // administrador», y desde que editar una OC firmada tiene llave propia eso es falso —y falso
-  // justo en el escenario para el que se hizo la fila: que la llave la lleve alguien que NO es
-  // administrador. Mandar al comprador a buscar «un administrador» sería mandarlo a la persona
-  // equivocada.
-  const pideLaLlaveDeEditarFirmada = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
-  return (
-    falta +
-    'Captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla.' +
-    (pideLaLlaveDeEditarFirmada
-      ? ` Como esta orden ya no está en captura (${origen.estatus}), esa captura la tiene que ` +
-        `hacer alguien con permiso para editar órdenes de compra ya autorizadas.`
-      : '')
-  );
-}
-
-/**
- * Duplica una OC a una NUEVA en estado `borrador` con folio nuevo (decisión (a) — "Duplicar a
- * nueva OC", para todos): copia el encabezado y las líneas (con su matriz), SIN datos de
- * autorización/cancelación; la copia sigue su propio ciclo. La OC origen debe ser de la empresa
- * activa (A9). Bitácora CREAR con el dato de origen. Devuelve la OC nueva. Permiso
- * `compras.administrar`.
- *
- * ⭐ V1-E4f (§Post-F9.103): la copia es una OC NUEVA, así que **necesita fecha de entrega**; si el
- * original no la trae, se rechaza diciendo cómo arreglarlo ({@link motivoNoDuplicarOc}).
- */
-export async function duplicarOC(
-  sesion: SesionUsuario,
-  id: number,
-  bd?: ContextoBd,
-): Promise<CompraSalida> {
-  verificarPermiso(sesion, 'compras.administrar');
-
-  const idNueva = await enTransaccion(async (tx) => {
-    const origen = await tx.ordenCompra.findFirst({
-      where: { id, idEmpresa: sesion.idEmpresaActiva },
-      // ⭐⭐ V1-E8c: la copia arrastra también el desglose por medida (y el color, ver abajo).
-      include: { lineas: { include: { tallas: true, medidas: true }, orderBy: { id: 'asc' } } },
-    });
-    if (origen === null) {
-      throw new ErrorNoEncontrado('OrdenCompra', id);
-    }
-    const motivo = motivoNoDuplicarOc(origen);
-    if (motivo !== null) {
-      throw new ErrorValidacion(motivo);
-    }
-    // ⭐⭐ V1-E8z — EL CANDADO, también por aquí. Duplicar es capturar una OC nueva contra la misma
-    // orden de producción, sólo que copiando: si la receta de esa orden está abierta para
-    // corregirse, su compra está congelada y esta copia no puede nacer.
-    //
-    // 🔴 Y de paso queda dicho lo que se encontró al pasar (deuda PREVIA, no de esta etapa): esta
-    // función NO llama a `validarLineas`, así que se salta las DOS puertas de la firma
-    // (`exigirRecetaLiberada` / `exigirMaterialesLiberados`) que sí cobra la captura a mano. Aquí
-    // sólo se cierra el candado de V1-E8z; cerrar el hueco de la firma es una decisión aparte,
-    // anotada para el lead.
-    await exigirComprasNoCongeladas(
-      tx,
-      origen.lineas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),
-      sesion.idEmpresaActiva,
-    );
-
-    const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
-
-    const nueva = await tx.ordenCompra.create({
-      data: {
-        numCompra: folio,
-        idEmpresa: sesion.idEmpresaActiva,
-        idProveedor: origen.idProveedor,
-        // La copia es una OC NUEVA: se emite HOY (§Post-F9.18), no el día de la original. La fecha
-        // de entrega y la dirección sí se arrastran (es el mismo pedido, capturado de nuevo) — y la
-        // fecha ya no puede ser nula: se verificó arriba (§Post-F9.103).
-        //
-        // ⭐ 0.179: y ese «hoy» es el de MÉXICO, igual que el del alta. Duplicar es capturar una OC
-        // nueva, así que le toca exactamente la misma regla — si aquí quedara el día UTC, duplicar
-        // por la tarde seguiría emitiendo con fecha de mañana.
-        fecha: hoyDelNegocioUtc(),
-        fechaEntrega: origen.fechaEntrega,
-        idDireccionEntrega: origen.idDireccionEntrega,
-        entregaEn: origen.entregaEn,
-        observaciones: origen.observaciones,
-        correspondeA: origen.correspondeA,
-        estatus: 'borrador',
-        ...datosCreacion(sesion),
-      },
-    });
-
-    // Copia las líneas (con su matriz) como un set de entrada nuevo, reusando crearLineas.
-    const lineas: DatosCompraLineaEntrada[] = origen.lineas.map((l) => ({
-      idTela: l.idTela,
-      idAvio: l.idAvio,
-      idAvioProveedor: l.idAvioProveedor,
-      // 🔴 **V1-E8c — Y AQUÍ FALTABA EL COLOR DE LA TELA.** No es de esta etapa: V1-E3u le dio color
-      // a la línea de OC y esta copia se quedó sin arrastrarlo, así que duplicar una OC devolvía una
-      // compra "de la misma tela" pero SIN TONO — el dato que la recepción cruza. Se arregla al
-      // pasar (un defecto conocido no es "menor"), junto con los tres campos nuevos.
-      idTelaColor: l.idTelaColor,
-      idColorPrenda: l.idColorPrenda,
-      colorAvio: l.colorAvio,
-      medidas: l.medidas.map((m) => ({
-        idAvioMedida: m.idAvioMedida,
-        etiqueta: m.etiqueta,
-        cantidad: m.cantidad.toNumber(),
-        orden: m.orden,
-      })),
-      cantidad: l.cantidad.toNumber(),
-      unidad: l.unidad,
-      precio: l.precio.toNumber(),
-      cantidadComplemento: l.cantidadComplemento?.toNumber() ?? null,
-      precioComplemento: l.precioComplemento?.toNumber() ?? null,
-      idOrden: l.idOrden,
-      descripcionLibre: l.descripcionLibre,
-      tallas: l.tallas.map((t) => ({
-        idColor: t.idColor,
-        idTalla: t.idTalla,
-        cantidad: t.cantidad,
-      })),
-    }));
-    await crearLineas(tx, sesion, nueva.id, lineas);
-    const idsOrden = new Set(
-      origen.lineas.map((l) => l.idOrden).filter((x): x is number => x != null),
-    );
-    await sincronizarOrdenesLigadas(tx, sesion, nueva.id, idsOrden);
-
-    await registrarBitacora(tx, sesion, {
-      entidad: 'OrdenCompra',
-      idEntidad: nueva.id,
-      accion: 'CREAR',
-      datos: { numCompra: Number(folio), duplicadaDe: id, renglones: lineas.length },
-    });
-
-    return nueva.id;
-  }, bd);
-
-  // ⭐ Fila 0.197: el ECO va por `proyectarOC` (sin reja de consulta). Con `obtenerOC`, quien
-  // tiene la llave de escribir y no la de ver recibía un 403 con la OC YA escrita.
-  return proyectarOC(sesion, idNueva, bd);
-}
-
-/**
  * Obtiene una OC (con todo su detalle) de la empresa activa, o lanza `ErrorNoEncontrado`.
  *
  * Es la CONSULTA suelta: quien no lleve `compras.ver` no la obtiene. El ECO de una escritura propia
@@ -1639,7 +1438,7 @@ export async function obtenerOC(
  * DESPUÉS del commit es lo que producía el defecto de esta fila: la OC se guardaba y el usuario
  * recibía un 403, o sea el sistema informando mal sobre su propio estado.
  *
- * 🔴 **Y aquí muerde el doble:** `crearOC`/`duplicarOC` estampan folio por secuencia atómica (A3,
+ * 🔴 **Y aquí muerde el doble:** `crearOC` estampa folio por secuencia atómica (A3,
  * irrepetible) ⇒ reintentar —lo natural al leer «no tienes permiso»— dejaba una SEGUNDA OC; y
  * `autorizarOC`/`desautorizarOC`/`cancelarOC` dejan su evento de outbox `oc-tela-resuelta` en la
  * MISMA transacción y publican ANTES de esta proyección ⇒ el 403 llegaba con el cambio de estado
