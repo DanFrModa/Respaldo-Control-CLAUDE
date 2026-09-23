@@ -71,6 +71,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.178 · 23-sep-2026 · **en prueba** — **Queda escrito que ninguna prenda debe salir del almacén sin una factura o una remisión, y qué tan lejos está eso de lo que ya hay**
+
+> **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca inventarios, ni
+> producción, ni finanzas. Escribe **una regla de negocio que dijo Daniel** y la convierte en un
+> pendiente con número, para que no se quede en una conversación. Está aquí porque **cada entrega
+> sube de versión**.
+>
+> 📌 **La v0.178 no cierra ninguna fila del programa**, porque no construye nada: **abre una** (la
+> **0.211**) y escribe la decisión que la funda. *Esta frase no es adorno: el verificador de
+> documentos la exige literal.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Lo que cambia es que una regla que sólo existía en la cabeza de Daniel
+  ya está escrita donde se toman las decisiones, con sus palabras y sin resumir.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Preguntaste cómo sale la mercancía del almacén, y la respuesta tiene dos mitades.** La entrega
+  al cliente **no está atada a ninguna factura ni a ninguna remisión**: eso es cierto y se comprobó.
+  Pero **no es verdad que salir del almacén y facturar sean mundos separados** — el estado de
+  resultados **ya arma las ventas del mes a partir de las entregas**. ⚠️ Eso sí: **no se actualiza
+  solo**. Si cancelas una entrega y **vuelves a generar** el estado de resultados de ese mes, la venta
+  que colgaba de ella desaparece — **salvo que alguien ya le hubiera escrito a mano el importe
+  facturado**, en cuyo caso se queda.
+- ⚠️ **Y la factura sí vive dentro del sistema, aunque se haga fuera.** Las facturas de venta **se
+  importan a CONTROL**, se revisan, se amarran al cliente y a su pedido, y generan la cuenta por
+  cobrar. Lo que todavía no se hace aquí es **emitirlas**.
+- **El papel de la entrega también existe ya.** La entrega **imprime un comprobante** con cliente,
+  modelo, orden, tallas, fecha y folio. Lo que falta no es el papel: es que ese papel sea **una
+  remisión con valor**.
+- **Y el cruce «entregaste 500, facturaste 300» existe a medias.** Se hace **una vez al mes y por
+  orden**, proponiendo desde las entregas, y **el importe facturado se teclea a mano**. Lo que no hay
+  es el cruce documento por documento.
+- 🔴 **Hay que decirlo claro: la primera versión de este texto afirmaba tres cosas que eran falsas** y
+  las presentaba como medidas. La revisión independiente las tumbó una por una y se reescribieron.
+  Queda anotado **cómo se metió el error**, porque es el mismo tropiezo que ya nos costó otra vez:
+  se dio por revisada una carpeta que resultó ser **de otra cosa**.
+
+### Qué sigue pendiente o roto
+
+- ⏸️ **El pendiente queda para la etapa de finanzas, como lo pidió Daniel** — pero por un motivo
+  distinto del que se escribió primero. **No** es que la factura esté fuera del sistema. Es que hoy
+  **la entrega cuelga de la orden de producción y la factura cuelga del pedido**, y las dos se
+  emparejan **por parecido de importe**, no por una liga firme. Mientras esa cadena no esté cerrada,
+  cualquier cruce fino hereda esa adivinanza — y cerrarla es justamente trabajo de finanzas.
+- ⏳ **Queda UNA pregunta abierta para Daniel, y es la que puede adelantarlo todo: ¿cada cuánto salen
+  muestras?** De los tres casos que él nombró, **las muestras son el único sin puerta propia**: salen
+  como un movimiento manual que **pide un motivo escrito, pero no guarda a quién se le dieron** en un
+  campo que después se pueda consultar. Si eso pasa cada semana, esa media pieza se adelanta y se hace
+  antes de arrancar; si pasa de vez en cuando, espera con el resto.
+- **No se duplicó lo que ya estaba.** La venta de sobrantes y segundas al saldero ya tenía su propio
+  pendiente con diseño aprobado desde el 4 de septiembre; esta regla **lo enmarca** en vez de
+  repetirlo.
+
 ## 0.177 · 19-sep-2026 · **en prueba** — **Diez referencias entre documentos mandaban a leer el renglón equivocado**
 
 > **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca catálogos, ni
