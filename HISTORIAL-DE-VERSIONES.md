@@ -92,8 +92,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - ⭐ **Preguntaste cómo sale la mercancía del almacén, y la respuesta tiene dos mitades.** La entrega
   al cliente **no está atada a ninguna factura ni a ninguna remisión**: eso es cierto y se comprobó.
   Pero **no es verdad que salir del almacén y facturar sean mundos separados** — el estado de
-  resultados **ya arma las ventas del mes a partir de las entregas**, y si cancelas una entrega, la
-  venta que colgaba de ella **se borra sola**.
+  resultados **ya arma las ventas del mes a partir de las entregas**. ⚠️ Eso sí: **no se actualiza
+  solo**. Si cancelas una entrega y **vuelves a generar** el estado de resultados de ese mes, la venta
+  que colgaba de ella desaparece — **salvo que alguien ya le hubiera escrito a mano el importe
+  facturado**, en cuyo caso se queda.
 - ⚠️ **Y la factura sí vive dentro del sistema, aunque se haga fuera.** Las facturas de venta **se
   importan a CONTROL**, se revisan, se amarran al cliente y a su pedido, y generan la cuenta por
   cobrar. Lo que todavía no se hace aquí es **emitirlas**.
