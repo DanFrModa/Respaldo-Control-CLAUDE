@@ -16096,16 +16096,14 @@ fundar una recomendación equivocada en (e).
 #### (Post-F9.236) — NINGUNA PRENDA SALE DEL ALMACÉN SIN UN DOCUMENTO QUE LA AMPARE
 
 **Cómo salió.** El 23-sep-2026, preparando su repaso de Inventarios (fila **0.096**), Daniel preguntó
-cómo se hace hoy la salida de producto terminado: *«la salida es mediante una entrega… ¿con una
-factura?, o cómo se hace la salida?»*. El lead **midió** y le contestó que la entrega **no lleva
-factura**: `dominio/produccion/entregas-cliente.ts` no menciona factura, CFDI ni remisión en ninguna
-línea, y **no existe ninguna liga desde Finanzas hacia la entrega** (barrido en `dominio/finanzas/`:
-cero ocurrencias de `entregaCliente`). Daniel respondió con una regla de negocio:
+cómo se hace hoy la salida de producto terminado: *«la salida es mediante una entrega.... con una
+factura?, o como se hace la salida?»*. El lead midió, le contestó, y **se equivocó en la mitad de la
+respuesta** (ver el recuadro del final). Daniel respondió con una regla de negocio:
 
 > *«Siempre deberíamos de sacar mercancía del almacén mediante **una factura o una remisión**
 > (saldero, o algún otro cliente, o muestras).»*
 
-Y con su encuadre de cuándo: *«déjala anotada para la etapa que incluya la parte de finanzas»*.
+Y con su encuadre de cuándo: *«dejala anotada para la etapa que incluya la parte de finanzas»*.
 
 **Qué DECIDE.** Toda salida de producto terminado nace amparada por un documento. No es un campo
 nuevo en la entrega: es que **el acto de sacar mercancía exige decir qué papel la respalda y a nombre
@@ -16114,18 +16112,22 @@ entrega normal de producción.
 
 ---
 
-**LO QUE YA EXISTE, medido antes de recomendar (y corrige la primera reacción del lead).**
+**LO QUE YA EXISTE, medido pieza por pieza** *(cuadro corregido tras el rechazo del reviewer; la
+primera versión declaraba «no existe» tres cosas que sí existen)*.
 
 | Pieza | Estado medido |
 |---|---|
-| El papel que acompaña la mercancía | ✅ **EXISTE**: `impresos/impreso-entrega-cliente.ts` — PDF con cliente, modelo, matriz color×talla, fecha y folio |
-| La salida del kardex con validación no-negativo | ✅ **EXISTE**, estricta y bajo bloqueo por artículo |
-| El concepto de **remisión** del lado de VENTAS | 🔴 **NO EXISTE** — la palabra sólo vive en compras (entrada de tela por factura/remisión del proveedor) |
-| Salida de PT para **muestras** | 🔴 **NO EXISTE** ninguna puerta: hoy sólo cabe como movimiento manual, que no registra a nombre de quién salió |
-| Cruce **entregado vs. facturado** | 🔴 **NO EXISTE** |
+| El papel que acompaña la mercancía | ✅ **EXISTE**: `impresos/impreso-entrega-cliente.ts` — PDF con cliente, modelo, orden, matriz color×talla, fecha y folio |
+| La salida del kardex con validación no-negativo | ✅ **EXISTE**, estricta y bajo bloqueo por artículo (`movimientos-pt.ts`) |
+| Factura de venta dentro de CONTROL | ✅ **EXISTE, IMPORTADA**: `terceros/cfdi/cfdi-ventas.ts` jala el XML ya timbrado por fuera (SINUBE u otro), lo valida, lo concilia con cliente y pedido, lo guarda en R2 y **crea el cargo fiscal de CxC**. Lo que NO existe es la **emisión** (R14/PAC, posterior) |
+| Alguna relación entrega ↔ venta | ✅ **EXISTE, y es viva**: `edr/edr.ts:112` construye las ventas del mes leyendo `etapa_movimiento WHERE tipo = 'entrega_cliente'`, **pre-propone las líneas desde las entregas**, y `edr.ts:260` re-sincroniza y borra las huérfanas cuando una entrega se cancela |
+| La **entrega en sí** atada a un comprobante | 🔴 **NO**: `produccion/entregas-cliente.ts` no menciona factura, CFDI ni remisión en **ninguna** de sus 823 líneas |
+| El concepto de **remisión** del lado de VENTAS | 🔴 **NO EXISTE** — la palabra sólo vive del lado del **proveedor** (entrada de tela, pagos a maquileros, cargo de entrada). Cero ocurrencias en ventas |
+| Salida de PT para **muestras** | 🔴 **NO EXISTE** puerta propia: cabe como movimiento manual, que **sí exige motivo** (3-500 caracteres) pero **no tiene destinatario estructurado** — el dato viaja en el texto, no en una FK |
+| Cruce **entregado vs. facturado** | 🔶 **PARCIAL Y MANUAL**: el EDR lo hace **mensual y por orden**, proponiendo desde las entregas y dejando que el usuario **teclee a mano** el importe realmente facturado (`edr.ts:724`). No existe **por documento ni atado al CFDI** |
 
-⇒ **No falta el papel: falta que el papel sea un documento con valor y que se cruce con la factura.**
-Decirlo así evita fundar la fila sobre un hueco que no existe.
+⇒ **No falta el papel ni falta la factura: falta que el papel sea un documento con valor y que la
+atadura sea POR DOCUMENTO en vez de mensual y tecleada.**
 
 ---
 
@@ -16148,32 +16150,63 @@ que es precisamente lo que el negocio no hace.
 | Merma / ajuste | nadie | Motivo + autorización | Nada |
 
 **3. ⭐ Hacer a la salida lo que YA se hace a la entrada.** Es el argumento más fuerte y es medido: el
-lado de COMPRAS ya resuelve exactamente este problema — `entradas-tela.ts` es *«entrada por
-FACTURA/REMISIÓN del proveedor»*, exige que **cada renglón diga qué renglón de OC surte**
-(§Post-F9.159(a)) y **hace nacer el cargo de CxP desde el propio documento**. El lado de VENTAS no tiene
-nada de eso. ⇒ **la simetría ya está diseñada y probada en este repo; falta espejarla**, no inventarla.
+lado del PROVEEDOR ya resuelve este problema — `entradas-tela.ts` es *«entrada por FACTURA/REMISIÓN
+del proveedor»*, exige que **cada renglón diga qué renglón de OC surte** (§Post-F9.159(a)) y **hace
+nacer el cargo de CxP desde el propio documento**. El lado del CLIENTE no tiene nada de eso ⇒ **la
+simetría ya está diseñada y probada en este repo; falta espejarla**, no inventarla.
 
-**4. El cruce que da el valor de verdad:** *«entregaste 500 y facturaste 300»*. Es el gemelo de ventas
-del cotejo que CxP ya hace en compras.
+**4. Cerrar el ancla, que es donde de verdad se rompe.** Hoy la **entrega cuelga de la ORDEN**
+(`edr.ts` agrega por `idOrden`) y el **CFDI cuelga del PEDIDO** (`cfdi-ventas.ts:175`, `idPedido`),
+y la liga CFDI↔pedido es **heurística**: se concilia *por total cercano*, con hasta 8 candidatos y un
+umbral de aviso del 0.5% (`cfdi-ventas.ts:53-57`). Mientras `orden ↔ pedido ↔ CFDI` no sea una cadena
+firme, cualquier cruce fino de *entregado vs. facturado* hereda esa heurística.
 
 ---
 
-**POR QUÉ NO ES PARA YA (recomendación §7.5: ⏸️ post-V1, alineada con lo que pidió Daniel).**
+**POR QUÉ NO ES PARA YA (recomendación §7.5: ⏸️ post-V1, como pidió Daniel).**
 
-🔑 **La razón buena no es «no es frecuente»: es que hoy la factura NO VIVE EN CONTROL.** Se sigue
-haciendo en SINUBE, y el timbrado propio vía PAC es **R14**, posterior. Un cruce *entregado vs.
-facturado* construido hoy tendría que atarse a un sistema que está de salida ⇒ se construiría dos
-veces. Por eso «la etapa que incluya la parte de finanzas» —las palabras de Daniel— **es además el
-momento técnicamente correcto**, no sólo el que él prefiere.
+🔑 **La razón buena, corregida.** La primera versión de esta decisión decía *«hoy la factura no vive
+en CONTROL, sigue en SINUBE»* — **y es falso**: `cfdi-ventas.ts` la importa, la valida, la liga a un
+cliente y a un pedido y le crea el cargo de CxC. Lo que no vive aquí es la **emisión**, y esa capa de
+importación está hecha a propósito para ser **agnóstica de quién timbra** ⇒ cambiar SINUBE por un PAC
+(R14) no la toca, así que el argumento de *«se construiría dos veces»* no se sostiene.
+
+**La razón que SÍ se sostiene es el punto 4 de arriba:** el ancla `orden ↔ pedido ↔ CFDI` no está
+cerrada, y el importe facturado del EDR se teclea a mano. Construir hoy el cruce por documento
+significaría **cerrar antes esa cadena**, que es trabajo de la capa de finanzas — exactamente «la
+etapa que incluya la parte de finanzas» que nombró Daniel. Su preferencia y el orden técnico
+coinciden, pero **por este motivo, no por el que se escribió primero**.
 
 ⚠️ **LO ÚNICO QUE PODRÍA NO AGUANTAR, y se PREGUNTA en vez de suponerse** (`CLAUDE.md` §7.5: *cuando la
 clasificación depende de con qué frecuencia pasa en el negocio, eso se pregunta*): **las muestras**.
-Es el único caso de los tres sin ninguna puerta hoy — sale como movimiento manual, que **no deja
-registro de a quién se le dio**. Si salen muestras cada semana, esa media pieza sube a *«duele»* y se
-hace antes del arranque; si salen de vez en cuando, espera con el resto. **Pendiente de la respuesta
-de Daniel.**
+Es el único de los tres casos sin puerta propia — sale como movimiento manual, que exige motivo pero
+**no deja destinatario estructurado**, así que no se puede consultar *a quién se le dio*. Si salen
+muestras cada semana, esa media pieza sube a *«duele»* y se hace antes del arranque; si salen de vez
+en cuando, espera con el resto. **Pendiente de la respuesta de Daniel.**
 
 📌 **Relación con la fila 0.130** (venta de sobrantes y segundas, diseño ya aprobado por él el
 4-sep): **no se duplica, se enmarca.** La 0.130 es *un caso* —el saldero— de la regla general que esta
 decisión establece; cuando se construya, su código entra en el mismo conjunto de códigos reservados
 que exige la 0.104.
+
+---
+
+> ### ⚠️ CÓMO NACIÓ EL ERROR — un barrido de TRES archivos presentado como «el barrido de Finanzas»
+>
+> El lead afirmó, en los tres documentos, que *«no existe ninguna liga desde Finanzas hacia la
+> entrega»*, y lo respaldó con *«barrido en `dominio/finanzas/`: cero ocurrencias de
+> `entregaCliente`»*. **El grep decía la verdad; la conclusión era falsa**, por dos fallos encadenados:
+>
+> 1. **`dominio/finanzas/` tiene TRES archivos** (`correccion-comun.ts` + dos pruebas), ayudantes de la
+>    *corrección de un movimiento sin factura* (fila 0.145). **No es el módulo de finanzas.** CxC, CxP
+>    y CFDI viven en `dominio/terceros/`; los pagos en `dominio/pagos/`; el estado de resultados en
+>    `dominio/edr/`. Se barrió una carpeta por su nombre, no por su contenido.
+> 2. **El EDR liga por la cadena SQL `'entrega_cliente'`, no por el identificador `entregaCliente`** ⇒
+>    aunque se hubiera barrido `edr/`, ese grep habría salido vacío igual.
+>
+> 🔑 **Es la fila 0.208 otra vez: una afirmación que se llama a sí misma «medida».** La lección
+> operativa, para que no vuelva: **antes de barrer una carpeta, cuenta cuántos archivos tiene** — si
+> son tres y esperabas un módulo, estás barriendo otra cosa; y **busca también la forma que usa la base
+> de datos** (`snake_case` entre comillas), no sólo el identificador del código.
+>
+> *(Lo cazó el reviewer independiente de la v0.178, que rechazó la primera versión entera.)*
