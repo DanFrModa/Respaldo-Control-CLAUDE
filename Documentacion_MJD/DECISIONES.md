@@ -16090,3 +16090,90 @@ midiendo** (un `sort` sobre códigos de ejemplo), no argumentando.
 la casa.** Se buscó `duplicar|clonar|copiarModelo` y se concluyó que no existía función de copiar
 modelo. **Existe: se llama «copiar receta»** (`copiarBom`). Esa falsa ausencia estuvo a punto de
 fundar una recomendación equivocada en (e).
+
+---
+
+#### (Post-F9.236) — NINGUNA PRENDA SALE DEL ALMACÉN SIN UN DOCUMENTO QUE LA AMPARE
+
+**Cómo salió.** El 23-sep-2026, preparando su repaso de Inventarios (fila **0.096**), Daniel preguntó
+cómo se hace hoy la salida de producto terminado: *«la salida es mediante una entrega… ¿con una
+factura?, o cómo se hace la salida?»*. El lead **midió** y le contestó que la entrega **no lleva
+factura**: `dominio/produccion/entregas-cliente.ts` no menciona factura, CFDI ni remisión en ninguna
+línea, y **no existe ninguna liga desde Finanzas hacia la entrega** (barrido en `dominio/finanzas/`:
+cero ocurrencias de `entregaCliente`). Daniel respondió con una regla de negocio:
+
+> *«Siempre deberíamos de sacar mercancía del almacén mediante **una factura o una remisión**
+> (saldero, o algún otro cliente, o muestras).»*
+
+Y con su encuadre de cuándo: *«déjala anotada para la etapa que incluya la parte de finanzas»*.
+
+**Qué DECIDE.** Toda salida de producto terminado nace amparada por un documento. No es un campo
+nuevo en la entrega: es que **el acto de sacar mercancía exige decir qué papel la respalda y a nombre
+de quién sale**. Cubre los tres casos que él nombró —saldero, otro cliente, muestras— además de la
+entrega normal de producción.
+
+---
+
+**LO QUE YA EXISTE, medido antes de recomendar (y corrige la primera reacción del lead).**
+
+| Pieza | Estado medido |
+|---|---|
+| El papel que acompaña la mercancía | ✅ **EXISTE**: `impresos/impreso-entrega-cliente.ts` — PDF con cliente, modelo, matriz color×talla, fecha y folio |
+| La salida del kardex con validación no-negativo | ✅ **EXISTE**, estricta y bajo bloqueo por artículo |
+| El concepto de **remisión** del lado de VENTAS | 🔴 **NO EXISTE** — la palabra sólo vive en compras (entrada de tela por factura/remisión del proveedor) |
+| Salida de PT para **muestras** | 🔴 **NO EXISTE** ninguna puerta: hoy sólo cabe como movimiento manual, que no registra a nombre de quién salió |
+| Cruce **entregado vs. facturado** | 🔴 **NO EXISTE** |
+
+⇒ **No falta el papel: falta que el papel sea un documento con valor y que se cruce con la factura.**
+Decirlo así evita fundar la fila sobre un hueco que no existe.
+
+---
+
+**LA RECOMENDACIÓN DEL LEAD (lo que Daniel pidió por su nombre).**
+
+**1. Separar dos cosas que se confunden y no son la misma.** El documento que ampara la **salida
+física** (remisión / nota de entrega, sale con el camión) y el **comprobante fiscal** (factura, CFDI)
+son documentos distintos que **casi nunca ocurren el mismo día**: la mercancía sale con remisión y se
+factura después, o sale ya facturada. Modelarlos como uno solo obliga a facturar para poder embarcar,
+que es precisamente lo que el negocio no hace.
+
+**2. Que la salida nazca con su TIPO, y el tipo diga qué la ampara.**
+
+| Tipo de salida | A nombre de | Qué la ampara | Qué toca en Finanzas |
+|---|---|---|---|
+| Entrega de producción | cliente con pedido | **Remisión** al salir → factura después | CxC al facturar |
+| Venta directa / saldero | cliente ocasional | Remisión o factura, según se venda | CxC si queda a deber (fila **0.130**) |
+| **Muestras** | cliente, showroom, interno | **Remisión sin valor comercial** | Nada, o cargo a gasto |
+| Traspaso | almacén propio | El traspaso, que ya tiene folio | Nada |
+| Merma / ajuste | nadie | Motivo + autorización | Nada |
+
+**3. ⭐ Hacer a la salida lo que YA se hace a la entrada.** Es el argumento más fuerte y es medido: el
+lado de COMPRAS ya resuelve exactamente este problema — `entradas-tela.ts` es *«entrada por
+FACTURA/REMISIÓN del proveedor»*, exige que **cada renglón diga qué renglón de OC surte**
+(§Post-F9.159(a)) y **hace nacer el cargo de CxP desde el propio documento**. El lado de VENTAS no tiene
+nada de eso. ⇒ **la simetría ya está diseñada y probada en este repo; falta espejarla**, no inventarla.
+
+**4. El cruce que da el valor de verdad:** *«entregaste 500 y facturaste 300»*. Es el gemelo de ventas
+del cotejo que CxP ya hace en compras.
+
+---
+
+**POR QUÉ NO ES PARA YA (recomendación §7.5: ⏸️ post-V1, alineada con lo que pidió Daniel).**
+
+🔑 **La razón buena no es «no es frecuente»: es que hoy la factura NO VIVE EN CONTROL.** Se sigue
+haciendo en SINUBE, y el timbrado propio vía PAC es **R14**, posterior. Un cruce *entregado vs.
+facturado* construido hoy tendría que atarse a un sistema que está de salida ⇒ se construiría dos
+veces. Por eso «la etapa que incluya la parte de finanzas» —las palabras de Daniel— **es además el
+momento técnicamente correcto**, no sólo el que él prefiere.
+
+⚠️ **LO ÚNICO QUE PODRÍA NO AGUANTAR, y se PREGUNTA en vez de suponerse** (`CLAUDE.md` §7.5: *cuando la
+clasificación depende de con qué frecuencia pasa en el negocio, eso se pregunta*): **las muestras**.
+Es el único caso de los tres sin ninguna puerta hoy — sale como movimiento manual, que **no deja
+registro de a quién se le dio**. Si salen muestras cada semana, esa media pieza sube a *«duele»* y se
+hace antes del arranque; si salen de vez en cuando, espera con el resto. **Pendiente de la respuesta
+de Daniel.**
+
+📌 **Relación con la fila 0.130** (venta de sobrantes y segundas, diseño ya aprobado por él el
+4-sep): **no se duplica, se enmarca.** La 0.130 es *un caso* —el saldero— de la regla general que esta
+decisión establece; cuando se construya, su código entra en el mismo conjunto de códigos reservados
+que exige la 0.104.

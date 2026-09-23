@@ -71,6 +71,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.178 · 23-sep-2026 · **en prueba** — **Queda escrito que ninguna prenda debe salir del almacén sin una factura o una remisión, y por qué eso todavía no se puede construir**
+
+> **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca inventarios, ni
+> producción, ni finanzas. Escribe **una regla de negocio que dijo Daniel** y la convierte en un
+> pendiente con número, para que no se quede en una conversación. Está aquí porque **cada entrega
+> sube de versión**.
+>
+> 📌 **La v0.178 no cierra ninguna fila del programa**, porque no construye nada: **abre una** (la
+> **0.211**) y escribe la decisión que la funda. *Esta frase no es adorno: el verificador de
+> documentos la exige literal.*
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en pantalla.** Lo que cambia es que una regla que sólo existía en la cabeza de Daniel
+  ya está escrita donde se toman las decisiones.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Preguntaste cómo sale la mercancía del almacén y la respuesta medida fue: sin factura.** La
+  entrega a cliente descuenta el inventario correctamente, pero **no está atada a ningún comprobante**,
+  y **facturar y sacar mercancía son hoy dos mundos que no se tocan** — se comprobó que desde finanzas
+  no hay ni una sola referencia a la entrega. De ahí salió tu regla: *«siempre deberíamos de sacar
+  mercancía del almacén mediante una factura o una remisión (saldero, o algún otro cliente, o
+  muestras)»*.
+- ⚠️ **Pero el papel sí existe, y decirlo cambia el tamaño del pendiente.** La entrega **ya imprime un
+  comprobante** con cliente, modelo, tallas, fecha y folio. Lo que falta no es el papel: es que ese
+  papel sea **una remisión con valor** y que después se pueda cruzar contra la factura para saber
+  *«entregaste 500 y facturaste 300»*.
+- **Y el diseño no hay que inventarlo: ya está hecho del otro lado.** Cuando *entra* tela, el sistema
+  exige la factura o remisión del proveedor, obliga a decir qué renglón de la orden surte cada
+  renglón, y de ahí nace solita la cuenta por pagar. **A la salida no hay nada de eso.** O sea que es
+  copiar un mecanismo que ya funciona, no diseñar uno nuevo.
+
+### Qué sigue pendiente o roto
+
+- ⏸️ **El pendiente queda para la etapa de finanzas, como lo pidió Daniel** — y hay una razón técnica
+  que coincide con su preferencia: **hoy la factura no vive en CONTROL**, sigue haciéndose en SINUBE.
+  Cruzar entregas contra facturas ahora obligaría a amarrarse a un sistema que está de salida, y
+  habría que construirlo dos veces.
+- ⏳ **Queda UNA pregunta abierta para Daniel, y es la que puede adelantarlo todo: ¿cada cuánto salen
+  muestras?** De los tres casos que él nombró, **las muestras son el único que hoy no tiene ninguna
+  puerta**: salen como un movimiento manual que **no deja registro de a quién se le dieron**. Si eso
+  pasa cada semana, esa media pieza se adelanta y se hace antes de arrancar; si pasa de vez en cuando,
+  espera con el resto.
+- **No se duplicó lo que ya estaba.** La venta de sobrantes y segundas al saldero ya tenía su propio
+  pendiente con diseño aprobado desde el 4 de septiembre; esta regla **lo enmarca** en vez de
+  repetirlo.
+
 ## 0.177 · 19-sep-2026 · **en prueba** — **Diez referencias entre documentos mandaban a leer el renglón equivocado**
 
 > **Esta versión no cambia nada de lo que ves ni de lo que puedes hacer.** No toca catálogos, ni
