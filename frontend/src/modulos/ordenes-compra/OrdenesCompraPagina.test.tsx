@@ -11,7 +11,6 @@ import { ocDePrueba } from './fixtures';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const autorizarMutate = vi.fn();
-const duplicarMutate = vi.fn();
 const useOrdenesCompraMock = vi.fn();
 // Resumen de cabecera (KPIs): cada test lo puede POBLAR; default = vacío.
 let resumenOc: { data: { ocAbiertas: number; porRecibir: number } | undefined };
@@ -20,7 +19,6 @@ vi.mock('@/api/ordenes-compra', () => ({
   useOrdenesCompra: (q: unknown) => useOrdenesCompraMock(q) as unknown,
   useResumenOc: () => resumenOc,
   useAutorizarOc: () => ({ mutate: autorizarMutate, isPending: false }),
-  useDuplicarOc: () => ({ mutate: duplicarMutate, isPending: false }),
   imprimirOc: vi.fn(),
 }));
 
@@ -42,6 +40,21 @@ vi.mock('@/api/proveedores', () => ({
   },
 }));
 
+// ⭐ El cajón de detalle consulta lo YA RECIBIDO por renglón (23-sep-2026). Se mockea para que la
+// prueba no toque la red; `pendientesOc` lo puebla cada caso que lo mida.
+let pendientesOc: {
+  data: unknown[] | undefined;
+  isPending: boolean;
+  isError: boolean;
+};
+const useLineasPendientesMock = vi.fn();
+vi.mock('@/api/recepciones', () => ({
+  useLineasPendientesDeOc: (id: number | undefined) => {
+    useLineasPendientesMock(id);
+    return pendientesOc;
+  },
+}));
+
 // El botón "Dar entrada a la tela" navega (§Post-F9.15): se espía la navegación.
 const { navegar } = vi.hoisted(() => ({ navegar: vi.fn() }));
 vi.mock('react-router-dom', async () => {
@@ -56,7 +69,7 @@ vi.mock('./DialogoDesautorizarOc', () => ({ DialogoDesautorizarOc: () => null })
 
 /**
  * Una OC en la lista. El default es **borrador**: es el estatus con el que nacen TODAS las OC
- * (alta, duplicado y explosión MRP). El fixture decía `pendiente_autorizacion` — un estatus que
+ * (alta y explosión MRP). El fixture decía `pendiente_autorizacion` — un estatus que
  * NADA escribe jamás — y por eso estas pruebas nunca vieron que ninguna OC nueva se podía
  * autorizar.
  */
@@ -78,10 +91,11 @@ function paginaConUna(estatus: ReturnType<typeof ocDePrueba>['estatus'] = 'borra
 describe('OrdenesCompraPagina (F4-E2)', () => {
   beforeEach(() => {
     autorizarMutate.mockReset();
-    duplicarMutate.mockReset();
     useOrdenesCompraMock.mockReset();
     navegar.mockReset();
+    useLineasPendientesMock.mockReset();
     resumenOc = { data: { ocAbiertas: 0, porRecibir: 0 } };
+    pendientesOc = { data: [], isPending: false, isError: false };
   });
 
   it('lista las OC y muestra su folio, proveedor y total', () => {
@@ -148,7 +162,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
 
   /**
    * LA PRUEBA QUE FIJA EL FLUJO: una OC recién creada (borrador) se puede autorizar. Es el bloqueo
-   * que tuvo muerta la cadena de compras — `crearOC`/`duplicarOC`/la explosión MRP dejan la OC en
+   * que tuvo muerta la cadena de compras — `crearOC`/la explosión MRP dejan la OC en
    * `borrador` y la pantalla sólo ofrecía autorizar desde `pendiente_autorizacion`, que nada
    * escribe. Si alguien vuelve a atar el botón a ese estatus, esto se pone rojo.
    */
@@ -220,6 +234,90 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     const detalle = screen.getByTestId('detalle-oc');
     expect(within(detalle).getByTestId('editar-oc')).toBeInTheDocument();
     expect(within(detalle).queryByTestId('ver-oc')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⛔ **EL BOTÓN «DUPLICAR» YA NO EXISTE** (DANIEL, 23-sep-2026: *"quita el botón"*). No se escondió:
+   * el endpoint y su servicio de dominio se retiraron enteros, porque la copia arrastraba el
+   * `idOrden` de cada renglón y ese borrador volvía a contar como «ya comprado» en la explosión MRP
+   * de esa orden de producción — en silencio.
+   *
+   * Se mide con `compras.administrar`, que era EXACTAMENTE la llave que lo mostraba: sin ese
+   * permiso la ausencia sería trivial y esta prueba no diría nada.
+   */
+  it('⛔ el detalle ya NO ofrece «Duplicar», ni con `compras.administrar`', () => {
+    paginaConUna('autorizada');
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba([
+        'compras.ver',
+        'compras.administrar',
+        'compras.editar-autorizada',
+      ]),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    const detalle = screen.getByTestId('detalle-oc');
+    // El resto de acciones de administrar sigue ahí: lo que se fue es SOLO duplicar.
+    expect(within(detalle).getByTestId('editar-oc')).toBeInTheDocument();
+    expect(within(detalle).queryByTestId('duplicar-oc')).not.toBeInTheDocument();
+    expect(within(detalle).queryByRole('button', { name: /duplicar/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ **LO QUE YA LLEGÓ Y LO QUE FALTA, POR RENGLÓN** (DANIEL, 23-sep-2026). Lo que aquí se fija no
+   * es el pintado (eso lo mide `DetalleRenglonesOc.test.tsx`) sino **a quién se le pregunta y
+   * cuándo**: sólo a los estatus donde puede haber recepciones, y con el id de ESA OC.
+   */
+  describe('⭐ el avance de recepción se consulta sólo donde puede haberlo', () => {
+    it.each(['autorizada', 'recibida_parcial', 'recibida_total'] as const)(
+      'en %s se pide el pendiente de esa OC y la tabla trae las columnas',
+      (estatus) => {
+        paginaConUna(estatus);
+        pendientesOc = {
+          data: [
+            {
+              idOrdenCompraLinea: 10,
+              tipo: 'tela',
+              cantidad: 100,
+              recibido: 60,
+              pendiente: 40,
+              cantidadComplemento: null,
+              recibidoComplemento: 0,
+              pendienteComplemento: 0,
+              surtido: false,
+            },
+          ],
+          isPending: false,
+          isError: false,
+        };
+        renderConProveedores(<OrdenesCompraPagina />, {
+          sesion: estadoSesionDePrueba(['compras.ver']),
+        });
+        fireEvent.click(screen.getByTestId('fila-oc'));
+
+        expect(useLineasPendientesMock).toHaveBeenCalledWith(1);
+        const detalle = screen.getByTestId('detalle-oc');
+        expect(within(detalle).getByTestId('recibido-renglon-oc')).toHaveTextContent('60');
+        expect(within(detalle).getByTestId('falta-renglon-oc')).toHaveTextContent('40');
+      },
+    );
+
+    it.each(['borrador', 'pendiente_autorizacion', 'cancelada'] as const)(
+      '🔴 en %s NO se consulta nada (ahí el dominio garantiza que no hay recepciones activas)',
+      (estatus) => {
+        paginaConUna(estatus);
+        renderConProveedores(<OrdenesCompraPagina />, {
+          sesion: estadoSesionDePrueba(['compras.ver']),
+        });
+        fireEvent.click(screen.getByTestId('fila-oc'));
+
+        // El hook se llama igual (las reglas de los hooks no admiten condicionales), pero SIN id:
+        // así la consulta queda deshabilitada y no se gasta una llamada por cada cajón que se abre.
+        expect(useLineasPendientesMock).toHaveBeenCalledWith(undefined);
+        expect(useLineasPendientesMock).not.toHaveBeenCalledWith(1);
+        const detalle = screen.getByTestId('detalle-oc');
+        expect(within(detalle).queryByTestId('recibido-renglon-oc')).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe('§Post-F9.15 — dar entrada a la tela desde la OC', () => {

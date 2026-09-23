@@ -188,3 +188,183 @@ describe('DetalleRenglonesOc — V1-E8c: el color y el desglose por medida del a
     expect(screen.queryByTestId('medidas-detalle-oc')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ⭐ **LO QUE YA LLEGÓ Y LO QUE FALTA, POR RENGLÓN** (DANIEL, 23-sep-2026: *"estoy viendo las
+ * órdenes con recibo parcial; no veo dónde diga que ya se recibió y qué falta por recibir"*).
+ *
+ * 🔑 **Lo que estas pruebas fijan es que la pantalla NO CALCULA.** Los tres números —pedido,
+ * recibido, falta— y el veredicto `surtido` los sirve el dominio (`lineasPendientesDeOC`, el mismo
+ * que precarga la captura de la recepción y el mismo `faltantePorRecibir` del estatus y del KPI).
+ * Por eso el caso central manda un `pendiente` que **NO es** `cantidad − recibido`: si alguien
+ * sustituyera esto por una resta local, la prueba se pondría roja — que es justo lo que una prueba
+ * de «no dupliques el cálculo» tiene que hacer.
+ */
+describe('DetalleRenglonesOc — el avance de recepción por renglón (23-sep-2026)', () => {
+  /** Una OC de tela con complemento (Cardigan), para medir las dos mitades del renglón. */
+  function ocConComplemento() {
+    const base = ocDePrueba();
+    return {
+      ...base,
+      estatus: 'recibida_parcial' as const,
+      lineas: base.lineas.map((l) => ({
+        ...l,
+        nombreComplementoTela: 'Cardigan',
+        cantidadComplemento: 20,
+        precioComplemento: 30,
+      })),
+    };
+  }
+
+  /** El avance del renglón 10, con overrides por caso. */
+  function avance(over: Record<string, unknown> = {}) {
+    return [
+      {
+        idOrdenCompraLinea: 10,
+        tipo: 'tela' as const,
+        cantidad: 100,
+        recibido: 60,
+        pendiente: 40,
+        cantidadComplemento: null,
+        recibidoComplemento: 0,
+        pendienteComplemento: 0,
+        surtido: false,
+        ...over,
+      },
+    ];
+  }
+
+  it('sin `recepcion` la tabla queda EXACTAMENTE como estaba (ni columnas ni nota)', () => {
+    renderConProveedores(<DetalleRenglonesOc oc={ocDePrueba()} />);
+    expect(screen.queryByText('Recibido')).not.toBeInTheDocument();
+    expect(screen.queryByText('Falta')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('recibido-renglon-oc')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nota-banda-recepcion')).not.toBeInTheDocument();
+  });
+
+  it('🔴 pinta lo RECIBIDO y lo que FALTA tal como los manda el servidor (no los calcula)', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        // 🔴 `pendiente: 33` NO es `100 − 60`: es el número del dominio. Una resta local daría 40 y
+        // esta aserción se pondría roja — que es el punto.
+        recepcion={{ porLinea: avance({ pendiente: 33 }), cargando: false, error: false }}
+      />,
+    );
+    expect(screen.getByText('Recibido')).toBeInTheDocument();
+    expect(screen.getByTestId('recibido-renglon-oc')).toHaveTextContent('60');
+    expect(screen.getByTestId('falta-renglon-oc')).toHaveTextContent('33');
+    // Y lo PEDIDO sigue en su columna: los tres se leen juntos.
+    expect(screen.getByText('100')).toBeInTheDocument();
+  });
+
+  it('⭐ un renglón SURTIDO lo dice con letras, aunque lo recibido no cuadre exacto', () => {
+    // La banda de tolerancia vive en el dominio: 96 de 100 puede venir con `surtido: true`. La
+    // pantalla NO decide eso; lo obedece.
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        recepcion={{
+          porLinea: avance({ recibido: 96, pendiente: 0, surtido: true }),
+          cargando: false,
+          error: false,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('falta-renglon-oc')).toHaveTextContent('Ya surtido');
+    // Y se explica por qué un renglón puede estar surtido con menos de lo pedido.
+    expect(screen.getByTestId('nota-banda-recepcion')).toHaveTextContent('banda de tolerancia');
+  });
+
+  it('⭐ el COMPLEMENTO (Cardigan) trae su propio recibido/falta, pegado a su cantidad', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocConComplemento()}
+        recepcion={{
+          porLinea: avance({
+            cantidadComplemento: 20,
+            recibidoComplemento: 8,
+            pendienteComplemento: 12,
+          }),
+          cargando: false,
+          error: false,
+        }}
+      />,
+    );
+    const complemento = screen.getByTestId('complemento-detalle-oc');
+    expect(complemento).toHaveTextContent('recibido 8');
+    expect(complemento).toHaveTextContent('falta 12');
+  });
+
+  it('🔴 un complemento ANUNCIADO pero SIN cantidad capturada tampoco gana la coletilla', () => {
+    // El caso DE EN MEDIO, que es el que faltaba: no es «sin complemento» ni «complemento completo»,
+    // sino uno que existe por nombre y al que nadie le puso cantidad. Sin la sub-condición
+    // `cantidadComplemento !== null`, aquí se imprimiría «recibido 0 · falta 0» sobre algo que nadie
+    // pidió. Lo cazó el reviewer mutando la condición (quitándola, no rompiendo el camino feliz).
+    const base = ocDePrueba();
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={{
+          ...base,
+          estatus: 'recibida_parcial' as const,
+          lineas: base.lineas.map((l) => ({
+            ...l,
+            nombreComplementoTela: 'Cardigan',
+            cantidadComplemento: null,
+            precioComplemento: null,
+          })),
+        }}
+        recepcion={{ porLinea: avance(), cargando: false, error: false }}
+      />,
+    );
+    expect(screen.getByTestId('complemento-detalle-oc')).toHaveTextContent(
+      'falta capturar la cantidad',
+    );
+    expect(screen.queryByTestId('complemento-avance-oc')).not.toBeInTheDocument();
+  });
+
+  it('un renglón SIN complemento no gana esa coletilla', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        recepcion={{ porLinea: avance(), cargando: false, error: false }}
+      />,
+    );
+    expect(screen.queryByTestId('complemento-avance-oc')).not.toBeInTheDocument();
+  });
+
+  it('🔴 si la consulta FALLA se dice, y las celdas quedan en «—» (no se inventa una resta)', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        recepcion={{ porLinea: undefined, cargando: false, error: true }}
+      />,
+    );
+    expect(screen.getByTestId('avance-recepcion-error')).toHaveTextContent(
+      'No se pudo consultar lo ya recibido',
+    );
+    expect(screen.getByTestId('recibido-renglon-oc')).toHaveTextContent('—');
+    expect(screen.getByTestId('falta-renglon-oc')).toHaveTextContent('—');
+  });
+
+  it('mientras carga, las celdas dicen «…» y NO se anuncia ningún error', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        recepcion={{ porLinea: undefined, cargando: true, error: false }}
+      />,
+    );
+    expect(screen.getByTestId('recibido-renglon-oc')).toHaveTextContent('…');
+    expect(screen.queryByTestId('avance-recepcion-error')).not.toBeInTheDocument();
+  });
+
+  it('un renglón que el servidor no trae queda en «—», no en cero (no se sabe ≠ no llegó nada)', () => {
+    renderConProveedores(
+      <DetalleRenglonesOc
+        oc={ocDePrueba()}
+        recepcion={{ porLinea: [], cargando: false, error: false }}
+      />,
+    );
+    expect(screen.getByTestId('recibido-renglon-oc')).toHaveTextContent('—');
+  });
+});

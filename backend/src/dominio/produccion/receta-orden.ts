@@ -1526,7 +1526,7 @@ const DONDE_SE_CIERRA =
  *
  * QUÉ FRENA Y QUÉ NO:
  *  • **FRENA el GASTO**: explotar el MRP, la previa/generación de OC, la OC capturada a mano ligada
- *    a la orden, duplicarla y autorizarla. Todas pasan por aquí.
+ *    a la orden y autorizarla. Todas pasan por aquí.
  *  • **NO frena la LECTURA** (§Post-F9.165 punto 6): ver qué falta no cuesta dinero, así que el
  *    tablero «qué tengo / qué falta», la receta y el estatus de materiales se consultan igual.
  *  • **NO toca las OC ya autorizadas** (punto 5): se bloquean las NUEVAS. Des-autorizar sigue
@@ -1560,7 +1560,7 @@ export function exigirCompraNoCongelada(orden: {
 }
 
 /**
- * EL CANDADO, para quien NO carga la orden (duplicar y autorizar una OC): comprueba de una sola
+ * EL CANDADO, para quien NO carga la orden (autorizar una OC): comprueba de una sola
  * consulta que ninguna de las órdenes ligadas tenga la receta abierta.
  *
  * **A9**: filtra por empresa, así que una orden ajena sencillamente no se comprueba (y no se nombra:

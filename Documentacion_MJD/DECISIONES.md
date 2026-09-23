@@ -214,9 +214,9 @@ Estrategia de migración del histórico. Decisión de Gabriel, 2026-06-20. Detal
 
 Reglas de Órdenes de Compra, recepción, explosión MRP, notas de salida y migración de la fase. Cerradas con **Daniel** (dueño / experto del negocio), relayed por Gabriel, 2026-06-20. Detalle operativo en la ficha `docs/hoja-de-ruta/F4-etapas.md`.
 
-#### (a) — Edición de una OC autorizada: bloqueada salvo admin + "Duplicar a nueva OC" (E2)
-- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. La **puede editar quien tenga el permiso `compras.editar-autorizada`**, ⚠️ **(actualizado el 11-sep-2026, fila 0.120: hasta entonces esto decía «el administrador», porque la facultad colgaba de `roles.administrar` — el interruptor que esa fila desmontó)**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.
-- **Por qué:** preserva el rastro de auditoría (no se reescriben a la ligera documentos ya autorizados) y resuelve la necesidad real de "cambiar un detallito sin rehacer".
+#### (a) — Edición de una OC autorizada: bloqueada salvo admin + ~~"Duplicar a nueva OC"~~ (E2)
+- **Decisión:** una OC **autorizada** queda **bloqueada** para edición por usuarios normales. La **puede editar quien tenga el permiso `compras.editar-autorizada`**, ⚠️ **(actualizado el 11-sep-2026, fila 0.120: hasta entonces esto decía «el administrador», porque la facultad colgaba de `roles.administrar` — el interruptor que esa fila desmontó)**, y cada cambio se registra en `Bitacora` (A7: quién, cuándo, qué). ⛔ ~~Además existe una acción **"Duplicar a nueva OC"** (para todos) que copia la OC a una nueva en estado borrador para ajustar un detalle sin recapturarla; la copia sigue su propio ciclo de autorización.~~ **(RETIRADO el 23-sep-2026 a petición de Daniel — §Post-F9.237(a), fila 0.212: *«quita el botón»*. No era sólo de más: la copia arrastraba `idOrden`, nacía en `borrador`, y el borrador cuenta como «ya comprado», así que duplicar inflaba en silencio lo comprado de esa OP. La primera mitad de esta decisión —el bloqueo de la OC autorizada— sigue VIGENTE.)**
+- **Por qué:** preserva el rastro de auditoría (no se reescriben a la ligera documentos ya autorizados) y resuelve la necesidad real de "cambiar un detallito sin rehacer". ⛔ **(23-sep-2026, §Post-F9.237(a) — de estas DOS razones, la SEGUNDA es la que sostenía el duplicado, y Daniel dice que esa necesidad no es real: *«no es común duplicar una OC»*. Para «cambiar un detallito sin rehacer» en una OC ya firmada queda la llave `compras.editar-autorizada`. La PRIMERA razón —el rastro de auditoría— sigue VIGENTE y sostiene el bloqueo.)**
 - **Aplica en:** F4-E2.
 
 #### (b) — La recepción exige OC autorizada (E3)
@@ -16210,3 +16210,104 @@ que exige la 0.104.
 > de datos** (`snake_case` entre comillas), no sólo el identificador del código.
 >
 > *(Lo cazó el reviewer independiente de la v0.178, que rechazó la primera versión entera.)*
+
+---
+
+#### (Post-F9.237) — FUERA «DUPLICAR OC», Y LA ORDEN DICE LO QUE YA LLEGÓ (DANIEL, 23-sep-2026)
+
+**Cómo salió.** Daniel estaba haciendo su repaso de Inventarios (fila **0.096**) y las dos salieron
+de usar el sistema, no de un plan.
+
+---
+
+**(a) EL BOTÓN DE DUPLICAR. Textual:**
+
+> *«Hay un botón de duplicar en las OC. Que le da mucha relevancia... no debería de existir. **No es
+> común duplicar una OC**... y aparte **casi siempre va ligada a una OP**. Entonces como que está raro
+> que hayan dos OC idénticas. No sé quién tiene acceso a ese botón, pero creo que mejor lo
+> quitamos... o lo dejamos en algún otro lugar más oculto. Creo que no es necesario...»*
+
+Preguntado si esconderlo o retirarlo: **«Quita el botón.»**
+
+🔴 **SU INSTINTO SEÑALABA UN DEFECTO REAL, no una molestia estética — y la cadena está medida:**
+1. `duplicarOC` **copiaba `idOrden` en cada renglón** ⇒ la copia apuntaba a **la misma OP**.
+2. La copia **nacía en `borrador`**.
+3. `comprometido-en-oc.ts` cuenta **todas las OC menos la cancelada, y el `borrador` SÍ cuenta** — eso
+   es deliberado, es el corazón del arreglo de V1-E3q (§Post-F9.85).
+
+⇒ **Duplicar una OC ligada a una OP duplicaba al instante el «ya comprado» de esa OP, y la explosión
+dejaba de proponer comprar lo que sí falta. En silencio.** Es justo el criterio de *«el sistema da
+información equivocada que lleva a decisiones equivocadas (dinero, compras)»*.
+
+**Quién lo tenía:** medido sobre `definirRoles()` — **8 de los 9 perfiles**, todos menos `Basico`;
+entre ellos `Ventas`, `Asistente` y `Secretarial`.
+
+**De dónde salió el botón** ⚠️ *(corregido tras el rechazo del reviewer; la primera redacción decía
+«de nadie, cero decisiones lo piden» y **era falsa**)*: de la **segunda mitad de la decisión (a) de F4**
+(`DECISIONES.md:217`, 20-jun-2026, registrada como *cerrada con Daniel*), que lo nombra por su nombre.
+Lo que **sí** es cierto, y medido sobre las palabras del propio registro: **su *«Por qué»* son DOS
+razones** — *«preserva el rastro de auditoría»*, que sostiene el **bloqueo** y **sigue en pie**, y
+*«resuelve la necesidad real de cambiar un detallito sin rehacer»*, que es **de la que se colgó el
+duplicado**. Hoy el dueño del negocio dice que esa segunda necesidad no es real, así que **cae sólo esa
+mitad**. ⚠️ *(La primera redacción de esta corrección decía que el «Por qué» justificaba «sólo» el
+bloqueo — y el propio bullet la desmentía: tiene dos cláusulas. Corregido tras el rechazo del
+reviewer; es el mismo modo de fallo, cometido dentro de su propio arreglo.)* 🔑 **La
+lección del barrido fallido: se buscó `duplicar (una|la) (oc|orden de compra)` y el registro lo llamaba
+«Duplicar a nueva OC».** Un grep que no encuentra nada no prueba ausencia: prueba que no se adivinó el
+vocabulario — la misma cicatriz que la fila **0.210**.
+
+⚖️ **POR QUÉ SE RETIRA ENTERO Y NO SE ESCONDE.** Esconderlo deja el endpoint vivo y el defecto
+intacto para quien lo encuentre — y este repo ya tiene la fila **0.175** sobre que *una capacidad que
+existe y que nadie gobierna es una promesa que nadie cumple*. Retirarlo **cierra además un tercer
+agujero que el propio código tenía anotado**: `duplicarOC` no llamaba a `validarLineas`, así que se
+saltaba **las dos puertas de la firma de receta** que sí cobra la captura a mano.
+⚠️ **Matiz que corrigió el coder y conviene conservar:** `duplicarOC` **sí pasaba** por el candado
+V1-E8z (`exigirComprasNoCongeladas`); el hueco era **sólo** el de la firma. La primera versión de
+esta decisión daba a entender que eran dos candados abiertos, y era uno.
+
+**El permiso `compras.administrar` NO se retira** — crear y editar siguen vivos. Sí se corrige su
+**descripción**, que decía *«(y duplicarlas a un borrador nuevo)»* y habría quedado mintiendo en la
+pantalla de perfiles.
+
+---
+
+**(b) LO RECIBIDO Y LO QUE FALTA, EN LA PROPIA ORDEN. Textual:**
+
+> *«Estoy viendo las órdenes con recibo parcial. **No veo dónde diga que ya se recibió y qué falta
+> por recibir**.»*
+
+Se le explicó que ese detalle **sí existe, pero en `Compras › Recepción`**, y contestó:
+
+> *«**Estaría bien poder ver que es lo que se ha recibido**, siendo que existe la recepción parcial.»*
+
+**El estado que encontró, medido:** en `Compras › Órdenes` el avance lo comunicaba **sólo la palabra
+del estatus** (parcial/total) más un KPI de cabecera con un **total en dinero de todas las OC
+abiertas**. El código lo decía con esas palabras: *«la barra de avance de recepción por OC la comunica
+el estatus»*.
+
+⭐ **Y LO QUE HIZO BARATA LA ENTREGA: no se escribió ni una línea de cálculo nuevo.**
+`lineasPendientesDeOC` (`recepciones.ts:1745`) **ya existía**, ya pedía `compras.ver`, ya agrupaba
+**sólo recepciones activas** (`reversadaEn: null`) y ya llamaba a **`faltantePorRecibir`** con la banda
+de tolerancia que pidió Daniel (*«la cantidad que se recibe nunca va a coincidir exacto con la OC»*).
+Su ruta ya estaba publicada; la usaba **sólo** la recepción de avíos. Ahora la usa también el cajón de
+la orden. 🔑 **Una sola verdad sobre «cuánto llegó»**, que es la regla que dejó V1-E3q: *una segunda
+implementación del mismo cruce es una segunda verdad*.
+
+**Qué se ve:** por renglón, **pedido → recibido → falta**; «Ya surtido» cuando la banda lo da por
+cerrado; el complemento con su propio recibido/falta; y una **nota al pie que explica por qué un
+renglón puede decir «ya surtido» con menos de lo pedido** — sin ella, ese cero se lee como error de
+captura. Si la consulta falla **se dice**, y las celdas quedan en «—»: nunca una resta local, que
+daría un número distinto del estatus.
+
+📌 **Dónde NO se metió, con su razón:** no se embebió en el DTO de `listarOC`, porque eso costaría la
+agregación en **cada** listado aunque nadie abra un cajón. El endpoint dedicado ya existe y pide el
+mismo permiso.
+
+---
+
+⏳ **QUEDA ABIERTO, del mismo repaso:** al explicarle dónde vive el detalle, Daniel preguntó por el
+archivo de muestra de la factura y añadió *«aparte creo que deberíamos de subir el PDF pero también el
+XML»*. **El XML ya se sube y se sella** (§Post-F9.20, decisión suya del 7-ago) — pero **sólo durante
+la captura**: si la entrada se guarda sin él, no hay forma de aportarlo después, y queda archivado
+sólo el PDF, que es la foto y no el documento fiscal. **Pendiente de su respuesta a con qué frecuencia
+llega la mercancía antes que la factura**, que es lo que decide si eso bloquea o aguanta.

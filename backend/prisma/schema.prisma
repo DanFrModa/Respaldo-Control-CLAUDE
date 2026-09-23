@@ -3677,7 +3677,7 @@ model Orden {
   //    firma solo (`revocarFirmaDeRenglones`), y cerrar exige que no quede nada sin firmar.
 
   /// ⭐ CUÁNDO se reabrió la receta de esta orden para corregirla. **NO NULL = la compra de esta
-  /// orden está CONGELADA** (explotar el MRP, planear, generar OC, capturar/duplicar/autorizar una
+  /// orden está CONGELADA** (explotar el MRP, planear, generar OC, capturar/autorizar una
   /// OC ligada). NULL = cerrada, la compra se rige por la firma de cada renglón, como siempre.
   /// Cortar, enviar a maquila, recibir y entregar **NO se bloquean nunca**.
   recetaAbiertaEn     DateTime? @map("receta_abierta_en")

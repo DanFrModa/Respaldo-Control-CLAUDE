@@ -30,7 +30,6 @@ import {
   cancelarOC,
   crearOC,
   desautorizarOC,
-  duplicarOC,
   obtenerOC,
   proyectarOC,
 } from './compras/ordenes-compra.js';
@@ -79,7 +78,7 @@ import {
  * ⭐ Integración de «ESCRIBIR Y LUEGO NEGAR» en todo lo que deja RASTRO NUEVO (fila 0.197).
  *
  * Lo que aquí se mide es UNA frase: **lo que el sistema le contesta a quien escribe dice lo mismo
- * que lo que quedó escrito** — en los VEINTIÚN sitios de esta fila. Hasta aquí los veintiuno abrían
+ * que lo que quedó escrito** — en los VEINTE sitios de esta fila. Hasta aquí los veinte abrían
  * con SU permiso de escritura (`ordenes.administrar`/`.cancelar`, `compras.administrar`/
  * `.autorizar`/`.desautorizar`/`.cancelar`, `notas.administrar`/`.cancelar`,
  * `pedidos.administrar`, `pedidos-reales.administrar`, `esma.modificar`,
@@ -365,15 +364,6 @@ describe('El eco de las escrituras con folio (fila 0.197, grupo a)', () => {
     );
 
     expect(oc.numCompra).toBe(1);
-  });
-
-  it('`duplicarOC` contesta la copia sin `compras.ver`', async () => {
-    const idOriginal = await ocNueva();
-
-    const copia = await duplicarOC(sesion(ADMIN_OC), idOriginal, bd());
-
-    expect(copia.id).not.toBe(idOriginal);
-    expect(copia.numCompra).toBe(2);
   });
 
   it('`crearNotaSalida` contesta su nota sin `notas.ver`', async () => {

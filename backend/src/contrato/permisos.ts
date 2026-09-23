@@ -364,7 +364,7 @@ export const CATALOGO_PERMISOS = [
   {
     clave: 'compras.administrar',
     modulo: 'compras',
-    descripcion: 'Crear y editar órdenes de compra (y duplicarlas a un borrador nuevo)',
+    descripcion: 'Crear y editar órdenes de compra',
   },
   {
     clave: 'compras.cancelar',

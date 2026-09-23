@@ -16,14 +16,14 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
 ## Capas (A1 — lógica solo en dominio)
 
 - **Dominio** `backend/src/dominio/compras/`:
-  - `ordenes-compra.ts` — `crearOC` / `actualizarOC` / `autorizarOC` / `cancelarOC` / `duplicarOC` /
+  - `ordenes-compra.ts` — `crearOC` / `actualizarOC` / `autorizarOC` / `cancelarOC` /
     `obtenerOC` / `listarOC`. Folio `NumCompra` por **secuencia atómica por empresa** (A3, nunca
     `Max()+1`). Estatus como **enum** (`borrador` / `pendiente_autorizacion` / `autorizada` /
     `recibida_parcial` / `recibida_total` / `cancelada`). Autorización exige el permiso
     `compras.autorizar` (ex-acceso #8) y registra usuario+fecha en `Bitacora` (A7). OC autorizada
     **bloqueada** salvo con el permiso **`compras.editar-autorizada`** (decisión **(a)**; hasta la
     fila 0.120 esto se resolvía preguntando por `roles.administrar`, o sea que administrar roles
-    regalaba la capacidad de tocar una compra ya firmada) + "Duplicar a nueva OC". El `Totales` viejo NO se
+    regalaba la capacidad de tocar una compra ya firmada). ⛔ **«Duplicar a nueva OC» se RETIRÓ** (v0.179, fila 0.212: la copia arrastraba la liga a la OP y el borrador volvía a contar como «ya comprado»). El `Totales` viejo NO se
     almacena: es derivado de las líneas.
   - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`.
     - ⚠️ **Desde §Post-F9.14 (7-ago-2026) la TELA no se recibe por aquí:** `recibirCompra` rechaza
@@ -669,7 +669,7 @@ Seis reglas que el **dominio** impone (la UI solo ayuda; el servidor es la autor
 
 | Regla | Dónde vive | Nota |
 |---|---|---|
-| La **fecha de emisión** la pone el servidor (hoy) | `crearOC`/`duplicarOC` (`hoyColumna()`) | No viaja en ningún cuerpo de entrada. El histórico entra por `crearOCMigrada` y conserva la suya. |
+| La **fecha de emisión** la pone el servidor (hoy) | `crearOC` | No viaja en ningún cuerpo de entrada. El histórico entra por `crearOCMigrada` y conserva la suya. |
 | La **fecha de entrega** es obligatoria y no se vacía | `esquemaCompraCrear` (requerida) / `esquemaCompraEditarCuerpo` (opcional **no** nullable) | Las migradas sin fecha siguen editables. |
 | La **dirección de entrega** sale del catálogo | `DireccionEntrega` + `exigirDireccionEntregaValida` | Global (ADR-0007), favorita única, gobernada por `compras.*` (sin permisos propios). El texto se **copia** a `entregaEn` para impresos/consultas viejas. |
 | La **unidad** de un renglón de tela la manda la tela | `validarLineas` (normaliza con `ETIQUETA_UNIDAD_TELA`) | Ignora lo que venga en el cuerpo. En **avíos** sigue libre (presentación ≠ unidad de consumo, R1). |

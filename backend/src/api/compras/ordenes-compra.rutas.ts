@@ -4,7 +4,7 @@
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
- *     `compras.ver` para leer, `compras.administrar` para mutar/duplicar,
+ *     `compras.ver` para leer, `compras.administrar` para mutar,
  *     `compras.autorizar` para autorizar, `compras.desautorizar` para DES-autorizar (V1-E3y),
  *     `compras.cancelar` para cancelar.
  *  3. **Delega** a los servicios de dominio (`dominio/compras/ordenes-compra.ts`).
@@ -14,9 +14,13 @@
  * `PATCH /ordenes-compra/:id` (encabezado + líneas; el dominio exige `compras.editar-autorizada`
  * si la OC ya salió de borrador, fila 0.120),
  * `POST /ordenes-compra/:id/autorizar`, `POST /ordenes-compra/:id/desautorizar` (motivo obligatorio),
- * `POST /ordenes-compra/:id/cancelar` (motivo obligatorio),
- * `POST /ordenes-compra/:id/duplicar`. El impreso es binario (`application/pdf`); el frontend solo
- * abre el blob (los impresos del proyecto son server-side).
+ * `POST /ordenes-compra/:id/cancelar` (motivo obligatorio). El impreso es binario
+ * (`application/pdf`); el frontend solo abre el blob (los impresos del proyecto son server-side).
+ *
+ * ⛔ **`POST /ordenes-compra/:id/duplicar` se RETIRÓ** (DANIEL, 23-sep-2026: *"quita el botón"*).
+ * No quedó escondido: la ruta y su servicio de dominio ya no existen, porque copiar una OC
+ * arrastraba la liga a la orden de producción de cada renglón y ese borrador contaba de nuevo como
+ * «ya comprado» en la explosión MRP.
  *
  * CERO lógica de negocio o acceso a datos aquí; los errores de dominio los traduce el error
  * handler global (`src/api/errores.ts`).
@@ -47,7 +51,6 @@ import {
   cancelarOC,
   crearOC,
   desautorizarOC,
-  duplicarOC,
   listarOC,
   obtenerOC,
   resumenOC,
@@ -262,25 +265,6 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return cancelarOC(sesion, request.params.id, request.body);
-    },
-  });
-
-  // Duplicar a una nueva OC en borrador (para todos con administrar).
-  app.route({
-    method: 'POST',
-    url: '/ordenes-compra/:id/duplicar',
-    preHandler: app.conPermiso('compras.administrar'),
-    schema: {
-      tags: ['compras'],
-      summary: 'Duplicar una orden de compra a un borrador nuevo',
-      security: SEGURIDAD_SESION,
-      params: esquemaParamId,
-      response: { 201: esquemaCompraSalida, ...respuestasError },
-    },
-    handler: async (request, reply) => {
-      const sesion = await exigirSesion(() => request.obtenerSesion());
-      const oc = await duplicarOC(sesion, request.params.id);
-      return reply.code(201).send(oc);
     },
   });
 

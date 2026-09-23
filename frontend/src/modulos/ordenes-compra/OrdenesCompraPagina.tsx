@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Copy,
   CircleSlash2,
   Factory,
   FileText,
@@ -22,13 +21,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import {
-  imprimirOc,
-  useAutorizarOc,
-  useDuplicarOc,
-  useOrdenesCompra,
-  useResumenOc,
-} from '@/api/ordenes-compra';
+import { imprimirOc, useAutorizarOc, useOrdenesCompra, useResumenOc } from '@/api/ordenes-compra';
+import { useLineasPendientesDeOc } from '@/api/recepciones';
 import type {
   EstatusOrdenCompra,
   OrdenCompra,
@@ -55,7 +49,7 @@ import { cn } from '@/lib/utils';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
-import { DetalleRenglonesOc } from './DetalleRenglonesOc';
+import { DetalleRenglonesOc, type AvanceRecepcionOc } from './DetalleRenglonesOc';
 import { DialogoCancelarOc } from './DialogoCancelarOc';
 import { DialogoDesautorizarOc } from './DialogoDesautorizarOc';
 import { DialogoEditarOc } from './DialogoEditarOc';
@@ -101,7 +95,7 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * (make-to-order) con filtros arriba (proveedor, estatus, rango de fechas, búsqueda), tabla densa con
  * su estatus y órdenes de producción ligadas, barra de totales al pie (importe de la página) y un
  * CAJÓN de detalle al hacer clic (encabezado, renglones con su matriz talla×color, órdenes ligadas y
- * total DERIVADO). Crear/editar/duplicar exigen `compras.administrar`; autorizar `compras.autorizar`;
+ * total DERIVADO). Crear/editar exigen `compras.administrar`; autorizar `compras.autorizar`;
  * cancelar `compras.cancelar`; DES-autorizar `compras.desautorizar` (V1-E3y,
  * §Post-F9.79 — la marcha atrás de la firma, solo sobre una OC `autorizada`).
  * Las acciones se ocultan sin permiso; la decisión real la toma el
@@ -113,8 +107,10 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * MISMO criterio de `recibido` que la recepción; el monto se abrevia como el proto ($482 K → $151.3 M).
  * Los otros dos KPIs del proto (faltantes MRP · recibido
  * a tiempo) viven donde está su dato: el banner de faltantes en Explosión/Estatus de materiales; el
- * "a tiempo" es de Indicadores. La barra de avance de recepción por OC la comunica el estatus
- * (parcial/total). Nada se deriva/pivotea en cliente.
+ * "a tiempo" es de Indicadores. El avance de recepción, que el estatus sólo insinuaba con una
+ * palabra, se ve RENGLÓN POR RENGLÓN en el cajón de detalle desde el 23-sep-2026 (Daniel): lo
+ * pedido, lo ya recibido y lo que falta, servido por `lineas-pendientes` — el mismo cálculo que usa
+ * la captura de la recepción. Nada se deriva/pivotea en cliente.
  */
 export function OrdenesCompraPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -161,7 +157,6 @@ export function OrdenesCompraPagina(): React.JSX.Element {
 
   const consulta = useOrdenesCompra(query);
   const autorizar = useAutorizarOc();
-  const duplicar = useDuplicarOc();
 
   // Resumen de cabecera (KPIs): mismo universo por proveedor/fecha/búsqueda, pero SOLO OC abiertas
   // (el servidor fuerza `autorizada`/`recibida_parcial`); no toma estatus/incluir-canceladas.
@@ -202,16 +197,6 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   function autorizarOc(oc: OrdenCompra): void {
     autorizar.mutate(oc.id, {
       onSuccess: (guardada) => toast.success(`Orden de compra ${guardada.numCompra} autorizada.`),
-      onError: (error) => toast.error(error.message),
-    });
-  }
-
-  function duplicarOc(oc: OrdenCompra): void {
-    duplicar.mutate(oc.id, {
-      onSuccess: (nueva) => {
-        toast.success(`Orden de compra ${nueva.numCompra} creada (copia en borrador).`);
-        setPagina(1);
-      },
       onError: (error) => toast.error(error.message),
     });
   }
@@ -608,18 +593,6 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   Ver
                 </Button>
               ) : null}
-              {puedeAdministrar ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => duplicarOc(seleccion)}
-                  disabled={duplicar.isPending}
-                  data-testid="duplicar-oc"
-                >
-                  <Copy aria-hidden />
-                  Duplicar
-                </Button>
-              ) : null}
               {/* §Post-F9.15 (Daniel): "mejor recibir las telas a partir de las OC. La buscamos
                   ahí y damos la entrada desde allá". Abre la captura de la factura con el proveedor
                   fijo y el panel de lo que falta por recibir de ESTA orden. Solo aparece si la OC
@@ -654,8 +627,8 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   {motivoNoRecibirTela(seleccion)}
                 </p>
               )}
-              {/* AUTORIZAR desde BORRADOR: es el estatus con el que nacen TODAS las OC (`crearOC`,
-                  `duplicarOC` y la explosión MRP) y el dominio lo acepta desde siempre
+              {/* AUTORIZAR desde BORRADOR: es el estatus con el que nacen TODAS las OC (`crearOC`
+                  y la explosión MRP) y el dominio lo acepta desde siempre
                   (`ESTATUS_EDITABLES_NORMAL`). Pedir `pendiente_autorizacion` —que nada escribe
                   jamás— dejaba sin autorizar a toda OC nueva. Se sigue ofreciendo en
                   `pendiente_autorizacion` por si algún dato migrado quedara ahí. */}
@@ -745,8 +718,36 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   );
 }
 
+/**
+ * Estatus en los que la OC PUEDE tener material recibido. Fuera de ellos el dominio garantiza que no
+ * hay recepciones ACTIVAS —`cancelarOC` y `desautorizarOC` exigen reversarlas antes, y una OC en
+ * captura nunca las tuvo—, así que las columnas «Recibido / Falta» no dirían nada y sólo costarían
+ * una consulta. El tipo impide escribir aquí un estatus inexistente; que la lista sea la CORRECTA la
+ * fija la prueba de la pantalla, que recorre los seis estatus y exige consulta en estos tres y
+ * silencio en los otros.
+ */
+const ESTATUS_CON_RECEPCION: readonly EstatusOrdenCompra[] = [
+  'autorizada',
+  'recibida_parcial',
+  'recibida_total',
+];
+
 /** Panel de DETALLE de una OC: encabezado, renglones (con matriz), órdenes ligadas y total. */
 function DetalleOc({ oc }: { oc: OrdenCompra }): React.JSX.Element {
+  /**
+   * ⭐ LO YA RECIBIDO Y LO QUE FALTA, POR RENGLÓN (DANIEL, 23-sep-2026). Se REUSA el mismo servicio
+   * que precarga la captura de la recepción (`GET /api/ordenes-compra/{id}/lineas-pendientes`,
+   * permiso `compras.ver`, el mismo que ya hace falta para ver este detalle): el cálculo —con su
+   * banda de tolerancia— vive en el dominio (A1) y aquí sólo se pinta. Escribir una segunda resta
+   * en la pantalla habría sido una segunda verdad, que es como el detalle y el estatus acaban
+   * diciendo cosas distintas.
+   */
+  const conRecepcion = ESTATUS_CON_RECEPCION.includes(oc.estatus);
+  const pendientes = useLineasPendientesDeOc(conRecepcion ? oc.id : undefined);
+  const recepcion: AvanceRecepcionOc | undefined = conRecepcion
+    ? { porLinea: pendientes.data, cargando: pendientes.isPending, error: pendientes.isError }
+    : undefined;
+
   return (
     <>
       <SeccionDetalle titulo="Datos de la orden de compra" icono={ShoppingCart}>
@@ -783,7 +784,7 @@ function DetalleOc({ oc }: { oc: OrdenCompra }): React.JSX.Element {
       </SeccionDetalle>
 
       <SeccionDetalle titulo="Renglones" icono={ShoppingCart}>
-        <DetalleRenglonesOc oc={oc} />
+        <DetalleRenglonesOc oc={oc} recepcion={recepcion} />
       </SeccionDetalle>
 
       {oc.ordenesLigadas.length > 0 ? (

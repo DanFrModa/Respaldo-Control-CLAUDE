@@ -27,7 +27,6 @@ import {
   cancelarOC,
   crearOC,
   desautorizarOC,
-  duplicarOC,
 } from '../compras/ordenes-compra.js';
 import { obtenerCostoOrden } from '../costos/costo-orden.js';
 import { enTransaccion } from '../../comun/transaccion.js';
@@ -4137,14 +4136,9 @@ describe('⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a))', () => {
       expect(editada.lineas[0]?.idOrden ?? null).toBeNull();
     });
 
-    it('⭐ boca 6 (hallazgo) · DUPLICAR una OC ligada a la orden', async () => {
-      const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
-      await abrirReceta(sesion(), ordenA, { motivo: 'corrigiendo' }, bd());
-
-      const mensaje = await mensajeDe(duplicarOC(sesionCompra(), oc.id, bd()));
-      expect(mensaje).toContain('ABIERTA para corregirse');
-      expect(await cliente.ordenCompra.count()).toBe(1);
-    });
+    // ⛔ La que fue «boca 6» era DUPLICAR una OC ligada, y **ya no existe ninguna puerta ahí**:
+    // `duplicarOC` se retiró entero (DANIEL, 23-sep-2026). La numeración NO se recorre a propósito,
+    // para que quien algún día vuelva a traer el duplicado sepa que le tocaba pasar por el candado.
 
     it('⭐ boca 7 (hallazgo) · AUTORIZAR una OC ligada — el momento en que sale el dinero', async () => {
       const oc = await crearOC(sesionCompra(), await cuerpoOcPropio(idProveedor, ordenA), bd());
