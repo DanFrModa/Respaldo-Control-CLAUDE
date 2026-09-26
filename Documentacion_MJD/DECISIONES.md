@@ -16707,9 +16707,16 @@ creadas (una por PDF ligado)»*).
 🔑 **Y esto es exactamente la lectura (ii) que esta sección ofrecía como HIPÓTESIS** (*«se le quedó un PDF
 fuera de la misma tanda»*) para explicar por qué Daniel pidió esto el 7-sep. **No era una hipótesis sobre su
 memoria: es comportamiento de diseño**, a treinta segundos del archivo que ya se estaba midiendo. ⚠️ **La
-respuesta de Daniel NO lo cubre**, porque no es una OC nueva: es la misma tanda, incompleta. 📌 *El mecanismo
-`noReconocidos` no estaba documentado en ningún sitio* — aparece una sola vez en toda la documentación
-(`DECISIONES.md:14107`) y sólo como número de línea.
+respuesta de Daniel NO lo cubre**, porque no es una OC nueva: es la misma tanda, incompleta. 📌 **El mecanismo `noReconocidos` estaba documentado sólo de pasada**, y para **una** de las cuatro ramas:
+`docs/rediseno/PLAN-IMPLEMENTACION.md:227`, *«liga a inactivo → advertencia y `noReconocidos`, no revienta
+la tx»*. ⚠️⚠️ **Y esta frase merece su propio aviso, porque nació falsa y por un camino nuevo.** Decía *«no
+estaba documentado en ningún sitio — aparece una sola vez en toda la documentación y sólo como número de
+línea»*, y era **falso**: `grep -rc "noReconocidos" --include=*.md` da **tres archivos**, y el tercero
+documenta comportamiento. 🔑 **No la midió el lead: se la creyó.** La escribió **el reviewer** en su informe
+—midiéndola sobre dos archivos cuando su propio barrido anterior ya listaba el tercero— y entró a este
+documento **copiada, sin re-medir**. ⇒ **la afirmación de un reviewer no es evidencia: se mide antes de
+publicarla, igual que la de cualquiera.** Es la primera vez en esta tanda que una falsedad entra por ahí, y
+por eso queda escrita: el reviewer es la red que caza los errores del lead, **no una fuente de hechos**.
 
 ### ⚠️ Y contradice sus palabras del 7-sep, que siguen en pie para ESE caso
 
@@ -16739,9 +16746,14 @@ tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que
   (`terceros/cfdi/cfdi-ventas.ts:152-181`) compara el total de la factura contra la suma de las líneas de
   cada **pedido** ⇒ una factura que cubre **varias OC de un mismo pedido SÍ cuadra**. Lo que rompe la
   sugerencia es que la factura cruce **PEDIDOS (tandas)**, no OC. 🐛 **Y un agravante encontrado de paso:**
-  el candidato devuelve `ocCliente: pedido.ocCliente` (`:178`), que por `oc-duplicada.ts:18` es la
-  *referencia general de la tanda* ⇒ **la fila de candidato no muestra una OC**, aunque la columna se llame
-  así.
+  el candidato devuelve `ocCliente: pedido.ocCliente` (`:178`) y eso significa **dos cosas distintas según
+  por dónde entró el pedido**: en los nacidos del **importador de PDF** es *«la referencia general de la
+  TANDA (que puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no muestra una
+  OC**; en los capturados **a mano o por Excel** sí lo es —`schema.prisma:3244-3246` lo define como *«OC
+  ORIGINAL del cliente… captura VIVA y editable»* y la pantalla lo rotula *«OC del cliente (referencia)»*
+  (`ConstructorPedido.tsx:359`)—. ⚠️ **Se acota a propósito:** la primera versión de esta sección lo
+  generalizó a todos los pedidos, que es **la misma sobre-generalización** que este párrafo acaba de
+  corregir en la frase de al lado.
 
 ### ⏳ Las preguntas, corregidas (las primeras estaban mal planteadas)
 

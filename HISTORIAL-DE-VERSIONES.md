@@ -85,9 +85,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   compra del mismo pedido después de haber hecho las OP, y contestaste: **nunca** — *«en todo caso se genera
   un nuevo pedido con una nueva OC»*. Ese caso, por tanto, **no hay que construirlo**.
 - 🔴 **Pero al medirlo apareció el caso que sí pasa, y lo causa el sistema:** cuando subes varios PDF de
-  golpe, **los que no reconoce los deja fuera en silencio** —sin liga a un modelo, sin tallas, o ilegible—
-  y crea el pedido con el resto. Y cuando arreglas el que falló y lo vuelves a subir, **no hay manera de
-  meterlo en el pedido que ya hiciste**: nace otro. Es decir, **el sistema te parte en dos la misma tanda**.
+  golpe, **los que no reconoce los deja fuera** —sin liga a un modelo, sin tallas, o ilegible— y crea el
+  pedido con el resto. **Sí te avisa**: te dice cuántos quedaron fuera al terminar, y antes de confirmar te
+  explica que uno ilegible se queda fuera aunque ligues los demás. **El problema no es el aviso: es que
+  cuando arreglas el que falló y lo vuelves a subir, no hay manera de meterlo en el pedido que ya hiciste**
+  — nace otro. Es decir, **el sistema te parte en dos la misma tanda**.
 - ⭐ **Eso hace la ficha más pequeña y más clara:** ya no hace falta «añadir a un pedido con OP vivas
   semanas después». Basta con **poder terminar la tanda que quedó a medias**. Sigue clasificada como «duele
   pero se aguanta», y ahora es de las baratas.
@@ -110,8 +112,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   - **La conciliación de la factura de venta sí tiene un problema, pero no el que te dije.** Compara el
     total de la factura contra el total de cada **pedido**, así que una factura que cubre **varias órdenes
     de compra del mismo pedido sí cuadra**. Lo que la descuadra es que la factura cruce **pedidos**. Y de
-    paso: la columna que te muestra como «OC» del candidato **no es una orden de compra**, es la referencia
-    general de la tanda.
+    paso: en los pedidos que nacen del importador de PDF, la columna que te muestra como «OC» del candidato
+    **no es una orden de compra**, es la referencia general de la tanda. En los que capturas a mano sí lo
+    es.
 - 📌 **Lo anterior queda tachado en su sitio**, no sólo corregido aquí: quien lea la ficha o el documento
   del porqué se encuentra el aviso pegado a la frase equivocada.
 
@@ -222,7 +225,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Y dos cosas que esa misma ficha decía y estaban mal**, ya corregidas en la documentación: el rodeo que
   usa Daniel —meter cada OC en su propio pedido y juntarlas al comprar— **sí funciona entero para
   comprar**; pero tiene dos agujeros que él no ha pisado: **el informe de márgenes agrupa por pedido**
-  (así que da una línea por OC en vez de una por lote de negocio) y **la conciliación de la factura de
+  (así que da una línea por OC en vez de una por lote de negocio) ⚠️ **[RETIRADO al día siguiente, en la
+  v0.184: parte de «una OC por pedido», y eso es falso — un pedido es la TANDA, así que el informe agrupa
+  por tanda y queda INDETERMINADO hasta que Daniel diga si un lote le llega de una vez]** y **la
+  conciliación de la factura de
   venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
   total cuadra.
 - **La prueba se dejó a propósito SIN blindar.** Se podría hacer robusta con una espera extra, pero eso la
