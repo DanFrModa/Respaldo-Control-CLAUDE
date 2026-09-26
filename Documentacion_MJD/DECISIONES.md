@@ -16311,3 +16311,101 @@ XML»*. **El XML ya se sube y se sella** (§Post-F9.20, decisión suya del 7-ago
 la captura**: si la entrada se guarda sin él, no hay forma de aportarlo después, y queda archivado
 sólo el PDF, que es la foto y no el documento fiscal. **Pendiente de su respuesta a con qué frecuencia
 llega la mercancía antes que la factura**, que es lo que decide si eso bloquea o aguanta.
+
+---
+
+#### (Post-F9.238) — DANIEL APRUEBA LAS CINCO QUE «DUELEN», Y UNA PREGUNTA QUE DECIDE UNA SEXTA (26-sep-2026)
+
+**Cómo salió.** Daniel llevaba tres días sin poder hacer su repaso de Inventarios (fila **0.096**) y
+preguntó: *«¿Quieres seguir avanzando con los pendientes de la fase dos para ganar tiempo?»*.
+
+⚖️ **El lead recomendó NO hacer fase dos, y la razón es una frase suya:** fase dos es explícitamente
+post-arranque, así que construirla no acerca el arranque ni un día — y el 7-sep él mismo dijo *«ha de
+haber muchas cosas que no son indispensables y **están gastando tiempo**»*. Si el objetivo es ganar
+tiempo, se gasta en lo que frena. De las tres que bloquean, **dos son que él las mire y una la hace
+Gabriel**: ninguna es del lead. Lo que sí quedaba y sí se podía hacer eran **las cinco marcadas 🔶
+«duele pero se aguanta»** — que por definición *se hacen si sobra tiempo antes de arrancar*.
+
+**Su respuesta, textual:** *«Adelante. Está bien. Arranca con las 206.»*
+
+⇒ **Queda CONFIRMADA por Daniel la clasificación 🔶 de las cinco** (0.147, 0.169, 0.200, 0.205, 0.206).
+**CUATRO de ellas** —0.169, 0.200, 0.205 y 0.206— llevaban el *«⏳ pendiente de que Daniel lo
+confirme»* que pide `CLAUDE.md` §7.5, y hoy lo pierden. ⚠️ **La 0.147 NO lo llevaba:** nació el
+7-sep marcada 🔶 a secas (§Post-F9.207), así que su confirmación no retira ninguna marca — se
+anota aquí para que el recuento de las cinco cuadre, no porque cambie su fila. El orden
+recomendado —0.206 primero por ser la única que le pasa a su gente a diario, luego 0.205 y 0.200— lo
+aceptó sin cambios.
+
+---
+
+**(a) 🔴 LA 0.206 YA ESTABA CONSTRUIDA, Y POR QUÉ NADIE LO SABÍA.**
+
+El lead fue a medir el código antes de encargar nada y el defecto **estaba arreglado desde V1-E3i
+(v0.005, 19-ago-2026)**. `frontend/src/sesion/ProveedorSesion.tsx` lo lleva escrito en su cabecera —
+*«⭐ V1-E3i — UN PARPADEO DE RED NO ES UNA SESIÓN AUSENTE»*— y hoy `derivarEstadoSesion` distingue
+**cuatro** estados (`cargando` · `con-sesion` · `sin-sesion` · `indeterminado`): sólo el 401 real
+navega a `/login`, y `indeterminado` pinta una pantalla con botón **Reintentar** en vez de expulsar.
+Con red de pruebas en `ProveedorSesion.test.tsx` y `RutaProtegida.test.tsx`.
+
+🔑 **Por qué existía la fila, que es la lección:** nació el **17-sep** de partir en dos un bullet de
+deuda del §4 escrito el **19-ago** — el mismo día que el arreglo entró. El bullet describía el
+defecto, el arreglo llegó, **nadie retiró el bullet**, y un mes después se convirtió en fila
+**releyendo el bullet en vez de el código**. La fila dice «MEDIDO» y no lo estaba.
+
+⚠️ **Es la misma familia de error que tumbó cuatro veces la v0.179** («no existe», «sólo», «de
+nadie»), y esta vez no vino del lead sino de una nota que sobrevivió a su causa. ⇒ **Una nota de deuda
+que se convierte en fila se mide CONTRA EL CÓDIGO, nunca contra la nota.** Y el corolario, que es el
+que ahorra trabajo: **al cerrar un defecto, hay que ir a borrar la nota que lo describía** — si no,
+alguien lo va a «arreglar» otra vez.
+
+---
+
+**(b) ⏳ LA PREGUNTA ABIERTA QUE DECIDE UNA SEXTA FILA — buscar órdenes sin acentos.**
+
+Al construir la 0.205 se midió que el hueco de los acentos **no eran cinco selectores**: eran **37
+funciones**, de las que la 0.205 cerró cuatro ⇒ **quedan 33 en 30 archivos** (fila **0.214**). De esas
+33, **`armarBusqueda` de órdenes** y **`busquedaCentro`** son las que duelen. Se dejaron fuera con razón
+de diseño, no por pereza: `armarBusqueda` es una función **pura y síncrona** que devuelve un
+`Prisma.OrdenWhereInput` y la usan varios llamadores; meterle un pre-filtro asíncrono obliga a `await`
+en todos ellos.
+
+⚠️ **ESTE APARTADO SE ESCRIBIÓ CON DOS ERRORES, los dos corregidos el 26-sep al re-medir.** (1) Decía
+**«31 sitios»** y **«28 cajas»**: el barrido que los produjo buscaba `equals` sólo cuatro líneas hacia
+atrás y en los `where` largos de Prisma eso no alcanza — la cifra buena es **33 funciones en 30
+archivos, 48 ocurrencias**, con el criterio *cada `mode: 'insensitive'` cuya clave de filtro más cercana
+sea `contains:`*. (2) Decía que el typeahead descubierto era **el del Centro de Órdenes**, y era falso
+en las dos mitades: los typeaheads server-side son **OCHO** (componentes que pasan `busquedaServidor` al
+`ComboboxBuscable`), **siete están cubiertos** —dos de ellos contra colores— y **el que falta es
+`SelectorOrden`**, el de **tres** pantallas de captura (entrega a cliente, salida de tela a orden y alta
+de auditoría). ⚠️ La primera versión de este apartado decía «seis», copiado del docblock del componente,
+que lista siete y es falso: corte, envío y recibo reciben la orden por prop y ahí no se busca.
+
+Los **tres comboboxes del Centro** (cliente, maquilero, prov. de arte) **sí
+quedaron cubiertos**. Lo que el Centro tiene descubierto es su **caja de texto libre**, que no es
+typeahead.
+
+**Lo que se le pregunta a Daniel** (y no lo decide el lead, porque depende de cómo busca él). ⚠️ La
+pregunta **también se re-apuntó**: la primera versión preguntaba por el **nombre de cliente**, y buscar
+por nombre de cliente en el Centro **ya funciona**. Su caja de texto libre busca **código de modelo +
+referencia del cliente + folio**.
+
+> **¿Busca órdenes por departamento o por referencia del cliente («Niño Infantil») en el Centro de
+> Órdenes, o sólo por folio y código de modelo?**
+
+- **Por departamento o referencia** ⇒ la fila **0.214** sube a 🔴 *bloquea*: en la pantalla más usada,
+  una lista vacía se lee como *«esa orden no existe»*.
+- **Sólo folio o código de modelo** (números y claves sin acento) ⇒ se queda en 🔶 y espera.
+
+🔴 **Y una medición que casi la contesta sola:** la referencia del cliente es donde viven los nombres de
+departamento (§Post-F9.172(a)), y de los **ocho departamentos reales, CUATRO llevan ñ** — «Niño
+Juvenil», «Niño Infantil», «Niña Juvenil», «Niña Infantil». Teclear `nino` en el Centro devuelve
+**cero** órdenes cuando lo correcto son *todas las de niño*, y **ni el camino de los sinónimos lo
+salva**: el resolvedor `sinonimosDeDepartamentos` es una de las 33. Es el gemelo del número de la 0.205
+(`nino` entre 5,400 modelos: **0** antes, **771** después). ⇒ **ya no se pregunta si muerde, sino si
+Daniel teclea ahí.**
+
+📌 **El criterio que separa los 33 sitios, y vale para futuras filas de esto:** un **typeahead** —donde
+se teclea a ciegas y la lista vacía es la única respuesta— es mucho peor que una **caja de búsqueda con
+la tabla a la vista**, donde se ve el resultado y se puede ordenar o paginar. De las 33, **una alimenta
+un typeahead** (`armarBusqueda` de órdenes) y **una la caja del Centro**: ésas dos son la prioridad; las
+**31 cajas** restantes, no.

@@ -55,7 +55,12 @@ export async function candidatosDesarrollo(
   const cliente = clienteLectura(bd);
   const verImportes = tienePermiso(sesion, 'pedidos.importes');
 
-  // Pre-filtro de ids por SQL crudo (unaccent en AMBOS lados; texto parametrizado y escapado).
+  // Pre-filtro de ids por SQL crudo: `lower(unaccent())` en AMBOS lados, texto parametrizado y
+  // escapado. ⚠️ El ORDEN importa y no es estético — `unaccent(lower(x))` ata la búsqueda al
+  // `LC_CTYPE` del servidor y con locale `C` falla en todo valor acentuado en MAYÚSCULA. La
+  // medición y el porqué viven en la cabecera de `comun/busqueda.ts`, que hace lo mismo para los
+  // seis catálogos; esto es su gemelo a mano (aquí el pre-filtro cruza tres tablas y lleva sus
+  // propias condiciones, así que no cabe en la whitelist del ayudante).
   const condiciones = [Prisma.sql`d.apagado = false`, Prisma.sql`p.id_empresa = ${idEmpresa}`];
   if (filtros.idCliente !== undefined) {
     condiciones.push(Prisma.sql`p.id_cliente = ${filtros.idCliente}`);
@@ -64,11 +69,11 @@ export async function candidatosDesarrollo(
     const patron = `%${escaparLike(filtros.busqueda)}%`;
     condiciones.push(
       Prisma.sql`(
-        unaccent(lower(m.codigo)) LIKE unaccent(lower(${patron}))
-        OR unaccent(lower(COALESCE(m.descripcion, ''))) LIKE unaccent(lower(${patron}))
-        OR unaccent(lower(COALESCE(d.numero_cliente, ''))) LIKE unaccent(lower(${patron}))
-        OR unaccent(lower(p.nombre)) LIKE unaccent(lower(${patron}))
-        OR unaccent(lower(c.nombre)) LIKE unaccent(lower(${patron}))
+        lower(unaccent(m.codigo)) LIKE lower(unaccent(${patron}))
+        OR lower(unaccent(COALESCE(m.descripcion, ''))) LIKE lower(unaccent(${patron}))
+        OR lower(unaccent(COALESCE(d.numero_cliente, ''))) LIKE lower(unaccent(${patron}))
+        OR lower(unaccent(p.nombre)) LIKE lower(unaccent(${patron}))
+        OR lower(unaccent(c.nombre)) LIKE lower(unaccent(${patron}))
       )`,
     );
   }

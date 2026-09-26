@@ -37,6 +37,34 @@ describe('normalizarTexto / filtrarOpciones (búsqueda sin acentos ni mayúscula
   it('texto vacío devuelve todas', () => {
     expect(filtrarOpciones(OSCARES, '')).toHaveLength(4);
   });
+
+  /**
+   * ⭐ Fila 0.205 — la MITAD EN CLIENTE del acuerdo con el servidor. Con el pre-filtro `unaccent`
+   * del backend (`comun/busqueda.ts`), las dos mitades de una misma lista tienen que coincidir
+   * para el mismo texto: en `SelectorColor` lo que trae el servidor y los colores RETIRADOS que
+   * se filtran aquí con `filtrarOpciones` salen juntos en el popover, y el defecto que cerró esa
+   * fila era justamente que no coincidían (el retirado aparecía y el activo no).
+   *
+   * Lo que se añade es la `ñ` y la `ü`: hasta ahora sólo estaban probados los acentos sobre
+   * vocales, y son los dos caracteres donde esta normalización (NFD + quitar diacríticos) podría
+   * haber diferido de `unaccent()` de Postgres. No difiere — medido en Postgres el 26-sep-2026:
+   * `lower(unaccent('NIÑO'))` = `'nino'`, igual que aquí. ⚠️ Se citaba al revés —`unaccent(lower(…))`—, que es
+   * justo el orden PROHIBIDO del backend y sólo da `'nino'` en UTF-8: con locale `C` da `'niNo'`.
+   */
+  it('la ñ y la ü también se doblan, igual que hace `unaccent` en el servidor', () => {
+    expect(normalizarTexto('NIÑO')).toBe('nino');
+    expect(normalizarTexto('Pingüino')).toBe('pinguino');
+    const colores: readonly OpcionCombobox[] = [
+      { id: 1, nombre: 'ÁMBAR' },
+      { id: 2, nombre: 'AZUL MARINO' },
+      { id: 3, nombre: 'VERDE LIMÓN' },
+    ];
+    // El caso literal que reportó Daniel: teclear "ambar" encuentra «ÁMBAR».
+    expect(filtrarOpciones(colores, 'ambar').map((o) => o.nombre)).toEqual(['ÁMBAR']);
+    // Y la gemela: no arrastra a los demás.
+    expect(filtrarOpciones(colores, 'limon').map((o) => o.nombre)).toEqual(['VERDE LIMÓN']);
+    expect(filtrarOpciones(colores, 'zzz')).toHaveLength(0);
+  });
 });
 
 /** Arnés controlado (el combobox es controlado por el padre). */

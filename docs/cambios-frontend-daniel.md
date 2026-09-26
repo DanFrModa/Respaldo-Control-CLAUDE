@@ -814,8 +814,17 @@ a cliente, salida de tela, nota de salida de tela y alta de auditoría) pedía *
 completas**. Con el estado automático, una orden de un modelo sin receta de avíos —muy común en lo
 que vino de Access— habría **desaparecido de esos siete buscadores** sin más explicación que un "no
 hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora esos buscadores muestran
-**todas las órdenes menos las canceladas**, que es lo único que el sistema rechaza de verdad. El
-`completa` es un **semáforo de captura**, no un permiso para trabajar.
+**todas las órdenes menos las canceladas**, que es lo único que el sistema rechaza de verdad.
+
+> ⚠️ **Nota del 26-sep-2026 (no se reescribe el relato de julio, se anota):** el «**siete**» de este
+> párrafo **es falso** y se midió. Ese buscador lo usan **TRES** pantallas: entrega a cliente, salida
+> de tela a orden y alta de auditoría. Corte, envío a maquila y recibo reciben la orden **por
+> parámetro** desde el panel de avance —ahí no se busca nada— y «Notas de salida» usa un desplegable,
+> no este buscador. El número salió del comentario del propio componente, que listaba siete y llevaba
+> meses equivocado; ya está corregido ahí y en su prueba. **Lo que este párrafo cuenta sigue siendo
+> cierto**: el filtro se quitó y las órdenes sin receta volvieron a aparecer.
+
+El `completa` es un **semáforo de captura**, no un permiso para trabajar.
 
 ### Los 3 remates que salieron del día
 
@@ -884,7 +893,7 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
 - **Pruebas:** `requisitos-orden.test.ts` (la regla completa, incluido *no aplica*, las
   transiciones y **cuándo se permite degradar**) · `ordenes.int.test.ts` (el BOM solo completa; una
   orden con corte vivo no se degrada; cancelada gana; la fecha no se borra — CI) ·
-  `SelectorOrden.test.tsx` (**nuevo**: la regresión de las 7 pantallas no vuelve) ·
+  `SelectorOrden.test.tsx` (**nuevo**: la regresión no vuelve — decía «7 pantallas» y son **3**, medido el 26-sep-2026; ver la nota de arriba) ·
   `png.test.ts` + `empresas-logo.test.ts` (los PNG malos) · `cache-documentos.test.ts` +
   `auditorias.int.test.ts` + `logo.rutas.test.ts` (no-store sí, logo no) ·
   `CentroOrdenesPagina.test.tsx` / `DialogoOrden.test.tsx` (el "Falta: …").

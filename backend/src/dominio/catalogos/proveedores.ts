@@ -62,7 +62,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
-import { idsPorNombreSinAcentos } from '../../comun/busqueda.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma, unicidadDeCampo } from '../../comun/prisma-errores.js';
 import {
@@ -730,7 +730,7 @@ export async function listarProveedores(
   const idsBusqueda =
     filtros.busqueda === undefined || filtros.busqueda === ''
       ? undefined
-      : await idsPorNombreSinAcentos(cliente, 'proveedor', filtros.busqueda);
+      : await idsPorTextoSinAcentos(cliente, 'proveedor', filtros.busqueda);
 
   const where: Prisma.ProveedorWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),

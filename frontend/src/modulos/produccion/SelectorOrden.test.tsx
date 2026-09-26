@@ -8,13 +8,21 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import { SelectorOrden } from './SelectorOrden';
 
 /**
- * REGRESIÓN QUE NO DEBE VOLVER (26-jul-2026): este selector es la puerta de entrada de SIETE
- * pantallas de operación (corte, envío a maquila, recibo, entrega a cliente, salida de tela, nota
- * de salida de tela y alta de auditoría). Filtraba `estado: 'completa'`; cuando ese estado pasó a
- * ser AUTOMÁTICO (hoy: tallas + receta liberada, y arte si aplica), las órdenes a las que les
- * faltaba cualquiera de esos requisitos —muy comunes en lo migrado de Access, que llegó sin
- * receta— DESAPARECÍAN de los siete buscadores y la orden no se podía operar. Aquí se fija que el
- * filtro sea "todas menos canceladas" y que una orden `capturada` SÍ se pueda elegir.
+ * REGRESIÓN QUE NO DEBE VOLVER (26-jul-2026): este selector es la puerta de entrada de **TRES**
+ * pantallas de operación (entrega a cliente, salida de tela a orden y alta de auditoría).
+ * Filtraba `estado: 'completa'`; cuando ese estado pasó a ser AUTOMÁTICO (hoy: tallas + receta
+ * liberada, y arte si aplica), las órdenes a las que les faltaba cualquiera de esos requisitos
+ * —muy comunes en lo migrado de Access, que llegó sin receta— DESAPARECÍAN de los tres buscadores
+ * y la orden no se podía operar. Aquí se fija que el filtro sea "todas menos canceladas" y que una
+ * orden `capturada` SÍ se pueda elegir.
+ *
+ * ⚠️ **Este docblock decía SIETE** (añadiendo corte, envío a maquila, recibo y «nota de salida de
+ * tela»), **y era falso** — corte, envío y recibo viven en `AvanceProduccion.tsx`, que recibe
+ * `idOrden` como prop, y «Notas de salida» usa un `<select>` nativo, no este componente. Medido el
+ * 26-sep-2026 con `grep -rn "SelectorOrden'" frontend/src`, tras haber engañado al lead, que
+ * publicó «seis pantallas» en la fila 0.214 citando el docblock del componente como si fuera una
+ * medición. **Si cambias quién usa este selector, mide y actualiza esto y su gemelo del
+ * componente.**
  */
 
 const useOrdenesMock = vi.fn<(query: Record<string, unknown>) => Record<string, unknown>>();

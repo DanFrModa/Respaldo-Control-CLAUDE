@@ -7,9 +7,19 @@ import { useDebounce } from '@/lib/useDebounce';
 
 /**
  * SELECTOR DE ORDEN reutilizable (F3-E2, pulido R9): busca órdenes VIVAS (todas menos las
- * canceladas) por folio, modelo, cliente o referencia, y al elegir una emite su id. Lo usan las
- * pantallas de corte, envío, recibo, entrega, salida de tela, nota de salida de tela y alta de
- * auditoría para fijar la orden sobre la que se captura. La lista de resultados vive en el POPOVER
+ * canceladas) por folio, modelo, cliente o referencia, y al elegir una emite su id. Lo usan TRES
+ * pantallas para fijar la orden sobre la que se captura: **entrega a cliente**, **salida de tela por
+ * orden** y **alta de auditoría**.
+ *
+ * ⚠️ **Este docblock listaba SIETE pantallas (corte, envío, recibo, entrega, salida de tela, nota de
+ * salida de tela, alta de auditoría) y era FALSO** — corte, envío y recibo viven en
+ * `AvanceProduccion.tsx`, que recibe `idOrden: number` como prop: ahí la orden ya viene elegida y no
+ * se busca. La lista falsa **ya engañó a alguien**: el 26-sep-2026 se publicó «seis pantallas de
+ * captura» en la fila 0.214 citando este comentario como si fuera una medición. Si cambias quién usa
+ * este componente, **mide con `grep -rn "SelectorOrden'" frontend/src` y actualiza esta línea** — y su
+ * gemela del docblock de `SelectorOrden.test.tsx`, que llevaba la misma lista falsa.
+ *
+ * La lista de resultados vive en el POPOVER
  * del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera) — antes se
  * pintaba SIEMPRE inline y reventaba el layout de las tarjetas. Presentación pura (A1): solo
  * consulta y emite.

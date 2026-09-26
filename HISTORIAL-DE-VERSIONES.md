@@ -71,6 +71,64 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.180 · 26-sep-2026 · **en prueba** — **Buscar «ambar» ya encuentra «Ámbar»: los buscadores de colores, telas, avíos y modelos dejaron de ignorar los acentos**
+
+> Daniel estaba ocupado y preguntó si se podía avanzar en algo para ganar tiempo. Se eligió esto, y de
+> paso se descubrió que **otro pendiente de la lista ya estaba resuelto desde agosto** y nadie lo sabía.
+>
+> 📌 **La v0.180 cierra las filas 0.205 y 0.206, y abre la 0.214.**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Escribir sin acentos y encontrar lo que buscas**, en los cuatro catálogos donde se teclea a
+  ciegas: **colores, telas, avíos y modelos**. `ambar` encuentra «ÁMBAR», `poliester` encuentra «Hilo
+  poliéster», `nino` encuentra «Sudadera niño», `algodon` encuentra «Algodón peinado».
+- **Y el número que enseña lo que estaba roto:** buscar `nino` entre los 5,400 modelos daba **cero
+  resultados**. Ahora da **771**. Cero resultados no se lee como «te faltó un acento»: se lee como «eso
+  no existe».
+- **Los buscadores de cliente y proveedor ya funcionaban así** desde julio. Lo que se hizo fue extender
+  ese mismo mecanismo, no inventar otro — así los dos lados de una misma lista por fin se comportan
+  igual.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Ya no puedes usar comodines por accidente, y antes sí pasaba.** Escribir `ROJO_` en colores te
+  traía «ROJO 100%» y «ROJO CEREZA», porque el guion bajo valía como «cualquier letra»; y `100%` te
+  traía todo lo que empezara con 100. Nadie lo había notado. Ahora lo que escribes es texto, tal cual.
+- ⭐ **Un pendiente de la lista resultó estar ya resuelto.** El defecto de que un parpadeo de red te
+  sacara a la pantalla de entrar **se arregló en agosto**: hoy el sistema distingue «no tienes sesión»
+  de «no pude preguntar», y en el segundo caso reintenta y te muestra un botón para volver a
+  intentarlo, sin sacarte. Seguía en la lista porque **la nota que lo describía se quedó ahí después de
+  arreglarlo**, y un mes más tarde alguien la convirtió en pendiente leyendo la nota en vez del
+  programa. Queda anotado para que no se repita.
+- **Buscar cuesta un poco más, y está medido:** una búsqueda normal entre 5,400 modelos tarda **entre
+  10 y 15 milésimas de segundo**. Sólo se nota al teclear **una sola letra**, donde nadie está buscando algo
+  concreto. **No hizo falta tocar la base de datos.**
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Hay una pregunta para Daniel, y su respuesta decide si algo se adelanta: en el Centro de
+  Órdenes, ¿buscas órdenes por departamento o por la referencia del cliente («Niño Infantil»), o sólo
+  por número de orden y código de modelo?** Buscar ahí por **nombre de cliente ya funciona**.
+  ⭐ **Y hay algo medido que casi contesta la pregunta sola:** de los **ocho departamentos** que trae
+  el sistema viejo, **cuatro llevan ñ** —Niño Juvenil, Niño Infantil, Niña Juvenil, Niña Infantil—,
+  así que teclear «nino» ahí devuelve **cero órdenes** cuando la respuesta correcta son *todas las de
+  niño*. **Si buscas así, se adelanta; si buscas por número de orden o por código de modelo, espera.**
+- ⏳ **Y hay un segundo buscador sin arreglar, que es el que de verdad se escribe a ciegas:** el que
+  elige la orden al capturar una **entrega a cliente**, una **salida de tela a orden** (la de
+  Inventarios › Telas, **no** «Notas de salida», que usa un desplegable y por eso no tiene este
+  problema) o el **alta de una auditoría**. Ahí no tienes una tabla delante: si la lista sale vacía,
+  parece que la orden no existe. Se dejó fuera a propósito, porque tocarlo obliga a cambiar una pieza
+  que usan varias pantallas y eso merece su propio trabajo.
+- ⬜ **Quedan 33 buscadores con el mismo asunto** —los dos de arriba entre ellos—, y la lista decía que
+  eran cinco. La diferencia importa menos de lo que parece: **31 de los 33** son **cajas de búsqueda
+  con la tabla a la vista**, donde si no encuentras algo lo ves y puedes ordenar o pasar de página.
+  Ahora cada uno es un cambio de tres líneas, porque el mecanismo quedó preparado.
+- **Una trampa que se cerró de paso, y que ya había costado una tarde:** el buscador dependía de una
+  configuración regional del servidor, y en una máquina mal configurada daba **cinco fallos falsos** que
+  parecían errores del programa. Ya no. Y quedó una comprobación automática que impide que vuelva —
+  incluso en los sitios donde nadie miraría.
+
 ## 0.179 · 23-sep-2026 · **en prueba** — **Se quita el botón de duplicar órdenes de compra, que estaba inflando en silencio lo que el sistema creía ya comprado, y la orden por fin dice qué llegó y qué falta**
 
 > Las dos salieron de que Daniel estuviera **usando el sistema**, no de un plan. Y la primera resultó

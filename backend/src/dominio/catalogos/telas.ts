@@ -62,6 +62,7 @@ import type { ComposicionTela, Prisma, Tela, TelaCategoria } from '../../datos/i
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -1768,14 +1769,22 @@ export async function listarTelas(
 ): Promise<Pagina<TelaConColores>> {
   verificarPermiso(sesion, 'telas.ver');
   const filtros = validarEntrada(esquemaListarTelas, parametros);
+  const cliente = clienteLectura(bd);
 
   // La búsqueda mira el nombre de la tela, el NOMBRE QUE LE DA SU PROVEEDOR, el nombre del
   // PROVEEDOR dueño, EL DE SUS COLORES y su PANTONE (Daniel, 30-jul-2026: *"me gustaría poder
   // buscar por color, por tipo de tela"*; ampliada en §Post-F9.11 con la identidad en 4 datos):
   // en el almacén se busca "negro" o "alsatex" mucho más seguido que el nombre exacto de la
-  // tela. Todo va por relaciones `some`/`is` sobre la MISMA tela raíz: ni duplica filas ni
-  // descuadra la paginación (igual que la búsqueda por color de siempre).
-  const busqueda = filtros.busqueda;
+  // tela. Desde la fila 0.205 las cinco columnas —las MISMAS de antes, incluidas las tres de
+  // tablas vecinas— se comparan SIN acentos ni mayúsculas con el pre-filtro de ids de
+  // `comun/busqueda.ts` ("algodon" encuentra «Algodón»). Las vecinas van por `EXISTS`, igual que
+  // las relaciones `some`/`is` de Prisma: una tela con varios colores sigue siendo UNA fila y la
+  // paginación no se descuadra.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorTextoSinAcentos(cliente, 'tela', filtros.busqueda);
+
   const where: Prisma.TelaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.idCategoria === undefined ? {} : { idCategoria: filtros.idCategoria }),
@@ -1783,20 +1792,9 @@ export async function listarTelas(
     // conservan las filas MIGRADAS; los colores nuevos (idColor NULL) no participan.
     ...(filtros.idColor === undefined ? {} : { colores: { some: { idColor: filtros.idColor } } }),
     ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
-    ...(busqueda === undefined || busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { nombre: { contains: busqueda, mode: 'insensitive' } },
-            { nombreProveedor: { contains: busqueda, mode: 'insensitive' } },
-            { proveedor: { is: { nombre: { contains: busqueda, mode: 'insensitive' } } } },
-            { colores: { some: { nombre: { contains: busqueda, mode: 'insensitive' } } } },
-            { colores: { some: { pantone: { contains: busqueda, mode: 'insensitive' } } } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.tela.count({ where }),
     cliente.tela.findMany({
