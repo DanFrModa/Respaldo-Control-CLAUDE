@@ -27,6 +27,7 @@ import { z } from 'zod';
 
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -1073,26 +1074,26 @@ export async function listarModelos(
 ): Promise<Pagina<ModeloConRelaciones>> {
   verificarPermiso(sesion, 'modelos.ver');
   const filtros = validarEntrada(esquemaListarModelosDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  // La búsqueda (código O código de desarrollo O descripción) va SIN acentos ni mayúsculas
+  // (fila 0.205: "sudadera nino" encuentra «Sudadera niño»): pre-filtro de ids vía unaccent
+  // (comun/busqueda.ts), compuesto con el resto del where. Las MISMAS tres columnas de antes —
+  // un modelo promovido tiene DOS números y los DOS siguen siendo buscables (§Post-F9.34 punto 5):
+  // buscar por su viejo `CYA-26-71-001` lo encuentra aunque hoy se llame `71001`.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorTextoSinAcentos(cliente, 'modelo', filtros.busqueda);
 
   const where: Prisma.ModeloWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     // El filtro de origen es lo que separa los dos catálogos (§Post-F9.34 punto 2).
     ...(filtros.origen === 'todos' ? {} : { origen: filtros.origen }),
     ...(filtros.idTemporada === undefined ? {} : { idTemporada: filtros.idTemporada }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
-            // Un modelo promovido tiene DOS números y los DOS son buscables (§Post-F9.34 punto 5):
-            // buscar por su viejo `CYA-26-71-001` lo encuentra aunque hoy se llame `71001`.
-            { codigoDesarrollo: { contains: filtros.busqueda, mode: 'insensitive' } },
-            { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.modelo.count({ where }),
     cliente.modelo.findMany({

@@ -37,6 +37,7 @@ import type { Avio, AvioProveedor, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -672,21 +673,22 @@ export async function listarAvios(
 ): Promise<Pagina<AvioConProveedores>> {
   verificarPermiso(sesion, 'avios.ver');
   const filtros = validarEntrada(esquemaListarAviosDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  // La búsqueda (clave O descripción) va SIN acentos ni mayúsculas (fila 0.205: "poliester"
+  // encuentra «Hilo poliéster»): pre-filtro de ids vía unaccent (comun/busqueda.ts), compuesto
+  // con el resto del where. Las MISMAS dos columnas que se buscaban antes.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorTextoSinAcentos(cliente, 'avio', filtros.busqueda);
 
   const where: Prisma.AvioWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.esGenerico === undefined ? {} : { esGenerico: filtros.esGenerico }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { clave: { contains: filtros.busqueda, mode: 'insensitive' } },
-            { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.avio.count({ where }),
     cliente.avio.findMany({

@@ -28,6 +28,7 @@ import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -440,15 +441,20 @@ export async function listarColores(
 ): Promise<Pagina<ColorConFusion>> {
   verificarPermiso(sesion, 'colores.ver');
   const filtros = validarEntrada(esquemaListarColores, parametros);
+  const cliente = clienteLectura(bd);
+
+  // Búsqueda por nombre SIN acentos ni mayúsculas (fila 0.205: "ambar" encuentra a «Ámbar»):
+  // pre-filtro de ids vía unaccent (comun/busqueda.ts), compuesto con el resto del where.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorTextoSinAcentos(cliente, 'color', filtros.busqueda);
 
   const where: Prisma.ColorWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.color.count({ where }),
     cliente.color.findMany({
