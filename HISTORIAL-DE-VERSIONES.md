@@ -71,7 +71,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
-## 0.183 · 26-sep-2026 · **en prueba** — **Las preguntas que estaban en un chat perdido, escritas donde se leen — y medirlas disolvió tres**
+## 0.183 · 26-sep-2026 · **en prueba** — **Las preguntas que estaban en un chat perdido, escritas donde se leen — y medirlas disolvió cuatro de las cinco**
 
 > **La v0.183 no cierra ninguna fila del programa**, y la razón es la contraria de lo habitual:
 > **desbloquea una.** La ficha de *«seguir añadiendo PDF a un pedido ya hecho»* —lo que pidió Daniel el
@@ -112,8 +112,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   meterle una orden de compra a un pedido **cancelado** o marcado **«no producir»**. **Ya lo impide**, con
   su mensaje y con dos pruebas que lo fijan. Se iba a mandar como pregunta con la propuesta «no» — y eso
   le habría ofrecido un «sí» **como si fuera gratis**, cuando decir sí costaría **quitar una protección
-  que hoy usan todos los caminos de alta de OP**. Lo cazó la revisión.
-- 📌 **Y un dato que ayuda a contestar la segunda:** el rodeo que usa hoy —una orden de compra por pedido—
+  que hoy usan todas las formas de crear una OP en el día a día**. Lo cazó la revisión.
+- 📌 **Y un dato que ayuda a contestarla:** el rodeo que usa hoy —una orden de compra por pedido—
   **rompe dos informes**. El de **márgenes agrupa por pedido**, así que da una línea por orden de compra
   en vez de una por lote de negocio; y la **conciliación de la factura de venta** compara totales contra
   el pedido, así que si una factura cubre tres órdenes de compra en tres pedidos, **ningún total cuadra**.

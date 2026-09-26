@@ -16534,7 +16534,7 @@ un hallazgo que no existe»*— aplicada a un caso donde el coste fue real: **bl
 
 ---
 
-### ⭐ Lo más útil: MEDIR disolvió tres de las preguntas, en vez de añadirlas
+### ⭐ Lo más útil: MEDIR disolvió CUATRO de las preguntas, en vez de añadirlas
 
 **(a) YA CONTESTADA por Daniel, no se le vuelve a preguntar.** *¿Se puede añadir a un pedido que ya tiene
 OP generadas?* Textual del 7-sep: *«que se pueda seguir añadiendo mas PDF **aunque ya esten hechas algunas
@@ -16577,8 +16577,8 @@ nombre**: `ordenes.int.test.ts:176` *«RECHAZA crear desde un renglón de pedido
 *«RECHAZA crear desde un renglón de pedido marcado NO PRODUCIR»*.
 ⚠️⚠️ **Es el defecto del día cometido EN EL PÁRRAFO SIGUIENTE al que lo documenta** (el (b) de arriba).
 🔴 **Y el daño no era cosmético: se le ofrecía a Daniel un «sí» como si fuera gratis.** Si contestaba que
-sí, el coste real es **quitar una guarda de producción compartida por TODOS los caminos de alta de OP y
-borrar dos pruebas** — información que la pregunta no le daba. Y si contestaba que no, **no había nada
+sí, el coste real es **quitar una guarda de producción compartida por TODOS los caminos de CAPTURA de OP
+—el ETL la esquiva por diseño, en modo migración— y borrar dos pruebas** — información que la pregunta no le daba. Y si contestaba que no, **no había nada
 que construir**: la fila hereda la guarda gratis.
 📌 **Refuerzos de cerca, mejores que el que se había ido a buscar a otro módulo:** `actualizarPedido` ya
 niega tocar un pedido cancelado (`pedidos/pedidos.ts:592-593`) y `cargarOcYaImportadas` filtra
@@ -16616,8 +16616,14 @@ cuadra** y la sugerencia no sirve.
 
 - **Un modelo que YA está en el pedido** ⇒ se añade como **renglón aparte** y se **avisa en la vista
   previa**. Dos OC pueden pedir el mismo modelo; fusionar o sumar en silencio sería peor.
-- **El sobre-pedido por packs** ⇒ **por OC, como hoy**. ⚠️ **Y de paso, un hecho que esta misma sección publicó mal y se corrige:** se escribió *«default 7 %, configurable por cliente»* para evitar citarlo como constante… **y el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)` (`schema.prisma:1589`), y la propia fuente lo dice: *«configurable por cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2, `DECISIONES.md:617`). ⇒ **el 7 % es el valor de C&A**, no el del sistema. *La frase escrita para corregir un error introdujo otro.* No cambia la decisión («por OC»), pero era un hecho falso en el documento del porqué. Es lo que el cliente pidió
-  en ese papel; recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó.
+- **El sobre-pedido por packs** ⇒ **por OC, como hoy**: es lo que el cliente pidió en ese papel, y
+  recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó. ⚠️ **Y un hecho que esta misma
+  sección publicó mal y se corrige:** se escribió *«default 7 %, configurable por cliente»* para evitar
+  citarlo como constante… **y el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)` (en
+  `schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice: *«configurable por cliente
+  (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2). ⇒ **el 7 % es el
+  valor de C&A**, no el del sistema. *La frase escrita para corregir un error introdujo otro.* No cambia
+  la decisión, pero era un hecho falso en el documento del porqué.
 - **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
   de precios, la referencia D7 y el EDR.
 - **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).
