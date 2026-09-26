@@ -16311,3 +16311,69 @@ XML»*. **El XML ya se sube y se sella** (§Post-F9.20, decisión suya del 7-ago
 la captura**: si la entrada se guarda sin él, no hay forma de aportarlo después, y queda archivado
 sólo el PDF, que es la foto y no el documento fiscal. **Pendiente de su respuesta a con qué frecuencia
 llega la mercancía antes que la factura**, que es lo que decide si eso bloquea o aguanta.
+
+---
+
+#### (Post-F9.238) — DANIEL APRUEBA LAS CINCO QUE «DUELEN», Y UNA PREGUNTA QUE DECIDE UNA SEXTA (26-sep-2026)
+
+**Cómo salió.** Daniel llevaba tres días sin poder hacer su repaso de Inventarios (fila **0.096**) y
+preguntó: *«¿Quieres seguir avanzando con los pendientes de la fase dos para ganar tiempo?»*.
+
+⚖️ **El lead recomendó NO hacer fase dos, y la razón es una frase suya:** fase dos es explícitamente
+post-arranque, así que construirla no acerca el arranque ni un día — y el 7-sep él mismo dijo *«ha de
+haber muchas cosas que no son indispensables y **están gastando tiempo**»*. Si el objetivo es ganar
+tiempo, se gasta en lo que frena. De las tres que bloquean, **dos son que él las mire y una la hace
+Gabriel**: ninguna es del lead. Lo que sí quedaba y sí se podía hacer eran **las cinco marcadas 🔶
+«duele pero se aguanta»** — que por definición *se hacen si sobra tiempo antes de arrancar*.
+
+**Su respuesta, textual:** *«Adelante. Está bien. Arranca con las 206.»*
+
+⇒ **Queda CONFIRMADA por Daniel la clasificación 🔶 de las cinco** (0.147, 0.169, 0.200, 0.205, 0.206),
+que hasta hoy estaban *«⏳ pendiente de que Daniel lo confirme»* según `CLAUDE.md` §7.5. El orden
+recomendado —0.206 primero por ser la única que le pasa a su gente a diario, luego 0.205 y 0.200— lo
+aceptó sin cambios.
+
+---
+
+**(a) 🔴 LA 0.206 YA ESTABA CONSTRUIDA, Y POR QUÉ NADIE LO SABÍA.**
+
+El lead fue a medir el código antes de encargar nada y el defecto **estaba arreglado desde V1-E3i
+(v0.005, 19-ago-2026)**. `frontend/src/sesion/ProveedorSesion.tsx` lo lleva escrito en su cabecera —
+*«⭐ V1-E3i — UN PARPADEO DE RED NO ES UNA SESIÓN AUSENTE»*— y hoy `derivarEstadoSesion` distingue
+**cuatro** estados (`cargando` · `con-sesion` · `sin-sesion` · `indeterminado`): sólo el 401 real
+navega a `/login`, y `indeterminado` pinta una pantalla con botón **Reintentar** en vez de expulsar.
+Con red de pruebas en `ProveedorSesion.test.tsx` y `RutaProtegida.test.tsx`.
+
+🔑 **Por qué existía la fila, que es la lección:** nació el **17-sep** de partir en dos un bullet de
+deuda del §4 escrito el **19-ago** — el mismo día que el arreglo entró. El bullet describía el
+defecto, el arreglo llegó, **nadie retiró el bullet**, y un mes después se convirtió en fila
+**releyendo el bullet en vez de el código**. La fila dice «MEDIDO» y no lo estaba.
+
+⚠️ **Es la misma familia de error que tumbó cuatro veces la v0.179** («no existe», «sólo», «de
+nadie»), y esta vez no vino del lead sino de una nota que sobrevivió a su causa. ⇒ **Una nota de deuda
+que se convierte en fila se mide CONTRA EL CÓDIGO, nunca contra la nota.** Y el corolario, que es el
+que ahorra trabajo: **al cerrar un defecto, hay que ir a borrar la nota que lo describía** — si no,
+alguien lo va a «arreglar» otra vez.
+
+---
+
+**(b) ⏳ LA PREGUNTA ABIERTA QUE DECIDE UNA SEXTA FILA — el buscador del Centro de Órdenes.**
+
+Al construir la 0.205 se midió que el hueco de los acentos **no eran cinco selectores, sino 31
+sitios**. Los cuatro typeaheads que faltaban quedaron cubiertos, pero **`busquedaCentro` /
+`armarBusqueda` NO** — y es la pantalla que más se usa. Se dejó fuera con razón de diseño, no por
+pereza: `armarBusqueda` es una función **pura y síncrona** que devuelve un `Prisma.OrdenWhereInput` y
+la usan varios llamadores; meterle un pre-filtro asíncrono obliga a `await` en todos ellos.
+
+**Lo que se le pregunta a Daniel** (y no lo decide el lead, porque depende de cómo busca él):
+
+> **En el Centro de Órdenes, ¿busca por nombre de cliente o por referencia con acentos?**
+
+- **Sí** ⇒ la fila **0.214** sube a 🔴 *bloquea*: en la pantalla más usada, una lista vacía se lee como
+  *«esa orden no existe»*.
+- **Busca por folio o por código de modelo** (números y claves sin acento) ⇒ se queda en 🔶 y espera.
+
+📌 **El criterio que separa los 31 sitios, y vale para futuras filas de esto:** un **typeahead** —donde
+se teclea a ciegas y la lista vacía es la única respuesta— es mucho peor que una **caja de búsqueda con
+la tabla a la vista**, donde se ve el resultado y se puede ordenar o paginar. Los seis typeaheads
+server-side son la prioridad; las 28 cajas restantes, no.
