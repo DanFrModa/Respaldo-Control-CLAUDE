@@ -101,19 +101,27 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   intentarlo, sin sacarte. Seguía en la lista porque **la nota que lo describía se quedó ahí después de
   arreglarlo**, y un mes más tarde alguien la convirtió en pendiente leyendo la nota en vez del
   programa. Queda anotado para que no se repita.
-- **Buscar cuesta un poco más, y está medido:** una búsqueda normal entre 5,400 modelos tarda **30
-  milésimas de segundo**. Sólo se nota al teclear **una sola letra**, donde nadie está buscando algo
+- **Buscar cuesta un poco más, y está medido:** una búsqueda normal entre 5,400 modelos tarda **entre
+  10 y 15 milésimas de segundo**. Sólo se nota al teclear **una sola letra**, donde nadie está buscando algo
   concreto. **No hizo falta tocar la base de datos.**
 
 ### Qué sigue pendiente o roto
 
 - ⏳ **Hay una pregunta para Daniel, y su respuesta decide si algo se adelanta: en el Centro de Órdenes,
-  ¿buscas por nombre de cliente o por referencia con acentos?** Ese buscador **es el único de los seis
-  donde se escribe a ciegas que quedó sin arreglar**, y es la pantalla que más se usa. Se dejó fuera a
-  propósito, porque tocarlo obliga a cambiar una pieza que usan varias pantallas y eso merece su propio
-  trabajo. **Si buscas ahí con acentos, se adelanta; si buscas por folio o por código, espera.**
-- ⬜ **Quedan 29 buscadores más con el mismo asunto**, y la lista decía que eran cinco. La diferencia
-  importa menos de lo que parece: los otros 29 son **cajas de búsqueda con la tabla a la vista**, donde
+  ¿buscas órdenes por departamento o por la referencia del cliente («Niño Infantil»), o sólo por número
+  de orden y código de modelo?** Buscar ahí por **nombre de cliente ya funciona**; lo que no funciona es
+  el código de modelo y la referencia. ⭐ **Y hay algo medido que casi contesta la pregunta sola:** de
+  los **ocho departamentos** que trae el sistema viejo, **cuatro llevan ñ** —Niño Juvenil, Niño
+  Infantil, Niña Juvenil, Niña Infantil—, así que teclear «nino» ahí devuelve **cero órdenes** cuando la
+  respuesta correcta son *todas las de niño*. **Si buscas así, se adelanta; si buscas por número de
+  orden o por código de modelo, espera.**
+- ⏳ **Y hay un segundo buscador sin arreglar, que es el que de verdad se escribe a ciegas:** el que
+  elige la orden al capturar una **entrega**, una **nota de salida de tela** o el **alta de una
+  auditoría**. Ahí no tienes una tabla delante: si la lista sale vacía, parece que la orden no existe.
+  Se dejó fuera a propósito, porque tocarlo obliga a cambiar una pieza que usan varias pantallas y eso
+  merece su propio trabajo.
+- ⬜ **Quedan 33 buscadores más con el mismo asunto**, y la lista decía que eran cinco. La diferencia
+  importa menos de lo que parece: **31 de los 33** son **cajas de búsqueda con la tabla a la vista**, donde
   si no encuentras algo lo ves y puedes ordenar o pasar de página. Ahora cada uno es un cambio de tres
   líneas, porque el mecanismo quedó preparado.
 - **Una trampa que se cerró de paso, y que ya había costado una tarde:** el buscador dependía de una

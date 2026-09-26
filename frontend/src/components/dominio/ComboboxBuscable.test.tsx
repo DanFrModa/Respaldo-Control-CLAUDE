@@ -48,7 +48,8 @@ describe('normalizarTexto / filtrarOpciones (búsqueda sin acentos ni mayúscula
    * Lo que se añade es la `ñ` y la `ü`: hasta ahora sólo estaban probados los acentos sobre
    * vocales, y son los dos caracteres donde esta normalización (NFD + quitar diacríticos) podría
    * haber diferido de `unaccent()` de Postgres. No difiere — medido en Postgres el 26-sep-2026:
-   * `unaccent(lower('NIÑO'))` = `'nino'`, igual que aquí.
+   * `lower(unaccent('NIÑO'))` = `'nino'`, igual que aquí. ⚠️ Se citaba al revés —`unaccent(lower(…))`—, que es
+   * justo el orden PROHIBIDO del backend y sólo da `'nino'` en UTF-8: con locale `C` da `'niNo'`.
    */
   it('la ñ y la ü también se doblan, igual que hace `unaccent` en el servidor', () => {
     expect(normalizarTexto('NIÑO')).toBe('nino');
