@@ -16740,21 +16740,23 @@ tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que
   que se le pregunta; si un lote se reparte en varias tandas —o si el `noReconocidos` lo parte—, da varias
   filas donde debería dar una. **No se puede cerrar midiendo código.** ⚠️ Y ojo con la dirección: una tanda
   de N OC **colapsa N OC en UNA fila**, que es el efecto contrario al que la fila 0.147 denunciaba.
-- **Conciliación del CFDI de venta: el problema existe. Lo que estaba mal era la GENERALIZACIÓN que hizo la
-  primera versión de ESTA sección** —*«si una factura cubre varias OC, ningún total cuadra»*—, **no lo que
-  decían §Post-F9.241 y la fila**, que hablaban de *«tres OC en **tres pedidos**»* y eso **es cierto**. `matchPedidos`
-  (`terceros/cfdi/cfdi-ventas.ts:152-181`) compara el total de la factura contra la suma de las líneas de
-  cada **pedido** ⇒ una factura que cubre **varias OC de un mismo pedido SÍ cuadra**. Lo que rompe la
-  sugerencia es que la factura cruce **PEDIDOS (tandas)**, no OC. 🐛 **Y un agravante encontrado de paso:**
-  el candidato devuelve `ocCliente: pedido.ocCliente` (`:178`) y eso significa **dos cosas distintas según
-  por dónde entró el pedido**: en los nacidos del **importador de PDF** es *«la referencia general de la
-  TANDA (que puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no necesariamente muestra una
-  OC** —la propia fuente lo admite, *«que puede ser otra cosa, o nada»*: en un import de un solo PDF donde
-  el usuario teclee la OC en `referenciaGeneral`, sí lo es—; en los capturados **a mano o por Excel** sí lo es —`schema.prisma:3244-3246` lo define como *«OC
-  ORIGINAL del cliente… captura VIVA y editable»* y la pantalla lo rotula *«OC del cliente (referencia)»*
-  (`ConstructorPedido.tsx:359`)—. ⚠️ **Se acota a propósito:** la primera versión de esta sección lo
-  generalizó a todos los pedidos, que es **la misma sobre-generalización** que este párrafo acaba de
-  corregir en la frase de al lado.
+- **Conciliación del CFDI de venta: el problema existe. Lo que estaba mal era la GENERALIZACIÓN que
+  hizo la primera versión de ESTA sección** —*«si una factura cubre varias OC, ningún total
+  cuadra»*—, **no lo que decían §Post-F9.241 y la fila**, que hablaban de *«tres OC en **tres
+  pedidos**»* y eso **es cierto**. `matchPedidos` (`terceros/cfdi/cfdi-ventas.ts:152-181`) compara
+  el total de la factura contra la suma de las líneas de cada **pedido** ⇒ una factura que cubre
+  **varias OC de un mismo pedido SÍ cuadra**. Lo que rompe la sugerencia es que la factura cruce
+  **PEDIDOS (tandas)**, no OC. 🐛 **Y un agravante encontrado de paso:** el candidato devuelve
+  `ocCliente: pedido.ocCliente` (`:178`) y eso significa **dos cosas distintas según por dónde entró
+  el pedido**: en los nacidos del **importador de PDF** es *«la referencia general de la TANDA (que
+  puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no necesariamente
+  muestra una OC** —y el «no necesariamente» es literal: en un import de un solo PDF donde el
+  usuario teclee la OC en `referenciaGeneral`, sí lo es—; en los capturados **a mano o por Excel**
+  sí lo es —`schema.prisma:3244-3246` lo define como *«OC ORIGINAL del cliente… captura VIVA y
+  editable»* y la pantalla lo rotula *«OC del cliente (referencia)»* (`ConstructorPedido.tsx:359`)—.
+  ⚠️ **Se acota a propósito:** la primera versión de esta sección lo generalizó a todos los pedidos,
+  que es **la misma sobre-generalización** que este párrafo acaba de corregir en la frase de al
+  lado.
 
 ### ⏳ Las preguntas, corregidas (las primeras estaban mal planteadas)
 
