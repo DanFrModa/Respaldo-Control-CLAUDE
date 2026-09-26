@@ -94,13 +94,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué cambió y puede sorprender
 
-- ⚠️ **Una de las tres que se disolvió iba a presentarse como «la más grave», y era falsa.** Se había
+- ⚠️ **Una de las cuatro que se disolvieron iba a presentarse como «la más grave», y era falsa.** Se había
   concluido que, al meter una segunda orden de compra a un pedido, **las nuevas OP nacerían etiquetadas
   con el número de la OC anterior**. Medido: **no ocurre** — el importador ya escribe en cada OP el número
   del papel del que salió. La conclusión venía de leer la mitad del flujo y parar ahí. *Media medición
   produce una conclusión que suena perfecta.*
-- Las otras dos que se cayeron: el aviso de «esa orden de compra ya se importó» **no hace falta tocarlo**
-  (ya busca por cliente, no por pedido), y lo de añadir **aunque ya haya OP hechas** ya estaba contestado.
+- Y las **otras tres**, para que estén las cuatro nombradas: el aviso de «esa orden de compra ya se
+  importó» **no hace falta tocarlo** (ya busca por cliente, no por pedido); lo de añadir **aunque ya haya
+  OP hechas** ya lo habías contestado; y la cuarta —que el sistema ya impide meterle una OP a un pedido
+  cancelado— va **en el apartado de abajo**, porque es la que más enseña.
 
 ### Qué sigue pendiente o roto
 

@@ -16544,8 +16544,9 @@ la BD impide es **QUITAR** un renglón con OP (`Restrict`).
 
 **(b) 🔴 NO ES UNA PREGUNTA, y el lead estuvo a punto de publicarla como la más grave.** Se había derivado
 que, al añadir un segundo PDF, *«las OP nuevas nacerían con el número de OC del PRIMER PDF»* — porque el
-`tx.pedido.create` copia `Pedido.ocCliente` y `Orden.ocCliente` es *«una copia que se hace al crear la
-orden y NO se re-escribe»* (`schema.prisma:3528`). **Es falso, y se cazó midiendo el resto del archivo:**
+`tx.pedido.create` copia `Pedido.ocCliente` y el comentario que `schema.prisma` tenía en `Orden.ocCliente`
+decía, textual, *«se copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe»* — **comentario
+corregido en esta misma entrega**, así que no se cita por línea: la línea ya no lo contiene. **Es falso, y se cazó midiendo el resto del archivo:**
 `importacion-pdf.ts:1360` escribe **`ocCliente: r.numeroOrden`** después de crear la orden ⇒ **cada OP ya
 lleva el número de la OC de la que salió**, con el comentario que lo dice en `:1344`. El docblock de
 `oc-duplicada.ts:15` lo confirma: *«el nº de orden del papel, uno POR OP. El importador PDF lo escribe con
@@ -16617,13 +16618,15 @@ cuadra** y la sugerencia no sirve.
 - **Un modelo que YA está en el pedido** ⇒ se añade como **renglón aparte** y se **avisa en la vista
   previa**. Dos OC pueden pedir el mismo modelo; fusionar o sumar en silencio sería peor.
 - **El sobre-pedido por packs** ⇒ **por OC, como hoy**: es lo que el cliente pidió en ese papel, y
-  recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó. ⚠️ **Y un hecho que esta misma
-  sección publicó mal y se corrige:** se escribió *«default 7 %, configurable por cliente»* para evitar
-  citarlo como constante… **y el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)` (en
-  `schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice: *«configurable por cliente
-  (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2). ⇒ **el 7 % es el
-  valor de C&A**, no el del sistema. *La frase escrita para corregir un error introdujo otro.* No cambia
-  la decisión, pero era un hecho falso en el documento del porqué.
+  recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó. ⚠️ **Y conviene fijar un dato
+  que es fácil citar mal, porque el borrador de esta sección lo citó mal una vez:** el porcentaje no
+  es *«default 7 %, configurable por cliente»* — **el default NO es 7: es 0.** `porcentajeAdicional
+  Decimal @default(0)` (`schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice:
+  *«configurable por cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»*
+  (§Post-F9.2). ⇒ **el 7 % es el valor de C&A**, no el del sistema. 📌 **Y la lección, que es lo que
+  vale:** esa cita falsa se escribió *para corregir* otra imprecisión ⇒ **una frase que arregla un
+  dato puede estropear otro, y la frase que corrige también hay que medirla.** No cambia la
+  decisión.
 - **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
   de precios, la referencia D7 y el EDR.
 - **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).

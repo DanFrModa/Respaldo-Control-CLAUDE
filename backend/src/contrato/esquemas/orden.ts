@@ -542,7 +542,7 @@ export const esquemaOrdenSalida = z
         'SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de ' +
           '`Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su ' +
           'propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún ' +
-          'endpoint lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice.',
+          'endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice.',
       ),
     // ── Datos de v1 conservados de SOLO LECTURA (sin motor; ETL los puebla). ──
     tallasV1: z
