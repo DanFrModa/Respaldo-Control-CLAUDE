@@ -16632,3 +16632,64 @@ cuadra** y la sugerencia no sirve.
 - **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
   de precios, la referencia D7 y el EDR.
 - **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).
+
+#### (Post-F9.242) — UNA OC = UN PEDIDO: LA 0.147 SE QUEDA SIN CASO (26-sep-2026, fila 0.147)
+
+**Contexto.** Se le preguntó a Daniel lo único que quedaba abierto de la 0.147 —la frecuencia, que es dato
+del negocio (`CLAUDE.md` §7.5)—. Su respuesta, textual:
+
+> *«No entendí bien. Pero **nunca llega una nueva OC de un pedido ya metido**. En todo caso **se genera un
+> nuevo pedido con una nueva OC**.»*
+
+⇒ **La frecuencia es CERO.** Y una fila cuyo caso no sucede no puede ser «duele pero se aguanta»: no hace
+falta.
+
+### 📐 Lo que se midió antes de recomendar nada, porque decide si la fila tiene sentido
+
+**El importador YA mete una TANDA ENTERA de PDF en UN pedido.** No es un PDF por pedido:
+
+- `confirmarImportacionPdf` hace **un solo** `tx.pedido.create`, con **un solo folio**
+  (`dominio/pedidos/importacion-pdf.ts:1083`), y después un `for (const item of aImportar)` que llama a
+  `crearOrdenDesdePdf` **una vez por PDF** (`:1096-1097`), todas en la misma transacción (A2).
+- Cada OP se queda con el nº de orden de **su propio papel** (`:1360`), no con el del primero.
+- El contrato lo dice con esas palabras: *«Confirma la importación por PDF: crea pedido interno + **OPs** +
+  RC + adjuntos»* y *«Referencia general del pedido (opcional; **cada OP guarda su propio nº de orden**)»*
+  (`contrato/esquemas/importacion-pdf.ts`), y su vista previa habla de *«otro PDF de esta misma **tanda**»*
+  y de *«cuando **dos OC** comparten modelo y color»*.
+
+⇒ **El hueco de la 0.147 era SÓLO el PDF que llega TARDE**, después de cerrar la importación. Y si una OC
+nueva nace siempre en su propio pedido, ese caso **no existe en su negocio**.
+
+### ⚠️ Pero contradice sus propias palabras del 7-sep, y eso NO se resuelve por él
+
+§Post-F9.207 lo cita textual, y es explícito en la dirección contraria:
+
+> *«es importante poder meter mas PDF al pedido ya hecho […] que se pueda seguir añadiendo mas PDF **aunque
+> ya esten hechas algunas OP**.»*
+
+**Las dos frases no se pueden promediar.** Caben dos lecturas y sólo él sabe cuál es la suya: **(i)** cambió
+de opinión al pensarlo en frío; o **(ii)** el caso del 7-sep era otro —se le quedó un PDF **fuera de la
+misma tanda** y quería añadirlo al pedido que acababa de crear, que es una corrección de captura, no una OC
+que llega días después—. ⏳ **Se le pregunta cuál, y hasta entonces la fila no se reclasifica.** Lo que sí
+queda dicho es la recomendación del lead: **⏸️ post-V1, o cerrada por «no aplica»**, porque el sistema ya
+resuelve la tanda completa de un golpe y el caso tardío, por su propia respuesta, no se da.
+
+### ✅ Y la respuesta DESHACE media medición del mismo día — se anota porque es instructivo
+
+La medición del 26-sep publicó que el rodeo *«rompe dos informes»*. Con **una OC = un pedido** como proceso
+**NORMAL** —no como rodeo—, las dos mitades se separan:
+
+- **Márgenes: el problema se DISUELVE.** Se había escrito que agrupar por pedido (`costos/margenes.ts:205`)
+  *«da una línea por OC en vez de una por lote de negocio»*. Si un pedido **es** una OC, agrupar por pedido
+  **es** agrupar por OC: el informe contesta exactamente lo que se le pregunta. 🔑 *No era un defecto del
+  informe: era el efecto de haber llamado «rodeo» a lo que resulta ser el proceso normal.*
+- **Conciliación del CFDI de venta: SOBREVIVE, y SUBE de categoría.** `matchPedidos`
+  (`terceros/cfdi/cfdi-ventas.ts:152-181`) propone candidatos comparando el total de la factura contra la
+  suma por **pedido** ⇒ si una factura cubre **varias OC**, ningún total cuadra y la sugerencia no sirve.
+  Eso ya **no** es el coste de un rodeo evitable: es una limitación del proceso normal, todos los días.
+  ⏳ **Falta el dato del negocio para clasificarla: ¿una factura cubre a veces más de una OC?** Si sí, es
+  fila propia; si no, no hay nada que arreglar.
+
+📌 **La lección de método:** la respuesta no sólo contestó la pregunta — **retiró un argumento que la propia
+fila usaba para subir su valor**. Preguntar antes de construir salió barato; haber construido el CAMINO A
+sobre «el rodeo rompe dos informes» habría salido caro, y uno de esos dos informes no estaba roto.

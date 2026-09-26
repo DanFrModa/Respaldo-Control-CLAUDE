@@ -71,6 +71,52 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.184 · 26-sep-2026 · **en prueba** — **La respuesta de Daniel deja sin caso una de las dos pendientes que «dolían»**
+
+> **La v0.184 no cierra ninguna fila del programa**: escribe una **respuesta tuya** donde se lee, y de
+> paso retira un argumento que la versión anterior había publicado de más. No cambia nada en pantalla.
+
+### Qué se puede hacer ahora que antes no
+
+- 📌 **Nada nuevo en el sistema: esto es papeleo del que ahorra trabajo.** Lo que cambia es que tu
+  respuesta del 26 de septiembre queda escrita en la ficha y en el documento del porqué, en vez de
+  quedarse en una conversación que mañana nadie encuentra.
+- ⭐ **Y lo que ahorra es una función entera.** Preguntaste con qué frecuencia te llega una orden de
+  compra del mismo pedido después de haber hecho las OP, y contestaste: **nunca** — *«en todo caso se
+  genera un nuevo pedido con una nueva OC»*. Con eso, la ficha que iba a construir «seguir añadiendo PDF
+  a un pedido ya hecho» **se queda sin caso que resolver**.
+- ✅ **Y se midió lo que lo confirma:** el importador **ya mete todos los PDF que le sueltes de una vez
+  en un solo pedido**, cada uno con su propia OP y con el número de su propio papel. Lo único que no
+  sabía hacer era añadir uno **más tarde** — y eso, por tu respuesta, no pasa.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Tu respuesta contradice lo que pediste el 7 de septiembre**, y está citado textual: *«es importante
+  poder meter mas PDF al pedido ya hecho… aunque ya esten hechas algunas OP»*. **No se eligió por ti.**
+  Caben dos explicaciones —cambiaste de opinión al verlo en frío, o el caso de aquel día era otro: que se
+  te quedó un PDF fuera de la **misma tanda** y querías añadirlo al pedido que acababas de crear, que es
+  corregir una captura, no una orden de compra que llega días después—. **Queda preguntado** y la ficha no
+  se reclasifica hasta que lo digas.
+- 🔴 **Y se retira un argumento que la versión anterior publicó de más.** La v0.183 decía que tu manera de
+  trabajar de hoy —una orden de compra por pedido— **rompía dos informes**. Con tu respuesta resulta que
+  eso no es un rodeo: **es el proceso normal**. Y entonces:
+  - **El informe de márgenes NO está roto.** Si un pedido *es* una orden de compra, agruparlo por pedido
+    es agruparlo por orden de compra: contesta exactamente lo que se le pregunta. *Parecía un defecto sólo
+    porque se había llamado «rodeo» a lo normal.*
+  - **La conciliación de la factura de venta sí tiene un problema, y ahora pesa más**, no menos: propone
+    candidatos comparando el total de la factura contra el total de cada pedido, así que si una factura
+    cubre varias órdenes de compra, ninguna cuadra. Ya no es el coste de un atajo evitable: es algo que
+    pasa todos los días. **Queda preguntado si tus facturas cubren más de una orden de compra**; si no lo
+    hacen, no hay nada que arreglar.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Dos preguntas para ti, las dos de una línea:** (1) ¿el caso del 7 de septiembre era el del PDF que
+  se quedó fuera de la misma tanda, o cambiaste de opinión? (2) ¿alguna de tus facturas cubre más de una
+  orden de compra?
+- 📌 **Si confirmas lo primero, se cae una de las dos pendientes que «duelen» para la primera versión** y
+  quedan trece, no catorce. Ese recuento **no se toca hasta que lo digas**.
+
 ## 0.183 · 26-sep-2026 · **en prueba** — **Las preguntas que estaban en un chat perdido, escritas donde se leen — y medirlas disolvió cuatro de las cinco**
 
 > **La v0.183 no cierra ninguna fila del programa**, y la razón es la contraria de lo habitual:
