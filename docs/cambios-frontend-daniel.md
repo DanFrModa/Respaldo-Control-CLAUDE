@@ -822,8 +822,9 @@ hay órdenes que coincidan", y no se habría podido cortar ni entregar. Ahora es
 > parámetro** desde el panel de avance —ahí no se busca nada— y «Notas de salida» usa un desplegable,
 > no este buscador. El número salió del comentario del propio componente, que listaba siete y llevaba
 > meses equivocado; ya está corregido ahí y en su prueba. **Lo que este párrafo cuenta sigue siendo
-> cierto**: el filtro se quitó y las órdenes sin receta volvieron a aparecer. El
-`completa` es un **semáforo de captura**, no un permiso para trabajar.
+> cierto**: el filtro se quitó y las órdenes sin receta volvieron a aparecer.
+
+El `completa` es un **semáforo de captura**, no un permiso para trabajar.
 
 ### Los 3 remates que salieron del día
 
