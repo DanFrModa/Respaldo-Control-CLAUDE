@@ -16546,7 +16546,8 @@ la BD impide es **QUITAR** un renglón con OP (`Restrict`).
 que, al añadir un segundo PDF, *«las OP nuevas nacerían con el número de OC del PRIMER PDF»* — porque el
 `tx.pedido.create` copia `Pedido.ocCliente` y el comentario que `schema.prisma` tenía en `Orden.ocCliente`
 decía, textual, *«se copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe»* — **comentario
-corregido en esta misma entrega**, así que no se cita por línea: la línea ya no lo contiene. **Es falso, y se cazó midiendo el resto del archivo:**
+corregido en esta misma entrega**, así que no se cita por línea: la línea ya no lo contiene. **La
+conclusión es falsa, y se cazó midiendo el resto del archivo:**
 `importacion-pdf.ts:1360` escribe **`ocCliente: r.numeroOrden`** después de crear la orden ⇒ **cada OP ya
 lleva el número de la OC de la que salió**, con el comentario que lo dice en `:1344`. El docblock de
 `oc-duplicada.ts:15` lo confirma: *«el nº de orden del papel, uno POR OP. El importador PDF lo escribe con
@@ -16579,8 +16580,8 @@ nombre**: `ordenes.int.test.ts:176` *«RECHAZA crear desde un renglón de pedido
 ⚠️⚠️ **Es el defecto del día cometido EN EL PÁRRAFO SIGUIENTE al que lo documenta** (el (b) de arriba).
 🔴 **Y el daño no era cosmético: se le ofrecía a Daniel un «sí» como si fuera gratis.** Si contestaba que
 sí, el coste real es **quitar una guarda de producción compartida por TODOS los caminos de CAPTURA de OP
-—el ETL la esquiva por diseño, en modo migración— y borrar dos pruebas** — información que la pregunta no le daba. Y si contestaba que no, **no había nada
-que construir**: la fila hereda la guarda gratis.
+—el ETL la esquiva por diseño, en modo migración— y borrar dos pruebas** — información que la pregunta
+no le daba. Y si contestaba que no, **no había nada que construir**: la fila hereda la guarda gratis.
 📌 **Refuerzos de cerca, mejores que el que se había ido a buscar a otro módulo:** `actualizarPedido` ya
 niega tocar un pedido cancelado (`pedidos/pedidos.ts:592-593`) y `cargarOcYaImportadas` filtra
 `pedCancelado: false` (`oc-duplicada.ts:147`) — **en el mismo archivo que esta sección ya citaba para
@@ -16620,10 +16621,11 @@ cuadra** y la sugerencia no sirve.
 - **El sobre-pedido por packs** ⇒ **por OC, como hoy**: es lo que el cliente pidió en ese papel, y
   recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó. ⚠️ **Y conviene fijar un dato
   que es fácil citar mal, porque el borrador de esta sección lo citó mal una vez:** el porcentaje no
-  es *«default 7 %, configurable por cliente»* — **el default NO es 7: es 0.** `porcentajeAdicional
-  Decimal @default(0)` (`schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice:
-  *«configurable por cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»*
-  (§Post-F9.2). ⇒ **el 7 % es el valor de C&A**, no el del sistema. 📌 **Y la lección, que es lo que
+  es *«default 7 %»* — **el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)`
+  (`schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice: *«configurable por
+  cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2) — o sea que
+  *«configurable por cliente»* **sí es cierto**, y el propio bullet lo demuestra: lo falso era sólo el
+  7 % como default. ⇒ **el 7 % es el valor de C&A**, no el del sistema. 📌 **Y la lección, que es lo que
   vale:** esa cita falsa se escribió *para corregir* otra imprecisión ⇒ **una frase que arregla un
   dato puede estropear otro, y la frase que corrige también hay que medirla.** No cambia la
   decisión.
