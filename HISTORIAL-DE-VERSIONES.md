@@ -93,7 +93,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   retraso mínimo**. Si justo en ese instante la prueba pedía otra pantalla, las dos navegaciones
   competían y ganaba la del «atrás», así que la prueba se quedaba en la pantalla anterior. **Se arregló
   el 17 de septiembre sin que nadie supiera que era eso**, al hacer que la prueba espere a que el cajón
-  se cierre de verdad. Desde entonces lleva **doce corridas limpias seguidas**.
+  se cierre de verdad. Desde entonces lleva **once corridas limpias seguidas** en la rama de prueba, más dos corridas de
+  revisión como refuerzo.
 - ⚠️ **Y lo que de verdad hay que retener: que el CI esté en verde no significa que todas las pruebas
   pasaran.** El sistema reintenta una vez cada prueba que falla, y si el segundo intento pasa, el
   resultado sale verde. Así se ocultaron **119 corridas en seis semanas** (otras 4 sí se vieron, en rojo). Desde ahora, antes de dar una
