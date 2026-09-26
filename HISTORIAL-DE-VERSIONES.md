@@ -91,7 +91,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   de consultar: tres capas diciendo dos cosas distintas. **Se comprobó perfil por perfil y ninguno de
   los nueve lo notaba** —los ocho que entregan llevan también el de consultar, y el noveno nace vacío—,
   así que era una trampa puesta **para el día en que se reparta el permiso de capturar sin el de ver el
-  taller**. Ese día el comprobante habría fallado sin explicación; ahora no.
+  taller**. Ese día las tres capas habrían dicho cosas distintas —la pantalla ofreciendo un botón que
+  el servidor niega por dentro—; ahora dicen lo mismo. ⚠️ **Y ojo, que no es lo mismo: eso NO significa
+  que ese día ya pueda imprimirlo** — sigue sin poder, y es justo la pregunta abierta de más abajo.
 
 ### Qué cambió y puede sorprender
 
