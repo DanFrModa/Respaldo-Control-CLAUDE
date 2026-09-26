@@ -16564,20 +16564,36 @@ pedido** ⇒ sigue cazando una OC repetida aunque el destino sea un pedido exist
 
 ---
 
-### Las DOS que sí necesitan a Daniel
+**(d) 🔴 NO ES UNA PREGUNTA — Y ESTO SE IBA A MANDAR A DANIEL. El código ya lo prohíbe, y lo prueba.**
+Se había derivado: *«¿se puede añadir un PDF a un pedido CANCELADO o marcado "no producir"?»*, con
+default *«no a las dos»*, y bajo la etiqueta **«📐 Medido»** — cuando la medición **se paró en
+`schema.prisma`**. Medido del todo: `resolverOrigenPedido` (`produccion/ordenes.ts:318`, y lo declara su
+docblock en `:299`) **lanza `ErrorConflicto`** en los dos casos —*«El pedido N está cancelado; no se le
+pueden crear órdenes»* (`:348-351`) y *«…está marcado como "no producir"…»* (`:353-356`)— y `crearOrden`
+lo llama **como primera línea de su transacción** (`:959`), o sea **incondicionalmente y en el camino del
+propio importador PDF** (`crearOrdenDesdePdf` → `salidaAProduccion` → `crearOrden`), que es la MISMA
+cadena que se acababa de recorrer para (b). Y está **amarrado por dos pruebas de integración con
+nombre**: `ordenes.int.test.ts:176` *«RECHAZA crear desde un renglón de pedido CANCELADO»* y `:186`
+*«RECHAZA crear desde un renglón de pedido marcado NO PRODUCIR»*.
+⚠️⚠️ **Es el defecto del día cometido EN EL PÁRRAFO SIGUIENTE al que lo documenta** (el (b) de arriba).
+🔴 **Y el daño no era cosmético: se le ofrecía a Daniel un «sí» como si fuera gratis.** Si contestaba que
+sí, el coste real es **quitar una guarda de producción compartida por TODOS los caminos de alta de OP y
+borrar dos pruebas** — información que la pregunta no le daba. Y si contestaba que no, **no había nada
+que construir**: la fila hereda la guarda gratis.
+📌 **Refuerzos de cerca, mejores que el que se había ido a buscar a otro módulo:** `actualizarPedido` ya
+niega tocar un pedido cancelado (`pedidos/pedidos.ts:592-593`) y `cargarOcYaImportadas` filtra
+`pedCancelado: false` (`oc-duplicada.ts:147`) — **en el mismo archivo que esta sección ya citaba para
+(c)**. *La jerarquía de la evidencia estaba invertida: se buscó refuerzo en `cfdi-ventas.ts`, en otro
+módulo, mientras la guarda de la operación exacta estaba en la cadena ya recorrida.*
+📐 **Lo que SÍ es cierto de la medición de las banderas:** `Pedido` **no tiene enum de estado** y tiene
+exactamente tres booleanos —`pedCancelado`, `noProducir`, `entregadoTienda`—; la tercera **no** frena nada
+y no debe frenar (un pedido puede tener parte entregada y seguir recibiendo OC).
 
-**(P1) ⏳ ¿Se puede añadir un PDF a un pedido CANCELADO, o a uno marcado «no producir»?**
-📐 **Medido: `Pedido` no tiene estado, tiene tres banderas** (`schema.prisma`, modelo `Pedido`):
-`pedCancelado`, `noProducir` y `entregadoTienda`. Las dos primeras son las que importan aquí.
-**Default propuesto: NO a las dos** — si el pedido está cancelado o marcado para no producir, el
-importador no lo ofrece como destino y lo dice con un mensaje claro. *En su idioma:* **si un pedido está
-cancelado, o marcado para no producir, ¿tiene sentido poder meterle una orden de compra nueva?**
-*(La tercera, «entregado a tienda», no se propone como freno: un pedido puede tener parte entregada y
-seguir recibiendo OC.)*
+---
 
-⭐ **Y una evidencia que apareció midiendo otra cosa y refuerza el default:** la conciliación del CFDI de venta **ya excluye los pedidos cancelados** al proponer candidatos (`cfdi-ventas.ts:153`, `where: { …, pedCancelado: false }`) ⇒ **el resto del sistema ya trata un pedido cancelado como fuera de juego**, así que dejarle meter una OC nueva sería la excepción, no la norma.
+### La ÚNICA que necesita a Daniel
 
-**(P2) ⏳ LA QUE DECIDE LA PRIORIDAD, y NO tiene default porque es dato del negocio** (`CLAUDE.md` §7.5,
+**⏳ LA QUE DECIDE LA PRIORIDAD, y NO tiene default porque es dato del negocio** (`CLAUDE.md` §7.5,
 la frecuencia se pregunta, no se supone):
 
 > **¿Cada cuánto te llega una OC del mismo pedido DESPUÉS de haber hecho las OP?**
@@ -16593,9 +16609,14 @@ cuadra** y la sugerencia no sirve.
 
 ### Las que se deciden con default y NO se le preguntan (se anotan para que quede el porqué)
 
+- **Lo único que queda abierto del (d), y es UX, no negocio:** ¿el importador **rechaza ARRIBA** —no
+  ofrece ese pedido como destino, con su mensaje— o **deja que truene abajo** con el mensaje de orden que
+  ya existe? *Default: arriba.* Enseñar la lista sin los pedidos cancelados es más claro que dejar elegir
+  uno y fallar al confirmar, y no duplica la regla: la guarda de abajo sigue siendo la que manda.
+
 - **Un modelo que YA está en el pedido** ⇒ se añade como **renglón aparte** y se **avisa en la vista
   previa**. Dos OC pueden pedir el mismo modelo; fusionar o sumar en silencio sería peor.
-- **El sobre-pedido por packs** (§Post-F9.2: default **7 %**, y ⚠️ **configurable por cliente** en `PlantillaImportacion` — no es una constante, aunque se cite como «el 7 %») ⇒ **por OC, como hoy**. Es lo que el cliente pidió
+- **El sobre-pedido por packs** ⇒ **por OC, como hoy**. ⚠️ **Y de paso, un hecho que esta misma sección publicó mal y se corrige:** se escribió *«default 7 %, configurable por cliente»* para evitar citarlo como constante… **y el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)` (`schema.prisma:1589`), y la propia fuente lo dice: *«configurable por cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2, `DECISIONES.md:617`). ⇒ **el 7 % es el valor de C&A**, no el del sistema. *La frase escrita para corregir un error introdujo otro.* No cambia la decisión («por OC»), pero era un hecho falso en el documento del porqué. Es lo que el cliente pidió
   en ese papel; recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó.
 - **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
   de precios, la referencia D7 y el EDR.

@@ -86,9 +86,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 - 📌 **Nada en el sistema: esto es papeleo, y del que desbloquea.** Lo que cambia es que las preguntas
   están **donde alguien las va a leer** en vez de en una conversación que ya no existe.
-- ⭐ **Y lo mejor: medir las dejó en DOS, no en ocho.** Tres de las que se iban a preguntar **se
-  disolvieron al medirlas**, y una de esas tres ya la había contestado Daniel el 7 de septiembre. Menos
-  preguntas y mejores: eso es lo que se gana midiendo antes de preguntar.
+- ⭐ **Y lo mejor: al final queda UNA sola pregunta.** Ojo, que no es que las ocho se hayan «reducido»:
+  **las ocho no se pudieron leer y se perdieron** — de las que se volvieron a derivar midiendo, **cuatro
+  se cayeron al medirlas** y queda una. Una de las cuatro ya la había contestado Daniel el 7 de
+  septiembre, y otra **la contesta el propio sistema**, que ya impide meterle una orden de compra a un
+  pedido cancelado. Menos preguntas y mejores: eso es lo que se gana midiendo antes de preguntar.
 
 ### Qué cambió y puede sorprender
 
@@ -102,12 +104,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- ⏳ **Dos preguntas para Daniel, y con esas dos la ficha queda lista para construir:**
-  1. **Si un pedido está cancelado, o marcado para no producir, ¿tiene sentido poder meterle una orden de
-     compra nueva?** *(propuesta: no, en los dos casos)*
-  2. **¿Cada cuánto te llega una orden de compra del mismo pedido DESPUÉS de haber hecho las OP?** Ésta
-     **no lleva propuesta** porque es un dato del negocio que sólo él tiene, y es la que decide si esto se
-     adelanta o espera.
+- ⏳ **UNA pregunta para Daniel, y con ella la ficha queda lista para construir:**
+  **¿Cada cuánto te llega una orden de compra del mismo pedido DESPUÉS de haber hecho las OP?** **No lleva
+  propuesta** porque es un dato del negocio que sólo él tiene, y es la que decide si esto se adelanta o
+  espera.
+- ⚠️ **Y una que se iba a preguntar y NO hacía falta, porque el sistema ya lo resuelve:** si se puede
+  meterle una orden de compra a un pedido **cancelado** o marcado **«no producir»**. **Ya lo impide**, con
+  su mensaje y con dos pruebas que lo fijan. Se iba a mandar como pregunta con la propuesta «no» — y eso
+  le habría ofrecido un «sí» **como si fuera gratis**, cuando decir sí costaría **quitar una protección
+  que hoy usan todos los caminos de alta de OP**. Lo cazó la revisión.
 - 📌 **Y un dato que ayuda a contestar la segunda:** el rodeo que usa hoy —una orden de compra por pedido—
   **rompe dos informes**. El de **márgenes agrupa por pedido**, así que da una línea por orden de compra
   en vez de una por lote de negocio; y la **conciliación de la factura de venta** compara totales contra
