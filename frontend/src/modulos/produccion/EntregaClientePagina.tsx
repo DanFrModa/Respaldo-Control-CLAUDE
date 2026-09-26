@@ -64,11 +64,30 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
  * a cliente»); esta pantalla es la puerta del menú, cuando se entrega sin venir de una orden.
  *
  * `produccion.entrega` gobierna la captura; `produccion.cancelar` cancela una entrega (inverso de
- * kardex que devuelve la existencia y el pendiente).
+ * kardex que devuelve la existencia y el pendiente); **`produccion.wip-ver`** ve el historial y el
+ * **comprobante PDF** (fila 0.200: reimprimir es consultar, no capturar).
  */
 export function EntregaClientePagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeEntregar = tienePermiso('produccion.entrega');
+  /**
+   * ⭐ Fila 0.200: el comprobante (PDF) lo sirve el backend con **`produccion.wip-ver`**, no con
+   * `produccion.entrega` — es una reimpresión, o sea una consulta, igual que los impresos de envío y
+   * de recibo.
+   *
+   * ⚠️ **Y lo que este gate NO es: hoy nadie cosecha ese 403.** Se escribió primero que un capturista
+   * con `produccion.entrega` y sin `wip-ver` «capturaba, veía el botón y se llevaba un 403», y **es
+   * falso** — lo desmiente una prueba de este módulo. La barra sale de `ultimaEntrega`, que es estado
+   * LOCAL puesto con la respuesta de la propia captura, **pero esa captura no llega a ocurrir**:
+   * `puedeGuardar` exige `excede === 0`, `excede` se calcula contra `disponible`, y `disponible` sale
+   * de `useSeguimientoEntrega`, que pide `wip-ver`. Sin él el mapa queda vacío, toda cantidad cuenta
+   * como exceso y **«Guardar entrega» nunca se habilita**.
+   * ⇒ El gate vale por dos razones REALES, no por un 403 en vivo: (1) las dos puertas al mismo PDF
+   * dicen lo mismo, y (2) deja de depender de un ACCIDENTE del cálculo del exceso — el día que
+   * alguien arregle ese cálculo para no bloquear cuando no hay disponible (arreglo razonable de
+   * pedir), la barra se vuelve alcanzable de verdad y este gate pasa a ser el único freno.
+   */
+  const puedeImprimirComprobante = tienePermiso('produccion.wip-ver');
 
   const [idOrden, setIdOrden] = useState<number | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<string>('');
@@ -378,16 +397,18 @@ export function EntregaClientePagina(): React.JSX.Element {
                     <span className="text-sm font-medium">
                       Última entrega guardada: #{ultimaEntrega.folio}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        window.open(urlComprobanteEntrega(ultimaEntrega.id), '_blank', 'noopener')
-                      }
-                      data-testid="entrega-pdf"
-                    >
-                      <Printer className="mr-1.5 size-4" aria-hidden /> Comprobante PDF
-                    </Button>
+                    {puedeImprimirComprobante ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          window.open(urlComprobanteEntrega(ultimaEntrega.id), '_blank', 'noopener')
+                        }
+                        data-testid="entrega-pdf"
+                      >
+                        <Printer className="mr-1.5 size-4" aria-hidden /> Comprobante PDF
+                      </Button>
+                    ) : null}
                     <BotonCancelarEntrega
                       entrega={ultimaEntrega}
                       alCancelar={() => {
@@ -417,6 +438,10 @@ export function EntregaClientePagina(): React.JSX.Element {
 function HistorialEntregasOrden({ idOrden }: { idOrden: number }): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeCancelar = tienePermiso('produccion.cancelar');
+  // Fila 0.200: mismo permiso que la ruta del comprobante y que ESTA consulta (`wip-ver`). Aquí el
+  // gate es defensivo —sin `wip-ver` la lista llega vacía y no hay fila que pintar—, pero se pone
+  // igual para que las dos puertas al mismo PDF digan lo mismo.
+  const puedeImprimirComprobante = tienePermiso('produccion.wip-ver');
   const consulta = useEntregasOrden(idOrden);
   const [aCancelar, setACancelar] = useState<EntregaHistorial | null>(null);
 
@@ -469,16 +494,18 @@ function HistorialEntregasOrden({ idOrden }: { idOrden: number }): React.JSX.Ele
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(urlComprobanteEntrega(entrega.id), '_blank', 'noopener')
-                      }
-                      aria-label={`Comprobante de la entrega ${entrega.folio}`}
-                    >
-                      <Printer className="size-4" aria-hidden />
-                    </Button>
+                    {puedeImprimirComprobante ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(urlComprobanteEntrega(entrega.id), '_blank', 'noopener')
+                        }
+                        aria-label={`Comprobante de la entrega ${entrega.folio}`}
+                      >
+                        <Printer className="size-4" aria-hidden />
+                      </Button>
+                    ) : null}
                     {puedeCancelar && !entrega.cancelado ? (
                       <Button
                         variant="outline"

@@ -10,7 +10,10 @@
  *  • `POST /produccion/entregas-cliente/:id/cancelar`(perm `produccion.cancelar`) → cancela (suave + inverso).
  *  • `GET  /produccion/ordenes/:id/entregas`         (perm `produccion.wip-ver`)  → historial de entregas.
  *  • `GET  /produccion/ordenes/:id/seguimiento-entrega`(perm `produccion.wip-ver`) → seguimiento derivado.
- *  • `GET  /produccion/entregas-cliente/:id/comprobante`(perm `produccion.entrega`) → comprobante (PDF).
+ *  • `GET  /produccion/entregas-cliente/:id/comprobante`(perm `produccion.wip-ver`) → comprobante (PDF).
+ *
+ * ⭐ El comprobante va con `produccion.wip-ver` —el permiso de CONSULTA— porque reimprime cualquier
+ * entrega del historial, igual que los impresos de envío y de recibo (fila 0.200).
  */
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
@@ -138,10 +141,16 @@ export const rutasEntregasCliente: FastifyPluginCallbackZod = (app, _opciones, d
   });
 
   // ── Comprobante (binario application/pdf; solo se documentan los errores) ─────
+  //
+  // ⭐ Fila 0.200: la puerta pide `produccion.wip-ver`, NO `produccion.entrega`. El comprobante es
+  // una CONSULTA (se reimprime cualquier entrega del historial), y su dominio entra por
+  // `obtenerEntrega`, que exige `produccion.wip-ver`. Con `produccion.entrega` aquí, quien lo
+  // tuviera sin `wip-ver` pasaba la puerta y se estrellaba contra la reja del dominio DESPUÉS.
+  // Es además lo que piden los tres impresos hermanos (`envios/:id/impreso`, `recibos/:id/impreso`).
   app.route({
     method: 'GET',
     url: '/produccion/entregas-cliente/:id/comprobante',
-    preHandler: app.conPermiso('produccion.entrega'),
+    preHandler: app.conPermiso('produccion.wip-ver'),
     schema: {
       tags: ['produccion'],
       summary: 'Comprobante de entrega a cliente (PDF)',
