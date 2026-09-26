@@ -16328,8 +16328,11 @@ Gabriel**: ninguna es del lead. Lo que sí quedaba y sí se podía hacer eran **
 
 **Su respuesta, textual:** *«Adelante. Está bien. Arranca con las 206.»*
 
-⇒ **Queda CONFIRMADA por Daniel la clasificación 🔶 de las cinco** (0.147, 0.169, 0.200, 0.205, 0.206),
-que hasta hoy estaban *«⏳ pendiente de que Daniel lo confirme»* según `CLAUDE.md` §7.5. El orden
+⇒ **Queda CONFIRMADA por Daniel la clasificación 🔶 de las cinco** (0.147, 0.169, 0.200, 0.205, 0.206).
+**CUATRO de ellas** —0.169, 0.200, 0.205 y 0.206— llevaban el *«⏳ pendiente de que Daniel lo
+confirme»* que pide `CLAUDE.md` §7.5, y hoy lo pierden. ⚠️ **La 0.147 NO lo llevaba:** nació el
+7-sep marcada 🔶 a secas (§Post-F9.207), así que su confirmación no retira ninguna marca — se
+anota aquí para que el recuento de las cinco cuadre, no porque cambie su fila. El orden
 recomendado —0.206 primero por ser la única que le pasa a su gente a diario, luego 0.205 y 0.200— lo
 aceptó sin cambios.
 
@@ -16357,23 +16360,49 @@ alguien lo va a «arreglar» otra vez.
 
 ---
 
-**(b) ⏳ LA PREGUNTA ABIERTA QUE DECIDE UNA SEXTA FILA — el buscador del Centro de Órdenes.**
+**(b) ⏳ LA PREGUNTA ABIERTA QUE DECIDE UNA SEXTA FILA — buscar órdenes sin acentos.**
 
-Al construir la 0.205 se midió que el hueco de los acentos **no eran cinco selectores, sino 31
-sitios**. Los cuatro typeaheads que faltaban quedaron cubiertos, pero **`busquedaCentro` /
-`armarBusqueda` NO** — y es la pantalla que más se usa. Se dejó fuera con razón de diseño, no por
-pereza: `armarBusqueda` es una función **pura y síncrona** que devuelve un `Prisma.OrdenWhereInput` y
-la usan varios llamadores; meterle un pre-filtro asíncrono obliga a `await` en todos ellos.
+Al construir la 0.205 se midió que el hueco de los acentos **no eran cinco selectores**: eran **37
+funciones**, de las que la 0.205 cerró cuatro ⇒ **quedan 33 en 30 archivos** (fila **0.214**). De esas
+33, **`armarBusqueda` de órdenes** y **`busquedaCentro`** son las que duelen. Se dejaron fuera con razón
+de diseño, no por pereza: `armarBusqueda` es una función **pura y síncrona** que devuelve un
+`Prisma.OrdenWhereInput` y la usan varios llamadores; meterle un pre-filtro asíncrono obliga a `await`
+en todos ellos.
 
-**Lo que se le pregunta a Daniel** (y no lo decide el lead, porque depende de cómo busca él):
+⚠️ **ESTE APARTADO SE ESCRIBIÓ CON DOS ERRORES, los dos corregidos el 26-sep al re-medir.** (1) Decía
+**«31 sitios»** y **«28 cajas»**: el barrido que los produjo buscaba `equals` sólo cuatro líneas hacia
+atrás y en los `where` largos de Prisma eso no alcanza — la cifra buena es **33 funciones en 30
+archivos, 48 ocurrencias**, con el criterio *cada `mode: 'insensitive'` cuya clave de filtro más cercana
+sea `contains:`*. (2) Decía que el typeahead descubierto era **el del Centro de Órdenes**, y era falso
+en las dos mitades: los typeaheads server-side son **OCHO** (componentes que pasan `busquedaServidor` al
+`ComboboxBuscable`), **siete están cubiertos** —dos de ellos contra colores— y **el que falta es
+`SelectorOrden`**, el de las seis pantallas de captura (corte, envío, recibo, entrega, nota de salida de
+tela, alta de auditoría). Los **tres comboboxes del Centro** (cliente, maquilero, prov. de arte) **sí
+quedaron cubiertos**. Lo que el Centro tiene descubierto es su **caja de texto libre**, que no es
+typeahead.
 
-> **En el Centro de Órdenes, ¿busca por nombre de cliente o por referencia con acentos?**
+**Lo que se le pregunta a Daniel** (y no lo decide el lead, porque depende de cómo busca él). ⚠️ La
+pregunta **también se re-apuntó**: la primera versión preguntaba por el **nombre de cliente**, y buscar
+por nombre de cliente en el Centro **ya funciona**. Su caja de texto libre busca **código de modelo +
+referencia del cliente + folio**.
 
-- **Sí** ⇒ la fila **0.214** sube a 🔴 *bloquea*: en la pantalla más usada, una lista vacía se lee como
-  *«esa orden no existe»*.
-- **Busca por folio o por código de modelo** (números y claves sin acento) ⇒ se queda en 🔶 y espera.
+> **¿Busca órdenes por departamento o por referencia del cliente («Niño Infantil») en el Centro de
+> Órdenes, o sólo por folio y código de modelo?**
 
-📌 **El criterio que separa los 31 sitios, y vale para futuras filas de esto:** un **typeahead** —donde
+- **Por departamento o referencia** ⇒ la fila **0.214** sube a 🔴 *bloquea*: en la pantalla más usada,
+  una lista vacía se lee como *«esa orden no existe»*.
+- **Sólo folio o código de modelo** (números y claves sin acento) ⇒ se queda en 🔶 y espera.
+
+🔴 **Y una medición que casi la contesta sola:** la referencia del cliente es donde viven los nombres de
+departamento (§Post-F9.172(a)), y de los **ocho departamentos reales, CUATRO llevan ñ** — «Niño
+Juvenil», «Niño Infantil», «Niña Juvenil», «Niña Infantil». Teclear `nino` en el Centro devuelve
+**cero** órdenes cuando lo correcto son *todas las de niño*, y **ni el camino de los sinónimos lo
+salva**: el resolvedor `sinonimosDeDepartamentos` es una de las 33. Es el gemelo del número de la 0.205
+(`nino` entre 5,400 modelos: **0** antes, **771** después). ⇒ **ya no se pregunta si muerde, sino si
+Daniel teclea ahí.**
+
+📌 **El criterio que separa los 33 sitios, y vale para futuras filas de esto:** un **typeahead** —donde
 se teclea a ciegas y la lista vacía es la única respuesta— es mucho peor que una **caja de búsqueda con
-la tabla a la vista**, donde se ve el resultado y se puede ordenar o paginar. Los seis typeaheads
-server-side son la prioridad; las 28 cajas restantes, no.
+la tabla a la vista**, donde se ve el resultado y se puede ordenar o paginar. De las 33, **una alimenta
+un typeahead** (`armarBusqueda` de órdenes) y **una la caja del Centro**: ésas dos son la prioridad; las
+**31 cajas** restantes, no.

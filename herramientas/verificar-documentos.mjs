@@ -174,6 +174,67 @@ for (const { simbolo, patron, nombre } of listasDelResumen) {
   }
 }
 
+// ── 1c · Las cifras que el propio resumen REPITE más abajo ──────────────────────────────────────
+//
+// El resumen no dice el número de ⬜ una vez: lo dice, y tres renglones después lo VUELVE A DECIR
+// para desglosarlo («Y de esas N ⬜, NUEVE las llama post-V1…»). El 26-sep-2026 el reviewer cazó que
+// la primera decía 25 y la segunda seguía en 26 — al bajar el total se corrigió el sitio que estaba
+// en el ojo y no el que estaba más abajo. El bloque 1 NO lo veía, porque su regex captura sólo la
+// PRIMERA aparición del patrón. Es la trampa del §8 de `CLAUDE.md` en su forma más pura: *un dato
+// repetido en N sitios necesita un cruce mecánico, no N lecturas*.
+const reMenciones = [...hoja.matchAll(/de esas \*{0,2}(\d+)\*{0,2} ⬜/g)];
+if (reMenciones.length === 0) {
+  problemas.push('No se encontró la re-mención «de esas N ⬜» del resumen; ¿se reescribió la línea?');
+}
+for (const [texto, cifra] of reMenciones) {
+  if (+cifra !== real.porHacer) {
+    problemas.push(
+      `El resumen re-dice «${texto.trim()}» y el tablero tiene ${real.porHacer} filas ⬜.`,
+    );
+  }
+}
+
+// ── 1d · El desglose de la V1: que sume, y que cada lista tenga los que dice ─────────────────────
+//
+// Este desglose YA salió mal una vez, y la propia línea lo cuenta: decía «15 … 3 + 7 + 5» y no
+// sumaba (eran 16, y las que pueden esperar 6). Se corrigió a mano y a mano volvió a quedar
+// expuesto. Tres números y tres listas cruzados entre sí es trabajo de script, no de ojo.
+const desglose = [
+  { nombre: 'bloquean', patron: /\*\*(\d+) que bloquean\*\* \(([^)]*)\)/ },
+  { nombre: 'duelen', patron: /\*\*(\d+) que duelen\*\* \(([^)]*)\)/ },
+  { nombre: 'pueden esperar', patron: /\*\*(\d+) que pueden esperar\*\* \(([^)]*)\)/ },
+];
+let sumaV1 = 0;
+let desgloseCompleto = true;
+for (const { nombre, patron } of desglose) {
+  const hallada = hoja.match(patron);
+  if (hallada === null) {
+    problemas.push(`No se encontró el grupo «N que ${nombre} (…)» del desglose de la V1.`);
+    desgloseCompleto = false;
+    continue;
+  }
+  const dicho = +hallada[1];
+  const filas = hallada[2]
+    .split(',')
+    .map((x) => x.trim())
+    .filter((x) => /^0\.\d+$/.test(x));
+  if (filas.length !== dicho) {
+    problemas.push(
+      `El desglose dice «${dicho} que ${nombre}» y su paréntesis nombra ${filas.length}: ${filas.join(', ')}.`,
+    );
+  }
+  sumaV1 += dicho;
+}
+const totalV1 = hoja.match(/pendientes de verdad para la V1: \*{0,2}(\d+)/);
+if (totalV1 === null) {
+  problemas.push('No se encontró el total «pendientes de verdad para la V1: N».');
+} else if (desgloseCompleto && +totalV1[1] !== sumaV1) {
+  problemas.push(
+    `El resumen dice «pendientes de verdad para la V1: ${totalV1[1]}» y sus tres grupos suman ${sumaV1}.`,
+  );
+}
+decir(`  V1: ${totalV1 === null ? '?' : totalV1[1]} pendientes = ${sumaV1} sumando los tres grupos`);
+
 // ── 2 · El número de versión, en sus cuatro sitios ──────────────────────────────────────────────
 const historial = leer('HISTORIAL-DE-VERSIONES.md');
 const versionTs = leer('frontend/src/version.ts');
