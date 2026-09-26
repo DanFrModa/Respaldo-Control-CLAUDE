@@ -16593,12 +16593,18 @@ y no debe frenar (un pedido puede tener parte entregada y seguir recibiendo OC).
 
 ---
 
-### La ÚNICA que necesita a Daniel
+### La ÚNICA que necesita a Daniel — ✅ **CONTESTADA EL MISMO DÍA (§Post-F9.242): «nunca»**
 
 **⏳ LA QUE DECIDE LA PRIORIDAD, y NO tiene default porque es dato del negocio** (`CLAUDE.md` §7.5,
 la frecuencia se pregunta, no se supone):
 
 > **¿Cada cuánto te llega una OC del mismo pedido DESPUÉS de haber hecho las OP?**
+
+> ✅ **Contestó: «nunca llega una nueva OC de un pedido ya metido. En todo caso se genera un nuevo pedido
+> con una nueva OC»** (26-sep-2026). ⇒ ese disparador tiene frecuencia **cero**… **pero la fila NO se queda
+> sin caso**: hay otro, y lo produce el propio importador al **omitir** los PDF que no reconoce y no
+> aceptar pedido de destino para el reintento, con lo que **parte la tanda en dos**. Medido y desarrollado
+> en **§Post-F9.242**, que es donde vive el estado de esta fila a partir de hoy.
 
 📌 Y el dato que sube el valor de la fila por encima de «comodidad», por si ayuda a contestarla: el rodeo
 actual —una OC por pedido— **rompe dos informes**. Los **márgenes agrupan por pedido**
@@ -16606,6 +16612,22 @@ actual —una OC por pedido— **rompe dos informes**. Los **márgenes agrupan p
 **conciliación del CFDI de venta** propone candidatos comparando el total de la factura contra el del
 pedido (`cfdi-ventas.ts:152-181`), así que si una factura cubre tres OC en tres pedidos, **ningún total
 cuadra** y la sugerencia no sirve.
+
+> ⚠️ **ANOTADO EL 26-SEP-2026, EL MISMO DÍA. Ver §Post-F9.242 — y ojo, que las dos mitades NO están igual.**
+> La premisa del párrafo, *«una OC por pedido»*, **es falsa**: un pedido es la **TANDA**, hasta 40 PDF, y
+> `contrato/esquemas/importacion-pdf.ts:142` lo dice con esas palabras —*«un pedido con muchas OCs»*—.
+> ⇒ **MÁRGENES: se RETIRA.** Agrupa por **tanda**, así que si el lote de negocio se captura de una sentada
+> el informe contesta justo lo que se le pregunta; y una tanda de N OC **colapsa N en UNA fila**, el efecto
+> contrario al que aquí se denuncia. Queda **INDETERMINADO** hasta que Daniel diga si un lote le llega de
+> una vez.
+> ⇒ **CONCILIACIÓN: se MANTIENE, porque tal como está escrita es CIERTA** —*«tres OC en tres pedidos»* **sí**
+> cruza pedidos, que es justo lo que descuadra—. Lo único que se añade es la precisión que invita a no
+> generalizarla: **lo que rompe la sugerencia es cruzar PEDIDOS, no OC**; varias OC del mismo pedido sí
+> cuadran. 🔑 Y se dice de quién fue el error: **§Post-F9.242 la generalizó a *«si una factura cubre varias
+> OC»*, y ESO sí era falso.** *Corregir un hecho no autoriza a acusar de falsa la frase de al lado que era
+> correcta.*
+> **Se anota aquí en vez de reescribirlo** porque quien lea esta sección tiene que ver el aviso pegado a la
+> afirmación, no en el documento de al lado (cicatriz del 3-sep).
 
 ---
 
@@ -16632,3 +16654,118 @@ cuadra** y la sugerencia no sirve.
 - **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
   de precios, la referencia D7 y el EDR.
 - **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).
+
+#### (Post-F9.242) — UN PEDIDO ES UNA TANDA, NO UNA OC — Y LA 0.147 CONSERVA UN CASO QUE PRODUCE EL PROPIO IMPORTADOR (26-sep-2026, fila 0.147)
+
+**Contexto.** Se le preguntó a Daniel lo único que quedaba abierto de la 0.147 —la frecuencia, que es dato
+del negocio (`CLAUDE.md` §7.5)—. Su respuesta, textual:
+
+> *«No entendí bien. Pero **nunca llega una nueva OC de un pedido ya metido**. En todo caso **se genera un
+> nuevo pedido con una nueva OC**.»*
+
+⇒ **Eso cierra UN disparador de la fila —la OC que llega días después— con frecuencia CERO.** No cierra la
+fila: hay **otro disparador**, y lo produce el importador él mismo (abajo).
+
+### 🔴 LA CONCLUSIÓN QUE SE PUBLICÓ PRIMERO ERA FALSA, Y SE CONTRADECÍA SOLA DOS PÁRRAFOS DESPUÉS
+
+Esta sección nació diciendo **«UNA OC = UN PEDIDO»** en su propio título, y sobre eso retiraba el hallazgo
+de los márgenes. **Es falso**, y lo desmiente el mismo archivo que se citaba como prueba:
+
+- `contrato/esquemas/importacion-pdf.ts:142`, textual: *«Cuántos PDFs se aceptan por importación (**un pedido
+  con muchas OCs**; bound de memoria/parseo)»*, con `MAX_ARCHIVOS_PDF = 40`.
+- `dominio/pedidos/numero-produccion-pdf.ts:124`, textual: *«una tanda repite el mismo modelo en **varias
+  OC** (**es el caso de Daniel**)»* — y `:113` habla de *«el resto de **las OC de la tanda**»*.
+- `dominio/pedidos/oc-duplicada.ts:15-18` lo dice como doctrina: **`Orden.ocCliente`** es *«el nº de orden
+  del papel, **uno POR OP**»*, y **`Pedido.ocCliente`** es *«la **referencia general de la TANDA** (que
+  puede ser otra cosa, o nada)»*.
+- `importacion-pdf.ts:1070-1071` pluraliza dentro de UN confirm: `${colisiones.length === 1 ? 'la OC' :
+  'las OC'}`.
+
+⇒ **Un pedido es una TANDA: las OC que se capturan de una sentada, hasta 40. La identidad de la OC vive en
+la OP.** Lo de Daniel y esto **no se contradicen**: varias OC capturadas **juntas** caben en un pedido; una
+OC que llega **después** abre pedido nuevo. Son las dos mitades de la misma regla.
+
+🔑 **Y la lección de método, que es la peor de la tanda:** el párrafo que midió bien —*«el importador ya mete
+una TANDA ENTERA de PDF en UN pedido»*— y el que concluyó mal —*«un pedido ES una OC»*— **estaban a dos
+párrafos de distancia, en la misma sección, escritos en la misma pasada**. No fue falta de datos: fue **no
+leer lo que yo mismo acababa de escribir**. Lo cazó el reviewer. *Una conclusión que suena redonda no se
+comprueba contra la memoria de haberla medido: se comprueba contra el párrafo de arriba.*
+
+### 🔴 EL OTRO DISPARADOR, MEDIDO: EL CONFIRM PARTE LA TANDA ÉL SOLO
+
+**El importador OMITE PDFs de la propia tanda y crea el pedido con el resto.** Su docblock
+(`importacion-pdf.ts:888-890`), textual: *«Los PDFs **sin liga** (ni aprendida ni en `ligas`), **sin tallas**
+o **corruptos** se **OMITEN** y se devuelven en `noReconocidos`»*. Son **cuatro** ramas con `continue`
+(`:955` PDF ilegible · `:968` OC ya importada · `:987` sin liga o liga a modelo inactivo · `:995` sin tallas
+con piezas), y el contrato las expone (`:566`, *«PDFs que quedaron sin importar»*, junto a `:565`, *«OPs
+creadas (una por PDF ligado)»*).
+
+⇒ El usuario arregla la liga, vuelve a importar… **y no hay destino**: el cuerpo del confirm
+(`esquemas/importacion-pdf.ts:482-507`) sólo acepta `idCliente`, `referenciaGeneral`, `archivos`, `ligas` y
+`porcentajeAdicional` ⇒ **nace un pedido nuevo y la tanda queda partida en dos**.
+
+🔑 **Y esto es exactamente la lectura (ii) que esta sección ofrecía como HIPÓTESIS** (*«se le quedó un PDF
+fuera de la misma tanda»*) para explicar por qué Daniel pidió esto el 7-sep. **No era una hipótesis sobre su
+memoria: es comportamiento de diseño**, a treinta segundos del archivo que ya se estaba midiendo. ⚠️ **La
+respuesta de Daniel NO lo cubre**, porque no es una OC nueva: es la misma tanda, incompleta. 📌 **El mecanismo `noReconocidos` estaba documentado sólo de pasada**, y para **una** de las cuatro ramas:
+`docs/rediseno/PLAN-IMPLEMENTACION.md:227`, *«liga a inactivo → advertencia y `noReconocidos`, no revienta
+la tx»*. ⚠️⚠️ **Y esta frase merece su propio aviso, porque nació falsa y por un camino nuevo.** Decía *«no
+estaba documentado en ningún sitio — aparece una sola vez en toda la documentación y sólo como número de
+línea»*, y era **falso**: `grep -rc "noReconocidos" --include=*.md` da **tres archivos**, y el tercero
+documenta comportamiento. 🔑 **No la midió el lead: se la creyó.** La escribió **el reviewer** en su informe
+—midiéndola sobre dos archivos cuando su propio barrido anterior ya listaba el tercero— y entró a este
+documento **copiada, sin re-medir**. ⇒ **la afirmación de un reviewer no es evidencia: se mide antes de
+publicarla, igual que la de cualquiera.** Es la primera vez en esta tanda que una falsedad entra por ahí, y
+por eso queda escrita: el reviewer es la red que caza los errores del lead, **no una fuente de hechos**.
+
+### ⚠️ Y contradice sus palabras del 7-sep, que siguen en pie para ESE caso
+
+§Post-F9.207 lo cita textual:
+
+> *«es importante poder meter mas PDF al pedido ya hecho […] que se pueda seguir añadiendo mas PDF **aunque
+> ya esten hechas algunas OP**.»*
+
+Con el disparador del `noReconocidos` medido, **ya no hay que elegir entre sus dos frases**: son
+compatibles. La del 7-sep describe la tanda partida (que sí pasa, y la produce el sistema); la del 26-sep
+descarta la OC tardía (que no pasa). ⇒ **La fila 0.147 conserva caso, y su caso es más chico y más claro que
+el que tenía**: no hace falta «añadir a un pedido con OP vivas semanas después», basta **poder terminar la
+tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que ése era su caso.
+
+### ✅ Las dos conclusiones sobre los informes, RE-DERIVADAS (las dos se habían publicado mal)
+
+- **Márgenes: NO está roto «porque un pedido es una OC» —eso era falso— y tampoco está roto como decía la
+  0.147. Queda INDETERMINADO, y depende de un dato del negocio.** `costos/margenes.ts:205` agrupa por
+  pedido (`GROUP BY p."id", p."folio", p."id_cliente", c."nombre", p."fecha_hasta"`, verificado) ⇒ **agrupa
+  por TANDA**. Si el lote de negocio **es** lo que se captura de una sentada, el informe contesta justo lo
+  que se le pregunta; si un lote se reparte en varias tandas —o si el `noReconocidos` lo parte—, da varias
+  filas donde debería dar una. **No se puede cerrar midiendo código.** ⚠️ Y ojo con la dirección: una tanda
+  de N OC **colapsa N OC en UNA fila**, que es el efecto contrario al que la fila 0.147 denunciaba.
+- **Conciliación del CFDI de venta: el problema existe. Lo que estaba mal era la GENERALIZACIÓN que
+  hizo la primera versión de ESTA sección** —*«si una factura cubre varias OC, ningún total
+  cuadra»*—, **no lo que decían §Post-F9.241 y la fila**, que hablaban de *«tres OC en **tres
+  pedidos**»* y eso **es cierto**. `matchPedidos` (`terceros/cfdi/cfdi-ventas.ts:152-181`) compara
+  el total de la factura contra la suma de las líneas de cada **pedido** ⇒ una factura que cubre
+  **varias OC de un mismo pedido SÍ cuadra**. Lo que rompe la sugerencia es que la factura cruce
+  **PEDIDOS (tandas)**, no OC. 🐛 **Y un agravante encontrado de paso:** el candidato devuelve
+  `ocCliente: pedido.ocCliente` (`:178`) y eso significa **dos cosas distintas según por dónde entró
+  el pedido**: en los nacidos del **importador de PDF** es *«la referencia general de la TANDA (que
+  puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no necesariamente
+  muestra una OC** —y el «no necesariamente» es literal: en un import de un solo PDF donde el
+  usuario teclee la OC en `referenciaGeneral`, sí lo es—; en los capturados **a mano o por Excel**
+  sí lo es —`schema.prisma:3244-3246` lo define como *«OC ORIGINAL del cliente… captura VIVA y
+  editable»* y la pantalla lo rotula *«OC del cliente (referencia)»* (`ConstructorPedido.tsx:359`)—.
+  ⚠️ **Se acota a propósito:** la primera versión de esta sección lo generalizó a todos los pedidos,
+  que es **la misma sobre-generalización** que este párrafo acaba de corregir en la frase de al
+  lado.
+
+### ⏳ Las preguntas, corregidas (las primeras estaban mal planteadas)
+
+1. **¿Las OC que van juntas en un lote de negocio te llegan y las capturas de una sentada, o te van llegando
+   en días distintos?** Es la que decide lo de márgenes, y no tiene default porque es dato del negocio.
+2. **¿Una factura tuya cubre a veces más de un PEDIDO (más de una tanda)?** ⚠️ Se le iba a preguntar *«más
+   de una OC»*, y esa respuesta **no decide nada**: varias OC del mismo pedido ya cuadran.
+3. **¿Tu caso del 7-sep era la tanda que quedó a medias** porque un PDF no se reconoció?
+
+📌 **La lección que queda escrita, y es la misma tres veces:** *preguntar antes de construir salió barato —el
+CAMINO A se iba a justificar sobre dos informes rotos y ninguno lo estaba como se decía—, pero **una pregunta
+mal planteada no ahorra nada**: gasta un viaje al dueño y vuelve con un dato que no decide.*

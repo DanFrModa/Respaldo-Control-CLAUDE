@@ -71,6 +71,65 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.184 · 26-sep-2026 · **en prueba** — **Tu respuesta acota una pendiente… y midiéndola aparece el caso de verdad: el importador parte la tanda él solo**
+
+> **La v0.184 no cierra ninguna fila del programa**: escribe una **respuesta tuya** donde se lee, y corrige
+> dos cosas que la versión anterior había publicado mal. No cambia nada en pantalla.
+
+### Qué se puede hacer ahora que antes no
+
+- 📌 **Nada nuevo en el sistema: esto es papeleo del que ahorra trabajo.** Lo que cambia es que tu
+  respuesta del 26 de septiembre queda escrita en la ficha y en el documento del porqué, en vez de quedarse
+  en una conversación que mañana nadie encuentra.
+- ⭐ **Tu respuesta acota la ficha a la mitad.** Te preguntamos con qué frecuencia te llega una orden de
+  compra del mismo pedido después de haber hecho las OP, y contestaste: **nunca** — *«en todo caso se genera
+  un nuevo pedido con una nueva OC»*. Ese caso, por tanto, **no hay que construirlo**.
+- 🔴 **Pero al medirlo apareció el caso que sí pasa, y lo causa el sistema:** cuando subes varios PDF de
+  golpe, **los que no reconoce los deja fuera** —sin liga a un modelo, sin tallas, o ilegible— y crea el
+  pedido con el resto. **Sí te avisa**: te marca **en rojo** el PDF que no se pudo leer, con su motivo debajo, y al
+  terminar te dice cuántos quedaron fuera. **El problema no es el aviso: es que
+  cuando arreglas el que falló y lo vuelves a subir, no hay manera de meterlo en el pedido que ya hiciste**
+  — nace otro. Es decir, **el sistema te parte en dos la misma tanda**.
+- ⭐ **Eso hace la ficha más pequeña y más clara:** ya no hace falta «añadir a un pedido con OP vivas
+  semanas después». Basta con **poder terminar la tanda que quedó a medias**. Sigue clasificada como «duele
+  pero se aguanta», y ahora es de las baratas.
+- ✅ **Y lo que sí se midió y funciona:** puedes subir **hasta 40 PDF de una vez y todos caen en un solo
+  pedido**, cada uno con su propia OP y con el número de su propio papel.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La versión anterior publicó una conclusión falsa y se corrige aquí: «un pedido es una orden de
+  compra».** No lo es: **un pedido es la TANDA** que subes de una vez, y puede llevar muchas órdenes de
+  compra —el propio código lo dice con esas palabras, y dice que las tandas con varias órdenes de compra
+  **son tu caso**—. La orden de compra vive en la OP, no en el pedido. *Tu respuesta y esto no se
+  contradicen: varias órdenes que capturas **juntas** van en un pedido; una que llega **después** abre uno
+  nuevo. Son las dos mitades de la misma regla.*
+- 🔴 **Y por eso se retira lo que te dije ayer de los dos informes.** Te dije que tu manera de trabajar
+  rompía el de márgenes y la conciliación de facturas. Con la medición bien hecha:
+  - **Márgenes: no se sabe, y depende de un dato tuyo.** Agrupa por pedido, o sea **por tanda**. Si un lote
+    de negocio es lo que subes de una sentada, el informe contesta justo lo que le preguntas. Si un lote se
+    te reparte en varias tandas, da varias líneas donde debería dar una. **Está preguntado abajo.**
+  - **La conciliación de la factura de venta sí tiene un problema, pero no el que te dije.** Compara el
+    total de la factura contra el total de cada **pedido**, así que una factura que cubre **varias órdenes
+    de compra del mismo pedido sí cuadra**. Lo que la descuadra es que la factura cruce **pedidos**. Y de
+    paso: en los pedidos que nacen del importador de PDF, la columna que te muestra como «OC» del candidato
+    **no es una orden de compra**, es la referencia general de la tanda. En los que capturas a mano sí lo
+    es.
+- 📌 **Lo anterior queda tachado en su sitio**, no sólo corregido aquí: quien lea la ficha o el documento
+  del porqué se encuentra el aviso pegado a la frase equivocada.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Tres preguntas para ti** —y las dos primeras están **re-planteadas**, porque como estaban antes te
+  habrían costado una respuesta que no decidía nada:
+  1. **¿Las órdenes de compra de un mismo lote te llegan y las capturas de una sentada, o te van llegando
+     en días distintos?** Es la que decide lo de márgenes.
+  2. **¿Alguna de tus facturas cubre más de un PEDIDO (más de una tanda)?** Antes te íbamos a preguntar «más
+     de una orden de compra», y eso no decide nada: varias del mismo pedido ya cuadran.
+  3. **¿Tu caso del 7 de septiembre era la tanda que quedó a medias** porque un PDF no se reconoció?
+- 📌 **El recuento de pendientes para la primera versión NO se mueve**: siguen catorce. La ficha conserva
+  caso, así que no sale de la lista.
+
 ## 0.183 · 26-sep-2026 · **en prueba** — **Las preguntas que estaban en un chat perdido, escritas donde se leen — y medirlas disolvió cuatro de las cinco**
 
 > **La v0.183 no cierra ninguna fila del programa**, y la razón es la contraria de lo habitual:
@@ -166,8 +225,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Y dos cosas que esa misma ficha decía y estaban mal**, ya corregidas en la documentación: el rodeo que
   usa Daniel —meter cada OC en su propio pedido y juntarlas al comprar— **sí funciona entero para
   comprar**; pero tiene dos agujeros que él no ha pisado: **el informe de márgenes agrupa por pedido**
-  (así que da una línea por OC en vez de una por lote de negocio) y **la conciliación de la factura de
-  venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
+  (así que da una línea por OC en vez de una por lote de negocio) ⚠️ **[RETIRADO al día siguiente, en la
+  v0.184: parte de «una OC por pedido», y eso es falso — un pedido es la TANDA, así que el informe agrupa
+  por tanda y queda INDETERMINADO hasta que Daniel diga si un lote le llega de una vez]** y **la conciliación de la
+  factura de venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
   total cuadra.
 - **La prueba se dejó a propósito SIN blindar.** Se podría hacer robusta con una espera extra, pero eso la
   volvería incapaz de avisar si la explicación resulta equivocada. Se queda como canario: si vuelve a
