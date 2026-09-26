@@ -71,6 +71,56 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.182 · 26-sep-2026 · **en prueba** — **Una prueba automática llevaba seis semanas fallando la mitad de las veces sin que nadie lo viera: ya sabemos por qué**
+
+> No cambia nada de lo que se ve en pantalla, y conviene decirlo en la primera línea. Es una revisión
+> interna que cierra un pendiente que llevaba abierto desde el 19 de agosto, y de paso destapa algo que
+> vale más que el pendiente: **el tablero decía «todo verde» y era cierto, pero una de las 105 pruebas
+> automáticas estaba fallando la mitad de las veces.**
+>
+> 📌 **La v0.182 cierra la fila 0.169.**
+
+### Qué se puede hacer ahora que antes no
+
+- 📌 **Nada que se note en el sistema.** Lo único que cambió es un comentario dentro de una prueba y la
+  documentación. Se publica porque cierra un pendiente y porque la lección de abajo tiene que quedar
+  escrita donde se lea.
+
+### Qué cambió y puede sorprender
+
+- ⭐ **La prueba que fallaba lo hacía por un «atrás» del navegador que nadie había buscado.** Al cerrar el
+  cajón de Ruta Crítica, el sistema deshace el paso que había apilado al abrirlo — y lo hace **con un
+  retraso mínimo**. Si justo en ese instante la prueba pedía otra pantalla, las dos navegaciones
+  competían y ganaba la del «atrás», así que la prueba se quedaba en la pantalla anterior. **Se arregló
+  el 17 de septiembre sin que nadie supiera que era eso**, al hacer que la prueba espere a que el cajón
+  se cierre de verdad. Desde entonces lleva **once corridas limpias seguidas** en la rama de prueba, más dos corridas de
+  revisión como refuerzo.
+- ⚠️ **Y lo que de verdad hay que retener: que el CI esté en verde no significa que todas las pruebas
+  pasaran.** El sistema reintenta una vez cada prueba que falla, y si el segundo intento pasa, el
+  resultado sale verde. Así se ocultaron **119 corridas en seis semanas** (otras 4 sí se vieron, en rojo). Desde ahora, antes de dar una
+  entrega por buena se lee el contador que lo delata — no basta el tick verde.
+- 🔎 **Esto también corrige dos cosas que el propio código afirmaba y eran falsas:** que el problema
+  ocurría «en tres corridas de agosto» (fueron 123) y que la evidencia se había perdido al caducar
+  (seguía disponible, y no hacía falta).
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Un pendiente de registro que hay que resolver antes de tocar otra cosa:** la ficha de *«seguir
+  añadiendo PDF a un pedido ya hecho»* —lo que pidió Daniel el 7 de septiembre— dice que hay **ocho
+  preguntas para él, con su propuesta cada una**, y remite a un mensaje de chat de una conversación
+  cerrada: **no se pueden leer**. Hay que volver a plantearlas antes de construir nada. La única que sí
+  quedó escrita, y que es dato del negocio: **¿cada cuánto te llega una orden de compra del mismo pedido
+  después de haber hecho las órdenes de producción?**
+- **Y dos cosas que esa misma ficha decía y estaban mal**, ya corregidas en la documentación: el rodeo que
+  usa Daniel —meter cada OC en su propio pedido y juntarlas al comprar— **sí funciona entero para
+  comprar**; pero tiene dos agujeros que él no ha pisado: **el informe de márgenes agrupa por pedido**
+  (así que da una línea por OC en vez de una por lote de negocio) y **la conciliación de la factura de
+  venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
+  total cuadra.
+- **La prueba se dejó a propósito SIN blindar.** Se podría hacer robusta con una espera extra, pero eso la
+  volvería incapaz de avisar si la explicación resulta equivocada. Se queda como canario: si vuelve a
+  caer, la explicación se cae con ella.
+
 ## 0.181 · 26-sep-2026 · **en prueba** — **El comprobante de entrega ya no se le esconde a quien puede imprimirlo (ni se le ofrece a quien no)**
 
 > Tercera de la lista que Daniel aprobó, después de la 0.206 y la 0.205. Es un arreglo de permisos:

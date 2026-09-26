@@ -276,21 +276,43 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');
-    // ⚠️ Esta recarga completa es FLAKY CRÓNICO desde antes de esta rama: falla en las 3 corridas de
-    // `prueba` del 18-ago y se salva con el reintento. Se afirma primero la URL para que, cuando
-    // falle, el mensaje DIGA dónde acabó la página en vez del inútil "element(s) not found".
+    // ⚠️ Esta recarga completa FUE FLAKY CRÓNICO, y su causa quedó MEDIDA el 26-sep-2026 (fila 0.169).
+    // Se afirma primero la URL para que, cuando falle, el mensaje DIGA dónde acabó la página en vez
+    // del inútil "element(s) not found" — esa instrumentación es la que permitió cazarlo.
     //
     // 🔴 8-sep-2026: y lo dijo. Al caer en el CI del PR #330 la página se había quedado en
     // `/produccion/ordenes` —la pantalla anterior, 62 sondeos con el mismo valor—, NO en `/login`.
-    // ⇒ la sospecha que este comentario traía antes (que la causa era la sesión, `retry: false` de
-    // `ProveedorSesion.tsx`) **queda descartada para este caso**. La causa real sigue SIN MEDIR: se
-    // descartó de paso que la devolviera una redirección de `App.tsx`, y la traza del CI que lo cazó
-    // (corrida 34269838020) EXPIRÓ el 15-sep, así que ya no hay de dónde sacarla.
+    // ⇒ la sospecha de que la causa era la sesión (`retry: false` de `ProveedorSesion.tsx`) quedó
+    // DESCARTADA. Los 92 fallos medidos dan `/produccion/ordenes` en 92 de 92: jamás `/login`.
     //
-    // 17-sep-2026: se cerró arriba la única precondición sin esperar que quedaba (el `Escape` que no
-    // aguardaba a que el cajón se desmontara). **No se afirma que fuera la causa.** Si esto vuelve a
-    // caer, la hipótesis de esa carrera queda descartada también, y la fila **0.169** —que sigue
-    // ABIERTA— tendrá que atacar lo siguiente con una traza fresca.
+    // ⭐ 26-sep-2026 — LA CAUSA, medida: **cerrar el cajón de Ruta Crítica dispara un «atrás» REAL
+    // del navegador, DIFERIDO, que compite con el `page.goto` de abajo.** `PanelRutaOrden` es un
+    // `CajonDetalle` (`:137`) y `CajonDetalle` usa `useCerrarConAtras` (`:73`): al abrirse apila un
+    // CLON con la MISMA URL (`useCerrarConAtras.ts:115`) y al cerrarse lo consume con
+    // `window.history.go(-1)` (`:128`) dentro de un `setTimeout(…, 0)` (`:159`). La entrada anterior
+    // del historial es, por eso, exactamente `/produccion/ordenes` — el `Received` invariable.
+    // 🔑 La prueba de humo es la tercera cara del fallo: `net::ERR_ABORTED` en este mismo `goto`.
+    // Chromium aborta una navegación en vuelo **cuando otra la adelanta**; no es red (nginx sirviendo
+    // un `index.html` estático no aborta) y no hay ningún `beforeunload` en el frontend.
+    //
+    // 📐 **Y la frecuencia real, que el comentario anterior dejaba en «las 3 corridas del 18-ago»:**
+    // medido sobre **242 jobs `e2e` de `prueba` del 1-ago al 23-sep**, esta prueba falló al menos un
+    // intento en **123** de ellos — **la mitad**. Sólo **4** llegaron a rojo; `retries: 1`
+    // (`playwright.config.ts:23`) escondió los otros **119** (las 4 rojas sí se veían). ⚠️ **Un job `e2e` VERDE no significa que
+    // esta prueba pasara**: lo único que lo delata es el contador `flaky` del resumen.
+    // ⚠️ También era falso que la evidencia se hubiera perdido al expirar la traza: las
+    // *check-run annotations* de las 123 (4 rojas + 119 flaky) siguen legibles por API.
+    //
+    // ✅ **Lo arregló el 17-sep el `cerrarCajon` de `e2e/ayudas.ts`**, que ahora espera
+    // `toHaveCount(0)` —la animación de salida de Radix, cientos de ms— en vez de resolver al
+    // despachar la tecla: el `go(-1)` termina antes de que arranque el `goto`. **11 corridas limpias
+    // seguidas en `prueba`** desde entonces (+ 2 corridas de PR, como refuerzo), contra una base de
+    // **123 de los 232 jobs que llegaron a correr = 53 %**.
+    // 🔴 **NO se añade aquí una espera explícita del clon** (`expect.poll` sobre
+    // `window.history.state.__capaFlotante === 0`) **a propósito**: haría la prueba robusta y de paso
+    // **taparía la señal**. Tal como está es el canario — si vuelve a caer con una de sus tres formas
+    // (este `toHaveURL` con `/produccion/ordenes`, el `ERR_ABORTED`, o el `toBeVisible` de abajo),
+    // la hipótesis de la carrera queda desmentida y la **0.169** se reabre con una traza fresca.
     await expect(page).toHaveURL(/\/pedidos\/administrar$/, { timeout: 30_000 });
     // `exact`: el matcher por nombre es substring y el panel de detalle trae un <h3>"Pedidos
     // reales"</h3> que aparece al auto-seleccionar un pedido (async) → sin exact, doble match flaky.

@@ -14096,6 +14096,41 @@ después. **Se miden juntos.**
 📌 **Rodeo que él mismo usó para no frenarse:** meter la OP nueva desde su propio PDF y juntarlas en la
 explosión con «agregar una OP de otro pedido».
 
+⚠️ **ANOTACIÓN AL PIE (26-sep-2026) — CUATRO COSAS DEL CUERPO DE ARRIBA QUEDARON DESMENTIDAS, y la fila
+0.147 ya lo recoge; esta sección no.** Se anota aquí en vez de reescribir el cuerpo porque **las palabras
+de Daniel no se tocan** y porque el relato del 7-sep es el registro de lo que se sabía ese día. Lo medido
+el 17-sep-2026, y re-verificado hoy:
+
+1. **Las tres citas están CADUCAS** (deriva del archivo, no invención): `confirmarImportacionPdf` está hoy
+   en **`:897`** (no `:810`), el `tx.pedido.create` en **`:1083`** (no `:987`) y el cuerpo del contrato en
+   **`:482-506`** (no `esquemas/importacion-pdf.ts:400-425`). Quien siguiera la primera cita aterrizaba en
+   `renglonError()` (definido en `:793`); la segunda, dentro del bucle de `noReconocidos.push`.
+2. 🔴 **«y la explosión no los junta» ES FALSO, y es lo que más cambia la fila.** `explosionarOrdenes`
+   (`compras/mrp.ts:2223`) recibe **una lista libre de ids de OP**, no un pedido; el pedido interno es
+   sólo **precarga de comodidad** (`:2344`) y la pantalla trae un **buscador libre** que agrega cualquier
+   OP. ⇒ **el rodeo de Daniel funciona ENTERO para comprar.**
+3. 🔴 **«Se miden juntos [con el punto 16]» YA NO APLICA.** El punto 16 es literalmente **«BORRAR vs
+   CANCELAR»** (§Post-F9.211); su guarda se construyó (fila 0.150) y **Daniel descartó el borrado físico**
+   (§Post-F9.212). Y el *«sin dejar verificar»* también era falso: el importador **es un asistente de dos
+   pasos con vista previa** que enseña modelo, packs, matriz editable y pantone, y avisa si esa OC ya se
+   importó. ⇒ **la 0.147 queda sola.**
+4. **«eso no está medido: falta ver en `compras/mrp.ts`…» SÍ se midió**, y el resultado es el punto 2.
+
+🔑 **Por qué esta anotación existe, y es la lección:** la fila 0.147 se corrigió el 17-sep y **esta
+sección no**, así que el documento que por la ley de este repo guarda **el porqué** seguía afirmando dos
+cosas falsas con toda su autoridad. Es el defecto del §8 de `CLAUDE.md` —*un dato repetido en N sitios
+necesita un cruce mecánico, no N lecturas*— en su forma más cara: se corrigió el sitio que se estaba
+mirando y no el otro.
+
+⚠️ **Y UN PENDIENTE DE REGISTRO QUE BLOQUEA ARRANCAR LA FILA:** su celda trae, en su bloque penúltimo, *«OCHO PREGUNTAS PARA
+DANIEL, con default, planteadas en lenguaje de negocio **(ver el mensaje del chat)»*** — y ese mensaje es
+de una sesión cerrada: **no se puede leer, y aquí no están.** ⇒ **hay que re-derivarlas del menú de
+caminos de la fila y escribirlas AQUÍ antes de construir nada.** Es exactamente la cicatriz del 3-sep que
+`CLAUDE.md` documenta: *«un hallazgo que no está donde se toma la decisión es un hallazgo que no existe»*.
+La única que la fila sí conserva, y **no tiene default porque es dato del negocio** (§7.5):
+
+> **¿Cada cuánto te llega una OC del mismo pedido DESPUÉS de haber hecho las OP?**
+
 ---
 
 #### (Post-F9.206) — QUE LA PARTIDA VIAJE EN EL TRASPASO (fila 0.142, 6-sep-2026): cuatro decisiones tomadas por el lead, con default. ✅ **P2 RATIFICADA por Daniel** (§Post-F9.205·1, con una adición) · ⏳ **P1, P3 y P4 siguen pendientes**
@@ -16452,3 +16487,32 @@ se calcula contra una consulta que también pide `wip-ver` y, sin ella, bloquea 
 se cree ese perfil hay que revisar la pantalla completa, no sólo la impresora. El síntoma visible
 —la tarjeta del historial le pinta el mensaje crudo del 403 en rojo— queda **anclado en §4 de
 `HOJA-DE-RUTA.md`**, no suelto en la prosa de una fila cerrada.
+
+---
+
+#### (Post-F9.240) — UN `e2e` VERDE NO SIGNIFICA QUE LAS PRUEBAS PASARAN (26-sep-2026, fila 0.169)
+
+**No es una decisión de negocio: es una decisión de CÓMO SE MIDE**, y se registra aquí porque cambia lo
+que cualquier sesión futura debe comprobar antes de mergear.
+
+**El hecho, medido.** El e2e `pedidos.spec.ts` falló al menos un intento en **123 de 242** jobs `e2e` de
+`prueba` entre el 1-ago y el 23-sep-2026 — **la mitad de todas las corridas**. Sólo **4** llegaron a rojo.
+Los otros **119** los escondió **`retries: 1`** (`frontend/playwright.config.ts:23`): el segundo intento pasa
+y el trabajo sale **VERDE**.
+
+> **La regla que sale de ahí: al vigilar el CI, un `e2e` en verde no basta. Hay que leer el resumen de
+> Playwright y comprobar que diga `N passed` SIN `flaky` ni `failed`.**
+
+📌 **Cómo se lee, verificado:** `get_job_logs` del MCP de GitHub **sí devuelve el log** (lo proxea el
+servidor; el 403 del redirect de descarga directa no aplica). También sirven las *check-run annotations*,
+cuya anotación `notice` trae los contadores.
+
+⚠️ **Y por qué importa más allá de este flaky:** durante seis semanas el tablero decía que el CI estaba
+verde y era cierto — pero **una prueba de las 105 estaba fallando en 123 de las 232 corridas que llegaron a correr — el 53 %** y nadie lo
+sabía. Un defecto que sólo se manifiesta en el primer intento es invisible para quien mira el tick verde,
+y esa invisibilidad duró porque **nadie había mirado el contador**, no porque fuera difícil.
+
+**La causa del flaky concreto quedó medida y la fila 0.169 cerrada** — era un `history.go(-1)` diferido
+compitiendo con una navegación; el detalle vive en la fila. Y se tomó una decisión de método que conviene
+no revertir por comodidad: **NO se añadió a la prueba la espera que la haría robusta**, porque eso la
+volvería incapaz de avisar si la hipótesis resulta falsa. La prueba se queda como **canario**.
