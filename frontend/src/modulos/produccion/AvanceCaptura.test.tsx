@@ -902,9 +902,12 @@ describe('Captura del avance · ENTREGA A CLIENTE (el cierre del ciclo)', () => 
   it('⭐ quien SOLO consulta (wip-ver) SÍ ve la impresora: reimprimir es consultar (fila 0.200)', async () => {
     // Antes de la fila 0.200 esta prueba afirmaba lo CONTRARIO, y por un desajuste de tres capas: la
     // RUTA del comprobante pedía `produccion.entrega` aunque su dominio entra por `obtenerEntrega`,
-    // que exige `produccion.wip-ver`. La pantalla copiaba el permiso de la ruta ⇒ a quien sólo
-    // consultaba se le escondía un botón que el servidor le habría servido. Hoy las tres capas piden
-    // `wip-ver`, como los otros tres impresos.
+    // que exige `produccion.wip-ver`. La pantalla copiaba el permiso de la ruta, así que era
+    // COHERENTE con ella: a quien sólo consultaba se le escondía el botón **y la ruta también le
+    // habría dado 403**. ⚠️ Esta línea decía «un botón que el servidor le habría servido», y **es
+    // falso** — lo desmiente `git show origin/prueba:…/entregas-cliente.rutas.ts` en su línea 144.
+    // Lo incoherente era la pareja RUTA↔DOMINIO, no pantalla↔servidor. Hoy las tres capas piden
+    // `wip-ver`, como los otros TRES impresos del módulo.
     useEntregasOrden.mockReturnValue({ isPending: false, data: { entregas: [entregaViva] } });
     const usuario = userEvent.setup();
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {

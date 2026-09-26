@@ -81,13 +81,17 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué se puede hacer ahora que antes no
 
-- ⭐ **Quien consulta el taller ya puede imprimir el comprobante de una entrega.** Antes la impresora
-  **se le escondía**, aunque el servidor sí le habría dado el PDF: la pantalla pedía el permiso de
-  *capturar entregas* en vez del de *consultar*. Ahora las cuatro impresiones del módulo —envío, ficha
-  de estampado, recibo y comprobante de entrega— piden lo mismo, que es lo razonable: **las cuatro son
-  reimpresiones de algo que ya pasó.**
-- **Y al revés: ya no se le ofrece a quien no puede usarla.** Quien sólo captura entregas veía el botón
-  y el clic le abría una pestaña con un error. Ahora no lo ve.
+- 📌 **Siendo honestos: hoy, nada que se note.** Y conviene decirlo así, porque la primera versión de
+  esta entrada vendía dos capacidades nuevas y **ninguna de las dos era cierta**. Lo que cambió es que
+  las cuatro impresiones del módulo —envío, ficha de estampado, recibo y comprobante de entrega— **piden
+  ahora el mismo permiso**, que es lo razonable: **las cuatro son reimpresiones de algo que ya pasó**, o
+  sea consultas.
+- ⭐ **Lo que sí se gana es que el sistema deja de tener una trampa armada.** El comprobante de entrega
+  pedía el permiso de *capturar* donde sus tres hermanos piden el de *consultar*, y por dentro pedía el
+  de consultar: tres capas diciendo dos cosas distintas. **Se comprobó perfil por perfil y ninguno de
+  los nueve lo notaba** —los ocho que entregan llevan también el de consultar, y el noveno nace vacío—,
+  así que era una trampa puesta **para el día en que se reparta el permiso de capturar sin el de ver el
+  taller**. Ese día el comprobante habría fallado sin explicación; ahora no.
 
 ### Qué cambió y puede sorprender
 

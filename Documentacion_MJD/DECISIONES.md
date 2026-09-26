@@ -16420,8 +16420,8 @@ quién puede imprimir el comprobante que firma el cliente.
 
 **La decisión: el comprobante va con el permiso de CONSULTA (`produccion.wip-ver`), no con el de
 captura.** Razón: el botón **reimprime cualquier entrega del histórico**, no sólo la última. Eso es una
-consulta, y es exactamente lo que ya hacen sus cuatro impresos hermanos (envío, ficha de estampado,
-recibo). Alinear las tres capas —ruta, dominio y pantalla— en el permiso de consulta deja el sistema
+consulta, y es exactamente lo que ya hacen sus **tres** impresos hermanos (envío, ficha de estampado,
+recibo), que con el comprobante hacen cuatro impresiones del módulo. Alinear las tres capas —ruta, dominio y pantalla— en el permiso de consulta deja el sistema
 coherente: *quien ve el taller imprime; quien sólo captura, no.*
 
 ⚠️ **Lo que esa decisión NO resuelve, y queda abierto con Daniel.** Quien captura una entrega ve, al
@@ -16447,4 +16447,6 @@ semilla: **cero de los nueve roles** tiene `produccion.entrega` sin `produccion.
 «capturista» del que habla la fila **no existe todavía**, y cuando exista se llevará una sorpresa peor
 que el botón del PDF: **tampoco podrá capturar** en la pantalla de entregas, porque el aviso de exceso
 se calcula contra una consulta que también pide `wip-ver` y, sin ella, bloquea el guardado. ⇒ el día que
-se cree ese perfil hay que revisar la pantalla completa, no sólo la impresora.
+se cree ese perfil hay que revisar la pantalla completa, no sólo la impresora. El síntoma visible
+—la tarjeta del historial le pinta el mensaje crudo del 403 en rojo— queda **anclado en §4 de
+`HOJA-DE-RUTA.md`**, no suelto en la prosa de una fila cerrada.
