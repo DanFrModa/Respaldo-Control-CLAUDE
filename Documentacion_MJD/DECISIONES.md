@@ -16376,9 +16376,11 @@ archivos, 48 ocurrencias**, con el criterio *cada `mode: 'insensitive'` cuya cla
 sea `contains:`*. (2) Decía que el typeahead descubierto era **el del Centro de Órdenes**, y era falso
 en las dos mitades: los typeaheads server-side son **OCHO** (componentes que pasan `busquedaServidor` al
 `ComboboxBuscable`), **siete están cubiertos** —dos de ellos contra colores— y **el que falta es
-`SelectorOrden`**, el de **tres** pantallas de captura (entrega a cliente, salida de tela por orden y alta de
-auditoría). ⚠️ La primera versión de este apartado decía «seis», copiado del docblock del componente, que
-lista siete y es falso: corte, envío y recibo reciben la orden por prop y ahí no se busca. Los **tres comboboxes del Centro** (cliente, maquilero, prov. de arte) **sí
+`SelectorOrden`**, el de **tres** pantallas de captura (entrega a cliente, salida de tela a orden y alta
+de auditoría). ⚠️ La primera versión de este apartado decía «seis», copiado del docblock del componente,
+que lista siete y es falso: corte, envío y recibo reciben la orden por prop y ahí no se busca.
+
+Los **tres comboboxes del Centro** (cliente, maquilero, prov. de arte) **sí
 quedaron cubiertos**. Lo que el Centro tiene descubierto es su **caja de texto libre**, que no es
 typeahead.
 

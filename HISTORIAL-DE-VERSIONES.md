@@ -109,19 +109,21 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 - ⏳ **Hay una pregunta para Daniel, y su respuesta decide si algo se adelanta: en el Centro de Órdenes,
   ¿buscas órdenes por departamento o por la referencia del cliente («Niño Infantil»), o sólo por número
-  de orden y código de modelo?** Buscar ahí por **nombre de cliente ya funciona**; lo que no funciona es
-  el código de modelo y la referencia. ⭐ **Y hay algo medido que casi contesta la pregunta sola:** de
+  de orden y código de modelo?** Buscar ahí por **nombre de cliente ya funciona**. ⭐ **Y hay algo
+  medido que casi contesta la pregunta sola:** de
   los **ocho departamentos** que trae el sistema viejo, **cuatro llevan ñ** —Niño Juvenil, Niño
   Infantil, Niña Juvenil, Niña Infantil—, así que teclear «nino» ahí devuelve **cero órdenes** cuando la
   respuesta correcta son *todas las de niño*. **Si buscas así, se adelanta; si buscas por número de
   orden o por código de modelo, espera.**
 - ⏳ **Y hay un segundo buscador sin arreglar, que es el que de verdad se escribe a ciegas:** el que
-  elige la orden al capturar una **entrega**, una **nota de salida de tela** o el **alta de una
-  auditoría**. Ahí no tienes una tabla delante: si la lista sale vacía, parece que la orden no existe.
+  elige la orden al capturar una **entrega a cliente**, una **salida de tela a orden** (la de
+  Inventarios › Telas, **no** «Notas de salida», que usa un desplegable y por eso no tiene este
+  problema) o el **alta de una auditoría**. Ahí no tienes una tabla delante: si la lista sale vacía, parece que la orden no existe.
   Se dejó fuera a propósito, porque tocarlo obliga a cambiar una pieza que usan varias pantallas y eso
   merece su propio trabajo.
-- ⬜ **Quedan 33 buscadores más con el mismo asunto**, y la lista decía que eran cinco. La diferencia
-  importa menos de lo que parece: **31 de los 33** son **cajas de búsqueda con la tabla a la vista**, donde
+- ⬜ **Quedan 33 buscadores con el mismo asunto** —los dos de arriba entre ellos—, y la lista decía que
+  eran cinco. La diferencia importa menos de lo que parece: **31 de los 33** son **cajas de búsqueda
+  con la tabla a la vista**, donde
   si no encuentras algo lo ves y puedes ordenar o pasar de página. Ahora cada uno es un cambio de tres
   líneas, porque el mecanismo quedó preparado.
 - **Una trampa que se cerró de paso, y que ya había costado una tarde:** el buscador dependía de una

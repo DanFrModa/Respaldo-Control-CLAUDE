@@ -16,7 +16,10 @@ import { useDebounce } from '@/lib/useDebounce';
  * `AvanceProduccion.tsx`, que recibe `idOrden: number` como prop: ahí la orden ya viene elegida y no
  * se busca. La lista falsa **ya engañó a alguien**: el 26-sep-2026 se publicó «seis pantallas de
  * captura» en la fila 0.214 citando este comentario como si fuera una medición. Si cambias quién usa
- * este componente, **mide con `grep -rn "SelectorOrden'" frontend/src` y actualiza esta línea**. La lista de resultados vive en el POPOVER
+ * este componente, **mide con `grep -rn "SelectorOrden'" frontend/src` y actualiza esta línea** — y su
+ * gemela del docblock de `SelectorOrden.test.tsx`, que llevaba la misma lista falsa.
+ *
+ * La lista de resultados vive en el POPOVER
  * del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera) — antes se
  * pintaba SIEMPRE inline y reventaba el layout de las tarjetas. Presentación pura (A1): solo
  * consulta y emite.
