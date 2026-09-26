@@ -16516,3 +16516,119 @@ y esa invisibilidad duró porque **nadie había mirado el contador**, no porque 
 compitiendo con una navegación; el detalle vive en la fila. Y se tomó una decisión de método que conviene
 no revertir por comodidad: **NO se añadió a la prueba la espera que la haría robusta**, porque eso la
 volvería incapaz de avisar si la hipótesis resulta falsa. La prueba se queda como **canario**.
+
+---
+
+#### (Post-F9.241) — LAS PREGUNTAS DE «SEGUIR AÑADIENDO PDF A UN PEDIDO YA HECHO», RE-DERIVADAS (26-sep-2026, fila 0.147)
+
+⚠️ **HONESTIDAD DE ENTRADA: estas NO son «las ocho» originales.** La celda de la fila 0.147 cerraba con
+*«OCHO PREGUNTAS PARA DANIEL, con default, planteadas en lenguaje de negocio **(ver el mensaje del
+chat)»*** — y ese mensaje es de una sesión cerrada: **no se puede leer, y aquí no estaban**. Fingir que se
+recuperaron sería publicar preguntas inventadas como si fueran las de entonces. ⇒ **éstas son NUEVAS**,
+derivadas de medir qué decisiones obliga a tomar el **CAMINO A** (destino opcional en el importador). Si
+alguna de las ocho era distinta, **se perdió**, y eso queda dicho aquí en vez de disimulado.
+
+🔑 **Y la lección de por qué esta sección existe:** ocho decisiones con su default vivían en un chat. Es la
+cicatriz del 3-sep-2026 que `CLAUDE.md` documenta —*«un hallazgo que no está donde se toma la decisión es
+un hallazgo que no existe»*— aplicada a un caso donde el coste fue real: **bloqueó la fila**.
+
+---
+
+### ⭐ Lo más útil: MEDIR disolvió CUATRO de las preguntas, en vez de añadirlas
+
+**(a) YA CONTESTADA por Daniel, no se le vuelve a preguntar.** *¿Se puede añadir a un pedido que ya tiene
+OP generadas?* Textual del 7-sep: *«que se pueda seguir añadiendo mas PDF **aunque ya esten hechas algunas
+OP**»* (§Post-F9.207). Y medido: **no abre una puerta nueva** — la vía manual (`sincronizarLineas`,
+`pedidos/pedidos.ts:262`) ya crea renglones **sin mirar si el pedido tiene órdenes** (`:335`). Lo único que
+la BD impide es **QUITAR** un renglón con OP (`Restrict`).
+
+**(b) 🔴 NO ES UNA PREGUNTA, y el lead estuvo a punto de publicarla como la más grave.** Se había derivado
+que, al añadir un segundo PDF, *«las OP nuevas nacerían con el número de OC del PRIMER PDF»* — porque el
+`tx.pedido.create` copia `Pedido.ocCliente` y el comentario que `schema.prisma` tenía en `Orden.ocCliente`
+decía, textual, *«se copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe»* — **comentario
+corregido en esta misma entrega**, así que no se cita por línea: la línea ya no lo contiene. **La
+conclusión es falsa, y se cazó midiendo el resto del archivo:**
+`importacion-pdf.ts:1360` escribe **`ocCliente: r.numeroOrden`** después de crear la orden ⇒ **cada OP ya
+lleva el número de la OC de la que salió**, con el comentario que lo dice en `:1344`. El docblock de
+`oc-duplicada.ts:15` lo confirma: *«el nº de orden del papel, uno POR OP. El importador PDF lo escribe con
+el número propio de cada PDF»*.
+⚠️ **La causa del error, escrita porque es la del día:** se leyó el `create` y **se paró ahí**, en vez de
+seguir el flujo hasta el final. *Media medición produce una conclusión que suena perfecta.*
+📌 Lo único que queda del asunto, y es menor: `Pedido.ocCliente` guarda *«la referencia general de la
+TANDA»* (`oc-duplicada.ts:17`). **Default: no se toca** — se queda la de la primera tanda, que es lo que
+ya significa.
+
+**(c) NO ES UNA PREGUNTA.** *¿Hay que cambiar el aviso de «esa OC ya se importó»?* **No.** Medido:
+`cargarOcYaImportadas` (`oc-duplicada.ts:120`) consulta por **empresa + cliente**
+(`where: { idEmpresa, pedidoLinea: { pedido: { idCliente } }, ocCliente: { in: claves } }`), **no por
+pedido** ⇒ sigue cazando una OC repetida aunque el destino sea un pedido existente. La guarda es además
+**compartida por las dos puertas** (Excel y PDF) a propósito, y su docblock explica por qué.
+
+---
+
+**(d) 🔴 NO ES UNA PREGUNTA — Y ESTO SE IBA A MANDAR A DANIEL. El código ya lo prohíbe, y lo prueba.**
+Se había derivado: *«¿se puede añadir un PDF a un pedido CANCELADO o marcado "no producir"?»*, con
+default *«no a las dos»*, y bajo la etiqueta **«📐 Medido»** — cuando la medición **se paró en
+`schema.prisma`**. Medido del todo: `resolverOrigenPedido` (`produccion/ordenes.ts:318`, y lo declara su
+docblock en `:299`) **lanza `ErrorConflicto`** en los dos casos —*«El pedido N está cancelado; no se le
+pueden crear órdenes»* (`:348-351`) y *«…está marcado como "no producir"…»* (`:353-356`)— y `crearOrden`
+lo llama **como primera línea de su transacción** (`:959`), o sea **incondicionalmente y en el camino del
+propio importador PDF** (`crearOrdenDesdePdf` → `salidaAProduccion` → `crearOrden`), que es la MISMA
+cadena que se acababa de recorrer para (b). Y está **amarrado por dos pruebas de integración con
+nombre**: `ordenes.int.test.ts:176` *«RECHAZA crear desde un renglón de pedido CANCELADO»* y `:186`
+*«RECHAZA crear desde un renglón de pedido marcado NO PRODUCIR»*.
+⚠️⚠️ **Es el defecto del día cometido EN EL PÁRRAFO SIGUIENTE al que lo documenta** (el (b) de arriba).
+🔴 **Y el daño no era cosmético: se le ofrecía a Daniel un «sí» como si fuera gratis.** Si contestaba que
+sí, el coste real es **quitar una guarda de producción compartida por TODOS los caminos de CAPTURA de OP
+—el ETL la esquiva por diseño, en modo migración— y borrar dos pruebas** — información que la pregunta
+no le daba. Y si contestaba que no, **no había nada que construir**: la fila hereda la guarda gratis.
+📌 **Refuerzos de cerca, mejores que el que se había ido a buscar a otro módulo:** `actualizarPedido` ya
+niega tocar un pedido cancelado (`pedidos/pedidos.ts:592-593`) y `cargarOcYaImportadas` filtra
+`pedCancelado: false` (`oc-duplicada.ts:147`) — **en el mismo archivo que esta sección ya citaba para
+(c)**. *La jerarquía de la evidencia estaba invertida: se buscó refuerzo en `cfdi-ventas.ts`, en otro
+módulo, mientras la guarda de la operación exacta estaba en la cadena ya recorrida.*
+📐 **Lo que SÍ es cierto de la medición de las banderas:** `Pedido` **no tiene enum de estado** y tiene
+exactamente tres booleanos —`pedCancelado`, `noProducir`, `entregadoTienda`—; la tercera **no** frena nada
+y no debe frenar (un pedido puede tener parte entregada y seguir recibiendo OC).
+
+---
+
+### La ÚNICA que necesita a Daniel
+
+**⏳ LA QUE DECIDE LA PRIORIDAD, y NO tiene default porque es dato del negocio** (`CLAUDE.md` §7.5,
+la frecuencia se pregunta, no se supone):
+
+> **¿Cada cuánto te llega una OC del mismo pedido DESPUÉS de haber hecho las OP?**
+
+📌 Y el dato que sube el valor de la fila por encima de «comodidad», por si ayuda a contestarla: el rodeo
+actual —una OC por pedido— **rompe dos informes**. Los **márgenes agrupan por pedido**
+(`costos/margenes.ts:205`), así que dan **una fila por OC** en vez de una por lote de negocio; y la
+**conciliación del CFDI de venta** propone candidatos comparando el total de la factura contra el del
+pedido (`cfdi-ventas.ts:152-181`), así que si una factura cubre tres OC en tres pedidos, **ningún total
+cuadra** y la sugerencia no sirve.
+
+---
+
+### Las que se deciden con default y NO se le preguntan (se anotan para que quede el porqué)
+
+- **Lo único que queda abierto del (d), y es UX, no negocio:** ¿el importador **rechaza ARRIBA** —no
+  ofrece ese pedido como destino, con su mensaje— o **deja que truene abajo** con el mensaje de orden que
+  ya existe? *Default: arriba.* Enseñar la lista sin los pedidos cancelados es más claro que dejar elegir
+  uno y fallar al confirmar, y no duplica la regla: la guarda de abajo sigue siendo la que manda.
+
+- **Un modelo que YA está en el pedido** ⇒ se añade como **renglón aparte** y se **avisa en la vista
+  previa**. Dos OC pueden pedir el mismo modelo; fusionar o sumar en silencio sería peor.
+- **El sobre-pedido por packs** ⇒ **por OC, como hoy**: es lo que el cliente pidió en ese papel, y
+  recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó. ⚠️ **Y conviene fijar un dato
+  que es fácil citar mal, porque el borrador de esta sección lo citó mal una vez:** el porcentaje no
+  es *«default 7 %»* — **el default NO es 7: es 0.** `porcentajeAdicional Decimal @default(0)`
+  (`schema.prisma`, modelo `PlantillaImportacion`), y la propia fuente lo dice: *«configurable por
+  cliente (`PlantillaImportacion.porcentajeAdicional`, **C&A=7, default 0**)»* (§Post-F9.2) — o sea que
+  *«configurable por cliente»* **sí es cierto**, y el propio bullet lo demuestra: lo falso era sólo el
+  7 % como default. ⇒ **el 7 % es el valor de C&A**, no el del sistema. 📌 **Y la lección, que es lo que
+  vale:** esa cita falsa se escribió *para corregir* otra imprecisión ⇒ **una frase que arregla un
+  dato puede estropear otro, y la frase que corrige también hay que medirla.** No cambia la
+  decisión.
+- **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
+  de precios, la referencia D7 y el EDR.
+- **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).

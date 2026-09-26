@@ -71,6 +71,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.183 · 26-sep-2026 · **en prueba** — **Las preguntas que estaban en un chat perdido, escritas donde se leen — y medirlas disolvió cuatro de las cinco**
+
+> **La v0.183 no cierra ninguna fila del programa**, y la razón es la contraria de lo habitual:
+> **desbloquea una.** La ficha de *«seguir añadiendo PDF a un pedido ya hecho»* —lo que pidió Daniel el
+> 7 de septiembre— decía que había **ocho preguntas para él, con su propuesta cada una**, y remitía a un
+> mensaje de chat de una conversación cerrada. **Ese mensaje no se puede leer.** Así que la ficha llevaba
+> semanas bloqueada por un puntero a ningún sitio.
+>
+> No se fingió recuperarlas: **se volvieron a derivar midiendo** qué decisiones obliga a tomar el arreglo,
+> y quedan escritas en `DECISIONES.md`, que es donde se toman.
+
+### Qué se puede hacer ahora que antes no
+
+- 📌 **Nada en el sistema: esto es papeleo, y del que desbloquea.** Lo que cambia es que las preguntas
+  están **donde alguien las va a leer** en vez de en una conversación que ya no existe.
+- ⭐ **Y lo mejor: al final queda UNA sola pregunta.** Ojo, que no es que las ocho se hayan «reducido»:
+  **las ocho no se pudieron leer y se perdieron** — de las que se volvieron a derivar midiendo, **cuatro
+  se cayeron al medirlas** y queda una. Una de las cuatro ya la había contestado Daniel el 7 de
+  septiembre, y otra **la contesta el propio sistema**, que ya impide meterle una orden de compra a un
+  pedido cancelado. Menos preguntas y mejores: eso es lo que se gana midiendo antes de preguntar.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Una de las cuatro que se disolvieron iba a presentarse como «la más grave», y era falsa.** Se había
+  concluido que, al meter una segunda orden de compra a un pedido, **las nuevas OP nacerían etiquetadas
+  con el número de la OC anterior**. Medido: **no ocurre** — el importador ya escribe en cada OP el número
+  del papel del que salió. La conclusión venía de leer la mitad del flujo y parar ahí. *Media medición
+  produce una conclusión que suena perfecta.*
+- Y las **otras tres**, para que estén las cuatro nombradas: el aviso de «esa orden de compra ya se
+  importó» **no hace falta tocarlo** (ya busca por cliente, no por pedido); lo de añadir **aunque ya haya
+  OP hechas** ya lo habías contestado; y la cuarta —que el sistema ya impide meterle una OP a un pedido
+  cancelado— va **en el apartado de abajo**, porque es la que más enseña.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **UNA pregunta para Daniel, y con ella la ficha queda lista para construir:**
+  **¿Cada cuánto te llega una orden de compra del mismo pedido DESPUÉS de haber hecho las OP?** **No lleva
+  propuesta** porque es un dato del negocio que sólo él tiene, y es la que decide si esto se adelanta o
+  espera.
+- ⚠️ **Y una que se iba a preguntar y NO hacía falta, porque el sistema ya lo resuelve:** si se puede
+  meterle una orden de compra a un pedido **cancelado** o marcado **«no producir»**. **Ya lo impide**, con
+  su mensaje y con dos pruebas que lo fijan. Se iba a mandar como pregunta con la propuesta «no» — y eso
+  le habría ofrecido un «sí» **como si fuera gratis**, cuando decir sí costaría **quitar una protección
+  que hoy usan todas las formas de crear una OP en el día a día**. Lo cazó la revisión.
+- 📌 **Y un dato que ayuda a contestarla:** el rodeo que usa hoy —una orden de compra por pedido—
+  **rompe dos informes**. El de **márgenes agrupa por pedido**, así que da una línea por orden de compra
+  en vez de una por lote de negocio; y la **conciliación de la factura de venta** compara totales contra
+  el pedido, así que si una factura cubre tres órdenes de compra en tres pedidos, **ningún total cuadra**.
+- Lo demás se decidió con propuesta y **no se le pregunta**, pero queda escrito el porqué: un modelo
+  repetido entra como renglón aparte con aviso; el sobre-pedido por packs se sigue calculando **por orden
+  de compra**; y un pedido de otro cliente o de otra empresa no se ofrece como destino.
+
 ## 0.182 · 26-sep-2026 · **en prueba** — **Una prueba automática llevaba seis semanas fallando la mitad de las veces sin que nadie lo viera: ya sabemos por qué**
 
 > No cambia nada de lo que se ve en pantalla, y conviene decirlo en la primera línea. Es una revisión

@@ -3525,8 +3525,17 @@ model Orden {
   tallasV1 String? @map("tallas_v1")
 
   /// SNAPSHOT de la OC original del cliente (rediseño R3, B3 — petición Daniel 7-jul §4.1): se
-  /// copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe (queda amarrado a la OP
-  /// aunque el pedido interno se reorganice). Ningún endpoint lo edita.
+  /// copia de `Pedido.ocCliente` AL CREAR la orden y queda amarrado a la OP aunque el pedido interno
+  /// se reorganice.
+  /// ⚠️ **CORREGIDO el 26-sep-2026 (fila 0.147): este comentario decía «ya NO se re-escribe… Ningún
+  /// endpoint lo edita», y es FALSO.** El importador de PDF SÍ lo re-escribe, justo después de crear
+  /// la orden: `dominio/pedidos/importacion-pdf.ts:1360` hace `ocCliente: r.numeroOrden` de forma
+  /// INCONDICIONAL, para que cada OP lleve el nº de orden de SU PROPIO papel (ver su comentario en
+  /// `:1344` y el docblock de `pedidos/oc-duplicada.ts:15`). Lo que no lo re-escribe es ninguna
+  /// PANTALLA de edición; el importador sí.
+  /// 🔑 Y la frase falsa costó caro: llevó a concluir que, al meter un segundo PDF en un pedido ya
+  /// hecho, las OP nuevas nacerían con el nº de OC del PRIMER PDF. No ocurre. Se documentó en
+  /// §Post-F9.241 como el defecto de «media medición» — leer el `create` y pararse ahí.
   ocCliente String? @map("oc_cliente")
 
   /// DESGLOSE SKU/packs del cliente (importador de OC por PDF, petición Daniel): la tabla SKU/Talla/

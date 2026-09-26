@@ -23753,7 +23753,7 @@ export interface paths {
                 cerradaEn: string | null;
                 /** @description Motivo del cierre (opcional), o null. */
                 motivoCierre: string | null;
-                /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+                /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
                 ocCliente: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
                 tallasV1: string | null;
@@ -25362,7 +25362,7 @@ export interface paths {
                 cerradaEn: string | null;
                 /** @description Motivo del cierre (opcional), o null. */
                 motivoCierre: string | null;
-                /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+                /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
                 ocCliente: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
                 tallasV1: string | null;
@@ -25682,7 +25682,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -25957,7 +25957,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -26249,7 +26249,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -26547,7 +26547,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -26832,7 +26832,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -27116,7 +27116,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -27401,7 +27401,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -27686,7 +27686,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -27974,7 +27974,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
@@ -28929,7 +28929,7 @@ export interface paths {
               cerradaEn: string | null;
               /** @description Motivo del cierre (opcional), o null. */
               motivoCierre: string | null;
-              /** @description SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice. */
+              /** @description SNAPSHOT de la OC original del cliente (R3, B3). `crearOrden` lo copia de `Pedido.ocCliente`; el importador de PDF lo PISA justo después con el nº de orden de su propio papel, así que cada OP lleva el de SU PDF. De solo lectura para la API (ningún endpoint DE ÓRDENES lo acepta como entrada) y amarrado a la OP aunque el pedido se reorganice. */
               ocCliente: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
