@@ -16409,3 +16409,42 @@ se teclea a ciegas y la lista vacía es la única respuesta— es mucho peor que
 la tabla a la vista**, donde se ve el resultado y se puede ordenar o paginar. De las 33, **una alimenta
 un typeahead** (`armarBusqueda` de órdenes) y **una la caja del Centro**: ésas dos son la prioridad; las
 **31 cajas** restantes, no.
+
+---
+
+#### (Post-F9.239) — REIMPRIMIR UN COMPROBANTE ES CONSULTAR, NO CAPTURAR (26-sep-2026, fila 0.200)
+
+**Cómo salió.** Al construir la fila 0.200 —«la puerta pide una llave y la reja de adentro pide otra»—
+había que **elegir el lado** por el que arreglar el desajuste, y eso no es una decisión de forma: cambia
+quién puede imprimir el comprobante que firma el cliente.
+
+**La decisión: el comprobante va con el permiso de CONSULTA (`produccion.wip-ver`), no con el de
+captura.** Razón: el botón **reimprime cualquier entrega del histórico**, no sólo la última. Eso es una
+consulta, y es exactamente lo que ya hacen sus cuatro impresos hermanos (envío, ficha de estampado,
+recibo). Alinear las tres capas —ruta, dominio y pantalla— en el permiso de consulta deja el sistema
+coherente: *quien ve el taller imprime; quien sólo captura, no.*
+
+⚠️ **Lo que esa decisión NO resuelve, y queda abierto con Daniel.** Quien captura una entrega ve, al
+guardarla, un botón para imprimir **el comprobante de lo que acaba de escribir**. Eso no es una consulta
+del histórico: es el **eco de su propia escritura**, y el sistema ya tiene una vía legítima para ese
+caso (la proyectora `proyectarEntrega`, cuyo contrato lo permite explícitamente para ese único uso).
+Construirlo es otra pieza, y abre una pregunta de negocio:
+
+> **¿Quien captura una entrega necesita imprimir el comprobante? ¿Y necesita reimprimir uno viejo que
+> capturó alguien más, o sólo el de lo que acaba de capturar?**
+
+**Default mientras no conteste:** el comprobante lo imprime quien ve el taller. Es lo construido hoy.
+
+📐 **Un dato que ayuda a contestarla, medido:** el PDF trae empresa, folio, fecha, cliente, modelo,
+almacén, orden, observaciones y la matriz color×talla de cantidades, más las líneas de firma —**ni un
+costo, ni un precio, ni un dato de proveedor**. Todo lo que muestra es lo que el capturista eligió o
+tecleó. ⇒ **enseñárselo no le revela nada que no tenga ya**, así que si Daniel dice que sí, no hay
+objeción de confidencialidad; la objeción sería abrirle el **histórico entero**, que es lo que la vía
+del eco evita.
+
+📌 **Y una advertencia sobre el perfil que esto afectaría.** Se midió corriendo `definirRoles()` de la
+semilla: **cero de los nueve roles** tiene `produccion.entrega` sin `produccion.wip-ver`. El perfil
+«capturista» del que habla la fila **no existe todavía**, y cuando exista se llevará una sorpresa peor
+que el botón del PDF: **tampoco podrá capturar** en la pantalla de entregas, porque el aviso de exceso
+se calcula contra una consulta que también pide `wip-ver` y, sin ella, bloquea el guardado. ⇒ el día que
+se cree ese perfil hay que revisar la pantalla completa, no sólo la impresora.

@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.181 · 26-sep-2026 · **en prueba** — **El comprobante de entrega ya no se le esconde a quien puede imprimirlo (ni se le ofrece a quien no)**
+
+> Tercera de la lista que Daniel aprobó, después de la 0.206 y la 0.205. Es un arreglo de permisos:
+> pequeño de tamaño, pero enseñó que **el mismo defecto ya se había «arreglado» antes por el lado
+> equivocado**, y que la nota que lo describía prometía un arreglo que no era.
+>
+> 📌 **La v0.181 cierra la fila 0.200.**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Quien consulta el taller ya puede imprimir el comprobante de una entrega.** Antes la impresora
+  **se le escondía**, aunque el servidor sí le habría dado el PDF: la pantalla pedía el permiso de
+  *capturar entregas* en vez del de *consultar*. Ahora las cuatro impresiones del módulo —envío, ficha
+  de estampado, recibo y comprobante de entrega— piden lo mismo, que es lo razonable: **las cuatro son
+  reimpresiones de algo que ya pasó.**
+- **Y al revés: ya no se le ofrece a quien no puede usarla.** Quien sólo captura entregas veía el botón
+  y el clic le abría una pestaña con un error. Ahora no lo ve.
+
+### Qué cambió y puede sorprender
+
+- **Si alguien imprimía comprobantes y de pronto no le aparece el botón**, es porque su perfil tiene el
+  permiso de *capturar* entregas pero no el de *consultar* el taller. **Hoy eso no le pasa a nadie**: se
+  comprobó perfil por perfil y los ocho que entregan llevan los dos permisos. Sólo afectaría a un perfil
+  nuevo creado a mano.
+- ⚠️ **Y si alguien crea ese perfil, el botón será su menor problema:** se midió que con el permiso de
+  capturar y sin el de consultar **tampoco se puede guardar una entrega** en esa pantalla, porque el
+  aviso de «te pasas de la existencia» se calcula con datos que sí requieren consultar, y sin ellos
+  bloquea el guardado. Queda anotado para el día que se reparta así.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Una pregunta para Daniel: ¿quien captura una entrega necesita imprimir el comprobante de lo que
+  acaba de capturar?** Hoy no puede: el comprobante lo imprime quien consulta el taller. Es una pieza
+  aparte —darle *lo que él mismo acaba de escribir*, sin abrirle el histórico de todas las entregas— y
+  se construye si dice que sí. **Y un dato que ayuda a contestar:** el PDF trae cliente, modelo, almacén
+  y cantidades, **ni un costo ni un precio**, así que enseñárselo no le revela nada que no haya
+  teclado él.
+- **Un detalle feo que se deja para otra vez:** a quien sólo captura, la tarjeta «Entregas de la orden»
+  le pinta un mensaje de error rojo en vez de decirle simplemente que eso no le toca. Es anterior a este
+  cambio y no se tocó.
+
 ## 0.180 · 26-sep-2026 · **en prueba** — **Buscar «ambar» ya encuentra «Ámbar»: los buscadores de colores, telas, avíos y modelos dejaron de ignorar los acentos**
 
 > Daniel estaba ocupado y preguntó si se podía avanzar en algo para ganar tiempo. Se eligió esto, y de

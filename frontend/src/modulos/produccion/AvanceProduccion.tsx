@@ -588,7 +588,7 @@ export function AvanceProduccion({
               <ListaEntregas
                 entregas={entregas.data?.entregas ?? []}
                 cargando={entregas.isPending}
-                puedeImprimir={tienePermiso('produccion.entrega')}
+                puedeImprimir={tienePermiso('produccion.wip-ver')}
                 puedeCancelar={tienePermiso('produccion.cancelar')}
                 alCancelar={setACancelar}
               />
@@ -920,9 +920,22 @@ function ListaEntregas({
   entregas: readonly EntregaHistorial[];
   cargando: boolean;
   /**
-   * El comprobante de la entrega exige `produccion.entrega` en el SERVIDOR (a diferencia de los
-   * otros tres impresos, que van con `produccion.wip-ver` como esta lista). Sin este gate, quien
-   * solo consulta veía la impresora y el clic le abría una pestaña con un 403.
+   * El comprobante de la entrega exige `produccion.wip-ver` en el SERVIDOR, igual que los otros tres
+   * impresos (envío, ficha de estampado, recibo) y que la consulta que llena ESTA lista: las cuatro
+   * impresiones piden lo mismo, porque las cuatro son reimpresiones de un histórico.
+   *
+   * ⚠️ Hasta la fila 0.200 no era así, y de ahí viene este gate: la RUTA del comprobante pedía
+   * `produccion.entrega` mientras su dominio entraba por `obtenerEntrega`, que exige
+   * `produccion.wip-ver` ⇒ quien tuviera `produccion.entrega` SIN `wip-ver` pasaba la puerta y se
+   * estrellaba contra la reja de adentro. La pantalla copiaba el permiso de la RUTA, así que
+   * escondía el botón a quien SÍ podía imprimir (sólo consulta) y lo ofrecía a quien no.
+   *
+   * 📌 **El desajuste era LATENTE, y conviene no exagerarlo:** para llegar a ese 403 había que ver
+   * esta lista, y la lista la llena `useEntregasOrden`, que ya pedía `wip-ver` — sin él no se pinta
+   * ni la tabla. Ningún perfil de la semilla está en ese estado (0 de 9). Era una trampa puesta para
+   * el primero que creara un perfil así a mano, no un error que alguien estuviera cosechando.
+   * Al alinear las tres capas en `wip-ver`, el gate sigue haciendo falta —quien no consulta no
+   * imprime— pero ya no miente en ninguna de las dos direcciones.
    */
   puedeImprimir: boolean;
   puedeCancelar: boolean;

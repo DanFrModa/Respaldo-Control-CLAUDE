@@ -889,7 +889,7 @@ describe('Captura del avance · ENTREGA A CLIENTE (el cierre del ciclo)', () => 
     motivoCancelacion: null,
   };
 
-  it('el COMPROBANTE solo se ofrece con `produccion.entrega` (el endpoint lo exige)', async () => {
+  it('el COMPROBANTE se ofrece con `produccion.wip-ver` (el permiso que el endpoint exige)', async () => {
     useEntregasOrden.mockReturnValue({ isPending: false, data: { entregas: [entregaViva] } });
     const usuario = userEvent.setup();
 
@@ -899,16 +899,33 @@ describe('Captura del avance · ENTREGA A CLIENTE (el cierre del ciclo)', () => 
     expect(screen.getByTestId('avance-imprimir-entrega')).toBeInTheDocument();
   });
 
-  it('quien SOLO consulta (wip-ver) NO ve la impresora del comprobante (evita un 403)', async () => {
+  it('⭐ quien SOLO consulta (wip-ver) SÍ ve la impresora: reimprimir es consultar (fila 0.200)', async () => {
+    // Antes de la fila 0.200 esta prueba afirmaba lo CONTRARIO, y por un desajuste de tres capas: la
+    // RUTA del comprobante pedía `produccion.entrega` aunque su dominio entra por `obtenerEntrega`,
+    // que exige `produccion.wip-ver`. La pantalla copiaba el permiso de la ruta ⇒ a quien sólo
+    // consultaba se le escondía un botón que el servidor le habría servido. Hoy las tres capas piden
+    // `wip-ver`, como los otros tres impresos.
     useEntregasOrden.mockReturnValue({ isPending: false, data: { entregas: [entregaViva] } });
     const usuario = userEvent.setup();
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
       sesion: estadoSesionDePrueba(['produccion.wip-ver']),
     });
     await usuario.click(screen.getByTestId('avance-stepper-entrega-cliente'));
-    // La entrega SÍ se ve en el historial…
+    // La entrega se ve en el historial…
     expect(screen.getByTestId('avance-entrega')).toBeInTheDocument();
-    // …pero sin `produccion.entrega` no se ofrece su PDF (el backend lo negaría con 403).
+    // …y con ella su PDF, aunque esta sesión NO pueda capturar entregas.
+    expect(screen.getByTestId('avance-imprimir-entrega')).toBeInTheDocument();
+  });
+
+  it('⭐ y quien SOLO captura (`produccion.entrega` sin `wip-ver`) NO la ve: el servidor lo negaría', async () => {
+    // La gemela negativa, que es la que fija el gate: `produccion.entrega` autoriza a CAPTURAR, no a
+    // reimprimir el histórico. Sin ella el gate podría borrarse sin que nada se pusiera rojo.
+    useEntregasOrden.mockReturnValue({ isPending: false, data: { entregas: [entregaViva] } });
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba(['produccion.entrega']),
+    });
+    await usuario.click(screen.getByTestId('avance-stepper-entrega-cliente'));
     expect(screen.queryByTestId('avance-imprimir-entrega')).not.toBeInTheDocument();
   });
 
