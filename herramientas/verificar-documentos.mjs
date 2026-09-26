@@ -184,7 +184,9 @@ for (const { simbolo, patron, nombre } of listasDelResumen) {
 // repetido en N sitios necesita un cruce mecánico, no N lecturas*.
 const reMenciones = [...hoja.matchAll(/de esas \*{0,2}(\d+)\*{0,2} ⬜/g)];
 if (reMenciones.length === 0) {
-  problemas.push('No se encontró la re-mención «de esas N ⬜» del resumen; ¿se reescribió la línea?');
+  problemas.push(
+    'No se encontró la re-mención «de esas N ⬜» del resumen; ¿se reescribió la línea?',
+  );
 }
 for (const [texto, cifra] of reMenciones) {
   if (+cifra !== real.porHacer) {
@@ -233,7 +235,9 @@ if (totalV1 === null) {
     `El resumen dice «pendientes de verdad para la V1: ${totalV1[1]}» y sus tres grupos suman ${sumaV1}.`,
   );
 }
-decir(`  V1: ${totalV1 === null ? '?' : totalV1[1]} pendientes = ${sumaV1} sumando los tres grupos`);
+decir(
+  `  V1: ${totalV1 === null ? '?' : totalV1[1]} pendientes = ${sumaV1} sumando los tres grupos`,
+);
 
 // ── 2 · El número de versión, en sus cuatro sitios ──────────────────────────────────────────────
 const historial = leer('HISTORIAL-DE-VERSIONES.md');

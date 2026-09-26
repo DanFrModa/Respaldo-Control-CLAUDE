@@ -36,16 +36,20 @@ function raizBackend(): string {
   }
 }
 
-/** Todos los `.ts` bajo un directorio, recursivo (sin `node_modules` ni el cliente generado). */
-function archivosTs(directorio: string): string[] {
+/**
+ * Todos los archivos con la extensión dada bajo un directorio, recursivo (sin `node_modules` ni el
+ * cliente generado). Sirve para los `.ts` del código y para los `.sql` de las migraciones, porque el
+ * orden malo cabe en los dos sitios.
+ */
+function archivosConExtension(directorio: string, extension: string): string[] {
   if (!existsSync(directorio)) return [];
   const salida: string[] = [];
   for (const entrada of readdirSync(directorio, { withFileTypes: true })) {
     const ruta = join(directorio, entrada.name);
     if (entrada.isDirectory()) {
       if (entrada.name === 'node_modules' || entrada.name === 'generated') continue;
-      salida.push(...archivosTs(ruta));
-    } else if (entrada.name.endsWith('.ts')) {
+      salida.push(...archivosConExtension(ruta, extension));
+    } else if (entrada.name.endsWith(extension)) {
       salida.push(ruta);
     }
   }
@@ -206,6 +210,12 @@ describe('sqlIdsPorTextoSinAcentos — la tabla raíz y sus vecinas', () => {
  * como cinco rojas que parecen ser de su código. Es exactamente el tipo de regresión que nadie ve
  * volver.
  *
+ * 📌 **Y "cualquier sitio" incluye las MIGRACIONES.** La red nació mirando sólo `.ts`, pero el orden
+ * malo se escribe igual de bien en SQL: la cabecera de `busqueda.ts` deja apuntado que el día que el
+ * rendimiento duela se pondrá un índice `GIN pg_trgm` sobre `lower(unaccent(col))`, y eso vive en un
+ * `migration.sql`, no en TypeScript. Por eso el escáner barre `src/`, `migracion/` **y** los `.sql`
+ * de `prisma/migrations/`.
+ *
  * Tres partes, y las tres hacen falta (mismo criterio que `eco-sin-reja.test.ts`):
  *  1. **Que la red mida algo**, contra un fixture sintético. Sin esto, una avería del escáner —un
  *     glob que no casa, un filtro de comentarios que se come el archivo entero— se leería como
@@ -219,16 +229,19 @@ describe('RED: el orden lower(unaccent(…)) está fijado en TODO el backend', (
    * Las líneas de COMENTARIO se saltan a propósito: la cabecera de `busqueda.ts` y el comentario de
    * `candidatos-desarrollo.ts` nombran el orden malo **para advertir contra él**, y ese aviso es
    * justamente lo que no queremos que la red borre.
+   *
+   * El estilo de comentario depende del archivo: en SQL el aviso se escribe con `--`, que en
+   * TypeScript **no** es un comentario (es el decremento `--i`). Por eso ese prefijo se añade sólo
+   * para los `.sql`, en vez de meterlo en la lista común: así no le abre al código TS un hueco por
+   * donde el orden malo pueda colarse sin que la red lo vea.
    */
-  function lineasDeCodigo(fuente: string): string[] {
+  function lineasDeCodigo(fuente: string, ruta: string): string[] {
+    const prefijosDeComentario = ruta.endsWith('.sql')
+      ? ['*', '//', '/*', '--']
+      : ['*', '//', '/*'];
     return fuente.split('\n').filter((linea) => {
       const limpia = linea.trim();
-      return (
-        limpia !== '' &&
-        !limpia.startsWith('*') &&
-        !limpia.startsWith('//') &&
-        !limpia.startsWith('/*')
-      );
+      return limpia !== '' && !prefijosDeComentario.some((prefijo) => limpia.startsWith(prefijo));
     });
   }
 
@@ -236,7 +249,7 @@ describe('RED: el orden lower(unaccent(…)) está fijado en TODO el backend', (
   function sitiosMalos(archivos: { ruta: string; fuente: string }[]): string[] {
     const hallazgos: string[] = [];
     for (const { ruta, fuente } of archivos) {
-      for (const linea of lineasDeCodigo(fuente)) {
+      for (const linea of lineasDeCodigo(fuente, ruta)) {
         if (linea.includes(ORDEN_PROHIBIDO)) hallazgos.push(`${ruta}: ${linea.trim()}`);
       }
     }
@@ -258,25 +271,58 @@ describe('RED: el orden lower(unaccent(…)) está fijado en TODO el backend', (
     expect(sitiosMalos([{ ruta: 'f.ts', fuente: `${aviso}\n${malo}` }])).toHaveLength(1);
   });
 
+  it('1-bis. la red MIDE EN SQL: caza el índice invertido y NO el aviso con `--`', () => {
+    // La forma real de lo que se va a escribir algún día: el índice `GIN pg_trgm` que la cabecera de
+    // `busqueda.ts` deja apuntado para cuando el rendimiento duela.
+    const maloSql = `CREATE INDEX colores_nombre_trgm ON "colores" USING gin (${ORDEN_PROHIBIDO}nombre)) gin_trgm_ops);`;
+    const avisoSql = `-- ⚠️ Nunca ${ORDEN_PROHIBIDO}x)): depende del LC_CTYPE del servidor.`;
+    const buenoSql =
+      'CREATE INDEX colores_nombre_trgm ON "colores" USING gin (lower(unaccent(nombre)) gin_trgm_ops);';
+
+    expect(sitiosMalos([{ ruta: 'm.sql', fuente: maloSql }])).toHaveLength(1);
+    expect(sitiosMalos([{ ruta: 'm.sql', fuente: avisoSql }])).toHaveLength(0);
+    expect(sitiosMalos([{ ruta: 'm.sql', fuente: buenoSql }])).toHaveLength(0);
+    // El caso mixto, que es la forma que tendrá la migración de verdad: aviso arriba, índice bueno
+    // abajo → limpio; pero si el índice se invierte, se caza aunque el aviso siga puesto.
+    expect(sitiosMalos([{ ruta: 'm.sql', fuente: `${avisoSql}\n${buenoSql}` }])).toHaveLength(0);
+    expect(sitiosMalos([{ ruta: 'm.sql', fuente: `${avisoSql}\n${maloSql}` }])).toHaveLength(1);
+    // ⭐ Y el `--` NO es un comentario en TypeScript: la misma línea dentro de un `.ts` SÍ se caza.
+    // Sin esto, añadir `--` a la lista común le abriría al código TS un hueco silencioso.
+    expect(sitiosMalos([{ ruta: 'f.ts', fuente: avisoSql }])).toHaveLength(1);
+  });
+
   it('2. el backend real está LIMPIO, y 3. el escáner de verdad miró', () => {
     const raiz = raizBackend();
-    const rutas = archivosTs(join(raiz, 'src')).concat(archivosTs(join(raiz, 'migracion')));
-    const archivos = rutas.map((ruta) => ({
+    const leer = (ruta: string) => ({
       ruta: relative(raiz, ruta),
       fuente: readFileSync(ruta, 'utf8'),
-    }));
+    });
+    const archivosTs = archivosConExtension(join(raiz, 'src'), '.ts')
+      .concat(archivosConExtension(join(raiz, 'migracion'), '.ts'))
+      .map(leer);
+    // ⭐ Las MIGRACIONES también entran. Hasta hoy la red sólo miraba `.ts`, y el orden malo tiene un
+    // sitio natural en SQL: un índice `GIN pg_trgm` sobre `lower(unaccent(col))` —el plan que la
+    // cabecera de `busqueda.ts` deja apuntado para cuando el rendimiento duela— o una columna
+    // generada. Escrito al revés ahí, el índice queda atado al `LC_CTYPE` del servidor y encima
+    // **deja de servirle al `WHERE`** (que sí usa el orden bueno), o sea que el defecto se paga dos
+    // veces y ninguna prueba de integración se entera.
+    const archivosSql = archivosConExtension(join(raiz, 'prisma', 'migrations'), '.sql').map(leer);
+    const todos = archivosTs.concat(archivosSql);
 
-    // (2) Cero sitios con el orden malo.
-    expect(sitiosMalos(archivos)).toEqual([]);
+    // (2) Cero sitios con el orden malo, ni en el código ni en las migraciones.
+    expect(sitiosMalos(todos)).toEqual([]);
 
     // (3) Canarios: que el escáner haya mirado de verdad. MEDIDO el 26-sep-2026 sobre este árbol:
-    // **1,096 archivos .ts** y **17 usos del orden bueno** en código — 2 en `busqueda.ts` (los dos
-    // lados de `comparacion()`), 10 en `candidatos-desarrollo.ts` (5 condiciones × 2 lados) y 5 en
-    // este archivo. Las cotas van muy por debajo de lo medido para no romperse al crecer el árbol,
-    // pero cazan que el glob deje de casar o que los pre-filtros desaparezcan sin que nadie mire.
-    expect(archivos.length).toBeGreaterThan(300);
-    const usosBuenos = archivos
-      .flatMap(({ fuente }) => lineasDeCodigo(fuente))
+    // **1,096 archivos .ts**, **124 archivos .sql** (uno por migración) y **18 usos del orden bueno**
+    // en código — 2 en `busqueda.ts` (los dos lados de `comparacion()`), 10 en
+    // `candidatos-desarrollo.ts` (5 condiciones × 2 lados) y 6 en este archivo; en `.sql` hoy hay
+    // CERO (ninguna migración indexa todavía). Las cotas van muy por debajo de lo medido para no
+    // romperse al crecer el árbol, pero cazan que el glob deje de casar o que los pre-filtros
+    // desaparezcan sin que nadie mire.
+    expect(archivosTs.length).toBeGreaterThan(300);
+    expect(archivosSql.length).toBeGreaterThan(50);
+    const usosBuenos = todos
+      .flatMap(({ ruta, fuente }) => lineasDeCodigo(fuente, ruta))
       .flatMap((linea) => linea.match(/lower\(unaccent\(/g) ?? []).length;
     expect(usosBuenos).toBeGreaterThanOrEqual(10);
   });
