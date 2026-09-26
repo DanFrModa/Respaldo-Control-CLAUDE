@@ -16421,7 +16421,9 @@ quién puede imprimir el comprobante que firma el cliente.
 **La decisión: el comprobante va con el permiso de CONSULTA (`produccion.wip-ver`), no con el de
 captura.** Razón: el botón **reimprime cualquier entrega del histórico**, no sólo la última. Eso es una
 consulta, y es exactamente lo que ya hacen sus **tres** impresos hermanos (envío, ficha de estampado,
-recibo); con el comprobante, las impresiones del módulo son cuatro. Alinear las tres capas —ruta, dominio y pantalla— en el permiso de consulta deja el sistema
+recibo); con el comprobante, las impresiones del módulo son cuatro.
+
+Alinear las tres capas —ruta, dominio y pantalla— en el permiso de consulta deja el sistema
 coherente: *quien ve el taller imprime; quien sólo captura, no.*
 
 ⚠️ **Lo que esa decisión NO resuelve, y queda abierto con Daniel.** Quien captura una entrega ve, al
