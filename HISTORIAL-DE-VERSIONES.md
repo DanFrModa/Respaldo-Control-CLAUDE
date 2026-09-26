@@ -86,8 +86,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   un nuevo pedido con una nueva OC»*. Ese caso, por tanto, **no hay que construirlo**.
 - 🔴 **Pero al medirlo apareció el caso que sí pasa, y lo causa el sistema:** cuando subes varios PDF de
   golpe, **los que no reconoce los deja fuera** —sin liga a un modelo, sin tallas, o ilegible— y crea el
-  pedido con el resto. **Sí te avisa**: te dice cuántos quedaron fuera al terminar, y antes de confirmar te
-  explica que uno ilegible se queda fuera aunque ligues los demás. **El problema no es el aviso: es que
+  pedido con el resto. **Sí te avisa**: te marca **en rojo** el PDF que no se pudo leer, con su motivo debajo, y al
+  terminar te dice cuántos quedaron fuera. **El problema no es el aviso: es que
   cuando arreglas el que falló y lo vuelves a subir, no hay manera de meterlo en el pedido que ya hiciste**
   — nace otro. Es decir, **el sistema te parte en dos la misma tanda**.
 - ⭐ **Eso hace la ficha más pequeña y más clara:** ya no hace falta «añadir a un pedido con OP vivas
@@ -227,9 +227,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   comprar**; pero tiene dos agujeros que él no ha pisado: **el informe de márgenes agrupa por pedido**
   (así que da una línea por OC en vez de una por lote de negocio) ⚠️ **[RETIRADO al día siguiente, en la
   v0.184: parte de «una OC por pedido», y eso es falso — un pedido es la TANDA, así que el informe agrupa
-  por tanda y queda INDETERMINADO hasta que Daniel diga si un lote le llega de una vez]** y **la
-  conciliación de la factura de
-  venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
+  por tanda y queda INDETERMINADO hasta que Daniel diga si un lote le llega de una vez]** y **la conciliación de la
+  factura de venta** compara totales contra el pedido, así que si una factura cubre tres OC en tres pedidos, ningún
   total cuadra.
 - **La prueba se dejó a propósito SIN blindar.** Se podría hacer robusta con una espera extra, pero eso la
   volvería incapaz de avisar si la explicación resulta equivocada. Se queda como canario: si vuelve a

@@ -16748,8 +16748,9 @@ tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que
   sugerencia es que la factura cruce **PEDIDOS (tandas)**, no OC. 🐛 **Y un agravante encontrado de paso:**
   el candidato devuelve `ocCliente: pedido.ocCliente` (`:178`) y eso significa **dos cosas distintas según
   por dónde entró el pedido**: en los nacidos del **importador de PDF** es *«la referencia general de la
-  TANDA (que puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no muestra una
-  OC**; en los capturados **a mano o por Excel** sí lo es —`schema.prisma:3244-3246` lo define como *«OC
+  TANDA (que puede ser otra cosa, o nada)»* (`oc-duplicada.ts:18`) ⇒ **ahí la columna «OC» no necesariamente muestra una
+  OC** —la propia fuente lo admite, *«que puede ser otra cosa, o nada»*: en un import de un solo PDF donde
+  el usuario teclee la OC en `referenciaGeneral`, sí lo es—; en los capturados **a mano o por Excel** sí lo es —`schema.prisma:3244-3246` lo define como *«OC
   ORIGINAL del cliente… captura VIVA y editable»* y la pantalla lo rotula *«OC del cliente (referencia)»*
   (`ConstructorPedido.tsx:359`)—. ⚠️ **Se acota a propósito:** la primera versión de esta sección lo
   generalizó a todos los pedidos, que es **la misma sobre-generalización** que este párrafo acaba de
