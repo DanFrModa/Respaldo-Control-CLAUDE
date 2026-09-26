@@ -14103,8 +14103,8 @@ el 17-sep-2026, y re-verificado hoy:
 
 1. **Las tres citas están CADUCAS** (deriva del archivo, no invención): `confirmarImportacionPdf` está hoy
    en **`:897`** (no `:810`), el `tx.pedido.create` en **`:1083`** (no `:987`) y el cuerpo del contrato en
-   **`:482-506`** (no `esquemas/importacion-pdf.ts:400-425`). Quien siguiera la cita aterrizaba en
-   `renglonError()`.
+   **`:482-506`** (no `esquemas/importacion-pdf.ts:400-425`). Quien siguiera la primera cita aterrizaba en
+   `renglonError()` (definido en `:793`); la segunda, dentro del bucle de `noReconocidos.push`.
 2. 🔴 **«y la explosión no los junta» ES FALSO, y es lo que más cambia la fila.** `explosionarOrdenes`
    (`compras/mrp.ts:2223`) recibe **una lista libre de ids de OP**, no un pedido; el pedido interno es
    sólo **precarga de comodidad** (`:2344`) y la pantalla trae un **buscador libre** que agrega cualquier
@@ -14122,7 +14122,7 @@ cosas falsas con toda su autoridad. Es el defecto del §8 de `CLAUDE.md` —*un 
 necesita un cruce mecánico, no N lecturas*— en su forma más cara: se corrigió el sitio que se estaba
 mirando y no el otro.
 
-⚠️ **Y UN PENDIENTE DE REGISTRO QUE BLOQUEA ARRANCAR LA FILA:** su celda cierra con *«OCHO PREGUNTAS PARA
+⚠️ **Y UN PENDIENTE DE REGISTRO QUE BLOQUEA ARRANCAR LA FILA:** su celda trae, en su bloque penúltimo, *«OCHO PREGUNTAS PARA
 DANIEL, con default, planteadas en lenguaje de negocio **(ver el mensaje del chat)»*** — y ese mensaje es
 de una sesión cerrada: **no se puede leer, y aquí no están.** ⇒ **hay que re-derivarlas del menú de
 caminos de la fila y escribirlas AQUÍ antes de construir nada.** Es exactamente la cicatriz del 3-sep que
@@ -16495,9 +16495,9 @@ se cree ese perfil hay que revisar la pantalla completa, no sólo la impresora. 
 **No es una decisión de negocio: es una decisión de CÓMO SE MIDE**, y se registra aquí porque cambia lo
 que cualquier sesión futura debe comprobar antes de mergear.
 
-**El hecho, medido.** El e2e `pedidos.spec.ts` falló al menos un intento en **122 de 242** jobs `e2e` de
+**El hecho, medido.** El e2e `pedidos.spec.ts` falló al menos un intento en **123 de 242** jobs `e2e` de
 `prueba` entre el 1-ago y el 23-sep-2026 — **la mitad de todas las corridas**. Sólo **4** llegaron a rojo.
-Los otros ~118 los escondió **`retries: 1`** (`frontend/playwright.config.ts:23`): el segundo intento pasa
+Los otros **119** los escondió **`retries: 1`** (`frontend/playwright.config.ts:23`): el segundo intento pasa
 y el trabajo sale **VERDE**.
 
 > **La regla que sale de ahí: al vigilar el CI, un `e2e` en verde no basta. Hay que leer el resumen de
@@ -16508,7 +16508,7 @@ servidor; el 403 del redirect de descarga directa no aplica). También sirven la
 cuya anotación `notice` trae los contadores.
 
 ⚠️ **Y por qué importa más allá de este flaky:** durante seis semanas el tablero decía que el CI estaba
-verde y era cierto — pero **una prueba de las 105 estaba fallando la mitad de las veces** y nadie lo
+verde y era cierto — pero **una prueba de las 105 estaba fallando en 123 de las 232 corridas que llegaron a correr — el 53 %** y nadie lo
 sabía. Un defecto que sólo se manifiesta en el primer intento es invisible para quien mira el tick verde,
 y esa invisibilidad duró porque **nadie había mirado el contador**, no porque fuera difícil.
 

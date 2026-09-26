@@ -297,16 +297,17 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     //
     // 📐 **Y la frecuencia real, que el comentario anterior dejaba en «las 3 corridas del 18-ago»:**
     // medido sobre **242 jobs `e2e` de `prueba` del 1-ago al 23-sep**, esta prueba falló al menos un
-    // intento en **122** de ellos — **la mitad**. Sólo **4** llegaron a rojo; `retries: 1`
-    // (`playwright.config.ts:23`) escondió los otros ~118. ⚠️ **Un job `e2e` VERDE no significa que
+    // intento en **123** de ellos — **la mitad**. Sólo **4** llegaron a rojo; `retries: 1`
+    // (`playwright.config.ts:23`) escondió los otros **119** (las 4 rojas sí se veían). ⚠️ **Un job `e2e` VERDE no significa que
     // esta prueba pasara**: lo único que lo delata es el contador `flaky` del resumen.
     // ⚠️ También era falso que la evidencia se hubiera perdido al expirar la traza: las
-    // *check-run annotations* de las 4 rojas y de las 122 flaky siguen legibles por API.
+    // *check-run annotations* de las 123 (4 rojas + 119 flaky) siguen legibles por API.
     //
     // ✅ **Lo arregló el 17-sep el `cerrarCajon` de `e2e/ayudas.ts`**, que ahora espera
     // `toHaveCount(0)` —la animación de salida de Radix, cientos de ms— en vez de resolver al
-    // despachar la tecla: el `go(-1)` termina antes de que arranque el `goto`. **12 corridas limpias
-    // seguidas** desde entonces (10 en `prueba` + los 2 PRs del 26-sep), contra una base del 53 %.
+    // despachar la tecla: el `go(-1)` termina antes de que arranque el `goto`. **11 corridas limpias
+    // seguidas en `prueba`** desde entonces (+ 2 corridas de PR, como refuerzo), contra una base de
+    // **123 de los 232 jobs que llegaron a correr = 53 %**.
     // 🔴 **NO se añade aquí una espera explícita del clon** (`expect.poll` sobre
     // `window.history.state.__capaFlotante === 0`) **a propósito**: haría la prueba robusta y de paso
     // **taparía la señal**. Tal como está es el canario — si vuelve a caer con una de sus tres formas

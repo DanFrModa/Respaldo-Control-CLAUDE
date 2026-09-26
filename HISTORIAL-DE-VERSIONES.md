@@ -96,10 +96,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   se cierre de verdad. Desde entonces lleva **doce corridas limpias seguidas**.
 - ⚠️ **Y lo que de verdad hay que retener: que el CI esté en verde no significa que todas las pruebas
   pasaran.** El sistema reintenta una vez cada prueba que falla, y si el segundo intento pasa, el
-  resultado sale verde. Así se ocultaron **122 corridas en seis semanas**. Desde ahora, antes de dar una
+  resultado sale verde. Así se ocultaron **119 corridas en seis semanas** (otras 4 sí se vieron, en rojo). Desde ahora, antes de dar una
   entrega por buena se lee el contador que lo delata — no basta el tick verde.
 - 🔎 **Esto también corrige dos cosas que el propio código afirmaba y eran falsas:** que el problema
-  ocurría «en tres corridas de agosto» (fueron 122) y que la evidencia se había perdido al caducar
+  ocurría «en tres corridas de agosto» (fueron 123) y que la evidencia se había perdido al caducar
   (seguía disponible, y no hacía falta).
 
 ### Qué sigue pendiente o roto
