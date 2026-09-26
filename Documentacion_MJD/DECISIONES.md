@@ -16516,3 +16516,87 @@ y esa invisibilidad duró porque **nadie había mirado el contador**, no porque 
 compitiendo con una navegación; el detalle vive en la fila. Y se tomó una decisión de método que conviene
 no revertir por comodidad: **NO se añadió a la prueba la espera que la haría robusta**, porque eso la
 volvería incapaz de avisar si la hipótesis resulta falsa. La prueba se queda como **canario**.
+
+---
+
+#### (Post-F9.241) — LAS PREGUNTAS DE «SEGUIR AÑADIENDO PDF A UN PEDIDO YA HECHO», RE-DERIVADAS (26-sep-2026, fila 0.147)
+
+⚠️ **HONESTIDAD DE ENTRADA: estas NO son «las ocho» originales.** La celda de la fila 0.147 cerraba con
+*«OCHO PREGUNTAS PARA DANIEL, con default, planteadas en lenguaje de negocio **(ver el mensaje del
+chat)»*** — y ese mensaje es de una sesión cerrada: **no se puede leer, y aquí no estaban**. Fingir que se
+recuperaron sería publicar preguntas inventadas como si fueran las de entonces. ⇒ **éstas son NUEVAS**,
+derivadas de medir qué decisiones obliga a tomar el **CAMINO A** (destino opcional en el importador). Si
+alguna de las ocho era distinta, **se perdió**, y eso queda dicho aquí en vez de disimulado.
+
+🔑 **Y la lección de por qué esta sección existe:** ocho decisiones con su default vivían en un chat. Es la
+cicatriz del 3-sep-2026 que `CLAUDE.md` documenta —*«un hallazgo que no está donde se toma la decisión es
+un hallazgo que no existe»*— aplicada a un caso donde el coste fue real: **bloqueó la fila**.
+
+---
+
+### ⭐ Lo más útil: MEDIR disolvió tres de las preguntas, en vez de añadirlas
+
+**(a) YA CONTESTADA por Daniel, no se le vuelve a preguntar.** *¿Se puede añadir a un pedido que ya tiene
+OP generadas?* Textual del 7-sep: *«que se pueda seguir añadiendo mas PDF **aunque ya esten hechas algunas
+OP**»* (§Post-F9.207). Y medido: **no abre una puerta nueva** — la vía manual (`sincronizarLineas`,
+`pedidos/pedidos.ts:262`) ya crea renglones **sin mirar si el pedido tiene órdenes** (`:335`). Lo único que
+la BD impide es **QUITAR** un renglón con OP (`Restrict`).
+
+**(b) 🔴 NO ES UNA PREGUNTA, y el lead estuvo a punto de publicarla como la más grave.** Se había derivado
+que, al añadir un segundo PDF, *«las OP nuevas nacerían con el número de OC del PRIMER PDF»* — porque el
+`tx.pedido.create` copia `Pedido.ocCliente` y `Orden.ocCliente` es *«una copia que se hace al crear la
+orden y NO se re-escribe»* (`schema.prisma:3528`). **Es falso, y se cazó midiendo el resto del archivo:**
+`importacion-pdf.ts:1360` escribe **`ocCliente: r.numeroOrden`** después de crear la orden ⇒ **cada OP ya
+lleva el número de la OC de la que salió**, con el comentario que lo dice en `:1344`. El docblock de
+`oc-duplicada.ts:15` lo confirma: *«el nº de orden del papel, uno POR OP. El importador PDF lo escribe con
+el número propio de cada PDF»*.
+⚠️ **La causa del error, escrita porque es la del día:** se leyó el `create` y **se paró ahí**, en vez de
+seguir el flujo hasta el final. *Media medición produce una conclusión que suena perfecta.*
+📌 Lo único que queda del asunto, y es menor: `Pedido.ocCliente` guarda *«la referencia general de la
+TANDA»* (`oc-duplicada.ts:17`). **Default: no se toca** — se queda la de la primera tanda, que es lo que
+ya significa.
+
+**(c) NO ES UNA PREGUNTA.** *¿Hay que cambiar el aviso de «esa OC ya se importó»?* **No.** Medido:
+`cargarOcYaImportadas` (`oc-duplicada.ts:120`) consulta por **empresa + cliente**
+(`where: { idEmpresa, pedidoLinea: { pedido: { idCliente } }, ocCliente: { in: claves } }`), **no por
+pedido** ⇒ sigue cazando una OC repetida aunque el destino sea un pedido existente. La guarda es además
+**compartida por las dos puertas** (Excel y PDF) a propósito, y su docblock explica por qué.
+
+---
+
+### Las DOS que sí necesitan a Daniel
+
+**(P1) ⏳ ¿Se puede añadir un PDF a un pedido CANCELADO, o a uno marcado «no producir»?**
+📐 **Medido: `Pedido` no tiene estado, tiene tres banderas** (`schema.prisma`, modelo `Pedido`):
+`pedCancelado`, `noProducir` y `entregadoTienda`. Las dos primeras son las que importan aquí.
+**Default propuesto: NO a las dos** — si el pedido está cancelado o marcado para no producir, el
+importador no lo ofrece como destino y lo dice con un mensaje claro. *En su idioma:* **si un pedido está
+cancelado, o marcado para no producir, ¿tiene sentido poder meterle una orden de compra nueva?**
+*(La tercera, «entregado a tienda», no se propone como freno: un pedido puede tener parte entregada y
+seguir recibiendo OC.)*
+
+⭐ **Y una evidencia que apareció midiendo otra cosa y refuerza el default:** la conciliación del CFDI de venta **ya excluye los pedidos cancelados** al proponer candidatos (`cfdi-ventas.ts:153`, `where: { …, pedCancelado: false }`) ⇒ **el resto del sistema ya trata un pedido cancelado como fuera de juego**, así que dejarle meter una OC nueva sería la excepción, no la norma.
+
+**(P2) ⏳ LA QUE DECIDE LA PRIORIDAD, y NO tiene default porque es dato del negocio** (`CLAUDE.md` §7.5,
+la frecuencia se pregunta, no se supone):
+
+> **¿Cada cuánto te llega una OC del mismo pedido DESPUÉS de haber hecho las OP?**
+
+📌 Y el dato que sube el valor de la fila por encima de «comodidad», por si ayuda a contestarla: el rodeo
+actual —una OC por pedido— **rompe dos informes**. Los **márgenes agrupan por pedido**
+(`costos/margenes.ts:205`), así que dan **una fila por OC** en vez de una por lote de negocio; y la
+**conciliación del CFDI de venta** propone candidatos comparando el total de la factura contra el del
+pedido (`cfdi-ventas.ts:152-181`), así que si una factura cubre tres OC en tres pedidos, **ningún total
+cuadra** y la sugerencia no sirve.
+
+---
+
+### Las que se deciden con default y NO se le preguntan (se anotan para que quede el porqué)
+
+- **Un modelo que YA está en el pedido** ⇒ se añade como **renglón aparte** y se **avisa en la vista
+  previa**. Dos OC pueden pedir el mismo modelo; fusionar o sumar en silencio sería peor.
+- **El sobre-pedido por packs** (§Post-F9.2: default **7 %**, y ⚠️ **configurable por cliente** en `PlantillaImportacion` — no es una constante, aunque se cite como «el 7 %») ⇒ **por OC, como hoy**. Es lo que el cliente pidió
+  en ese papel; recalcularlo sobre el pedido entero cambiaría lo que ya se fabricó.
+- **Un pedido de OTRO cliente** ⇒ **se rechaza**. No es decisión de negocio: mezclarlos rompería la lista
+  de precios, la referencia D7 y el EDR.
+- **Un pedido de otra empresa** ⇒ **no aparece como destino** (A9, invariante de arquitectura).
