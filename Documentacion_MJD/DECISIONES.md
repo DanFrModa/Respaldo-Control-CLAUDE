@@ -17450,10 +17450,13 @@ nuevo.
 
 ### ✅ SUS SEIS NOTAS DEL CUESTIONARIO, textuales, y qué cambia cada una
 
-**(a) Director General** — *«ok, dos perfiles»*. ⏳ **Una confirmación pendiente de UNA línea:** la
-recomendación medida era **dos USUARIOS** (dos inicios de sesión), porque dos perfiles sobre la misma persona
-se **suman** y dan los dos siempre. Su *«dos perfiles»* probablemente usa la palabra como en el sistema viejo
-—donde son dos usuarios— pero **conviene confirmarlo, porque es la diferencia entre que funcione y que no.**
+**(a) Director General** — *«ok, dos perfiles»*, y al pedírsele la confirmación exacta: **✅ *«Correcto. Dos
+usuarios»*** (30-sep). ⇒ **DECIDIDO: dos USUARIOS, dos inicios de sesión distintos**, como los tiene hoy en el
+sistema viejo — uno para operar a diario sin poder cambiar el sistema y uno de administrador. **No** dos
+perfiles sobre la misma persona, que se **suman** y darían los dos poderes siempre. ⏳ **Queda una consecuencia
+por resolver cuando se creen:** su bandera `Usuario.puedeCorregirSinFactura` **vive en la persona, no en el
+perfil** (§Post-F9.203: *«sólo yo, ni con permiso»*) ⇒ hay que decidir **cuál de sus dos usuarios la lleva**, y
+sólo se pone por base de datos porque ninguna pantalla la asigna.
 
 **(b) Gerente de Ventas (Aurora)** — *«Las listas **negociar solo de lectura y poder agregar comentarios**, pero
 no modificar lo que yo hice. Administración o yo damos de alta al cliente. Ella puede meter información de
