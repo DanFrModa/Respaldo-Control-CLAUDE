@@ -17106,6 +17106,19 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > acierto**: la máquina señala dónde mirar, la decisión de si está mal es de quien lee. *Un cruce que se
 > cierra en el número, sin abrir los aciertos, convierte cada cicatriz escrita en un falso defecto — y a la
 > tercera nadie vuelve a correrlo.*
+>
+> ⭐ **Y LA CUARTA PATA LA APORTÓ EL REVIEWER, ganándosela igual que el lead: casi reporta como INVENTADO un
+> ejemplo que era cierto.** Al verificar el falso positivo del `320 llamadas` lo buscó en los tres documentos
+> y en los tres commits de la rama, dio **0 en todos**, y su conclusión provisional fue que el lead describía
+> un acierto imposible. **Antes de escribirlo amplió el barrido a todo el repositorio y ahí estaba**, en
+> `docs/hoja-de-ruta/V1-etapas.md`. Lo corto no era el ejemplo: era **su ventana de tres archivos**. 🔑 **La
+> regla completa, con las dos mitades:** además de **normalizar** antes de contar, hay que comprobar que **el
+> UNIVERSO del cruce es el mismo** —`git ls-files '*.md'`, no los tres archivos que uno tiene en la cabeza—,
+> porque *dos mediciones que no barren los mismos archivos no se contradicen: hablan de cosas distintas*. ⇒
+> **el desacuerdo entre dos mediciones es, hasta que se demuestre lo contrario, un desacuerdo sobre el
+> MÉTODO, no sobre el hecho**: se comparan primero la normalización y el universo, y sólo después se discute
+> quién tiene razón. Las dos veces que esto pasó en esa hora —una en cada dirección— el hecho estaba bien y
+> el método estaba corto.
 
 ### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
 
