@@ -17282,3 +17282,112 @@ perfil?»*. ⇒ **una metáfora en lugar de la palabra llana cuesta una vuelta e
 ejemplo (Juan, de Compras, 5 permisos de habilitaciones) y una tabla de tres filas, y lo entendió de
 inmediato. *Cuando el interlocutor es el dueño del negocio y no el que escribe el código, la palabra que hay
 que usar es la del sistema que él va a operar, no la figura literaria.*
+
+#### (Post-F9.247) — LOS 16 PERFILES DE PUESTO QUE DIO DANIEL, Y LOS TRES CHOQUES CON SUS PROPIAS DECISIONES (30-sep-2026)
+
+**Daniel entregó la lista, como había dicho que haría** (§Post-F9.246: *«la lista creo que mejor te los doy yo»*),
+con esta advertencia y estas dos condiciones:
+
+> *«Te paso los perfiles así como me los pediste. **Están algo burdos.** Ayúdame a definir qué permisos debería
+> de tener cada uno. Asumiendo que **podemos generar más perfiles todo el tiempo** y que **una persona puede
+> tener más de un perfil (suele pasar mucho)**.»*
+
+🔑 **Esa última frase es un DATO DEL NEGOCIO que sólo él tenía, y confirma el modelo de §246 por la vía difícil:**
+llevar varios perfiles no es el caso raro, es lo normal. Medido: `UsuarioRol` ya es N:M (`schema.prisma:433`) y la
+resolución de permisos es la **unión** de los de todos sus roles (`comun/permisos.ts:131-135`) ⇒ **eso ya
+funciona hoy, sin construir nada.** Él mismo lo usó al describir a Aurora: *«le asignaría dos perfiles»*.
+
+### Los 16 puestos, con sus palabras
+
+| # | Puesto | Lo que dijo que hace (resumido de su textual) |
+|---|---|---|
+| 1 | **Director General** (él) | *«Tiene todos los permisos que a lo largo del desarrollo te puse "solo yo"»*. En el sistema viejo tiene **dos** perfiles, administrador y director general, y *«la única diferencia es que con el de director general no puedo modificar nada del sistema»*. |
+| 2 | **Gerente de Ventas** (Aurora, 1 de 2) | *«Es el perfil más completo después de mí.»* Hace listas de precios y precosteos; ve precios de producto y costos de avíos, telas y maquilas. **No** ve costos finales, **ni** estados de resultados, **ni** las relaciones de pagos de Finanzas. |
+| 3 | **Líder de Desarrollo** (Aurora, 2 de 2) | El mismo perfil que la diseñadora: *«esto también lo puede hacer Aurora»*. |
+| 4 | **Administración** (Lupita) | *«Ve todo lo que tenga que ver con finanzas.»* Pagos, la corrida, estados de cuenta de maquileros y proveedores. *«Es quien debería de dar de alta proveedores (con su CSF)»*, sube facturas, eventualmente factura. También ve entregas, *«porque ella es la que factura y hay información que sale de las órdenes»*. |
+| 5 | **Producción** (hoy Bernardo) | Sigue producción y *«va alimentando todo el WIP»*. Podría meter los consumos de telas *«y en una de esas el recibo de telas»*. |
+| 6 | **Compras** | Hace todas las OC, sigue compras y proveedores; podría recibir avíos o telas. Habilitaciones está a su cargo. ⭐ Preguntó: *«Podría llevar inventarios (¿cómo ves?, ¿es una buena práctica?)»*. |
+| 7 | **Habilitaciones** | Recibe las OP (no las hace), hace las notas de salida a las maquilas, lleva el inventario de avíos. |
+| 8 | **Gestión Técnica** | Hace todas las fichas técnicas. *«Me parece que está en una segunda o tercera fase.»* |
+| 9 | **Desarrollo / Diseñadora** | Define qué lleva cada modelo desde el principio. *«Es quien va a liberar el modelo para que ya se pueda comprar, una vez que esté hecha la OP.»* |
+| 10 | **Diseño Gráfico** | Desarrolla todos los artes, define el proveedor que los hace y *«cotiza cuánto cuesta cada uno»*. |
+| 11 | **Entregas** | Organiza la entrega; necesita producción para armar el proceso de cada cliente. *«Estos procesos los vamos a hacer posteriormente.»* |
+| 12 | **Almacén de PT** | *«Podría ser el mismo de entregas o no.»* Recibe la mercancía, la cuenta y le da ingreso al inventario. |
+| 13 | **Encargado de Telas** | Recibe las telas y lleva su control: inventario, entradas, salidas, recibo. |
+| 14 | **Líder de Calidad** | Asigna a los supervisores y determina auditorías finales. Debe ver *«qué tiene cada maquila para poder auditar»* y la ficha técnica *«para saber qué auditar»*. |
+| 15 | **Supervisor de Calidad** | Hace auditorías en línea y finales. Su pantalla de celular *«aún no la desarrollamos»*. |
+| 16 | **Auxiliar** | *«Un perfil bajo que pueda consultar órdenes de producción… Ellos casi no tienen acceso al sistema actual, pero sería bueno que tengan un usuario para algunas cositas.»* |
+
+⚠️ **NO son los nueve perfiles de v2, y eso es a propósito.** Los nueve de hoy los propuso el lead derivando los
+niveles del viejo y heredaron su defecto (tres idénticos, §246). Estos 16 salen de los **puestos reales**, que es
+lo que Daniel pidió: *«un perfil de cada puesto con las actividades que hace realmente cada uno»*.
+
+### 📐 LO QUE SÍ SE PUEDE EXPRESAR: el límite de Aurora, que era el más fino
+
+Su frontera —*«ve precios y costos de componentes, NO costos finales ni estados de resultados»*— **el catálogo
+la dice exacta**, medida en `contrato/permisos.ts`:
+
+- **FUERA:** `costos.ver` = *«el costo real de una orden, la lista de costos y los **márgenes por pedido**»* ·
+  `edr.ver` = *«el estado de resultados mensual y anual»* · `ordenes.ver-costos` = *«el botón de costos de la
+  orden»*.
+- **DENTRO:** `precostos.consultar` (*«el pre-costo estimado y la lista de precios sugeridos»*) ·
+  `desarrollo.precostear` · `telas.ver-totales` · `ordenes.ver-precio-real-maquila` · `pedidos.importes`.
+
+⇒ **ve lo que cuestan las piezas, no lo que gana la empresa**, y son permisos distintos, no matices del mismo.
+⏳ El único dudoso es `consultas.ver-importes`: su descripción dice *«importes totales y precios»* **sin
+distinguir precio de venta de costo**, así que hay que abrir esa pantalla antes de dárselo.
+
+### 🔴 LOS TRES CHOQUES — decisiones de Daniel contra decisiones de Daniel
+
+**(a) El perfil de Lupita NO SE PUEDE ARMAR sin abrir siete reservados.** Su puesto, tal como él lo describió,
+necesita `cxp.administrar`, `cxc.administrar`, `terceros.administrar`, `terceros.fiscal`,
+`conceptos-pago.administrar`, **`proveedores.administrar`** —que pidió explícitamente para ella— y
+**`pagos.corrida-armar`**, que en `seed.ts` lleva escrito *«Daniel la pidió para él (§Post-F9.189(g)): armar la
+corrida es decidir a quién se le paga»*. Los siete están en `SOLO_ADMINISTRADOR`. **Decisión suya, uno por uno.**
+
+**(b) «Asignar supervisores de calidad» hoy exige el gobierno de TODOS los usuarios.** Medido: marcar a alguien
+como auditor (`Usuario.esAuditor`) pasa por las rutas de usuarios, que exigen **`usuarios.administrar`** —*«dar de
+alta gente y repartir roles es gobierno del sistema»*, reservado—. **No hay forma de dar una cosa sin la otra.**
+Tres salidas: (a) dárselo completo, (b) que los asigne Daniel, (c) un permiso propio para marcar auditores.
+**Recomendación del lead: (b) por ahora, (c) apuntado.**
+
+**(c) EL ARTE NO TIENE PERMISO PROPIO** ⇒ Diseño Gráfico no se puede acotar. Medido en
+`dominio/modelos/arte-modelo.ts`: el arte del modelo exige **`modelos.administrar`**, el mismo permiso que la
+ficha, el BOM completo y las fotos (su propia descripción lo dice: *«ficha, BOM (telas/avíos/arte) y fotos»*). Y
+las fotos de arte de la orden (`produccion/fotos-arte-orden.ts`) exigen **`desarrollo.administrar`**, que abre
+alta y edición de proyectos. ⇒ **quien mete el arte puede cambiar telas y avíos de cualquier modelo.** Para
+acotarlo hay que **partir `modelos.administrar` en dos**: es un cambio, no un reparto. **No es opinión: es lo que
+mide el código.**
+
+### ✅ LAS DOS PREGUNTAS DIRECTAS QUE HIZO, CONTESTADAS
+
+**1. ¿Un perfil o dos para él? ⇒ DOS USUARIOS, no dos perfiles.** Y la razón es una medición: en v2 los permisos
+de una persona son **la UNIÓN de todos sus perfiles** (`comun/permisos.ts:131-135`), así que *«Director General»* +
+*«Administrador»* sobre la misma persona da **los dos siempre** y la protección desaparece. **Lo que le protegía
+en el viejo no era tener dos perfiles: era ENTRAR CON OTRO USUARIO** — el acto de cambiar de sesión ES la
+protección. 🔑 **Y el hallazgo general que sale de ahí, que vale para cualquier caso futuro: el modelo de unión NO
+PUEDE expresar «tengo este poder pero sólo cuando decido usarlo».** Si algún día se quiere eso de verdad, hace
+falta otra cosa (un modo administrador que se enciende a propósito), no un perfil más. ⚠️ Y una consecuencia
+concreta: su bandera `puedeCorregirSinFactura` **vive en la persona, no en el perfil** ⇒ hay que decidir cuál de
+sus dos usuarios la lleva.
+
+**2. ¿Compras debería llevar inventarios? ⇒ NO, y no hace falta, porque su propio organigrama ya lo resuelve.**
+El problema no es desconfianza: si la misma persona pide el material, lo recibe y puede ajustar el inventario a
+mano, **los tres números salen de la misma mano y un descuadre no tiene con qué contrastarse** — no hace falta
+mala fe, basta un error sin segundo par de ojos. Él ya dijo que **Habilitaciones lleva el inventario de avíos** ⇒
+Compras se queda con `inventario-avios.ver` (para comprar bien) y Habilitaciones con `inventario-avios.mover`.
+⭐ **Y para la cobertura —vacaciones, ausencia— NO se hornea el permiso en el perfil de Compras: se le da el perfil
+de Habilitaciones como SEGUNDO perfil ese día.** Es el primer uso real del modelo que él eligió: el estado normal
+queda separado y el de cobertura es deliberado y queda registrado.
+
+⏳ **Preguntas que quedaron abiertas con él** (cada una en la ficha de su puesto en la página): ¿quién **autoriza**
+las OC, si no debería ser quien las hace? · ¿quién **recibe** físicamente los avíos, Compras o Habilitaciones?
+(hoy `compras.recibir` es **un solo permiso** para telas, avíos y para *reversar* recepciones, así que no se puede
+limitar por material) · ¿Lupita ve **EDR y márgenes**? · ¿la diseñadora puede **dar de alta** una tela o un avío
+que no existe? (hoy es reservado, y le va a pasar seguido) · ¿Almacén de PT lleva `ipt.modificar-movimientos` y
+`ipt.cantidades-negativas`, que son el borrador de un descuadre? · ¿Entregas y Almacén de PT son la misma persona?
+
+📌 **Las propuestas completas —248 permisos, con el porqué de cada uno y lo que se deja fuera a propósito— viven
+en una página de consulta donde él marca Sí/No y se guarda:**
+<https://claude.ai/artifact/117ErS5sYRUwmdDe38EL3D>. ⚠️ **Vive FUERA del repositorio** (es una página publicada,
+no un archivo de `docs/`), igual que el catálogo de los 134 permisos de §246.
