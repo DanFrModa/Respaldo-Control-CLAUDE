@@ -16769,3 +16769,109 @@ tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que
 📌 **La lección que queda escrita, y es la misma tres veces:** *preguntar antes de construir salió barato —el
 CAMINO A se iba a justificar sobre dos informes rotos y ninguno lo estaba como se decía—, pero **una pregunta
 mal planteada no ahorra nada**: gasta un viaje al dueño y vuelve con un dato que no decide.*
+
+#### (Post-F9.243) — EL REPASO DE INVENTARIOS DE DANIEL, ENTERO Y CON SUS PALABRAS (30-sep-2026, cierra la fila 0.096)
+
+**Daniel corrió el repaso de Inventarios** —uno de los tres que bloqueaban la V1— y entregó **13 puntos: 12
+hallazgos y 1 bien**. Se registran **textuales**, punto por punto, porque el matiz de cómo lo dice es lo que
+decide el tamaño de cada arreglo. La clasificación de abajo **la confirmó él** («está bien como lo
+planteas»).
+
+> ⚠️ **PRIMER HALLAZGO, Y NO ES SUYO: PROBÓ LA v0.177 Y `prueba` YA IBA EN LA v0.184.** Su propio
+> encabezado lo dice («CONTROL v2 v0.177»). ⇒ **su punto 01 ya estaba resuelto** y lo reportó como
+> pendiente porque no lo tenía: las columnas **«Recibido» y «Falta»** de la orden de compra entraron en la
+> **v0.179** (`HISTORIAL-DE-VERSIONES.md`, entrada 0.179), y el docblock de
+> `frontend/src/modulos/ordenes-compra/DetalleRenglonesOc.tsx:9-12` **lo cita a él**, del 23-sep.
+> 🔑 **La lección operativa, que vale para cuando entren más personas a probar:** un repaso contra una
+> versión vieja gasta su tiempo y el nuestro. **La guía de prueba tiene que decir contra qué versión se
+> prueba, y la pantalla ya pinta el número en la barra de arriba** (`frontend/src/version.ts`). Los otros
+> once hallazgos **sí** son reales contra la 0.184.
+
+### 🔴 Los DOS que lo dejaron tirado — y uno arrastró tres puntos
+
+**(11) Traspaso entre almacenes de producto terminado.** Textual:
+
+> *«Tiene que haber un cuadro igual al de la entrega. No lo hay, pide que escoja una talla y un color. No
+> tiene sentido, me está poniendo cosas que no existen. Me pone todas las tallas yo creo que existen en
+> todos los modelos. Está muy mal. **No puedo avanzar**.»*
+
+📐 **MEDIDO, y es peor de lo que él vio: el defecto está en DOS pantallas, no en una.** El cuadro **sí
+existe** —`TraspasosPtPagina.tsx` importa `MatrizColorTalla`—, pero **las columnas se arman con el catálogo
+GLOBAL de tallas**: `TraspasosPtPagina.tsx:97` y `MovimientosPtPagina.tsx:110` llaman
+`useTallas({ pagina: 1, porPagina: 100 })`, y la segunda lo pasa a `tallasColumnas(...)` en `:170`. Eso es
+literalmente *«todas las tallas que yo creo que existen en todos los modelos»*.
+⭐ **Y el patrón correcto ya vive al lado, en la pantalla que él pone como modelo:** la entrega hace
+`setTallas(tallasDeOrden(o))` (`EntregaClientePagina.tsx:133`), con el helper
+`produccion/matriz-orden.ts:12` que deriva las columnas de `orden.lineas[].tallas`.
+🔴 **Y esto explica sus puntos 12 y 13**, que él dejó en *«no pude hacer nada por que no pude hacer un
+movimiento»* y *«lo mismo»*: **sin poder mover PT no hay kardex que leer ni movimiento que cancelar.** ⇒ un
+solo defecto tumbó **tres** puntos del repaso.
+
+**(07c) Nota de salida de avíos.** Textual:
+
+> *«Al traer los avíos de la OP… **como me jala avíos que no hay stock, no me deja**. Estaría bien que no
+> deje meter los avíos que no hay stock, ANTES de meterlos. Porque ahorita valida DESPUÉS de haberlos
+> metido en la nota de salida.»*
+
+📐 **MEDIDO:** `CapturaRenglonesAvio.tsx` **no menciona stock ni existencia en ninguna línea** ⇒ hoy no
+filtra nada al capturar y la guarda vive en el servidor, al confirmar. ⚠️ **La guarda del servidor NO se
+toca** (es la que manda, A1): lo que se añade es no dejar llegar hasta ahí.
+
+### 🔶 Los cinco que entran antes de arrancar (confirmados por él)
+
+- **(02) La entrada de tela por factura trae el importe y no el precio.** Textual: *«Podemos quitarle el
+  importe y el precio en la entrada. Para cuestión de inventarios no es necesario saber el importe. Cuando
+  cruce con algo de información de facturas… sí es importante que venga el precio y el importe, pero para
+  cuestión de movimientos no es necesario.»* ⇒ **se quitan los dos de la captura de movimiento**; el precio
+  y el importe son del mundo de la factura, no del inventario.
+- **(08) El recibo de maquila pide un precio que ya está en la salida.** Textual: *«No me debe de preguntar
+  el precio del recibo. Eso está en la salida de maquila.»*
+- **(10b) La entrega a cliente no enseña la existencia por talla.** Textual: *«Debería de decir la
+  existencia que hay por talla para saber lo que se va a capturar no exceda la cantidad por talla.»*
+  ⇒ hoy se captura a ciegas y el error llega al confirmar; es el mismo patrón que el (07c).
+- **(07b) El preliminar de avíos: escoger qué se manda, y sólo lo que hay.** Textual: *«Al traer los avíos
+  de la OP, estaría bien ver un preliminar y seleccionar qué avíos son los que se van a mandar
+  (obviamente tendría que validar que sólo te ofrezca los que ya se recibieron en almacén).»*
+- **(06) Los movimientos de cada avío, y agrupar por proveedor.** Textual: *«Debería haber un botón para ver
+  los movimientos de cada avío. Falta agrupar por proveedor.»*
+
+### ⏸️ Los cuatro que ÉL MISMO dejó para la fase siguiente
+
+- **(04) Al sacar tela a una OP, precargar las telas que se compraron para esa OP.** Textual: *«Para la
+  siguiente fase, estaría muy bien que como opción por default ponga las telas de las que fue comprada
+  para esa OP. Pudiendo meter también otras telas. Pero ya sabemos qué telas compramos para cada OP, ya que
+  la OC viene ligada a la OP.»* 🔑 **El dato que lo hace barato es suyo: la OC ya viene ligada a la OP.**
+- **(05) Validar el XML del proveedor al recibir material.** Textual: *«Habíamos acordado de validar los XML
+  del proveedor al hacer la recepción del material. Pero podríamos dejarlo para la siguiente fase.»*
+- **(09) Las existencias de PT, por modelo y no por talla.** Textual: *«Para la siguiente fase, en el
+  inventario quiero ver un solo renglón por modelo de existencias. Y ya si me meto al modelo, poder ver el
+  cuadrito por talla y color. No quiero todas la lista de tallas. Y quiero un botón para ver todos los
+  movimientos que ha tenido ese modelo. Entregadas y salidas.»*
+- **(10a) Subir la factura en la entrega.** Textual: *«Habíamos quedado que vamos a subir la factura para la
+  fase 2.»* ⇒ **NO nace ficha nueva: ya es la 0.211** (*«ninguna prenda sale del almacén sin un documento
+  que la ampare»*, §Post-F9.211 y su encuadre del 23-sep). Se **anota** que su repaso la reconfirma.
+
+### ✅ Y el único que salió bien
+
+**(03) La existencia de tela cuadra.** Es el que más tranquiliza de los trece: el motor de kardex —suma de
+movimientos bajo bloqueo, nunca la vista (D3)— **da el número correcto contra datos que él mismo capturó**.
+Lo que falla alrededor es la captura y lo que se enseña, no la contabilidad.
+
+### 📌 Fichas que nacen de aquí
+
+`0.215` (11+12+13, 🔴 bloquea) · `0.216` (07c+07a, 🔴 bloquea) · `0.217` (02, 🔶) · `0.218` (08, 🔶) ·
+`0.219` (10b, 🔶) · `0.220` (07b, 🔶) · `0.221` (06, 🔶) · `0.222` (04, ⏸️) · `0.223` (05, ⏸️) ·
+`0.224` (09, ⏸️). La **0.096** cierra: el repaso se hizo.
+
+### ⏳ Y lo que sigue faltando para que entren MÁS personas a probar
+
+Daniel lo pidió el mismo día: *«quiero poder dárselo a algunas personas para que lo vayan probando»*.
+**El sistema ya lo permite** —hay alta de usuarios con rol en *Administración › Usuarios* y *› Roles*, y
+siete roles sembrados— pero faltan **dos pasos manuales que el lead no puede hacer** (la base de `prueba` es
+privada en Railway):
+1. 🔴 **Cambiar la contraseña de `admin`**, que sigue siendo la del arranque (`seed.ts:1779`,
+   `PASSWORD_TEMPORAL_ADMIN`). Pendiente desde junio; con gente entrando, es lo primero.
+2. ⚠️ **Correr el sembrador de datos de Inventarios** contra `prueba`
+   (`npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts`, idempotente, con `--simular` y
+   `--limpiar`). Sin eso entran y no tienen material, proveedores, compras ni facturas — que es justo lo que
+   frenó a Daniel la primera vez.
