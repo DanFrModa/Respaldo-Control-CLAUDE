@@ -71,6 +71,93 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.185 · 30-sep-2026 · **en prueba** — **Se desbloquea tu repaso de Inventarios: ya puedes mover producto terminado y la nota de salida deja de ofrecerte avíos que no hay**
+
+> **La v0.185 cierra las dos fichas que te dejaron tirado** en el repaso (0.215 y 0.216). Lo demás que
+> encontraste queda escrito y clasificado, pero **no se construye todavía**.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Mover producto terminado, que era lo que no podías hacer.** El traspaso entre almacenes y los
+  movimientos manuales ya **no te ofrecen tallas que ese modelo no tiene**: el cuadro se arma con lo que de
+  verdad hay en el almacén de origen. Tu frase fue *«me pone todas las tallas yo creo que existen en todos
+  los modelos. Está muy mal. No puedo avanzar»* — y era eso literalmente: las columnas salían del catálogo
+  completo de tallas.
+- ⭐ **Y con eso se destraban otros dos puntos tuyos de un golpe**: leer la película de los movimientos y
+  cancelar uno. Los habías dejado en *«no pude hacer nada por que no pude hacer un movimiento»*: **era un
+  solo defecto tumbando tres puntos**.
+- ✅ **La nota de salida ya no te deja meter avíos que no hay.** Antes te los traía de la orden y te avisaba
+  **al confirmar**; ahora los filtra antes, **y te dice cuáles quedaron fuera** —porque la receta los pide y
+  alguien tiene que comprarlos—. Si eliges uno a mano sin existencia, no entra. Y donde antes veías un hueco
+  en blanco, ahora dice **«Sin existencia en el almacén origen»**: ese hueco hacía que la captura pareciera
+  correcta.
+- ✅ **Una fecha que se adelantaba un día.** Las fechas por default se calculaban con el día universal, así
+  que **de las 6 de la tarde en adelante proponían mañana**. Corregido en la nota de salida.
+
+### Qué cambió y puede sorprender
+
+- 📌 **Tu punto 01 ya estaba resuelto y no lo sabías: probaste la versión 0.177 y ya íbamos en la 0.184.** Lo
+  que pediste el 23 de septiembre —ver en la orden de compra lo que ya llegó y lo que falta— entró en la
+  **0.179**. De aquí en adelante la guía de prueba va a decir contra qué versión se prueba, porque el número
+  se pinta arriba en la pantalla.
+- ⚠️ **En una ENTRADA de producto terminado el catálogo completo de tallas se queda a propósito.** Es el
+  único camino para meter piezas que el sistema todavía no conoce (el conteo inicial), y ahí la talla puede
+  no existir en ningún movimiento. En una SALIDA ya no aparece: no hay nada que sacar que el almacén no
+  tenga.
+- ⚠️ **Y algo que estuvo mal y se corrigió antes de subirlo, porque conviene que lo sepas.** Pediste *«por
+  default que dé la fecha de hoy»*; al medirlo, la de **elaboración** ya nacía en hoy, así que se llenó la de
+  **envío** — y **ese vacío no era un descuido: significaba «todavía no ha salido»**, se lee «pendiente» en
+  dos pantallas y **se imprime en el papel que acompaña las prendas**. Te preguntamos *«¿era ésa?»* **sin
+  decirte lo que costaba**, dijiste que sí, y el reviewer lo cazó. **Revertido.** Tus dos fechas —elaboración
+  por default y envío aparte— **ya eran como las querías**: el diseño estaba bien, lo que estuvo mal fue la
+  pregunta. 📌 Lo que **sí** se queda de ahí: el arreglo del día que se adelantaba.
+
+### Qué sigue pendiente o roto
+
+- 📋 **Tu repaso dejó diez fichas** (0.215 a 0.224). Dos están hechas —las de arriba—; **cinco entran antes
+  de arrancar** (quitar el importe y el precio de la entrada de tela, que el recibo de maquila no pida un
+  precio que ya está en la salida, ver la existencia por talla al entregar, el preliminar para escoger qué
+  avíos se mandan, y los movimientos por avío agrupados por proveedor) y **tres las dejaste tú para la fase
+  siguiente**. ⚠️ Tu **cuarto** punto de fase siguiente —subir la factura al entregar— **no nació ficha
+  nueva**: reconfirmó una que ya existía. 2 + 5 + 3 = 10.
+- 📋 **Y tu regla de las órdenes cerradas dejó seis más** (0.225 a 0.230), con tus cinco decisiones escritas.
+  **Y tres más** (0.231 a 0.233) de lo que decidiste al final del día: **marcar la OC como reposición,
+  merma o sobre-corte** —hoy la OC no puede decir por qué existe, así que el sobrecosto no se puede sumar—;
+  **que el sobre-corte pida su material** —hoy la explosión calcula contra lo que pidió el cliente, nunca
+  contra lo que se cortó, así que el 20 % extra hay que comprarlo a mano proveedor por proveedor—; y una que
+  salió de corregir una cita equivocada mía: **otras tres pantallas siguen dejándote sacar avíos que no hay**
+  (salida sin orden, ajuste y traspaso de materiales), el mismo defecto que reportaste pero fuera de la nota.
+  **No se construye nada de eso todavía**: primero termina de probar Inventarios.
+- 👤 **Y una última, la de los perfiles y los permisos** (0.234), que salió de la otra conversación del
+  mismo día. Tu modelo ya quedó decidido y escrito: **cada persona lleva el perfil de su puesto, y encima se
+  le puede abrir o quitar un permiso suelto** —sigue ligada al perfil, así que si mañana cambias lo que hace
+  «Compras», les cambia a todos los de Compras sin tocarlos uno por uno—, y el sistema sabe decir, de cada
+  permiso, si lo tiene *porque es de Compras* o *porque se le dio a mano tal día*. **De las tres cosas que
+  pediste, dos ya existen** (perfiles con permisos, y asignarle un perfil a una persona); **la que falta es
+  abrirle un permiso suelto a alguien**, y mientras no esté hay un rodeo que funciona hoy: darle dos perfiles
+  a la vez. ⭐ **Y el ejercicio ya encontró algo por su cuenta: tres de los nueve perfiles de hoy son
+  idénticos** —`Logística`, `Asistente` y `Secretarial` tienen exactamente los mismos permisos—, o sea que
+  hay menos perfiles de los que parece, y los propuse yo derivándolos del sistema viejo, que como dijiste
+  tampoco los tenía bien definidos. ⏳ **Lo que espera de ti:** la lista de los puestos que hoy existen con
+  lo que hace realmente cada uno; de ahí te propongo los permisos de cada uno con el porqué. Y donde lo
+  sepas, dime también **lo que ese puesto NO debe poder hacer** (ver importes y márgenes, autorizar compras,
+  reabrir órdenes, mover inventario) — es la mitad que se olvida y donde está el daño. ⚠️ **Esto tiene que
+  quedar cerrado antes de PRODUCCIÓN, no antes de las pruebas:** con datos reales, un permiso de más deja de
+  ser un detalle. 📌 Mientras tanto te dejé **el catálogo completo de los 134 permisos como página de
+  consulta**, con los 29 delicados marcados y su razón:
+  **https://claude.ai/artifact/KHKSNqVtfpzMMWUZ4RnSE7** *(es una página aparte, no vive dentro del sistema;
+  puedes ir marcando ahí lo que quieras para cada puesto y lo que apuntes se guarda).*
+- 🔴 **De esas seis, una bloquea el arranque y conviene que la sepas: hoy «cerrada» no bloquea de verdad.**
+  Se puede sacar tela, comprar material, auditar y mover producto terminado contra una orden cerrada, porque
+  la protección existe pero **no está puesta en siete módulos**. Y en pantalla el formulario se abre completo:
+  el rechazo llega al pulsar Guardar.
+- 🐛 **Un defecto encontrado de paso, sin relación con nada de esto:** si alguien **agrega un renglón a una
+  orden de compra ya recibida del todo**, ese material **no se puede recibir nunca más** — queda comprado y
+  sin puerta de entrada, y el sistema lo cuenta como cubierto. Para clasificarlo necesito saber de ti si eso
+  pasa en la práctica.
+- ⏳ **Y dos cosas tuyas siguen esperando para que entren personas a probar:** cambiar la contraseña de
+  `admin`, que sigue siendo la del arranque, y correr el sembrador de datos de Inventarios contra `prueba`.
+
 ## 0.184 · 26-sep-2026 · **en prueba** — **Tu respuesta acota una pendiente… y midiéndola aparece el caso de verdad: el importador parte la tanda él solo**
 
 > **La v0.184 no cierra ninguna fila del programa**: escribe una **respuesta tuya** donde se lee, y corrige

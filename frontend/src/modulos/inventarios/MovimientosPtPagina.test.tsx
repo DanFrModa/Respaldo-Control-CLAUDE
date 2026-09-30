@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Modelo } from '@/api/modelos';
-import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { hoy } from './fecha-captura-pt';
 import { MovimientosPtPagina } from './MovimientosPtPagina';
@@ -23,8 +23,38 @@ vi.mock('@/api/inventarios', () => ({
     useExistenciasPtMock(query, habilitado),
 }));
 
-function fila(idOrden: number | null, folioOrden: number | null, existencia: number) {
-  return { idModelo: 1, idColor: 7, idTalla: 11, idAlmacen: 3, idOrden, folioOrden, existencia };
+/**
+ * Un renglón de existencia como lo devuelve el servidor. ⭐ Fila 0.215 — trae el NOMBRE del color y
+ * la ETIQUETA/orden de la talla porque de estos renglones se arma el CUADRO de captura: son sus
+ * filas y sus columnas, ya no las pone el catálogo global.
+ */
+function fila(
+  idOrden: number | null,
+  folioOrden: number | null,
+  existencia: number,
+  ejes: Partial<{
+    idColor: number;
+    color: string;
+    colorActivo: boolean;
+    idTalla: number;
+    etiquetaTalla: string;
+    ordenTalla: number;
+  }> = {},
+) {
+  return {
+    idModelo: 1,
+    idColor: 7,
+    color: 'Rojo',
+    colorActivo: true,
+    idTalla: 11,
+    etiquetaTalla: 'CH',
+    ordenTalla: 1,
+    idAlmacen: 3,
+    idOrden,
+    folioOrden,
+    existencia,
+    ...ejes,
+  };
 }
 
 /**
@@ -45,10 +75,16 @@ const EXISTENCIAS_SALIDA = {
 /**
  * Consulta de ENTRADA (`incluirCeros`, sin filtro de almacén): la orden 55 salió COMPLETA a
  * Aplicación y su bucket quedó en 0 — es justo la que tiene que poder elegirse al regresar.
+ *
+ * ⚠️ El bucket 55 va como UN renglón en CERO, no como dos (+100/−100): así lo devuelve el servidor,
+ * porque `existencia_pt` es una vista AGREGADA por modelo×color×talla×orden×almacén. La forma
+ * importa desde la fila 0.215: de estos renglones se arman los EJES del cuadro, y con dos renglones
+ * el de +100 hacía de eje por su cuenta ⇒ la prueba del regreso del estampado no medía nada (medido:
+ * quitarle el `incluirCeros` a los ejes no rompía ninguna prueba).
  */
 const EXISTENCIAS_ENTRADA = {
   data: {
-    filas: [fila(55, 9001, 100), fila(55, 9001, -100), fila(null, null, 6)],
+    filas: [fila(55, 9001, 0), fila(null, null, 6)],
     totalExistencia: 6,
   },
   isPending: false,
@@ -155,6 +191,9 @@ const TIPOS_MOV_OK = {
  */
 const ALMACENES_TODOS = [
   { id: 3, nombre: 'Primeras', tipo: 'PT' },
+  // ⭐ Fila 0.215 (ronda de corrección) — un SEGUNDO almacén de PT: sin él no se puede probar qué
+  // le pasa al cuadro al CAMBIAR de almacén, que es donde se colaba el borrado silencioso.
+  { id: 4, nombre: 'Segundas', tipo: 'PT' },
   { id: 5, nombre: 'Naucalpan', tipo: 'TELA' },
   { id: 7, nombre: 'Almacén de avíos', tipo: 'AVIO' },
 ];
@@ -173,8 +212,20 @@ vi.mock('@/api/almacenes', () => ({
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] } }),
 }));
+/**
+ * ⭐ Fila 0.215 — el catálogo GLOBAL trae una talla ('G') que NUNCA tiene existencia. Es el cebo de
+ * las dos pruebas del «Agregar talla»: en una SALIDA no debe aparecer (de lo que no hay no se saca)
+ * y en una ENTRADA sí (ahí se meten piezas que el kardex no conoce todavía).
+ */
 vi.mock('@/api/tallas', () => ({
-  useTallas: () => ({ data: { datos: [{ id: 11, etiqueta: 'CH', orden: 1 }] } }),
+  useTallas: () => ({
+    data: {
+      datos: [
+        { id: 11, etiqueta: 'CH', orden: 1 },
+        { id: 13, etiqueta: 'G', orden: 3 },
+      ],
+    },
+  }),
 }));
 
 const modelo: Modelo = {
@@ -300,16 +351,18 @@ describe('MovimientosPtPagina (F3-E3)', () => {
    * salida. 🔑 Y hace falta decirlo: **quitar ese `excluirIds` no rompía NINGUNA prueba** —medido—
    * hasta que existió ésta.
    */
-  it('el color YA capturado desaparece del buscador (no se puede repetir la fila)', async () => {
+  it('el color que YA es fila desaparece del buscador (no se puede repetir la fila)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
     await elegirModelo(usuario);
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
+    // ⭐ Fila 0.215 — "Rojo" ya es fila porque el CUADRO se armó con las existencias, no porque se
+    // haya agregado a mano. La exclusión tiene que valer igual (el servidor rechaza el repetido).
+    expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
 
-    // La lista se vuelve a abrir contra el MISMO catálogo del servidor (el mock siempre trae
-    // "Rojo"): si el color capturado siguiera ofreciéndose, aquí habría una opción.
+    // La lista se abre contra el MISMO catálogo del servidor (el mock siempre trae "Rojo"): si el
+    // color que ya es fila siguiera ofreciéndose, aquí habría una opción.
     const input = screen.getByTestId('mov-matriz-agregar-color-busqueda');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'Rojo' } });
@@ -325,9 +378,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    // La matriz arranca vacía: se agrega un color y una talla del catálogo, luego se captura.
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+    // ⭐ Fila 0.215 — la matriz ya viene ARMADA con lo que hay (Rojo × CH): no se agrega nada.
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '12');
@@ -384,8 +435,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // entrada
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
     await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '100');
@@ -424,8 +473,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
     await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '4');
@@ -443,8 +490,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '3');
@@ -463,23 +508,11 @@ describe('MovimientosPtPagina (F3-E3)', () => {
    * mano esa mercancía no tenía puerta. Aparece rotulado —para que nadie lo confunda con uno del
    * catálogo— y sólo porque el SERVIDOR lo devuelve con existencia en este contexto.
    */
-  it('ofrece el color RETIRADO con existencia, rotulado, y se puede capturar con él', async () => {
+  it('el color RETIRADO con existencia es fila del cuadro, rotulado, y se captura con él', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue({
       data: {
-        filas: [
-          {
-            idModelo: 1,
-            idColor: 9,
-            color: 'Blanco Hueso',
-            colorActivo: false,
-            idTalla: 11,
-            idAlmacen: 3,
-            idOrden: null,
-            folioOrden: null,
-            existencia: 30,
-          },
-        ],
+        filas: [fila(null, null, 30, { idColor: 9, color: 'Blanco Hueso', colorActivo: false })],
         totalExistencia: 30,
       },
       isPending: false,
@@ -491,22 +524,17 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
 
-    await usuario.click(screen.getByTestId('mov-matriz-agregar-color-busqueda'));
-    const textos = (await screen.findAllByTestId('mov-matriz-agregar-color-opcion')).map(
-      (o) => o.textContent ?? '',
-    );
-    expect(textos).toContain('Blanco Hueso (retirado)');
-    // Y el catálogo vivo sigue ahí, sin marca: la puerta se abre, no se sustituye.
-    expect(textos).toContain('Rojo');
+    // ⭐ Fila 0.215 — ya no hay que ir a buscarlo: si tiene piezas aquí, ES fila del cuadro. Y sigue
+    // ROTULADO, para que nadie lo confunda con uno del catálogo vivo (fila 0.164).
+    expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Blanco Hueso (retirado)');
 
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Blanco', 'Blanco Hueso (retirado)');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '30');
     await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
 
+    // Lo que viaja es el `idColor`: el rótulo sólo se pinta.
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idColor: number }[] }];
     expect(cuerpo.lineas[0]?.idColor).toBe(9);
   });
@@ -613,14 +641,246 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     });
   });
 
+  /**
+   * ⭐⭐ FILA 0.215 — EL MISMO DEFECTO QUE EN EL TRASPASO, EN ESTA PANTALLA.
+   *
+   * Daniel lo reportó del traspaso —*«me pone todas las tallas yo creo que existen en todos los
+   * modelos»*, §Post-F9.243 p.11— y aquí estaba igual: las columnas salían del catálogo GLOBAL.
+   * Ahora el cuadro se ARMA con los renglones de existencia del bucket, y el catálogo sólo queda
+   * disponible donde de verdad hace falta: la ENTRADA.
+   */
+  describe('el cuadro se arma con lo que HAY (fila 0.215)', () => {
+    it('⭐ trae la fila del color y la columna de la talla que tienen piezas, sin tocar nada', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
+      expect(screen.getByTestId('mov-matriz-celda')).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴 EL GUARDIÁN DE LA SALIDA. El catálogo trae 'G', que no tiene existencia en ningún renglón.
+     * Si el «Agregar talla» de una SALIDA volviera a alimentarse del catálogo, la 'G' aparecería y
+     * se podría capturar una salida de algo que no hay — la que el servidor rechaza bajo bloqueo.
+     * MEDIDO: con `tallasDisponibles={tallasDelCatalogo}` esta prueba falla.
+     */
+    it('⭐ en una SALIDA el «Agregar talla» NO ofrece el catálogo global', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      const agregarTalla = screen.getByTestId('mov-matriz-agregar-talla');
+      const opciones = [...agregarTalla.querySelectorAll('option')].map((o) =>
+        (o.textContent ?? '').trim(),
+      );
+      expect(opciones).toEqual(['Agregar talla…']); // 'CH' ya es columna, 'G' no existe aquí
+      expect(agregarTalla).toBeDisabled();
+    });
+
+    /**
+     * ⭐ LA GEMELA POSITIVA, y no es simetría de adorno: la ENTRADA es el único modo que mete piezas
+     * que el kardex todavía no conoce (el conteo inicial, §Post-F9.25). Ahí la talla puede no estar
+     * en ningún renglón, y sin el catálogo el cuadro no tendría columna en la que capturarla.
+     */
+    it('⭐ en una ENTRADA el «Agregar talla» SÍ ofrece el catálogo (se meten piezas nuevas)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // Inventario Inicial
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      const opciones = [
+        ...screen.getByTestId('mov-matriz-agregar-talla').querySelectorAll('option'),
+      ].map((o) => (o.textContent ?? '').trim());
+      expect(opciones).toEqual(['Agregar talla…', 'G']);
+    });
+
+    /**
+     * 🔴🔴 EL REGRESO DEL ESTAMPADO: EL BUCKET EN **CERO** SIGUE TENIENDO EJES.
+     *
+     * Es la razón de que los ejes de la ENTRADA se pidan con `incluirCeros`. Las piezas de la orden
+     * 55 salieron completas a Aplicación y su bucket quedó en 0; al volver tienen que encontrar SU
+     * color y SU talla en el cuadro. Si el corte de «sin piezas no es eje» se aplicara también aquí,
+     * el cuadro saldría vacío y las piezas acabarían entrando a «sin orden» — y entonces la entrega
+     * al cliente de la orden 55 diría "no hay existencia" con la mercancía en el almacén.
+     *
+     * (Medido: sin el `{ incluirCeros: esEntrada }` de la llamada, esta prueba se pone roja y era la
+     * única que faltaba — el hallazgo del reviewer sobre mis mutaciones supervivientes.)
+     */
+    it('🔴 en una ENTRADA, un bucket en CERO sigue trayendo su color y su talla', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // Inventario Inicial
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+      await usuario.selectOptions(screen.getByTestId('mov-orden'), '55'); // bucket en 0
+
+      expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
+      expect(screen.getByTestId('mov-matriz-tabla')).toHaveTextContent('CH');
+      expect(screen.getByTestId('mov-matriz-celda')).toBeInTheDocument();
+    });
+
+    /**
+     * ⭐ Y LA GEMELA NEGATIVA: en una SALIDA un renglón sin piezas NO es eje. Va **NEGATIVO** a
+     * propósito, y por dos razones:
+     *  1. es lo que el servidor puede devolver de verdad en una salida (descarta `<> 0`, **no** los
+     *     negativos), así que el −3 —rastro de un error de captura— llegaba a la pantalla;
+     *  2. el renglón va en el bucket «SIN ORDEN», que es el elegido por default ⇒ lo único que puede
+     *     dejarlo fuera del cuadro es el corte de «sin piezas». Con una orden distinta, el filtro por
+     *     bucket lo excluiría solo y esta prueba pasaría sin medir nada — que es como estaba escrita
+     *     en la primera versión de esta ronda (lo cazó una mutación).
+     */
+    it('⭐ en una SALIDA, un renglón NEGATIVO no es eje (no se saca de menos que nada)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [fila(null, null, -3)], totalExistencia: -3 },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.queryByTestId('mov-matriz-celda')).not.toBeInTheDocument();
+      expect(screen.getByTestId('mov-sin-piezas')).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴🔴 CORREGIR EL ALMACÉN NO PUEDE BORRAR UNA CAPTURA DE ENTRADA.
+     *
+     * Hallazgo del reviewer, medido: la firma del cuadro llevaba `idTipoMov` e `idAlmacen` SIEMPRE, y
+     * en una ENTRADA eso **borraba en silencio** la celda, la fila y la columna en cuanto se corregía
+     * el almacén. Sobraba, además: la consulta de ENTRADA **no filtra por almacén** ⇒ sus ejes no
+     * pueden cambiar por eso. El damnificado es justo el flujo que la asimetría existe para proteger:
+     * el CONTEO INICIAL, donde se teclea un modelo entero a mano.
+     *
+     * 🔑 Se captura sobre una talla AGREGADA A MANO del catálogo ('G', que no está en ningún renglón
+     * de existencia): así la prueba cubre las tres cosas que se perdían —la columna, la fila y el
+     * número—, no sólo el número.
+     */
+    it('🔴 en una ENTRADA, cambiar de ALMACÉN conserva lo capturado (columna, fila y número)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // Inventario Inicial
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+      // Talla del catálogo que NO existe en los renglones: sólo la entrada puede agregarla.
+      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '13');
+      const celdas = screen.getAllByTestId('mov-matriz-celda');
+      const celdaG = celdas[celdas.length - 1] as HTMLElement;
+      await usuario.clear(celdaG);
+      await usuario.type(celdaG, '7');
+
+      // Se corrige el almacén: la entrada no consulta por almacén, así que el cuadro es el mismo.
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '4');
+
+      const despues = screen.getAllByTestId('mov-matriz-celda');
+      expect(despues).toHaveLength(celdas.length);
+      expect(despues[despues.length - 1]).toHaveValue(7);
+      expect(screen.getByTestId('mov-matriz-tabla')).toHaveTextContent('G');
+      expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
+    });
+
+    /**
+     * ⭐ Y EL OTRO SENTIDO, que es la razón de que el almacén SÍ siga en la firma de la SALIDA: aquí
+     * la consulta lo filtra, y dos almacenes pueden tener los MISMOS colores y tallas con **saldos
+     * distintos**. Arrastrar el número sería capturarlo contra un disponible que no es el suyo.
+     * (El mock devuelve los mismos renglones para los dos almacenes: así lo único que puede vaciar el
+     * cuadro es el almacén de la firma — si se le quitara, esta prueba se pone roja.)
+     */
+    it('⭐ en una SALIDA, cambiar de ALMACÉN sí vacía lo capturado (otro saldo, otro cuadro)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+      const celda = screen.getByTestId('mov-matriz-celda');
+      await usuario.clear(celda);
+      await usuario.type(celda, '5');
+      expect(screen.getByTestId('mov-matriz-celda')).toHaveValue(5);
+
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '4');
+      expect(screen.getByTestId('mov-matriz-celda')).toHaveValue(null);
+    });
+
+    /**
+     * ⚠️ UNA CONSULTA QUE FALLÓ NO ES UN ALMACÉN VACÍO (hallazgo del reviewer). El párrafo sólo
+     * miraba `isPending`, así que con la consulta EN ERROR la pantalla AFIRMABA que no hay piezas de
+     * ese modelo —y aconsejaba cambiar de almacén—, las dos cosas falsas. Es el mismo criterio que
+     * `stockConocido` en la nota de salida, a tres metros de aquí.
+     */
+    it('⚠️ con las existencias EN ERROR no dice «no hay piezas» (eso sería mentir)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.queryByTestId('mov-sin-piezas')).not.toBeInTheDocument();
+      // Lo que sí se dice es que no se pudieron leer (el selector de orden ya lo avisa).
+      expect(screen.getByTestId('mov-orden-error')).toBeInTheDocument();
+    });
+
+    it('⭐ en una SALIDA con el bucket vacío dice POR QUÉ el cuadro está vacío', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [], totalExistencia: 0 },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.getByTestId('mov-sin-piezas')).toHaveTextContent(
+        'De un bucket vacío no se puede sacar',
+      );
+    });
+
+    /**
+     * Y en una ENTRADA ese aviso NO sale, a propósito: capturar sobre un bucket vacío es justo lo
+     * normal ahí (el conteo inicial y el regreso del estampado). Decirlo sería regañar por lo
+     * correcto.
+     */
+    it('en una ENTRADA con el bucket vacío NO se avisa nada (ahí es lo normal)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [], totalExistencia: 0 },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // entrada
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.queryByTestId('mov-sin-piezas')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Fila 0.100 · el motivo es obligatorio', () => {
     /** Deja la pantalla lista para guardar, SIN motivo. */
     async function capturaSinMotivo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
       await elegirModelo(usuario);
       await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
       await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-      await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+      // Fila 0.215 — la celda ya está: el cuadro se armó con las existencias del bucket.
       const celda = screen.getByTestId('mov-matriz-celda');
       await usuario.clear(celda);
       await usuario.type(celda, '12');
@@ -650,6 +910,39 @@ describe('MovimientosPtPagina (F3-E3)', () => {
       await capturaSinMotivo(usuario);
       await ponerMotivo(usuario, 'ab');
 
+      expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+    });
+
+    /**
+     * 🔴🔴 AL GUARDAR, EL CUADRO SE VACÍA — Y ESTO ES LO QUE IMPIDE UN MOVIMIENTO DUPLICADO.
+     *
+     * Hallazgo del reviewer: con `limpiarMatriz()` en cuerpo VACÍO las 30 pruebas seguían verdes, y
+     * es el único mecanismo que limpia el cuadro tras guardar (la fila 0.215 cambió de mecanismo:
+     * antes vaciaba `lineas`/`tallas` a mano, ahora olvida la firma para que se rearme). Si se rompe,
+     * las cantidades del movimiento ya asentado se quedan tecleadas y la siguiente pulsación lo
+     * repite — en un módulo D3, donde deshacerlo exige un inverso auditado.
+     *
+     * ⚠️ Y no basta con que la firma cambie sola: un movimiento PARCIAL deja los MISMOS colores y
+     * tallas ⇒ la firma no se mueve.
+     */
+    it('🔴 al guardar el CUADRO se vacía (o la siguiente pulsación duplica el movimiento)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await capturaSinMotivo(usuario);
+      await ponerMotivo(usuario);
+      expect(screen.getByTestId('mov-matriz-celda')).toHaveValue(12);
+
+      await usuario.click(screen.getByTestId('mov-guardar'));
+      const [, opciones] = crearMutate.mock.calls[0] as [
+        unknown,
+        { onSuccess: (mov: unknown) => void },
+      ];
+      act(() => {
+        opciones.onSuccess({ folio: 4321, totalPiezas: 12 });
+      });
+
+      // El cuadro sigue ahí (tipo, modelo y almacén no cambiaron) pero SIN lo capturado.
+      expect(screen.getByTestId('mov-matriz-celda')).toHaveValue(null);
       expect(screen.getByTestId('mov-guardar')).toBeDisabled();
     });
 

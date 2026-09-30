@@ -90,6 +90,71 @@ describe('EditorRenglonesNota (F4-E5 · rediseño R6 §4.6 — solo-avíos)', ()
     expect(screen.getByTestId('existencia-nota')).toHaveTextContent('Excede');
   });
 
+  /**
+   * 🔴🔴 FILA 0.216 — LA EXISTENCIA **CERO** SE PINTA, Y ANTES NO.
+   *
+   * Hallazgo del reviewer: quitando el `?? { existencia: 0, unidad: null }` de `RenglonAvio` los 54
+   * tests seguían verdes ⇒ *«pintar la existencia cero»*, que la entrega listaba como uno de los tres
+   * arreglos, **no tenía ninguna prueba**.
+   *
+   * Y el caso es el habitual, no un borde: la vista de existencias sólo tiene renglón donde hubo
+   * movimientos, así que **el avío que nunca entró a ese almacén NO está en el mapa** — y hasta esta
+   * fila eso se pintaba EN BLANCO: el renglón parecía correcto y el error llegaba al confirmar la
+   * nota, que es exactamente lo que Daniel reportó.
+   */
+  it('🔴 un avío que NO está en el mapa se pinta «Sin existencia», no en blanco', () => {
+    const renglon: RenglonNotaCaptura = {
+      ...renglonVacio(),
+      tipo: 'avio',
+      idOrden: 50,
+      idAvio: 4, // no está en el mapa: nunca entró a ese almacén
+      cantidad: '60',
+    };
+    renderEditor([renglon], {
+      existenciaPorAvio: new Map([[3, { existencia: 100, unidad: 'pza' }]]),
+    });
+
+    expect(screen.getByTestId('existencia-nota')).toHaveTextContent(
+      'Sin existencia en el almacén origen',
+    );
+  });
+
+  it('y el renglón cuya existencia ES cero dice lo mismo (no «Excede · hay 0»)', () => {
+    const renglon: RenglonNotaCaptura = {
+      ...renglonVacio(),
+      tipo: 'avio',
+      idOrden: 50,
+      idAvio: 3,
+      cantidad: '5',
+    };
+    renderEditor([renglon], {
+      existenciaPorAvio: new Map([[3, { existencia: 0, unidad: 'pza' }]]),
+    });
+
+    // Lo que hay que hacer no es bajar la cantidad, es recibir el avío en almacén.
+    expect(screen.getByTestId('existencia-nota')).toHaveTextContent(
+      'Sin existencia en el almacén origen',
+    );
+  });
+
+  /**
+   * ⭐ Y LA GEMELA DEL OTRO LADO: sin stock CONOCIDO (sin almacén elegido, o su consulta en vuelo o
+   * en error) **no se pinta existencia ninguna**. Afirmar un cero que no se midió es el defecto
+   * simétrico del que arriba se arregla.
+   */
+  it('⭐ sin stock conocido (`existenciaPorAvio` undefined) no se pinta NINGUNA existencia', () => {
+    const renglon: RenglonNotaCaptura = {
+      ...renglonVacio(),
+      tipo: 'avio',
+      idOrden: 50,
+      idAvio: 4,
+      cantidad: '60',
+    };
+    renderEditor([renglon]);
+
+    expect(screen.queryByTestId('existencia-nota')).toBeNull();
+  });
+
   // §Post-F9.38 — la tela ya no se captura en la nota; los renglones viejos solo se MUESTRAN.
   it('un renglón de TELA viejo se muestra en SOLO LECTURA, sin selectores que capturar', () => {
     const renglon: RenglonNotaCaptura = {

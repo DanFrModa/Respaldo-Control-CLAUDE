@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aNumero,
   capturaDesdeNota,
+  hayStockDeAvio,
   renglonApi,
   renglonCompleto,
   renglonVacio,
@@ -128,5 +129,40 @@ describe('captura de notas de salida (F4-E5)', () => {
         descripcionLegacy: '3 conos hilo negro y etiquetas',
       });
     });
+  });
+});
+
+/**
+ * ⭐⭐ FILA 0.216 — Daniel: *«que no deje meter los avíos que no hay stock, ANTES de meterlos. Porque
+ * ahorita valida DESPUÉS de haberlos metido en la nota de salida»* (§Post-F9.243, punto 07c).
+ */
+describe('hayStockDeAvio (fila 0.216)', () => {
+  const stock = new Map([[3, { existencia: 500 }]]);
+
+  it('con existencia, sí', () => {
+    expect(hayStockDeAvio(stock, 3)).toBe(true);
+  });
+
+  /**
+   * El avío que NO tiene renglón en la vista de existencias es un avío que nunca entró a ese almacén
+   * —la vista sólo tiene renglón donde hubo movimientos, y la pantalla pide `incluirCeros`—, así que
+   * «no está» y «hay cero» son lo mismo y las dos cierran la puerta.
+   */
+  it('sin renglón en el mapa, NO (nunca entró a ese almacén)', () => {
+    expect(hayStockDeAvio(stock, 4)).toBe(false);
+  });
+
+  it('con el renglón en CERO (o en negativo), NO', () => {
+    expect(hayStockDeAvio(new Map([[3, { existencia: 0 }]]), 3)).toBe(false);
+    expect(hayStockDeAvio(new Map([[3, { existencia: -5 }]]), 3)).toBe(false);
+  });
+
+  /**
+   * 🔑 LA TERCERA POSIBILIDAD, y es la que evita el daño colateral: si no hay almacén elegido —o su
+   * consulta no ha vuelto— NO SE SABE, y bloquear sería inventar un cero que dejaría la captura
+   * entera muerta. Se deja pasar y decide el servidor al confirmar (A1).
+   */
+  it('⭐ sin stock CONOCIDO deja pasar (no se frena por lo que no se sabe)', () => {
+    expect(hayStockDeAvio(undefined, 4)).toBe(true);
   });
 });

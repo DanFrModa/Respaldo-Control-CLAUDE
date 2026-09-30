@@ -16769,3 +16769,516 @@ tanda que el importador dejó a medias**. ⏳ Queda por confirmar con Daniel que
 📌 **La lección que queda escrita, y es la misma tres veces:** *preguntar antes de construir salió barato —el
 CAMINO A se iba a justificar sobre dos informes rotos y ninguno lo estaba como se decía—, pero **una pregunta
 mal planteada no ahorra nada**: gasta un viaje al dueño y vuelve con un dato que no decide.*
+
+#### (Post-F9.243) — EL REPASO DE INVENTARIOS DE DANIEL, ENTERO Y CON SUS PALABRAS (30-sep-2026, cierra la fila 0.096)
+
+**Daniel corrió el repaso de Inventarios** —uno de los tres que bloqueaban la V1— y entregó **13 puntos: 12
+hallazgos y 1 bien**. Se registran **textuales**, punto por punto, porque el matiz de cómo lo dice es lo que
+decide el tamaño de cada arreglo. La clasificación de abajo **la confirmó él** («está bien como lo
+planteas»).
+
+> ⚠️ **PRIMER HALLAZGO, Y NO ES SUYO: PROBÓ LA v0.177 Y `prueba` YA IBA EN LA v0.184.** Su propio
+> encabezado lo dice («CONTROL v2 v0.177»). ⇒ **su punto 01 ya estaba resuelto** y lo reportó como
+> pendiente porque no lo tenía: las columnas **«Recibido» y «Falta»** de la orden de compra entraron en la
+> **v0.179** (`HISTORIAL-DE-VERSIONES.md`, entrada 0.179), y el docblock de
+> `frontend/src/modulos/ordenes-compra/DetalleRenglonesOc.tsx:9-12` **lo cita a él**, del 23-sep.
+> 🔑 **La lección operativa, que vale para cuando entren más personas a probar:** un repaso contra una
+> versión vieja gasta su tiempo y el nuestro. **La guía de prueba tiene que decir contra qué versión se
+> prueba, y la pantalla ya pinta el número en la barra de arriba** (`frontend/src/version.ts`). Los otros
+> once hallazgos **sí** son reales contra la 0.184.
+
+### 🔴 Los DOS que lo dejaron tirado — y uno arrastró tres puntos
+
+**(11) Traspaso entre almacenes de producto terminado.** Textual:
+
+> *«Tiene que haber un cuadro igual al de la entrega. No lo hay, pide que escoja una talla y un color. No
+> tiene sentido, me está poniendo cosas que no existen. Me pone todas las tallas yo creo que existen en
+> todos los modelos. Está muy mal. **No puedo avanzar**.»*
+
+📐 **MEDIDO, y es peor de lo que él vio: el defecto está en DOS pantallas, no en una.** El cuadro **sí
+existe** —`TraspasosPtPagina.tsx` importa `MatrizColorTalla`—, pero **las columnas se arman con el catálogo
+GLOBAL de tallas**: `TraspasosPtPagina.tsx:97` y `MovimientosPtPagina.tsx:110` llaman
+`useTallas({ pagina: 1, porPagina: 100 })`, y la segunda lo pasa a `tallasColumnas(...)` en `:170`. Eso es
+literalmente *«todas las tallas que yo creo que existen en todos los modelos»*.
+⭐ **Y el patrón correcto ya vive al lado, en la pantalla que él pone como modelo:** la entrega hace
+`setTallas(tallasDeOrden(o))` (`EntregaClientePagina.tsx:133`), con el helper
+`produccion/matriz-orden.ts:12` que deriva las columnas de `orden.lineas[].tallas`.
+🔴 **Y esto explica sus puntos 12 y 13**, que él dejó en *«no pude hacer nada por que no pude hacer un
+movimiento»* y *«lo mismo»*: **sin poder mover PT no hay kardex que leer ni movimiento que cancelar.** ⇒ un
+solo defecto tumbó **tres** puntos del repaso.
+
+**(07c) Nota de salida de avíos.** Textual:
+
+> *«Al traer los avíos de la OP… **como me jala avíos que no hay stock, no me deja**. Estaría bien que no
+> deje meter los avíos que no hay stock, ANTES de meterlos. Porque ahorita valida DESPUÉS de haberlos
+> metido en la nota de salida.»*
+
+📐 **MEDIDO:** la pantalla de la nota es `notas-salida/EditorRenglonesNota.tsx`, y su precarga no
+comprobaba existencia ⇒ la guarda vivía sólo en el servidor, al confirmar. ⚠️ **CORREGIDO el 30-sep: esta
+frase citaba `CapturaRenglonesAvio.tsx`, que es el archivo EQUIVOCADO** —vive en `inventarios/` y lo usan
+Salida sin orden, Ajuste y Traspaso de materiales, **no** la nota—. 🔑 **Y al corregirla se destapó algo real
+que la cita falsa disfrazaba de arreglado: esas TRES pantallas siguen con el defecto exacto que Daniel
+reportó** (elegir un avío sin existencia y enterarse al guardar) ⇒ **ficha 0.233**. ⚠️ **La guarda del servidor NO se
+toca** (es la que manda, A1): lo que se añade es no dejar llegar hasta ahí.
+
+### 🔶 Los cinco que entran antes de arrancar (confirmados por él)
+
+- **(02) La entrada de tela por factura trae el importe y no el precio.** Textual: *«Podemos quitarle el
+  importe y el precio en la entrada. Para cuestión de inventarios no es necesario saber el importe. Cuando
+  cruce con algo de información de facturas… sí es importante que venga el precio y el importe, pero para
+  cuestión de movimientos no es necesario.»* ⇒ **se quitan los dos de la captura de movimiento**; el precio
+  y el importe son del mundo de la factura, no del inventario.
+- **(08) El recibo de maquila pide un precio que ya está en la salida.** Textual: *«No me debe de preguntar
+  el precio del recibo. Eso está en la salida de maquila.»*
+- **(10b) La entrega a cliente no enseña la existencia por talla.** Textual: *«Debería de decir la
+  existencia que hay por talla para saber lo que se va a capturar no exceda la cantidad por talla.»*
+  ⇒ hoy se captura a ciegas y el error llega al confirmar; es el mismo patrón que el (07c).
+- **(07a) La fecha por default en la nota de salida.** Textual: *«Por default que dé la fecha de hoy.»*
+  ⚠️ **Y este punto es el que peor salió de toda la entrega, por culpa del lead:** al medirlo, la fecha de
+  **elaboración** YA nacía en hoy y la que estaba vacía era la de **ENVÍO**, así que se cambió ésa… **pero
+  ese vacío no era un descuido, era un estado del negocio** (*«cuando salga el envío»*, se lee «pendiente» en
+  dos pantallas y se imprime en el papel que acompaña las prendas). Se le preguntó a Daniel *«¿era ésa?»*
+  **sin decirle lo que costaba**, contestó que sí, y hubo que revertirlo. Su respuesta posterior
+  —*«una fecha de elaboración (por default) y una fecha de envío»*— **describe exactamente lo que ya
+  existía**. El detalle y la lección, en §Post-F9.245(e).
+- **(07b) El preliminar de avíos: escoger qué se manda, y sólo lo que hay.** Textual: *«Al traer los avíos
+  de la OP, estaría bien ver un preliminar y seleccionar qué avíos son los que se van a mandar
+  (obviamente tendría que validar que sólo te ofrezca los que ya se recibieron en almacén).»*
+- **(06) Los movimientos de cada avío, y agrupar por proveedor.** Textual: *«Debería haber un botón para ver
+  los movimientos de cada avío. Falta agrupar por proveedor.»*
+
+### ⏸️ Los cuatro que ÉL MISMO dejó para la fase siguiente
+
+- **(04) Al sacar tela a una OP, precargar las telas que se compraron para esa OP.** Textual: *«Para la
+  siguiente fase, estaría muy bien que como opción por default ponga las telas de las que fue comprada
+  para esa OP. Pudiendo meter también otras telas. Pero ya sabemos qué telas compramos para cada OP, ya que
+  la OC viene ligada a la OP.»* 🔑 **El dato que lo hace barato es suyo: la OC ya viene ligada a la OP.**
+- **(05) Validar el XML del proveedor al recibir material.** Textual: *«Habíamos acordado de validar los XML
+  del proveedor al hacer la recepción del material. Pero podríamos dejarlo para la siguiente fase.»*
+- **(09) Las existencias de PT, por modelo y no por talla.** Textual: *«Para la siguiente fase, en el
+  inventario quiero ver un solo renglón por modelo de existencias. Y ya si me meto al modelo, poder ver el
+  cuadrito por talla y color. No quiero todas la lista de tallas. Y quiero un botón para ver todos los
+  movimientos que ha tenido ese modelo. Entregadas y salidas.»*
+- **(10a) Subir la factura en la entrega.** Textual: *«Habíamos quedado que vamos a subir la factura para la
+  fase 2.»* ⇒ **NO nace ficha nueva: ya es la 0.211** (*«ninguna prenda sale del almacén sin un documento
+  que la ampare»*, **§Post-F9.236** y su encuadre del 23-sep). Se **anota** que su repaso la reconfirma.
+⚠️ **CORREGIDO el 30-sep: esto citaba §Post-F9.211**, que es *«BORRAR DE VERDAD LOS ERRORES DEL DÍA»* y no
+tiene nada que ver — se confundió **la fila 0.211** con **el § 211**. No era una referencia colgante: era
+peor, mandaba a una sección que existe y que el lector habría creído.
+
+### ✅ Y el único que salió bien
+
+**(03) La existencia de tela cuadra.** Es el que más tranquiliza de los trece: el motor de kardex —suma de
+movimientos bajo bloqueo, nunca la vista (D3)— **da el número correcto contra datos que él mismo capturó**.
+Lo que falla alrededor es la captura y lo que se enseña, no la contabilidad.
+
+### 📌 Fichas que nacen de aquí
+
+`0.215` (11+12+13, 🔴 bloquea) · `0.216` (07c+07a, 🔴 bloquea) · `0.217` (02, 🔶) · `0.218` (08, 🔶) ·
+`0.219` (10b, 🔶) · `0.220` (07b, 🔶) · `0.221` (06, 🔶) · `0.222` (04, ⏸️) · `0.223` (05, ⏸️) ·
+`0.224` (09, ⏸️). La **0.096** cierra: el repaso se hizo.
+
+### ⏳ Y lo que sigue faltando para que entren MÁS personas a probar
+
+Daniel lo pidió el mismo día: *«quiero poder dárselo a algunas personas para que lo vayan probando»*.
+**El sistema ya lo permite** —hay alta de usuarios con rol en *Administración › Usuarios* y *› Roles*, y
+siete roles sembrados— pero faltan **dos pasos manuales que el lead no puede hacer** (la base de `prueba` es
+privada en Railway):
+1. 🔴 **Cambiar la contraseña de `admin`**, que sigue siendo la del arranque (`seed.ts:1779`,
+   `PASSWORD_TEMPORAL_ADMIN`). Pendiente desde junio; con gente entrando, es lo primero.
+2. ⚠️ **Correr el sembrador de datos de Inventarios** contra `prueba`
+   (`npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts`, idempotente, con `--simular` y
+   `--limpiar`). Sin eso entran y no tienen material, proveedores, compras ni facturas — que es justo lo que
+   frenó a Daniel la primera vez.
+
+#### (Post-F9.244) — SOLO LAS ÓRDENES ABIERTAS APARECEN DONDE SE CAPTURA (30-sep-2026, decisión de Daniel + peinado del sistema)
+
+**Daniel dictó una regla que toca todo el sistema.** Textual, en dos mensajes:
+
+> *«Toda la información que haya que llenar de producción (entradas, salidas, ruta crítica, WIP, compras
+> de avíos, recibos de avíos, recibo de maquilas, etc.) debería estar visible **solamente para órdenes que
+> aún no estén entregadas**. […] Lo que sí debe poderse ver es la parte de **consulta**. […] Una vez que se
+> cierra la orden, ya no debería permitir movimientos… a menos que pueda «abrirla». **Solamente yo la puedo
+> abrir.** […] En la pantalla para recibir Órdenes de Compra, solo deberían estar visibles las que tienen
+> pendientes por recibir.»*
+>
+> *«**No quisiera que las órdenes sean invisibles.** Deberán poderse consultar todo lo que ha pasado en esa
+> orden aunque esté cerrada. Pero todas las pantallas donde sean de meter información, ya no deberían
+> aparecer esas órdenes.»*
+
+Se peinó el sistema entero en tres frentes (producción+selectores, compras+inventarios, RC+calidad+costos+
+finanzas). **Lo medido cambió la forma de la regla en cuatro puntos**, y Daniel resolvió las cinco preguntas
+que salieron de ahí.
+
+### 🔴 Lo primero que la medición desmintió: «ENTREGADA» NO EXISTE COMO DATO
+
+- No hay estado ni columna: el enum es `capturada|completa|cancelada|cerrada`
+  (`contrato/esquemas/orden.ts:369`), lo entregado se **deriva** sumando entregas vivas —*«NUNCA se escribe
+  a una columna `entregado`»*, `produccion/entregas-cliente.ts:20-21`— y `Orden.fechaEntrega` es la
+  **comprometida**, no la real (`orden.ts:515`).
+- Y el 100 % entregado **es inalcanzable a propósito** para una clase entera de órdenes:
+  `cierre-orden.ts:13-17` — *«como los FALTANTES se le cobran al maquilero y las INCOMPLETAS salen como
+  merma, esas piezas **no vuelven nunca** ⇒ una orden que perdió piezas jamás llega al 100 % entregado»*.
+
+⚠️ **El lead le había propuesto a Daniel un diseño «en dos capas» con «entregada del todo» como disparador
+automático, y se retiró al medirlo:** si nunca llega al 100 %, nunca sale de la lista. ⇒ **el disparador es
+`cerrada`**, el acto explícito que la fila 0.061 construyó **por esta misma razón**.
+
+### ✅ LAS CINCO DECISIONES DE DANIEL
+
+1. **¿Quién cierra y cuándo?** ⇒ **«Ok»** a la recomendación del lead: **quien entrega**, como último paso
+   del flujo, **y el sistema se lo sugiere** cuando ve que ya no queda nada por mover. Daniel conserva el
+   reabrir.
+2. **FINANZAS QUEDA FUERA.** Textual: *«tienes razón que en finanzas sigue viva. Ahí no aplica esto.»*
+   🔑 Lo que lo motivó, medido: **el dinero del maquilero NO se fija en el recibo, se fija al VALIDAR el
+   cargo** (`esma/cargos.ts:218-260`, que lee el cargo y `maquilero.modalidadFacturacion` y **nunca carga la
+   orden**). Y el matiz que salvó la conversación: **la cola de cobranza se entra por MAQUILERO, no por
+   orden** ⇒ la primera mitad de la regla no cierra esa puerta; la que la cerraría es la segunda, y ahí *el
+   maquilero se queda sin cobrar y su cobranza acabaría pasando por Daniel*.
+3. **MRP/EXPLOSIÓN Y LA RC ATRASADA TAMBIÉN QUEDAN FUERA** ⇒ **«sí»**.
+   - **MRP:** netea contra las OC históricas para no pedir dos veces; su criterio escrito es **el inverso**
+     de la regla —*«esconderla dejaría al comprador preguntándose por qué el pedido "tiene menos OP de las
+     que tiene"»*— ⇒ **marca, no esconde**.
+   - **RC:** que se captura tarde **está medido, no supuesto**: el umbral de 2 días viene literal del VBA de
+     Access, el acceso viejo #10 se llamaba *«se puede meter las fechas con mas de dos dias de retrazo»*, y
+     la llave que lo abre sin límite (`rc.fecha-libre-cumplimiento`) está sembrada en **8 de los 9 perfiles**
+     (`seed.ts:416,529,626,712,798,891`). Sacar las entregadas de la bandeja dejaría procesos con
+     `fechaReal = null` para siempre, y ésa es la base del KPI de puntualidad (D11).
+4. **REABRIR ES SUYO.** Textual: *«solo yo (o el que yo autorice… debería de ser un permiso que de entrada
+   solo yo tengo activo)»* ⇒ permiso con nombre propio en el conjunto **`SOLO_ADMINISTRADOR`**
+   (`seed.ts:174`), que es donde cada llave lleva **su razón escrita** y donde ya vive la salida de material
+   que él definió como *«siempre autorizada sólo por mí. Nadie más»*.
+   ⚠️ **Trampa avisada:** ese conjunto se reparte a los **dos** perfiles de acceso total (`Administrador` y
+   `AdministracionDireccion`, `seed.ts:310`) ⇒ «solo yo» se cumple **sólo si nadie más tiene esos dos
+   roles**, y eso vive en la base de `prueba`. Queda como comprobación suya en *Administración › Usuarios*.
+   📌 Y el cambio de reparto que se dice en voz alta: **`Directivo` conserva cerrar y PIERDE reabrir**
+   (`ordenes.cerrar` está hoy en `seed.ts:388`, dentro de `DIRECTIVO`).
+5. **LA SOBRE-RECEPCIÓN TARDÍA NO ES CASO NORMAL.** Textual: *«normalmente llega al mismo tiempo que lo
+   demás. Una vez que se cierra es por que ya se recibió todo.»* ⇒ no hace falta una puerta sin firma para
+   el 5 % que llega tarde.
+
+### ⭐ Y de la respuesta (5) salió una SIMPLIFICACIÓN que nadie había visto
+
+*«Una vez que se cierra es porque ya se recibió todo»* **describe algo que ya existe**: el estatus
+**`recibida_total`**, que el sistema pone solo cuando todos los renglones están surtidos
+(`recalcularEstatusOC`, `compras/recepciones.ts:563`, `:484-511`). ⇒ **para las OC NO hay que estrenar un
+cierre**: ya lo tienen, y es derivado. Falta sólo **la llave para reabrirla** y arreglar el defecto vivo de
+abajo. Eso baja la etapa de compras de «estrenar estado + columna + permiso + rutas + reapertura» a **dos
+piezas chicas**.
+⚠️ **Lo que sigue abierto ahí:** la **devolución ligada a la OC no existe** — la que hay es un movimiento de
+kardex suelto, con la llave de Daniel, *«sin liga a la OC ni a la recepción, sin revertir lo recibido y sin
+efecto en CxP»*, y a quién se le devolvió **viaja en el motivo, no en una FK**
+(`inventarios/salida-sin-orden.ts:12-18`). ⇒ **la llave abriría un cuarto que hay que amueblar después.**
+
+### 🔴 LO QUE LA MEDICIÓN ENCONTRÓ Y HAY QUE ARREGLAR ANTES DE APRETAR NADA
+
+**«Cerrada» es hoy una promesa a medias.** La guarda existe y es una sola —`exigirOrdenAbierta`
+(`cierre-orden.ts:102`)— pero **se aplica A MANO, puerta por puerta**: **17 llamadas en 9 archivos**, y **SIETE
+módulos no la llaman** (calidad, ruta crítica, inventarios, compras, notas, EsMa, EDR). Hoy se puede sacar
+tela, comprar material, auditar y mover PT contra una orden cerrada sin que nada proteste.
+
+**Y dos módulos ESCRIBEN la fila de la orden cerrada** (verificado: los dos archivos tienen **cero**
+referencias a la guarda o a `cerradaEn`):
+- `Orden.pagada` ← pagos de EsMa (`esma/orden-pagada.ts:91`)
+- `Orden.rcActiva` ← auto-avance de RC (`ruta-critica/autoAvance.ts:381,428`)
+
+✅ **Y las decisiones (2) y (3) de Daniel los resuelven sin trabajo: como Finanzas y RC quedan FUERA de la
+regla, esas dos escrituras NO son defectos — son excepciones legítimas**, y quedan documentadas como tales.
+*(Lectura del lead a partir de sus dos respuestas, planteada así para que él la corrigiera; no la dijo con
+esas palabras.)*
+
+**En pantalla el bloqueo es casi invisible:** sólo **dos** vistas del sistema condicionan algo por el cierre
+—`costos/CosteoOrdenPagina.tsx:167,187` (bloquea) y `ordenes/DialogoOrden.tsx:228-230`—; el resto abre el
+formulario habilitado y el rechazo llega al pulsar Guardar.
+
+### ⚠️ EL PRECEDENTE QUE OBLIGA A PONERLE AVISO AL FILTRO
+
+**Filtrar el selector de órdenes por estado ya rompió la operación una vez** (26-jul-2026), y está escrito
+en el propio componente (`produccion/SelectorOrden.tsx:27-35`): filtraba por `estado:'completa'` y las
+órdenes migradas de Access sin receta *«dejaban de aparecer y NO se podía cortar, enviar, recibir ni
+entregar, sin más explicación que un "no hay órdenes que coincidan"»*. La conclusión que quedó: **el estado
+es informativo, NUNCA una llave para operar.**
+⇒ El filtro nuevo lleva **interruptor para ver las cerradas** y **aviso de por qué no aparece una orden**,
+que es justo lo que faltó esa vez.
+
+### 📋 EL PLAN, POR ETAPAS — y NO entra antes de que Daniel termine de probar Inventarios
+
+1. **Tapar el agujero de «cerrada» donde ya debería valer**: la guarda en los módulos que mueven inventario,
+   y que la pantalla **deshabilite** en vez de dejar llegar el error al Guardar. Es lo que más vale y no
+   cambia ningún flujo.
+2. **El filtro por defecto en las listas de captura**, con su interruptor y su aviso.
+3. **Partir `ordenes.cerrar`**: nace `ordenes.reabrir` en `SOLO_ADMINISTRADOR`. Código chico (2 rutas, 1
+   dominio, 1 catálogo, 1 seed, **y el espejo del frontend `DialogoOrden.tsx:154`, que es el que a la fila
+   0.120 se le olvidó en su encargo**); el cambio caro es el **reparto**.
+4. **Las OC**: la llave de reapertura sobre `recibida_total`, y el defecto vivo.
+
+### 🐛 DEFECTO VIVO ENCONTRADO DE PASO, INDEPENDIENTE DE ESTA DECISIÓN
+
+**Editar al alza una OC ya `recibida_total` deja el renglón nuevo inalcanzable para siempre.** Verificado:
+los **cuatro** llamadores de `recalcularEstatusOC` están todos en `compras/recepciones.ts`
+(`:825,1268,1351,1491`) y **`actualizarOC` no lo llama** ⇒ el estatus se queda en `recibida_total`, la OC no
+aparece en `ocsRecibibles` —cuyo `where` filtra estatus **antes** que el número de OC
+(`recepciones.ts:1944-1950`)— y `recibirCompra` la rechaza. **El material queda comprado y sin puerta de
+entrada.** Ficha propia.
+
+#### (Post-F9.245) — LA OC RECIBIDA NO SE EDITA: SE HACE OTRA, PARA QUE EL SOBRECOSTO SE VEA (30-sep-2026, decisiones de Daniel)
+
+Salieron de preguntarle por el defecto de la fila 0.225, y **contestó con una regla más general y mejor que
+la pregunta**. Sus palabras:
+
+> *«Las OC que ya están recibidas, ya se quedan con esa cantidad recibida y se cierra. Si se quiere recibir
+> más, se tendría que hacer una nueva OC. […] Eso mismo puede pasar cuando se pierden cosas, o se echan a
+> perder. Y creo que lo correcto es hacer una nueva OC **justo para saber que fue un sobre precio**.»*
+
+### ✅ (a) LA REGLA, y su razón es la que vale
+
+**Una OC recibida se cierra con lo recibido. Para más material, OC nueva.** 🔑 **Y el porqué es de negocio, no
+de sistema: una OC aparte hace VISIBLE el sobrecosto.** Si se edita la original, el material extra se esconde
+dentro del costo original y se pierde la señal de que se gastó más de lo planeado.
+
+📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
+mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
+`compras/ordenes-compra.ts:122`; valida que la orden exista y sea de la empresa activa, `:298`). Y lo que
+importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
+ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
+material.
+
+⇒ **Y esto REESCRIBE el arreglo de la fila 0.225, haciéndolo más chico:** editar al alza es el camino
+**equivocado** según su propia regla, así que el arreglo ya no es *«hacer que lo editado se pueda recibir»*
+—eso sería construir una puerta para algo que él no quiere que se haga— sino **CERRAR esa puerta**: que el
+sistema no deje subir la cantidad de una OC ya recibida del todo y diga *«haz una OC nueva»*.
+
+### ✅ (b) EL CATÁLOGO DE MOTIVOS DE LA OC — y el tercero lo dio su propia pregunta
+
+> *«Reposición y merma podrían ser las primeras dos del catálogo.»*
+
+Y luego preguntó qué pasa si se cortan 20 % más prendas y hay que volver a comprar de todo ⇒ **ése es el
+tercero: SOBRE-CORTE.** No es lo mismo: la **merma** es material que se perdió, la **reposición** es material
+que hay que reponer, y el **sobre-corte** es que se decidió hacer más prendas. Los tres son sobrecosto, por
+razones distintas, y él va a querer saber cuál fue.
+
+📐 **MEDIDO: hoy la OC NO puede decir por qué existe DE FORMA QUE SE PUEDA SUMAR.** `OrdenCompra` tiene
+**cinco** campos de texto: `observaciones` (libre), `motivoCancelacion`, `entregaEn`,
+`facturasAmparadasLegacy` (`:5824`, sólo lectura — lo llena el ETL, no se captura por pantalla) y —el que
+importa— **`correspondeA`**
+(`schema.prisma:5821`, *«A qué corresponde la compra»*, heredado del viejo `OrdCompra.CorrespondeA`), que
+**está VIVO y se captura hoy**: `contrato/esquemas/compra.ts:269` lo valida opcional con tope de 500,
+`DialogoEditarOc.tsx` lo pide con la etiqueta *«Corresponde a»*, y se pinta en la bandeja de autorización
+(`BandejaAutorizacionPagina.tsx`) y en la lista de OC (`OrdenesCompraPagina.tsx`). **Ninguno es
+estructurado**, así que ningún informe puede agrupar ni sumar por motivo ⇒ el sobrecosto quedaría visible
+sólo si alguien se acuerda de comparar contra la explosión. ⚠️ **Y de ahí sale una decisión que la ficha
+0.231 tiene que tomar ANTES de construir, no después:** `correspondeA` ya contesta *«por qué existe esta
+OC»* en prosa. Si el motivo nuevo se añade sin mirarlo, quedan **dos campos contestando la misma pregunta y
+nada que impida que se contradigan** — que es, palabra por palabra, el defecto que este repo ya catalogó y
+cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `correspondeA`, lo
+**complementa** (el motivo clasifica, el texto detalla) o si lo viejo **se migra** al catálogo. **Ficha
+0.231.**
+
+> ⚠️ **Y ESTA LÍNEA ESTUVO FALSA DOS COMMITS.** Decía *«sus únicos campos de texto son `observaciones` y
+> `motivoCancelacion`»*, bajo el rótulo **📐 MEDIDO** — y `correspondeA` llevaba ahí todo el tiempo,
+> capturándose en una pantalla. **La conclusión era correcta** (no hay campo estructurado), pero la
+> evidencia con la que se sostenía era falsa, y eso es peor que no medir: le habría escondido al
+> constructor de la 0.231 **justo el campo que su función va a duplicar**. La cazó el reviewer
+> independiente de la v0.185 leyendo el modelo en vez de creerle a la línea. 🔑 **La lección, que es la de
+> siempre con una vuelta más:** *«no hay campo X»* se comprueba **listando los campos que SÍ hay**, no
+> buscando el que se sospecha — un `grep` de lo que uno espera no encontrar sale vacío tanto si el campo
+> no existe como si se llama de otro modo.
+>
+> ⚠️ **Y AL ARREGLARLA, EL LEAD COMETIÓ LA MISMA FALTA DOS VECES EN UNA HORA, con la variante que la vuelve
+> peligrosa: creyó haber refutado a quien tenía razón.** (1) Midiendo si unas citas de Daniel estaban en este
+> archivo, su `grep` dio **0** para dos que **sí estaban** —una escrita con otra mayúscula, la otra **partida
+> en dos líneas por el ajuste de ancho**, que ningún `grep` de una línea cruza—. (2) Cruzando *«ocho módulos»*
+> contra *«siete módulos»*, su cuenta dio **0 ocurrencias de «siete»** en dos archivos que decían **`SIETE`
+> en mayúsculas** ⇒ estuvo a punto de publicar que el reviewer se equivocaba. 🔑 **La regla, y es de
+> procedimiento, no de criterio: un cruce de texto entre documentos NORMALIZA ANTES DE CONTAR** —caja a
+> minúsculas y saltos de línea colapsados a un espacio, quitando los prefijos de cita `>`—, y cuando el
+> resultado **contradice a otra medición**, lo primero que se sospecha es la propia normalización, no la del
+> otro. *Un cruce mecánico mal normalizado miente con toda la autoridad de un script, y su mentira favorita
+> es «eso no está».*
+>
+> ⚠️ **Y la tercera pata, de la misma hora: el cruce bien normalizado dio DOS falsos positivos, y los dos
+> enseñan lo que un conteo no sabe hacer.** (1) Buscando *«20 llamadas»* (la cifra vieja) casó dentro de
+> **`320 llamadas`**, que es otro dato y está bien — **una subcadena de un número es otro número**, así que
+> el patrón lleva su frontera (`\b`, o el texto completo *«20 llamadas en 9 archivos»*). (2) La cifra vieja
+> *«ocho módulos»* apareció **dentro de este mismo recuadro**, que la cita para explicar su corrección ⇒ **un
+> conteo no distingue una AFIRMACIÓN de una MENCIÓN**, y un archivo que documenta sus propios errores está
+> lleno de menciones a propósito. 🔑 **Por eso el cruce mecánico termina SIEMPRE mirando el contexto de cada
+> acierto**: la máquina señala dónde mirar, la decisión de si está mal es de quien lee. *Un cruce que se
+> cierra en el número, sin abrir los aciertos, convierte cada cicatriz escrita en un falso defecto — y a la
+> tercera nadie vuelve a correrlo.*
+>
+> ⭐ **Y LA CUARTA PATA LA APORTÓ EL REVIEWER, ganándosela igual que el lead: casi reporta como INVENTADO un
+> ejemplo que era cierto.** Al verificar el falso positivo del `320 llamadas` lo buscó en los tres documentos
+> y en los tres commits de la rama, dio **0 en todos**, y su conclusión provisional fue que el lead describía
+> un acierto imposible. **Antes de escribirlo amplió el barrido a todo el repositorio y ahí estaba**, en
+> `docs/hoja-de-ruta/V1-etapas.md`. Lo corto no era el ejemplo: era **su ventana de tres archivos**. 🔑 **La
+> regla completa, con las dos mitades:** además de **normalizar** antes de contar, hay que comprobar que **el
+> UNIVERSO del cruce es el mismo** —`git ls-files '*.md'`, no los tres archivos que uno tiene en la cabeza—,
+> porque *dos mediciones que no barren los mismos archivos no se contradicen: hablan de cosas distintas*. ⇒
+> **el desacuerdo entre dos mediciones es, hasta que se demuestre lo contrario, un desacuerdo sobre el
+> MÉTODO, no sobre el hecho**: se comparan primero la normalización y el universo, y sólo después se discute
+> quién tiene razón. Las dos veces que esto pasó en esa hora —una en cada dirección— el hecho estaba bien y
+> el método estaba corto.
+
+### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
+
+El lead propuso que la explosión preguntara *«¿exploto contra lo pedido o contra lo cortado?»*. Daniel:
+
+> *«El problema es que **casi siempre se compra antes de cortar**. Cuando se corta ya deberían de estar los
+> avíos con el maquilero.»*
+
+⇒ **La propuesta daba a elegir en un momento en que la elección no existe**: al explotar no hay nada cortado
+todavía, la cifra sería cero. 📐 Y lo que el lead sí había medido bien es la mitad del problema:
+`totalPiezasOrden` (`compras/mrp.ts:494`) suma `orden.lineas[].tallas[].cantidad` — **la matriz de la ORDEN**
+⇒ la explosión nunca pide el material del sobre-corte.
+
+**Replanteado con su corrección, no es una alternativa: es una SEGUNDA PASADA, después de cortar.** Y ahí el
+neteo ya existente hace casi todo el trabajo: pediría **exactamente la diferencia**, no todo otra vez.
+
+⭐ **Y su segunda frase añadió una COLA que el lead no había visto:** el 20 % extra no sólo hay que
+comprarlo, hay que **mandárselo al maquilero que ya está trabajando** ⇒ una **segunda nota de salida** al
+mismo maquilero. **El sobre-corte tiene tres pasos —comprar la diferencia · recibirla · mandarla al
+taller— y de los tres, el único que hoy no ayuda nada es el primero.** **Ficha 0.232.**
+
+### ✅ (d) SU CLASIFICACIÓN, con el matiz que la justifica
+
+> *«Se queda esperando el material. **Depende de qué taller sea. Algunos empiezan y algunos no. La mayoría sí
+> empieza.** No es algo mega urgente. Si es complicado lo dejamos como duele, pero no bloquea. Apúntalo para
+> hacerlo después, **pero no se vaya a quedar sin hacerlo**.»*
+
+⇒ **🔶 duele pero se aguanta.** El matiz queda escrito porque **es el que justifica la clasificación**: si
+todos los talleres se quedaran parados, esto bloquearía.
+📌 **Y sobre su «no se vaya a quedar sin hacerlo», se le respondió con el mecanismo, no con una promesa:**
+cada ficha va **nombrada una por una** en el recuento del tablero, y el verificador **corre dentro del CI** y
+se pone **rojo** si las cifras no cuadran con las listas ⇒ una ficha no puede desaparecer en silencio. Lo que
+el mecanismo NO hace es priorizar: eso sigue siendo decisión suya.
+
+### ✅ (e) LAS DOS FECHAS DE LA NOTA DE SALIDA: ya eran como las quería
+
+> *«Está bueno poder armar las notas de salida aunque no se vayan ese día, entonces podríamos poner una fecha
+> de elaboración (por default) y una fecha de envío. ¿Cómo ves? Si es mucho problema dejamos solo una fecha
+> de envío.»*
+
+**Cero problema: es EXACTAMENTE el diseño que ya existía** — `fechaElaboracion` obligatoria y con hoy por
+default, `fechaEnvio` opcional *«cuando salga el envío»* (`contrato/esquemas/nota-salida.ts:76`), y la nota se
+lee **«pendiente»** mientras esté vacía (`ConsultaNotasPagina.tsx:386`, `NotasSalidaPagina.tsx:549`).
+🔴 **Lo que lo rompió fue la entrega, no el diseño:** ver la corrección en la ficha 0.216 y la lección de
+abajo. Revertirlo devuelve el sistema a lo que él acaba de describir.
+📌 Y se le dio el dato operativo que cambia cómo lo usa: **el material se descuenta al CONFIRMAR la nota, no
+al armarla** ⇒ una nota que sale el jueves se confirma el jueves; armar el borrador antes y dejarlo pendiente
+es justo para lo que sirve.
+
+### 🔑 LA LECCIÓN, Y ES DEL LEAD
+
+**Se le pidió a Daniel un «sí» escondiéndole lo que costaba.** La pregunta fue *«la fecha que estaba vacía
+era la de envío, ¿era ésa?»* — presentando como **descuido** algo que era un **estado del negocio**: el vacío
+significa *«todavía no ha salido»*, se lee «pendiente» en dos pantallas y **se imprime en el papel que
+acompaña las prendas** (`impreso-nota-salida.ts:252`). Contestó que sí, y su sí **no estaba informado**.
+⚠️ Es la **segunda vez en dos semanas** que pasa lo mismo (la primera, §Post-F9.241: una pregunta que ofrecía
+un «sí» que costaba quitar una guarda de producción y borrar dos pruebas). ⇒ **antes de mandarle una
+pregunta, hay que escribir al lado lo que cuesta cada respuesta.** Si la respuesta parece gratis, es que no
+se midió.
+
+### 🔑 Y UNA SEGUNDA LECCIÓN, DEL CODER, SOBRE CÓMO SE MIDE UNA PRUEBA
+
+En la ronda de corrección, **tres de sus propias mutaciones «sobrevivieron» siendo FALSAS**: el `assert` del
+script no casó porque el texto existía **dos veces** en el archivo ⇒ **la mutación nunca se aplicó**, y el
+verde no significaba nada. ⇒ **una mutación que no se aplica se lee IGUAL que una que sobrevive: hay que
+verificar que se aplicó.** Y en la misma ronda cazó otras dos del mismo género: una prueba que pasaba porque
+el **fixture no era lo que devuelve el servidor** (dos renglones +100/−100 donde la vista agregada da uno en
+cero) y otra que pasaba **por el motivo equivocado** (la excluía el filtro por bucket, no el corte que la
+prueba creía medir). *Trece mutaciones, trece muertas — pero sólo después de comprobar que cada una se
+aplicó de verdad.*
+
+#### (Post-F9.246) — LOS PERMISOS VIVEN EN LA PERSONA, CON SU PERFIL COMO LIGA VIVA (30-sep-2026, decisión de Daniel)
+
+**Daniel pidió rehacer los perfiles, y de camino decidió el modelo de permisos.** Sus palabras, en orden —
+y las dos primeras son **el origen de la ficha 0.234**, la que pide la lista de puestos:
+
+> *«Cuando pueda, creo que tenemos que definir el perfil de cada usuario, y empezar a definir los permisos
+> que tiene cada perfil. **Quiero hacer perfiles con los permisos definidos y cada que haya un usuario poder
+> asignarle qué perfil es, y aparte poder tener la posibilidad de abrirle algún permiso en particular.**»*
+>
+> *«Queda pendiente revisar el tema de los perfiles para ir definiendo los permisos.»* · *«Quiero que me
+> ayudes a definir perfiles y permisos… ¿cómo podemos hacerle de una manera más dinámica?»*
+>
+> *«Avísame cuando te empiece a pasar los perfiles que hoy existen y sus alcances para que vayas determinando
+> los permisos.»*
+>
+> *«No me gusta cómo están definidos. Prefiero ir haciendo **un perfil de cada puesto con las actividades que
+> hace realmente cada uno**, y de ahí me ayudas a definirle los permisos que creas que son los que debe
+> tener.»*
+>
+> *«El sistema viejo no tiene tampoco muy bien definidos los perfiles.»* · *«La lista creo que mejor te los
+> doy yo.»*
+>
+> *«Me gustaría definir perfiles con permisos, y asignarle a una persona el perfil… y si después una persona
+> de compras decido que también va a hacer algunas actividades que son de habilitaciones, que pueda asignarle
+> los permisos necesarios. **Al final los permisos van a vivir en cada persona. Los perfiles son de
+> referencia, o más bien de punto de partida.**»*
+
+### ⚠️ Y la parte que le toca al lead: los nueve perfiles de hoy son MÍOS, y heredaron el defecto
+
+Los nueve perfiles de v2 los **propuso el lead** derivándolos de los niveles del viejo. Si el viejo los tenía
+mal definidos —y Daniel dice que sí—, los de ahora **heredaron el problema**: de ahí que **tres salieran
+literalmente idénticos** (`Logistica`/`Asistente`/`Secretarial`, el mismo conjunto de 76, comprobado
+comparando los conjuntos y no los conteos). **No se degradaron: nacieron así.** ⇒ **esto no es arreglar una
+migración, es definirlo bien por primera vez**, y por eso vale el tiempo.
+
+### ✅ EL MODELO DECIDIDO — «perfil + excepciones», con el origen registrado
+
+Se le pusieron **tres** opciones sobre su caso real (Juan, de Compras, al que quiere darle 5 permisos de
+habilitaciones), y **la pregunta que las separa es una sola: cuando cambies un perfil, ¿quieres que cambien
+también las personas que ya lo tienen?**
+
+| | Cómo | Si cambia el perfil |
+|---|---|---|
+| **(1) Dos perfiles** *(funciona HOY, sin construir nada)* | Juan lleva «Compras» **y** un perfil chico de habilitaciones | Juan cambia |
+| **(2) Copiar** *(su primera formulación)* | Al asignar el perfil se **copian** sus permisos a Juan; ya son suyos | **Juan NO cambia** |
+| **(3) Perfil + excepciones** ⭐ *(recomendada y **ELEGIDA**: «me encanta tu recomendación, está perfecto»)* | Juan sigue **ligado** al perfil; se calcula «lo del perfil **+** lo agregado **−** lo quitado» | Juan cambia, **salvo en sus excepciones** |
+
+🔑 **Por qué se recomendó la (3) y no la (2), que era su formulación literal:** la (2) da lo que pide, pero su
+precio es que **un cambio de política hay que repetirlo persona por persona** — con tres personas no importa,
+con veinte y dos años encima es la diferencia entre una política que se aplica y una que se olvida. La (3) le
+da **lo mismo que pedía** (abrirle permisos sueltos a alguien) **sin ese precio**, y además puede decir, por
+cada permiso de una persona, *«éste lo tiene porque es de Compras»* o *«éste se le dio a mano tal día»* — que
+es lo que dentro de dos años permite entender por qué alguien puede hacer algo.
+📌 **En pantalla las tres se ven igual** (abres a la persona y ves todo lo que puede hacer); la diferencia es
+por dentro. Eso se le dijo explícitamente, para que eligiera por la consecuencia y no por la apariencia.
+
+### 📐 QUÉ HACE FALTA CONSTRUIR, MEDIDO
+
+- **La tabla de permiso por persona NO existe.** Hay `Permiso`, `RolPermiso` (permisos del perfil) y
+  `UsuarioRol` (perfiles de la persona, **N:M** — una persona ya puede llevar varios, que es la opción (1)),
+  pero **no hay `UsuarioPermiso`** ⇒ hoy lo que puede hacer alguien **se calcula** de sus perfiles y no hay
+  nada guardado en la persona.
+- ⭐ **Y la mejor noticia: el cálculo vive en UNA sola función.** `backend/src/comun/permisos.ts:131-135`
+  junta `usuario.roles → rol.permisos → clave` en un `Set`. **Ahí entra el modelo entero** — `+ agregados
+  − quitados` — sin tocar ningún otro sitio, porque A1 ya tenía la resolución en un solo lugar.
+- Falta además la pantalla: abrir a una persona, ver **todo** lo que puede hacer **con el origen de cada
+  permiso**, y agregar o quitar.
+
+⇒ **Ficha 0.234**, reescrita con este modelo.
+
+### ⏳ Cómo sigue, por decisión suya
+
+**Él da la lista de perfiles** (*«mejor te los doy yo»*), puesto por puesto y con lo que hace cada uno; el
+lead propone los permisos de cada uno y los ajustan. Se le pidió que, donde lo sepa, diga también **lo que
+ese puesto NO debe poder hacer** —ver importes y márgenes, autorizar compras, reabrir órdenes, mover
+inventario—, que es la mitad que se olvida y donde está el daño.
+📌 **Y el catálogo de los 134 permisos quedó publicado como página de consulta** (con su descripción y los
+**29** reservados marcados con su razón), que es de donde salen las propuestas:
+<https://claude.ai/artifact/KHKSNqVtfpzMMWUZ4RnSE7>. ⚠️ **Vive FUERA del repositorio** —es una página
+publicada, no un archivo de `docs/`— así que quien lea esto y no tenga el enlace no puede llegar a ella por
+su cuenta; de ahí que el enlace vaya escrito aquí y en el historial. *Prometerle algo al dueño sin decirle
+cómo llegar es no habérselo dejado.* ⚠️ Esa cifra se había
+publicado como **37** por un conteo torpe del lead; son **29**, extraídos uno por uno.
+
+### 🔑 Una lección chica de comunicación, porque costó una vuelta
+
+El lead usó **«llave»** como metáfora de **«permiso»** durante toda la explicación, y Daniel tuvo que
+preguntar *«no entiendo bien lo que dices de la llave; ¿te refieres a que cada persona puede tener más de un
+perfil?»*. ⇒ **una metáfora en lugar de la palabra llana cuesta una vuelta entera.** Se rehízo con su propio
+ejemplo (Juan, de Compras, 5 permisos de habilitaciones) y una tabla de tres filas, y lo entendió de
+inmediato. *Cuando el interlocutor es el dueño del negocio y no el que escribe el código, la palabra que hay
+que usar es la del sistema que él va a operar, no la figura literaria.*

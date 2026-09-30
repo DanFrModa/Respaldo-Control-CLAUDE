@@ -8,6 +8,7 @@ import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
+import { hoy } from '@/lib/fecha-negocio';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,6 +25,7 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import {
   capturaDesdeNota,
+  hayStockDeAvio,
   nuevaClaveRenglon,
   renglonApi,
   renglonCompleto,
@@ -31,11 +33,6 @@ import {
   type RenglonNotaCaptura,
 } from './captura';
 import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
 export interface PrefillRenglonNota {
@@ -126,15 +123,40 @@ export function DialogoEditarNota({
     idAlmacen === null ? {} : { idAlmacen, incluirCeros: 'true' },
     { habilitado: idAlmacen !== null },
   );
+  /**
+   * ⭐⭐ FILA 0.216 — ¿YA SE SABE QUÉ HAY EN EL ALMACÉN ORIGEN?
+   *
+   * Es la pregunta que decide si esta pantalla puede FRENAR un avío sin stock o no. Hacen falta las
+   * tres condiciones y ninguna sobra:
+   *  • **almacén elegido**: sin él no hay a qué preguntarle (y la consulta va apagada);
+   *  • **respuesta en la mano** (`data !== undefined`): mientras carga, todo avío parecería tener
+   *    cero y se bloquearía la captura entera;
+   *  • **dato de ESTE almacén** (`!isPlaceholderData`): la consulta usa `keepPreviousData`, así que
+   *    al cambiar de almacén sigue entregando los renglones del ANTERIOR mientras vuelve la nueva.
+   *    Esos renglones son de otro `idAlmacen`, el filtro de abajo los descarta **todos** y el mapa
+   *    queda vacío ⇒ sin esta condición, cambiar de almacén bloquearía cada avío durante ese hueco.
+   *  • **sin error** (`!isError`): una consulta que falló no es un almacén vacío.
+   */
+  const stockConocido =
+    idAlmacen !== null &&
+    existencias.data !== undefined &&
+    !existencias.isPlaceholderData &&
+    !existencias.isError;
+  /**
+   * Existencia por avío en el almacén origen — o `undefined` cuando **no se sabe** (ver
+   * {@link stockConocido}). La diferencia entre «mapa vacío» y `undefined` es la que evita que la
+   * pantalla frene una captura por un cero que se inventó: con `undefined`, ni se pinta existencia
+   * ni se bloquea nada, y decide el servidor al confirmar (A1).
+   */
   const existenciaPorAvio = useMemo(() => {
+    if (!stockConocido) return undefined;
     const mapa = new Map<number, ExistenciaAvioNota>();
-    if (idAlmacen === null) return mapa;
     for (const f of existencias.data?.filas ?? []) {
       if (f.idAlmacen === idAlmacen)
         mapa.set(f.idAvio, { existencia: f.existencia, unidad: f.unidad });
     }
     return mapa;
-  }, [existencias.data, idAlmacen]);
+  }, [existencias.data, idAlmacen, stockConocido]);
 
   const recetaPorOrden = useMemo(() => {
     const mapa = new Map<number, Set<number>>();
@@ -163,6 +185,14 @@ export function DialogoEditarNota({
       setNombreMaquilero(undefined);
       setIdAlmacen(prefill.idAlmacen ?? null);
       setFechaElaboracion(hoy());
+      // 🔴 LA FECHA DE ENVÍO NACE VACÍA, Y ESO NO ES UN DESCUIDO: es un ESTADO del negocio
+      // («todavía no ha salido»). El contrato la declara opcional *«cuando salga el envío»*
+      // (`contrato/esquemas/nota-salida.ts`), dos pantallas pintan «pendiente» cuando es `null`
+      // (`ConsultaNotasPagina`, `NotasSalidaPagina`), sale IMPRESA en el papel que acompaña las
+      // prendas (`impreso-nota-salida.ts`) y `confirmarNotaSalida` NUNCA la escribe. Ponerla en
+      // «hoy» por default borraba ese estado para toda nota nueva. ⏳ Fila 0.216: queda pendiente la
+      // decisión de Daniel (con el costo a la vista) sobre escribirla al CONFIRMAR la nota — que le
+      // daría la fecha sin teclearla y conservaría el «pendiente» del borrador.
       setFechaEnvio('');
       setObservaciones('');
       setRenglones(
@@ -187,6 +217,7 @@ export function DialogoEditarNota({
       setIdMaquilero(null);
       setIdAlmacen(null);
       setFechaElaboracion(hoy());
+      // 🔴 Vacía también en el alta sin pre-carga: ver el porqué en la rama del prefill de arriba.
       setFechaEnvio('');
       setObservaciones('');
       setRenglones([renglonVacio()]);
@@ -194,10 +225,24 @@ export function DialogoEditarNota({
     }
   }, [abierto, nota, prefill]);
 
-  /** Carga los avíos de la receta de la orden elegida (cantidad = requerido); PROPONE, no LIMITA. */
+  /**
+   * Carga los avíos de la receta de la orden elegida (cantidad = requerido); PROPONE, no LIMITA.
+   *
+   * ⭐⭐ FILA 0.216 — **pero sólo los que HAY en el almacén origen.** Daniel: *«como me jala avíos que
+   * no hay stock, no me deja… que no deje meter los avíos que no hay stock, ANTES de meterlos»*
+   * (§Post-F9.243, punto 07c). Los que no tienen existencia **no se traen** y se dicen por su clave:
+   * callarlos sería peor que traerlos, porque la receta los pide y alguien tiene que ir a comprarlos.
+   *
+   * 🔒 Y por eso el ALMACÉN es requisito de este botón: el stock es *de un almacén*, así que sin él
+   * no hay nada contra lo que filtrar (`hayStockDeAvio` dejaría pasar todo) y volvería el defecto.
+   */
   function traerAvios(): void {
     if (!habLista || habTraer.data === undefined) {
       toast.error('Elige una orden y espera a que cargue su receta.');
+      return;
+    }
+    if (!stockConocido) {
+      toast.error('Elige primero el almacén origen: de ahí se sabe qué avíos hay para mandar.');
       return;
     }
     const data = habTraer.data;
@@ -206,7 +251,17 @@ export function DialogoEditarNota({
       toast.error('La orden no tiene avíos en su receta.');
       return;
     }
-    const nuevos: RenglonNotaCaptura[] = deReceta.map((a) => ({
+    // 🔴 EL FILTRO DE LA FILA 0.216. Si se quitara, la nota volvería a nacer con renglones que el
+    // servidor rechaza al confirmar — el callejón sin salida que Daniel reportó.
+    const conStock = deReceta.filter((a) => hayStockDeAvio(existenciaPorAvio, a.idAvio));
+    const sinStock = deReceta.filter((a) => !hayStockDeAvio(existenciaPorAvio, a.idAvio));
+    if (conStock.length === 0) {
+      toast.error(
+        `Ninguno de los ${String(deReceta.length)} avíos de la receta tiene existencia en este almacén: no hay nada que mandar.`,
+      );
+      return;
+    }
+    const nuevos: RenglonNotaCaptura[] = conStock.map((a) => ({
       clave: nuevaClaveRenglon(),
       tipo: 'avio',
       idOrden: data.idOrden,
@@ -228,11 +283,22 @@ export function DialogoEditarNota({
       );
       return [...conContenido, ...nuevos];
     });
+    // La RECETA completa (no sólo lo traído): el flag ✓/⚠ dice si el avío pertenece a la receta de
+    // la orden, y eso no cambia porque hoy no haya existencia de él.
     setRecetas((prev) => ({ ...prev, [data.idOrden]: deReceta.map((a) => a.idAvio) }));
     if (idMaquilero === null && data.idMaquilero !== null) setIdMaquilero(data.idMaquilero);
     toast.success(
-      `${nuevos.length} avíos de la orden ${data.folioOrden} agregados desde su receta.`,
+      `${String(nuevos.length)} avíos de la orden ${String(data.folioOrden)} agregados desde su receta.`,
     );
+    if (sinStock.length > 0) {
+      // Un aviso APARTE del éxito, y con las claves: si no, quien captura no se enteraría de que la
+      // receta pide más de lo que se llevó.
+      toast.warning(
+        `No se trajeron ${String(sinStock.length)} avíos de la receta porque no hay existencia en este almacén: ${sinStock
+          .map((a) => a.clave ?? String(a.idAvio))
+          .join(', ')}.`,
+      );
+    }
   }
 
   const renglonesValidos = renglones.length > 0 && renglones.every(renglonCompleto);
@@ -397,10 +463,14 @@ export function DialogoEditarNota({
               className="flex flex-col gap-2 rounded-md border bg-panel-2 p-3 sm:flex-row sm:items-end"
               data-testid="nota-traer-avios"
             >
+              {/* ⭐ Fila 0.216 — el texto DICE las dos cosas nuevas: que hace falta el almacén, y
+                  que sólo se trae lo que hay ahí. El aviso llega ANTES de capturar, no al
+                  confirmar, que es justo lo que Daniel pidió. */}
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground sm:flex-1">
                 <InfoIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 La receta del modelo ya dice qué avíos lleva la orden. Tráelos ya cargados con su
-                cantidad sugerida.
+                cantidad sugerida. Elige antes el almacén origen: sólo se traen los avíos que hay
+                ahí.
               </p>
               <div className="flex items-end gap-2">
                 <label className="text-xs text-muted-foreground">
