@@ -17057,10 +17057,30 @@ tercero: SOBRE-CORTE.** No es lo mismo: la **merma** es material que se perdió,
 que hay que reponer, y el **sobre-corte** es que se decidió hacer más prendas. Los tres son sobrecosto, por
 razones distintas, y él va a querer saber cuál fue.
 
-📐 **MEDIDO: hoy la OC NO puede decir por qué existe.** Sus únicos campos de texto son `observaciones` (libre)
-y `motivoCancelacion` — **no hay campo estructurado**, así que ningún informe puede agrupar ni sumar por
-motivo. ⇒ el sobrecosto quedaría visible sólo si alguien se acuerda de comparar contra la explosión. **Ficha
+📐 **MEDIDO: hoy la OC NO puede decir por qué existe DE FORMA QUE SE PUEDA SUMAR.** Sus campos de texto son
+`observaciones` (libre), `motivoCancelacion`, `entregaEn` y —el que importa— **`correspondeA`**
+(`schema.prisma:5821`, *«A qué corresponde la compra»*, heredado del viejo `OrdCompra.CorrespondeA`), que
+**está VIVO y se captura hoy**: `contrato/esquemas/compra.ts:269` lo valida opcional con tope de 500,
+`DialogoEditarOc.tsx` lo pide con la etiqueta *«Corresponde a»*, y se pinta en la bandeja de autorización
+(`BandejaAutorizacionPagina.tsx`) y en la lista de OC (`OrdenesCompraPagina.tsx`). **Ninguno es
+estructurado**, así que ningún informe puede agrupar ni sumar por motivo ⇒ el sobrecosto quedaría visible
+sólo si alguien se acuerda de comparar contra la explosión. ⚠️ **Y de ahí sale una decisión que la ficha
+0.231 tiene que tomar ANTES de construir, no después:** `correspondeA` ya contesta *«por qué existe esta
+OC»* en prosa. Si el motivo nuevo se añade sin mirarlo, quedan **dos campos contestando la misma pregunta y
+nada que impida que se contradigan** — que es, palabra por palabra, el defecto que este repo ya catalogó y
+cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `correspondeA`, lo
+**complementa** (el motivo clasifica, el texto detalla) o si lo viejo **se migra** al catálogo. **Ficha
 0.231.**
+
+> ⚠️ **Y ESTA LÍNEA ESTUVO FALSA DOS COMMITS.** Decía *«sus únicos campos de texto son `observaciones` y
+> `motivoCancelacion`»*, bajo el rótulo **📐 MEDIDO** — y `correspondeA` llevaba ahí todo el tiempo,
+> capturándose en una pantalla. **La conclusión era correcta** (no hay campo estructurado), pero la
+> evidencia con la que se sostenía era falsa, y eso es peor que no medir: le habría escondido al
+> constructor de la 0.231 **justo el campo que su función va a duplicar**. La cazó el reviewer
+> independiente de la v0.185 leyendo el modelo en vez de creerle a la línea. 🔑 **La lección, que es la de
+> siempre con una vuelta más:** *«no hay campo X»* se comprueba **listando los campos que SÍ hay**, no
+> buscando el que se sospecha — un `grep` de lo que uno espera no encontrar sale vacío tanto si el campo
+> no existe como si se llama de otro modo.
 
 ### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
 
@@ -17134,8 +17154,19 @@ aplicó de verdad.*
 
 #### (Post-F9.246) — LOS PERMISOS VIVEN EN LA PERSONA, CON SU PERFIL COMO LIGA VIVA (30-sep-2026, decisión de Daniel)
 
-**Daniel pidió rehacer los perfiles, y de camino decidió el modelo de permisos.** Sus palabras, en orden:
+**Daniel pidió rehacer los perfiles, y de camino decidió el modelo de permisos.** Sus palabras, en orden —
+y las dos primeras son **el origen de la ficha 0.234**, la que pide la lista de puestos:
 
+> *«Cuando pueda, creo que tenemos que definir el perfil de cada usuario, y empezar a definir los permisos
+> que tiene cada perfil. **Quiero hacer perfiles con los permisos definidos y cada que haya un usuario poder
+> asignarle qué perfil es, y aparte poder tener la posibilidad de abrirle algún permiso en particular.**»*
+>
+> *«Queda pendiente revisar el tema de los perfiles para ir definiendo los permisos.»* · *«Quiero que me
+> ayudes a definir perfiles y permisos… ¿cómo podemos hacerle de una manera más dinámica?»*
+>
+> *«Avísame cuando te empiece a pasar los perfiles que hoy existen y sus alcances para que vayas determinando
+> los permisos.»*
+>
 > *«No me gusta cómo están definidos. Prefiero ir haciendo **un perfil de cada puesto con las actividades que
 > hace realmente cada uno**, y de ahí me ayudas a definirle los permisos que creas que son los que debe
 > tener.»*

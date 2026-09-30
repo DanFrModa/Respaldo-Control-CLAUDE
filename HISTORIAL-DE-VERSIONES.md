@@ -121,13 +121,30 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   siguiente**. ⚠️ Tu **cuarto** punto de fase siguiente —subir la factura al entregar— **no nació ficha
   nueva**: reconfirmó una que ya existía. 2 + 5 + 3 = 10.
 - 📋 **Y tu regla de las órdenes cerradas dejó seis más** (0.225 a 0.230), con tus cinco decisiones escritas.
-  **Y tres últimas** (0.231 a 0.233) de lo que decidiste al final del día: **marcar la OC como reposición,
+  **Y tres más** (0.231 a 0.233) de lo que decidiste al final del día: **marcar la OC como reposición,
   merma o sobre-corte** —hoy la OC no puede decir por qué existe, así que el sobrecosto no se puede sumar—;
   **que el sobre-corte pida su material** —hoy la explosión calcula contra lo que pidió el cliente, nunca
   contra lo que se cortó, así que el 20 % extra hay que comprarlo a mano proveedor por proveedor—; y una que
   salió de corregir una cita equivocada mía: **otras tres pantallas siguen dejándote sacar avíos que no hay**
   (salida sin orden, ajuste y traspaso de materiales), el mismo defecto que reportaste pero fuera de la nota.
   **No se construye nada de eso todavía**: primero termina de probar Inventarios.
+- 👤 **Y una última, la de los perfiles y los permisos** (0.234), que salió de la otra conversación del
+  mismo día. Tu modelo ya quedó decidido y escrito: **cada persona lleva el perfil de su puesto, y encima se
+  le puede abrir o quitar un permiso suelto** —sigue ligada al perfil, así que si mañana cambias lo que hace
+  «Compras», les cambia a todos los de Compras sin tocarlos uno por uno—, y el sistema sabe decir, de cada
+  permiso, si lo tiene *porque es de Compras* o *porque se le dio a mano tal día*. **De las tres cosas que
+  pediste, dos ya existen** (perfiles con permisos, y asignarle un perfil a una persona); **la que falta es
+  abrirle un permiso suelto a alguien**, y mientras no esté hay un rodeo que funciona hoy: darle dos perfiles
+  a la vez. ⭐ **Y el ejercicio ya encontró algo por su cuenta: tres de los nueve perfiles de hoy son
+  idénticos** —`Logística`, `Asistente` y `Secretarial` tienen exactamente los mismos permisos—, o sea que
+  hay menos perfiles de los que parece, y los propuse yo derivándolos del sistema viejo, que como dijiste
+  tampoco los tenía bien definidos. ⏳ **Lo que espera de ti:** la lista de los puestos que hoy existen con
+  lo que hace realmente cada uno; de ahí te propongo los permisos de cada uno con el porqué. Y donde lo
+  sepas, dime también **lo que ese puesto NO debe poder hacer** (ver importes y márgenes, autorizar compras,
+  reabrir órdenes, mover inventario) — es la mitad que se olvida y donde está el daño. ⚠️ **Esto tiene que
+  quedar cerrado antes de PRODUCCIÓN, no antes de las pruebas:** con datos reales, un permiso de más deja de
+  ser un detalle. 📌 Mientras tanto te dejé **el catálogo completo de los 134 permisos como página de
+  consulta**, con los 29 delicados marcados y su razón.
 - 🔴 **De esas seis, una bloquea el arranque y conviene que la sepas: hoy «cerrada» no bloquea de verdad.**
   Se puede sacar tela, comprar material, auditar y mover producto terminado contra una orden cerrada, porque
   la protección existe pero **no está puesta en ocho módulos**. Y en pantalla el formulario se abre completo:
