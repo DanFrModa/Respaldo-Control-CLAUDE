@@ -239,6 +239,101 @@ decir(
   `  V1: ${totalV1 === null ? '?' : totalV1[1]} pendientes = ${sumaV1} sumando los tres grupos`,
 );
 
+// ── 1-bis · LA COLA NARRATIVA de la línea del resumen ───────────────────────────────────────────
+//
+// ⭐ POR QUÉ EXISTE ESTE BLOQUE (lo pidió el reviewer de la v0.186, y se lo ganó cazando la misma
+// falta TRES veces en una sola entrega). Los bloques de arriba cruzan el ENCABEZADO de la línea
+// «📊 Dónde va el programa» y sus tres listas nombradas. Pero esa línea sigue **8.000 caracteres
+// más** contando la historia de cada vuelta —«⇒ N fichas nuevas», «las pendientes de V1 en N»,
+// «pasan de 14 a N»— y **esa cola no la cruzaba nadie**. Resultado medido: al nacer UNA fila
+// (la 0.239), el encabezado decía 33 y la cola seguía diciendo 32 en dos sitios, y la cuenta de
+// fichas nuevas se quedó en 24 cuando eran 25.
+//
+// 🔑 La forma del defecto, que es lo que este bloque cierra: **cada vez que nace una fila hay N
+// sitios que la cuentan**, y sólo algunos son listas. Un número escrito en PROSA envejece igual
+// que uno escrito en una tabla, pero nadie lo vuelve a mirar. No se comprueba «está bien
+// redactado»: se comprueba que **todas las cifras de V1 de la línea digan lo mismo**, que es
+// mecánico y no opina de estilo.
+const lineaResumen = hoja.split('\n').find((l) => l.includes('Dónde va el programa')) ?? '';
+if (lineaResumen === '') {
+  problemas.push('No se encontró la línea «📊 Dónde va el programa» en HOJA-DE-RUTA.md.');
+} else if (totalV1 !== null) {
+  const esperado = +totalV1[1];
+  // Todas las formas en que esa línea vuelve a decir el total de pendientes de V1.
+  const formas = [
+    { re: /pendientes de V1 en \*{0,2}(\d+)\*{0,2}/g, como: 'las pendientes de V1 en N' },
+    { re: /pendientes de V1 pasan de \*{0,2}\d+ a (\d+)\*{0,2}/g, como: 'pasan de 14 a N' },
+  ];
+  for (const { re, como } of formas) {
+    for (const m of lineaResumen.matchAll(re)) {
+      if (+m[1] !== esperado) {
+        problemas.push(
+          `La cola narrativa del resumen dice «${como}» con ${m[1]}, y el total de la V1 es ${esperado}. ` +
+            'Es la cifra que envejece sola: si nació una fila, hay que propagarla a TODA la línea, no sólo al encabezado.',
+        );
+      }
+    }
+  }
+  // La cadena «⇒ N fichas nuevas …»: su ÚLTIMO eslabón es el vigente, y se cruza DOS veces —contra
+  // «De las N, …» y contra el TABLERO—, porque una sola de las dos no basta.
+  //
+  // ⚠️ CICATRIZ: la primera versión de este bloque sólo cruzaba la cadena CONTRA SÍ MISMA (el
+  // último eslabón contra «De las N»), y su comentario afirmaba cazar «24 cuando eran 25». NO lo
+  // cazaba: en el defecto real las DOS cifras estaban rancias y DE ACUERDO entre ellas (la cadena
+  // decía 24 y el texto «De las 24»), así que pasaba en verde e imprimía «vigente 24» con 25 filas
+  // en el tablero. Lo destapó el reviewer de la v0.186 con la mutación que faltaba, y es la
+  // cicatriz de `CLAUDE.md` §8 al pie de la letra: las tres mutaciones del lead rompían la
+  // coherencia interna, y NINGUNA probó el caso en que la prosa concuerda consigo misma y no con la
+  // realidad — que es justo el que ocurrió. *Dos cifras equivocadas que se dan la razón pasan
+  // cualquier comprobación que sólo las compare entre ellas.*
+  const eslabones = [
+    ...lineaResumen.matchAll(
+      /\*{0,2}(\d+) fichas(?: nuevas)?(?: en total)?(?: el \d+-\w+)?\*{0,2}/g,
+    ),
+  ].map((m) => +m[1]);
+  const deLasN = [...lineaResumen.matchAll(/De las (\d+),/g)].map((m) => +m[1]);
+  const ultimo = eslabones.length > 0 ? Math.max(...eslabones) : null;
+  if (ultimo !== null) {
+    for (const n of deLasN) {
+      if (n !== ultimo) {
+        problemas.push(
+          `La cola narrativa dice «De las ${n},» y el último eslabón de la cadena de fichas nuevas es ${ultimo}. ` +
+            'Los dos cuentan lo mismo y tienen que coincidir.',
+        );
+      }
+    }
+    // El ancla contra la REALIDAD: el propio párrafo nombra la fila con la que arranca la tanda
+    // —«(0.215-0.224)»—, y el tablero ya está parseado, así que el total es derivable.
+    //
+    // ⚠️ LÍMITE CONOCIDO, dicho en vez de presumido: toma el PRIMER rango «(0.NNN-0.NNN)» de la
+    // línea. Hoy ése es el arranque de la tanda porque la narración va en orden, pero si alguien
+    // reordena las oraciones, el ancla puede agarrar otro rango y la cifra que compare será otra.
+    // Se midió: al quitarle el primero, ancla en el siguiente y cuenta 15 en vez de 25 —sigue
+    // fallando, o sea que no calla, pero por el motivo equivocado—. Arreglarlo bien pide un
+    // marcador explícito en la prosa; mientras no exista, esto es un cruce útil, no una garantía.
+    const arranque = lineaResumen.match(/\((0\.\d{3})-0\.\d{3}\)/)?.[1];
+    if (arranque === undefined) {
+      problemas.push(
+        'La cola narrativa cuenta «N fichas nuevas» pero no nombra el rango de arranque «(0.NNN-0.NNN)», ' +
+          'así que no hay contra qué cruzarlo en el tablero.',
+      );
+    } else {
+      const nacidas = [...estadoPorFila.keys()].filter((f) => f >= arranque).length;
+      if (ultimo !== nacidas) {
+        problemas.push(
+          `La cola narrativa dice «${ultimo} fichas nuevas» y el tablero tiene ${nacidas} filas desde la ${arranque}. ` +
+            'Sin este cruce, dos cifras rancias de acuerdo entre ellas pasaban en verde.',
+        );
+      }
+    }
+  }
+  decir(
+    `  cola narrativa del resumen: ${eslabones.length} eslabones de «N fichas» (vigente ${
+      eslabones.length ? Math.max(...eslabones) : '?'
+    }) · cifras de V1 cruzadas contra ${esperado}`,
+  );
+}
+
 // ── 2 · El número de versión, en sus cuatro sitios ──────────────────────────────────────────────
 const historial = leer('HISTORIAL-DE-VERSIONES.md');
 const versionTs = leer('frontend/src/version.ts');

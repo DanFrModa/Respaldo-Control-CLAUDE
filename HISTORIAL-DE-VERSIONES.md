@@ -71,6 +71,80 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.186 · 30-sep-2026 · **en prueba** — **Tus perfiles quedan escritos, y de medirlos salieron cinco cosas: cuatro permisos que no se pueden acotar y una fila que te tenía trabajando a mano de más**
+
+> **La v0.186 no cierra ninguna fila del programa**, y tampoco cambia nada de cómo funciona el sistema: es la
+> versión que **guarda tus decisiones** para que no vivan en un chat, y trae **una corrección del tablero que
+> sí te ahorra trabajo desde hoy**.
+
+### ⭐ Lo primero, porque te ahorra trabajo: hay algo que sigues haciendo a mano y el sistema ya lo hace
+
+**Tu documento de «yo te digo qué facturarme»** —el impreso por proveedor con razón social, RFC, régimen, uso
+de CFDI y los importes de la corrida, con el IVA explícito— **está construido y funcionando.** El tablero
+tenía dos celdas describiéndolo como manual —una decía *«se sigue mandando a mano»* y la otra *«se corta porque
+hoy se hace a mano»*—, y era una entrada que se quedó vieja: la función se
+cortó un día de septiembre y volvió el mismo día, se construyó, y **nadie actualizó la nota**.
+
+⇒ **Si tú o Lupita lo siguen armando a mano, ya no hace falta** — pero **con tres condiciones**, porque el
+sistema no lo emite a ciegas: sale **uno por cada pago** de la corrida (no uno por proveedor), y sólo cuando
+**(1)** la corrida ya está **cerrada** —en borrador no lo da, para que los montos sean los finales—, **(2)** el
+pago es **con factura y por transferencia** —los pagos en efectivo no llevan documento— y **(3)** están
+capturados los datos fiscales, tanto los del proveedor como los de **FR Moda**: razón social, RFC, régimen
+fiscal y código postal.
+
+⚠️ **Esa tercera es la que hay que comprobar antes de confiarse:** si a FR Moda le falta el régimen o el código
+postal fiscal, **no sale para nadie** — y el tablero todavía lista *«capturar régimen y CP fiscal de FR Moda en
+Administración › Empresas»* como paso pendiente. **No pude verificar si ya está puesto**, porque eso vive en la
+base de datos de `prueba` y no la alcanzo desde aquí. Si falta, el sistema te dice exactamente qué campo es.
+
+### ✅ Tus 16 puestos, escritos con tus palabras
+
+Diste la lista de puestos reales —con Aurora llevando dos, y notando que **una persona con varios perfiles
+«suele pasar mucho»**— y eso último confirmó que el modelo elegido es el bueno: **ya funciona hoy**, sin
+construir nada, porque una persona puede llevar varios perfiles y el sistema suma lo que le dan.
+
+Y de las seis fichas que contestaste salieron cuatro cosas que **ya funcionan y no hay que construir**:
+
+- **Compras de cosas que no son de producción** (los productos de limpieza): una orden de compra **puede no
+  colgar de ninguna orden de producción**. Ya se puede.
+- **El precio de maquila «sólo con permiso»**: eso ya *es* un permiso aparte. Se da o no se da.
+- **Que las órdenes de compra las autorices tú**: era la propuesta, coincidimos.
+- **Que Aurora vea precios y costos de piezas pero no márgenes ni resultados**: son permisos distintos, así
+  que la línea se puede trazar exactamente donde la quieres.
+
+⭐ **Y tu respuesta sobre Lupita desarmó la decisión más pesada:** *«ella me manda saldos de proveedores y yo
+defino la corrida de pagos»* ⇒ la corrida **se queda contigo**, que es como lo habías pedido en su momento. De
+los siete permisos delicados que su puesto necesitaba, **el que más pesaba ya no está en discusión**.
+
+### ⚠️ Qué cambió y puede sorprender: cuatro cosas que pediste y el sistema no puede acotar
+
+Las cuatro son el mismo problema —**un permiso que empaqueta cosas de peso muy distinto**— y las cuatro quedaron
+apuntadas para arreglarse, no olvidadas:
+
+1. **El arte no se puede separar del modelo.** Quien mete el arte puede también cambiarle las telas y los
+   avíos a cualquier modelo. Decidiste darle el permiso completo por ahora y partirlo después.
+2. **Que Aurora comente la negociación sin modificar lo tuyo**: comentar y **cotizarle a un cliente** son hoy
+   el mismo permiso. Mientras no se parta, ella lee y las rondas las capturas tú.
+3. **Asignar supervisores de calidad** arrastra el poder de dar de alta a cualquiera. Los asignas tú, que es
+   lo que ya haces.
+4. ⚠️ **Y ésta te la corrijo, porque ayer te dije que estaba resuelta y no lo está.** Dijiste que Aurora puede
+   meter **compradores y departamentos**, y que dar de alta al cliente es de Administración o tuyo. **Hoy no se
+   le puede dar sólo la primera mitad:** el permiso que parecía servir **no hace nada** —está en la lista pero
+   nada en el sistema lo pide—, y el único que sí habilita meter compradores y departamentos **le daría también
+   dar de alta y desactivar clientes**, que es justo lo que te reservaste. Mientras no se parta: esos datos los
+   captura **Administración o tú**, y Aurora los consulta.
+
+### ⏳ Qué sigue pendiente
+
+- **Diez puestos por contestar.** Tus notas de los seis primeros están guardadas y aplicadas; **las marcas de
+  Sí/No de esa primera vuelta se perdieron** por un defecto de la página, ya corregido: ahora, si algo no se
+  guarda, el aviso **se queda en pantalla** y el pie te dice cuántos permisos llevas marcados.
+- **Seis permisos de Finanzas** que sólo tú puedes abrir, incluido dar de alta proveedores con su constancia.
+- **Tus dos usuarios**: queda decidir cuál de los dos lleva tu permiso de corregir movimientos sin factura,
+  porque ése vive en la persona y no en el perfil.
+- **Y lo de siempre, que no depende de mí:** cambiar la contraseña de `admin` y sembrar los datos de demo en
+  `prueba` para que la gente pueda probar.
+
 ## 0.185 · 30-sep-2026 · **en prueba** — **Se desbloquea tu repaso de Inventarios: ya puedes mover producto terminado y la nota de salida deja de ofrecerte avíos que no hay**
 
 > **La v0.185 cierra las dos fichas que te dejaron tirado** en el repaso (0.215 y 0.216). Lo demás que

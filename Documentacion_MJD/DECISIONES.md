@@ -17038,7 +17038,7 @@ dentro del costo original y se pierde la señal de que se gastó más de lo plan
 
 📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
 mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
-`compras/ordenes-compra.ts:122`; valida que la orden exista y sea de la empresa activa, `:298`). Y lo que
+`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa — la regla está **enunciada** en `compras/ordenes-compra.ts:298` y la que la **cumple** es `:612`, el `throw new ErrorNoEncontrado('Orden', idOrden)`). Y lo que
 importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
 ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
 material.
@@ -17119,6 +17119,29 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > MÉTODO, no sobre el hecho**: se comparan primero la normalización y el universo, y sólo después se discute
 > quién tiene razón. Las dos veces que esto pasó en esa hora —una en cada dirección— el hecho estaba bien y
 > el método estaba corto.
+>
+> ⭐ **Y LA QUINTA, QUE LE DA LA VUELTA A TODO LO ANTERIOR: una medición que NO coincide puede estar midiendo algo
+> que nadie medía — y ahí había un defecto real.** Contando las filas del tablero el lead obtuvo **183** contra las
+> **176** del verificador. Aplicó la regla, sospechó de su método… **y su método era el que veía algo nuevo:** son
+> —**medido el 30-sep sobre la v0.185**— **176 filas DISTINTAS** en **183 apariciones** (**ya eran otras el MISMO día, en la entrega siguiente**: la v0.185 y la v0.186 están las dos fechadas 30-sep, así que la cifra caducó en horas. Va fechada porque la cifra caduca y el mecanismo no), porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
+> 0.118, 0.122, 0.126, 0.127) — una vez en el tablero y otra en la lista *«LO QUE ESPERA A LA FASE 2»*, que es
+> **deliberado**. 🔴 **Pero al abrir las siete, una no cuadraba: la 0.118 estaba `✅` en el tablero y la lista de
+> fase 2 decía *«se corta porque hoy se hace a mano»* y *«se sigue mandando a mano»*.** Medido contra el código:
+> **está construida** —`dominio/pagos/documento-facturacion.ts` (25 KB), **tres** rutas en `api/pagos/corrida.rutas.ts`
+> (`:278` JSON, `:296` el PDF de un pago y `:324` el PDF de toda la corrida) y la pantalla
+> `DocumentoParaFacturar.tsx`— así que esa entrada llevaba semanas **diciéndole a
+> Daniel que siguiera haciendo a mano algo que el sistema ya le saca**. Corregida.
+> 🔑 **Tres cosas que enseña, y ninguna es la que uno esperaría:**
+> 1. **Ni el verificador ni el reviewer podían verlo**, y los dos publicaron *«0 duplicados»*: los dos indexan por
+>    número de fila, y **un `Map` deduplica en silencio**. *Una herramienta que agrupa por una llave no puede
+>    contar cuántas veces aparece esa llave.*
+> 2. **La fila ya estaba MEDIO corregida, y en la columna equivocada:** su última celda decía *«volvió a la V1 el
+>    4-sep»* mientras las dos primeras —las que alguien lee— seguían describiendo el corte. Es la cicatriz del §8
+>    otra vez (*el aviso que importa es el que está pegado a la cosa*), con la vuelta de que **aquí la cosa es una
+>    celda**: corregir una fila de cinco columnas obliga a mirar las cinco.
+> 3. ⇒ **la regla de sospechar del propio método se completa así: sospéchalo, pero no lo deseches — ÁBRELO.** La
+>    diferencia entre dos cifras es una pregunta, y a veces la respuesta no es *«me equivoqué»* sino *«encontré
+>    algo que el otro no busca»*.
 
 ### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
 
@@ -17282,3 +17305,239 @@ perfil?»*. ⇒ **una metáfora en lugar de la palabra llana cuesta una vuelta e
 ejemplo (Juan, de Compras, 5 permisos de habilitaciones) y una tabla de tres filas, y lo entendió de
 inmediato. *Cuando el interlocutor es el dueño del negocio y no el que escribe el código, la palabra que hay
 que usar es la del sistema que él va a operar, no la figura literaria.*
+
+#### (Post-F9.247) — LOS 16 PERFILES DE PUESTO QUE DIO DANIEL, Y LOS TRES CHOQUES CON SUS PROPIAS DECISIONES (30-sep-2026)
+
+**Daniel entregó la lista, como había dicho que haría** (§Post-F9.246: *«la lista creo que mejor te los doy yo»*),
+con esta advertencia y estas dos condiciones:
+
+> *«Te paso los perfiles así como me los pediste. **Están algo burdos.** Ayúdame a definir qué permisos debería
+> de tener cada uno. Asumiendo que **podemos generar más perfiles todo el tiempo** y que **una persona puede
+> tener más de un perfil (suele pasar mucho)**.»*
+
+🔑 **Esa última frase es un DATO DEL NEGOCIO que sólo él tenía, y confirma el modelo de §246 por la vía difícil:**
+llevar varios perfiles no es el caso raro, es lo normal. Medido: `UsuarioRol` ya es N:M (`schema.prisma:433`) y la
+resolución de permisos es la **unión** de los de todos sus roles (`comun/permisos.ts:131-135`) ⇒ **eso ya
+funciona hoy, sin construir nada.** Él mismo lo usó al describir a Aurora: *«le asignaría dos perfiles»*.
+
+### Los 16 puestos, con sus palabras
+
+| # | Puesto | Lo que dijo que hace (resumido de su textual) |
+|---|---|---|
+| 1 | **Director General** (él) | *«Tiene todos los permisos que a lo largo del desarrollo te puse "solo yo"»*. En el sistema viejo tiene **dos** perfiles, administrador y director general, y *«la única diferencia es que con el de director general no puedo modificar nada del sistema»*. |
+| 2 | **Gerente de Ventas** (Aurora, 1 de 2) | *«Es el perfil más completo después de mí.»* Hace listas de precios y precosteos; ve precios de producto y costos de avíos, telas y maquilas. **No** ve costos finales, **ni** estados de resultados, **ni** las relaciones de pagos de Finanzas. |
+| 3 | **Líder de Desarrollo** (Aurora, 2 de 2) | El mismo perfil que la diseñadora: *«esto también lo puede hacer Aurora»*. |
+| 4 | **Administración** (Lupita) | *«Ve todo lo que tenga que ver con finanzas.»* Pagos, la corrida, estados de cuenta de maquileros y proveedores. *«Es quien debería de dar de alta proveedores (con su CSF)»*, sube facturas, eventualmente factura. También ve entregas, *«porque ella es la que factura y hay información que sale de las órdenes»*. |
+| 5 | **Producción** (hoy Bernardo) | Sigue producción y *«va alimentando todo el WIP»*. Podría meter los consumos de telas *«y en una de esas el recibo de telas»*. |
+| 6 | **Compras** | Hace todas las OC, sigue compras y proveedores; podría recibir avíos o telas. Habilitaciones está a su cargo. ⭐ Preguntó: *«Podría llevar inventarios (¿cómo ves?, ¿es una buena práctica?)»*. |
+| 7 | **Habilitaciones** | Recibe las OP (no las hace), hace las notas de salida a las maquilas, lleva el inventario de avíos. |
+| 8 | **Gestión Técnica** | Hace todas las fichas técnicas. *«Me parece que está en una segunda o tercera fase.»* |
+| 9 | **Desarrollo / Diseñadora** | Define qué lleva cada modelo desde el principio. *«Es quien va a liberar el modelo para que ya se pueda comprar, una vez que esté hecha la OP.»* |
+| 10 | **Diseño Gráfico** | Desarrolla todos los artes, define el proveedor que los hace y *«cotiza cuánto cuesta cada uno»*. |
+| 11 | **Entregas** | Organiza la entrega; necesita producción para armar el proceso de cada cliente. *«Estos procesos los vamos a hacer posteriormente.»* |
+| 12 | **Almacén de PT** | *«Podría ser el mismo de entregas o no.»* Recibe la mercancía, la cuenta y le da ingreso al inventario. |
+| 13 | **Encargado de Telas** | Recibe las telas y lleva su control: inventario, entradas, salidas, recibo. |
+| 14 | **Líder de Calidad** | Asigna a los supervisores y determina auditorías finales. Debe ver *«qué tiene cada maquila para poder auditar»* y la ficha técnica *«para saber qué auditar»*. |
+| 15 | **Supervisor de Calidad** | Hace auditorías en línea y finales. Su pantalla de celular *«aún no la desarrollamos»*. |
+| 16 | **Auxiliar** | *«Un perfil bajo que pueda consultar órdenes de producción… Ellos casi no tienen acceso al sistema actual, pero sería bueno que tengan un usuario para algunas cositas.»* |
+
+⚠️ **NO son los nueve perfiles de v2, y eso es a propósito.** Los nueve de hoy los propuso el lead derivando los
+niveles del viejo y heredaron su defecto (tres idénticos, §246). Estos 16 salen de los **puestos reales**, que es
+lo que Daniel pidió: *«un perfil de cada puesto con las actividades que hace realmente cada uno»*.
+
+### 📐 LO QUE SÍ SE PUEDE EXPRESAR: el límite de Aurora, que era el más fino
+
+Su frontera —*«ve precios y costos de componentes, NO costos finales ni estados de resultados»*— **el catálogo
+la dice exacta**, medida en `contrato/permisos.ts`:
+
+- **FUERA:** `costos.ver` = *«el costo real de una orden, la lista de costos y los **márgenes por pedido**»* ·
+  `edr.ver` = *«el estado de resultados mensual y anual»* · `ordenes.ver-costos` = *«el botón de costos de la
+  orden»*.
+- **DENTRO:** `precostos.consultar` (*«consultar el pre-costo (estimado) de un modelo y la lista de precios sugeridos»*) ·
+  `desarrollo.precostear` · `telas.ver-totales` · `ordenes.ver-precio-real-maquila` · `pedidos.importes`.
+
+⇒ **ve lo que cuestan las piezas, no lo que gana la empresa**, y son permisos distintos, no matices del mismo.
+⏳ El único dudoso es `consultas.ver-importes`: su descripción dice *«importes totales y precios»* **sin
+distinguir precio de venta de costo**, así que hay que abrir esa pantalla antes de dárselo.
+
+### 🔴 LOS TRES CHOQUES — decisiones de Daniel contra decisiones de Daniel
+
+**(a) El perfil de Lupita NO SE PUEDE ARMAR sin abrir siete reservados.** Su puesto, tal como él lo describió,
+necesita `cxp.administrar`, `cxc.administrar`, `terceros.administrar`, `terceros.fiscal`,
+`conceptos-pago.administrar`, **`proveedores.administrar`** —que pidió explícitamente para ella— y
+**`pagos.corrida-armar`**, que en `seed.ts` lleva escrito *«Daniel la pidió para él (§Post-F9.189(g)): armar la
+corrida es decidir a quién se le paga»*. Los siete están en `SOLO_ADMINISTRADOR`. **Decisión suya, uno por uno.**
+
+**(b) «Asignar supervisores de calidad» hoy exige el gobierno de TODOS los usuarios.** Medido: marcar a alguien
+como auditor (`Usuario.esAuditor`) pasa por las rutas de usuarios, que exigen **`usuarios.administrar`** —*«dar de
+alta gente y repartir roles es gobierno del sistema»*, reservado—. **No hay forma de dar una cosa sin la otra.**
+Tres salidas: (a) dárselo completo, (b) que los asigne Daniel, (c) un permiso propio para marcar auditores.
+**Recomendación del lead: (b) por ahora, (c) apuntado.**
+
+**(c) EL ARTE NO TIENE PERMISO PROPIO** ⇒ Diseño Gráfico no se puede acotar. Medido en
+`dominio/modelos/arte-modelo.ts`: el arte del modelo exige **`modelos.administrar`**, el mismo permiso que la
+ficha, el BOM completo y las fotos (su propia descripción lo dice: *«ficha, BOM (telas/avíos/arte) y fotos»*). Y
+las fotos de arte de la orden (`produccion/fotos-arte-orden.ts`) exigen **`desarrollo.administrar`**, que abre
+alta y edición de proyectos. ⇒ **quien mete el arte puede cambiar telas y avíos de cualquier modelo.** Para
+acotarlo hay que **partir `modelos.administrar` en dos**: es un cambio, no un reparto. **No es opinión: es lo que
+mide el código.**
+
+### ✅ LAS DOS PREGUNTAS DIRECTAS QUE HIZO, CONTESTADAS
+
+**1. ¿Un perfil o dos para él? ⇒ DOS USUARIOS, no dos perfiles.** Y la razón es una medición: en v2 los permisos
+de una persona son **la UNIÓN de todos sus perfiles** (`comun/permisos.ts:131-135`), así que *«Director General»* +
+*«Administrador»* sobre la misma persona da **los dos siempre** y la protección desaparece. **Lo que le protegía
+en el viejo no era tener dos perfiles: era ENTRAR CON OTRO USUARIO** — el acto de cambiar de sesión ES la
+protección. 🔑 **Y el hallazgo general que sale de ahí, que vale para cualquier caso futuro: el modelo de unión NO
+PUEDE expresar «tengo este poder pero sólo cuando decido usarlo».** Si algún día se quiere eso de verdad, hace
+falta otra cosa (un modo administrador que se enciende a propósito), no un perfil más. ⚠️ Y una consecuencia
+concreta: su bandera `puedeCorregirSinFactura` **vive en la persona, no en el perfil** ⇒ hay que decidir cuál de
+sus dos usuarios la lleva.
+
+**2. ¿Compras debería llevar inventarios? ⇒ NO, y no hace falta, porque su propio organigrama ya lo resuelve.**
+El problema no es desconfianza: si la misma persona pide el material, lo recibe y puede ajustar el inventario a
+mano, **los tres números salen de la misma mano y un descuadre no tiene con qué contrastarse** — no hace falta
+mala fe, basta un error sin segundo par de ojos. Él ya dijo que **Habilitaciones lleva el inventario de avíos** ⇒
+Compras se queda con `inventario-avios.ver` (para comprar bien) y Habilitaciones con `inventario-avios.mover`.
+⭐ **Y para la cobertura —vacaciones, ausencia— NO se hornea el permiso en el perfil de Compras: se le da el perfil
+de Habilitaciones como SEGUNDO perfil ese día.** Es el primer uso real del modelo que él eligió: el estado normal
+queda separado y el de cobertura es deliberado y queda registrado.
+
+⏳ **Preguntas que quedaron abiertas con él** (cada una en la ficha de su puesto en la página): ¿quién **autoriza**
+las OC, si no debería ser quien las hace? · ¿quién **recibe** físicamente los avíos, Compras o Habilitaciones?
+(hoy `compras.recibir` es **un solo permiso** para telas, avíos y para *reversar* recepciones, así que no se puede
+limitar por material) · ¿Lupita ve **EDR y márgenes**? · ¿la diseñadora puede **dar de alta** una tela o un avío
+que no existe? (hoy es reservado, y le va a pasar seguido) · ¿Almacén de PT lleva `ipt.modificar-movimientos` y
+`ipt.cantidades-negativas`, que son el borrador de un descuadre? · ¿Entregas y Almacén de PT son la misma persona?
+
+📌 **Las propuestas completas —248 permisos, con el porqué de cada uno y lo que se deja fuera a propósito— viven
+en una página de consulta donde él marca Sí/No y se guarda:**
+<https://claude.ai/artifact/117ErS5sYRUwmdDe38EL3D>. ⚠️ **Vive FUERA del repositorio** (es una página publicada,
+no un archivo de `docs/`), igual que el catálogo de los 134 permisos de §246.
+
+#### (Post-F9.248) — LAS RESPUESTAS DE DANIEL A LOS PERFILES, Y EL DEFECTO QUE SE COMIÓ SUS MARCAS (30-sep-2026)
+
+**Daniel contestó la mitad del cuestionario y las tres preguntas de este chat, y de camino preguntó algo que
+destapó un defecto del lead.**
+
+### 🔴 PRIMERO EL DEFECTO, porque es lo que cuesta trabajo suyo
+
+Preguntó: *«¿Tú puedes ver lo que estoy contestando?»* — y la respuesta honesta era **mitad y mitad**: sus
+**NOTAS por puesto sí se guardaron** (seis, leídas íntegras), pero **ninguna de sus marcas Sí/No**, porque la
+colección `decisiones` estaba **vacía**. 📐 **Causa medida:** la página construía el id del documento como
+`perfil|clave`, y el id de un documento de esa base sólo admite `[A-Za-z0-9_-.~:@+]` ⇒ **la barra `|` —y
+también el `*`, la `/`, los espacios y los paréntesis de claves como `cxp.* / cxc.* / pagos.*`— hacían fallar
+CADA clic.** Las notas se salvaron por casualidad: sus ids son limpios (`compras`, `finanzas`).
+
+🔑 **Y la parte que convierte un bug en una pérdida de trabajo ajeno: el aviso de error SE BORRABA A LOS 2.5
+SEGUNDOS.** El `catch` existía y pintaba *«No se pudo guardar ese cambio»*… y el mismo temporizador que
+limpiaba los mensajes de éxito lo limpiaba a él. ⇒ **un fallo de guardado era, a efectos prácticos,
+silencioso.** *Un error que se auto-borra es un error que nadie ve, y el trabajo se pierde igual que si no se
+hubiera avisado nunca.*
+
+**Arreglado y verificado el mismo día:** ids normalizados a `perfil__clave` (probados **los 3.856 posibles**
+contra el patrón de la base: 0 inválidos), **el aviso de fallo ya NO se borra solo** (banner rojo permanente
+hasta que se arregle) y el pie muestra **cuántos permisos van marcados**, para que la ausencia de guardado se
+vea sin tener que fijarse en un mensaje. Probado escribiendo, leyendo y borrando un documento con el formato
+nuevo.
+
+### ✅ LAS TRES DEL CHAT
+
+| # | Su respuesta | Consecuencia |
+|---|---|---|
+| 1 | *«Ya lo contesté en el cuestionario»* (los reservados de Lupita) | Ver su nota de Finanzas abajo: **resuelve el choque grande**. |
+| 2 | *«Yo soy el que da de alta usuarios. También los supervisores. **Por ahora nadie más da de alta usuarios más que yo**»* | ⇒ **fila 0.236 decidida**: el rodeo que el lead recomendó ES la política. El permiso propio para marcar auditores sigue siendo deseable, no urgente. |
+| 3 | *«Podemos darle todo el permiso por ahora y después lo partimos. **Que no se te olvide para después.**»* (el arte) | ⇒ **fila 0.235 confirmada en 🔶**: Diseño Gráfico lleva `modelos.administrar` completo **por ahora**, con el alcance aceptado a sabiendas. Su *«que no se te olvide»* es justo para lo que existe la fila. |
+
+### ✅ SUS SEIS NOTAS DEL CUESTIONARIO, textuales, y qué cambia cada una
+
+**(a) Director General** — *«ok, dos perfiles»*, y al pedírsele la confirmación exacta: **✅ *«Correcto. Dos
+usuarios»*** (30-sep). ⇒ **DECIDIDO: dos USUARIOS, dos inicios de sesión distintos**, como los tiene hoy en el
+sistema viejo — uno para operar a diario sin poder cambiar el sistema y uno de administrador. **No** dos
+perfiles sobre la misma persona, que se **suman** y darían los dos poderes siempre. ⏳ **Queda una consecuencia
+por resolver cuando se creen:** su bandera `Usuario.puedeCorregirSinFactura` **vive en la persona, no en el
+perfil** (§Post-F9.203: *«sólo yo, ni con permiso»*) ⇒ hay que decidir **cuál de sus dos usuarios la lleva**, y
+sólo se pone por base de datos porque ninguna pantalla la asigna.
+
+**(b) Gerente de Ventas (Aurora)** — *«Las listas **negociar solo de lectura y poder agregar comentarios**, pero
+no modificar lo que yo hice. Administración o yo damos de alta al cliente. Ella puede meter información de
+compradores, departamentos, datos de cada comprador, etc.»*
+- 🔴 **LO DE CLIENTES NO ESTÁ RESUELTO, y esta línea dijo que sí. Es un QUINTO CHOQUE (fila 0.239).** Decía:
+  *«ella no lleva `clientes.administrar` (reservado); lleva `clientes.modificar`, que es exactamente
+  «compradores, departamentos, datos de cada comprador»»* — y **es falso por partida doble**, medido por el
+  reviewer de la v0.186 y re-medido:
+  **(1) `clientes.modificar` ES UN PERMISO MUERTO:** **cero** referencias en `backend/src/api` y
+  `backend/src/dominio`. Sólo existe en el catálogo (`contrato/permisos.ts:294`), en el seed (6 roles) y en una
+  prueba de reparto. Dárselo **no le habilita nada**. *(De paso, su descripción del catálogo —«Modificar
+  clientes (cualquiera puede agregar)»— también es falsa: `crearCliente` exige `clientes.administrar`. Eso es
+  anterior a esta entrega, pero es justo el hecho que la línea decía haber medido.)*
+  **(2) Lo que Daniel le concedió EXIGE el reservado:** las **13** rutas de clientes piden
+  `clientes.administrar`, y ahí caen **todas** las mutaciones de lo que él nombró — departamentos
+  (`agregar`/`actualizar`/`desactivar`/`reactivar`/`fusionar`/`previsualizarFusionDepartamentos`, las **seis**), contactos (`crearContactoCliente`,
+  `actualizarContactoCliente`) y los campos por cliente.
+  ⇒ **«Ella puede meter información de compradores, departamentos, datos de cada comprador» NO se puede
+  conceder sin darle un reservado** que además la dejaría **dar de alta y desactivar clientes**, que es justo lo
+  que él se reservó (*«Administración o yo damos de alta al cliente»*). **Decisión suya, y con una ficha propia.**
+  🔑 **La lección, y es la peor forma de equivocarse de esta entrega:** el lead vio que existía un permiso con
+  el nombre adecuado —`clientes.modificar`— y **dio por hecho que gobernaba algo**. *Un permiso existe en el
+  catálogo; que ALGUIEN LO EXIJA es otra cosa, y se comprueba buscándolo en `api/` y `dominio/`, no en el
+  catálogo.* Marcar esto con un ✅ era peor que dejarlo abierto: un perfil armado leyendo esa línea le habría
+  dado a Aurora un permiso que no hace nada, y **no** le habría dado lo que Daniel le concedió.
+- 🔴 **Pero «leer y comentar sin modificar» NO SE PUEDE EXPRESAR HOY, y es un hallazgo nuevo (fila 0.238).**
+  Medido: la **lectura** sí la da `listas.ver` (*«consultar listas de precios por cliente, sus renglones **y su
+  negociación**»*). El problema es **comentar**: el texto de cada ronda vive en `NegociacionEvento.acuerdo`
+  (con `registradoPorId`/`registradoEn`, así que ya queda firmado), y escribirlo exige **`listas.negociar`**,
+  que gobierna **NUEVE** operaciones —`registrarRonda` (:180), `registrarAcuerdo` (:281),
+  `cambiarEstadoLista` (:331), `cambiarEstadoRenglon` (:447), `simularNegociacion` (:588), `simularMesa`
+  (:691), **`guardarMesa` (:858)** y, en `cotizaciones.ts`, **`emitirCotizacion` (:364) y `cancelarCotizacion`
+  (:501)**—. ⇒ **darle «comentar» le daría EMITIR Y CANCELAR COTIZACIONES a un cliente**, y además **guardar
+  la mesa de negociación**, que es mucho más de lo que pidió.
+  ⚠️ **Y esta línea dijo OCHO en su primera versión, omitiendo justo `guardarMesa` — la cazó el reviewer de la
+  v0.186.** No es un error de conteo cualquiera: **`guardarMesa` ESCRIBE** (`tx.negociacionEvento.create`, y su
+  propio comentario dice *«cada disparo es un evento nuevo e INMUTABLE (D3)»*), y esta ficha existe **para
+  inventariar qué escrituras regala ese permiso** ⇒ omitir una escritura es fallar en lo único que mide.
+  🔑 **La lección, que es de método:** una enumeración presentada como **exhaustiva** se cierra **contando con
+  la máquina** (`grep -c "verificarPermiso(sesion, 'listas.negociar')"` da **9**, y el conteo gemelo por las
+  rutas también da 9), **no leyendo los nombres que uno reconoce** — el que se escapa es siempre el que no
+  suena a lo que buscabas.
+  ⚠️ **Y el corolario sobre el rodeo:** decir que *«lo que cuesta es exactamente lo único que pidió»* era
+  falso. Sin `listas.negociar`, Aurora **también** pierde mover el estado de la lista y de cada renglón,
+  simular y guardar la mesa ⇒ **pierde la mesa de negociación entera**, no sólo el comentario.
+
+**(c) Administración (Lupita)** — *«**no ve ni estados de resultados ni costos finales. Solo lo veo yo, y solo
+yo los hago.** Ella me manda saldos de proveedores y **yo defino la corrida de pagos**. Sí ve producción.»*
+⭐ **ESTO DESARMA EL CHOQUE MÁS GRANDE DE §247(a).** El reservado que más pesaba —`pagos.corrida-armar`, que el
+seed documenta como pedido *«para él»*— **se queda con él**: ella prepara los saldos, él decide la corrida. Y
+`edr.*` y `costos.*` quedan fuera, como estaban propuestos. ⇒ de los siete reservados de su perfil, **el más
+delicado ya no está en discusión**; quedan por confirmar los otros seis (cuentas por pagar y cobrar,
+movimientos de cuenta corriente, vista fiscal, conceptos de pago y **alta de proveedores**, que él sí pidió
+para ella con su constancia fiscal).
+
+**(d) Producción (Bernardo)** — *«el precio de maquila lo puede modificar **solo con permiso**. O cuando
+modifique **que me avise**.»* ✅ **Su primera opción YA FUNCIONA, sin construir nada:**
+`ordenes.precio-maquila` es un **permiso propio** (*«capturar o modificar el precio de maquila»*), separado de
+`ordenes.ver-precio-real-maquila` ⇒ se le da o no se le da, y ahí queda dicho. ⚠️ **Su segunda opción NO
+existe:** medido, **no hay ninguna infraestructura de avisos** en el backend —ni módulo de notificaciones ni
+librería de correo—; F5 dejó *«notificaciones push/correo → F7»* y **nunca se construyó**. ⇒ **recomendación:
+quedarse con la opción del permiso**, que es gratis y él ya la nombró primero.
+
+**(e) Compras** — *«**Yo autorizo OC.** SÍ creo que debe de poder dar de alta avíos. Aparte compra cosas como
+**productos de limpieza que no tienen nada que ver con producción**, y también lo da de alta él.»*
+- ✅ **`compras.autorizar` se queda con Daniel**, que es exactamente como estaba propuesto (dejarlo fuera de
+  Compras): quien hace la OC no la firma.
+- ⇒ **`avios.administrar` (reservado) se abre para Compras.**
+- ✅ **Y lo de los productos de limpieza YA FUNCIONA:** medido, `idOrden` es **opcional por renglón** de OC
+  (`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`) ⇒ **una OC puede no colgar de ninguna orden de producción**, que es
+  justo lo que hace falta para comprar cosas ajenas a producción. **No hace falta construir nada.**
+
+**(f) Desarrollo / Diseñadora** — *«sí debe de poder darlo de alta»* (tela o avío que no existe) ⇒ **se abren
+`telas.administrar` y `avios.administrar`** para ese perfil. ⇒ **en total, sus respuestas abren DOS claves reservadas**
+—`avios.administrar` y `telas.administrar`—, no cuatro: `avios.administrar` la piden **dos** perfiles (Compras y
+Desarrollo), y contarla una vez por perfil la duplicaba.
+
+### 📊 Estado del ejercicio
+
+**6 de 16 puestos contestados** (director, ventas, finanzas, producción, compras, desarrollo). Quedan diez, y él
+dijo que sigue mañana. 🔑 **Lo importante: sus notas de esos seis están a salvo y leídas; sus marcas Sí/No de
+esos seis, si las hizo, se perdieron por el defecto de arriba** — y al volver verá el conteo en el pie, que es
+lo que evita que vuelva a pasar sin darse cuenta.
