@@ -17038,7 +17038,7 @@ dentro del costo original y se pierde la señal de que se gastó más de lo plan
 
 📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
 mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
-`compras/ordenes-compra.ts:122`; valida que la orden exista y sea de la empresa activa, `:298`). Y lo que
+`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa, `compras/ordenes-compra.ts:298`). Y lo que
 importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
 ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
 material.
@@ -17123,12 +17123,13 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > ⭐ **Y LA QUINTA, QUE LE DA LA VUELTA A TODO LO ANTERIOR: una medición que NO coincide puede estar midiendo algo
 > que nadie medía — y ahí había un defecto real.** Contando las filas del tablero el lead obtuvo **183** contra las
 > **176** del verificador. Aplicó la regla, sospechó de su método… **y su método era el que veía algo nuevo:** son
-> **176 filas DISTINTAS** en **183 apariciones**, porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
+> —**medido el 30-sep sobre la v0.185**— **176 filas DISTINTAS** en **183 apariciones** (al día siguiente ya eran otras: va fechada porque la cifra caduca y el mecanismo no), porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
 > 0.118, 0.122, 0.126, 0.127) — una vez en el tablero y otra en la lista *«LO QUE ESPERA A LA FASE 2»*, que es
 > **deliberado**. 🔴 **Pero al abrir las siete, una no cuadraba: la 0.118 estaba `✅` en el tablero y la lista de
 > fase 2 decía *«se corta porque hoy se hace a mano»* y *«se sigue mandando a mano»*.** Medido contra el código:
-> **está construida** —`dominio/pagos/documento-facturacion.ts` (25 KB), dos rutas en `api/pagos/corrida.rutas.ts`
-> (JSON y `.pdf`) y la pantalla `DocumentoParaFacturar.tsx`— así que esa entrada llevaba semanas **diciéndole a
+> **está construida** —`dominio/pagos/documento-facturacion.ts` (25 KB), **tres** rutas en `api/pagos/corrida.rutas.ts`
+> (`:278` JSON, `:296` el PDF de un pago y `:324` el PDF de toda la corrida) y la pantalla
+> `DocumentoParaFacturar.tsx`— así que esa entrada llevaba semanas **diciéndole a
 > Daniel que siguiera haciendo a mano algo que el sistema ya le saca**. Corregida.
 > 🔑 **Tres cosas que enseña, y ninguna es la que uno esperaría:**
 > 1. **Ni el verificador ni el reviewer podían verlo**, y los dos publicaron *«0 duplicados»*: los dos indexan por
@@ -17352,7 +17353,7 @@ la dice exacta**, medida en `contrato/permisos.ts`:
 - **FUERA:** `costos.ver` = *«el costo real de una orden, la lista de costos y los **márgenes por pedido**»* ·
   `edr.ver` = *«el estado de resultados mensual y anual»* · `ordenes.ver-costos` = *«el botón de costos de la
   orden»*.
-- **DENTRO:** `precostos.consultar` (*«el pre-costo estimado y la lista de precios sugeridos»*) ·
+- **DENTRO:** `precostos.consultar` (*«consultar el pre-costo (estimado) de un modelo y la lista de precios sugeridos»*) ·
   `desarrollo.precostear` · `telas.ver-totales` · `ordenes.ver-precio-real-maquila` · `pedidos.importes`.
 
 ⇒ **ve lo que cuestan las piezas, no lo que gana la empresa**, y son permisos distintos, no matices del mismo.
@@ -17461,16 +17462,47 @@ sólo se pone por base de datos porque ninguna pantalla la asigna.
 **(b) Gerente de Ventas (Aurora)** — *«Las listas **negociar solo de lectura y poder agregar comentarios**, pero
 no modificar lo que yo hice. Administración o yo damos de alta al cliente. Ella puede meter información de
 compradores, departamentos, datos de cada comprador, etc.»*
-- ✅ **El alta de clientes queda como estaba propuesto**: ella **no** lleva `clientes.administrar` (reservado);
-  lleva `clientes.modificar`, que es exactamente *«compradores, departamentos, datos de cada comprador»*.
+- 🔴 **LO DE CLIENTES NO ESTÁ RESUELTO, y esta línea dijo que sí. Es un QUINTO CHOQUE (fila 0.239).** Decía:
+  *«ella no lleva `clientes.administrar` (reservado); lleva `clientes.modificar`, que es exactamente
+  «compradores, departamentos, datos de cada comprador»»* — y **es falso por partida doble**, medido por el
+  reviewer de la v0.186 y re-medido:
+  **(1) `clientes.modificar` ES UN PERMISO MUERTO:** **cero** referencias en `backend/src/api` y
+  `backend/src/dominio`. Sólo existe en el catálogo (`contrato/permisos.ts:294`), en el seed (6 roles) y en una
+  prueba de reparto. Dárselo **no le habilita nada**. *(De paso, su descripción del catálogo —«Modificar
+  clientes (cualquiera puede agregar)»— también es falsa: `crearCliente` exige `clientes.administrar`. Eso es
+  anterior a esta entrega, pero es justo el hecho que la línea decía haber medido.)*
+  **(2) Lo que Daniel le concedió EXIGE el reservado:** las **13** rutas de clientes piden
+  `clientes.administrar`, y ahí caen **todas** las mutaciones de lo que él nombró — departamentos
+  (`agregar`/`actualizar`/`desactivar`/`reactivar`/`fusionar`), contactos (`crearContactoCliente`,
+  `actualizarContactoCliente`) y los campos por cliente.
+  ⇒ **«Ella puede meter información de compradores, departamentos, datos de cada comprador» NO se puede
+  conceder sin darle un reservado** que además la dejaría **dar de alta y desactivar clientes**, que es justo lo
+  que él se reservó (*«Administración o yo damos de alta al cliente»*). **Decisión suya, y con una ficha propia.**
+  🔑 **La lección, y es la peor forma de equivocarse de esta entrega:** el lead vio que existía un permiso con
+  el nombre adecuado —`clientes.modificar`— y **dio por hecho que gobernaba algo**. *Un permiso existe en el
+  catálogo; que ALGUIEN LO EXIJA es otra cosa, y se comprueba buscándolo en `api/` y `dominio/`, no en el
+  catálogo.* Marcar esto con un ✅ era peor que dejarlo abierto: un perfil armado leyendo esa línea le habría
+  dado a Aurora un permiso que no hace nada, y **no** le habría dado lo que Daniel le concedió.
 - 🔴 **Pero «leer y comentar sin modificar» NO SE PUEDE EXPRESAR HOY, y es un hallazgo nuevo (fila 0.238).**
   Medido: la **lectura** sí la da `listas.ver` (*«consultar listas de precios por cliente, sus renglones **y su
   negociación**»*). El problema es **comentar**: el texto de cada ronda vive en `NegociacionEvento.acuerdo`
   (con `registradoPorId`/`registradoEn`, así que ya queda firmado), y escribirlo exige **`listas.negociar`**,
-  que gobierna **OCHO** operaciones —`registrarRonda`, `registrarAcuerdo`, `cambiarEstadoLista`,
-  `cambiarEstadoRenglon`, `simularNegociacion`, `simularMesa` y, las dos que pesan, **`emitirCotizacion` y
-  `cancelarCotizacion`**—. ⇒ **darle «comentar» le daría EMITIR Y CANCELAR COTIZACIONES a un cliente**, que es
-  mucho más de lo que pidió.
+  que gobierna **NUEVE** operaciones —`registrarRonda` (:180), `registrarAcuerdo` (:281),
+  `cambiarEstadoLista` (:331), `cambiarEstadoRenglon` (:447), `simularNegociacion` (:588), `simularMesa`
+  (:691), **`guardarMesa` (:858)** y, en `cotizaciones.ts`, **`emitirCotizacion` (:364) y `cancelarCotizacion`
+  (:501)**—. ⇒ **darle «comentar» le daría EMITIR Y CANCELAR COTIZACIONES a un cliente**, y además **guardar
+  la mesa de negociación**, que es mucho más de lo que pidió.
+  ⚠️ **Y esta línea dijo OCHO en su primera versión, omitiendo justo `guardarMesa` — la cazó el reviewer de la
+  v0.186.** No es un error de conteo cualquiera: **`guardarMesa` ESCRIBE** (`tx.negociacionEvento.create`, y su
+  propio comentario dice *«cada disparo es un evento nuevo e INMUTABLE (D3)»*), y esta ficha existe **para
+  inventariar qué escrituras regala ese permiso** ⇒ omitir una escritura es fallar en lo único que mide.
+  🔑 **La lección, que es de método:** una enumeración presentada como **exhaustiva** se cierra **contando con
+  la máquina** (`grep -c "verificarPermiso(sesion, 'listas.negociar')"` da **9**, y el conteo gemelo por las
+  rutas también da 9), **no leyendo los nombres que uno reconoce** — el que se escapa es siempre el que no
+  suena a lo que buscabas.
+  ⚠️ **Y el corolario sobre el rodeo:** decir que *«lo que cuesta es exactamente lo único que pidió»* era
+  falso. Sin `listas.negociar`, Aurora **también** pierde mover el estado de la lista y de cada renglón,
+  simular y guardar la mesa ⇒ **pierde la mesa de negociación entera**, no sólo el comentario.
 
 **(c) Administración (Lupita)** — *«**no ve ni estados de resultados ni costos finales. Solo lo veo yo, y solo
 yo los hago.** Ella me manda saldos de proveedores y **yo defino la corrida de pagos**. Sí ve producción.»*
@@ -17493,13 +17525,15 @@ quedarse con la opción del permiso**, que es gratis y él ya la nombró primero
 **productos de limpieza que no tienen nada que ver con producción**, y también lo da de alta él.»*
 - ✅ **`compras.autorizar` se queda con Daniel**, que es exactamente como estaba propuesto (dejarlo fuera de
   Compras): quien hace la OC no la firma.
-- ⇒ **`avios.administrar` (reservado) se abre para Compras.** Es el segundo reservado que su respuesta abre.
+- ⇒ **`avios.administrar` (reservado) se abre para Compras.**
 - ✅ **Y lo de los productos de limpieza YA FUNCIONA:** medido, `idOrden` es **opcional por renglón** de OC
-  (`dominio/compras/ordenes-compra.ts:122`) ⇒ **una OC puede no colgar de ninguna orden de producción**, que es
+  (`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`) ⇒ **una OC puede no colgar de ninguna orden de producción**, que es
   justo lo que hace falta para comprar cosas ajenas a producción. **No hace falta construir nada.**
 
 **(f) Desarrollo / Diseñadora** — *«sí debe de poder darlo de alta»* (tela o avío que no existe) ⇒ **se abren
-`telas.administrar` y `avios.administrar`** para ese perfil. Tercer y cuarto reservado que sus respuestas abren.
+`telas.administrar` y `avios.administrar`** para ese perfil. ⇒ **en total, sus respuestas abren DOS claves reservadas**
+—`avios.administrar` y `telas.administrar`—, no cuatro: `avios.administrar` la piden **dos** perfiles (Compras y
+Desarrollo), y contarla una vez por perfil la duplicaba.
 
 ### 📊 Estado del ejercicio
 

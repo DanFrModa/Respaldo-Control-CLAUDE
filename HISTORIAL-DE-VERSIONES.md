@@ -81,11 +81,21 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 **Tu documento de «yo te digo qué facturarme»** —el impreso por proveedor con razón social, RFC, régimen, uso
 de CFDI y los importes de la corrida, con el IVA explícito— **está construido y funcionando.** El tablero
-decía en dos sitios que *«se sigue mandando a mano»*, y era una entrada que se quedó vieja: la función se
+tenía dos celdas describiéndolo como manual —una decía *«se sigue mandando a mano»* y la otra *«se corta porque
+hoy se hace a mano»*—, y era una entrada que se quedó vieja: la función se
 cortó un día de septiembre y volvió el mismo día, se construyó, y **nadie actualizó la nota**.
 
-⇒ **Si tú o Lupita lo siguen armando a mano, dejen de hacerlo.** Sale de la corrida de pagos, por proveedor,
-en pantalla y en PDF.
+⇒ **Si tú o Lupita lo siguen armando a mano, ya no hace falta** — pero **con tres condiciones**, porque el
+sistema no lo emite a ciegas: sale **uno por cada pago** de la corrida (no uno por proveedor), y sólo cuando
+**(1)** la corrida ya está **cerrada** —en borrador no lo da, para que los montos sean los finales—, **(2)** el
+pago es **con factura y por transferencia** —los pagos en efectivo no llevan documento— y **(3)** están
+capturados los datos fiscales, tanto los del proveedor como los de **FR Moda**: razón social, RFC, régimen
+fiscal y código postal.
+
+⚠️ **Esa tercera es la que hay que comprobar antes de confiarse:** si a FR Moda le falta el régimen o el código
+postal fiscal, **no sale para nadie** — y el tablero todavía lista *«capturar régimen y CP fiscal de FR Moda en
+Administración › Empresas»* como paso pendiente. **No pude verificar si ya está puesto**, porque eso vive en la
+base de datos de `prueba` y no la alcanzo desde aquí. Si falta, el sistema te dice exactamente qué campo es.
 
 ### ✅ Tus 16 puestos, escritos con tus palabras
 
