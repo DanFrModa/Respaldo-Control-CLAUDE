@@ -73,8 +73,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ## 0.187 · 30-sep-2026 · **en prueba** — **Contestaste los 16 puestos, y al cruzarlos aparecieron cuatro cosas que hoy sólo podrías hacer tú**
 
-> **La v0.187 no cierra ninguna fila del programa** y no cambia cómo funciona el sistema: guarda tus 187
-> respuestas y lo que salió de medirlas.
+> **La v0.187 cierra una fila del programa —la 0.240— sin construir nada**, porque tu respuesta la disolvió. No
+> cambia cómo funciona el sistema: guarda tus 187 respuestas, las seis que contestaste después, y lo que salió
+> de medirlas.
 
 ### ✅ Se guardó todo, esta vez
 
@@ -108,20 +109,26 @@ de Producto.)*
 
 ### ⚠️ Qué más salió, y puede sorprender
 
-**El sobrante de corte no se puede devolver.** Contaste que Telas saca la tela, se la entrega a corte, y corte
-devuelve lo que sobró. **Ese camino no existe**: hay entradas, ajustes, conteos, traspasos y cancelaciones,
-pero no una devolución desde una orden. Hoy se cuadraría con un ajuste, que arregla el inventario **pero deja
-el costo de esa orden inflado**. Te pregunté cada cuánto sobra tela, porque de eso depende si esto duele o
-bloquea.
+**El precio de maquila lleva un tope nuevo, y lo pediste tú.** Al corregir tu propia marca —*«chance me
+equivoqué»*— dijiste que producción sí lo captura, **pero que no pueda ponerlo más caro que lo cotizado sin que
+tú autorices**. Eso se puede construir: el precio que captura producción y el que se cotizó en el desarrollo son
+dos datos que el sistema ya tiene, así que sólo falta compararlos. ⚠️ **Con un límite:** eso vale para la
+**costura**. El precio del **estampado** no tiene con qué compararse, porque su cotización no se guarda en
+ningún lado. Te pregunté si quieres el mismo tope ahí; si sí, primero hay que capturar esa cotización.
 
-**Y en Diseño Gráfico tienes dos respuestas que se contradicen.** Por la mañana dijiste que le diéramos el
-permiso completo y lo partiéramos después; por la tarde marcaste que no, y que hay que construirle el permiso
-del arte. Las dos se entienden — **pero no puedo aplicar las dos**, y con tus marcas de la tarde ese puesto
-**no puede meter artes** hasta que se construya. No elegí por ti: te pregunté cuál manda.
+### ✅ Y una cosa que ibas a leer aquí y tu respuesta borró
+
+Te iba a decir que **el sobrante de corte no se puede devolver al inventario**. **Me equivoqué, y no en la
+medición sino en cómo creía que trabajan:** yo suponía que la tela sale del sistema *antes* de cortar, por la
+cantidad teórica, y que después haría falta devolver lo que sobró. Me explicaste que es al revés — la tela se le
+entrega al cortador físicamente, y **la salida se registra cuando ya cortó, por lo que de verdad se consumió**—,
+así que **no hay nada que devolver**. Comprobado que el sistema lo permite exactamente así. La ficha se cerró el
+mismo día sin construir nada.
 
 ### ⏳ Qué sigue pendiente
 
-- **Las seis preguntas de arriba.** Son las que faltan para armar los perfiles de verdad.
+- **Una sola pregunta abierta:** si quieres el tope del precio también en el **estampado** (hoy no se puede,
+  porque su cotización no se guarda). Las otras cinco ya las contestaste.
 - **Tus dos usuarios**: decidir cuál lleva tu permiso de corregir movimientos sin factura.
 - **Lo que no depende de mí:** cambiar la contraseña de `admin`, sembrar los datos de demo en `prueba`, y
   comprobar que estén capturados el régimen y el código postal fiscal de FR Moda — sin eso, el documento para

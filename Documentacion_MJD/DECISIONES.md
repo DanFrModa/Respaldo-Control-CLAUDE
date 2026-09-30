@@ -17659,3 +17659,92 @@ flaky = los 105 de siempre). El diff de esa entrega eran tres `.md` y un `.mjs` 
 puede ser suyo**. 📐 **Comprobado que NO estaba registrado en ninguna parte** (la única fila de flaky, la 0.169,
 es de `pedidos.spec.ts` y ya cerró) ⇒ **fila 0.241**, para que no se pierda. 🔑 *«Flake» no es una causa, y un
 flaky que nadie anota es un rojo futuro sin historia.*
+
+#### (Post-F9.250) — LAS CINCO RESPUESTAS QUE CERRARON LOS HUECOS, Y DOS COSAS QUE EL LEAD HABÍA MEDIDO SOBRE UN FLUJO EQUIVOCADO (30-sep-2026)
+
+Daniel contestó las seis preguntas de §Post-F9.249. **Dos de sus respuestas desmontan hallazgos del lead, y las
+dos por el mismo motivo: el lead había supuesto un flujo que el negocio no hace así.**
+
+### 🔴 (a) EL SOBRANTE DE CORTE: la fila 0.240 SE DISUELVE, y el error era de premisa
+
+Su respuesta, textual:
+
+> *«Lo que se hace es que **físicamente se le da tela al cortador y cuando acaba de cortar es cuando se registra
+> la salida en el sistema**. Es decir, **no hay que hacer salida y entrada**. Simplemente se registra lo que se
+> cortó. El manejo de sobrantes entre diferentes almacenes se maneja con un **traspaso**. Así está bien, creo que
+> **no hay que mover nada**.»*
+
+📐 **Y el sistema lo permite exactamente así, medido:** capturar el corte **NO toca el inventario de tela**
+(`dominio/produccion/etapas.ts` no tiene una sola referencia a las partidas de tela) ⇒ la salida de tela se
+registra **aparte y cuando él dice**, con lo que de verdad se consumió. Y el traspaso entre almacenes ya existe
+(`registrarSalidaTelaColorAOrden` para la salida real, `traspasarTelaColor` para mover entre almacenes).
+⇒ **la 0.240 se cierra sin construir nada.**
+
+🔑 **DÓNDE SE EQUIVOCÓ EL LEAD, porque la lección es la que vale:** midió bien el código —**no existe** una
+devolución desde una orden, y eso es cierto— pero **construyó la fila sobre un flujo que se inventó**: dio por
+hecho que la salida de tela se registra ANTES de cortar (por la cantidad teórica) y que después haría falta
+devolver el sobrante. En el negocio real **la salida se registra DESPUÉS, por lo que se cortó**, así que no hay
+nada que devolver. *Una ausencia en el código sólo es un defecto si el negocio necesita esa función; medir que
+algo «no existe» no dice nada hasta saber si alguien lo haría.* El lead escribió «no existe una devolución» y
+saltó a «⇒ el costo queda inflado», que era una **inferencia sobre el proceso**, no una medición. **La pregunta
+que sí hizo bien fue la que lo salvó:** al preguntarle *«¿cada cuánto sobra tela?»* en vez de clasificar solo,
+la respuesta trajo el flujo verdadero y disolvió la fila entera.
+
+### ✅ (b) EL ARTE: gana su respuesta de la mañana, confirmada sabiendo que contradecía a la otra
+
+> *«Ok, **abre los permisos en lo que se construye**.»*
+
+⇒ **Diseño Gráfico lleva `modelos.administrar` y `desarrollo.administrar` AHORA**, con el alcance aceptado a
+sabiendas, y la **fila 0.235** sigue viva para partir el permiso. Vuelve a tener rodeo ⇒ **se queda en 🔶 y deja
+de bloquear a nadie.** 🔑 Se le preguntó cuál de sus dos respuestas mandaba en vez de aplicar la más reciente:
+*la más nueva no gana por ser más nueva.*
+
+### ✅ (c) LAS ÓRDENES Y EL IMPORTADOR: sólo él, y la hipótesis del lead era FALSA
+
+> *«Las órdenes de producción (**que incluye el importador de pedidos del cliente**) **sólo los meto Yo**. Aurora
+> no los mete.»*
+
+⇒ **`pedidos.administrar` y `ordenes.administrar` se quedan con él.** Los dos «huecos» que el lead marcó como
+*«no parecen deliberados»* **sí lo eran**.
+🔑 **Y la hipótesis del lead era equivocada:** había escrito que *«al marcar no en `pedidos.administrar`
+probablemente quiso decir que Aurora no administra los pedidos INTERNOS, no que nadie importe la OC»*. **No era
+eso**: él captura **todo**, internos y el importador. ⭐ **Y ahí está el valor de haberla escrito como hipótesis
+y preguntado, en vez de como decisión:** si se hubiera «corregido» el perfil de Aurora dándole
+`pedidos.administrar`, se le habría abierto **el arranque entero del negocio** a alguien que él no quiere que lo
+toque — y habría quedado como una decisión suya que nunca tomó.
+
+### ⚠️ (d) EL PRECIO DE MAQUILA: era un error suyo, y de corregirlo nace un CONTROL DE DINERO — fila 0.242
+
+> *«El precio de maquila **sí lo debe de capturar producción. Chance me equivoqué.** Lo que hay que hacer es
+> **validar que no pueda ponerlo más caro que el que está en la cotización** a menos que se le autorice. (**Yo
+> autorizo**.)»*
+
+⇒ **Producción lleva `ordenes.precio-maquila`** (su «no» del cuestionario queda revertido por él mismo). Y su
+condición es **trabajo nuevo**, no un permiso.
+📐 **MEDIDO — se puede construir, y hay contra qué comparar:** producción escribe **`Orden.maquilaOrd`**
+(`dominio/produccion/precios-orden.ts:202`, bajo ese permiso, con lock e historial de cambios), y la cotización
+vive en **`Modelo.maquilaBase`** — *«Costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`),
+capturada en el editor de desarrollo, con su `idMaquileroCotizado` al lado.
+⚠️ **PERO el estampado NO tiene con qué compararse:** existe `Orden.aplicacionOrd` (`:3554`) y **no existe
+ningún `aplicacionBase`/`estampadoBase`** en el modelo ⇒ **el tope sólo se puede construir para la COSTURA**.
+⏳ Preguntado a Daniel: ¿quiere el mismo tope en el precio del estampado? Si sí, hay que capturar antes su
+cotización en el desarrollo.
+
+### ✅ (e) LAS CANCELACIONES, repartidas
+
+> *«**Yo** hago las cancelaciones de OP. **Compras puede cancelar OC y yo**.»*
+
+⇒ `ordenes.cancelar` **suyo**; `compras.cancelar` **de Compras y suyo**. Cierra el cuarto hueco.
+
+### 📊 Cómo quedan los cuatro huecos de §249
+
+| Hueco | Su respuesta | Resultado |
+|---|---|---|
+| Importar la OC del cliente | *«sólo los meto Yo»* | **Deliberado.** La hipótesis del lead era falsa. |
+| Crear la orden de producción | ídem | **Deliberado.** |
+| Capturar el precio de maquila | *«sí lo debe capturar producción, chance me equivoqué»* | **Era su error** ⇒ se le da, **más un tope nuevo** (fila 0.242). |
+| Cancelar orden / OC | OP suya, OC de Compras y suya | **Repartido.** |
+
+🔑 **El balance del ejercicio, y es lo que justifica haber preguntado las seis:** de los cuatro huecos, **dos
+eran a propósito, uno era un error suyo y uno faltaba repartir.** Ninguno era un defecto del sistema, y **el
+lead habría acertado en cero de los cuatro** si los hubiera resuelto solo por lo que le parecía razonable.
