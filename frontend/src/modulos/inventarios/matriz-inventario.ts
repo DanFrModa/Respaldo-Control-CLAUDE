@@ -1,10 +1,15 @@
 import type { MatrizLinea, MatrizTalla } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 
 /**
- * Helpers para la {@link MatrizColorTalla} en el inventario PT (F3-E3). A diferencia del corte/envío
- * (que se limitan a la matriz de UNA orden), un movimiento manual o un traspaso pueden ser de
- * CUALQUIER color×talla del catálogo: aquí los colores/tallas disponibles vienen de los catálogos
- * globales y el usuario agrega los renglones/columnas que necesite. Funciones PURAS (A1).
+ * Helpers para la {@link MatrizColorTalla} en el inventario PT (F3-E3). Funciones PURAS (A1).
+ *
+ * ⭐ **FILA 0.215 — de dónde salen las filas y las columnas.** Hasta esta fila el cuadro arrancaba
+ * VACÍO y se armaba a mano contra los catálogos GLOBALES de color y talla, y eso es lo que Daniel
+ * encontró en el traspaso: *«me pone todas las tallas yo creo que existen en todos los modelos»*
+ * (§Post-F9.243, punto 11). Hoy los ejes se DERIVAN de lo que hay —{@link ejesDeExistencias}—, como
+ * la entrega a cliente los deriva de su orden. El catálogo de tallas sigue disponible **sólo donde
+ * mete piezas nuevas** (la ENTRADA manual: un conteo inicial puede nombrar una talla que el kardex
+ * todavía no conoce); para SACAR o TRASPASAR no hay nada que agregar que el almacén no tenga.
  */
 
 /** Suma total de una matriz de captura (todas las celdas). */
@@ -172,4 +177,110 @@ export function tallasColumnas(
     .slice()
     .sort((a, b) => a.orden - b.orden || a.id - b.id)
     .map((t) => ({ idTalla: t.id, etiqueta: t.etiqueta }));
+}
+
+/** Lo que un renglón de existencias tiene que traer para poder armar el cuadro con él. */
+export interface FilaParaEjes {
+  idColor: number;
+  color: string;
+  colorActivo: boolean;
+  idTalla: number;
+  etiquetaTalla: string;
+  ordenTalla: number;
+  /** `null` = bucket «sin orden». */
+  idOrden: number | null;
+}
+
+/** Los ejes de un cuadro de captura: sus COLUMNAS (tallas) y sus FILAS (colores), ya ordenados. */
+export interface EjesMatrizPt {
+  tallas: MatrizTalla[];
+  lineas: MatrizLinea[];
+  /**
+   * ⭐ FIRMA del CONTENIDO de los ejes: qué bucket, qué tallas y qué colores. Es lo que las pantallas
+   * comparan para decidir si el cuadro hay que REARMARLO, en vez de comparar la identidad del objeto.
+   *
+   * 🔴 **Y no es un adorno: sin ella el rearme se colgaba.** El efecto que arma el cuadro dependía de
+   * la identidad de `ejes`, que cuelga de la respuesta de la consulta; en cuanto algo entrega un
+   * objeto NUEVO en cada render, el efecto vuelve a correr, vuelve a escribir estado y no para nunca
+   * (medido: la suite de Movimientos se quedó **10 minutos sin imprimir una línea**). Con la firma, un
+   * objeto nuevo con el mismo contenido no rearma nada.
+   *
+   * 📌 Lleva el **bucket** dentro a propósito: dos órdenes pueden tener los mismos colores y las
+   * mismas tallas y NO son el mismo cuadro —su saldo es otro—, así que cambiar de orden tiene que
+   * vaciar lo capturado. Lo que la firma NO sabe es el modelo ni el almacén: eso lo añade cada
+   * pantalla, que es la que los conoce.
+   */
+  firma: string;
+}
+
+/**
+ * ⭐⭐ FILA 0.215 — EL CUADRO SE ARMA CON LO QUE DE VERDAD HAY, NO CON EL CATÁLOGO.
+ *
+ * Nace del repaso de Inventarios de DANIEL (§Post-F9.243, punto 11), sobre el traspaso de PT:
+ *
+ * > *«Tiene que haber un cuadro igual al de la entrega. No lo hay, pide que escoja una talla y un
+ * > color. No tiene sentido, me está poniendo cosas que no existen. Me pone todas las tallas yo
+ * > creo que existen en todos los modelos. Está muy mal. **No puedo avanzar**.»*
+ *
+ * 🔑 **De dónde salen las columnas, y por qué NO de la orden.** La entrega a cliente deriva su
+ * matriz de la ORDEN (`produccion/matriz-orden.ts` → `tallasDeOrden`) y eso ahí es correcto: se
+ * entrega contra lo pedido. Aquí NO: el traspaso y la salida manual mueven **lo que hay en el
+ * almacén**, y la existencia de PT es por modelo×color×talla×**ORDEN**×almacén (F6-E2). Una talla de
+ * la orden con existencia **cero** en ese almacén es, palabra por palabra, *«algo que no existe»*: el
+ * servidor la rechazaría bajo bloqueo (D3) y la columna sólo serviría para cosechar el error. Por eso
+ * los ejes se derivan de los **renglones de existencia del bucket elegido**, que son los mismos de
+ * los que ya salían el desplegable de órdenes (`ordenesConExistencia`) y el «disponible».
+ *
+ * ⚠️ **El ALCANCE lo fija la consulta que hizo la pantalla, no esta función** (mismo criterio que
+ * {@link coloresRetiradosConExistencia}): en SALIDA/TRASPASO los renglones vienen sin ceros ⇒ el
+ * cuadro es exactamente lo movible; en ENTRADA la consulta pide `incluirCeros` a propósito (el
+ * va-y-ven del estampado) ⇒ el cuadro trae también lo que quedó en cero, que es justo lo que tiene
+ * que poder REGRESAR.
+ *
+ * 📌 El color RETIRADO (fila 0.164) llega rotulado igual que en el buscador: sus piezas son
+ * movimientos ya asentados y siguen ahí, pero nadie debe confundirlo con uno del catálogo vivo.
+ *
+ * Función PURA (A1): el servidor sigue siendo la autoridad del no-negativo.
+ */
+export function ejesDeExistencias(
+  filas: readonly FilaParaEjes[],
+  idOrden: number | null,
+): EjesMatrizPt {
+  const tallas = new Map<number, { talla: MatrizTalla; orden: number }>();
+  const lineas = new Map<number, MatrizLinea>();
+  for (const f of filas) {
+    // 🔴 EL BUCKET MANDA: un renglón de OTRA orden no es existencia de este movimiento. Sin este
+    // filtro el cuadro volvería a ofrecer «cosas que no existen», sólo que disfrazadas de reales.
+    if (f.idOrden !== idOrden) continue;
+    if (!tallas.has(f.idTalla)) {
+      tallas.set(f.idTalla, {
+        talla: { idTalla: f.idTalla, etiqueta: f.etiquetaTalla },
+        orden: f.ordenTalla,
+      });
+    }
+    if (!lineas.has(f.idColor)) {
+      lineas.set(f.idColor, {
+        idColor: f.idColor,
+        color: f.colorActivo ? f.color : `${f.color}${SUFIJO_COLOR_RETIRADO}`,
+        cantidades: {},
+      });
+    }
+  }
+  // Las columnas van en el orden del CATÁLOGO de tallas (CH, M, G…), que es el que trae cada
+  // renglón: ordenarlas por id las pintaría en el orden en que se dieron de alta.
+  const columnas = [...tallas.values()]
+    .sort((a, b) => a.orden - b.orden || a.talla.idTalla - b.talla.idTalla)
+    .map((t) => t.talla);
+  const filasOrdenadas = [...lineas.values()].sort(
+    (a, b) => a.color.localeCompare(b.color, 'es') || a.idColor - b.idColor,
+  );
+  return {
+    tallas: columnas,
+    lineas: filasOrdenadas,
+    firma: [
+      idOrden === null ? 'sin' : String(idOrden),
+      columnas.map((t) => t.idTalla).join(','),
+      filasOrdenadas.map((l) => l.idColor).join(','),
+    ].join('#'),
+  };
 }

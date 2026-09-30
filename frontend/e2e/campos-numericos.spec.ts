@@ -42,6 +42,16 @@ test.describe('Campos numéricos sin incremento automático', () => {
     await expect(page.getByRole('heading', { name: 'Movimientos de inventario' })).toBeVisible();
     await page.getByTestId('selector-modelo-busqueda').fill(codigoModelo);
     await page.getByTestId('selector-modelo-opcion').first().click();
+    /**
+     * ⭐ FILA 0.215 — hace falta elegir un tipo de ENTRADA y un almacén para poder capturar sobre un
+     * modelo recién creado. Desde esa fila el cuadro se arma con las EXISTENCIAS del bucket, y este
+     * modelo no tiene ninguna: el catálogo de tallas sólo queda disponible en la ENTRADA, que es el
+     * único modo que mete piezas que el kardex todavía no conoce. En una salida no habría columna —y
+     * es correcto: de lo que no hay no se saca—. Este spec sólo necesita UNA celda numérica.
+     * (`index: 1` es la primera opción real del desplegable: «Inventario Inicial (+)».)
+     */
+    await page.getByTestId('mov-tipo').selectOption({ index: 1 });
+    await page.getByTestId('mov-almacen').selectOption({ label: 'Primeras' });
     await elegirPrimeroEnCombobox(page, page.locator('body'), 'mov-matriz-agregar-color');
     const agregarTalla = page.getByTestId('mov-matriz-agregar-talla');
     if (await agregarTalla.isEnabled()) {

@@ -1,4 +1,6 @@
 import { Trash2Icon } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 import type { OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -7,7 +9,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { SelectorAvio } from '../inventarios/SelectorAvio';
 
-import { aNumero, renglonVacio, type RenglonNotaCaptura } from './captura';
+import { aNumero, hayStockDeAvio, renglonVacio, type RenglonNotaCaptura } from './captura';
 
 /** Existencia de un avío en el almacén origen elegido (para el aviso "excede", §4.6). */
 export interface ExistenciaAvioNota {
@@ -33,6 +35,14 @@ export interface ExistenciaAvioNota {
  * de la receta — se enviará igual** (la nota PROPONE, no LIMITA) y muestra la **existencia
  * disponible** del almacén origen en rojo si la cantidad la excede. Presentación pura (A1): el
  * backend re-valida (no-negativo del avío al confirmar).
+ *
+ * ⭐⭐ FILA 0.216 (§Post-F9.243, punto 07c) — **UN AVÍO SIN EXISTENCIA NO SE PUEDE ELEGIR.** Daniel:
+ * *«que no deje meter los avíos que no hay stock, ANTES de meterlos. Porque ahorita valida DESPUÉS de
+ * haberlos metido en la nota de salida»*. El selector sigue buscando en TODO el catálogo (lo hace el
+ * servidor y no puede filtrar por existencia), pero al elegir uno sin stock la selección **se
+ * rechaza con su razón** en vez de quedar puesta para que el error salga al confirmar. Y la
+ * existencia se pinta también cuando es CERO —antes, el avío que nunca entró a ese almacén no tenía
+ * renglón en la vista y aquí se veía **en blanco**: la captura parecía correcta.
  */
 export function EditorRenglonesNota({
   renglones,
@@ -181,9 +191,48 @@ function RenglonAvio({
         ? 'en'
         : 'fuera';
 
-  // Existencia del avío en el almacén origen (aviso si la cantidad la excede).
-  const existencia = renglon.idAvio === null ? undefined : existenciaPorAvio?.get(renglon.idAvio);
+  /**
+   * Existencia del avío en el almacén origen (aviso si la cantidad la excede).
+   *
+   * ⭐ Fila 0.216 — con el stock CONOCIDO, un avío que no tiene renglón en la vista de existencias
+   * es un avío que **nunca entró a ese almacén**: vale CERO y se dice, en vez de dejar el hueco en
+   * blanco que hacía parecer correcta la captura. Con `existenciaPorAvio` en `undefined` (sin almacén
+   * o sin respuesta) no se sabe nada y no se pinta nada.
+   */
+  const existencia =
+    renglon.idAvio === null || existenciaPorAvio === undefined
+      ? undefined
+      : (existenciaPorAvio.get(renglon.idAvio) ?? { existencia: 0, unidad: null });
   const excede = existencia !== undefined && aNumero(renglon.cantidad) > existencia.existencia;
+
+  /**
+   * ⭐ Fila 0.216 — cuántas selecciones se han RECHAZADO por falta de existencia. Es la `key` del
+   * combobox, que lo REMONTA tras cada rechazo.
+   *
+   * 🔑 Hace falta porque el combobox lleva su propio texto visible y lo escribe al clickear, antes de
+   * saber si el padre acepta: sin remontarlo, el campo se quedaba enseñando el avío que NO entró
+   * —incluso al salir del campo, porque su etiqueta interna ya era ésa— y la pantalla mentía. Mismo
+   * recurso que el buscador de color de las pantallas de PT (fila 0.192).
+   */
+  const [rechazos, setRechazos] = useState(0);
+
+  /**
+   * 🔴 LA PUERTA DE LA FILA 0.216: el avío sin existencia NO se pone en el renglón.
+   *
+   * Si se le quitara la condición, la selección volvería a quedar puesta y el error saldría al
+   * confirmar la nota — el *«no me deja»* de Daniel, una pantalla más tarde. La guarda del servidor
+   * sigue ahí y sigue mandando (A1): esto sólo evita llegar hasta ella.
+   */
+  function elegirAvio(avio: { id: number; clave: string }): void {
+    if (!hayStockDeAvio(existenciaPorAvio, avio.id)) {
+      toast.error(
+        `El avío ${avio.clave} no tiene existencia en el almacén origen: no se puede mandar. Recíbelo en almacén primero o elige otro.`,
+      );
+      setRechazos((n) => n + 1);
+      return;
+    }
+    actualizar(renglon.clave, { idAvio: avio.id, avioEtiqueta: avio.clave });
+  }
 
   return (
     <div className="mt-2 space-y-1.5">
@@ -193,12 +242,11 @@ function RenglonAvio({
               avíos del catálogo y "buscaba" por prefijo (el typeahead del navegador). */}
           <span className="mb-1 block">Avío</span>
           <SelectorAvio
+            key={rechazos}
             idSeleccionado={renglon.idAvio ?? undefined}
             {...(renglon.avioEtiqueta === null ? {} : { etiquetaSeleccion: renglon.avioEtiqueta })}
             deshabilitado={soloLectura}
-            alSeleccionar={(avio) =>
-              actualizar(renglon.clave, { idAvio: avio.id, avioEtiqueta: avio.clave })
-            }
+            alSeleccionar={elegirAvio}
             alLimpiar={() => actualizar(renglon.clave, { idAvio: null, avioEtiqueta: null })}
             testid="selector-avio-nota"
           />
@@ -243,7 +291,13 @@ function RenglonAvio({
           </span>
         ) : null}
         {existencia !== undefined ? (
-          excede ? (
+          existencia.existencia <= 0 ? (
+            // ⭐ Fila 0.216 — el cero se dice con su nombre, no como «Excede · hay 0»: lo que hay
+            // que hacer no es bajar la cantidad, es recibir el avío en almacén.
+            <span className="font-semibold text-crit" data-testid="existencia-nota">
+              Sin existencia en el almacén origen
+            </span>
+          ) : excede ? (
             <span className="font-semibold text-crit" data-testid="existencia-nota">
               Excede · hay {existencia.existencia.toLocaleString('es-MX')}
               {existencia.unidad !== null ? ` ${existencia.unidad}` : ''}

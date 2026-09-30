@@ -1,5 +1,5 @@
 import { ArrowLeftRight } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -28,6 +28,7 @@ import {
   aIdOrden,
   aLineasApi,
   coloresRetiradosConExistencia,
+  ejesDeExistencias,
   ordenesConExistencia,
   tallasColumnas,
   totalMatriz,
@@ -53,6 +54,18 @@ import { hoy, limitesFechaCapturaPt } from './fecha-captura-pt';
  *    si el cero las excluyera, entrarían a «sin orden» y la entrega al cliente de esa orden diría
  *    "no hay existencia" con la mercancía físicamente en el almacén.
  * En ambos casos el bucket «sin orden» (default) siempre está.
+ *
+ * ⭐⭐ Fila 0.215 (§Post-F9.243, punto 11) — EL CUADRO SE ARMA SOLO. Daniel encontró este mismo
+ * defecto en el traspaso —*«me pone todas las tallas yo creo que existen en todos los modelos»*— y
+ * está igual aquí: las columnas salían del catálogo GLOBAL de tallas. Hoy las filas y las columnas
+ * se DERIVAN de los renglones de existencia del bucket elegido (`ejesDeExistencias`), los mismos de
+ * los que ya salía el desplegable de órdenes. Y el «Agregar talla» se comporta según la DIRECCIÓN,
+ * porque no son el mismo acto:
+ *  • SALIDA: sólo las tallas del cuadro. De lo que no hay no se puede sacar; ofrecer el catálogo
+ *    era invitar a capturar una salida que el servidor rechaza bajo bloqueo (D3).
+ *  • ENTRADA: el catálogo SIGUE disponible, a propósito. Aquí se meten piezas que el kardex todavía
+ *    no conoce (el conteo inicial de §Post-F9.25), así que la talla puede no existir en ningún
+ *    renglón — y sin catálogo el cuadro no tendría columna en la que capturarla.
  *
  * Fila 0.100 (§Post-F9.193 decisión 3) — el MOTIVO es OBLIGATORIO: *"hoy se mueven mil piezas sin
  * una palabra"* (Daniel). Mismo trato que ya tenían telas y avíos; se guarda en las observaciones
@@ -154,6 +167,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const bucketValido =
     ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
   const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
+  const idOrdenElegida = aIdOrden(ordenElegida);
 
   // Fila 0.164 — los colores RETIRADOS que tienen mercancía en este contexto (el mismo
   // `existencias` del que salen los buckets de orden, ya elegido por modo). Sin esto, las piezas
@@ -164,12 +178,55 @@ export function MovimientosPtPagina(): React.JSX.Element {
     [existencias.data],
   );
   // Colores que YA son fila de la matriz: el buscador no los vuelve a ofrecer (el servidor rechaza
-  // el color repetido).
+  // el color repetido). Desde la fila 0.215 eso incluye los que el cuadro trae ARMADOS de las
+  // existencias: el color que ya está no se ofrece otra vez, venga de donde venga.
   const coloresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
-  const tallasDisponibles = useMemo(
+
+  /**
+   * ⭐⭐ FILA 0.215 — LOS EJES DEL CUADRO, DERIVADOS DE LO QUE HAY (nunca del catálogo de tallas).
+   * Salen de la MISMA lista de renglones que alimenta el desplegable de órdenes —ya elegida por modo
+   * (salida sin ceros / entrada con ceros)—, acotada al bucket elegido.
+   */
+  const ejes = useMemo(
+    () => ejesDeExistencias(existencias.data?.filas ?? [], idOrdenElegida),
+    [existencias.data, idOrdenElegida],
+  );
+  /**
+   * De qué CONTEXTO es el cuadro que está en pantalla: el tipo de movimiento (la dirección cambia la
+   * consulta entera), el modelo y el almacén —que la firma de los ejes no conoce— más el bucket y
+   * los ejes mismos. Si esto cambia, el cuadro es otro.
+   */
+  const firmaCuadro = `${idTipoMov}|${String(modelo?.id ?? '')}|${idAlmacen}|${ejes.firma}`;
+  const [firmaArmada, setFirmaArmada] = useState('');
+  /**
+   * El cuadro se REARMA cuando cambia su contexto o sus ejes. Una captura a medias NO se arrastra a
+   * un contexto nuevo: sería capturarla contra un saldo que no es el suyo.
+   *
+   * 🔑 **Lo que decide es la FIRMA, no la identidad de `ejes`** (ver `EjesMatrizPt.firma`): una
+   * respuesta nueva con el mismo contenido no pisa lo tecleado, y este efecto no puede entrar en
+   * bucle si algún día `ejes` llega nuevo en cada render.
+   * 📌 Por eso mismo se respetan las tallas que se agregan A MANO en una ENTRADA (y el quitar una
+   * fila o una columna): nada de eso cambia la firma.
+   */
+  useEffect(() => {
+    if (firmaArmada === firmaCuadro) {
+      return;
+    }
+    setFirmaArmada(firmaCuadro);
+    setTallas(ejes.tallas);
+    setLineas(ejes.lineas);
+  }, [firmaCuadro, firmaArmada, ejes]);
+
+  /**
+   * Qué se puede AGREGAR como columna. En una ENTRADA, el catálogo: es el único modo que mete piezas
+   * que el kardex no conoce (el conteo inicial), y ahí la talla puede no estar en ningún renglón. En
+   * una SALIDA, sólo las del cuadro: de lo que no hay no se saca.
+   */
+  const tallasDelCatalogo = useMemo(
     () => tallasColumnas(tallasCat.data?.datos ?? []),
     [tallasCat.data],
   );
+  const tallasDisponibles = esEntrada ? tallasDelCatalogo : ejes.tallas;
 
   // Aviso reintentable si falla algún catálogo de la captura.
   const catalogoError = tiposMov.isError || almacenes.isError || tallasCat.isError;
@@ -209,9 +266,14 @@ export function MovimientosPtPagina(): React.JSX.Element {
     setVecesAgregado((n) => n + 1);
   }, []);
 
+  /**
+   * ⭐ Fila 0.215 — REARMA el cuadro tras guardar: olvidar la firma lo hace volver a nacer de las
+   * existencias, con las celdas en blanco. Hace falta pedirlo explícitamente porque un movimiento
+   * PARCIAL deja los mismos colores y tallas —la firma no cambia— y sin esto el cuadro se quedaría
+   * con lo que ya se guardó escrito.
+   */
   function limpiarMatriz(): void {
-    setLineas([]);
-    setTallas([]);
+    setFirmaArmada('');
   }
 
   function guardar(): void {
@@ -225,7 +287,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
         idModelo: modelo.id,
         fecha,
         motivo: motivo.trim(),
-        lineas: aLineasApi(lineas, numOrdenV1, aIdOrden(ordenElegida)),
+        lineas: aLineasApi(lineas, numOrdenV1, idOrdenElegida),
       },
       {
         onSuccess: (mov) => {
@@ -376,7 +438,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
                 idBase="mov"
                 datos={existencias.data}
                 mostrados={existencias.data?.filas.length ?? 0}
-                consejo="Si no aparece la orden que buscas, no significa que no tenga piezas: la lista se quedó corta — repórtalo."
+                consejo="Si no aparece la orden que buscas —o al cuadro le falta un color o una talla— no significa que no tenga piezas: la lista se quedó corta — repórtalo."
                 className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
               />
 
@@ -413,10 +475,25 @@ export function MovimientosPtPagina(): React.JSX.Element {
 
               <div>
                 <h3 className="mb-2 text-sm font-medium">Cantidades (color × talla)</h3>
+                {/* ⭐ Fila 0.215 — en una SALIDA con el bucket vacío el cuadro sale vacío Y SE DICE
+                    POR QUÉ: no falta el cuadro, falta la mercancía. En una ENTRADA no se dice nada,
+                    porque ahí capturar sobre un bucket vacío es justo lo normal (el conteo inicial y
+                    el regreso del estampado). */}
+                {!esEntrada && hayArticulo && !existencias.isPending && ejes.lineas.length === 0 ? (
+                  <p
+                    className="mb-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
+                    data-testid="mov-sin-piezas"
+                  >
+                    En este almacén no hay piezas de este modelo
+                    {idOrdenElegida === null ? ' sin orden' : ' en la orden elegida'}. De un bucket
+                    vacío no se puede sacar: elige otro almacén u otra orden.
+                  </p>
+                ) : null}
                 <MatrizColorTalla
                   testid="mov-matriz"
                   tallas={tallas}
                   lineas={lineas}
+                  // Fila 0.215: el catálogo de tallas sólo en la ENTRADA (ver `tallasDisponibles`).
                   tallasDisponibles={tallasDisponibles}
                   onLineasChange={setLineas}
                   onTallasChange={setTallas}

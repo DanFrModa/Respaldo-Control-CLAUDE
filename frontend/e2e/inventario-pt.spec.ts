@@ -64,11 +64,19 @@ test.describe('Inventario PT operable (F3-E3)', () => {
 
     await page.getByTestId('traspaso-origen').selectOption({ label: 'Primeras' });
     await page.getByTestId('traspaso-destino').selectOption({ label: 'Segundas' });
-    await elegirPrimeroEnCombobox(page, page.locator('body'), 'traspaso-matriz-agregar-color');
-    const agregarTallaT = page.getByTestId('traspaso-matriz-agregar-talla');
-    if (await agregarTallaT.isEnabled()) {
-      await agregarTallaT.selectOption({ index: 1 });
-    }
+    /**
+     * ⭐⭐ FILA 0.215 — AQUÍ NO SE AGREGA NI COLOR NI TALLA, Y ESO ES LO QUE SE ESTÁ MIDIENDO.
+     *
+     * El cuadro se arma SOLO con lo que hay en el origen: las 30 piezas que acaba de meter la
+     * entrada de arriba ya son su fila (el color) y su columna (la talla). Es *«el cuadro igual al
+     * de la entrega»* que pidió Daniel (§Post-F9.243 p.11); antes había que agregar las dos cosas a
+     * mano, eligiendo la talla de un desplegable con el catálogo GLOBAL.
+     * 🔑 Y contra el stack real esto vale doble: si las columnas volvieran a salir del catálogo, la
+     * celda seguiría existiendo y nadie lo notaría — pero la FILA no estaría, y la aserción de abajo
+     * sí se cae.
+     */
+    await expect(page.getByTestId('traspaso-matriz-fila')).toHaveCount(1);
+    await expect(page.getByTestId('traspaso-matriz-agregar-talla')).toBeDisabled();
     await page.getByTestId('traspaso-matriz-celda').first().fill('10');
     // Fila 0.100 — el MOTIVO es obligatorio también en el traspaso.
     await page.getByTestId('traspaso-motivo').fill('Reacomodo de la prueba');

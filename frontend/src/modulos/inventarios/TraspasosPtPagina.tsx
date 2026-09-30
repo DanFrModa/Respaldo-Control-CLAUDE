@@ -1,10 +1,9 @@
 import { Printer } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { urlImpresoTraspasoPt, useCrearTraspasoPt, useExistenciasPt } from '@/api/inventarios';
-import { useTallas } from '@/api/tallas';
 import type { Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
@@ -28,8 +27,8 @@ import {
   aIdOrden,
   aLineasApi,
   coloresRetiradosConExistencia,
+  ejesDeExistencias,
   ordenesConExistencia,
-  tallasColumnas,
   totalMatriz,
 } from './matriz-inventario';
 import { hoy, limitesFechaCapturaPt } from './fecha-captura-pt';
@@ -50,6 +49,15 @@ import { hoy, limitesFechaCapturaPt } from './fecha-captura-pt';
  * patas: el destino no elige orden —hereda la del origen—, y un bucket sin piezas en el origen no
  * tiene nada que traspasar. La excepción de «entrada a un bucket en cero» (regresar del estampado)
  * vive en Movimientos, no aquí: un traspaso no crea piezas.
+ *
+ * ⭐⭐ Fila 0.215 (§Post-F9.243, punto 11) — EL CUADRO SE ARMA SOLO, CON LO QUE HAY EN EL ORIGEN.
+ * Daniel: *«Tiene que haber un cuadro igual al de la entrega. No lo hay, pide que escoja una talla y
+ * un color… me está poniendo cosas que no existen… **No puedo avanzar**»*. Sus filas (colores) y sus
+ * columnas (tallas) salen de los RENGLONES DE EXISTENCIA del bucket elegido en el origen
+ * (`ejesDeExistencias`), los mismos de los que ya salían el desplegable de órdenes y el
+ * «disponible» — no del catálogo global de tallas, que es lo que pintaba *«todas las tallas que yo
+ * creo que existen en todos los modelos»*. Y por eso el «Agregar talla» tampoco ofrece el catálogo:
+ * un traspaso no puede mover una talla que el origen no tiene.
  *
  * Fila 0.100 (§Post-F9.193) — el MOTIVO es OBLIGATORIO y al guardar ofrece la HOJA DEL TRASPASO,
  * el papel que acompaña las prendas (antes de esta fila el inventario de PT no tenía NI UN solo
@@ -94,7 +102,6 @@ export function TraspasosPtPagina(): React.JSX.Element {
     direccion: 'asc',
     tipo: 'PT',
   });
-  const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
   const crear = useCrearTraspasoPt();
 
   // Existencias disponibles en el ORIGEN para el modelo elegido (para guiar al usuario). La query
@@ -153,7 +160,8 @@ export function TraspasosPtPagina(): React.JSX.Element {
     [existencias.data],
   );
   // Colores que YA son fila de la matriz: el buscador no los vuelve a ofrecer (el servidor rechaza
-  // el color repetido).
+  // el color repetido). Desde la fila 0.215 eso incluye los que el cuadro trae ARMADOS de las
+  // existencias: el color que ya está no se ofrece otra vez, venga de donde venga.
   const coloresUsados = useMemo(() => new Set(lineas.map((l) => l.idColor)), [lineas]);
   /**
    * Agrega la fila del color elegido en el buscador (fila 0.192: el catálogo lo busca el SERVIDOR,
@@ -171,10 +179,39 @@ export function TraspasosPtPagina(): React.JSX.Element {
     ]);
     setVecesAgregado((n) => n + 1);
   }, []);
-  const tallasDisponibles = useMemo(
-    () => tallasColumnas(tallasCat.data?.datos ?? []),
-    [tallasCat.data],
+  /**
+   * ⭐⭐ FILA 0.215 — LOS EJES DEL CUADRO, DERIVADOS DE LO QUE HAY EN EL ORIGEN (nunca del catálogo).
+   * Es la MISMA lista de renglones que alimenta el desplegable de órdenes y el «disponible», acotada
+   * al bucket elegido: así el cuadro y el saldo que se compara hablan del mismo inventario.
+   */
+  const ejes = useMemo(
+    () => ejesDeExistencias(existencias.data?.filas ?? [], idOrdenElegida),
+    [existencias.data, idOrdenElegida],
   );
+  /**
+   * De qué CONTEXTO es el cuadro que está en pantalla: el modelo y el almacén de origen (que la
+   * firma de los ejes no conoce) más el bucket y los ejes mismos. Si esto cambia, el cuadro es otro.
+   */
+  const firmaCuadro = `${String(modelo?.id ?? '')}|${idAlmacenOrigen}|${ejes.firma}`;
+  const [firmaArmada, setFirmaArmada] = useState('');
+  /**
+   * El cuadro se REARMA cuando cambia su contexto o sus ejes: otro modelo, otro almacén, otra orden,
+   * o unas existencias distintas (también tras guardar, que las refresca). Una captura a medias NO
+   * se arrastra a un contexto nuevo: sería capturarla contra un saldo que no es el suyo.
+   *
+   * 🔑 **Lo que decide es la FIRMA, no la identidad de `ejes`** (ver `EjesMatrizPt.firma`): así una
+   * respuesta nueva con el mismo contenido no pisa lo que la persona tecleó, y —sobre todo— este
+   * efecto no puede entrar en bucle si algún día `ejes` llega nuevo en cada render.
+   * 📌 Y por eso mismo quitar una fila o una columna a mano SÍ se respeta: eso no cambia la firma.
+   */
+  useEffect(() => {
+    if (firmaArmada === firmaCuadro) {
+      return;
+    }
+    setFirmaArmada(firmaCuadro);
+    setTallas(ejes.tallas);
+    setLineas(ejes.lineas);
+  }, [firmaCuadro, firmaArmada, ejes]);
 
   // Aviso de sobre-traspaso (UI): cuántas piezas capturadas exceden lo disponible en el origen.
   const avisoExcede = useMemo(() => {
@@ -223,8 +260,11 @@ export function TraspasosPtPagina(): React.JSX.Element {
           toast.success(
             `Traspaso guardado (salida #${traspaso.salida.folio} → entrada #${traspaso.entrada.folio}).`,
           );
-          setLineas([]);
-          setTallas([]);
+          // ⭐ Fila 0.215 — el cuadro se REARMA: olvidar la firma lo hace volver a nacer de las
+          // existencias, con las celdas en blanco. Hace falta pedirlo explícitamente porque un
+          // traspaso PARCIAL deja los mismos colores y tallas —la firma no cambia— y sin esto el
+          // cuadro se quedaría con lo que ya se traspasó escrito.
+          setFirmaArmada('');
           setMotivo('');
           // El folio del traspaso es el de la pata de SALIDA (no se genera ninguno nuevo).
           setRecienGuardado({ id: traspaso.salida.id, folio: traspaso.salida.folio });
@@ -402,7 +442,11 @@ export function TraspasosPtPagina(): React.JSX.Element {
                   testid="traspaso-matriz"
                   tallas={tallas}
                   lineas={lineas}
-                  tallasDisponibles={tallasDisponibles}
+                  // ⭐ Fila 0.215 — el «Agregar talla» ofrece SOLO las tallas del cuadro (mismo
+                  // patrón que la entrega, `EntregaClientePagina.tsx`: `tallasDisponibles={tallas}`).
+                  // Nunca el catálogo global: una talla sin piezas en el origen no se puede
+                  // traspasar, así que ofrecerla sólo servía para cosechar el rechazo del servidor.
+                  tallasDisponibles={ejes.tallas}
                   onLineasChange={setLineas}
                   onTallasChange={setTallas}
                   soloLectura={!puedeMover}
@@ -422,6 +466,20 @@ export function TraspasosPtPagina(): React.JSX.Element {
                     </div>
                   }
                 />
+                {/* ⭐ Fila 0.215 — si el bucket no tiene piezas, el cuadro sale vacío Y SE DICE POR
+                    QUÉ. Sin esta línea el operador leería el «Agrega un color para empezar» de la
+                    matriz y volvería a buscar en un catálogo que ya no está: el cuadro no falta,
+                    falta la mercancía. */}
+                {hayOrigen && !existencias.isPending && ejes.lineas.length === 0 ? (
+                  <p
+                    className="mt-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
+                    data-testid="traspaso-sin-piezas"
+                  >
+                    En este almacén no hay piezas de este modelo
+                    {idOrdenElegida === null ? ' sin orden' : ' en la orden elegida'}. Elige otro
+                    almacén de origen u otra orden.
+                  </p>
+                ) : null}
                 {idAlmacenOrigen !== '' ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Existencia disponible en el origen{' '}
@@ -438,12 +496,14 @@ export function TraspasosPtPagina(): React.JSX.Element {
                     FILAS de existencias, que desde la 0.143 vienen topadas. Si el tope alcanza,
                     ese número se queda CORTO y un bucket puede faltar del desplegable. El servidor
                     sigue validando el saldo de verdad bajo bloqueo (D3), así que esto no deja pasar
-                    un traspaso indebido — pero sí engañaría al que lo captura, y por eso se dice. */}
+                    un traspaso indebido — pero sí engañaría al que lo captura, y por eso se dice.
+                    ⭐ Fila 0.215 — y ahora el CUADRO sale de esas mismas filas, así que un recorte
+                    también le puede faltar un color o una talla: va dicho en el consejo. */}
                 <AvisoExistenciasRecortadas
                   idBase="traspaso"
                   datos={existencias.data}
                   mostrados={existencias.data?.filas.length ?? 0}
-                  consejo="El disponible de arriba y la lista de órdenes pueden quedarse cortos; el servidor sí valida el saldo real al guardar."
+                  consejo="El disponible, la lista de órdenes y el cuadro de captura pueden quedarse cortos (puede faltar un color o una talla); el servidor sí valida el saldo real al guardar."
                   className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
                 />
               </div>

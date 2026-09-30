@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Modelo } from '@/api/modelos';
-import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { hoy } from './fecha-captura-pt';
 import { MovimientosPtPagina } from './MovimientosPtPagina';
@@ -23,8 +23,38 @@ vi.mock('@/api/inventarios', () => ({
     useExistenciasPtMock(query, habilitado),
 }));
 
-function fila(idOrden: number | null, folioOrden: number | null, existencia: number) {
-  return { idModelo: 1, idColor: 7, idTalla: 11, idAlmacen: 3, idOrden, folioOrden, existencia };
+/**
+ * Un renglón de existencia como lo devuelve el servidor. ⭐ Fila 0.215 — trae el NOMBRE del color y
+ * la ETIQUETA/orden de la talla porque de estos renglones se arma el CUADRO de captura: son sus
+ * filas y sus columnas, ya no las pone el catálogo global.
+ */
+function fila(
+  idOrden: number | null,
+  folioOrden: number | null,
+  existencia: number,
+  ejes: Partial<{
+    idColor: number;
+    color: string;
+    colorActivo: boolean;
+    idTalla: number;
+    etiquetaTalla: string;
+    ordenTalla: number;
+  }> = {},
+) {
+  return {
+    idModelo: 1,
+    idColor: 7,
+    color: 'Rojo',
+    colorActivo: true,
+    idTalla: 11,
+    etiquetaTalla: 'CH',
+    ordenTalla: 1,
+    idAlmacen: 3,
+    idOrden,
+    folioOrden,
+    existencia,
+    ...ejes,
+  };
 }
 
 /**
@@ -173,8 +203,20 @@ vi.mock('@/api/almacenes', () => ({
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] } }),
 }));
+/**
+ * ⭐ Fila 0.215 — el catálogo GLOBAL trae una talla ('G') que NUNCA tiene existencia. Es el cebo de
+ * las dos pruebas del «Agregar talla»: en una SALIDA no debe aparecer (de lo que no hay no se saca)
+ * y en una ENTRADA sí (ahí se meten piezas que el kardex no conoce todavía).
+ */
 vi.mock('@/api/tallas', () => ({
-  useTallas: () => ({ data: { datos: [{ id: 11, etiqueta: 'CH', orden: 1 }] } }),
+  useTallas: () => ({
+    data: {
+      datos: [
+        { id: 11, etiqueta: 'CH', orden: 1 },
+        { id: 13, etiqueta: 'G', orden: 3 },
+      ],
+    },
+  }),
 }));
 
 const modelo: Modelo = {
@@ -300,16 +342,18 @@ describe('MovimientosPtPagina (F3-E3)', () => {
    * salida. 🔑 Y hace falta decirlo: **quitar ese `excluirIds` no rompía NINGUNA prueba** —medido—
    * hasta que existió ésta.
    */
-  it('el color YA capturado desaparece del buscador (no se puede repetir la fila)', async () => {
+  it('el color que YA es fila desaparece del buscador (no se puede repetir la fila)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
     await elegirModelo(usuario);
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
+    // ⭐ Fila 0.215 — "Rojo" ya es fila porque el CUADRO se armó con las existencias, no porque se
+    // haya agregado a mano. La exclusión tiene que valer igual (el servidor rechaza el repetido).
+    expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
 
-    // La lista se vuelve a abrir contra el MISMO catálogo del servidor (el mock siempre trae
-    // "Rojo"): si el color capturado siguiera ofreciéndose, aquí habría una opción.
+    // La lista se abre contra el MISMO catálogo del servidor (el mock siempre trae "Rojo"): si el
+    // color que ya es fila siguiera ofreciéndose, aquí habría una opción.
     const input = screen.getByTestId('mov-matriz-agregar-color-busqueda');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'Rojo' } });
@@ -325,9 +369,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    // La matriz arranca vacía: se agrega un color y una talla del catálogo, luego se captura.
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+    // ⭐ Fila 0.215 — la matriz ya viene ARMADA con lo que hay (Rojo × CH): no se agrega nada.
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '12');
@@ -384,8 +426,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // entrada
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
     await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '100');
@@ -424,8 +464,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
     await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '4');
@@ -443,8 +481,6 @@ describe('MovimientosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '3');
@@ -463,23 +499,11 @@ describe('MovimientosPtPagina (F3-E3)', () => {
    * mano esa mercancía no tenía puerta. Aparece rotulado —para que nadie lo confunda con uno del
    * catálogo— y sólo porque el SERVIDOR lo devuelve con existencia en este contexto.
    */
-  it('ofrece el color RETIRADO con existencia, rotulado, y se puede capturar con él', async () => {
+  it('el color RETIRADO con existencia es fila del cuadro, rotulado, y se captura con él', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue({
       data: {
-        filas: [
-          {
-            idModelo: 1,
-            idColor: 9,
-            color: 'Blanco Hueso',
-            colorActivo: false,
-            idTalla: 11,
-            idAlmacen: 3,
-            idOrden: null,
-            folioOrden: null,
-            existencia: 30,
-          },
-        ],
+        filas: [fila(null, null, 30, { idColor: 9, color: 'Blanco Hueso', colorActivo: false })],
         totalExistencia: 30,
       },
       isPending: false,
@@ -491,22 +515,17 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
 
-    await usuario.click(screen.getByTestId('mov-matriz-agregar-color-busqueda'));
-    const textos = (await screen.findAllByTestId('mov-matriz-agregar-color-opcion')).map(
-      (o) => o.textContent ?? '',
-    );
-    expect(textos).toContain('Blanco Hueso (retirado)');
-    // Y el catálogo vivo sigue ahí, sin marca: la puerta se abre, no se sustituye.
-    expect(textos).toContain('Rojo');
+    // ⭐ Fila 0.215 — ya no hay que ir a buscarlo: si tiene piezas aquí, ES fila del cuadro. Y sigue
+    // ROTULADO, para que nadie lo confunda con uno del catálogo vivo (fila 0.164).
+    expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Blanco Hueso (retirado)');
 
-    await elegirEnCombobox('mov-matriz-agregar-color', 'Blanco', 'Blanco Hueso (retirado)');
-    await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('mov-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '30');
     await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('mov-guardar'));
 
+    // Lo que viaja es el `idColor`: el rótulo sólo se pinta.
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idColor: number }[] }];
     expect(cuerpo.lineas[0]?.idColor).toBe(9);
   });
@@ -613,14 +632,112 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     });
   });
 
+  /**
+   * ⭐⭐ FILA 0.215 — EL MISMO DEFECTO QUE EN EL TRASPASO, EN ESTA PANTALLA.
+   *
+   * Daniel lo reportó del traspaso —*«me pone todas las tallas yo creo que existen en todos los
+   * modelos»*, §Post-F9.243 p.11— y aquí estaba igual: las columnas salían del catálogo GLOBAL.
+   * Ahora el cuadro se ARMA con los renglones de existencia del bucket, y el catálogo sólo queda
+   * disponible donde de verdad hace falta: la ENTRADA.
+   */
+  describe('el cuadro se arma con lo que HAY (fila 0.215)', () => {
+    it('⭐ trae la fila del color y la columna de la talla que tienen piezas, sin tocar nada', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.getByTestId('mov-matriz-fila')).toHaveTextContent('Rojo');
+      expect(screen.getByTestId('mov-matriz-celda')).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴 EL GUARDIÁN DE LA SALIDA. El catálogo trae 'G', que no tiene existencia en ningún renglón.
+     * Si el «Agregar talla» de una SALIDA volviera a alimentarse del catálogo, la 'G' aparecería y
+     * se podría capturar una salida de algo que no hay — la que el servidor rechaza bajo bloqueo.
+     * MEDIDO: con `tallasDisponibles={tallasDelCatalogo}` esta prueba falla.
+     */
+    it('⭐ en una SALIDA el «Agregar talla» NO ofrece el catálogo global', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // Otras Salidas (salida)
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      const agregarTalla = screen.getByTestId('mov-matriz-agregar-talla');
+      const opciones = [...agregarTalla.querySelectorAll('option')].map((o) =>
+        (o.textContent ?? '').trim(),
+      );
+      expect(opciones).toEqual(['Agregar talla…']); // 'CH' ya es columna, 'G' no existe aquí
+      expect(agregarTalla).toBeDisabled();
+    });
+
+    /**
+     * ⭐ LA GEMELA POSITIVA, y no es simetría de adorno: la ENTRADA es el único modo que mete piezas
+     * que el kardex todavía no conoce (el conteo inicial, §Post-F9.25). Ahí la talla puede no estar
+     * en ningún renglón, y sin el catálogo el cuadro no tendría columna en la que capturarla.
+     */
+    it('⭐ en una ENTRADA el «Agregar talla» SÍ ofrece el catálogo (se meten piezas nuevas)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // Inventario Inicial
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      const opciones = [
+        ...screen.getByTestId('mov-matriz-agregar-talla').querySelectorAll('option'),
+      ].map((o) => (o.textContent ?? '').trim());
+      expect(opciones).toEqual(['Agregar talla…', 'G']);
+    });
+
+    it('⭐ en una SALIDA con el bucket vacío dice POR QUÉ el cuadro está vacío', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [], totalExistencia: 0 },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.getByTestId('mov-sin-piezas')).toHaveTextContent(
+        'De un bucket vacío no se puede sacar',
+      );
+    });
+
+    /**
+     * Y en una ENTRADA ese aviso NO sale, a propósito: capturar sobre un bucket vacío es justo lo
+     * normal ahí (el conteo inicial y el regreso del estampado). Decirlo sería regañar por lo
+     * correcto.
+     */
+    it('en una ENTRADA con el bucket vacío NO se avisa nada (ahí es lo normal)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [], totalExistencia: 0 },
+        isPending: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1'); // entrada
+      await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+      expect(screen.queryByTestId('mov-sin-piezas')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Fila 0.100 · el motivo es obligatorio', () => {
     /** Deja la pantalla lista para guardar, SIN motivo. */
     async function capturaSinMotivo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
       await elegirModelo(usuario);
       await usuario.selectOptions(screen.getByTestId('mov-tipo'), '1');
       await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
-      await elegirEnCombobox('mov-matriz-agregar-color', 'Rojo');
-      await usuario.selectOptions(screen.getByTestId('mov-matriz-agregar-talla'), '11');
+      // Fila 0.215 — la celda ya está: el cuadro se armó con las existencias del bucket.
       const celda = screen.getByTestId('mov-matriz-celda');
       await usuario.clear(celda);
       await usuario.type(celda, '12');

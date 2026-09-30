@@ -1,3 +1,9 @@
+// ⚠️ Import RELATIVO a propósito, no con el alias `@/`: este archivo lo compila TAMBIÉN
+// `tsconfig.node.json` (lo arrastra `src/ventana-fecha-pt.test.ts`, que lee el `openapi.json` con
+// `node:fs`), y ese proyecto no declara `baseUrl`/`paths` — con el alias, el typecheck del
+// frontend truena con «Cannot find module '@/lib/fecha-negocio'» (medido).
+import { hoy } from '../../lib/fecha-negocio';
+
 /**
  * La VENTANA de fecha de la captura de PT (fila 0.171; el huso, fila 0.174) — el lado de la
  * pantalla.
@@ -11,33 +17,16 @@
  *
  * Los DOS lados tienen que decir el mismo número: si el dominio cambia la ventana, éste se cambia
  * con él (por eso está en un solo sitio y no copiado en cada pantalla).
+ *
+ * 📌 **Fila 0.216 — el día del negocio se mudó a `lib/fecha-negocio.ts`** (y se re-exporta aquí para
+ * no tocar a sus consumidores): lo necesitaba también la nota de salida de avíos, y la zona escrita
+ * dos veces es exactamente el dato repetido que acaba divergiendo.
  */
 
 /** Días hacia atrás que puede fechar quien NO tiene `ipt.fecha-libre` (espejo del backend). */
 export const DIAS_VENTANA_CAPTURA_PT = 7;
 
-/**
- * Huso en el que vive el negocio (FR Moda, Ciudad de México). Espejo de `ZONA_DEL_NEGOCIO` en
- * `backend/src/comun/fecha-negocio.ts`: son dos paquetes sin workspace, no se puede importar.
- *
- * ⚠️ Va ESCRITO, no se toma del navegador. Es el mismo día que usa el servidor para decidir, así
- * que un navegador puesto en otra zona —o un usuario de viaje— vería la misma ventana que aplica
- * la guarda, no una corrida.
- */
-const ZONA_DEL_NEGOCIO = 'America/Mexico_City';
-
-/**
- * Fecha de hoy en YYYY-MM-DD **del negocio** (México), igual que la compara el servidor.
- *
- * ⚠️ No es `toISOString()`. Hasta la fila 0.174 los dos lados miraban el día **UTC**, y entre las
- * 18:00 y las 23:59 de México eso es ya el día siguiente: el selector ofrecía MAÑANA como tope. El
- * servidor lo aceptaba (mismo defecto) hasta que la 0.174 ancló la guarda en el día del negocio;
- * si este espejo se hubiera quedado en UTC, la pantalla seguiría ofreciendo una fecha que ahora el
- * servidor rebota.
- */
-export function hoy(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: ZONA_DEL_NEGOCIO });
-}
+export { hoy };
 
 /** El día más viejo que acepta el servidor sin `ipt.fecha-libre`, en YYYY-MM-DD. */
 export function inicioVentanaCapturaPt(): string {

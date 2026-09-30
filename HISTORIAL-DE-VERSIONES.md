@@ -71,6 +71,63 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.185 · 30-sep-2026 · **en prueba** — **Se desbloquea tu repaso de Inventarios: ya puedes mover producto terminado y la nota de salida deja de ofrecerte avíos que no hay**
+
+> **La v0.185 cierra las dos fichas que te dejaron tirado** en el repaso (0.215 y 0.216). Lo demás que
+> encontraste queda escrito y clasificado, pero **no se construye todavía**.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Mover producto terminado, que era lo que no podías hacer.** El traspaso entre almacenes y los
+  movimientos manuales ya **no te ofrecen tallas que ese modelo no tiene**: el cuadro se arma con lo que de
+  verdad hay en el almacén de origen. Tu frase fue *«me pone todas las tallas yo creo que existen en todos
+  los modelos. Está muy mal. No puedo avanzar»* — y era eso literalmente: las columnas salían del catálogo
+  completo de tallas.
+- ⭐ **Y con eso se destraban otros dos puntos tuyos de un golpe**: leer la película de los movimientos y
+  cancelar uno. Los habías dejado en *«no pude hacer nada por que no pude hacer un movimiento»*: **era un
+  solo defecto tumbando tres puntos**.
+- ✅ **La nota de salida ya no te deja meter avíos que no hay.** Antes te los traía de la orden y te avisaba
+  **al confirmar**; ahora los filtra antes, **y te dice cuáles quedaron fuera** —porque la receta los pide y
+  alguien tiene que comprarlos—. Si eliges uno a mano sin existencia, no entra. Y donde antes veías un hueco
+  en blanco, ahora dice **«Sin existencia en el almacén origen»**: ese hueco hacía que la captura pareciera
+  correcta.
+- ✅ **Una fecha que se adelantaba un día.** Las fechas por default se calculaban con el día universal, así
+  que **de las 6 de la tarde en adelante proponían mañana**. Corregido en la nota de salida.
+
+### Qué cambió y puede sorprender
+
+- 📌 **Tu punto 01 ya estaba resuelto y no lo sabías: probaste la versión 0.177 y ya íbamos en la 0.184.** Lo
+  que pediste el 23 de septiembre —ver en la orden de compra lo que ya llegó y lo que falta— entró en la
+  **0.179**. De aquí en adelante la guía de prueba va a decir contra qué versión se prueba, porque el número
+  se pinta arriba en la pantalla.
+- ⚠️ **En una ENTRADA de producto terminado el catálogo completo de tallas se queda a propósito.** Es el
+  único camino para meter piezas que el sistema todavía no conoce (el conteo inicial), y ahí la talla puede
+  no existir en ningún movimiento. En una SALIDA ya no aparece: no hay nada que sacar que el almacén no
+  tenga.
+- 📌 **Una pregunta chica para ti:** pediste *«por default que dé la fecha de hoy»*. Al medirlo, la fecha de
+  elaboración **ya** nacía en hoy; la que estaba vacía era la de **envío**, y ésa es la que se arregló.
+  **Confírmame que era ésa.**
+
+### Qué sigue pendiente o roto
+
+- 📋 **Tu repaso dejó diez fichas** (0.215 a 0.224). Dos están hechas —las de arriba—; **cinco entran antes
+  de arrancar** (quitar el importe y el precio de la entrada de tela, que el recibo de maquila no pida un
+  precio que ya está en la salida, ver la existencia por talla al entregar, el preliminar para escoger qué
+  avíos se mandan, y los movimientos por avío agrupados por proveedor) y **cuatro las dejaste tú para la
+  fase siguiente**.
+- 📋 **Y tu regla de las órdenes cerradas dejó seis más** (0.225 a 0.230), con tus cinco decisiones escritas.
+  **No se construye nada de eso todavía**: primero termina de probar Inventarios.
+- 🔴 **De esas seis, una bloquea el arranque y conviene que la sepas: hoy «cerrada» no bloquea de verdad.**
+  Se puede sacar tela, comprar material, auditar y mover producto terminado contra una orden cerrada, porque
+  la protección existe pero **no está puesta en ocho módulos**. Y en pantalla el formulario se abre completo:
+  el rechazo llega al pulsar Guardar.
+- 🐛 **Un defecto encontrado de paso, sin relación con nada de esto:** si alguien **agrega un renglón a una
+  orden de compra ya recibida del todo**, ese material **no se puede recibir nunca más** — queda comprado y
+  sin puerta de entrada, y el sistema lo cuenta como cubierto. Para clasificarlo necesito saber de ti si eso
+  pasa en la práctica.
+- ⏳ **Y dos cosas tuyas siguen esperando para que entren personas a probar:** cambiar la contraseña de
+  `admin`, que sigue siendo la del arranque, y correr el sembrador de datos de Inventarios contra `prueba`.
+
 ## 0.184 · 26-sep-2026 · **en prueba** — **Tu respuesta acota una pendiente… y midiéndola aparece el caso de verdad: el importador parte la tanda él solo**
 
 > **La v0.184 no cierra ninguna fila del programa**: escribe una **respuesta tuya** donde se lee, y corrige

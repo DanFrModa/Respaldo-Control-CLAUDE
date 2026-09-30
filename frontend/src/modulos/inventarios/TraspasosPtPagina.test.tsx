@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApiInventarios from '@/api/inventarios';
 import type { Modelo } from '@/api/modelos';
-import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { hoy } from './fecha-captura-pt';
 import { TOPE_EXISTENCIAS_PT } from './tope-existencias';
@@ -30,7 +30,41 @@ vi.mock('@/api/inventarios', async (importarOriginal) => {
   };
 });
 
-/** Sin existencias (el caso base de los tests viejos). */
+/**
+ * Un renglón de existencia tal como lo devuelve el servidor. ⭐ Fila 0.215 — trae el NOMBRE del
+ * color y la ETIQUETA/orden de la talla porque de estos renglones se arma el cuadro de captura: son
+ * sus filas y sus columnas, ya no las pone el catálogo.
+ */
+function filaPt(
+  p: Partial<{
+    idColor: number;
+    color: string;
+    colorActivo: boolean;
+    idTalla: number;
+    etiquetaTalla: string;
+    ordenTalla: number;
+    idAlmacen: number;
+    idOrden: number | null;
+    folioOrden: number | null;
+    existencia: number;
+  }> = {},
+) {
+  return {
+    idColor: 7,
+    color: 'Rojo',
+    colorActivo: true,
+    idTalla: 11,
+    etiquetaTalla: 'CH',
+    ordenTalla: 1,
+    idAlmacen: 3,
+    idOrden: null,
+    folioOrden: null,
+    existencia: 4,
+    ...p,
+  };
+}
+
+/** Sin existencias: el cuadro sale VACÍO y la pantalla tiene que decir por qué (fila 0.215). */
 const EXISTENCIAS_VACIAS = {
   data: { filas: [], totalExistencia: 0 },
   refetch: vi.fn(),
@@ -41,10 +75,7 @@ const EXISTENCIAS_VACIAS = {
 /** En el origen (almacén 3): 15 pzas de la orden 55 (folio 9001) y 4 «sin orden». */
 const EXISTENCIAS_CON_ORDEN = {
   data: {
-    filas: [
-      { idColor: 7, idTalla: 11, idAlmacen: 3, idOrden: 55, folioOrden: 9001, existencia: 15 },
-      { idColor: 7, idTalla: 11, idAlmacen: 3, idOrden: null, folioOrden: null, existencia: 4 },
-    ],
+    filas: [filaPt({ idOrden: 55, folioOrden: 9001, existencia: 15 }), filaPt()],
     totalExistencia: 19,
   },
   refetch: vi.fn(),
@@ -65,8 +96,22 @@ vi.mock('@/api/almacenes', () => ({
 vi.mock('@/api/colores', () => ({
   useColores: () => ({ data: { datos: [{ id: 7, nombre: 'Rojo' }] } }),
 }));
+/**
+ * ⭐ Fila 0.215 — el catálogo GLOBAL de tallas trae una talla ('G') que NUNCA tiene existencia en el
+ * origen. Es el cebo: si esta pantalla volviera a alimentar el «Agregar talla» del catálogo —lo que
+ * Daniel describió como *«me pone todas las tallas yo creo que existen en todos los modelos»*— la
+ * 'G' aparecería, y hay una prueba que lo vigila. La pantalla ya no llama `useTallas`; el mock se
+ * queda para que esa vuelta atrás se note.
+ */
 vi.mock('@/api/tallas', () => ({
-  useTallas: () => ({ data: { datos: [{ id: 11, etiqueta: 'CH', orden: 1 }] } }),
+  useTallas: () => ({
+    data: {
+      datos: [
+        { id: 11, etiqueta: 'CH', orden: 1 },
+        { id: 13, etiqueta: 'G', orden: 3 },
+      ],
+    },
+  }),
 }));
 
 const modelo: Modelo = {
@@ -107,7 +152,9 @@ describe('TraspasosPtPagina (F3-E3)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
     useExistenciasPtMock.mockReset();
-    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_VACIAS);
+    // ⭐ Fila 0.215 — el default trae existencias: el cuadro se ARMA con ellas, así que sin
+    // renglones no habría ni fila ni columna en la que capturar (y eso lo mide su propia prueba).
+    useExistenciasPtMock.mockReturnValue(EXISTENCIAS_CON_ORDEN);
   });
 
   it('avisa y NO permite guardar si origen = destino', async () => {
@@ -130,16 +177,19 @@ describe('TraspasosPtPagina (F3-E3)', () => {
    * salida. 🔑 Y hace falta decirlo: **quitar ese `excluirIds` no rompía NINGUNA prueba** —medido—
    * hasta que existió ésta.
    */
-  it('el color YA capturado desaparece del buscador (no se puede repetir la fila)', async () => {
+  it('el color que YA es fila desaparece del buscador (no se puede repetir la fila)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
     await elegirModelo(usuario);
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
+    // ⭐ Fila 0.215 — "Rojo" ya es fila: lo puso el CUADRO al armarse con las existencias del
+    // origen, no el buscador. La exclusión tiene que valer igual (el servidor rechaza el color
+    // repetido), y si dependiera de haberlo agregado a mano, aquí se colaría.
+    expect(screen.getByTestId('traspaso-matriz-fila')).toHaveTextContent('Rojo');
 
-    // La lista se vuelve a abrir contra el MISMO catálogo del servidor (el mock siempre trae
-    // "Rojo"): si el color capturado siguiera ofreciéndose, aquí habría una opción.
+    // La lista se abre contra el MISMO catálogo del servidor (el mock siempre trae "Rojo"): si el
+    // color que ya es fila siguiera ofreciéndose, aquí habría una opción.
     const input = screen.getByTestId('traspaso-matriz-agregar-color-busqueda');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'Rojo' } });
@@ -153,11 +203,11 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
+    // ⭐ Fila 0.215 — NO se agrega nada a mano: la celda ya está ahí porque el cuadro se armó con
+    // la existencia del origen. Esto es *«el cuadro igual al de la entrega»* que Daniel pidió.
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
-    await usuario.type(celda, '5');
+    await usuario.type(celda, '3');
     await ponerMotivo(usuario);
 
     const guardar = screen.getByTestId('traspaso-guardar');
@@ -183,8 +233,6 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
 
     await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
-    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '5');
@@ -203,22 +251,11 @@ describe('TraspasosPtPagina (F3-E3)', () => {
    * los activos —y así sigue, para no invitar a capturar sobre colores muertos—; lo que se abre es
    * la puerta de lo que el SERVIDOR devuelve con existencia aquí, y va rotulado.
    */
-  it('ofrece el color RETIRADO con existencia en el ORIGEN, rotulado (fila 0.164)', async () => {
+  it('el color RETIRADO con existencia en el ORIGEN es fila del cuadro, rotulado (fila 0.164)', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue({
       data: {
-        filas: [
-          {
-            idColor: 9,
-            color: 'Blanco Hueso',
-            colorActivo: false,
-            idTalla: 11,
-            idAlmacen: 3,
-            idOrden: null,
-            folioOrden: null,
-            existencia: 12,
-          },
-        ],
+        filas: [filaPt({ idColor: 9, color: 'Blanco Hueso', colorActivo: false, existencia: 12 })],
         totalExistencia: 12,
       },
       refetch: vi.fn(),
@@ -230,21 +267,17 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
 
-    await usuario.click(screen.getByTestId('traspaso-matriz-agregar-color-busqueda'));
-    const textos = (await screen.findAllByTestId('traspaso-matriz-agregar-color-opcion')).map(
-      (o) => o.textContent ?? '',
-    );
-    expect(textos).toContain('Blanco Hueso (retirado)');
-    expect(textos).toContain('Rojo'); // el catálogo vivo sigue ahí, y sin marca
+    // ⭐ Fila 0.215 — ya no hay que ir a buscarlo al desplegable: si tiene piezas aquí, ES fila del
+    // cuadro. Y sigue ROTULADO, para que nadie lo confunda con uno del catálogo vivo (fila 0.164).
+    expect(screen.getByTestId('traspaso-matriz-fila')).toHaveTextContent('Blanco Hueso (retirado)');
 
-    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Blanco', 'Blanco Hueso (retirado)');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
     await usuario.type(celda, '12');
     await ponerMotivo(usuario);
     await usuario.click(screen.getByTestId('traspaso-guardar'));
 
+    // Lo que viaja es el `idColor`: el rótulo sólo se pinta.
     const [cuerpo] = crearMutate.mock.calls[0] as [{ lineas: { idColor: number }[] }];
     expect(cuerpo.lineas[0]?.idColor).toBe(9);
   });
@@ -257,15 +290,22 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-    await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
-    await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
     const celda = screen.getByTestId('traspaso-matriz-celda');
     await usuario.clear(celda);
     // 6 pzas: caben en la orden 55 (15) pero NO en el bucket «sin orden» (4), que es el default.
     await usuario.type(celda, '6');
     expect(screen.getByTestId('traspaso-aviso-excede')).toBeInTheDocument();
 
+    // ⚠️ Cambiar de bucket REARMA el cuadro (fila 0.215) y con él se va lo capturado: es otro
+    // inventario, y arrastrar el número sería capturarlo contra un saldo que no es el suyo. Por eso
+    // aquí se vuelve a teclear: sin esto, la aserción de abajo pasaría porque la celda quedó VACÍA
+    // —no porque 6 sí quepan en la orden 55—, y sería un verde que no mide nada.
     await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
+    const celdaOrden = screen.getByTestId('traspaso-matriz-celda');
+    // La celda del bucket nuevo llega VACÍA (un `<input type=number>` sin valor da `null`).
+    expect(celdaOrden).toHaveValue(null);
+    await usuario.clear(celdaOrden);
+    await usuario.type(celdaOrden, '6');
     expect(screen.queryByTestId('traspaso-aviso-excede')).not.toBeInTheDocument();
   });
 
@@ -331,11 +371,10 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       await elegirModelo(usuario);
       await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
       await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
-      await elegirEnCombobox('traspaso-matriz-agregar-color', 'Rojo');
-      await usuario.selectOptions(screen.getByTestId('traspaso-matriz-agregar-talla'), '11');
+      // Fila 0.215 — la celda viene del cuadro ya armado con la existencia del origen.
       const celda = screen.getByTestId('traspaso-matriz-celda');
       await usuario.clear(celda);
-      await usuario.type(celda, '5');
+      await usuario.type(celda, '3');
     }
 
     it('SIN motivo no deja guardar, aunque todo lo demás esté capturado', async () => {
@@ -417,6 +456,122 @@ describe('TraspasosPtPagina (F3-E3)', () => {
         'noopener',
       );
       abrir.mockRestore();
+    });
+  });
+
+  /**
+   * ⭐⭐ FILA 0.215 — «TIENE QUE HABER UN CUADRO IGUAL AL DE LA ENTREGA» (Daniel, §Post-F9.243 p.11).
+   *
+   * Lo que él encontró: *«No lo hay, pide que escoja una talla y un color. No tiene sentido, me está
+   * poniendo cosas que no existen. Me pone todas las tallas yo creo que existen en todos los
+   * modelos. Está muy mal. **No puedo avanzar**»*. Y como no pudo mover nada, se le cayeron también
+   * el kardex y la cancelación: un defecto tumbó tres puntos de su repaso.
+   */
+  describe('el cuadro se arma con lo que HAY en el origen (fila 0.215)', () => {
+    it('⭐ trae la fila del color y la columna de la talla que tienen piezas, sin tocar nada', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.getByTestId('traspaso-matriz-fila')).toHaveTextContent('Rojo');
+      const columnas = [
+        ...screen.getByTestId('traspaso-matriz-tabla').querySelectorAll('thead th'),
+      ];
+      expect(columnas.map((c) => (c.textContent ?? '').trim())).toEqual([
+        'Color',
+        'CH',
+        'Total',
+        '',
+      ]);
+      // Y hay celda en la que capturar desde el primer momento (era justo lo que faltaba).
+      expect(screen.getByTestId('traspaso-matriz-celda')).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴 EL GUARDIÁN DEL CATÁLOGO. El mock de `@/api/tallas` trae una talla 'G' que NUNCA tiene
+     * existencia en el origen. Si el «Agregar talla» volviera a alimentarse del catálogo —la línea
+     * que Daniel describió como *«todas las tallas que yo creo que existen en todos los modelos»*—
+     * la 'G' aparecería aquí. MEDIDO: con `tallasDisponibles={tallasColumnas(tallasCat...)}` esta
+     * prueba falla (ofrece 'G' y el desplegable deja de estar deshabilitado).
+     */
+    it('⭐ el «Agregar talla» NO ofrece el catálogo global: sólo las tallas del cuadro', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      const agregarTalla = screen.getByTestId('traspaso-matriz-agregar-talla');
+      const opciones = [...agregarTalla.querySelectorAll('option')].map((o) =>
+        (o.textContent ?? '').trim(),
+      );
+      // 'CH' ya es columna (no se re-ofrece) y 'G' no existe en el origen ⇒ no hay nada que agregar.
+      expect(opciones).toEqual(['Agregar talla…']);
+      expect(agregarTalla).toBeDisabled();
+    });
+
+    it('⭐ el cuadro es el del BUCKET elegido: cambiar de orden lo rearma', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: {
+          filas: [
+            filaPt(),
+            filaPt({
+              idOrden: 55,
+              folioOrden: 9001,
+              idColor: 8,
+              color: 'Marino',
+              idTalla: 13,
+              etiquetaTalla: 'G',
+              ordenTalla: 3,
+              existencia: 15,
+            }),
+          ],
+          totalExistencia: 19,
+        },
+        refetch: vi.fn(),
+        isPending: false,
+        isError: false,
+      });
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      // Bucket «sin orden» (el default): Rojo × CH.
+      expect(screen.getByTestId('traspaso-matriz-fila')).toHaveTextContent('Rojo');
+      expect(screen.getByTestId('traspaso-matriz-tabla')).toHaveTextContent('CH');
+
+      await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
+      // Bucket de la orden 55: Marino × G. Y NADA del otro bucket (ni Rojo ni CH).
+      const fila = screen.getByTestId('traspaso-matriz-fila');
+      expect(fila).toHaveTextContent('Marino');
+      expect(fila).not.toHaveTextContent('Rojo');
+      const columnas = [...screen.getByTestId('traspaso-matriz-tabla').querySelectorAll('thead th')]
+        .map((c) => (c.textContent ?? '').trim())
+        .filter((t) => t !== '');
+      expect(columnas).toEqual(['Color', 'G', 'Total']);
+    });
+
+    it('⭐ sin piezas en el bucket dice POR QUÉ el cuadro está vacío (no manda a buscar al catálogo)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue(EXISTENCIAS_VACIAS);
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.getByTestId('traspaso-sin-piezas')).toHaveTextContent(
+        'En este almacén no hay piezas de este modelo sin orden.',
+      );
+      expect(screen.queryByTestId('traspaso-matriz-celda')).not.toBeInTheDocument();
+    });
+
+    it('y con piezas ese aviso NO sale (tiene que significar algo)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.queryByTestId('traspaso-sin-piezas')).not.toBeInTheDocument();
     });
   });
 

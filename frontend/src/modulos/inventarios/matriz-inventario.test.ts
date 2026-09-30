@@ -9,9 +9,11 @@ import type { MatrizLinea } from '@/componentes/matriz-color-talla/MatrizColorTa
 import {
   aLineasApi,
   coloresRetiradosConExistencia,
+  ejesDeExistencias,
   ordenesConExistencia,
   SUFIJO_COLOR_RETIRADO,
   totalMatriz,
+  type FilaParaEjes,
 } from './matriz-inventario';
 
 const matriz: MatrizLinea[] = [
@@ -140,5 +142,138 @@ describe('coloresRetiradosConExistencia (filas 0.164 / 0.192)', () => {
     expect(
       coloresRetiradosConExistencia([{ idColor: 7, color: 'Rojo', colorActivo: true }]),
     ).toEqual([]);
+  });
+});
+
+/**
+ * ⭐⭐ FILA 0.215 — LOS EJES DEL CUADRO SALEN DE LO QUE HAY, NO DEL CATÁLOGO.
+ *
+ * Nace del repaso de Daniel (§Post-F9.243, punto 11): *«pide que escoja una talla y un color… me
+ * está poniendo cosas que no existen. Me pone todas las tallas yo creo que existen en todos los
+ * modelos… No puedo avanzar»*.
+ */
+describe('ejesDeExistencias (fila 0.215)', () => {
+  /** Un renglón de existencia, con lo justo que el cuadro necesita. */
+  function fila(p: Partial<FilaParaEjes> = {}): FilaParaEjes {
+    return {
+      idColor: 7,
+      color: 'Rojo',
+      colorActivo: true,
+      idTalla: 11,
+      etiquetaTalla: 'CH',
+      ordenTalla: 1,
+      idOrden: null,
+      ...p,
+    };
+  }
+
+  it('sin renglones no arma nada (no inventa columnas del catálogo)', () => {
+    const ejes = ejesDeExistencias([], null);
+    expect(ejes.tallas).toEqual([]);
+    expect(ejes.lineas).toEqual([]);
+  });
+
+  it('arma una columna por talla y una fila por color, SIN repetir', () => {
+    const ejes = ejesDeExistencias(
+      [
+        fila(),
+        // el mismo color×talla en otro almacén: es el mismo eje, no dos
+        fila(),
+        fila({ idTalla: 12, etiquetaTalla: 'M', ordenTalla: 2 }),
+        fila({ idColor: 8, color: 'Marino' }),
+      ],
+      null,
+    );
+    expect(ejes.tallas).toEqual([
+      { idTalla: 11, etiqueta: 'CH' },
+      { idTalla: 12, etiqueta: 'M' },
+    ]);
+    expect(ejes.lineas).toEqual([
+      { idColor: 8, color: 'Marino', cantidades: {} },
+      { idColor: 7, color: 'Rojo', cantidades: {} },
+    ]);
+  });
+
+  it('las columnas van en el orden del CATÁLOGO de tallas (CH, M, G), no en el que llegaron', () => {
+    const ejes = ejesDeExistencias(
+      [
+        fila({ idTalla: 13, etiquetaTalla: 'G', ordenTalla: 3 }),
+        fila({ idTalla: 11, etiquetaTalla: 'CH', ordenTalla: 1 }),
+        fila({ idTalla: 12, etiquetaTalla: 'M', ordenTalla: 2 }),
+      ],
+      null,
+    );
+    expect(ejes.tallas.map((t) => t.etiqueta)).toEqual(['CH', 'M', 'G']);
+  });
+
+  /**
+   * 🔴 EL GUARDIÁN DEL FILTRO POR BUCKET. Si se le quitara el `if (f.idOrden !== idOrden) continue`,
+   * el cuadro del bucket «sin orden» traería la talla G y el color Marino de la orden 55 — o sea
+   * volvería a ofrecer «cosas que no existen», ahora disfrazadas de reales. MEDIDO: sin esa línea,
+   * este `toEqual` falla con 2 tallas y 2 colores.
+   */
+  it('⭐ SOLO el bucket pedido: los renglones de otra orden no son ejes de éste', () => {
+    const filas = [
+      fila({ idOrden: null }),
+      fila({
+        idOrden: 55,
+        idColor: 8,
+        color: 'Marino',
+        idTalla: 13,
+        etiquetaTalla: 'G',
+        ordenTalla: 3,
+      }),
+    ];
+    expect(ejesDeExistencias(filas, null)).toMatchObject({
+      tallas: [{ idTalla: 11, etiqueta: 'CH' }],
+      lineas: [{ idColor: 7, color: 'Rojo', cantidades: {} }],
+    });
+    // Y su gemela: pedir la orden 55 trae SUS ejes, no los del bucket «sin orden».
+    expect(ejesDeExistencias(filas, 55)).toMatchObject({
+      tallas: [{ idTalla: 13, etiqueta: 'G' }],
+      lineas: [{ idColor: 8, color: 'Marino', cantidades: {} }],
+    });
+  });
+
+  /**
+   * ⭐⭐ LA FIRMA — y esto NO es un detalle interno. Las dos pantallas deciden con ella si REARMAN el
+   * cuadro. Si comparasen la identidad del objeto, una respuesta nueva con el mismo contenido
+   * rearmaría en cada render y el efecto no pararía nunca: pasó, y la suite de Movimientos se quedó
+   * **diez minutos sin imprimir una línea**.
+   */
+  describe('la firma de los ejes', () => {
+    it('no cambia si el contenido es el mismo (aunque los renglones lleguen en otro objeto)', () => {
+      expect(ejesDeExistencias([fila()], null).firma).toBe(ejesDeExistencias([fila()], null).firma);
+    });
+
+    it('cambia si cambia una talla o un color', () => {
+      const base = ejesDeExistencias([fila()], null).firma;
+      expect(ejesDeExistencias([fila({ idTalla: 12, etiquetaTalla: 'M' })], null).firma).not.toBe(
+        base,
+      );
+      expect(ejesDeExistencias([fila({ idColor: 8, color: 'Marino' })], null).firma).not.toBe(base);
+    });
+
+    /**
+     * 🔑 Y lleva el BUCKET dentro. Dos órdenes con los mismos colores y las mismas tallas NO son el
+     * mismo cuadro: su saldo es otro. Sin esto, cambiar de orden dejaría pegado lo capturado y se
+     * validaría contra un disponible que no le corresponde.
+     */
+    it('⭐ cambia al cambiar de BUCKET, aunque los ejes sean idénticos', () => {
+      expect(ejesDeExistencias([fila({ idOrden: 55 })], 55).firma).not.toBe(
+        ejesDeExistencias([fila({ idOrden: null })], null).firma,
+      );
+    });
+  });
+
+  /**
+   * Fila 0.164 — el color retirado conserva sus piezas (§Post-F9.222), así que sí es fila del
+   * cuadro; pero va ROTULADO, o se leería como uno más del catálogo vivo.
+   */
+  it('el color RETIRADO es fila del cuadro, y va rotulado', () => {
+    expect(
+      ejesDeExistencias([fila({ idColor: 9, color: 'Blanco Hueso', colorActivo: false })], null)
+        .lineas,
+    ).toEqual([{ idColor: 9, color: `Blanco Hueso${SUFIJO_COLOR_RETIRADO}`, cantidades: {} }]);
   });
 });
