@@ -16875,3 +16875,133 @@ privada en Railway):
    (`npx tsx --env-file=.env migracion/sembrar-demo-inventarios.ts`, idempotente, con `--simular` y
    `--limpiar`). Sin eso entran y no tienen material, proveedores, compras ni facturas — que es justo lo que
    frenó a Daniel la primera vez.
+
+#### (Post-F9.244) — SOLO LAS ÓRDENES ABIERTAS APARECEN DONDE SE CAPTURA (30-sep-2026, decisión de Daniel + peinado del sistema)
+
+**Daniel dictó una regla que toca todo el sistema.** Textual, en dos mensajes:
+
+> *«Toda la información que haya que llenar de producción (entradas, salidas, ruta crítica, WIP, compras
+> de avíos, recibos de avíos, recibo de maquilas, etc.) debería estar visible **solamente para órdenes que
+> aún no estén entregadas**. […] Lo que sí debe poderse ver es la parte de **consulta**. […] Una vez que se
+> cierra la orden, ya no debería permitir movimientos… a menos que pueda «abrirla». **Solamente yo la puedo
+> abrir.** […] En la pantalla para recibir Órdenes de Compra, solo deberían estar visibles las que tienen
+> pendientes por recibir.»*
+>
+> *«**No quisiera que las órdenes sean invisibles.** Deberán poderse consultar todo lo que ha pasado en esa
+> orden aunque esté cerrada. Pero todas las pantallas donde sean de meter información, ya no deberían
+> aparecer esas órdenes.»*
+
+Se peinó el sistema entero en tres frentes (producción+selectores, compras+inventarios, RC+calidad+costos+
+finanzas). **Lo medido cambió la forma de la regla en cuatro puntos**, y Daniel resolvió las cinco preguntas
+que salieron de ahí.
+
+### 🔴 Lo primero que la medición desmintió: «ENTREGADA» NO EXISTE COMO DATO
+
+- No hay estado ni columna: el enum es `capturada|completa|cancelada|cerrada`
+  (`contrato/esquemas/orden.ts:369`), lo entregado se **deriva** sumando entregas vivas —*«NUNCA se escribe
+  a una columna `entregado`»*, `produccion/entregas-cliente.ts:20-21`— y `Orden.fechaEntrega` es la
+  **comprometida**, no la real (`orden.ts:515`).
+- Y el 100 % entregado **es inalcanzable a propósito** para una clase entera de órdenes:
+  `cierre-orden.ts:13-17` — *«como los FALTANTES se le cobran al maquilero y las INCOMPLETAS salen como
+  merma, esas piezas **no vuelven nunca** ⇒ una orden que perdió piezas jamás llega al 100 % entregado»*.
+
+⚠️ **El lead le había propuesto a Daniel un diseño «en dos capas» con «entregada del todo» como disparador
+automático, y se retiró al medirlo:** si nunca llega al 100 %, nunca sale de la lista. ⇒ **el disparador es
+`cerrada`**, el acto explícito que la fila 0.061 construyó **por esta misma razón**.
+
+### ✅ LAS CINCO DECISIONES DE DANIEL
+
+1. **¿Quién cierra y cuándo?** ⇒ **«Ok»** a la recomendación del lead: **quien entrega**, como último paso
+   del flujo, **y el sistema se lo sugiere** cuando ve que ya no queda nada por mover. Daniel conserva el
+   reabrir.
+2. **FINANZAS QUEDA FUERA.** Textual: *«tienes razón que en finanzas sigue viva. Ahí no aplica esto.»*
+   🔑 Lo que lo motivó, medido: **el dinero del maquilero NO se fija en el recibo, se fija al VALIDAR el
+   cargo** (`esma/cargos.ts:218-260`, que lee el cargo y `maquilero.modalidadFacturacion` y **nunca carga la
+   orden**). Y el matiz que salvó la conversación: **la cola de cobranza se entra por MAQUILERO, no por
+   orden** ⇒ la primera mitad de la regla no cierra esa puerta; la que la cerraría es la segunda, y ahí *el
+   maquilero se queda sin cobrar y su cobranza acabaría pasando por Daniel*.
+3. **MRP/EXPLOSIÓN Y LA RC ATRASADA TAMBIÉN QUEDAN FUERA** ⇒ **«sí»**.
+   - **MRP:** netea contra las OC históricas para no pedir dos veces; su criterio escrito es **el inverso**
+     de la regla —*«esconderla dejaría al comprador preguntándose por qué el pedido "tiene menos OP de las
+     que tiene"»*— ⇒ **marca, no esconde**.
+   - **RC:** que se captura tarde **está medido, no supuesto**: el umbral de 2 días viene literal del VBA de
+     Access, el acceso viejo #10 se llamaba *«se puede meter las fechas con mas de dos dias de retrazo»*, y
+     la llave que lo abre sin límite (`rc.fecha-libre-cumplimiento`) está sembrada en **8 de los 9 perfiles**
+     (`seed.ts:416,529,626,712,798,891`). Sacar las entregadas de la bandeja dejaría procesos con
+     `fechaReal = null` para siempre, y ésa es la base del KPI de puntualidad (D11).
+4. **REABRIR ES SUYO.** Textual: *«solo yo (o el que yo autorice… debería de ser un permiso que de entrada
+   solo yo tengo activo)»* ⇒ permiso con nombre propio en el conjunto **`SOLO_ADMINISTRADOR`**
+   (`seed.ts:174`), que es donde cada llave lleva **su razón escrita** y donde ya vive la salida de material
+   que él definió como *«siempre autorizada sólo por mí. Nadie más»*.
+   ⚠️ **Trampa avisada:** ese conjunto se reparte a los **dos** perfiles de acceso total (`Administrador` y
+   `AdministracionDireccion`, `seed.ts:310`) ⇒ «solo yo» se cumple **sólo si nadie más tiene esos dos
+   roles**, y eso vive en la base de `prueba`. Queda como comprobación suya en *Administración › Usuarios*.
+   📌 Y el cambio de reparto que se dice en voz alta: **`Directivo` conserva cerrar y PIERDE reabrir**
+   (`ordenes.cerrar` está hoy en `seed.ts:388`, dentro de `DIRECTIVO`).
+5. **LA SOBRE-RECEPCIÓN TARDÍA NO ES CASO NORMAL.** Textual: *«normalmente llega al mismo tiempo que lo
+   demás. Una vez que se cierra es por que ya se recibió todo.»* ⇒ no hace falta una puerta sin firma para
+   el 5 % que llega tarde.
+
+### ⭐ Y de la respuesta (5) salió una SIMPLIFICACIÓN que nadie había visto
+
+*«Una vez que se cierra es porque ya se recibió todo»* **describe algo que ya existe**: el estatus
+**`recibida_total`**, que el sistema pone solo cuando todos los renglones están surtidos
+(`recalcularEstatusOC`, `compras/recepciones.ts:563`, `:484-511`). ⇒ **para las OC NO hay que estrenar un
+cierre**: ya lo tienen, y es derivado. Falta sólo **la llave para reabrirla** y arreglar el defecto vivo de
+abajo. Eso baja la etapa de compras de «estrenar estado + columna + permiso + rutas + reapertura» a **dos
+piezas chicas**.
+⚠️ **Lo que sigue abierto ahí:** la **devolución ligada a la OC no existe** — la que hay es un movimiento de
+kardex suelto, con la llave de Daniel, *«sin liga a la OC ni a la recepción, sin revertir lo recibido y sin
+efecto en CxP»*, y a quién se le devolvió **viaja en el motivo, no en una FK**
+(`inventarios/salida-sin-orden.ts:12-18`). ⇒ **la llave abriría un cuarto que hay que amueblar después.**
+
+### 🔴 LO QUE LA MEDICIÓN ENCONTRÓ Y HAY QUE ARREGLAR ANTES DE APRETAR NADA
+
+**«Cerrada» es hoy una promesa a medias.** La guarda existe y es una sola —`exigirOrdenAbierta`
+(`cierre-orden.ts:102`)— pero **se aplica A MANO, puerta por puerta**: 20 llamadas en 9 archivos, y **ocho
+módulos no la llaman** (calidad, ruta crítica, inventarios, compras, notas, EsMa, EDR). Hoy se puede sacar
+tela, comprar material, auditar y mover PT contra una orden cerrada sin que nada proteste.
+
+**Y dos módulos ESCRIBEN la fila de la orden cerrada** (verificado: los dos archivos tienen **cero**
+referencias a la guarda o a `cerradaEn`):
+- `Orden.pagada` ← pagos de EsMa (`esma/orden-pagada.ts:91`)
+- `Orden.rcActiva` ← auto-avance de RC (`ruta-critica/autoAvance.ts:381,428`)
+
+✅ **Y las decisiones (2) y (3) de Daniel los resuelven sin trabajo: como Finanzas y RC quedan FUERA de la
+regla, esas dos escrituras NO son defectos — son excepciones legítimas**, y quedan documentadas como tales.
+*(Lectura del lead a partir de sus dos respuestas, planteada así para que él la corrigiera; no la dijo con
+esas palabras.)*
+
+**En pantalla el bloqueo es casi invisible:** sólo **dos** vistas del sistema condicionan algo por el cierre
+—`costos/CosteoOrdenPagina.tsx:167,187` (bloquea) y `ordenes/DialogoOrden.tsx:228-230`—; el resto abre el
+formulario habilitado y el rechazo llega al pulsar Guardar.
+
+### ⚠️ EL PRECEDENTE QUE OBLIGA A PONERLE AVISO AL FILTRO
+
+**Filtrar el selector de órdenes por estado ya rompió la operación una vez** (26-jul-2026), y está escrito
+en el propio componente (`produccion/SelectorOrden.tsx:27-35`): filtraba por `estado:'completa'` y las
+órdenes migradas de Access sin receta *«dejaban de aparecer y NO se podía cortar, enviar, recibir ni
+entregar, sin más explicación que un "no hay órdenes que coincidan"»*. La conclusión que quedó: **el estado
+es informativo, NUNCA una llave para operar.**
+⇒ El filtro nuevo lleva **interruptor para ver las cerradas** y **aviso de por qué no aparece una orden**,
+que es justo lo que faltó esa vez.
+
+### 📋 EL PLAN, POR ETAPAS — y NO entra antes de que Daniel termine de probar Inventarios
+
+1. **Tapar el agujero de «cerrada» donde ya debería valer**: la guarda en los módulos que mueven inventario,
+   y que la pantalla **deshabilite** en vez de dejar llegar el error al Guardar. Es lo que más vale y no
+   cambia ningún flujo.
+2. **El filtro por defecto en las listas de captura**, con su interruptor y su aviso.
+3. **Partir `ordenes.cerrar`**: nace `ordenes.reabrir` en `SOLO_ADMINISTRADOR`. Código chico (2 rutas, 1
+   dominio, 1 catálogo, 1 seed, **y el espejo del frontend `DialogoOrden.tsx:154`, que es el que a la fila
+   0.120 se le olvidó en su encargo**); el cambio caro es el **reparto**.
+4. **Las OC**: la llave de reapertura sobre `recibida_total`, y el defecto vivo.
+
+### 🐛 DEFECTO VIVO ENCONTRADO DE PASO, INDEPENDIENTE DE ESTA DECISIÓN
+
+**Editar al alza una OC ya `recibida_total` deja el renglón nuevo inalcanzable para siempre.** Verificado:
+los **cuatro** llamadores de `recalcularEstatusOC` están todos en `compras/recepciones.ts`
+(`:825,1268,1351,1491`) y **`actualizarOC` no lo llama** ⇒ el estatus se queda en `recibida_total`, la OC no
+aparece en `ocsRecibibles` —cuyo `where` filtra estatus **antes** que el número de OC
+(`recepciones.ts:1944-1950`)— y `recibirCompra` la rechaza. **El material queda comprado y sin puerta de
+entrada.** Ficha propia.
