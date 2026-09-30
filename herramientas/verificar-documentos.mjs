@@ -274,21 +274,55 @@ if (lineaResumen === '') {
       }
     }
   }
-  // La cadena «⇒ N fichas nuevas …»: su ÚLTIMO eslabón es el vigente y tiene que cuadrar con
-  // «De las N, …» que viene justo después.
+  // La cadena «⇒ N fichas nuevas …»: su ÚLTIMO eslabón es el vigente, y se cruza DOS veces —contra
+  // «De las N, …» y contra el TABLERO—, porque una sola de las dos no basta.
+  //
+  // ⚠️ CICATRIZ: la primera versión de este bloque sólo cruzaba la cadena CONTRA SÍ MISMA (el
+  // último eslabón contra «De las N»), y su comentario afirmaba cazar «24 cuando eran 25». NO lo
+  // cazaba: en el defecto real las DOS cifras estaban rancias y DE ACUERDO entre ellas (la cadena
+  // decía 24 y el texto «De las 24»), así que pasaba en verde e imprimía «vigente 24» con 25 filas
+  // en el tablero. Lo destapó el reviewer de la v0.186 con la mutación que faltaba, y es la
+  // cicatriz de `CLAUDE.md` §8 al pie de la letra: las tres mutaciones del lead rompían la
+  // coherencia interna, y NINGUNA probó el caso en que la prosa concuerda consigo misma y no con la
+  // realidad — que es justo el que ocurrió. *Dos cifras equivocadas que se dan la razón pasan
+  // cualquier comprobación que sólo las compare entre ellas.*
   const eslabones = [
     ...lineaResumen.matchAll(
       /\*{0,2}(\d+) fichas(?: nuevas)?(?: en total)?(?: el \d+-\w+)?\*{0,2}/g,
     ),
   ].map((m) => +m[1]);
   const deLasN = [...lineaResumen.matchAll(/De las (\d+),/g)].map((m) => +m[1]);
-  if (eslabones.length > 0 && deLasN.length > 0) {
-    const ultimo = Math.max(...eslabones);
+  const ultimo = eslabones.length > 0 ? Math.max(...eslabones) : null;
+  if (ultimo !== null) {
     for (const n of deLasN) {
       if (n !== ultimo) {
         problemas.push(
           `La cola narrativa dice «De las ${n},» y el último eslabón de la cadena de fichas nuevas es ${ultimo}. ` +
             'Los dos cuentan lo mismo y tienen que coincidir.',
+        );
+      }
+    }
+    // El ancla contra la REALIDAD: el propio párrafo nombra la fila con la que arranca la tanda
+    // —«(0.215-0.224)»—, y el tablero ya está parseado, así que el total es derivable.
+    //
+    // ⚠️ LÍMITE CONOCIDO, dicho en vez de presumido: toma el PRIMER rango «(0.NNN-0.NNN)» de la
+    // línea. Hoy ése es el arranque de la tanda porque la narración va en orden, pero si alguien
+    // reordena las oraciones, el ancla puede agarrar otro rango y la cifra que compare será otra.
+    // Se midió: al quitarle el primero, ancla en el siguiente y cuenta 15 en vez de 25 —sigue
+    // fallando, o sea que no calla, pero por el motivo equivocado—. Arreglarlo bien pide un
+    // marcador explícito en la prosa; mientras no exista, esto es un cruce útil, no una garantía.
+    const arranque = lineaResumen.match(/\((0\.\d{3})-0\.\d{3}\)/)?.[1];
+    if (arranque === undefined) {
+      problemas.push(
+        'La cola narrativa cuenta «N fichas nuevas» pero no nombra el rango de arranque «(0.NNN-0.NNN)», ' +
+          'así que no hay contra qué cruzarlo en el tablero.',
+      );
+    } else {
+      const nacidas = [...estadoPorFila.keys()].filter((f) => f >= arranque).length;
+      if (ultimo !== nacidas) {
+        problemas.push(
+          `La cola narrativa dice «${ultimo} fichas nuevas» y el tablero tiene ${nacidas} filas desde la ${arranque}. ` +
+            'Sin este cruce, dos cifras rancias de acuerdo entre ellas pasaban en verde.',
         );
       }
     }

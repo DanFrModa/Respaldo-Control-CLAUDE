@@ -17038,7 +17038,7 @@ dentro del costo original y se pierde la señal de que se gastó más de lo plan
 
 📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
 mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
-`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa, `compras/ordenes-compra.ts:298`). Y lo que
+`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa — la regla está **enunciada** en `compras/ordenes-compra.ts:298` y la que la **cumple** es `:612`, el `throw new ErrorNoEncontrado('Orden', idOrden)`). Y lo que
 importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
 ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
 material.
@@ -17123,7 +17123,7 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > ⭐ **Y LA QUINTA, QUE LE DA LA VUELTA A TODO LO ANTERIOR: una medición que NO coincide puede estar midiendo algo
 > que nadie medía — y ahí había un defecto real.** Contando las filas del tablero el lead obtuvo **183** contra las
 > **176** del verificador. Aplicó la regla, sospechó de su método… **y su método era el que veía algo nuevo:** son
-> —**medido el 30-sep sobre la v0.185**— **176 filas DISTINTAS** en **183 apariciones** (al día siguiente ya eran otras: va fechada porque la cifra caduca y el mecanismo no), porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
+> —**medido el 30-sep sobre la v0.185**— **176 filas DISTINTAS** en **183 apariciones** (**ya eran otras el MISMO día, en la entrega siguiente**: la v0.185 y la v0.186 están las dos fechadas 30-sep, así que la cifra caducó en horas. Va fechada porque la cifra caduca y el mecanismo no), porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
 > 0.118, 0.122, 0.126, 0.127) — una vez en el tablero y otra en la lista *«LO QUE ESPERA A LA FASE 2»*, que es
 > **deliberado**. 🔴 **Pero al abrir las siete, una no cuadraba: la 0.118 estaba `✅` en el tablero y la lista de
 > fase 2 decía *«se corta porque hoy se hace a mano»* y *«se sigue mandando a mano»*.** Medido contra el código:
@@ -17473,7 +17473,7 @@ compradores, departamentos, datos de cada comprador, etc.»*
   anterior a esta entrega, pero es justo el hecho que la línea decía haber medido.)*
   **(2) Lo que Daniel le concedió EXIGE el reservado:** las **13** rutas de clientes piden
   `clientes.administrar`, y ahí caen **todas** las mutaciones de lo que él nombró — departamentos
-  (`agregar`/`actualizar`/`desactivar`/`reactivar`/`fusionar`), contactos (`crearContactoCliente`,
+  (`agregar`/`actualizar`/`desactivar`/`reactivar`/`fusionar`/`previsualizarFusionDepartamentos`, las **seis**), contactos (`crearContactoCliente`,
   `actualizarContactoCliente`) y los campos por cliente.
   ⇒ **«Ella puede meter información de compradores, departamentos, datos de cada comprador» NO se puede
   conceder sin darle un reservado** que además la dejaría **dar de alta y desactivar clientes**, que es justo lo
