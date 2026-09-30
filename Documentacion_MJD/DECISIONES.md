@@ -17057,8 +17057,10 @@ tercero: SOBRE-CORTE.** No es lo mismo: la **merma** es material que se perdió,
 que hay que reponer, y el **sobre-corte** es que se decidió hacer más prendas. Los tres son sobrecosto, por
 razones distintas, y él va a querer saber cuál fue.
 
-📐 **MEDIDO: hoy la OC NO puede decir por qué existe DE FORMA QUE SE PUEDA SUMAR.** Sus campos de texto son
-`observaciones` (libre), `motivoCancelacion`, `entregaEn` y —el que importa— **`correspondeA`**
+📐 **MEDIDO: hoy la OC NO puede decir por qué existe DE FORMA QUE SE PUEDA SUMAR.** `OrdenCompra` tiene
+**cinco** campos de texto: `observaciones` (libre), `motivoCancelacion`, `entregaEn`,
+`facturasAmparadasLegacy` (`:5824`, sólo lectura — lo llena el ETL, no se captura por pantalla) y —el que
+importa— **`correspondeA`**
 (`schema.prisma:5821`, *«A qué corresponde la compra»*, heredado del viejo `OrdCompra.CorrespondeA`), que
 **está VIVO y se captura hoy**: `contrato/esquemas/compra.ts:269` lo valida opcional con tope de 500,
 `DialogoEditarOc.tsx` lo pide con la etiqueta *«Corresponde a»*, y se pinta en la bandeja de autorización
@@ -17081,6 +17083,29 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > siempre con una vuelta más:** *«no hay campo X»* se comprueba **listando los campos que SÍ hay**, no
 > buscando el que se sospecha — un `grep` de lo que uno espera no encontrar sale vacío tanto si el campo
 > no existe como si se llama de otro modo.
+>
+> ⚠️ **Y AL ARREGLARLA, EL LEAD COMETIÓ LA MISMA FALTA DOS VECES EN UNA HORA, con la variante que la vuelve
+> peligrosa: creyó haber refutado a quien tenía razón.** (1) Midiendo si unas citas de Daniel estaban en este
+> archivo, su `grep` dio **0** para dos que **sí estaban** —una escrita con otra mayúscula, la otra **partida
+> en dos líneas por el ajuste de ancho**, que ningún `grep` de una línea cruza—. (2) Cruzando *«ocho módulos»*
+> contra *«siete módulos»*, su cuenta dio **0 ocurrencias de «siete»** en dos archivos que decían **`SIETE`
+> en mayúsculas** ⇒ estuvo a punto de publicar que el reviewer se equivocaba. 🔑 **La regla, y es de
+> procedimiento, no de criterio: un cruce de texto entre documentos NORMALIZA ANTES DE CONTAR** —caja a
+> minúsculas y saltos de línea colapsados a un espacio, quitando los prefijos de cita `>`—, y cuando el
+> resultado **contradice a otra medición**, lo primero que se sospecha es la propia normalización, no la del
+> otro. *Un cruce mecánico mal normalizado miente con toda la autoridad de un script, y su mentira favorita
+> es «eso no está».*
+>
+> ⚠️ **Y la tercera pata, de la misma hora: el cruce bien normalizado dio DOS falsos positivos, y los dos
+> enseñan lo que un conteo no sabe hacer.** (1) Buscando *«20 llamadas»* (la cifra vieja) casó dentro de
+> **`320 llamadas`**, que es otro dato y está bien — **una subcadena de un número es otro número**, así que
+> el patrón lleva su frontera (`\b`, o el texto completo *«20 llamadas en 9 archivos»*). (2) La cifra vieja
+> *«ocho módulos»* apareció **dentro de este mismo recuadro**, que la cita para explicar su corrección ⇒ **un
+> conteo no distingue una AFIRMACIÓN de una MENCIÓN**, y un archivo que documenta sus propios errores está
+> lleno de menciones a propósito. 🔑 **Por eso el cruce mecánico termina SIEMPRE mirando el contexto de cada
+> acierto**: la máquina señala dónde mirar, la decisión de si está mal es de quien lee. *Un cruce que se
+> cierra en el número, sin abrir los aciertos, convierte cada cicatriz escrita en un falso defecto — y a la
+> tercera nadie vuelve a correrlo.*
 
 ### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
 
@@ -17229,7 +17254,11 @@ lead propone los permisos de cada uno y los ajustan. Se le pidió que, donde lo 
 ese puesto NO debe poder hacer** —ver importes y márgenes, autorizar compras, reabrir órdenes, mover
 inventario—, que es la mitad que se olvida y donde está el daño.
 📌 **Y el catálogo de los 134 permisos quedó publicado como página de consulta** (con su descripción y los
-**29** reservados marcados con su razón), que es de donde salen las propuestas. ⚠️ Esa cifra se había
+**29** reservados marcados con su razón), que es de donde salen las propuestas:
+<https://claude.ai/artifact/KHKSNqVtfpzMMWUZ4RnSE7>. ⚠️ **Vive FUERA del repositorio** —es una página
+publicada, no un archivo de `docs/`— así que quien lea esto y no tenga el enlace no puede llegar a ella por
+su cuenta; de ahí que el enlace vaya escrito aquí y en el historial. *Prometerle algo al dueño sin decirle
+cómo llegar es no habérselo dejado.* ⚠️ Esa cifra se había
 publicado como **37** por un conteo torpe del lead; son **29**, extraídos uno por uno.
 
 ### 🔑 Una lección chica de comunicación, porque costó una vuelta

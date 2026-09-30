@@ -144,10 +144,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   reabrir órdenes, mover inventario) — es la mitad que se olvida y donde está el daño. ⚠️ **Esto tiene que
   quedar cerrado antes de PRODUCCIÓN, no antes de las pruebas:** con datos reales, un permiso de más deja de
   ser un detalle. 📌 Mientras tanto te dejé **el catálogo completo de los 134 permisos como página de
-  consulta**, con los 29 delicados marcados y su razón.
+  consulta**, con los 29 delicados marcados y su razón:
+  **https://claude.ai/artifact/KHKSNqVtfpzMMWUZ4RnSE7** *(es una página aparte, no vive dentro del sistema;
+  puedes ir marcando ahí lo que quieras para cada puesto y lo que apuntes se guarda).*
 - 🔴 **De esas seis, una bloquea el arranque y conviene que la sepas: hoy «cerrada» no bloquea de verdad.**
   Se puede sacar tela, comprar material, auditar y mover producto terminado contra una orden cerrada, porque
-  la protección existe pero **no está puesta en ocho módulos**. Y en pantalla el formulario se abre completo:
+  la protección existe pero **no está puesta en siete módulos**. Y en pantalla el formulario se abre completo:
   el rechazo llega al pulsar Guardar.
 - 🐛 **Un defecto encontrado de paso, sin relación con nada de esto:** si alguien **agrega un renglón a una
   orden de compra ya recibida del todo**, ese material **no se puede recibir nunca más** — queda comprado y
