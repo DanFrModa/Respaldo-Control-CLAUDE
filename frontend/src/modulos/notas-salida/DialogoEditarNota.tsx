@@ -185,9 +185,15 @@ export function DialogoEditarNota({
       setNombreMaquilero(undefined);
       setIdAlmacen(prefill.idAlmacen ?? null);
       setFechaElaboracion(hoy());
-      // ⭐ Fila 0.216 — las DOS fechas nacen en HOY (Daniel: *«por default que dé la fecha de hoy»*).
-      // Hasta esta fila la de envío nacía VACÍA y había que teclearla en cada nota.
-      setFechaEnvio(hoy());
+      // 🔴 LA FECHA DE ENVÍO NACE VACÍA, Y ESO NO ES UN DESCUIDO: es un ESTADO del negocio
+      // («todavía no ha salido»). El contrato la declara opcional *«cuando salga el envío»*
+      // (`contrato/esquemas/nota-salida.ts`), dos pantallas pintan «pendiente» cuando es `null`
+      // (`ConsultaNotasPagina`, `NotasSalidaPagina`), sale IMPRESA en el papel que acompaña las
+      // prendas (`impreso-nota-salida.ts`) y `confirmarNotaSalida` NUNCA la escribe. Ponerla en
+      // «hoy» por default borraba ese estado para toda nota nueva. ⏳ Fila 0.216: queda pendiente la
+      // decisión de Daniel (con el costo a la vista) sobre escribirla al CONFIRMAR la nota — que le
+      // daría la fecha sin teclearla y conservaría el «pendiente» del borrador.
+      setFechaEnvio('');
       setObservaciones('');
       setRenglones(
         (prefill.renglones ?? []).map((r) => ({
@@ -211,8 +217,8 @@ export function DialogoEditarNota({
       setIdMaquilero(null);
       setIdAlmacen(null);
       setFechaElaboracion(hoy());
-      // ⭐ Fila 0.216 — también en el alta vacía: las dos fechas arrancan en HOY.
-      setFechaEnvio(hoy());
+      // 🔴 Vacía también en el alta sin pre-carga: ver el porqué en la rama del prefill de arriba.
+      setFechaEnvio('');
       setObservaciones('');
       setRenglones([renglonVacio()]);
       setRecetas({});

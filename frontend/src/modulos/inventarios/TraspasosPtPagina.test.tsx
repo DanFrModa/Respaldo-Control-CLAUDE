@@ -423,6 +423,43 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       expect(screen.getByTestId('traspaso-motivo')).toHaveValue('');
     });
 
+    /**
+     * 🔴🔴 AL GUARDAR, EL CUADRO SE VACÍA — Y ESTO ES LO QUE IMPIDE UN TRASPASO DUPLICADO.
+     *
+     * Hallazgo del reviewer: quitando el `setFirmaArmada('')` del `onSuccess` las 20 pruebas seguían
+     * VERDES, y es **el único mecanismo** que limpia el cuadro tras guardar (la fila 0.215 cambió de
+     * mecanismo: antes se vaciaban `lineas`/`tallas` a mano). Si se rompe, las cantidades del
+     * traspaso que ya se asentó **se quedan tecleadas** y la siguiente pulsación de «Guardar
+     * traspaso» lo repite — en un módulo D3, donde lo guardado es inmutable y deshacerlo exige un
+     * movimiento inverso auditado.
+     *
+     * ⚠️ Y no basta con que la firma cambie sola: un traspaso PARCIAL deja los MISMOS colores y
+     * tallas en el origen ⇒ la firma no se mueve, y sin el rearme explícito el número se queda.
+     */
+    it('🔴 al guardar el CUADRO se vacía (o la siguiente pulsación duplica el traspaso)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await capturaCompleta(usuario);
+      await ponerMotivo(usuario);
+      expect(screen.getByTestId('traspaso-matriz-celda')).toHaveValue(3);
+
+      await usuario.click(screen.getByTestId('traspaso-guardar'));
+      const [, opciones] = crearMutate.mock.calls[0] as [
+        unknown,
+        { onSuccess: (t: unknown) => void },
+      ];
+      act(() => {
+        opciones.onSuccess({
+          salida: { id: 200, folio: 9910 },
+          entrada: { id: 201, folio: 9911 },
+        });
+      });
+
+      // El cuadro sigue ahí (el modelo y el almacén no cambiaron) pero SIN lo capturado.
+      expect(screen.getByTestId('traspaso-matriz-celda')).toHaveValue(null);
+      expect(screen.getByTestId('traspaso-guardar')).toBeDisabled();
+    });
+
     it('al guardar ofrece la HOJA del traspaso con el folio QUE YA EXISTE', async () => {
       const usuario = userEvent.setup();
       renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
@@ -552,6 +589,31 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       expect(columnas).toEqual(['Color', 'G', 'Total']);
     });
 
+    /**
+     * ⭐ UN RENGLÓN **NEGATIVO** NO ES EJE DE UN TRASPASO (hallazgo del reviewer sobre la gemela
+     * `ordenesConExistencia`, que sí cortaba). El servidor descarta `existencia <> 0` pero **no** los
+     * negativos, así que un −3 —el rastro de un error de captura— llegaba a la pantalla y se volvía
+     * fila y columna: el cuadro invitaba a mover piezas de donde hay menos que nada.
+     *
+     * 🔑 Va en el bucket «SIN ORDEN», el elegido por default, para que lo único que pueda dejarlo
+     * fuera sea el corte de «sin piezas» y no el filtro por bucket.
+     */
+    it('⭐ un renglón NEGATIVO no es eje (no se traspasa de menos que nada)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: { filas: [filaPt({ existencia: -3 })], totalExistencia: -3 },
+        refetch: vi.fn(),
+        isPending: false,
+        isError: false,
+      });
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.queryByTestId('traspaso-matriz-celda')).not.toBeInTheDocument();
+      expect(screen.getByTestId('traspaso-sin-piezas')).toBeInTheDocument();
+    });
+
     it('⭐ sin piezas en el bucket dice POR QUÉ el cuadro está vacío (no manda a buscar al catálogo)', async () => {
       const usuario = userEvent.setup();
       useExistenciasPtMock.mockReturnValue(EXISTENCIAS_VACIAS);
@@ -563,6 +625,28 @@ describe('TraspasosPtPagina (F3-E3)', () => {
         'En este almacén no hay piezas de este modelo sin orden.',
       );
       expect(screen.queryByTestId('traspaso-matriz-celda')).not.toBeInTheDocument();
+    });
+
+    /**
+     * ⚠️ UNA CONSULTA QUE FALLÓ NO ES UN ALMACÉN VACÍO (hallazgo del reviewer). El párrafo sólo
+     * miraba `isPending`, así que con las existencias EN ERROR la pantalla AFIRMABA que no hay piezas
+     * de ese modelo en ese almacén —y aconsejaba elegir otro—, las dos cosas falsas.
+     */
+    it('⚠️ con las existencias EN ERROR no dice «no hay piezas» (eso sería mentir)', async () => {
+      const usuario = userEvent.setup();
+      useExistenciasPtMock.mockReturnValue({
+        data: undefined,
+        refetch: vi.fn(),
+        isPending: false,
+        isError: true,
+      });
+      renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+      await elegirModelo(usuario);
+      await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+
+      expect(screen.queryByTestId('traspaso-sin-piezas')).not.toBeInTheDocument();
+      // Lo que sí se dice es que no se pudieron leer (el selector de orden ya lo avisa).
+      expect(screen.getByTestId('traspaso-orden-error')).toBeInTheDocument();
     });
 
     it('y con piezas ese aviso NO sale (tiene que significar algo)', async () => {

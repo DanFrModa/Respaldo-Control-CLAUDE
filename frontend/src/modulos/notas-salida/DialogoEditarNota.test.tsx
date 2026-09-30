@@ -106,6 +106,31 @@ const EXISTENCIAS_AVIO_EN_VUELO = {
   isError: false,
   isPlaceholderData: false,
 };
+
+/**
+ * ⭐ Lo que entrega `keepPreviousData` justo después de cambiar de almacén: los renglones del
+ * almacén ANTERIOR (aquí el 99), marcados con `isPlaceholderData`. Son datos reales pero de OTRO
+ * almacén: el filtro por `idAlmacen` los descarta todos ⇒ sin la condición `!isPlaceholderData` el
+ * mapa quedaría VACÍO y la pantalla leería «no hay nada de nada» durante ese hueco.
+ */
+const EXISTENCIAS_AVIO_DEL_ANTERIOR = {
+  data: { filas: [{ idAvio: 3, idAlmacen: 99, existencia: 500, unidad: 'pza' }] },
+  isPending: false,
+  isError: false,
+  isPlaceholderData: true,
+};
+
+/**
+ * ⭐ Una consulta que FALLÓ conservando el dato viejo. `data` existe (por eso `data !== undefined` no
+ * la caza) pero no se puede creer: sin `!isError` el mapa se armaría vacío y todo avío pasaría por
+ * «sin existencia».
+ */
+const EXISTENCIAS_AVIO_EN_ERROR = {
+  data: { filas: [] },
+  isPending: false,
+  isError: true,
+  isPlaceholderData: false,
+};
 // "Traer avíos de la orden" (R6): la habilitación de la orden elegida (mock controlable por test).
 const useHabilitacionOrdenMock = vi.fn();
 vi.mock('@/api/habilitacion', () => ({
@@ -364,6 +389,46 @@ describe('DialogoEditarNota (F4-E5)', () => {
      * condición `stockConocido` deja la captura entera bloqueada, que es peor que el defecto que la
      * fila vino a arreglar.
      */
+    /**
+     * 🔴🔴 EL HUECO DE `keepPreviousData` — hallazgo del reviewer: quitando `!isPlaceholderData` de
+     * `stockConocido` las 14 pruebas seguían VERDES, y es **justo la condición que separa «no se
+     * sabe» de «no hay»**. La prueba de «en vuelo» no la alcanza porque corta antes, por
+     * `data === undefined`.
+     *
+     * El escenario real: se cambia de almacén, la consulta nueva sale y mientras vuelve TanStack
+     * entrega los renglones del almacén ANTERIOR. Son de otro `idAlmacen`, el filtro los descarta
+     * todos y el mapa queda vacío ⇒ sin esta condición, durante ese hueco **ningún avío se puede
+     * elegir** y la pantalla dice que no hay existencia de nada.
+     */
+    it('🔴 con los datos del almacén ANTERIOR (placeholder) NO se bloquea nada', () => {
+      useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO_DEL_ANTERIOR);
+      abrirAlta();
+      fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+      elegirAvioBoton('BOT-01');
+
+      expect(toastError).not.toHaveBeenCalled();
+      fireEvent.blur(screen.getByTestId('selector-avio-nota-busqueda'));
+      expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('BOT-01');
+      // Y no se pinta existencia: no se sabe cuánta hay, así que no se afirma ninguna.
+      expect(screen.queryByTestId('existencia-nota')).not.toBeInTheDocument();
+    });
+
+    /**
+     * ⚠️ Y una consulta que FALLÓ no es un almacén vacío. `data` sigue ahí (el dato viejo), así que
+     * `data !== undefined` no la caza: hace falta `!isError`. Sin él, un fallo de red convertiría
+     * cada avío en «sin existencia» y dejaría la nota incapturable.
+     */
+    it('⚠️ con las existencias EN ERROR tampoco se bloquea (un fallo no es un cero)', () => {
+      useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO_EN_ERROR);
+      abrirAlta();
+      fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+      elegirAvioBoton('BOT-01');
+
+      expect(toastError).not.toHaveBeenCalled();
+      fireEvent.blur(screen.getByTestId('selector-avio-nota-busqueda'));
+      expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('BOT-01');
+    });
+
     it('⭐ sin almacén (o con la consulta en vuelo) NO se bloquea la captura', () => {
       useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO_EN_VUELO);
       abrirAlta();
@@ -378,21 +443,25 @@ describe('DialogoEditarNota (F4-E5)', () => {
   });
 
   /**
-   * ⭐ FILA 0.216 — «Por default que dé la fecha de hoy» (Daniel, en el mismo punto del repaso). La
-   * fecha de elaboración ya nacía en hoy; la de ENVÍO nacía vacía y había que teclearla cada vez.
+   * ⭐ La fecha de ELABORACIÓN del alta arranca en HOY — y «hoy» es el día DEL NEGOCIO (México), no
+   * el día UTC: con `toISOString()`, de 18:00 a 23:59 de México este campo proponía **mañana**.
+   *
+   * 🔴 **Y la de ENVÍO arranca VACÍA, a propósito: es un ESTADO del negocio** («todavía no ha
+   * salido»). El contrato la declara opcional *«cuando salga el envío»*, dos pantallas pintan
+   * «pendiente» cuando es `null`, sale impresa en el papel que acompaña las prendas y el confirmar
+   * NUNCA la escribe. Ponerla en «hoy» por default —como se hizo en la primera vuelta de la fila
+   * 0.216— borraba ese estado para toda nota nueva; esta aserción es la que no deja que vuelva.
    */
-  it('⭐ las DOS fechas del alta arrancan en HOY (fila 0.216)', () => {
+  it('⭐ la fecha de ELABORACIÓN arranca en HOY y la de ENVÍO arranca VACÍA', () => {
     renderConProveedores(
       <DialogoEditarNota abierto alCambiarAbierto={() => undefined} alGuardada={() => undefined} />,
       { sesion: estadoSesionDePrueba(['notas.administrar']) },
     );
-    // ⚠️ «Hoy» es el día DEL NEGOCIO (México), no el día UTC: entre las 18:00 y las 23:59 de México
-    // el UTC va uno adelante, y con `toISOString()` este campo proponía MAÑANA.
     const hoyDelNegocio = new Date().toLocaleDateString('en-CA', {
       timeZone: 'America/Mexico_City',
     });
     expect(screen.getByTestId('nota-fecha-elaboracion')).toHaveValue(hoyDelNegocio);
-    expect(screen.getByTestId('nota-fecha-envio')).toHaveValue(hoyDelNegocio);
+    expect(screen.getByTestId('nota-fecha-envio')).toHaveValue('');
   });
 
   it('en EDICIÓN las fechas son las de la nota, no las de hoy (no se le pisa lo guardado)', () => {

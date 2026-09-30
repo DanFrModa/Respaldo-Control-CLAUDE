@@ -189,6 +189,8 @@ export interface FilaParaEjes {
   ordenTalla: number;
   /** `null` = bucket «sin orden». */
   idOrden: number | null;
+  /** Piezas de ESE renglón (modelo×color×talla×orden×almacén). Puede venir NEGATIVA. */
+  existencia: number;
 }
 
 /** Los ejes de un cuadro de captura: sus COLUMNAS (tallas) y sus FILAS (colores), ya ordenados. */
@@ -208,7 +210,18 @@ export interface EjesMatrizPt {
    * 📌 Lleva el **bucket** dentro a propósito: dos órdenes pueden tener los mismos colores y las
    * mismas tallas y NO son el mismo cuadro —su saldo es otro—, así que cambiar de orden tiene que
    * vaciar lo capturado. Lo que la firma NO sabe es el modelo ni el almacén: eso lo añade cada
-   * pantalla, que es la que los conoce.
+   * pantalla, que es la que los conoce (y la de Movimientos lo añade **según la dirección**, porque
+   * su consulta de ENTRADA no filtra por almacén).
+   *
+   * ⏳ **DECISIÓN ESCRITA (ronda de corrección): la firma lleva IDs, no ETIQUETAS, y se queda así.**
+   * Consecuencia real y conocida: si mientras la pantalla está abierta alguien **renombra una talla**
+   * o **retira un color** (que le añadiría el rótulo «(retirado)»), el cuadro sigue pintando los
+   * rótulos viejos hasta el siguiente rearme. Se acepta porque **la firma no gobierna lo que se
+   * pinta: gobierna si se TIRA lo que la persona ya tecleó.** Meter las etiquetas dentro haría que un
+   * renombre en otra pestaña borrara una captura a medias — cambiar trabajo perdido por un rótulo
+   * fresco es un mal trueque. Y el daño está acotado a lo cosmético: al API viaja el **`idColor` /
+   * `idTalla`**, que sí son los correctos, así que el movimiento que se guarda nunca es el equivocado;
+   * el rótulo se corrige en cuanto cambia el modelo, el almacén, la orden o se guarda.
    */
   firma: string;
 }
@@ -231,11 +244,16 @@ export interface EjesMatrizPt {
  * los ejes se derivan de los **renglones de existencia del bucket elegido**, que son los mismos de
  * los que ya salían el desplegable de órdenes (`ordenesConExistencia`) y el «disponible».
  *
- * ⚠️ **El ALCANCE lo fija la consulta que hizo la pantalla, no esta función** (mismo criterio que
- * {@link coloresRetiradosConExistencia}): en SALIDA/TRASPASO los renglones vienen sin ceros ⇒ el
- * cuadro es exactamente lo movible; en ENTRADA la consulta pide `incluirCeros` a propósito (el
- * va-y-ven del estampado) ⇒ el cuadro trae también lo que quedó en cero, que es justo lo que tiene
- * que poder REGRESAR.
+ * ⭐ **`incluirCeros` es EL MISMO parámetro, con el MISMO criterio, que su gemela
+ * {@link ordenesConExistencia}** — y tenerlos distintos era un defecto (hallazgo del reviewer):
+ *  • **salida / traspaso** (default, `false`): sólo renglones con piezas. ⚠️ Y el filtro hace falta
+ *    AQUÍ, no basta el del servidor: el servidor descarta `existencia <> 0` pero **NO los
+ *    NEGATIVOS**, así que un renglón en −3 —el rastro de un error de captura— se volvía columna y
+ *    fila de una SALIDA, ofreciendo sacar de donde debe menos que nada.
+ *  • **entrada** (`true`): también el CERO, a propósito. Es el va-y-ven del estampado: la orden 55
+ *    salió completa a Aplicación (su bucket quedó en 0) y al volver las piezas tienen que encontrar
+ *    su color y su talla en el cuadro. Aquí el negativo también entra, y está bien: corregirlo es
+ *    justo lo que una entrada hace.
  *
  * 📌 El color RETIRADO (fila 0.164) llega rotulado igual que en el buscador: sus piezas son
  * movimientos ya asentados y siguen ahí, pero nadie debe confundirlo con uno del catálogo vivo.
@@ -245,13 +263,17 @@ export interface EjesMatrizPt {
 export function ejesDeExistencias(
   filas: readonly FilaParaEjes[],
   idOrden: number | null,
+  opciones: { incluirCeros?: boolean } = {},
 ): EjesMatrizPt {
+  const incluirCeros = opciones.incluirCeros ?? false;
   const tallas = new Map<number, { talla: MatrizTalla; orden: number }>();
   const lineas = new Map<number, MatrizLinea>();
   for (const f of filas) {
     // 🔴 EL BUCKET MANDA: un renglón de OTRA orden no es existencia de este movimiento. Sin este
     // filtro el cuadro volvería a ofrecer «cosas que no existen», sólo que disfrazadas de reales.
     if (f.idOrden !== idOrden) continue;
+    // 🔴 Y SIN PIEZAS NO ES EJE (salvo en la entrada): mismo corte que `ordenesConExistencia`.
+    if (!incluirCeros && f.existencia <= 0) continue;
     if (!tallas.has(f.idTalla)) {
       tallas.set(f.idTalla, {
         talla: { idTalla: f.idTalla, etiqueta: f.etiquetaTalla },

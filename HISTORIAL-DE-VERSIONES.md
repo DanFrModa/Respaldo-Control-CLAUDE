@@ -104,18 +104,29 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   único camino para meter piezas que el sistema todavía no conoce (el conteo inicial), y ahí la talla puede
   no existir en ningún movimiento. En una SALIDA ya no aparece: no hay nada que sacar que el almacén no
   tenga.
-- 📌 **Una pregunta chica para ti:** pediste *«por default que dé la fecha de hoy»*. Al medirlo, la fecha de
-  elaboración **ya** nacía en hoy; la que estaba vacía era la de **envío**, y ésa es la que se arregló.
-  **Confírmame que era ésa.**
+- ⚠️ **Y algo que estuvo mal y se corrigió antes de subirlo, porque conviene que lo sepas.** Pediste *«por
+  default que dé la fecha de hoy»*; al medirlo, la de **elaboración** ya nacía en hoy, así que se llenó la de
+  **envío** — y **ese vacío no era un descuido: significaba «todavía no ha salido»**, se lee «pendiente» en
+  dos pantallas y **se imprime en el papel que acompaña las prendas**. Te preguntamos *«¿era ésa?»* **sin
+  decirte lo que costaba**, dijiste que sí, y el reviewer lo cazó. **Revertido.** Tus dos fechas —elaboración
+  por default y envío aparte— **ya eran como las querías**: el diseño estaba bien, lo que estuvo mal fue la
+  pregunta. 📌 Lo que **sí** se queda de ahí: el arreglo del día que se adelantaba.
 
 ### Qué sigue pendiente o roto
 
 - 📋 **Tu repaso dejó diez fichas** (0.215 a 0.224). Dos están hechas —las de arriba—; **cinco entran antes
   de arrancar** (quitar el importe y el precio de la entrada de tela, que el recibo de maquila no pida un
   precio que ya está en la salida, ver la existencia por talla al entregar, el preliminar para escoger qué
-  avíos se mandan, y los movimientos por avío agrupados por proveedor) y **cuatro las dejaste tú para la
-  fase siguiente**.
+  avíos se mandan, y los movimientos por avío agrupados por proveedor) y **tres las dejaste tú para la fase
+  siguiente**. ⚠️ Tu **cuarto** punto de fase siguiente —subir la factura al entregar— **no nació ficha
+  nueva**: reconfirmó una que ya existía. 2 + 5 + 3 = 10.
 - 📋 **Y tu regla de las órdenes cerradas dejó seis más** (0.225 a 0.230), con tus cinco decisiones escritas.
+  **Y tres últimas** (0.231 a 0.233) de lo que decidiste al final del día: **marcar la OC como reposición,
+  merma o sobre-corte** —hoy la OC no puede decir por qué existe, así que el sobrecosto no se puede sumar—;
+  **que el sobre-corte pida su material** —hoy la explosión calcula contra lo que pidió el cliente, nunca
+  contra lo que se cortó, así que el 20 % extra hay que comprarlo a mano proveedor por proveedor—; y una que
+  salió de corregir una cita equivocada mía: **otras tres pantallas siguen dejándote sacar avíos que no hay**
+  (salida sin orden, ajuste y traspaso de materiales), el mismo defecto que reportaste pero fuera de la nota.
   **No se construye nada de eso todavía**: primero termina de probar Inventarios.
 - 🔴 **De esas seis, una bloquea el arranque y conviene que la sepas: hoy «cerrada» no bloquea de verdad.**
   Se puede sacar tela, comprar material, auditar y mover producto terminado contra una orden cerrada, porque

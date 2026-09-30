@@ -452,6 +452,25 @@ export function TraspasosPtPagina(): React.JSX.Element {
                   soloLectura={!puedeMover}
                   slotAgregarColor={
                     <div className="w-60">
+                      {/* ⏳ DECISIÓN ESCRITA (ronda de corrección) — el buscador de COLOR se queda,
+                      y hay que decir lo que hoy puede ofrecer: sólo colores SIN existencia aquí.
+
+                      El reviewer tiene razón en el fondo: como todo color con piezas en este bucket
+                      ya es fila del cuadro, `excluirIds` los descarta y lo único que queda en el
+                      buscador son colores que este bucket no tiene. Añadir uno da una fila que el
+                      servidor va a rechazar (o, si además faltan columnas, que no se puede ni
+                      teclear) — y ése es el MISMO argumento con el que la fila 0.215 le quitó el
+                      catálogo al «Agregar talla».
+                      ⛔ Y NO sirve de salida de emergencia: si la lista de existencias viniera
+                      recortada (fila 0.143) y faltara un color, con las tallas ya cerradas la fila
+                      añadida seguiría sin columna en la que capturar. No se conserva por eso.
+
+                      🔒 Por qué NO se retira en esta entrega: quitarlo borra la puerta que
+                      construyeron las filas 0.164 (ofrecer el color RETIRADO con mercancía) y 0.192
+                      (buscarlo en el SERVIDOR en vez del `<select>` topado en 100), cada una con su
+                      prueba y su razón. Eso es QUITAR UNA CAPACIDAD, no arreglar el defecto que
+                      Daniel reportó, y el encargo de esta entrega dice explícitamente que no se
+                      amplíe por cuenta propia. Va como fila propia, con el visto bueno de Daniel. */}
                       <SelectorColor
                         key={vecesAgregado}
                         idSeleccionado={undefined}
@@ -470,7 +489,13 @@ export function TraspasosPtPagina(): React.JSX.Element {
                     QUÉ. Sin esta línea el operador leería el «Agrega un color para empezar» de la
                     matriz y volvería a buscar en un catálogo que ya no está: el cuadro no falta,
                     falta la mercancía. */}
-                {hayOrigen && !existencias.isPending && ejes.lineas.length === 0 ? (
+                {hayOrigen &&
+                !existencias.isPending &&
+                // ⚠️ Y NO con la consulta en ERROR (hallazgo del reviewer): sin esto la pantalla
+                // AFIRMA que el almacén está vacío cuando lo único que pasó es que no se pudo
+                // preguntar — y encima aconseja cambiar de almacén.
+                !existencias.isError &&
+                ejes.lineas.length === 0 ? (
                   <p
                     className="mt-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
                     data-testid="traspaso-sin-piezas"

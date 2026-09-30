@@ -163,6 +163,7 @@ describe('ejesDeExistencias (fila 0.215)', () => {
       etiquetaTalla: 'CH',
       ordenTalla: 1,
       idOrden: null,
+      existencia: 10,
       ...p,
     };
   }
@@ -263,6 +264,47 @@ describe('ejesDeExistencias (fila 0.215)', () => {
       expect(ejesDeExistencias([fila({ idOrden: 55 })], 55).firma).not.toBe(
         ejesDeExistencias([fila({ idOrden: null })], null).firma,
       );
+    });
+  });
+
+  /**
+   * ⭐⭐ `incluirCeros` — EL MISMO CRITERIO QUE SU GEMELA `ordenesConExistencia` (hallazgo del
+   * reviewer: tenerlos distintos era un defecto).
+   *
+   * 🔴 Y el filtro hace falta AQUÍ, no basta el del servidor: el servidor descarta `existencia <> 0`
+   * pero **NO los NEGATIVOS**, así que un renglón en −3 se volvía columna y fila de una SALIDA.
+   */
+  describe('sin piezas no es eje (salvo en la entrada)', () => {
+    it('⭐ por omisión descarta el CERO y el NEGATIVO (de ahí no se puede sacar)', () => {
+      const ejes = ejesDeExistencias(
+        [
+          fila({ idTalla: 11, etiquetaTalla: 'CH', ordenTalla: 1, existencia: 0 }),
+          fila({
+            idColor: 8,
+            color: 'Marino',
+            idTalla: 12,
+            etiquetaTalla: 'M',
+            ordenTalla: 2,
+            existencia: -3,
+          }),
+          fila({ idColor: 9, color: 'Verde', idTalla: 13, etiquetaTalla: 'G', ordenTalla: 3 }),
+        ],
+        null,
+      );
+      expect(ejes.tallas).toEqual([{ idTalla: 13, etiqueta: 'G' }]);
+      expect(ejes.lineas.map((l) => l.color)).toEqual(['Verde']);
+    });
+
+    /**
+     * ⭐ La gemela positiva, y NO es simetría de adorno: es el va-y-ven del estampado. La orden 55
+     * salió completa a Aplicación (su bucket quedó en 0) y al volver las piezas tienen que encontrar
+     * su color y su talla en el cuadro; si el cero las excluyera, la entrada no tendría dónde
+     * capturarse.
+     */
+    it('⭐ con `incluirCeros` el CERO sí es eje (volver del estampado a su orden)', () => {
+      const ejes = ejesDeExistencias([fila({ existencia: 0 })], null, { incluirCeros: true });
+      expect(ejes.tallas).toEqual([{ idTalla: 11, etiqueta: 'CH' }]);
+      expect(ejes.lineas.map((l) => l.color)).toEqual(['Rojo']);
     });
   });
 

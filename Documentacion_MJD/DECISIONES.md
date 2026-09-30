@@ -16813,8 +16813,12 @@ solo defecto tumbó **tres** puntos del repaso.
 > deje meter los avíos que no hay stock, ANTES de meterlos. Porque ahorita valida DESPUÉS de haberlos
 > metido en la nota de salida.»*
 
-📐 **MEDIDO:** `CapturaRenglonesAvio.tsx` **no menciona stock ni existencia en ninguna línea** ⇒ hoy no
-filtra nada al capturar y la guarda vive en el servidor, al confirmar. ⚠️ **La guarda del servidor NO se
+📐 **MEDIDO:** la pantalla de la nota es `notas-salida/EditorRenglonesNota.tsx`, y su precarga no
+comprobaba existencia ⇒ la guarda vivía sólo en el servidor, al confirmar. ⚠️ **CORREGIDO el 30-sep: esta
+frase citaba `CapturaRenglonesAvio.tsx`, que es el archivo EQUIVOCADO** —vive en `inventarios/` y lo usan
+Salida sin orden, Ajuste y Traspaso de materiales, **no** la nota—. 🔑 **Y al corregirla se destapó algo real
+que la cita falsa disfrazaba de arreglado: esas TRES pantallas siguen con el defecto exacto que Daniel
+reportó** (elegir un avío sin existencia y enterarse al guardar) ⇒ **ficha 0.233**. ⚠️ **La guarda del servidor NO se
 toca** (es la que manda, A1): lo que se añade es no dejar llegar hasta ahí.
 
 ### 🔶 Los cinco que entran antes de arrancar (confirmados por él)
@@ -16829,6 +16833,14 @@ toca** (es la que manda, A1): lo que se añade es no dejar llegar hasta ahí.
 - **(10b) La entrega a cliente no enseña la existencia por talla.** Textual: *«Debería de decir la
   existencia que hay por talla para saber lo que se va a capturar no exceda la cantidad por talla.»*
   ⇒ hoy se captura a ciegas y el error llega al confirmar; es el mismo patrón que el (07c).
+- **(07a) La fecha por default en la nota de salida.** Textual: *«Por default que dé la fecha de hoy.»*
+  ⚠️ **Y este punto es el que peor salió de toda la entrega, por culpa del lead:** al medirlo, la fecha de
+  **elaboración** YA nacía en hoy y la que estaba vacía era la de **ENVÍO**, así que se cambió ésa… **pero
+  ese vacío no era un descuido, era un estado del negocio** (*«cuando salga el envío»*, se lee «pendiente» en
+  dos pantallas y se imprime en el papel que acompaña las prendas). Se le preguntó a Daniel *«¿era ésa?»*
+  **sin decirle lo que costaba**, contestó que sí, y hubo que revertirlo. Su respuesta posterior
+  —*«una fecha de elaboración (por default) y una fecha de envío»*— **describe exactamente lo que ya
+  existía**. El detalle y la lección, en §Post-F9.245(e).
 - **(07b) El preliminar de avíos: escoger qué se manda, y sólo lo que hay.** Textual: *«Al traer los avíos
   de la OP, estaría bien ver un preliminar y seleccionar qué avíos son los que se van a mandar
   (obviamente tendría que validar que sólo te ofrezca los que ya se recibieron en almacén).»*
@@ -16849,7 +16861,10 @@ toca** (es la que manda, A1): lo que se añade es no dejar llegar hasta ahí.
   movimientos que ha tenido ese modelo. Entregadas y salidas.»*
 - **(10a) Subir la factura en la entrega.** Textual: *«Habíamos quedado que vamos a subir la factura para la
   fase 2.»* ⇒ **NO nace ficha nueva: ya es la 0.211** (*«ninguna prenda sale del almacén sin un documento
-  que la ampare»*, §Post-F9.211 y su encuadre del 23-sep). Se **anota** que su repaso la reconfirma.
+  que la ampare»*, **§Post-F9.236** y su encuadre del 23-sep). Se **anota** que su repaso la reconfirma.
+⚠️ **CORREGIDO el 30-sep: esto citaba §Post-F9.211**, que es *«BORRAR DE VERDAD LOS ERRORES DEL DÍA»* y no
+tiene nada que ver — se confundió **la fila 0.211** con **el § 211**. No era una referencia colgante: era
+peor, mandaba a una sección que existe y que el lector habría creído.
 
 ### ✅ Y el único que salió bien
 
@@ -16958,7 +16973,7 @@ efecto en CxP»*, y a quién se le devolvió **viaja en el motivo, no en una FK*
 ### 🔴 LO QUE LA MEDICIÓN ENCONTRÓ Y HAY QUE ARREGLAR ANTES DE APRETAR NADA
 
 **«Cerrada» es hoy una promesa a medias.** La guarda existe y es una sola —`exigirOrdenAbierta`
-(`cierre-orden.ts:102`)— pero **se aplica A MANO, puerta por puerta**: 20 llamadas en 9 archivos, y **ocho
+(`cierre-orden.ts:102`)— pero **se aplica A MANO, puerta por puerta**: **17 llamadas en 9 archivos**, y **SIETE
 módulos no la llaman** (calidad, ruta crítica, inventarios, compras, notas, EsMa, EDR). Hoy se puede sacar
 tela, comprar material, auditar y mover PT contra una orden cerrada sin que nada proteste.
 
@@ -17005,3 +17020,114 @@ los **cuatro** llamadores de `recalcularEstatusOC` están todos en `compras/rece
 aparece en `ocsRecibibles` —cuyo `where` filtra estatus **antes** que el número de OC
 (`recepciones.ts:1944-1950`)— y `recibirCompra` la rechaza. **El material queda comprado y sin puerta de
 entrada.** Ficha propia.
+
+#### (Post-F9.245) — LA OC RECIBIDA NO SE EDITA: SE HACE OTRA, PARA QUE EL SOBRECOSTO SE VEA (30-sep-2026, decisiones de Daniel)
+
+Salieron de preguntarle por el defecto de la fila 0.225, y **contestó con una regla más general y mejor que
+la pregunta**. Sus palabras:
+
+> *«Las OC que ya están recibidas, ya se quedan con esa cantidad recibida y se cierra. Si se quiere recibir
+> más, se tendría que hacer una nueva OC. […] Eso mismo puede pasar cuando se pierden cosas, o se echan a
+> perder. Y creo que lo correcto es hacer una nueva OC **justo para saber que fue un sobre precio**.»*
+
+### ✅ (a) LA REGLA, y su razón es la que vale
+
+**Una OC recibida se cierra con lo recibido. Para más material, OC nueva.** 🔑 **Y el porqué es de negocio, no
+de sistema: una OC aparte hace VISIBLE el sobrecosto.** Si se edita la original, el material extra se esconde
+dentro del costo original y se pierde la señal de que se gastó más de lo planeado.
+
+📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
+mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
+`compras/ordenes-compra.ts:122`; valida que la orden exista y sea de la empresa activa, `:298`). Y lo que
+importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
+ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
+material.
+
+⇒ **Y esto REESCRIBE el arreglo de la fila 0.225, haciéndolo más chico:** editar al alza es el camino
+**equivocado** según su propia regla, así que el arreglo ya no es *«hacer que lo editado se pueda recibir»*
+—eso sería construir una puerta para algo que él no quiere que se haga— sino **CERRAR esa puerta**: que el
+sistema no deje subir la cantidad de una OC ya recibida del todo y diga *«haz una OC nueva»*.
+
+### ✅ (b) EL CATÁLOGO DE MOTIVOS DE LA OC — y el tercero lo dio su propia pregunta
+
+> *«Reposición y merma podrían ser las primeras dos del catálogo.»*
+
+Y luego preguntó qué pasa si se cortan 20 % más prendas y hay que volver a comprar de todo ⇒ **ése es el
+tercero: SOBRE-CORTE.** No es lo mismo: la **merma** es material que se perdió, la **reposición** es material
+que hay que reponer, y el **sobre-corte** es que se decidió hacer más prendas. Los tres son sobrecosto, por
+razones distintas, y él va a querer saber cuál fue.
+
+📐 **MEDIDO: hoy la OC NO puede decir por qué existe.** Sus únicos campos de texto son `observaciones` (libre)
+y `motivoCancelacion` — **no hay campo estructurado**, así que ningún informe puede agrupar ni sumar por
+motivo. ⇒ el sobrecosto quedaría visible sólo si alguien se acuerda de comparar contra la explosión. **Ficha
+0.231.**
+
+### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
+
+El lead propuso que la explosión preguntara *«¿exploto contra lo pedido o contra lo cortado?»*. Daniel:
+
+> *«El problema es que **casi siempre se compra antes de cortar**. Cuando se corta ya deberían de estar los
+> avíos con el maquilero.»*
+
+⇒ **La propuesta daba a elegir en un momento en que la elección no existe**: al explotar no hay nada cortado
+todavía, la cifra sería cero. 📐 Y lo que el lead sí había medido bien es la mitad del problema:
+`totalPiezasOrden` (`compras/mrp.ts:494`) suma `orden.lineas[].tallas[].cantidad` — **la matriz de la ORDEN**
+⇒ la explosión nunca pide el material del sobre-corte.
+
+**Replanteado con su corrección, no es una alternativa: es una SEGUNDA PASADA, después de cortar.** Y ahí el
+neteo ya existente hace casi todo el trabajo: pediría **exactamente la diferencia**, no todo otra vez.
+
+⭐ **Y su segunda frase añadió una COLA que el lead no había visto:** el 20 % extra no sólo hay que
+comprarlo, hay que **mandárselo al maquilero que ya está trabajando** ⇒ una **segunda nota de salida** al
+mismo maquilero. **El sobre-corte tiene tres pasos —comprar la diferencia · recibirla · mandarla al
+taller— y de los tres, el único que hoy no ayuda nada es el primero.** **Ficha 0.232.**
+
+### ✅ (d) SU CLASIFICACIÓN, con el matiz que la justifica
+
+> *«Se queda esperando el material. **Depende de qué taller sea. Algunos empiezan y algunos no. La mayoría sí
+> empieza.** No es algo mega urgente. Si es complicado lo dejamos como duele, pero no bloquea. Apúntalo para
+> hacerlo después, **pero no se vaya a quedar sin hacerlo**.»*
+
+⇒ **🔶 duele pero se aguanta.** El matiz queda escrito porque **es el que justifica la clasificación**: si
+todos los talleres se quedaran parados, esto bloquearía.
+📌 **Y sobre su «no se vaya a quedar sin hacerlo», se le respondió con el mecanismo, no con una promesa:**
+cada ficha va **nombrada una por una** en el recuento del tablero, y el verificador **corre dentro del CI** y
+se pone **rojo** si las cifras no cuadran con las listas ⇒ una ficha no puede desaparecer en silencio. Lo que
+el mecanismo NO hace es priorizar: eso sigue siendo decisión suya.
+
+### ✅ (e) LAS DOS FECHAS DE LA NOTA DE SALIDA: ya eran como las quería
+
+> *«Está bueno poder armar las notas de salida aunque no se vayan ese día, entonces podríamos poner una fecha
+> de elaboración (por default) y una fecha de envío. ¿Cómo ves? Si es mucho problema dejamos solo una fecha
+> de envío.»*
+
+**Cero problema: es EXACTAMENTE el diseño que ya existía** — `fechaElaboracion` obligatoria y con hoy por
+default, `fechaEnvio` opcional *«cuando salga el envío»* (`contrato/esquemas/nota-salida.ts:76`), y la nota se
+lee **«pendiente»** mientras esté vacía (`ConsultaNotasPagina.tsx:386`, `NotasSalidaPagina.tsx:549`).
+🔴 **Lo que lo rompió fue la entrega, no el diseño:** ver la corrección en la ficha 0.216 y la lección de
+abajo. Revertirlo devuelve el sistema a lo que él acaba de describir.
+📌 Y se le dio el dato operativo que cambia cómo lo usa: **el material se descuenta al CONFIRMAR la nota, no
+al armarla** ⇒ una nota que sale el jueves se confirma el jueves; armar el borrador antes y dejarlo pendiente
+es justo para lo que sirve.
+
+### 🔑 LA LECCIÓN, Y ES DEL LEAD
+
+**Se le pidió a Daniel un «sí» escondiéndole lo que costaba.** La pregunta fue *«la fecha que estaba vacía
+era la de envío, ¿era ésa?»* — presentando como **descuido** algo que era un **estado del negocio**: el vacío
+significa *«todavía no ha salido»*, se lee «pendiente» en dos pantallas y **se imprime en el papel que
+acompaña las prendas** (`impreso-nota-salida.ts:252`). Contestó que sí, y su sí **no estaba informado**.
+⚠️ Es la **segunda vez en dos semanas** que pasa lo mismo (la primera, §Post-F9.241: una pregunta que ofrecía
+un «sí» que costaba quitar una guarda de producción y borrar dos pruebas). ⇒ **antes de mandarle una
+pregunta, hay que escribir al lado lo que cuesta cada respuesta.** Si la respuesta parece gratis, es que no
+se midió.
+
+### 🔑 Y UNA SEGUNDA LECCIÓN, DEL CODER, SOBRE CÓMO SE MIDE UNA PRUEBA
+
+En la ronda de corrección, **tres de sus propias mutaciones «sobrevivieron» siendo FALSAS**: el `assert` del
+script no casó porque el texto existía **dos veces** en el archivo ⇒ **la mutación nunca se aplicó**, y el
+verde no significaba nada. ⇒ **una mutación que no se aplica se lee IGUAL que una que sobrevive: hay que
+verificar que se aplicó.** Y en la misma ronda cazó otras dos del mismo género: una prueba que pasaba porque
+el **fixture no era lo que devuelve el servidor** (dos renglones +100/−100 donde la vista agregada da uno en
+cero) y otra que pasaba **por el motivo equivocado** (la excluía el filtro por bucket, no el corte que la
+prueba creía medir). *Trece mutaciones, trece muertas — pero sólo después de comprobar que cada una se
+aplicó de verdad.*

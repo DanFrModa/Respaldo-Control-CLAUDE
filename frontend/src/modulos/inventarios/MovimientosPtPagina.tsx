@@ -188,15 +188,30 @@ export function MovimientosPtPagina(): React.JSX.Element {
    * (salida sin ceros / entrada con ceros)—, acotada al bucket elegido.
    */
   const ejes = useMemo(
-    () => ejesDeExistencias(existencias.data?.filas ?? [], idOrdenElegida),
-    [existencias.data, idOrdenElegida],
+    () =>
+      ejesDeExistencias(existencias.data?.filas ?? [], idOrdenElegida, { incluirCeros: esEntrada }),
+    [existencias.data, idOrdenElegida, esEntrada],
   );
   /**
-   * De qué CONTEXTO es el cuadro que está en pantalla: el tipo de movimiento (la dirección cambia la
-   * consulta entera), el modelo y el almacén —que la firma de los ejes no conoce— más el bucket y
-   * los ejes mismos. Si esto cambia, el cuadro es otro.
+   * De qué CONTEXTO es el cuadro que está en pantalla. Lleva la DIRECCIÓN (no el tipo) y el modelo;
+   * el almacén, **sólo en la SALIDA**. Si esto cambia, el cuadro es otro y lo capturado no vale.
+   *
+   * 🔴 **EL ALMACÉN SÓLO EN LA SALIDA, y esto es un ARREGLO de la ronda de corrección.** La firma
+   * llevaba `idTipoMov` e `idAlmacen` siempre, y eso **borraba en silencio** una captura de ENTRADA
+   * en cuanto se corregía el almacén: se iba la celda, la fila y la columna. Y sobraba, porque la
+   * consulta de ENTRADA **no filtra por almacén** (ver `existenciasEntrada`) ⇒ sus ejes no pueden
+   * cambiar por eso. El damnificado era justo el flujo que la asimetría existe para proteger: el
+   * **conteo inicial**, donde se teclea un modelo entero a mano.
+   * 📌 Por la misma razón va la DIRECCIÓN y no el `idTipoMov`: los dos tipos de entrada («Inventario
+   * Inicial» y «Entrada de Aplicación») comparten consulta, así que cambiar de uno al otro no cambia
+   * el cuadro —sólo el rótulo del movimiento— y no tiene por qué tirar lo tecleado.
+   * ⚠️ En la SALIDA el almacén SÍ va: ahí la consulta lo filtra, y dos almacenes con los MISMOS
+   * colores y tallas tienen ejes idénticos pero **saldos distintos** — arrastrar el número sería
+   * capturarlo contra un disponible que no es el suyo.
    */
-  const firmaCuadro = `${idTipoMov}|${String(modelo?.id ?? '')}|${idAlmacen}|${ejes.firma}`;
+  const firmaCuadro = esEntrada
+    ? `entrada|${String(modelo?.id ?? '')}|${ejes.firma}`
+    : `salida|${String(modelo?.id ?? '')}|${idAlmacen}|${ejes.firma}`;
   const [firmaArmada, setFirmaArmada] = useState('');
   /**
    * El cuadro se REARMA cuando cambia su contexto o sus ejes. Una captura a medias NO se arrastra a
@@ -479,7 +494,15 @@ export function MovimientosPtPagina(): React.JSX.Element {
                     POR QUÉ: no falta el cuadro, falta la mercancía. En una ENTRADA no se dice nada,
                     porque ahí capturar sobre un bucket vacío es justo lo normal (el conteo inicial y
                     el regreso del estampado). */}
-                {!esEntrada && hayArticulo && !existencias.isPending && ejes.lineas.length === 0 ? (
+                {!esEntrada &&
+                hayArticulo &&
+                !existencias.isPending &&
+                // ⚠️ Y NO con la consulta en ERROR (hallazgo del reviewer): sin esto la pantalla
+                // AFIRMA que el almacén está vacío cuando lo único que pasó es que no se pudo
+                // preguntar — y encima aconseja cambiar de almacén. Es el mismo criterio que
+                // `stockConocido` en la nota de salida: una consulta que falló no es un cero.
+                !existencias.isError &&
+                ejes.lineas.length === 0 ? (
                   <p
                     className="mb-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
                     data-testid="mov-sin-piezas"
@@ -500,6 +523,25 @@ export function MovimientosPtPagina(): React.JSX.Element {
                   soloLectura={!puedeMover}
                   slotAgregarColor={
                     <div className="w-60">
+                      {/* ⏳ DECISIÓN ESCRITA (ronda de corrección) — el buscador de COLOR se queda,
+                      y hay que decir lo que hoy puede ofrecer: sólo colores SIN existencia aquí.
+
+                      El reviewer tiene razón en el fondo: como todo color con piezas en este bucket
+                      ya es fila del cuadro, `excluirIds` los descarta y lo único que queda en el
+                      buscador son colores que este bucket no tiene. Añadir uno da una fila que el
+                      servidor va a rechazar (o, si además faltan columnas, que no se puede ni
+                      teclear) — y ése es el MISMO argumento con el que la fila 0.215 le quitó el
+                      catálogo al «Agregar talla».
+                      ⛔ Y NO sirve de salida de emergencia: si la lista de existencias viniera
+                      recortada (fila 0.143) y faltara un color, con las tallas ya cerradas la fila
+                      añadida seguiría sin columna en la que capturar. No se conserva por eso.
+
+                      🔒 Por qué NO se retira en esta entrega: quitarlo borra la puerta que
+                      construyeron las filas 0.164 (ofrecer el color RETIRADO con mercancía) y 0.192
+                      (buscarlo en el SERVIDOR en vez del `<select>` topado en 100), cada una con su
+                      prueba y su razón. Eso es QUITAR UNA CAPACIDAD, no arreglar el defecto que
+                      Daniel reportó, y el encargo de esta entrega dice explícitamente que no se
+                      amplíe por cuenta propia. Va como fila propia, con el visto bueno de Daniel. */}
                       <SelectorColor
                         key={vecesAgregado}
                         idSeleccionado={undefined}
