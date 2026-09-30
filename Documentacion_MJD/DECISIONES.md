@@ -17541,3 +17541,121 @@ Desarrollo), y contarla una vez por perfil la duplicaba.
 dijo que sigue mañana. 🔑 **Lo importante: sus notas de esos seis están a salvo y leídas; sus marcas Sí/No de
 esos seis, si las hizo, se perdieron por el defecto de arriba** — y al volver verá el conteo en el pie, que es
 lo que evita que vuelva a pasar sin darse cuenta.
+
+#### (Post-F9.249) — EL CUESTIONARIO DE PERFILES, CONTESTADO ENTERO: 187 MARCAS Y 16 NOTAS (30-sep-2026)
+
+**Daniel: *«Ya contesté todo lo de los permisos»*.** Y esta vez **sí se guardó todo**, porque el defecto que se
+comió sus marcas de la primera vuelta (§Post-F9.248) quedó arreglado: **187 marcas y 16 notas**, los 16 puestos.
+
+📊 **El reparto: 172 «sí» y 15 «no».** Y los 15 «no» son donde está la información, no los 172 «sí».
+
+### ✅ Sus «no» corrigieron TRES cosas que el lead había propuesto mal
+
+| Su «no» | Qué corrige |
+|---|---|
+| **Compras NO recibe** (`compras.recibir`) | Coherente con su nota de Habilitaciones —*«ya se quedó la recepción en este perfil»*— ⇒ **quien compra no confirma lo que llegó**, que era la recomendación de §247. Él la aplicó sin que hiciera falta insistir. |
+| **Producción NO programa la ruta** (`rc.programar`) | La **captura** (`rc.capturar` sí) pero no la programa. |
+| **El líder de calidad NO modifica auditorías** (`calidad.modificar-auditorias`) ni asigna usuarios | Confirma por segunda vía lo que ya había dicho en el chat: los auditores los asigna él. |
+
+### ✅ Y una BUENA NOTICIA medida: la línea del Encargado de Telas YA se puede trazar
+
+Su nota: *«Sí tiene que poder ver los precios de las telas, **porque él va a recibir las facturas**. Pero no es
+necesario que vea los importes de las telas ya en el inventario. **Las cantidades sí es indispensable** que las
+vea.»* — y marcó **no** a `telas.ver-totales`.
+
+📐 **MEDIDO, y su marca es exacta:** son **dos permisos distintos**. El **precio del catálogo** (la tabla
+`TelaProveedor`, precio de una tela a un proveedor, con su grid por color) se lee con **`telas.ver`**
+(`dominio/catalogos/tela-proveedores.ts:260`), que **sí tiene**. Y **`telas.ver-totales`** gobierna sólo los
+**importes de los movimientos y las entradas** de inventario (`inventarios/entradas-tela.ts` en seis sitios y
+`inventarios/avios.ts:278,353`, donde se pasa como bandera `verImportes` a la proyección). ⇒ **ve precios para
+cotejar facturas y no ve importes acumulados del inventario, sin construir nada.**
+📌 Y no le estorba para capturar: al dar de alta una entrada **teclea** el `precioUnit` de la factura que tiene
+en mano (`contrato/esquemas/entrada-tela.ts:75-80`; ese precio viaja al kardex como `costoUnit`, D1) — teclear
+no exige el permiso de **ver** los acumulados.
+
+### 🔴 EL HALLAZGO GRANDE: CUATRO COSAS QUE, CON SUS MARCAS, SÓLO PODRÍA HACER ÉL
+
+Cruce mecánico de las 187 marcas contra el catálogo real (134 permisos en `contrato/permisos.ts`): **79 los
+lleva algún puesto**; de los **55 restantes**, **21 son reservados** —suyos por diseño— y **34 son operativos
+sin dueño**. La mayoría de esos 34 son legítimamente suyos porque él lo dijo (`costos.*`, `edr.*`,
+`listas.aprobar`, `ordenes.cerrar`, `compras.autorizar`, `esma.cargo-validar`, los tres de `ipt.*` que aceptó
+dejar fuera). **Pero cuatro no parecen deliberados, y dos de ellos son el arranque del negocio:**
+
+| Nadie puede… | Medido |
+|---|---|
+| **Importar la OC del cliente** | El importador de Excel y de PDF exige **`pedidos.administrar`** (5 sitios en `dominio/pedidos/importacion*.ts`) y `ordenes.administrar` (2) — y él marcó **no** a `pedidos.administrar` para Aurora, que era el único perfil que lo tenía propuesto. |
+| **Crear una orden de producción** | `dominio/produccion/ordenes.ts` exige **`ordenes.administrar`** en **6** sitios, y **ningún perfil lo lleva**. |
+| **Capturar el precio de maquila** | Dijo *«sólo con permiso»* (§248(d)) y `ordenes.precio-maquila` **no se lo dio a nadie**. |
+| **Cancelar una orden o una OC** | `ordenes.cancelar` y `compras.cancelar`, **sin dueño**. |
+
+⏳ **Preguntado a Daniel, y NO se supone:** la hipótesis del lead es que al marcar «no» en `pedidos.administrar`
+quiso decir *«Aurora no administra los pedidos INTERNOS»*, no *«nadie importa la OC del cliente»* — pero **eso
+es una suposición y se le preguntó en vez de escribirla como decisión**: quién importa la OC · quién crea las
+OP · quién captura el precio de maquila · quién cancela.
+📌 **Dos menores del mismo barrido:** nadie lleva **`admin.ver-bitacora`** (el registro de quién cambió qué) ni
+los **`indicadores.ip-*`** de Ingeniería de Producto. Propuesta: la bitácora con él; los indicadores, en
+Gestión Técnica cuando ese puesto exista de verdad.
+
+🔑 **Y por qué este cruce vale más que las 172 marcas afirmativas:** Daniel pidió el ejercicio *«marcando a
+quién le FALTA algo y a quién le SOBRA algo peligroso»*. Las marcas «sí» contestan la segunda mitad; **sólo el
+cruce contra el catálogo contesta la primera** — un permiso que nadie lleva no aparece en ninguna ficha, así
+que **no se puede ver leyendo perfil por perfil**. *La pregunta «¿a quién le falta?» no se responde mirando lo
+que hay: se responde restando.*
+
+### 🔴 DOS COSAS NUEVAS QUE SALIERON DE MEDIR SUS RESPUESTAS
+
+**(a) EL SOBRANTE DE CORTE NO SE PUEDE DEVOLVER AL INVENTARIO — fila 0.240.** Su nota de Corte describe un
+flujo que el sistema no tiene: *«El consumo lo debe de capturar **el encargado de telas**. No corte. **Telas
+saca del inventario y le entrega a corte, y corte le debe de regresar lo que sobró para cuadrar inventarios.**»*
+📐 **MEDIDO en `dominio/inventarios/partidas-telas.ts`:** los caminos de tela son `crearPartidaTela` (lote
+nuevo), `ajustarInventarioTelaColor` (ajuste), `registrarConteoTelaColor` (conteo), `traspasarTelaColor`
+(traspaso), `cancelarMovimientoTelaColor` (inverso auditado), y las salidas
+`registrarSalidaTelaColorAOrden` / `...SinOrden`. **NO existe una devolución DESDE una orden.** ⇒ hoy el
+sobrante se cuadraría con un **ajuste**, que arregla el inventario pero **no dice que vino de corte y no baja
+el consumo de la orden** ⇒ **el costo de esa orden queda inflado para siempre**.
+⏳ **Y la clasificación depende de un dato que sólo él tiene, así que se le preguntó (regla de §7.5):
+¿cada cuánto sobra tela de un corte?** Si es casi siempre, toca el costo de casi todas las órdenes y sube de
+categoría; si es raro, aguanta con el ajuste.
+
+**(b) DISEÑO GRÁFICO QUEDÓ SIN PODER TRABAJAR, Y ES UN CAMBIO DE DECISIÓN SUYO.** Marcó **no** a
+`modelos.administrar` **y** a `desarrollo.administrar` —los dos únicos que habilitan meter un arte— y escribió:
+*«Ahorita te puse que **no tiene permiso para cambiar el modelo**. Pero **hay que desarrollarle el permiso para
+modificar sólo el arte** y que sí pueda subir fotos del arte.»*
+⚠️ **Esto CONTRADICE su respuesta de doce horas antes** (§Post-F9.248, respuesta #3): *«podemos darle todo el
+permiso por ahora y después lo partimos»*. Las dos son razonables —la de ayer prioriza que el puesto opere, la
+de hoy prioriza no darle poder de más— **pero no se puede aplicar las dos**, y el lead **no eligió por él**: se
+le preguntó cuál manda. Con las marcas de hoy tal como están, **ese puesto no puede meter artes hasta que se
+construya la fila 0.235**, que deja de ser «duele pero se aguanta con el rodeo» y pasa a bloquear a una persona
+concreta.
+🔑 *Cuando dos respuestas del dueño se contradicen, la más nueva no gana automáticamente: gana la que él
+confirme sabiendo que contradice a la otra.* Escribirlo sin avisar habría sido decidir en su nombre.
+
+### 📋 Sus dieciséis notas, y qué cambia cada una
+
+| Puesto | Su nota (textual, resumida) | Consecuencia |
+|---|---|---|
+| **Director** | *«ok, dos perfiles»* → confirmado *«Correcto. Dos usuarios»* | §248(a). Falta decidir cuál de sus dos usuarios lleva la bandera de corregir sin factura. |
+| **Ventas** | negociar sólo lectura + comentarios; el alta de cliente es de Administración o suya | Filas **0.238** y **0.239**: ninguna de las dos líneas se puede trazar hoy. |
+| **Desarrollo** | *«sí debe de poder darlo de alta»* | Abre `telas.administrar` y `avios.administrar` (reservados). |
+| **Finanzas** | no ve EDR ni costos finales; *«ella me manda saldos y **yo** defino la corrida»*; sí ve producción | **Desarma el choque grande**: la corrida se queda con él, y abre los **seis** reservados restantes. |
+| **Producción** | el precio de maquila *«sólo con permiso»* | Ya es un permiso propio ⇒ nada que construir… **pero no se lo dio a nadie** (ver el hueco arriba). |
+| **Compras** | *«**yo autorizo OC**»* · sí da de alta avíos · compra cosas ajenas a producción *(limpieza)* y también las da de alta · ⭐ **«las órdenes de compra de TELAS también las hace compras. Yo sólo autorizo»** | Lo último **aclara un alcance que la ficha no decía**: Compras cubre telas y avíos, no sólo avíos. |
+| **Habilitaciones** | *«ya se quedó la recepción en este perfil»* | Cierra la duda de §247: **recibe Habilitaciones**, no Compras. |
+| **Telas** | ve precios (recibe facturas), no ve importes del inventario, las cantidades sí | **Ya se puede** (medido arriba). |
+| **Corte** | el consumo lo captura **Telas**; corte devuelve el sobrante | **Fila 0.240** (la devolución no existe). |
+| **Almacén PT** | *«Sí está bien así como lo propones… lo que dejaste afuera»* | ✅ Confirma dejar fuera los tres permisos que borran un descuadre (`ipt.modificar-movimientos`, `ipt.cantidades-negativas`, `ipt.fecha-libre`). |
+| **Entregas** | *«a veces entregas e inventarios es la misma persona. No siempre… depende de cuánto trabajo tengamos»* | ⭐ **Justifica el modelo elegido**: se le dan **los dos perfiles** cuando coincide, sin inventar un tercero. |
+| **Gestión Técnica** | son personas distintas hoy; *«con el sistema bien hecho, esa ficha podría salir de desarrollo… chance se podría llegar a fusionar»* | El puesto se crea ya; su pantalla llega cuando se construya la ficha técnica. |
+| **Diseño Gráfico** | no cambia el modelo; hay que construirle el permiso del arte | **Cambio de decisión** (ver arriba). |
+| **Líder de Calidad** | *«sí lo define él: los AQL y catálogo de defectos»* | Abre `calidad.administrar-catalogo` (reservado). |
+| **Supervisor de Calidad** | *«el líder asigna y él las ejecuta»* | ✅ Confirma la propuesta. |
+| **Auxiliar** | *«lo vamos viendo. Así está bien como quedó»* | Con sus dos «no»: **no ve pedidos ni ruta crítica**. |
+
+### 🧹 Y un defecto de la casa que apareció al mergear la v0.186, sin relación con nada de esto
+
+El job `e2e` del CI salió **verde con `1 flaky`**: `e2e/proveedores.spec.ts:211` —*«adjuntar un PDF (red de R2
+mockeada) lo lista y se puede quitar»*— **falló en el primer intento y pasó al reintento** (`104 passed` + 1
+flaky = los 105 de siempre). El diff de esa entrega eran tres `.md` y un `.mjs` de herramientas, así que **no
+puede ser suyo**. 📐 **Comprobado que NO estaba registrado en ninguna parte** (la única fila de flaky, la 0.169,
+es de `pedidos.spec.ts` y ya cerró) ⇒ **fila 0.241**, para que no se pierda. 🔑 *«Flake» no es una causa, y un
+flaky que nadie anota es un rojo futuro sin historia.*

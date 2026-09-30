@@ -71,6 +71,62 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.187 · 30-sep-2026 · **en prueba** — **Contestaste los 16 puestos, y al cruzarlos aparecieron cuatro cosas que hoy sólo podrías hacer tú**
+
+> **La v0.187 no cierra ninguna fila del programa** y no cambia cómo funciona el sistema: guarda tus 187
+> respuestas y lo que salió de medirlas.
+
+### ✅ Se guardó todo, esta vez
+
+**187 marcas y 16 notas, los 16 puestos.** El defecto que se comió tus marcas de la primera vuelta quedó
+arreglado, y ahora, si algo no se guarda, el aviso **se queda en pantalla**.
+
+**172 «sí» y 15 «no»** — y tus «no» corrigieron **tres cosas que yo había propuesto mal**: que Compras no
+recibe lo que Compras pidió, que Producción captura la ruta pero no la programa, y que el líder de calidad no
+modifica auditorías ya cerradas.
+
+⭐ **Y lo que más desatoró: abriste los seis permisos de Administración.** Con la corrida de pagos quedándose
+contigo, el perfil de Lupita ya se puede armar completo. Era la decisión más pesada de la lista.
+
+### 🔴 Lo que tienes que ver: cuatro cosas sin dueño
+
+Cruzé tus 187 marcas contra la lista completa de permisos. **79 los lleva algún puesto.** De los que sobran, la
+mayoría son tuyos porque tú lo dijiste —costos, resultados, aprobar precios, autorizar compras, cerrar
+órdenes—. **Pero cuatro no creo que sean a propósito**, y dos son el arranque del negocio:
+
+- **Nadie puede importar la orden de compra del cliente.**
+- **Nadie puede crear una orden de producción.**
+- **Nadie puede capturar el precio de maquila** (dijiste «sólo con permiso», y no se lo diste a nadie).
+- **Nadie puede cancelar una orden ni una orden de compra.**
+
+Con tus marcas tal cual, **tú capturarías cada pedido y cada orden**. Sospecho que al marcar «no» en los
+pedidos de Aurora querías decir que ella no lleva los pedidos internos, no que nadie importe la OC del
+cliente — **pero no lo doy por hecho**. Te pregunté quién hace cada una.
+
+*(Y dos menores: nadie puede ver el registro de quién cambió qué, y nadie lleva los indicadores de Ingeniería
+de Producto.)*
+
+### ⚠️ Qué más salió, y puede sorprender
+
+**El sobrante de corte no se puede devolver.** Contaste que Telas saca la tela, se la entrega a corte, y corte
+devuelve lo que sobró. **Ese camino no existe**: hay entradas, ajustes, conteos, traspasos y cancelaciones,
+pero no una devolución desde una orden. Hoy se cuadraría con un ajuste, que arregla el inventario **pero deja
+el costo de esa orden inflado**. Te pregunté cada cuánto sobra tela, porque de eso depende si esto duele o
+bloquea.
+
+**Y en Diseño Gráfico tienes dos respuestas que se contradicen.** Por la mañana dijiste que le diéramos el
+permiso completo y lo partiéramos después; por la tarde marcaste que no, y que hay que construirle el permiso
+del arte. Las dos se entienden — **pero no puedo aplicar las dos**, y con tus marcas de la tarde ese puesto
+**no puede meter artes** hasta que se construya. No elegí por ti: te pregunté cuál manda.
+
+### ⏳ Qué sigue pendiente
+
+- **Las seis preguntas de arriba.** Son las que faltan para armar los perfiles de verdad.
+- **Tus dos usuarios**: decidir cuál lleva tu permiso de corregir movimientos sin factura.
+- **Lo que no depende de mí:** cambiar la contraseña de `admin`, sembrar los datos de demo en `prueba`, y
+  comprobar que estén capturados el régimen y el código postal fiscal de FR Moda — sin eso, el documento para
+  facturar no sale para nadie.
+
 ## 0.186 · 30-sep-2026 · **en prueba** — **Tus perfiles quedan escritos, y de medirlos salieron cinco cosas: cuatro permisos que no se pueden acotar y una fila que te tenía trabajando a mano de más**
 
 > **La v0.186 no cierra ninguna fila del programa**, y tampoco cambia nada de cómo funciona el sistema: es la
