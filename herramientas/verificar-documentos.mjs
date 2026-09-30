@@ -239,6 +239,67 @@ decir(
   `  V1: ${totalV1 === null ? '?' : totalV1[1]} pendientes = ${sumaV1} sumando los tres grupos`,
 );
 
+// ── 1-bis · LA COLA NARRATIVA de la línea del resumen ───────────────────────────────────────────
+//
+// ⭐ POR QUÉ EXISTE ESTE BLOQUE (lo pidió el reviewer de la v0.186, y se lo ganó cazando la misma
+// falta TRES veces en una sola entrega). Los bloques de arriba cruzan el ENCABEZADO de la línea
+// «📊 Dónde va el programa» y sus tres listas nombradas. Pero esa línea sigue **8.000 caracteres
+// más** contando la historia de cada vuelta —«⇒ N fichas nuevas», «las pendientes de V1 en N»,
+// «pasan de 14 a N»— y **esa cola no la cruzaba nadie**. Resultado medido: al nacer UNA fila
+// (la 0.239), el encabezado decía 33 y la cola seguía diciendo 32 en dos sitios, y la cuenta de
+// fichas nuevas se quedó en 24 cuando eran 25.
+//
+// 🔑 La forma del defecto, que es lo que este bloque cierra: **cada vez que nace una fila hay N
+// sitios que la cuentan**, y sólo algunos son listas. Un número escrito en PROSA envejece igual
+// que uno escrito en una tabla, pero nadie lo vuelve a mirar. No se comprueba «está bien
+// redactado»: se comprueba que **todas las cifras de V1 de la línea digan lo mismo**, que es
+// mecánico y no opina de estilo.
+const lineaResumen = hoja.split('\n').find((l) => l.includes('Dónde va el programa')) ?? '';
+if (lineaResumen === '') {
+  problemas.push('No se encontró la línea «📊 Dónde va el programa» en HOJA-DE-RUTA.md.');
+} else if (totalV1 !== null) {
+  const esperado = +totalV1[1];
+  // Todas las formas en que esa línea vuelve a decir el total de pendientes de V1.
+  const formas = [
+    { re: /pendientes de V1 en \*{0,2}(\d+)\*{0,2}/g, como: 'las pendientes de V1 en N' },
+    { re: /pendientes de V1 pasan de \*{0,2}\d+ a (\d+)\*{0,2}/g, como: 'pasan de 14 a N' },
+  ];
+  for (const { re, como } of formas) {
+    for (const m of lineaResumen.matchAll(re)) {
+      if (+m[1] !== esperado) {
+        problemas.push(
+          `La cola narrativa del resumen dice «${como}» con ${m[1]}, y el total de la V1 es ${esperado}. ` +
+            'Es la cifra que envejece sola: si nació una fila, hay que propagarla a TODA la línea, no sólo al encabezado.',
+        );
+      }
+    }
+  }
+  // La cadena «⇒ N fichas nuevas …»: su ÚLTIMO eslabón es el vigente y tiene que cuadrar con
+  // «De las N, …» que viene justo después.
+  const eslabones = [
+    ...lineaResumen.matchAll(
+      /\*{0,2}(\d+) fichas(?: nuevas)?(?: en total)?(?: el \d+-\w+)?\*{0,2}/g,
+    ),
+  ].map((m) => +m[1]);
+  const deLasN = [...lineaResumen.matchAll(/De las (\d+),/g)].map((m) => +m[1]);
+  if (eslabones.length > 0 && deLasN.length > 0) {
+    const ultimo = Math.max(...eslabones);
+    for (const n of deLasN) {
+      if (n !== ultimo) {
+        problemas.push(
+          `La cola narrativa dice «De las ${n},» y el último eslabón de la cadena de fichas nuevas es ${ultimo}. ` +
+            'Los dos cuentan lo mismo y tienen que coincidir.',
+        );
+      }
+    }
+  }
+  decir(
+    `  cola narrativa del resumen: ${eslabones.length} eslabones de «N fichas» (vigente ${
+      eslabones.length ? Math.max(...eslabones) : '?'
+    }) · cifras de V1 cruzadas contra ${esperado}`,
+  );
+}
+
 // ── 2 · El número de versión, en sus cuatro sitios ──────────────────────────────────────────────
 const historial = leer('HISTORIAL-DE-VERSIONES.md');
 const versionTs = leer('frontend/src/version.ts');

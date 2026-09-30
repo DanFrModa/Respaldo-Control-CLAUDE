@@ -71,7 +71,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
-## 0.186 · 30-sep-2026 · **en prueba** — **Tus perfiles quedan escritos, y de medirlos salieron cuatro cosas: tres permisos que no se pueden acotar y una fila que te tenía trabajando a mano de más**
+## 0.186 · 30-sep-2026 · **en prueba** — **Tus perfiles quedan escritos, y de medirlos salieron cinco cosas: cuatro permisos que no se pueden acotar y una fila que te tenía trabajando a mano de más**
 
 > **La v0.186 no cierra ninguna fila del programa**, y tampoco cambia nada de cómo funciona el sistema: es la
 > versión que **guarda tus decisiones** para que no vivan en un chat, y trae **una corrección del tablero que
@@ -116,9 +116,9 @@ Y de las seis fichas que contestaste salieron cuatro cosas que **ya funcionan y 
 defino la corrida de pagos»* ⇒ la corrida **se queda contigo**, que es como lo habías pedido en su momento. De
 los siete permisos delicados que su puesto necesitaba, **el que más pesaba ya no está en discusión**.
 
-### ⚠️ Qué cambió y puede sorprender: tres cosas que pediste y el sistema no puede acotar
+### ⚠️ Qué cambió y puede sorprender: cuatro cosas que pediste y el sistema no puede acotar
 
-Las tres son el mismo problema —**un permiso que empaqueta cosas de peso muy distinto**— y las tres quedaron
+Las cuatro son el mismo problema —**un permiso que empaqueta cosas de peso muy distinto**— y las cuatro quedaron
 apuntadas para arreglarse, no olvidadas:
 
 1. **El arte no se puede separar del modelo.** Quien mete el arte puede también cambiarle las telas y los
@@ -127,6 +127,12 @@ apuntadas para arreglarse, no olvidadas:
    el mismo permiso. Mientras no se parta, ella lee y las rondas las capturas tú.
 3. **Asignar supervisores de calidad** arrastra el poder de dar de alta a cualquiera. Los asignas tú, que es
    lo que ya haces.
+4. ⚠️ **Y ésta te la corrijo, porque ayer te dije que estaba resuelta y no lo está.** Dijiste que Aurora puede
+   meter **compradores y departamentos**, y que dar de alta al cliente es de Administración o tuyo. **Hoy no se
+   le puede dar sólo la primera mitad:** el permiso que parecía servir **no hace nada** —está en la lista pero
+   nada en el sistema lo pide—, y el único que sí habilita meter compradores y departamentos **le daría también
+   dar de alta y desactivar clientes**, que es justo lo que te reservaste. Mientras no se parta: esos datos los
+   captura **Administración o tú**, y Aurora los consulta.
 
 ### ⏳ Qué sigue pendiente
 
