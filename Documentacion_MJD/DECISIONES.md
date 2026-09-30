@@ -17413,3 +17413,94 @@ que no existe? (hoy es reservado, y le va a pasar seguido) · ¿Almacén de PT l
 en una página de consulta donde él marca Sí/No y se guarda:**
 <https://claude.ai/artifact/117ErS5sYRUwmdDe38EL3D>. ⚠️ **Vive FUERA del repositorio** (es una página publicada,
 no un archivo de `docs/`), igual que el catálogo de los 134 permisos de §246.
+
+#### (Post-F9.248) — LAS RESPUESTAS DE DANIEL A LOS PERFILES, Y EL DEFECTO QUE SE COMIÓ SUS MARCAS (30-sep-2026)
+
+**Daniel contestó la mitad del cuestionario y las tres preguntas de este chat, y de camino preguntó algo que
+destapó un defecto del lead.**
+
+### 🔴 PRIMERO EL DEFECTO, porque es lo que cuesta trabajo suyo
+
+Preguntó: *«¿Tú puedes ver lo que estoy contestando?»* — y la respuesta honesta era **mitad y mitad**: sus
+**NOTAS por puesto sí se guardaron** (seis, leídas íntegras), pero **ninguna de sus marcas Sí/No**, porque la
+colección `decisiones` estaba **vacía**. 📐 **Causa medida:** la página construía el id del documento como
+`perfil|clave`, y el id de un documento de esa base sólo admite `[A-Za-z0-9_-.~:@+]` ⇒ **la barra `|` —y
+también el `*`, la `/`, los espacios y los paréntesis de claves como `cxp.* / cxc.* / pagos.*`— hacían fallar
+CADA clic.** Las notas se salvaron por casualidad: sus ids son limpios (`compras`, `finanzas`).
+
+🔑 **Y la parte que convierte un bug en una pérdida de trabajo ajeno: el aviso de error SE BORRABA A LOS 2.5
+SEGUNDOS.** El `catch` existía y pintaba *«No se pudo guardar ese cambio»*… y el mismo temporizador que
+limpiaba los mensajes de éxito lo limpiaba a él. ⇒ **un fallo de guardado era, a efectos prácticos,
+silencioso.** *Un error que se auto-borra es un error que nadie ve, y el trabajo se pierde igual que si no se
+hubiera avisado nunca.*
+
+**Arreglado y verificado el mismo día:** ids normalizados a `perfil__clave` (probados **los 3.856 posibles**
+contra el patrón de la base: 0 inválidos), **el aviso de fallo ya NO se borra solo** (banner rojo permanente
+hasta que se arregle) y el pie muestra **cuántos permisos van marcados**, para que la ausencia de guardado se
+vea sin tener que fijarse en un mensaje. Probado escribiendo, leyendo y borrando un documento con el formato
+nuevo.
+
+### ✅ LAS TRES DEL CHAT
+
+| # | Su respuesta | Consecuencia |
+|---|---|---|
+| 1 | *«Ya lo contesté en el cuestionario»* (los reservados de Lupita) | Ver su nota de Finanzas abajo: **resuelve el choque grande**. |
+| 2 | *«Yo soy el que da de alta usuarios. También los supervisores. **Por ahora nadie más da de alta usuarios más que yo**»* | ⇒ **fila 0.236 decidida**: el rodeo que el lead recomendó ES la política. El permiso propio para marcar auditores sigue siendo deseable, no urgente. |
+| 3 | *«Podemos darle todo el permiso por ahora y después lo partimos. **Que no se te olvide para después.**»* (el arte) | ⇒ **fila 0.235 confirmada en 🔶**: Diseño Gráfico lleva `modelos.administrar` completo **por ahora**, con el alcance aceptado a sabiendas. Su *«que no se te olvide»* es justo para lo que existe la fila. |
+
+### ✅ SUS SEIS NOTAS DEL CUESTIONARIO, textuales, y qué cambia cada una
+
+**(a) Director General** — *«ok, dos perfiles»*. ⏳ **Una confirmación pendiente de UNA línea:** la
+recomendación medida era **dos USUARIOS** (dos inicios de sesión), porque dos perfiles sobre la misma persona
+se **suman** y dan los dos siempre. Su *«dos perfiles»* probablemente usa la palabra como en el sistema viejo
+—donde son dos usuarios— pero **conviene confirmarlo, porque es la diferencia entre que funcione y que no.**
+
+**(b) Gerente de Ventas (Aurora)** — *«Las listas **negociar solo de lectura y poder agregar comentarios**, pero
+no modificar lo que yo hice. Administración o yo damos de alta al cliente. Ella puede meter información de
+compradores, departamentos, datos de cada comprador, etc.»*
+- ✅ **El alta de clientes queda como estaba propuesto**: ella **no** lleva `clientes.administrar` (reservado);
+  lleva `clientes.modificar`, que es exactamente *«compradores, departamentos, datos de cada comprador»*.
+- 🔴 **Pero «leer y comentar sin modificar» NO SE PUEDE EXPRESAR HOY, y es un hallazgo nuevo (fila 0.238).**
+  Medido: la **lectura** sí la da `listas.ver` (*«consultar listas de precios por cliente, sus renglones **y su
+  negociación**»*). El problema es **comentar**: el texto de cada ronda vive en `NegociacionEvento.acuerdo`
+  (con `registradoPorId`/`registradoEn`, así que ya queda firmado), y escribirlo exige **`listas.negociar`**,
+  que gobierna **OCHO** operaciones —`registrarRonda`, `registrarAcuerdo`, `cambiarEstadoLista`,
+  `cambiarEstadoRenglon`, `simularNegociacion`, `simularMesa` y, las dos que pesan, **`emitirCotizacion` y
+  `cancelarCotizacion`**—. ⇒ **darle «comentar» le daría EMITIR Y CANCELAR COTIZACIONES a un cliente**, que es
+  mucho más de lo que pidió.
+
+**(c) Administración (Lupita)** — *«**no ve ni estados de resultados ni costos finales. Solo lo veo yo, y solo
+yo los hago.** Ella me manda saldos de proveedores y **yo defino la corrida de pagos**. Sí ve producción.»*
+⭐ **ESTO DESARMA EL CHOQUE MÁS GRANDE DE §247(a).** El reservado que más pesaba —`pagos.corrida-armar`, que el
+seed documenta como pedido *«para él»*— **se queda con él**: ella prepara los saldos, él decide la corrida. Y
+`edr.*` y `costos.*` quedan fuera, como estaban propuestos. ⇒ de los siete reservados de su perfil, **el más
+delicado ya no está en discusión**; quedan por confirmar los otros seis (cuentas por pagar y cobrar,
+movimientos de cuenta corriente, vista fiscal, conceptos de pago y **alta de proveedores**, que él sí pidió
+para ella con su constancia fiscal).
+
+**(d) Producción (Bernardo)** — *«el precio de maquila lo puede modificar **solo con permiso**. O cuando
+modifique **que me avise**.»* ✅ **Su primera opción YA FUNCIONA, sin construir nada:**
+`ordenes.precio-maquila` es un **permiso propio** (*«capturar o modificar el precio de maquila»*), separado de
+`ordenes.ver-precio-real-maquila` ⇒ se le da o no se le da, y ahí queda dicho. ⚠️ **Su segunda opción NO
+existe:** medido, **no hay ninguna infraestructura de avisos** en el backend —ni módulo de notificaciones ni
+librería de correo—; F5 dejó *«notificaciones push/correo → F7»* y **nunca se construyó**. ⇒ **recomendación:
+quedarse con la opción del permiso**, que es gratis y él ya la nombró primero.
+
+**(e) Compras** — *«**Yo autorizo OC.** SÍ creo que debe de poder dar de alta avíos. Aparte compra cosas como
+**productos de limpieza que no tienen nada que ver con producción**, y también lo da de alta él.»*
+- ✅ **`compras.autorizar` se queda con Daniel**, que es exactamente como estaba propuesto (dejarlo fuera de
+  Compras): quien hace la OC no la firma.
+- ⇒ **`avios.administrar` (reservado) se abre para Compras.** Es el segundo reservado que su respuesta abre.
+- ✅ **Y lo de los productos de limpieza YA FUNCIONA:** medido, `idOrden` es **opcional por renglón** de OC
+  (`dominio/compras/ordenes-compra.ts:122`) ⇒ **una OC puede no colgar de ninguna orden de producción**, que es
+  justo lo que hace falta para comprar cosas ajenas a producción. **No hace falta construir nada.**
+
+**(f) Desarrollo / Diseñadora** — *«sí debe de poder darlo de alta»* (tela o avío que no existe) ⇒ **se abren
+`telas.administrar` y `avios.administrar`** para ese perfil. Tercer y cuarto reservado que sus respuestas abren.
+
+### 📊 Estado del ejercicio
+
+**6 de 16 puestos contestados** (director, ventas, finanzas, producción, compras, desarrollo). Quedan diez, y él
+dijo que sigue mañana. 🔑 **Lo importante: sus notas de esos seis están a salvo y leídas; sus marcas Sí/No de
+esos seis, si las hizo, se perdieron por el defecto de arriba** — y al volver verá el conteo en el pie, que es
+lo que evita que vuelva a pasar sin darse cuenta.
