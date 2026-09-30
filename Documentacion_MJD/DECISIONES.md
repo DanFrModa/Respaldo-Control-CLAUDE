@@ -17131,3 +17131,81 @@ el **fixture no era lo que devuelve el servidor** (dos renglones +100/−100 don
 cero) y otra que pasaba **por el motivo equivocado** (la excluía el filtro por bucket, no el corte que la
 prueba creía medir). *Trece mutaciones, trece muertas — pero sólo después de comprobar que cada una se
 aplicó de verdad.*
+
+#### (Post-F9.246) — LOS PERMISOS VIVEN EN LA PERSONA, CON SU PERFIL COMO LIGA VIVA (30-sep-2026, decisión de Daniel)
+
+**Daniel pidió rehacer los perfiles, y de camino decidió el modelo de permisos.** Sus palabras, en orden:
+
+> *«No me gusta cómo están definidos. Prefiero ir haciendo **un perfil de cada puesto con las actividades que
+> hace realmente cada uno**, y de ahí me ayudas a definirle los permisos que creas que son los que debe
+> tener.»*
+>
+> *«El sistema viejo no tiene tampoco muy bien definidos los perfiles.»* · *«La lista creo que mejor te los
+> doy yo.»*
+>
+> *«Me gustaría definir perfiles con permisos, y asignarle a una persona el perfil… y si después una persona
+> de compras decido que también va a hacer algunas actividades que son de habilitaciones, que pueda asignarle
+> los permisos necesarios. **Al final los permisos van a vivir en cada persona. Los perfiles son de
+> referencia, o más bien de punto de partida.**»*
+
+### ⚠️ Y la parte que le toca al lead: los nueve perfiles de hoy son MÍOS, y heredaron el defecto
+
+Los nueve perfiles de v2 los **propuso el lead** derivándolos de los niveles del viejo. Si el viejo los tenía
+mal definidos —y Daniel dice que sí—, los de ahora **heredaron el problema**: de ahí que **tres salieran
+literalmente idénticos** (`Logistica`/`Asistente`/`Secretarial`, el mismo conjunto de 76, comprobado
+comparando los conjuntos y no los conteos). **No se degradaron: nacieron así.** ⇒ **esto no es arreglar una
+migración, es definirlo bien por primera vez**, y por eso vale el tiempo.
+
+### ✅ EL MODELO DECIDIDO — «perfil + excepciones», con el origen registrado
+
+Se le pusieron **tres** opciones sobre su caso real (Juan, de Compras, al que quiere darle 5 permisos de
+habilitaciones), y **la pregunta que las separa es una sola: cuando cambies un perfil, ¿quieres que cambien
+también las personas que ya lo tienen?**
+
+| | Cómo | Si cambia el perfil |
+|---|---|---|
+| **(1) Dos perfiles** *(funciona HOY, sin construir nada)* | Juan lleva «Compras» **y** un perfil chico de habilitaciones | Juan cambia |
+| **(2) Copiar** *(su primera formulación)* | Al asignar el perfil se **copian** sus permisos a Juan; ya son suyos | **Juan NO cambia** |
+| **(3) Perfil + excepciones** ⭐ *(recomendada y **ELEGIDA**: «me encanta tu recomendación, está perfecto»)* | Juan sigue **ligado** al perfil; se calcula «lo del perfil **+** lo agregado **−** lo quitado» | Juan cambia, **salvo en sus excepciones** |
+
+🔑 **Por qué se recomendó la (3) y no la (2), que era su formulación literal:** la (2) da lo que pide, pero su
+precio es que **un cambio de política hay que repetirlo persona por persona** — con tres personas no importa,
+con veinte y dos años encima es la diferencia entre una política que se aplica y una que se olvida. La (3) le
+da **lo mismo que pedía** (abrirle permisos sueltos a alguien) **sin ese precio**, y además puede decir, por
+cada permiso de una persona, *«éste lo tiene porque es de Compras»* o *«éste se le dio a mano tal día»* — que
+es lo que dentro de dos años permite entender por qué alguien puede hacer algo.
+📌 **En pantalla las tres se ven igual** (abres a la persona y ves todo lo que puede hacer); la diferencia es
+por dentro. Eso se le dijo explícitamente, para que eligiera por la consecuencia y no por la apariencia.
+
+### 📐 QUÉ HACE FALTA CONSTRUIR, MEDIDO
+
+- **La tabla de permiso por persona NO existe.** Hay `Permiso`, `RolPermiso` (permisos del perfil) y
+  `UsuarioRol` (perfiles de la persona, **N:M** — una persona ya puede llevar varios, que es la opción (1)),
+  pero **no hay `UsuarioPermiso`** ⇒ hoy lo que puede hacer alguien **se calcula** de sus perfiles y no hay
+  nada guardado en la persona.
+- ⭐ **Y la mejor noticia: el cálculo vive en UNA sola función.** `backend/src/comun/permisos.ts:131-135`
+  junta `usuario.roles → rol.permisos → clave` en un `Set`. **Ahí entra el modelo entero** — `+ agregados
+  − quitados` — sin tocar ningún otro sitio, porque A1 ya tenía la resolución en un solo lugar.
+- Falta además la pantalla: abrir a una persona, ver **todo** lo que puede hacer **con el origen de cada
+  permiso**, y agregar o quitar.
+
+⇒ **Ficha 0.234**, reescrita con este modelo.
+
+### ⏳ Cómo sigue, por decisión suya
+
+**Él da la lista de perfiles** (*«mejor te los doy yo»*), puesto por puesto y con lo que hace cada uno; el
+lead propone los permisos de cada uno y los ajustan. Se le pidió que, donde lo sepa, diga también **lo que
+ese puesto NO debe poder hacer** —ver importes y márgenes, autorizar compras, reabrir órdenes, mover
+inventario—, que es la mitad que se olvida y donde está el daño.
+📌 **Y el catálogo de los 134 permisos quedó publicado como página de consulta** (con su descripción y los
+**29** reservados marcados con su razón), que es de donde salen las propuestas. ⚠️ Esa cifra se había
+publicado como **37** por un conteo torpe del lead; son **29**, extraídos uno por uno.
+
+### 🔑 Una lección chica de comunicación, porque costó una vuelta
+
+El lead usó **«llave»** como metáfora de **«permiso»** durante toda la explicación, y Daniel tuvo que
+preguntar *«no entiendo bien lo que dices de la llave; ¿te refieres a que cada persona puede tener más de un
+perfil?»*. ⇒ **una metáfora en lugar de la palabra llana cuesta una vuelta entera.** Se rehízo con su propio
+ejemplo (Juan, de Compras, 5 permisos de habilitaciones) y una tabla de tres filas, y lo entendió de
+inmediato. *Cuando el interlocutor es el dueño del negocio y no el que escribe el código, la palabra que hay
+que usar es la del sistema que él va a operar, no la figura literaria.*
