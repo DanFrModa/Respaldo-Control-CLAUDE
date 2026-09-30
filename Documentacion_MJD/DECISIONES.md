@@ -17119,6 +17119,28 @@ cerró en la **fila 0.124**. ⇒ hay que decidir si el motivo **sustituye** a `c
 > MÉTODO, no sobre el hecho**: se comparan primero la normalización y el universo, y sólo después se discute
 > quién tiene razón. Las dos veces que esto pasó en esa hora —una en cada dirección— el hecho estaba bien y
 > el método estaba corto.
+>
+> ⭐ **Y LA QUINTA, QUE LE DA LA VUELTA A TODO LO ANTERIOR: una medición que NO coincide puede estar midiendo algo
+> que nadie medía — y ahí había un defecto real.** Contando las filas del tablero el lead obtuvo **183** contra las
+> **176** del verificador. Aplicó la regla, sospechó de su método… **y su método era el que veía algo nuevo:** son
+> **176 filas DISTINTAS** en **183 apariciones**, porque **siete filas se escriben dos veces** (0.072, 0.086, 0.087,
+> 0.118, 0.122, 0.126, 0.127) — una vez en el tablero y otra en la lista *«LO QUE ESPERA A LA FASE 2»*, que es
+> **deliberado**. 🔴 **Pero al abrir las siete, una no cuadraba: la 0.118 estaba `✅` en el tablero y la lista de
+> fase 2 decía *«se corta porque hoy se hace a mano»* y *«se sigue mandando a mano»*.** Medido contra el código:
+> **está construida** —`dominio/pagos/documento-facturacion.ts` (25 KB), dos rutas en `api/pagos/corrida.rutas.ts`
+> (JSON y `.pdf`) y la pantalla `DocumentoParaFacturar.tsx`— así que esa entrada llevaba semanas **diciéndole a
+> Daniel que siguiera haciendo a mano algo que el sistema ya le saca**. Corregida.
+> 🔑 **Tres cosas que enseña, y ninguna es la que uno esperaría:**
+> 1. **Ni el verificador ni el reviewer podían verlo**, y los dos publicaron *«0 duplicados»*: los dos indexan por
+>    número de fila, y **un `Map` deduplica en silencio**. *Una herramienta que agrupa por una llave no puede
+>    contar cuántas veces aparece esa llave.*
+> 2. **La fila ya estaba MEDIO corregida, y en la columna equivocada:** su última celda decía *«volvió a la V1 el
+>    4-sep»* mientras las dos primeras —las que alguien lee— seguían describiendo el corte. Es la cicatriz del §8
+>    otra vez (*el aviso que importa es el que está pegado a la cosa*), con la vuelta de que **aquí la cosa es una
+>    celda**: corregir una fila de cinco columnas obliga a mirar las cinco.
+> 3. ⇒ **la regla de sospechar del propio método se completa así: sospéchalo, pero no lo deseches — ÁBRELO.** La
+>    diferencia entre dos cifras es una pregunta, y a veces la respuesta no es *«me equivoqué»* sino *«encontré
+>    algo que el otro no busca»*.
 
 ### 🔴 (c) EL SOBRE-CORTE: el lead lo planteó AL REVÉS y Daniel lo corrigió
 
