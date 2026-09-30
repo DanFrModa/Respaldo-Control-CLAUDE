@@ -109,12 +109,21 @@ de Producto.)*
 
 ### ⚠️ Qué más salió, y puede sorprender
 
-**El precio de maquila lleva un tope nuevo, y lo pediste tú.** Al corregir tu propia marca —*«chance me
-equivoqué»*— dijiste que producción sí lo captura, **pero que no pueda ponerlo más caro que lo cotizado sin que
-tú autorices**. Eso se puede construir: el precio que captura producción y el que se cotizó en el desarrollo son
-dos datos que el sistema ya tiene, así que sólo falta compararlos. ⚠️ **Con un límite:** eso vale para la
-**costura**. El precio del **estampado** no tiene con qué compararse, porque su cotización no se guarda en
-ningún lado. Te pregunté si quieres el mismo tope ahí; si sí, primero hay que capturar esa cotización.
+**El precio de maquila y el de estampado llevan un tope nuevo, y lo pediste tú.** Al corregir tu propia marca
+—*«chance me equivoqué»*— dijiste que producción sí los captura, **pero que no pueda ponerlos más caros que lo
+negociado sin que tú autorices**. Y precisaste contra qué: **contra la última información negociada con el
+cliente, no contra lo que metió desarrollo al principio** — y el tope es el **costo negociado exacto**, sin
+margen.
+
+⭐ **Tenías razón en que ya está estructurado así.** Lo tracé: la orden sabe de qué desarrollo viene, el
+desarrollo tiene su renglón en la lista de precios del cliente, y ese renglón **se actualiza en cada ronda de
+negociación**, así que siempre apunta a lo último que se acordó. Dentro de eso, la maquila y el estampado tienen
+cada uno su propio renglón de costo. **Los dos topes se pueden construir.**
+
+⚠️ **Y me corregiste dos cosas, las dos importantes.** Te había propuesto topar contra el costo que captura
+desarrollo — que es exactamente lo que no querías, y el tope habría funcionado comparando contra un número
+viejo en cuanto hubiera una negociación. Y te dije que el estampado no tenía con qué compararse: **era falso**,
+sí tiene. Los dos errores salieron de mirar un solo sitio y dar por hecho que valía para todo el sistema.
 
 ### ✅ Y una cosa que ibas a leer aquí y tu respuesta borró
 
@@ -127,8 +136,10 @@ mismo día sin construir nada.
 
 ### ⏳ Qué sigue pendiente
 
-- **Una sola pregunta abierta:** si quieres el tope del precio también en el **estampado** (hoy no se puede,
-  porque su cotización no se guarda). Las otras cinco ya las contestaste.
+- **Tres cosas que se deciden al construir el tope:** qué pasa con una orden que **no nació de un desarrollo**
+  (no tendría contra qué compararse); que el mismo modelo vendido a **dos clientes** tiene dos topes distintos,
+  uno por cliente; y que al ser el costo **exacto**, si el negociado y el real casi nunca coinciden al centavo,
+  esto se vuelve un trámite diario de autorización — **conviene medirlo operando antes de cerrar la puerta**.
 - **Tus dos usuarios**: decidir cuál lleva tu permiso de corregir movimientos sin factura.
 - **Lo que no depende de mí:** cambiar la contraseña de `admin`, sembrar los datos de demo en `prueba`, y
   comprobar que estén capturados el régimen y el código postal fiscal de FR Moda — sin eso, el documento para

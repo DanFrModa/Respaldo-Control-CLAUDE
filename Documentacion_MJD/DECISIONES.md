@@ -17748,3 +17748,62 @@ cotización en el desarrollo.
 🔑 **El balance del ejercicio, y es lo que justifica haber preguntado las seis:** de los cuatro huecos, **dos
 eran a propósito, uno era un error suyo y uno faltaba repartir.** Ninguno era un defecto del sistema, y **el
 lead habría acertado en cero de los cuatro** si los hubiera resuelto solo por lo que le parecía razonable.
+
+#### (Post-F9.251) — DE DÓNDE SALE EL PRECIO DE REFERENCIA DEL TOPE: LO ÚLTIMO NEGOCIADO, NO LO QUE METIÓ DESARROLLO (30-sep-2026)
+
+**Daniel corrigió la fila 0.242 antes de que se construyera, y con una pregunta que obligó a trazar la cadena
+entera:**
+
+> *«El precio de maquila y de estampado debe de ir topado… pero **más bien a la última información que se
+> negoció con el cliente. NO a la información que metió originalmente desarrollo**. Me parece que así está
+> estructurado, pero **revísalo bien** por favor. **¿De dónde sale el precio de referencia** de maquila y
+> estampado?»*
+
+Y a la pregunta de si el tope lleva margen: **«Costo negociado»** ⇒ **exacto, sin holgura**: un centavo por
+encima pide su autorización.
+
+### ✅ TENÍA RAZÓN: el sistema ya guarda «lo último negociado», y la cadena está medida
+
+| Paso | Dónde, medido |
+|---|---|
+| La orden apunta a su desarrollo | **`Orden.desarrolloOrden`** → `DesarrolloOrden` (`schema.prisma:8836`, `idOrden @unique` ⇒ 1:1). Es la liga de R16/E6. |
+| El desarrollo tiene su renglón en la lista del cliente | **`ListaPreciosLinea`** (`:9091`) con `idDesarrollo` + **`idPrecosto`**, y su `costoUnit`, `precioCalculado`, `precioAprobado`. |
+| Ese renglón apunta **al precosto VIGENTE** | ⭐ **`registrarRonda` lo ACTUALIZA en cada ronda** (`dominio/desarrollo/negociacion.ts`): valida el precosto nuevo (`:192`), **rechaza si es el mismo** (`:208`), guarda el anterior (`:219`), **escribe `idPrecosto: nuevo.id` en el renglón** (`:226`) y deja el evento con la pareja anterior→nuevo (`:240-241`). ⇒ **ese campo SIEMPRE apunta a la última versión negociada.** |
+| Dentro del precosto, el precio por concepto | **`PrecostoLinea`** (`:8914`) con `idConceptoCosto` y `precioUnit`. Los conceptos fijos del seed incluyen **`maquila-costura`** (`seed.ts:1029`), **`estampado`** (`:1044`) y **`aplicacion`** (`:1047`). |
+
+⇒ **La referencia del tope es: el renglón del concepto `maquila-costura` (y `estampado`/`aplicacion`) del
+precosto al que apunta `ListaPreciosLinea.idPrecosto` de la lista del CLIENTE de esa orden.**
+
+### 🔴 Y DOS ERRORES DEL LEAD QUE SU PREGUNTA CAZÓ — los dos en §Post-F9.250(d), escritos ayer
+
+**(1) `Modelo.maquilaBase` NO sirve como referencia, y era la que el lead había propuesto.** Su propia
+descripción lo dice: *«costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`), **capturado en el
+editor de desarrollo** ⇒ es, palabra por palabra, *«la información que metió originalmente desarrollo»*, que es
+justo lo que Daniel **no** quiere. La fila habría topado contra el número equivocado, y el defecto habría sido
+**invisible**: el tope existiría, funcionaría, y compararía contra un valor obsoleto en cuanto hubiera una
+negociación.
+
+**(2) «El estampado no tiene con qué compararse» era FALSO.** El lead midió que no existe ningún
+`aplicacionBase` en `Modelo` —cierto— y de ahí concluyó que no había referencia **en ninguna parte**. La hay: el
+precosto lleva **un renglón por concepto**, y `estampado` y `aplicacion` son dos de los conceptos fijos. ⇒ **los
+dos topes se pueden construir, con la MISMA referencia.**
+
+🔑 **La lección, y es la misma de §250(a) con otra cara:** las dos veces el lead midió bien **un** sitio y
+**generalizó a todo el sistema**. «No existe en `Modelo`» ⇒ «no existe». Y las dos veces lo cazó una pregunta de
+Daniel sobre el **proceso**, no sobre el código. *Medir un lugar y concluir sobre el sistema es la forma más
+cómoda de equivocarse: el `grep` sale limpio y la conclusión es falsa.* ⭐ **Y lo que lo hizo pescable: él pidió
+«revísalo bien» y preguntó de dónde sale el dato, en vez de aceptar la propuesta.** Una fila aprobada sin esa
+pregunta se habría construido contra `maquilaBase`.
+
+### ⏳ Tres cosas que la ficha tiene que resolver, ahora nombradas
+
+1. **La liga orden→desarrollo es OPCIONAL** (`desarrolloOrden DesarrolloOrden?`) ⇒ una orden que **no nació de un
+   desarrollo** no tiene contra qué compararse. ¿Pasa sin tope, o se bloquea hasta ligarla? **Preguntado.**
+2. **Un desarrollo puede estar en VARIAS listas** — `ListaPrecios` lleva `idCliente` + `idClienteDepartamento`
+   (`:9020-9030` aprox.) ⇒ hay que resolver por el **cliente de la orden**: el mismo modelo vendido a dos
+   clientes tiene **dos** topes distintos, y cada orden va contra el de su cliente. **Preguntado** si eso cubre
+   todos los casos.
+3. **El tope es el costo negociado EXACTO**, decidido por él ⇒ sin holgura. ⚠️ **Y su consecuencia, dicha:** si
+   el costo negociado y el real coinciden al centavo casi nunca, esto se vuelve un trámite diario de
+   autorización. Es el tipo de cosa que sólo se ve al operar, así que conviene medirla en `prueba` antes de
+   cerrar la puerta del todo.
