@@ -17541,3 +17541,478 @@ Desarrollo), y contarla una vez por perfil la duplicaba.
 dijo que sigue mañana. 🔑 **Lo importante: sus notas de esos seis están a salvo y leídas; sus marcas Sí/No de
 esos seis, si las hizo, se perdieron por el defecto de arriba** — y al volver verá el conteo en el pie, que es
 lo que evita que vuelva a pasar sin darse cuenta.
+
+#### (Post-F9.249) — EL CUESTIONARIO DE PERFILES, CONTESTADO ENTERO: 187 MARCAS Y 16 NOTAS (30-sep-2026)
+
+**Daniel: *«Ya contesté todo lo de los permisos»*.** Y esta vez **sí se guardó todo**, porque el defecto que se
+comió sus marcas de la primera vuelta (§Post-F9.248) quedó arreglado: **187 marcas y 16 notas**, los 16 puestos.
+
+📊 **El reparto: 172 «sí» y 15 «no».** Y los 15 «no» son donde está la información, no los 172 «sí».
+
+### ✅ Sus «no» corrigieron TRES cosas que el lead había propuesto mal
+
+| Su «no» | Qué corrige |
+|---|---|
+| **Compras NO recibe** (`compras.recibir`) | Coherente con su nota de Habilitaciones —*«ya se quedó la recepción en este perfil»*— ⇒ **quien compra no confirma lo que llegó**, que era la recomendación de §247. Él la aplicó sin que hiciera falta insistir. |
+| **Producción NO programa la ruta** (`rc.programar`) | La **captura** (`rc.capturar` sí) pero no la programa. |
+| **El líder de calidad NO modifica auditorías** (`calidad.modificar-auditorias`) ni asigna usuarios | Confirma por segunda vía lo que ya había dicho en el chat: los auditores los asigna él. |
+
+### ✅ Y una BUENA NOTICIA medida: la línea del Encargado de Telas YA se puede trazar
+
+Su nota: *«Sí tiene que poder ver los precios de las telas, **porque él va a recibir las facturas**. Pero no es
+necesario que vea los importes de las telas ya en el inventario. **Las cantidades sí es indispensable** que las
+vea.»* — y marcó **no** a `telas.ver-totales`.
+
+📐 **MEDIDO, y su marca es exacta:** son **dos permisos distintos**. El **precio del catálogo** (la tabla
+`TelaProveedor`, precio de una tela a un proveedor, con su grid por color) se lee con **`telas.ver`**
+(`dominio/catalogos/tela-proveedores.ts:260`), que **sí tiene**. Y **`telas.ver-totales`** gobierna sólo los
+**importes de los movimientos y las entradas** de inventario (`inventarios/entradas-tela.ts` en seis sitios y
+`inventarios/avios.ts:278,353`, donde se pasa como bandera `verImportes` a la proyección). ⇒ **ve precios para
+cotejar facturas y no ve importes acumulados del inventario, sin construir nada.**
+📌 Y no le estorba para capturar: al dar de alta una entrada **teclea** el `precioUnit` de la factura que tiene
+en mano (`contrato/esquemas/entrada-tela.ts:75-80`; ese precio viaja al kardex como `costoUnit`, D1) — teclear
+no exige el permiso de **ver** los acumulados.
+
+### 🔴 EL HALLAZGO GRANDE: CUATRO COSAS QUE, CON SUS MARCAS, SÓLO PODRÍA HACER ÉL
+
+Cruce mecánico de las 187 marcas contra el catálogo real (134 permisos en `contrato/permisos.ts`): **79 los
+lleva algún puesto**; de los **55 restantes**, **21 son reservados** —suyos por diseño— y **34 son operativos
+sin dueño**. La mayoría de esos 34 son legítimamente suyos porque él lo dijo (`costos.*`, `edr.*`,
+`listas.aprobar`, `ordenes.cerrar`, `compras.autorizar`, `esma.cargo-validar`, los tres de `ipt.*` que aceptó
+dejar fuera). **Pero cuatro no parecen deliberados, y dos de ellos son el arranque del negocio:**
+
+| Nadie puede… | Medido |
+|---|---|
+| **Importar la OC del cliente** | El importador de Excel y de PDF exige **`pedidos.administrar`** (5 sitios en `dominio/pedidos/importacion*.ts`) y `ordenes.administrar` (2) — y él marcó **no** a `pedidos.administrar` para Aurora, que era el único perfil que lo tenía propuesto. |
+| **Crear una orden de producción** | `dominio/produccion/ordenes.ts` exige **`ordenes.administrar`** en **6** sitios, y **ningún perfil lo lleva**. |
+| **Capturar el precio de maquila** | Dijo *«sólo con permiso»* (§248(d)) y `ordenes.precio-maquila` **no se lo dio a nadie**. |
+| **Cancelar una orden o una OC** | `ordenes.cancelar` y `compras.cancelar`, **sin dueño**. |
+
+⏳ **Preguntado a Daniel, y NO se supone:** la hipótesis del lead es que al marcar «no» en `pedidos.administrar`
+quiso decir *«Aurora no administra los pedidos INTERNOS»*, no *«nadie importa la OC del cliente»* — pero **eso
+es una suposición y se le preguntó en vez de escribirla como decisión**: quién importa la OC · quién crea las
+OP · quién captura el precio de maquila · quién cancela.
+📌 **Dos menores del mismo barrido:** nadie lleva **`admin.ver-bitacora`** (el registro de quién cambió qué) ni
+los **`indicadores.ip-*`** de Ingeniería de Producto. Propuesta: la bitácora con él; los indicadores, en
+Gestión Técnica cuando ese puesto exista de verdad.
+
+🔑 **Y por qué este cruce vale más que las 172 marcas afirmativas:** Daniel pidió el ejercicio *«marcando a
+quién le FALTA algo y a quién le SOBRA algo peligroso»*. Las marcas «sí» contestan la segunda mitad; **sólo el
+cruce contra el catálogo contesta la primera** — un permiso que nadie lleva no aparece en ninguna ficha, así
+que **no se puede ver leyendo perfil por perfil**. *La pregunta «¿a quién le falta?» no se responde mirando lo
+que hay: se responde restando.*
+
+### 🔴 DOS COSAS NUEVAS QUE SALIERON DE MEDIR SUS RESPUESTAS
+
+**(a) EL SOBRANTE DE CORTE NO SE PUEDE DEVOLVER AL INVENTARIO — fila 0.240.** Su nota de Corte describe un
+flujo que el sistema no tiene: *«El consumo lo debe de capturar **el encargado de telas**. No corte. **Telas
+saca del inventario y le entrega a corte, y corte le debe de regresar lo que sobró para cuadrar inventarios.**»*
+📐 **MEDIDO en `dominio/inventarios/partidas-telas.ts`:** los caminos de tela son `crearPartidaTela` (lote
+nuevo), `ajustarInventarioTelaColor` (ajuste), `registrarConteoTelaColor` (conteo), `traspasarTelaColor`
+(traspaso), `cancelarMovimientoTelaColor` (inverso auditado), y las salidas
+`registrarSalidaTelaColorAOrden` / `...SinOrden`. **NO existe una devolución DESDE una orden.** ⇒ hoy el
+sobrante se cuadraría con un **ajuste**, que arregla el inventario pero **no dice que vino de corte y no baja
+el consumo de la orden** ⇒ **el costo de esa orden queda inflado para siempre**.
+⏳ **Y la clasificación depende de un dato que sólo él tiene, así que se le preguntó (regla de §7.5):
+¿cada cuánto sobra tela de un corte?** Si es casi siempre, toca el costo de casi todas las órdenes y sube de
+categoría; si es raro, aguanta con el ajuste.
+
+**(b) DISEÑO GRÁFICO QUEDÓ SIN PODER TRABAJAR, Y ES UN CAMBIO DE DECISIÓN SUYO.** Marcó **no** a
+`modelos.administrar` **y** a `desarrollo.administrar` —los dos únicos que habilitan meter un arte— y escribió:
+*«Ahorita te puse que **no tiene permiso para cambiar el modelo**. Pero **hay que desarrollarle el permiso para
+modificar sólo el arte** y que sí pueda subir fotos del arte.»*
+⚠️ **Esto CONTRADICE su respuesta de doce horas antes** (§Post-F9.248, respuesta #3): *«podemos darle todo el
+permiso por ahora y después lo partimos»*. Las dos son razonables —la de ayer prioriza que el puesto opere, la
+de hoy prioriza no darle poder de más— **pero no se puede aplicar las dos**, y el lead **no eligió por él**: se
+le preguntó cuál manda. Con las marcas de hoy tal como están, **ese puesto no puede meter artes hasta que se
+construya la fila 0.235**, que deja de ser «duele pero se aguanta con el rodeo» y pasa a bloquear a una persona
+concreta.
+🔑 *Cuando dos respuestas del dueño se contradicen, la más nueva no gana automáticamente: gana la que él
+confirme sabiendo que contradice a la otra.* Escribirlo sin avisar habría sido decidir en su nombre.
+
+### 📋 Sus dieciséis notas, y qué cambia cada una
+
+| Puesto | Su nota (textual, resumida) | Consecuencia |
+|---|---|---|
+| **Director** | *«ok, dos perfiles»* → confirmado *«Correcto. Dos usuarios»* | §248(a). Falta decidir cuál de sus dos usuarios lleva la bandera de corregir sin factura. |
+| **Ventas** | negociar sólo lectura + comentarios; el alta de cliente es de Administración o suya | Filas **0.238** y **0.239**: ninguna de las dos líneas se puede trazar hoy. |
+| **Desarrollo** | *«sí debe de poder darlo de alta»* | Abre `telas.administrar` y `avios.administrar` (reservados). |
+| **Finanzas** | no ve EDR ni costos finales; *«ella me manda saldos y **yo** defino la corrida»*; sí ve producción | **Desarma el choque grande**: la corrida se queda con él, y abre los **seis** reservados restantes. |
+| **Producción** | el precio de maquila *«sólo con permiso»* | Ya es un permiso propio ⇒ nada que construir… **pero no se lo dio a nadie** (ver el hueco arriba). |
+| **Compras** | *«**yo autorizo OC**»* · sí da de alta avíos · compra cosas ajenas a producción *(limpieza)* y también las da de alta · ⭐ **«las órdenes de compra de TELAS también las hace compras. Yo sólo autorizo»** | Lo último **aclara un alcance que la ficha no decía**: Compras cubre telas y avíos, no sólo avíos. |
+| **Habilitaciones** | *«ya se quedó la recepción en este perfil»* | Cierra la duda de §247: **recibe Habilitaciones**, no Compras. |
+| **Telas** | ve precios (recibe facturas), no ve importes del inventario, las cantidades sí | **Ya se puede** (medido arriba). |
+| **Corte** | el consumo lo captura **Telas**; corte devuelve el sobrante | **Fila 0.240** (la devolución no existe). |
+| **Almacén PT** | *«Sí está bien así como lo propones… lo que dejaste afuera»* | ✅ Confirma dejar fuera los tres permisos que borran un descuadre (`ipt.modificar-movimientos`, `ipt.cantidades-negativas`, `ipt.fecha-libre`). |
+| **Entregas** | *«a veces entregas e inventarios es la misma persona. No siempre… depende de cuánto trabajo tengamos»* | ⭐ **Justifica el modelo elegido**: se le dan **los dos perfiles** cuando coincide, sin inventar un tercero. |
+| **Gestión Técnica** | son personas distintas hoy; *«con el sistema bien hecho, esa ficha podría salir de desarrollo… chance se podría llegar a fusionar»* | El puesto se crea ya; su pantalla llega cuando se construya la ficha técnica. |
+| **Diseño Gráfico** | no cambia el modelo; hay que construirle el permiso del arte | **Cambio de decisión** (ver arriba). |
+| **Líder de Calidad** | *«sí lo define él: los AQL y catálogo de defectos»* | Abre `calidad.administrar-catalogo` (reservado). |
+| **Supervisor de Calidad** | *«el líder asigna y él las ejecuta»* | ✅ Confirma la propuesta. |
+| **Auxiliar** | *«lo vamos viendo. Así está bien como quedó»* | Con sus dos «no»: **no ve pedidos ni ruta crítica**. |
+
+### 🧹 Y un defecto de la casa que apareció al mergear la v0.186, sin relación con nada de esto
+
+El job `e2e` del CI salió **verde con `1 flaky`**: `e2e/proveedores.spec.ts:211` —*«adjuntar un PDF (red de R2
+mockeada) lo lista y se puede quitar»*— **falló en el primer intento y pasó al reintento** (`104 passed` + 1
+flaky = los 105 de siempre). El diff de esa entrega eran tres `.md` y un `.mjs` de herramientas, así que **no
+puede ser suyo**. 📐 **Comprobado que NO estaba registrado en ninguna parte** (la única fila de flaky, la 0.169,
+es de `pedidos.spec.ts` y ya cerró) ⇒ **fila 0.241**, para que no se pierda. 🔑 *«Flake» no es una causa, y un
+flaky que nadie anota es un rojo futuro sin historia.*
+
+#### (Post-F9.250) — LAS CINCO RESPUESTAS QUE CERRARON LOS HUECOS, Y DOS COSAS QUE EL LEAD HABÍA MEDIDO SOBRE UN FLUJO EQUIVOCADO (30-sep-2026)
+
+Daniel contestó las seis preguntas de §Post-F9.249. **Dos de sus respuestas desmontan hallazgos del lead, y las
+dos por el mismo motivo: el lead había supuesto un flujo que el negocio no hace así.**
+
+### 🔴 (a) EL SOBRANTE DE CORTE: la fila 0.240 SE DISUELVE, y el error era de premisa
+
+Su respuesta, textual:
+
+> *«Lo que se hace es que **físicamente se le da tela al cortador y cuando acaba de cortar es cuando se registra
+> la salida en el sistema**. Es decir, **no hay que hacer salida y entrada**. Simplemente se registra lo que se
+> cortó. El manejo de sobrantes entre diferentes almacenes se maneja con un **traspaso**. Así está bien, creo que
+> **no hay que mover nada**.»*
+
+📐 **Y el sistema lo permite exactamente así, medido:** capturar el corte **NO toca el inventario de tela**
+(`dominio/produccion/etapas.ts` no tiene una sola referencia a las partidas de tela) ⇒ la salida de tela se
+registra **aparte y cuando él dice**, con lo que de verdad se consumió. Y el traspaso entre almacenes ya existe
+(`registrarSalidaTelaColorAOrden` para la salida real, `traspasarTelaColor` para mover entre almacenes).
+⇒ **la 0.240 se cierra sin construir nada.**
+
+🔑 **DÓNDE SE EQUIVOCÓ EL LEAD, porque la lección es la que vale:** midió bien el código —**no existe** una
+devolución desde una orden, y eso es cierto— pero **construyó la fila sobre un flujo que se inventó**: dio por
+hecho que la salida de tela se registra ANTES de cortar (por la cantidad teórica) y que después haría falta
+devolver el sobrante. En el negocio real **la salida se registra DESPUÉS, por lo que se cortó**, así que no hay
+nada que devolver. *Una ausencia en el código sólo es un defecto si el negocio necesita esa función; medir que
+algo «no existe» no dice nada hasta saber si alguien lo haría.* El lead escribió «no existe una devolución» y
+saltó a «⇒ el costo queda inflado», que era una **inferencia sobre el proceso**, no una medición. **La pregunta
+que sí hizo bien fue la que lo salvó:** al preguntarle *«¿cada cuánto sobra tela?»* en vez de clasificar solo,
+la respuesta trajo el flujo verdadero y disolvió la fila entera.
+
+### ✅ (b) EL ARTE: gana su respuesta de la mañana, confirmada sabiendo que contradecía a la otra
+
+> *«Ok, **abre los permisos en lo que se construye**.»*
+
+⇒ **Diseño Gráfico lleva `modelos.administrar` y `desarrollo.administrar` AHORA**, con el alcance aceptado a
+sabiendas, y la **fila 0.235** sigue viva para partir el permiso. Vuelve a tener rodeo ⇒ **se queda en 🔶 y deja
+de bloquear a nadie.** 🔑 Se le preguntó cuál de sus dos respuestas mandaba en vez de aplicar la más reciente:
+*la más nueva no gana por ser más nueva.*
+
+### ✅ (c) LAS ÓRDENES Y EL IMPORTADOR: sólo él, y la hipótesis del lead era FALSA
+
+> *«Las órdenes de producción (**que incluye el importador de pedidos del cliente**) **sólo los meto Yo**. Aurora
+> no los mete.»*
+
+⇒ **`pedidos.administrar` y `ordenes.administrar` se quedan con él.** Los dos «huecos» que el lead marcó como
+*«no parecen deliberados»* **sí lo eran**.
+🔑 **Y la hipótesis del lead era equivocada:** había escrito que *«al marcar no en `pedidos.administrar`
+probablemente quiso decir que Aurora no administra los pedidos INTERNOS, no que nadie importe la OC»*. **No era
+eso**: él captura **todo**, internos y el importador. ⭐ **Y ahí está el valor de haberla escrito como hipótesis
+y preguntado, en vez de como decisión:** si se hubiera «corregido» el perfil de Aurora dándole
+`pedidos.administrar`, se le habría abierto **el arranque entero del negocio** a alguien que él no quiere que lo
+toque — y habría quedado como una decisión suya que nunca tomó.
+
+### ⚠️ (d) EL PRECIO DE MAQUILA: era un error suyo, y de corregirlo nace un CONTROL DE DINERO — fila 0.242
+
+> *«El precio de maquila **sí lo debe de capturar producción. Chance me equivoqué.** Lo que hay que hacer es
+> **validar que no pueda ponerlo más caro que el que está en la cotización** a menos que se le autorice. (**Yo
+> autorizo**.)»*
+
+⇒ **Producción lleva `ordenes.precio-maquila`** (su «no» del cuestionario queda revertido por él mismo). Y su
+condición es **trabajo nuevo**, no un permiso.
+📐 **MEDIDO — se puede construir, y hay contra qué comparar:** producción escribe **`Orden.maquilaOrd`**
+(`dominio/produccion/precios-orden.ts:202`, bajo ese permiso, con lock e historial de cambios), y la cotización —⛔ **SUPERADO por §Post-F9.251: ésta NO es la referencia buena**— se creía en **`Modelo.maquilaBase`** — *«Costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`),
+capturada en el editor de desarrollo, con su `idMaquileroCotizado` al lado.
+⛔ **SUPERADO por §Post-F9.251 — ESTA FRASE ES FALSA y se conserva para que el error quede a la vista:** ⚠️ ~~**PERO el estampado NO tiene con qué compararse:**~~ existe `Orden.aplicacionOrd` (`:3554`) y **no existe
+ningún `aplicacionBase`/`estampadoBase`** en el modelo ⇒ **el tope sólo se puede construir para la COSTURA**.
+⏳ Preguntado a Daniel: ¿quiere el mismo tope en el precio del estampado? Si sí, hay que capturar antes su
+cotización en el desarrollo.
+
+### ✅ (e) LAS CANCELACIONES, repartidas
+
+> *«**Yo** hago las cancelaciones de OP. **Compras puede cancelar OC y yo**.»*
+
+⇒ `ordenes.cancelar` **suyo**; `compras.cancelar` **de Compras y suyo**. Cierra el cuarto hueco.
+
+### 📊 Cómo quedan los cuatro huecos de §249
+
+| Hueco | Su respuesta | Resultado |
+|---|---|---|
+| Importar la OC del cliente | *«sólo los meto Yo»* | **Deliberado.** La hipótesis del lead era falsa. |
+| Crear la orden de producción | ídem | **Deliberado.** |
+| Capturar el precio de maquila | *«sí lo debe capturar producción, chance me equivoqué»* | **Era su error** ⇒ se le da, **más un tope nuevo** (fila 0.242). |
+| Cancelar orden / OC | OP suya, OC de Compras y suya | **Repartido.** |
+
+🔑 **El balance del ejercicio, y es lo que justifica haber preguntado las seis:** de los cuatro huecos, **dos
+eran a propósito, uno era un error suyo y uno faltaba repartir.** Ninguno era un defecto del sistema, y **el
+lead habría acertado en cero de los cuatro** si los hubiera resuelto solo por lo que le parecía razonable.
+
+#### (Post-F9.251) — DE DÓNDE SALE EL PRECIO DE REFERENCIA DEL TOPE: LO ÚLTIMO NEGOCIADO, NO LO QUE METIÓ DESARROLLO (30-sep-2026)
+
+**Daniel corrigió la fila 0.242 antes de que se construyera, y con una pregunta que obligó a trazar la cadena
+entera:**
+
+> *«El precio de maquila y de estampado debe de ir topado… pero **más bien a la última información que se
+> negoció con el cliente. NO a la información que metió originalmente desarrollo**. Me parece que así está
+> estructurado, pero **revísalo bien** por favor. **¿De dónde sale el precio de referencia** de maquila y
+> estampado?»*
+
+Y a la pregunta de si el tope lleva margen: **«Costo negociado»** ⇒ ⛔ **«exacto, sin holgura» quedó SUPERADO el mismo día por §Post-F9.252(3) (`$1.00`) y luego por §Post-F9.253(1), que lo dejó en 5 % — la regla VIGENTE es `precio > referencia × 1.05`.** Lo que decía esta línea: un centavo por
+encima pide su autorización.
+
+### ✅ TENÍA RAZÓN: el sistema ya guarda «lo último negociado», y la cadena está medida
+
+| Paso | Dónde, medido |
+|---|---|
+| La orden apunta a su desarrollo | **`Orden.desarrolloOrden`** → `DesarrolloOrden` (`schema.prisma:8836`, `idOrden @unique` ⇒ 1:1). Es la liga de R16/E6. |
+| El desarrollo tiene su renglón en la lista del cliente | **`ListaPreciosLinea`** (`:9091`) con `idDesarrollo` + **`idPrecosto`**, y su `costoUnit`, `precioCalculado`, `precioAprobado`. |
+| Ese renglón apunta **al precosto VIGENTE** | ⭐ **`registrarRonda` lo ACTUALIZA en cada ronda** (`dominio/desarrollo/negociacion.ts`): valida el precosto nuevo (`:192`), **rechaza si es el mismo** (`:208`), guarda el anterior (`:219`), **escribe `idPrecosto: nuevo.id` en el renglón** (`:226`) y deja el evento con la pareja anterior→nuevo (`:240-241`). ⇒ **ese campo SIEMPRE apunta a la última versión negociada.** |
+| Dentro del precosto, el precio por concepto | **`PrecostoLinea`** (`:8914`) con `idConceptoCosto` y `precioUnit`. El catálogo real es **`CONCEPTOS_COSTO_BASE`** (`seed.ts:1587-1605`) y tiene **nueve**: `tela`, `avios`, **`maquila`** (`:1590`), **`estampado`** (`:1591`), **`bordado`** (`:1592`), **`otros-procesos`** (`:1593`), `otros`, `corte`, `empaque`. La constante canónica del dominio lo confirma: `CONCEPTO_MAQUILA = 'maquila'` (`dominio/desarrollo/conceptos-precosto.ts:19`). ⚠️ **NO existe un concepto `aplicacion` ni `lavado`**: esos dos procesos caen en **`otros-procesos`**. |
+
+> 🔴 **ESTA LÍNEA ESTUVO FALSA, Y ES LA MISMA FALTA QUE EL PÁRRAFO DE ABAJO DECLARA COMO LECCIÓN.** Decía, bajo
+> 📐 MEDIDO, que los conceptos fijos incluyen *«`maquila-costura` (`seed.ts:1029`), `estampado` (`:1044`) y
+> `aplicacion` (`:1047`)»*. **Las tres líneas son `ROLES_PROVEEDOR_BASE`** —el catálogo de **roles de
+> proveedor**, no de conceptos de costo—, y **ni `maquila-costura` ni `aplicacion` existen como concepto**. Lo
+> cazó el reviewer de la v0.187.
+> 🔑 **Cómo se produjo, porque importa más que el arreglo:** el lead buscó `codigo:` junto a la palabra
+> «maquila» y **aterrizó en el primer arreglo que casó**, que resultó ser el de roles. Es **exactamente** el
+> modo de fallo que este mismo párrafo escribió como lección nueve líneas más abajo —*«el `grep` sale limpio y
+> la conclusión es falsa»*— cometido **en el párrafo que lo enunciaba**.
+> ⚠️ **Y lo que lo hacía peligroso, no cosmético:** ésta es la **cita operativa** de la fila 0.242. Quien
+> construyera el tope habría buscado un concepto `maquila-costura` y uno `aplicacion` en el precosto y **no los
+> habría encontrado**. Peor: **§Post-F9.253 dice lo CORRECTO** —los nueve conceptos, con `maquila`— así que la
+> misma entrega llevaba las dos versiones sin decir cuál manda. *Dos párrafos del mismo documento que se
+> contradicen no son medio ciertos: son una trampa para quien lea el primero.*
+> 📌 **Regla que sale de aquí:** un `codigo:` o un `clave:` **nunca se cita por la línea donde lo encontró el
+> grep**, sino por **el nombre del arreglo que lo contiene** —`CONCEPTOS_COSTO_BASE`, `ROLES_PROVEEDOR_BASE`—,
+> que es lo único que dice **de qué catálogo** se está hablando.
+
+
+⇒ **La referencia del tope es: el renglón del concepto `maquila` (y `estampado`/`bordado`, o `otros-procesos` para aplicación y lavado) del
+precosto al que apunta `ListaPreciosLinea.idPrecosto` de la lista del CLIENTE de esa orden.**
+
+### 🔴 Y DOS ERRORES DEL LEAD QUE SU PREGUNTA CAZÓ — los dos en §Post-F9.250(d), del mismo día
+
+**(1) `Modelo.maquilaBase` NO sirve como referencia, y era la que el lead había propuesto.** Su propia
+descripción lo dice: *«costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`), **capturado en el
+editor de desarrollo** ⇒ es, palabra por palabra, *«la información que metió originalmente desarrollo»*, que es
+justo lo que Daniel **no** quiere. La fila habría topado contra el número equivocado, y el defecto habría sido
+**invisible**: el tope existiría, funcionaría, y compararía contra un valor obsoleto en cuanto hubiera una
+negociación.
+
+**(2) «El estampado no tiene con qué compararse» era FALSO.** El lead midió que no existe ningún
+`aplicacionBase` en `Modelo` —cierto— y de ahí concluyó que no había referencia **en ninguna parte**. La hay: el
+precosto lleva **un renglón por concepto**, y `estampado` y `aplicacion` son dos de los conceptos fijos. ⇒ **los
+dos topes se pueden construir, con la MISMA referencia.**
+
+🔑 **La lección, y es la misma de §250(a) con otra cara:** las dos veces el lead midió bien **un** sitio y
+**generalizó a todo el sistema**. «No existe en `Modelo`» ⇒ «no existe». Y las dos veces lo cazó una pregunta de
+Daniel sobre el **proceso**, no sobre el código. *Medir un lugar y concluir sobre el sistema es la forma más
+cómoda de equivocarse: el `grep` sale limpio y la conclusión es falsa.* ⭐ **Y lo que lo hizo pescable: él pidió
+«revísalo bien» y preguntó de dónde sale el dato, en vez de aceptar la propuesta.** Una fila aprobada sin esa
+pregunta se habría construido contra `maquilaBase`.
+
+### ⏳ Tres cosas que la ficha tiene que resolver, ahora nombradas
+
+1. **La liga orden→desarrollo es OPCIONAL** (`desarrolloOrden DesarrolloOrden?`) ⇒ una orden que **no nació de un
+   desarrollo** no tiene contra qué compararse. ¿Pasa sin tope, o se bloquea hasta ligarla? **Preguntado.**
+2. **Un desarrollo puede estar en VARIAS listas** — `ListaPrecios` lleva `idCliente` + `idClienteDepartamento`
+   (`ListaPrecios` abre en `:9009`; `idCliente` en `:9014` y `idClienteDepartamento` en `:9016`) ⇒ hay que resolver por el **cliente de la orden**: el mismo modelo vendido a dos
+   clientes tiene **dos** topes distintos, y cada orden va contra el de su cliente. **Preguntado** si eso cubre
+   todos los casos.
+3. **El tope es el costo negociado EXACTO**, decidido por él ⇒ sin holgura. ⚠️ **Y su consecuencia, dicha:** si
+   el costo negociado y el real coinciden al centavo casi nunca, esto se vuelve un trámite diario de
+   autorización. Es el tipo de cosa que sólo se ve al operar, así que conviene medirla en `prueba` antes de
+   cerrar la puerta del todo.
+
+#### (Post-F9.252) — EL TOPE SE SIMPLIFICA: UN PRECIO DE REFERENCIA EN LA OP, PUESTO POR DANIEL (30-sep-2026)
+
+Sus tres respuestas a los huecos de §Post-F9.251, y la primera **cambia el diseño a mejor**:
+
+> **(1)** *«No sé si exista un campo de precio de referencia dentro de la OP. **Debería de llenarse por mí**.»*
+> **(2)** *«**No pasa que un modelo se venda a diferentes clientes.** Normalmente un modelo es exclusivo de un
+> cliente. Y en caso de que suceda, debería de ser el mismo precio. Pero **no ha sucedido nunca en 30 años**.»*
+> **(3)** *«Podríamos darle un **margen de 1 peso hacia arriba** (hacia abajo **no hay freno**. Se puede pagar
+> siempre más barato de lo que se cotizó).»*
+
+### 📐 (1) MEDIDO: ese campo NO existe, y su instinto era correcto
+
+`Orden` tiene **sólo dos campos de dinero de maquila**: `maquilaOrd` (*«costo de maquila de la orden»*,
+`schema.prisma:3552`) y `aplicacionOrd` (*«costo de aplicación/estampado»*, `:3554`) — **los dos son el precio
+REAL que se negoció con el taller**, no una referencia. Su historial vive en `OrdenPrecioEvento`, que guarda
+anterior→nuevo, **el proveedor con quien se negoció** y una nota. ⇒ **no hay ningún campo de referencia; hay que
+crearlo.**
+
+### ⭐ Y SU PROPUESTA ES MEJOR QUE LA CADENA QUE EL LEAD TRAZÓ. Tres razones, y las tres son suyas sin saberlo:
+
+1. **Mata los dos huecos de §251 de un golpe.** La cadena orden→desarrollo→lista→precosto tenía dos agujeros —la
+   liga es **opcional** y un desarrollo puede estar en **varias listas**—. Un campo en la propia OP **no tiene
+   cadena que resolver**, así que ninguno de los dos existe.
+2. **No le cuesta un paso extra, porque ya es él quien crea las OP** (§Post-F9.250(c): *«sólo los meto Yo»*) ⇒
+   el campo se llena **en la misma pantalla y el mismo momento** en que ya está trabajando.
+3. **Convierte la referencia en una DECISIÓN explícita en vez de una derivación silenciosa.** Si el costo
+   negociado cambia después de abrir la OP, una cadena seguiría al nuevo sin avisar; un campo dice *«el tope de
+   ESTA orden es el que yo puse»*, con su rastro de quién y cuándo. *Para un control de dinero, un número que
+   alguien decidió vale más que uno que el sistema dedujo.*
+
+📌 **PROPUESTA DEL LEAD (pendiente de su OK), para que no tenga que teclearlo de cero:** que al crear la OP el
+sistema **pre-llene** ese campo con lo que dice la cadena —el concepto `maquila`/`estampado` del precosto
+vigente del renglón de la lista— y **él confirme o lo ajuste**. Se queda lo bueno de las dos: no teclea nada
+cuando el dato ya existe, y el valor que gobierna sigue siendo el que él aprobó. ⏳ Y la pregunta que falta:
+**¿qué pasa si el campo queda VACÍO?** (sin tope, o no se puede capturar precio de maquila).
+
+### ✅ (2) EL RIESGO DE LAS VARIAS LISTAS LO DESCARTA EL NEGOCIO, con 30 años de evidencia
+
+*«No ha sucedido nunca en 30 años»*, y si sucediera **sería el mismo precio**. ⇒ el punto (b) de §251 **se cierra
+sin construir nada**. 🔑 **Y es el tipo de cosa que el lead NO podía decidir:** `ListaPrecios` lleva `idCliente`
+y `idClienteDepartamento`, así que **el modelo de datos admite el caso** y desde el código parece un riesgo real.
+Sólo él sabe que en tres décadas no pasó. *El modelo de datos dice qué es POSIBLE; sólo el dueño dice qué OCURRE.*
+
+### ⛔ (3) LA TOLERANCIA: +$1.00 hacia arriba — **SUPERADA por §Post-F9.253: él la subió a 5 %**
+
+Y **revisó su propia respuesta de una hora antes**: había dicho *«costo negociado»* exacto, y al ver el costo
+—que un centavo de más pediría su autorización— lo ajustó a **un peso de holgura**. ⇒ la regla queda:
+**se rechaza si `precio > referencia + 1.00`; por debajo, nunca se frena** —*«se puede pagar siempre más barato
+de lo que se cotizó»*—, y entre la referencia y el peso de holgura pasa sin pedir nada.
+⚠️ **Dicho para que no se olvide:** $1.00 es un **absoluto**, no un porcentaje. En una prenda de $40 es 2.5 %; en
+una de $400, 0.25 %. Si algún día los precios de maquila suben de orden de magnitud, la holgura se vuelve
+simbólica — **el número vive en un sitio y se cambia ahí**, no se reparte por el código.
+
+#### (Post-F9.253) — SU REGLA DEL ENVÍO DESTAPÓ QUE LA REFERENCIA TIENE QUE SER POR PROCESO, NO DOS CAMPOS (30-sep-2026)
+
+> **(1)** *«Está bien la propuesta. Ok. **Pongamos 5 % de margen hacia arriba**. En precios de maquila y de
+> estampado.»*
+> **(2)** *«**Si está vacía, no debería de poder salir a maquila.** Es indispensable tener el precio de
+> referencia para poder generar la salida a maquila.»*
+
+### ✅ (1) La tolerancia pasa a 5 %, y eso resuelve el aviso del lead
+
+Había dicho `$1.00` y el lead advirtió que **un absoluto envejece** (2.5 % en una prenda de $40, 0.25 % en una de
+$400). ⇒ **5 % hacia arriba**, y **sin freno hacia abajo**. La regla: se rechaza si
+`precio > referencia × 1.05`. 🔑 *Su cambio no fue una corrección del lead: fue la respuesta al coste que el
+lead puso por escrito.* Por eso las advertencias se escriben con su número al lado, no como una reserva vaga.
+
+### 🔴 (2) Y SU REGLA DEL ENVÍO DESTAPÓ UN DEFECTO DE DISEÑO, antes de construirlo
+
+Poner la guarda en **la salida a maquila** —y no sólo en la captura del precio— obliga a preguntar **de qué
+proceso** es esa salida. Y ahí se rompe el diseño de «dos campos»:
+
+📐 **MEDIDO: el catálogo de procesos tiene CINCO tipos y es ABIERTO.** `TipoProceso` siembra `costura`,
+`estampado`, `bordado`, `lavado` y `aplicacion`, y su propio TSDoc dice que *«un proceso raro («embosado») se da
+de alta UNA vez»* (§Post-F9.54). Y `registrarEnvioMaquila` (`produccion/etapas.ts:917`) es **una sola función
+para todos**: resuelve el `TipoProceso` por su id.
+⇒ **con dos campos de referencia (maquila y estampado), un envío de BORDADO, LAVADO o APLICACIÓN no tendría
+referencia** y, por su regla, **no podría salir nunca**. La regla que pidió para proteger el dinero habría
+**parado la operación** en tres de los cinco procesos.
+
+### ⭐ Y EL SISTEMA YA RESUELVE ESTO EN DOS SITIOS — la referencia debe ir POR PROCESO
+
+| Evidencia | Qué dice |
+|---|---|
+| **El precosto** | Sus conceptos de costo son **nueve** y hay uno por proceso: **`maquila`**, **`estampado`**, **`bordado`** y **`otros-procesos`** (más tela, avíos, corte, empaque, otros). ⇒ **la cotización ya distingue por proceso.** |
+| **EsMa** | **`EsMaCargo` lleva `idTipoProceso` + `precioReal` + `cantidadReal`** ⇒ **el precio REAL que se le paga al taller ya se guarda POR PROCESO**, no en dos columnas. |
+| **Los dos campos de la orden** | `maquilaOrd` y `aplicacionOrd` son **herencia de v1** —su TSDoc lo dice: *«DATO conservado de v1»*— y el segundo se llama *«costo de aplicación/estampado»*, **juntando dos procesos que el catálogo tiene SEPARADOS**. Son el sitio equivocado para apoyar una regla nueva. |
+
+📌 **RECOMENDACIÓN DEL LEAD, pendiente de su OK:** la referencia **no son dos campos en la OP, sino un renglón
+por proceso** —una tabla chica `orden × tipoProceso → precioReferencia`—, que él llena al crear la OP
+**pre-llenada desde el concepto equivalente del precosto vigente**. Así: (a) su regla del envío funciona para
+**los cinco** procesos y para el que añada mañana; (b) queda **del mismo lado** que `EsMaCargo`, que ya es por
+proceso; (c) no hereda el error de v1 de meter estampado y aplicación en la misma columna. **El 5 % aplica a
+cada renglón.**
+
+🔑 **Y la lección del rato, que es de método:** el lead venía diseñando con **dos** campos porque Daniel habló de
+*«maquila y estampado»*, y Daniel habló de dos porque son los que usa casi siempre. **Ninguno de los dos estaba
+mirando el catálogo.** Lo destapó una regla operativa —*«si está vacía no puede salir»*— al chocar con una
+pregunta que el diseño no se había hecho: *¿salir DE QUÉ proceso?* ⇒ **una guarda puesta en el acto operativo
+obliga a enumerar los casos reales; puesta en la captura, no.** *Cuando una regla nueva se apoya en un campo que
+existe, hay que comprobar que ese campo cubre todos los casos que la regla va a tocar — y el catálogo abierto es
+donde se mira, no la conversación.*
+
+#### (Post-F9.254) — SU PRECONDICIÓN YA ESTÁ CONSTRUIDA, Y EL CAMPO DE REFERENCIA TAMBIÉN (para cuatro de los cinco procesos) — 30-sep-2026
+
+> *«Ok. Está bien. Pero entonces **se debe de definir antes qué procesos lleva la OP** (si lo jala del modelo de
+> desarrollo, ya tiene la información, pero si no, hay que definirlo).»*
+
+**Tenía razón, y el sistema está más adelantado de lo que el lead creía.** Tres hallazgos:
+
+### ✅ (1) La OP YA SABE qué procesos lleva, y por el camino que él describió
+
+📐 **MEDIDO:** **`OrdenArte`** (`schema.prisma:4294`) es la lista de procesos de arte **congelada en la orden**,
+con `idTipoArte` → **`TipoProceso`**, su `idProveedor`, y dos banderas que son exactamente sus dos casos:
+**`agregadoAMano`** (el modelo no lo traía y se definió aquí) y **`excluido`** (no aplica en esta orden).
+Y se llena **sola desde el modelo**: `copiarRecetaDelModelo` (`produccion/receta-orden.ts:302`) hace
+`tx.ordenArte.createMany` (`:428`) y es **idempotente** (comprueba `yaTieneArtes` en `:310`); si falta algo,
+`agregarRenglonReceta` (`:2010`) lo agrega a mano. ⇒ **su «si lo jala del modelo ya tiene la información, si no
+hay que definirlo» es literalmente lo que el sistema hace hoy.**
+
+### ⭐⭐ (2) Y EL CAMPO DE REFERENCIA **YA EXISTE** para los procesos de arte — no hace falta tabla nueva
+
+📐 **MEDIDO: `OrdenArte` tiene `precio`** (`:4314`, *«Precio del arte EN ESTA ORDEN… NULL = sin precio congelado»*), y `copiarRecetaDelModelo` lo **copia del modelo** junto con
+el tipo de proceso y el proveedor (`:435` `precio: a.precio === null ? null : new Prisma.Decimal(a.precio)`).
+Y `ModeloArte` tiene **`precostoLineas`** ⇒ **su precio está atado al precosto**.
+⇒ **`OrdenArte.precio` ES la referencia por proceso que se estaba por inventar**: por orden, por proceso, con su
+proveedor, con su estado de liberación (`liberadoEn`/`liberadoPorId`) y heredada del modelo.
+🔑 **Corrige la recomendación de §Post-F9.253:** NO hace falta la tabla `orden × tipoProceso → precioReferencia`
+para **estampado, bordado, aplicación y lavado** — los cuatro son `esArte = true` y ya tienen su renglón.
+**Lo único que falta es COSTURA**, que es `esArte = false` y por tanto no tiene `OrdenArte`. ⇒ el trabajo se
+reduce a **una referencia de costura** + la guarda, en vez de una tabla nueva y cinco renglones.
+*Dos veces en una hora el diseño se encogió al mirar el catálogo en vez de la conversación.*
+
+### ⚠️ (3) PERO SU REGLA CRUZA UNA LÍNEA QUE EL SISTEMA TRAZÓ A PROPÓSITO, y hay que decidirlo con eso delante
+
+El código lo dice con todas sus letras (`receta-orden.ts:41-44`):
+
+> *«Desarrollo LIBERA, y la puerta va antes de **COMPRAR**. Sin liberar no se explota el MRP ni se generan OC.
+> **Cortar y producir NO se bloquean**: el piso no se detiene porque Desarrollo no haya terminado de revisar; lo
+> único que se frena es **gastar dinero** contra una receta que nadie miró.»*
+
+Y se confirma en los llamadores: `exigirRecetaLiberada` sólo lo invocan **compras** (`ordenes-compra.ts:647`,
+`mrp.ts:1957,2759`). ⇒ **hoy NINGUNA falta de datos detiene la producción.** Su regla sería **la primera guarda
+de esta familia del lado del piso**.
+
+🔴 **Y la consecuencia concreta, que sólo se ve al juntar sus dos decisiones:** él dijo que **las OP sólo las mete
+él** (§Post-F9.250(c)) y ahora que **sin referencia no sale a maquila**. Juntas significan que **un día que él no
+esté, el piso se detiene** en cuanto haya una orden nueva sin referencia capturada. **Es su decisión y puede ser
+la correcta** —proteger el dinero vale una parada— pero **no debe tomarse sin ver ese costo**, porque es
+exactamente el motivo por el que el sistema dejó la producción sin candados.
+⏳ **Tres salidas, para que elija:** (a) tal cual, asumiendo la parada; (b) que la referencia **también la pueda
+capturar producción**, y lo que él autoriza sea sólo **pasarse del 5 %**; (c) que la falta de referencia **avise
+en vez de frenar**, y frene sólo al cerrar la orden o al cargar a EsMa. **Recomendación del lead: (b)** — mueve
+el candado del *dato* al *exceso*, que es lo que a él le preocupa, y no le ata el piso a su agenda.
+
+#### (Post-F9.255) — EL TOPE, CERRADO: la salida (b), y el coste que trae la recomendación del lead (30-sep-2026)
+
+> *«Ok. La B.»*
+
+⇒ **DECIDIDO, y con esto la fila 0.242 queda especificada del todo:**
+
+| Pieza | Cómo queda |
+|---|---|
+| **La referencia** | Una **por proceso**. Para `estampado`, `bordado`, `aplicacion` y `lavado` **ya existe**: `OrdenArte.precio`, copiado del modelo (§Post-F9.254). **Falta crear la de `costura`**, que no es arte. |
+| **Quién la captura** | **También producción** —no sólo Daniel— para que el piso no dependa de su agenda. Pre-llenada desde el concepto equivalente del precosto vigente. |
+| **La guarda del envío** | `registrarEnvioMaquila` (`produccion/etapas.ts:917`) exige que **exista** la referencia del proceso de esa salida. Su regla se conserva; lo que cambia es que cualquiera de producción puede satisfacerla. |
+| **El tope** | Se rechaza si `precio > referencia × 1.05`. **Sin freno hacia abajo.** |
+| **La excepción** | Pasarse del 5 % exige **autorización de Daniel** ⇒ permiso reservado (patrón `SOLO_ADMINISTRADOR`). |
+
+### ⚠️ EL COSTE DE LA (b), que el lead debe decir porque la (b) FUE SU RECOMENDACIÓN
+
+**Si producción captura la referencia Y el precio, el candado se afloja:** podría poner una referencia alta y
+pagar cualquier cosa por debajo **sin pedir nada**. La (a) —sólo Daniel la captura— no tenía ese hueco; se cambió
+por no atarle el piso a su agenda, y **ese es el intercambio real: un candado duro por un rastro visible.**
+
+**Lo que sostiene el control en la (b)**, y por eso sigue valiendo:
+1. **El valor por defecto es el negociado**, pre-llenado del precosto ⇒ para aflojarlo hay que **cambiarlo a
+   mano**, que es un acto, no un descuido.
+2. **Ese cambio deja rastro.** El patrón ya existe en el sistema: `OrdenPrecioEvento` guarda anterior→nuevo, quién
+   y cuándo para los precios de la orden ⇒ la referencia debe guardar lo mismo.
+3. ⭐ **Y el aviso que lo vuelve operable: la señal que Daniel necesita ya no es «me piden autorización», es «la
+   referencia cambió».** Con la (a) él se enteraba por fuerza; con la (b) hay que **informarle**, o el rastro
+   existe y nadie lo mira.
+
+📌 **RECOMENDACIÓN DEL LEAD, pendiente de su OK:** que la ficha incluya **una consulta de referencias cambiadas**
+—qué orden, qué proceso, de cuánto a cuánto, quién y cuándo— porque sin ella la (b) es un control que **sólo
+funciona si alguien se acuerda de buscarlo**. Es chico (una lectura sobre el rastro que ya hay que guardar) y es
+lo que hace que elegir la (b) no sea bajar la guardia. ⚠️ **Y lo que NO se recomienda:** un aviso automático por
+correo o notificación — **no existe infraestructura de avisos** en el backend (medido en §Post-F9.248(d)), así que
+eso sería otra fila, más grande.

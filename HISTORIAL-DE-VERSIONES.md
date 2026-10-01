@@ -71,6 +71,94 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.187 · 30-sep-2026 · **en prueba** — **Contestaste los 16 puestos, y al cruzarlos aparecieron cuatro cosas que hoy sólo podrías hacer tú**
+
+> **La v0.187 cierra una fila del programa —la 0.240— sin construir nada**, porque tu respuesta la disolvió. No
+> cambia cómo funciona el sistema: guarda tus 187 respuestas, las cinco vueltas que contestaste después, y lo que salió
+> de medirlas.
+
+### ✅ Se guardó todo, esta vez
+
+**187 marcas y 16 notas, los 16 puestos.** El defecto que se comió tus marcas de la primera vuelta quedó
+arreglado, y ahora, si algo no se guarda, el aviso **se queda en pantalla**.
+
+**172 «sí» y 15 «no»** — y tus «no» corrigieron **tres cosas que yo había propuesto mal**: que Compras no
+recibe lo que Compras pidió, que Producción captura la ruta pero no la programa, y que el líder de calidad no
+modifica auditorías ya cerradas.
+
+⭐ **Y lo que más desatoró: abriste los seis permisos de Administración.** Con la corrida de pagos quedándose
+contigo, el perfil de Lupita ya se puede armar completo. Era la decisión más pesada de la lista.
+
+### 🔴 Lo que tienes que ver: cuatro cosas sin dueño
+
+Crucé tus 187 marcas contra la lista completa de permisos. **79 los lleva algún puesto.** De los que sobran, la
+mayoría son tuyos porque tú lo dijiste —costos, resultados, aprobar precios, autorizar compras, cerrar
+órdenes—. **Pero cuatro no creo que sean a propósito**, y dos son el arranque del negocio:
+
+- **Nadie puede importar la orden de compra del cliente.**
+- **Nadie puede crear una orden de producción.**
+- **Nadie puede capturar el precio de maquila** (dijiste «sólo con permiso», y no se lo diste a nadie).
+- **Nadie puede cancelar una orden ni una orden de compra.**
+
+Con tus marcas tal cual, **tú capturarías cada pedido y cada orden**. Sospecho que al marcar «no» en los
+pedidos de Aurora querías decir que ella no lleva los pedidos internos, no que nadie importe la OC del
+cliente — **pero no lo doy por hecho**. Te pregunté quién hace cada una.
+
+*(Y dos menores: nadie puede ver el registro de quién cambió qué, y nadie lleva los indicadores de Ingeniería
+de Producto.)*
+
+### ⚠️ Qué más salió, y puede sorprender
+
+**El precio de maquila y el de estampado llevan un tope nuevo, y lo pediste tú.** Al corregir tu propia marca
+—*«chance me equivoqué»*— dijiste que producción sí los captura, **pero que no pueda ponerlos más caros que lo
+negociado sin que tú autorices**. Después de cinco vueltas, así quedó:
+
+- **El tope es +5 %** sobre el precio de referencia, y **hacia abajo no hay freno** — se puede pagar siempre más
+  barato de lo cotizado. Pasarse del 5 % **pide tu autorización**.
+- **La referencia es una por proceso**, no una sola para todo. Para estampado, bordado, aplicación y lavado
+  **ya existe** en el sistema: cada arte de la orden ya trae su precio, copiado del modelo. **Falta crear la de
+  costura**, que es lo único nuevo.
+- **La captura también producción**, no sólo tú — con el valor del precosto ya puesto por defecto. Así el piso
+  no se detiene un día que no estés.
+- **Y sin referencia no sale a maquila**, como pediste. Sólo que ahora cualquiera de producción puede llenarla,
+  así que la regla protege el dinero sin frenar el trabajo.
+
+⭐ **Tenías razón en que ya está estructurado así**, y además mejor de lo que yo creía: la orden ya sabe qué
+procesos lleva —se copian del modelo al crearla, y lo que falte se agrega a mano— y **cada uno ya trae su
+precio**. Eso encogió el trabajo de «una tabla nueva» a «una referencia de costura más la validación».
+
+⚠️ **Y me corregiste tres cosas.** Te había propuesto topar contra el costo que captura desarrollo — que es
+exactamente lo que no querías, y el tope habría funcionado comparando contra un número viejo en cuanto hubiera
+una negociación. Te dije que el estampado no tenía con qué compararse: **era falso**. Y mi primera idea tenía
+sólo **dos** referencias, cuando el sistema maneja **cinco** procesos ⇒ **bordado, lavado y aplicación no
+habrían podido salir nunca** con tu regla. Las tres salieron de mirar un solo sitio y dar por hecho que valía
+para todo.
+
+⚠️ **Una cosa que cambió al elegir que producción también capture la referencia:** el candado pasa de ser
+«sólo tú pones el número» a «cualquiera lo pone, pero queda el rastro de quién lo cambió». Es un intercambio
+real — más agilidad, menos dureza — y para que no se afloje en silencio te propongo **una consulta de
+referencias cambiadas**: qué orden, qué proceso, de cuánto a cuánto, quién y cuándo.
+
+### ✅ Y una cosa que ibas a leer aquí y tu respuesta borró
+
+Te iba a decir que **el sobrante de corte no se puede devolver al inventario**. **Me equivoqué, y no en la
+medición sino en cómo creía que trabajan:** yo suponía que la tela sale del sistema *antes* de cortar, por la
+cantidad teórica, y que después haría falta devolver lo que sobró. Me explicaste que es al revés — la tela se le
+entrega al cortador físicamente, y **la salida se registra cuando ya cortó, por lo que de verdad se consumió**—,
+así que **no hay nada que devolver**. Comprobado que el sistema lo permite exactamente así. La ficha se cerró el
+mismo día sin construir nada.
+
+### ⏳ Qué sigue pendiente
+
+- **Del tope ya no queda nada por decidir** — las tres dudas que tenía las cerraste tú: el 5 % resolvió lo del
+  trámite diario, poner la referencia en la orden mató el problema de la orden sin desarrollo, y lo de los dos
+  clientes lo descartaste con 30 años de evidencia. **Lo único que te propongo encima** es la consulta de
+  referencias cambiadas, para que el rastro se pueda mirar sin acordarse de buscarlo.
+- **Tus dos usuarios**: decidir cuál lleva tu permiso de corregir movimientos sin factura.
+- **Lo que no depende de mí:** cambiar la contraseña de `admin`, sembrar los datos de demo en `prueba`, y
+  comprobar que estén capturados el régimen y el código postal fiscal de FR Moda — sin eso, el documento para
+  facturar no sale para nadie.
+
 ## 0.186 · 30-sep-2026 · **en prueba** — **Tus perfiles quedan escritos, y de medirlos salieron cinco cosas: cuatro permisos que no se pueden acotar y una fila que te tenía trabajando a mano de más**
 
 > **La v0.186 no cierra ninguna fila del programa**, y tampoco cambia nada de cómo funciona el sistema: es la
