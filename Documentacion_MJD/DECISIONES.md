@@ -17860,3 +17860,53 @@ de lo que se cotizó»*—, y entre la referencia y el peso de holgura pasa sin 
 ⚠️ **Dicho para que no se olvide:** $1.00 es un **absoluto**, no un porcentaje. En una prenda de $40 es 2.5 %; en
 una de $400, 0.25 %. Si algún día los precios de maquila suben de orden de magnitud, la holgura se vuelve
 simbólica — **el número vive en un sitio y se cambia ahí**, no se reparte por el código.
+
+#### (Post-F9.253) — SU REGLA DEL ENVÍO DESTAPÓ QUE LA REFERENCIA TIENE QUE SER POR PROCESO, NO DOS CAMPOS (30-sep-2026)
+
+> **(1)** *«Está bien la propuesta. Ok. **Pongamos 5 % de margen hacia arriba**. En precios de maquila y de
+> estampado.»*
+> **(2)** *«**Si está vacía, no debería de poder salir a maquila.** Es indispensable tener el precio de
+> referencia para poder generar la salida a maquila.»*
+
+### ✅ (1) La tolerancia pasa a 5 %, y eso resuelve el aviso del lead
+
+Había dicho `$1.00` y el lead advirtió que **un absoluto envejece** (2.5 % en una prenda de $40, 0.25 % en una de
+$400). ⇒ **5 % hacia arriba**, y **sin freno hacia abajo**. La regla: se rechaza si
+`precio > referencia × 1.05`. 🔑 *Su cambio no fue una corrección del lead: fue la respuesta al coste que el
+lead puso por escrito.* Por eso las advertencias se escriben con su número al lado, no como una reserva vaga.
+
+### 🔴 (2) Y SU REGLA DEL ENVÍO DESTAPÓ UN DEFECTO DE DISEÑO, antes de construirlo
+
+Poner la guarda en **la salida a maquila** —y no sólo en la captura del precio— obliga a preguntar **de qué
+proceso** es esa salida. Y ahí se rompe el diseño de «dos campos»:
+
+📐 **MEDIDO: el catálogo de procesos tiene CINCO tipos y es ABIERTO.** `TipoProceso` siembra `costura`,
+`estampado`, `bordado`, `lavado` y `aplicacion`, y su propio TSDoc dice que *«un proceso raro («embosado») se da
+de alta UNA vez»* (§Post-F9.54). Y `registrarEnvioMaquila` (`produccion/etapas.ts:917`) es **una sola función
+para todos**: resuelve el `TipoProceso` por su id.
+⇒ **con dos campos de referencia (maquila y estampado), un envío de BORDADO, LAVADO o APLICACIÓN no tendría
+referencia** y, por su regla, **no podría salir nunca**. La regla que pidió para proteger el dinero habría
+**parado la operación** en tres de los cinco procesos.
+
+### ⭐ Y EL SISTEMA YA RESUELVE ESTO EN DOS SITIOS — la referencia debe ir POR PROCESO
+
+| Evidencia | Qué dice |
+|---|---|
+| **El precosto** | Sus conceptos de costo son **nueve** y hay uno por proceso: **`maquila`**, **`estampado`**, **`bordado`** y **`otros-procesos`** (más tela, avíos, corte, empaque, otros). ⇒ **la cotización ya distingue por proceso.** |
+| **EsMa** | **`EsMaCargo` lleva `idTipoProceso` + `precioReal` + `cantidadReal`** ⇒ **el precio REAL que se le paga al taller ya se guarda POR PROCESO**, no en dos columnas. |
+| **Los dos campos de la orden** | `maquilaOrd` y `aplicacionOrd` son **herencia de v1** —su TSDoc lo dice: *«DATO conservado de v1»*— y el segundo se llama *«costo de aplicación/estampado»*, **juntando dos procesos que el catálogo tiene SEPARADOS**. Son el sitio equivocado para apoyar una regla nueva. |
+
+📌 **RECOMENDACIÓN DEL LEAD, pendiente de su OK:** la referencia **no son dos campos en la OP, sino un renglón
+por proceso** —una tabla chica `orden × tipoProceso → precioReferencia`—, que él llena al crear la OP
+**pre-llenada desde el concepto equivalente del precosto vigente**. Así: (a) su regla del envío funciona para
+**los cinco** procesos y para el que añada mañana; (b) queda **del mismo lado** que `EsMaCargo`, que ya es por
+proceso; (c) no hereda el error de v1 de meter estampado y aplicación en la misma columna. **El 5 % aplica a
+cada renglón.**
+
+🔑 **Y la lección del rato, que es de método:** el lead venía diseñando con **dos** campos porque Daniel habló de
+*«maquila y estampado»*, y Daniel habló de dos porque son los que usa casi siempre. **Ninguno de los dos estaba
+mirando el catálogo.** Lo destapó una regla operativa —*«si está vacía no puede salir»*— al chocar con una
+pregunta que el diseño no se había hecho: *¿salir DE QUÉ proceso?* ⇒ **una guarda puesta en el acto operativo
+obliga a enumerar los casos reales; puesta en la captura, no.** *Cuando una regla nueva se apoya en un campo que
+existe, hay que comprobar que ese campo cubre todos los casos que la regla va a tocar — y el catálogo abierto es
+donde se mira, no la conversación.*
