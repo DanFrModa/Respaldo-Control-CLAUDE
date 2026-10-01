@@ -17910,3 +17910,55 @@ pregunta que el diseño no se había hecho: *¿salir DE QUÉ proceso?* ⇒ **una
 obliga a enumerar los casos reales; puesta en la captura, no.** *Cuando una regla nueva se apoya en un campo que
 existe, hay que comprobar que ese campo cubre todos los casos que la regla va a tocar — y el catálogo abierto es
 donde se mira, no la conversación.*
+
+#### (Post-F9.254) — SU PRECONDICIÓN YA ESTÁ CONSTRUIDA, Y EL CAMPO DE REFERENCIA TAMBIÉN (para cuatro de los cinco procesos) — 30-sep-2026
+
+> *«Ok. Está bien. Pero entonces **se debe de definir antes qué procesos lleva la OP** (si lo jala del modelo de
+> desarrollo, ya tiene la información, pero si no, hay que definirlo).»*
+
+**Tenía razón, y el sistema está más adelantado de lo que el lead creía.** Tres hallazgos:
+
+### ✅ (1) La OP YA SABE qué procesos lleva, y por el camino que él describió
+
+📐 **MEDIDO:** **`OrdenArte`** (`schema.prisma:4294`) es la lista de procesos de arte **congelada en la orden**,
+con `idTipoArte` → **`TipoProceso`**, su `idProveedor`, y dos banderas que son exactamente sus dos casos:
+**`agregadoAMano`** (el modelo no lo traía y se definió aquí) y **`excluido`** (no aplica en esta orden).
+Y se llena **sola desde el modelo**: `copiarRecetaDelModelo` (`produccion/receta-orden.ts:302`) hace
+`tx.ordenArte.createMany` (`:428`) y es **idempotente** (comprueba `yaTieneArtes` en `:310`); si falta algo,
+`agregarRenglonReceta` (`:2010`) lo agrega a mano. ⇒ **su «si lo jala del modelo ya tiene la información, si no
+hay que definirlo» es literalmente lo que el sistema hace hoy.**
+
+### ⭐⭐ (2) Y EL CAMPO DE REFERENCIA **YA EXISTE** para los procesos de arte — no hace falta tabla nueva
+
+📐 **MEDIDO: `OrdenArte` tiene `precio`** (`:4303`), y `copiarRecetaDelModelo` lo **copia del modelo** junto con
+el tipo de proceso y el proveedor (`:435` `precio: a.precio === null ? null : new Prisma.Decimal(a.precio)`).
+Y `ModeloArte` tiene **`precostoLineas`** ⇒ **su precio está atado al precosto**.
+⇒ **`OrdenArte.precio` ES la referencia por proceso que se estaba por inventar**: por orden, por proceso, con su
+proveedor, con su estado de liberación (`liberadoEn`/`liberadoPorId`) y heredada del modelo.
+🔑 **Corrige la recomendación de §Post-F9.253:** NO hace falta la tabla `orden × tipoProceso → precioReferencia`
+para **estampado, bordado, aplicación y lavado** — los cuatro son `esArte = true` y ya tienen su renglón.
+**Lo único que falta es COSTURA**, que es `esArte = false` y por tanto no tiene `OrdenArte`. ⇒ el trabajo se
+reduce a **una referencia de costura** + la guarda, en vez de una tabla nueva y cinco renglones.
+*Dos veces en una hora el diseño se encogió al mirar el catálogo en vez de la conversación.*
+
+### ⚠️ (3) PERO SU REGLA CRUZA UNA LÍNEA QUE EL SISTEMA TRAZÓ A PROPÓSITO, y hay que decidirlo con eso delante
+
+El código lo dice con todas sus letras (`receta-orden.ts:42-44`):
+
+> *«Desarrollo LIBERA, y la puerta va antes de **COMPRAR**. Sin liberar no se explota el MRP ni se generan OC.
+> **Cortar y producir NO se bloquean**: el piso no se detiene porque Desarrollo no haya terminado de revisar; lo
+> único que se frena es **gastar dinero** contra una receta que nadie miró.»*
+
+Y se confirma en los llamadores: `exigirRecetaLiberada` sólo lo invocan **compras** (`ordenes-compra.ts:647`,
+`mrp.ts:1957,2759`). ⇒ **hoy NINGUNA falta de datos detiene la producción.** Su regla sería **la primera guarda
+de esta familia del lado del piso**.
+
+🔴 **Y la consecuencia concreta, que sólo se ve al juntar sus dos decisiones:** él dijo que **las OP sólo las mete
+él** (§Post-F9.250(c)) y ahora que **sin referencia no sale a maquila**. Juntas significan que **un día que él no
+esté, el piso se detiene** en cuanto haya una orden nueva sin referencia capturada. **Es su decisión y puede ser
+la correcta** —proteger el dinero vale una parada— pero **no debe tomarse sin ver ese costo**, porque es
+exactamente el motivo por el que el sistema dejó la producción sin candados.
+⏳ **Tres salidas, para que elija:** (a) tal cual, asumiendo la parada; (b) que la referencia **también la pueda
+capturar producción**, y lo que él autoriza sea sólo **pasarse del 5 %**; (c) que la falta de referencia **avise
+en vez de frenar**, y frene sólo al cerrar la orden o al cargar a EsMa. **Recomendación del lead: (b)** — mueve
+el candado del *dato* al *exceso*, que es lo que a él le preocupa, y no le ata el piso a su agenda.
