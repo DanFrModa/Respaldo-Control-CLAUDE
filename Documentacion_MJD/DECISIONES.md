@@ -17807,3 +17807,56 @@ pregunta se habría construido contra `maquilaBase`.
    el costo negociado y el real coinciden al centavo casi nunca, esto se vuelve un trámite diario de
    autorización. Es el tipo de cosa que sólo se ve al operar, así que conviene medirla en `prueba` antes de
    cerrar la puerta del todo.
+
+#### (Post-F9.252) — EL TOPE SE SIMPLIFICA: UN PRECIO DE REFERENCIA EN LA OP, PUESTO POR DANIEL (30-sep-2026)
+
+Sus tres respuestas a los huecos de §Post-F9.251, y la primera **cambia el diseño a mejor**:
+
+> **(1)** *«No sé si exista un campo de precio de referencia dentro de la OP. **Debería de llenarse por mí**.»*
+> **(2)** *«**No pasa que un modelo se venda a diferentes clientes.** Normalmente un modelo es exclusivo de un
+> cliente. Y en caso de que suceda, debería de ser el mismo precio. Pero **no ha sucedido nunca en 30 años**.»*
+> **(3)** *«Podríamos darle un **margen de 1 peso hacia arriba** (hacia abajo **no hay freno**. Se puede pagar
+> siempre más barato de lo que se cotizó).»*
+
+### 📐 (1) MEDIDO: ese campo NO existe, y su instinto era correcto
+
+`Orden` tiene **sólo dos campos de dinero de maquila**: `maquilaOrd` (*«costo de maquila de la orden»*,
+`schema.prisma:3552`) y `aplicacionOrd` (*«costo de aplicación/estampado»*, `:3554`) — **los dos son el precio
+REAL que se negoció con el taller**, no una referencia. Su historial vive en `OrdenPrecioEvento`, que guarda
+anterior→nuevo, **el proveedor con quien se negoció** y una nota. ⇒ **no hay ningún campo de referencia; hay que
+crearlo.**
+
+### ⭐ Y SU PROPUESTA ES MEJOR QUE LA CADENA QUE EL LEAD TRAZÓ. Tres razones, y las tres son suyas sin saberlo:
+
+1. **Mata los dos huecos de §251 de un golpe.** La cadena orden→desarrollo→lista→precosto tenía dos agujeros —la
+   liga es **opcional** y un desarrollo puede estar en **varias listas**—. Un campo en la propia OP **no tiene
+   cadena que resolver**, así que ninguno de los dos existe.
+2. **No le cuesta un paso extra, porque ya es él quien crea las OP** (§Post-F9.250(c): *«sólo los meto Yo»*) ⇒
+   el campo se llena **en la misma pantalla y el mismo momento** en que ya está trabajando.
+3. **Convierte la referencia en una DECISIÓN explícita en vez de una derivación silenciosa.** Si el costo
+   negociado cambia después de abrir la OP, una cadena seguiría al nuevo sin avisar; un campo dice *«el tope de
+   ESTA orden es el que yo puse»*, con su rastro de quién y cuándo. *Para un control de dinero, un número que
+   alguien decidió vale más que uno que el sistema dedujo.*
+
+📌 **PROPUESTA DEL LEAD (pendiente de su OK), para que no tenga que teclearlo de cero:** que al crear la OP el
+sistema **pre-llene** ese campo con lo que dice la cadena —el concepto `maquila-costura`/`estampado` del precosto
+vigente del renglón de la lista— y **él confirme o lo ajuste**. Se queda lo bueno de las dos: no teclea nada
+cuando el dato ya existe, y el valor que gobierna sigue siendo el que él aprobó. ⏳ Y la pregunta que falta:
+**¿qué pasa si el campo queda VACÍO?** (sin tope, o no se puede capturar precio de maquila).
+
+### ✅ (2) EL RIESGO DE LAS VARIAS LISTAS LO DESCARTA EL NEGOCIO, con 30 años de evidencia
+
+*«No ha sucedido nunca en 30 años»*, y si sucediera **sería el mismo precio**. ⇒ el punto (b) de §251 **se cierra
+sin construir nada**. 🔑 **Y es el tipo de cosa que el lead NO podía decidir:** `ListaPrecios` lleva `idCliente`
+y `idClienteDepartamento`, así que **el modelo de datos admite el caso** y desde el código parece un riesgo real.
+Sólo él sabe que en tres décadas no pasó. *El modelo de datos dice qué es POSIBLE; sólo el dueño dice qué OCURRE.*
+
+### ✅ (3) LA TOLERANCIA: +$1.00 hacia arriba, sin freno hacia abajo
+
+Y **revisó su propia respuesta de una hora antes**: había dicho *«costo negociado»* exacto, y al ver el costo
+—que un centavo de más pediría su autorización— lo ajustó a **un peso de holgura**. ⇒ la regla queda:
+**se rechaza si `precio > referencia + 1.00`; por debajo, nunca se frena** —*«se puede pagar siempre más barato
+de lo que se cotizó»*—, y entre la referencia y el peso de holgura pasa sin pedir nada.
+⚠️ **Dicho para que no se olvide:** $1.00 es un **absoluto**, no un porcentaje. En una prenda de $40 es 2.5 %; en
+una de $400, 0.25 %. Si algún día los precios de maquila suben de orden de magnitud, la holgura se vuelve
+simbólica — **el número vive en un sitio y se cambia ahí**, no se reparte por el código.
