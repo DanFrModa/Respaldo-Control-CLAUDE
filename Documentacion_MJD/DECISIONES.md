@@ -17962,3 +17962,39 @@ exactamente el motivo por el que el sistema dejó la producción sin candados.
 capturar producción**, y lo que él autoriza sea sólo **pasarse del 5 %**; (c) que la falta de referencia **avise
 en vez de frenar**, y frene sólo al cerrar la orden o al cargar a EsMa. **Recomendación del lead: (b)** — mueve
 el candado del *dato* al *exceso*, que es lo que a él le preocupa, y no le ata el piso a su agenda.
+
+#### (Post-F9.255) — EL TOPE, CERRADO: la salida (b), y el coste que trae la recomendación del lead (30-sep-2026)
+
+> *«Ok. La B.»*
+
+⇒ **DECIDIDO, y con esto la fila 0.242 queda especificada del todo:**
+
+| Pieza | Cómo queda |
+|---|---|
+| **La referencia** | Una **por proceso**. Para `estampado`, `bordado`, `aplicacion` y `lavado` **ya existe**: `OrdenArte.precio`, copiado del modelo (§Post-F9.254). **Falta crear la de `costura`**, que no es arte. |
+| **Quién la captura** | **También producción** —no sólo Daniel— para que el piso no dependa de su agenda. Pre-llenada desde el concepto equivalente del precosto vigente. |
+| **La guarda del envío** | `registrarEnvioMaquila` (`produccion/etapas.ts:917`) exige que **exista** la referencia del proceso de esa salida. Su regla se conserva; lo que cambia es que cualquiera de producción puede satisfacerla. |
+| **El tope** | Se rechaza si `precio > referencia × 1.05`. **Sin freno hacia abajo.** |
+| **La excepción** | Pasarse del 5 % exige **autorización de Daniel** ⇒ permiso reservado (patrón `SOLO_ADMINISTRADOR`). |
+
+### ⚠️ EL COSTE DE LA (b), que el lead debe decir porque la (b) FUE SU RECOMENDACIÓN
+
+**Si producción captura la referencia Y el precio, el candado se afloja:** podría poner una referencia alta y
+pagar cualquier cosa por debajo **sin pedir nada**. La (a) —sólo Daniel la captura— no tenía ese hueco; se cambió
+por no atarle el piso a su agenda, y **ese es el intercambio real: un candado duro por un rastro visible.**
+
+**Lo que sostiene el control en la (b)**, y por eso sigue valiendo:
+1. **El valor por defecto es el negociado**, pre-llenado del precosto ⇒ para aflojarlo hay que **cambiarlo a
+   mano**, que es un acto, no un descuido.
+2. **Ese cambio deja rastro.** El patrón ya existe en el sistema: `OrdenPrecioEvento` guarda anterior→nuevo, quién
+   y cuándo para los precios de la orden ⇒ la referencia debe guardar lo mismo.
+3. ⭐ **Y el aviso que lo vuelve operable: la señal que Daniel necesita ya no es «me piden autorización», es «la
+   referencia cambió».** Con la (a) él se enteraba por fuerza; con la (b) hay que **informarle**, o el rastro
+   existe y nadie lo mira.
+
+📌 **RECOMENDACIÓN DEL LEAD, pendiente de su OK:** que la ficha incluya **una consulta de referencias cambiadas**
+—qué orden, qué proceso, de cuánto a cuánto, quién y cuándo— porque sin ella la (b) es un control que **sólo
+funciona si alguien se acuerda de buscarlo**. Es chico (una lectura sobre el rastro que ya hay que guardar) y es
+lo que hace que elegir la (b) no sea bajar la guardia. ⚠️ **Y lo que NO se recomienda:** un aviso automático por
+correo o notificación — **no existe infraestructura de avisos** en el backend (medido en §Post-F9.248(d)), así que
+eso sería otra fila, más grande.
