@@ -74,7 +74,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ## 0.187 · 30-sep-2026 · **en prueba** — **Contestaste los 16 puestos, y al cruzarlos aparecieron cuatro cosas que hoy sólo podrías hacer tú**
 
 > **La v0.187 cierra una fila del programa —la 0.240— sin construir nada**, porque tu respuesta la disolvió. No
-> cambia cómo funciona el sistema: guarda tus 187 respuestas, las seis que contestaste después, y lo que salió
+> cambia cómo funciona el sistema: guarda tus 187 respuestas, las cinco vueltas que contestaste después, y lo que salió
 > de medirlas.
 
 ### ✅ Se guardó todo, esta vez
@@ -91,7 +91,7 @@ contigo, el perfil de Lupita ya se puede armar completo. Era la decisión más p
 
 ### 🔴 Lo que tienes que ver: cuatro cosas sin dueño
 
-Cruzé tus 187 marcas contra la lista completa de permisos. **79 los lleva algún puesto.** De los que sobran, la
+Crucé tus 187 marcas contra la lista completa de permisos. **79 los lleva algún puesto.** De los que sobran, la
 mayoría son tuyos porque tú lo dijiste —costos, resultados, aprobar precios, autorizar compras, cerrar
 órdenes—. **Pero cuatro no creo que sean a propósito**, y dos son el arranque del negocio:
 
@@ -111,19 +111,33 @@ de Producto.)*
 
 **El precio de maquila y el de estampado llevan un tope nuevo, y lo pediste tú.** Al corregir tu propia marca
 —*«chance me equivoqué»*— dijiste que producción sí los captura, **pero que no pueda ponerlos más caros que lo
-negociado sin que tú autorices**. Y precisaste contra qué: **contra la última información negociada con el
-cliente, no contra lo que metió desarrollo al principio** — y el tope es el **costo negociado exacto**, sin
-margen.
+negociado sin que tú autorices**. Después de cinco vueltas, así quedó:
 
-⭐ **Tenías razón en que ya está estructurado así.** Lo tracé: la orden sabe de qué desarrollo viene, el
-desarrollo tiene su renglón en la lista de precios del cliente, y ese renglón **se actualiza en cada ronda de
-negociación**, así que siempre apunta a lo último que se acordó. Dentro de eso, la maquila y el estampado tienen
-cada uno su propio renglón de costo. **Los dos topes se pueden construir.**
+- **El tope es +5 %** sobre el precio de referencia, y **hacia abajo no hay freno** — se puede pagar siempre más
+  barato de lo cotizado. Pasarse del 5 % **pide tu autorización**.
+- **La referencia es una por proceso**, no una sola para todo. Para estampado, bordado, aplicación y lavado
+  **ya existe** en el sistema: cada arte de la orden ya trae su precio, copiado del modelo. **Falta crear la de
+  costura**, que es lo único nuevo.
+- **La captura también producción**, no sólo tú — con el valor del precosto ya puesto por defecto. Así el piso
+  no se detiene un día que no estés.
+- **Y sin referencia no sale a maquila**, como pediste. Sólo que ahora cualquiera de producción puede llenarla,
+  así que la regla protege el dinero sin frenar el trabajo.
 
-⚠️ **Y me corregiste dos cosas, las dos importantes.** Te había propuesto topar contra el costo que captura
-desarrollo — que es exactamente lo que no querías, y el tope habría funcionado comparando contra un número
-viejo en cuanto hubiera una negociación. Y te dije que el estampado no tenía con qué compararse: **era falso**,
-sí tiene. Los dos errores salieron de mirar un solo sitio y dar por hecho que valía para todo el sistema.
+⭐ **Tenías razón en que ya está estructurado así**, y además mejor de lo que yo creía: la orden ya sabe qué
+procesos lleva —se copian del modelo al crearla, y lo que falte se agrega a mano— y **cada uno ya trae su
+precio**. Eso encogió el trabajo de «una tabla nueva» a «una referencia de costura más la validación».
+
+⚠️ **Y me corregiste tres cosas.** Te había propuesto topar contra el costo que captura desarrollo — que es
+exactamente lo que no querías, y el tope habría funcionado comparando contra un número viejo en cuanto hubiera
+una negociación. Te dije que el estampado no tenía con qué compararse: **era falso**. Y mi primera idea tenía
+sólo **dos** referencias, cuando el sistema maneja **cinco** procesos ⇒ **bordado, lavado y aplicación no
+habrían podido salir nunca** con tu regla. Las tres salieron de mirar un solo sitio y dar por hecho que valía
+para todo.
+
+⚠️ **Una cosa que cambió al elegir que producción también capture la referencia:** el candado pasa de ser
+«sólo tú pones el número» a «cualquiera lo pone, pero queda el rastro de quién lo cambió». Es un intercambio
+real — más agilidad, menos dureza — y para que no se afloje en silencio te propongo **una consulta de
+referencias cambiadas**: qué orden, qué proceso, de cuánto a cuánto, quién y cuándo.
 
 ### ✅ Y una cosa que ibas a leer aquí y tu respuesta borró
 
@@ -136,10 +150,10 @@ mismo día sin construir nada.
 
 ### ⏳ Qué sigue pendiente
 
-- **Tres cosas que se deciden al construir el tope:** qué pasa con una orden que **no nació de un desarrollo**
-  (no tendría contra qué compararse); que el mismo modelo vendido a **dos clientes** tiene dos topes distintos,
-  uno por cliente; y que al ser el costo **exacto**, si el negociado y el real casi nunca coinciden al centavo,
-  esto se vuelve un trámite diario de autorización — **conviene medirlo operando antes de cerrar la puerta**.
+- **Del tope ya no queda nada por decidir** — las tres dudas que tenía las cerraste tú: el 5 % resolvió lo del
+  trámite diario, poner la referencia en la orden mató el problema de la orden sin desarrollo, y lo de los dos
+  clientes lo descartaste con 30 años de evidencia. **Lo único que te propongo encima** es la consulta de
+  referencias cambiadas, para que el rastro se pueda mirar sin acordarse de buscarlo.
 - **Tus dos usuarios**: decidir cuál lleva tu permiso de corregir movimientos sin factura.
 - **Lo que no depende de mí:** cambiar la contraseña de `admin`, sembrar los datos de demo en `prueba`, y
   comprobar que estén capturados el régimen y el código postal fiscal de FR Moda — sin eso, el documento para

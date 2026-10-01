@@ -17722,10 +17722,9 @@ toque — y habría quedado como una decisión suya que nunca tomó.
 ⇒ **Producción lleva `ordenes.precio-maquila`** (su «no» del cuestionario queda revertido por él mismo). Y su
 condición es **trabajo nuevo**, no un permiso.
 📐 **MEDIDO — se puede construir, y hay contra qué comparar:** producción escribe **`Orden.maquilaOrd`**
-(`dominio/produccion/precios-orden.ts:202`, bajo ese permiso, con lock e historial de cambios), y la cotización
-vive en **`Modelo.maquilaBase`** — *«Costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`),
+(`dominio/produccion/precios-orden.ts:202`, bajo ese permiso, con lock e historial de cambios), y la cotización —⛔ **SUPERADO por §Post-F9.251: ésta NO es la referencia buena**— se creía en **`Modelo.maquilaBase`** — *«Costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`),
 capturada en el editor de desarrollo, con su `idMaquileroCotizado` al lado.
-⚠️ **PERO el estampado NO tiene con qué compararse:** existe `Orden.aplicacionOrd` (`:3554`) y **no existe
+⛔ **SUPERADO por §Post-F9.251 — ESTA FRASE ES FALSA y se conserva para que el error quede a la vista:** ⚠️ ~~**PERO el estampado NO tiene con qué compararse:**~~ existe `Orden.aplicacionOrd` (`:3554`) y **no existe
 ningún `aplicacionBase`/`estampadoBase`** en el modelo ⇒ **el tope sólo se puede construir para la COSTURA**.
 ⏳ Preguntado a Daniel: ¿quiere el mismo tope en el precio del estampado? Si sí, hay que capturar antes su
 cotización en el desarrollo.
@@ -17759,7 +17758,7 @@ entera:**
 > estructurado, pero **revísalo bien** por favor. **¿De dónde sale el precio de referencia** de maquila y
 > estampado?»*
 
-Y a la pregunta de si el tope lleva margen: **«Costo negociado»** ⇒ **exacto, sin holgura**: un centavo por
+Y a la pregunta de si el tope lleva margen: **«Costo negociado»** ⇒ ⛔ **«exacto, sin holgura» quedó SUPERADO el mismo día por §Post-F9.252(3) (`$1.00`) y luego por §Post-F9.253(1), que lo dejó en 5 % — la regla VIGENTE es `precio > referencia × 1.05`.** Lo que decía esta línea: un centavo por
 encima pide su autorización.
 
 ### ✅ TENÍA RAZÓN: el sistema ya guarda «lo último negociado», y la cadena está medida
@@ -17769,12 +17768,31 @@ encima pide su autorización.
 | La orden apunta a su desarrollo | **`Orden.desarrolloOrden`** → `DesarrolloOrden` (`schema.prisma:8836`, `idOrden @unique` ⇒ 1:1). Es la liga de R16/E6. |
 | El desarrollo tiene su renglón en la lista del cliente | **`ListaPreciosLinea`** (`:9091`) con `idDesarrollo` + **`idPrecosto`**, y su `costoUnit`, `precioCalculado`, `precioAprobado`. |
 | Ese renglón apunta **al precosto VIGENTE** | ⭐ **`registrarRonda` lo ACTUALIZA en cada ronda** (`dominio/desarrollo/negociacion.ts`): valida el precosto nuevo (`:192`), **rechaza si es el mismo** (`:208`), guarda el anterior (`:219`), **escribe `idPrecosto: nuevo.id` en el renglón** (`:226`) y deja el evento con la pareja anterior→nuevo (`:240-241`). ⇒ **ese campo SIEMPRE apunta a la última versión negociada.** |
-| Dentro del precosto, el precio por concepto | **`PrecostoLinea`** (`:8914`) con `idConceptoCosto` y `precioUnit`. Los conceptos fijos del seed incluyen **`maquila-costura`** (`seed.ts:1029`), **`estampado`** (`:1044`) y **`aplicacion`** (`:1047`). |
+| Dentro del precosto, el precio por concepto | **`PrecostoLinea`** (`:8914`) con `idConceptoCosto` y `precioUnit`. El catálogo real es **`CONCEPTOS_COSTO_BASE`** (`seed.ts:1587-1605`) y tiene **nueve**: `tela`, `avios`, **`maquila`** (`:1590`), **`estampado`** (`:1591`), **`bordado`** (`:1592`), **`otros-procesos`** (`:1593`), `otros`, `corte`, `empaque`. La constante canónica del dominio lo confirma: `CONCEPTO_MAQUILA = 'maquila'` (`dominio/desarrollo/conceptos-precosto.ts:19`). ⚠️ **NO existe un concepto `aplicacion` ni `lavado`**: esos dos procesos caen en **`otros-procesos`**. |
 
-⇒ **La referencia del tope es: el renglón del concepto `maquila-costura` (y `estampado`/`aplicacion`) del
+> 🔴 **ESTA LÍNEA ESTUVO FALSA, Y ES LA MISMA FALTA QUE EL PÁRRAFO DE ABAJO DECLARA COMO LECCIÓN.** Decía, bajo
+> 📐 MEDIDO, que los conceptos fijos incluyen *«`maquila-costura` (`seed.ts:1029`), `estampado` (`:1044`) y
+> `aplicacion` (`:1047`)»*. **Las tres líneas son `ROLES_PROVEEDOR_BASE`** —el catálogo de **roles de
+> proveedor**, no de conceptos de costo—, y **ni `maquila-costura` ni `aplicacion` existen como concepto**. Lo
+> cazó el reviewer de la v0.187.
+> 🔑 **Cómo se produjo, porque importa más que el arreglo:** el lead buscó `codigo:` junto a la palabra
+> «maquila» y **aterrizó en el primer arreglo que casó**, que resultó ser el de roles. Es **exactamente** el
+> modo de fallo que este mismo párrafo escribió como lección nueve líneas más abajo —*«el `grep` sale limpio y
+> la conclusión es falsa»*— cometido **en el párrafo que lo enunciaba**.
+> ⚠️ **Y lo que lo hacía peligroso, no cosmético:** ésta es la **cita operativa** de la fila 0.242. Quien
+> construyera el tope habría buscado un concepto `maquila-costura` y uno `aplicacion` en el precosto y **no los
+> habría encontrado**. Peor: **§Post-F9.253 dice lo CORRECTO** —los nueve conceptos, con `maquila`— así que la
+> misma entrega llevaba las dos versiones sin decir cuál manda. *Dos párrafos del mismo documento que se
+> contradicen no son medio ciertos: son una trampa para quien lea el primero.*
+> 📌 **Regla que sale de aquí:** un `codigo:` o un `clave:` **nunca se cita por la línea donde lo encontró el
+> grep**, sino por **el nombre del arreglo que lo contiene** —`CONCEPTOS_COSTO_BASE`, `ROLES_PROVEEDOR_BASE`—,
+> que es lo único que dice **de qué catálogo** se está hablando.
+
+
+⇒ **La referencia del tope es: el renglón del concepto `maquila` (y `estampado`/`bordado`, o `otros-procesos` para aplicación y lavado) del
 precosto al que apunta `ListaPreciosLinea.idPrecosto` de la lista del CLIENTE de esa orden.**
 
-### 🔴 Y DOS ERRORES DEL LEAD QUE SU PREGUNTA CAZÓ — los dos en §Post-F9.250(d), escritos ayer
+### 🔴 Y DOS ERRORES DEL LEAD QUE SU PREGUNTA CAZÓ — los dos en §Post-F9.250(d), del mismo día
 
 **(1) `Modelo.maquilaBase` NO sirve como referencia, y era la que el lead había propuesto.** Su propia
 descripción lo dice: *«costo de maquila base que heredan las órdenes»* (`schema.prisma:2536`), **capturado en el
@@ -17800,7 +17818,7 @@ pregunta se habría construido contra `maquilaBase`.
 1. **La liga orden→desarrollo es OPCIONAL** (`desarrolloOrden DesarrolloOrden?`) ⇒ una orden que **no nació de un
    desarrollo** no tiene contra qué compararse. ¿Pasa sin tope, o se bloquea hasta ligarla? **Preguntado.**
 2. **Un desarrollo puede estar en VARIAS listas** — `ListaPrecios` lleva `idCliente` + `idClienteDepartamento`
-   (`:9020-9030` aprox.) ⇒ hay que resolver por el **cliente de la orden**: el mismo modelo vendido a dos
+   (`ListaPrecios` abre en `:9009`; `idCliente` en `:9014` y `idClienteDepartamento` en `:9016`) ⇒ hay que resolver por el **cliente de la orden**: el mismo modelo vendido a dos
    clientes tiene **dos** topes distintos, y cada orden va contra el de su cliente. **Preguntado** si eso cubre
    todos los casos.
 3. **El tope es el costo negociado EXACTO**, decidido por él ⇒ sin holgura. ⚠️ **Y su consecuencia, dicha:** si
@@ -17839,7 +17857,7 @@ crearlo.**
    alguien decidió vale más que uno que el sistema dedujo.*
 
 📌 **PROPUESTA DEL LEAD (pendiente de su OK), para que no tenga que teclearlo de cero:** que al crear la OP el
-sistema **pre-llene** ese campo con lo que dice la cadena —el concepto `maquila-costura`/`estampado` del precosto
+sistema **pre-llene** ese campo con lo que dice la cadena —el concepto `maquila`/`estampado` del precosto
 vigente del renglón de la lista— y **él confirme o lo ajuste**. Se queda lo bueno de las dos: no teclea nada
 cuando el dato ya existe, y el valor que gobierna sigue siendo el que él aprobó. ⏳ Y la pregunta que falta:
 **¿qué pasa si el campo queda VACÍO?** (sin tope, o no se puede capturar precio de maquila).
@@ -17851,7 +17869,7 @@ sin construir nada**. 🔑 **Y es el tipo de cosa que el lead NO podía decidir:
 y `idClienteDepartamento`, así que **el modelo de datos admite el caso** y desde el código parece un riesgo real.
 Sólo él sabe que en tres décadas no pasó. *El modelo de datos dice qué es POSIBLE; sólo el dueño dice qué OCURRE.*
 
-### ✅ (3) LA TOLERANCIA: +$1.00 hacia arriba, sin freno hacia abajo
+### ⛔ (3) LA TOLERANCIA: +$1.00 hacia arriba — **SUPERADA por §Post-F9.253: él la subió a 5 %**
 
 Y **revisó su propia respuesta de una hora antes**: había dicho *«costo negociado»* exacto, y al ver el costo
 —que un centavo de más pediría su autorización— lo ajustó a **un peso de holgura**. ⇒ la regla queda:
@@ -17930,7 +17948,7 @@ hay que definirlo» es literalmente lo que el sistema hace hoy.**
 
 ### ⭐⭐ (2) Y EL CAMPO DE REFERENCIA **YA EXISTE** para los procesos de arte — no hace falta tabla nueva
 
-📐 **MEDIDO: `OrdenArte` tiene `precio`** (`:4303`), y `copiarRecetaDelModelo` lo **copia del modelo** junto con
+📐 **MEDIDO: `OrdenArte` tiene `precio`** (`:4314`, *«Precio del arte EN ESTA ORDEN… NULL = sin precio congelado»*), y `copiarRecetaDelModelo` lo **copia del modelo** junto con
 el tipo de proceso y el proveedor (`:435` `precio: a.precio === null ? null : new Prisma.Decimal(a.precio)`).
 Y `ModeloArte` tiene **`precostoLineas`** ⇒ **su precio está atado al precosto**.
 ⇒ **`OrdenArte.precio` ES la referencia por proceso que se estaba por inventar**: por orden, por proceso, con su
@@ -17943,7 +17961,7 @@ reduce a **una referencia de costura** + la guarda, en vez de una tabla nueva y 
 
 ### ⚠️ (3) PERO SU REGLA CRUZA UNA LÍNEA QUE EL SISTEMA TRAZÓ A PROPÓSITO, y hay que decidirlo con eso delante
 
-El código lo dice con todas sus letras (`receta-orden.ts:42-44`):
+El código lo dice con todas sus letras (`receta-orden.ts:41-44`):
 
 > *«Desarrollo LIBERA, y la puerta va antes de **COMPRAR**. Sin liberar no se explota el MRP ni se generan OC.
 > **Cortar y producir NO se bloquean**: el piso no se detiene porque Desarrollo no haya terminado de revisar; lo
