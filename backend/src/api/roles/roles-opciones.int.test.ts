@@ -165,9 +165,25 @@ describe('GET /api/roles/opciones — la reja del catálogo de roles', () => {
     for (const rol of datos) {
       expect(Object.keys(rol).sort()).toEqual(['id', 'nombre']);
     }
-    // Orden alfabético estable, igual que el listado gordo.
+    // Orden alfabético estable, igual que el listado gordo (`orderBy: { nombre: 'asc' }`).
+    //
+    // ⚠️ EL ÁRBITRO ES POSTGRES, NO `localeCompare`, y el cambio NO es un relajamiento: hasta los
+    // perfiles de puesto de Daniel todos los nombres de rol eran ASCII puro y las dos ordenaciones
+    // coincidían por casualidad. Con nombres acentuados **dejan de coincidir**, y está medido:
+    // la colación `C.UTF-8` compara bytes y pone `AdministracionDireccion` antes de
+    // `Administración y Finanzas` (`n` = 0x6E < `ó` = 0xC3 0xB3), mientras el ICU de Node hace lo
+    // contrario (el espacio pesa menos que una letra). Lo mismo con `Líder de Calidad`/`Logistica`.
+    // O sea: comparar la salida del endpoint contra `localeCompare` medía la colación de la máquina,
+    // no el endpoint — y daba resultados distintos según dónde corriera.
+    //
+    // Lo que el endpoint promete es devolverlos en el orden en que la BASE los ordena por nombre, y
+    // eso es lo que se comprueba. Sigue cazando lo que importa: que no vengan en orden de inserción,
+    // ni por id, ni al revés, ni paginados.
     const nombres = datos.map((r) => String(r.nombre));
-    expect(nombres).toEqual([...nombres].sort((a, b) => a.localeCompare(b)));
+    const enLaBase = (
+      await cliente.rol.findMany({ orderBy: { nombre: 'asc' }, select: { nombre: true } })
+    ).map((rol) => rol.nombre);
+    expect(nombres).toEqual(enLaBase);
   });
 });
 

@@ -8,7 +8,14 @@
  */
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { definirRoles, PERFILES_ACCESO_TOTAL, sembrar } from '../../prisma/seed.js';
+import {
+  definirRoles,
+  PERFILES_ACCESO_TOTAL,
+  PERFILES_DE_PUESTO,
+  PERFILES_EDITABLES,
+  sembrar,
+} from '../../prisma/seed.js';
+import { ROLES_FUNCIONALES_RC } from '../../prisma/seed-ruta-critica.js';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO } from '../contrato/index.js';
 import { limpiarBaseDatos } from '../pruebas/contexto.js';
 import { crearClientePrisma, type PrismaClient } from './index.js';
@@ -65,9 +72,18 @@ describe('seed de fundación', () => {
 
     expect(segunda).toEqual(primera);
     expect(primera.permisos).toBe(CATALOGO_PERMISOS.length);
-    // 9 roles de sistema (niveles viejos absorbidos) + 17 roles funcionales de la RC
-    // (F5-E1, desde RC_TipoUsuarios; "Administrador" se reutiliza, no se duplica) = 26.
-    expect(primera.roles).toBe(26);
+    // La cuenta, renglón por renglón (si este número se mueve, aquí está el porqué):
+    //   9  roles de SISTEMA (los niveles viejos absorbidos)
+    // + 1  `Director General`, el perfil de puesto del dueño, que también es de sistema
+    // + 15 perfiles de PUESTO de Daniel (`sembrarPerfilesDePuesto`, esSistema:false)
+    // +  1 «Consulta general», el PISO DE LECTURA (mismo camino, esSistema:false)
+    // + 17 roles funcionales de la RC (18 nombres, pero "Ventas" ya existe como rol de sistema)
+    // − 2  «Habilitaciones» y «Entregas» son A LA VEZ perfil de puesto de Daniel y rol funcional de
+    //      la RC (`seed-ruta-critica.ts`) y `nombre` es único ⇒ comparten FILA. Es correcto (son la
+    //      misma persona, y el rol de la RC nace vacío): la fila queda con los permisos del puesto.
+    //      Lo mide la prueba de colisiones de abajo.
+    //   = 41
+    expect(primera.roles).toBe(41);
     expect(primera.empresas).toBeGreaterThanOrEqual(1);
   });
 
@@ -386,16 +402,25 @@ describe('seed de fundación', () => {
       where: { permisos: { some: { permiso: { clave: 'esma.revisar' } } } },
       select: { nombre: true },
     });
+    // ⚠️ Esta consulta ve TODOS los roles de la base, no sólo los de sistema, así que aquí sí
+    // aparecen los perfiles de PUESTO de Daniel: `Director General` (lleva el catálogo entero) y
+    // `Administración y Finanzas`, al que él le dio `esma.revisar` (confirmado). No rompe la fila
+    // 0.128: lo que su frase protege es `esma.cargo-validar`, y ésa no la lleva ningún perfil de
+    // puesto. Las dos mitades están en `roles-perfiles-puesto.test.ts`; si alguien mueve cualquiera
+    // de las dos, esta prueba lo cuenta.
     expect(conElPermiso.map((r) => r.nombre).sort()).toEqual([
       'AdministracionDireccion',
+      'Administración y Finanzas',
       'Administrador',
       'Directivo',
+      'Director General',
     ]);
   });
 
-  it('los dos perfiles de acceso total llevan el catálogo COMPLETO, y Basico va en cero', async () => {
-    // Los extremos, dichos aparte: son los dos que un reparto mal editado rompe primero, y ninguno
-    // de los dos depende de que los perfiles de en medio estén anidados.
+  it('los perfiles de acceso total llevan el catálogo COMPLETO, y Basico va en cero', async () => {
+    // Los extremos, dichos aparte: son los que un reparto mal editado rompe primero, y ninguno
+    // depende de que los perfiles de en medio estén anidados. Desde los perfiles de puesto son
+    // TRES: entró `Director General`, que deriva el catálogo entero igual que los otros dos.
     const roles = await prisma.rol.findMany({
       where: { nombre: { in: [...PERFILES_ACCESO_TOTAL, 'Basico'] } },
       select: { nombre: true, permisos: { select: { permiso: { select: { clave: true } } } } },
@@ -412,6 +437,193 @@ describe('seed de fundación', () => {
       porNombre.get('Basico')?.permisos ?? ['(falta el rol Basico)'],
       'Basico existe para NO tener permisos',
     ).toEqual([]);
+  });
+});
+
+/**
+ * ⭐⭐ LOS 15 PERFILES DE PUESTO DE DANIEL — lo que mide esta batería es que el seed **NO** los pise.
+ *
+ * `sembrarPerfilesDePuesto` es lo contrario de `sembrarRoles`: **crear-si-no-existe**. Pasa por aquí
+ * y no por `definirRoles()` porque el dueño los va a afinar desde Administración › Roles —y
+ * `asignarPermisos` se lo permite, no mira `esSistema`— mientras `SEED_ON_START=true` está encendido
+ * **permanentemente** en `prueba`. Si se sincronizaran, cada deploy le borraría el trabajo en
+ * silencio.
+ *
+ * La prueba que de verdad protege ese trabajo es la segunda: **un perfil ya editado sobrevive a
+ * re-sembrar**. Las otras dos fijan cómo NACEN.
+ */
+describe('roles EDITABLES (puestos + piso de lectura): se crean una vez y no se pisan', () => {
+  /**
+   * Los perfiles de puesto cuyo nombre choca AL CARÁCTER con un rol funcional de la Ruta Crítica.
+   *
+   * Se CALCULA, no se escribe a mano: así una colisión nueva aparece sola (la aserción de la 3ª
+   * prueba la caza al instante), que es exactamente lo que no pasó cuando se escribió la lista.
+   */
+  const NOMBRES_QUE_CHOCAN_CON_LA_RC = PERFILES_EDITABLES.map((perfil) => perfil.nombre).filter(
+    (nombre) => ROLES_FUNCIONALES_RC.includes(nombre),
+  );
+
+  /** Roles editables cuyo nombre NO choca con ningún otro rol del seed (ver la prueba de colisiones). */
+  const SIN_COLISION = PERFILES_EDITABLES.filter(
+    (perfil) => !NOMBRES_QUE_CHOCAN_CON_LA_RC.includes(perfil.nombre),
+  );
+
+  it('⭐ nacen con esSistema:FALSE y con sus permisos exactos', async () => {
+    const filas = await prisma.rol.findMany({
+      where: { nombre: { in: SIN_COLISION.map((perfil) => perfil.nombre) } },
+      select: {
+        nombre: true,
+        descripcion: true,
+        esSistema: true,
+        permisos: { select: { permiso: { select: { clave: true } } } },
+      },
+    });
+    expect(filas, 'faltan perfiles de puesto en la BD').toHaveLength(SIN_COLISION.length);
+    const porNombre = new Map(filas.map((fila) => [fila.nombre, fila]));
+
+    for (const perfil of SIN_COLISION) {
+      const fila = porNombre.get(perfil.nombre);
+      // 🔴 `esSistema` TIENE que ser false: `eliminarRol` prohíbe borrar un rol de sistema y
+      // `actualizarRol` prohíbe renombrarlo, así que en `true` el dueño se quedaría con perfiles
+      // que no podría ni quitar ni corregir — y además el seed se los re-sincronizaría.
+      expect(fila?.esSistema, `${perfil.nombre} NO puede ser rol de sistema`).toBe(false);
+      expect(fila?.descripcion, perfil.nombre).toBe(perfil.descripcion);
+      expect(
+        (fila?.permisos ?? []).map((rp) => rp.permiso.clave).sort(),
+        `${perfil.nombre}: la BD no coincide con PERFILES_EDITABLES`,
+      ).toEqual([...perfil.permisos].sort());
+    }
+  });
+
+  /**
+   * 🔴 **LA PRUEBA QUE PROTEGE EL TRABAJO DEL DUEÑO.** Es la contraria exacta de «REVOCA lo que
+   * sobra» de arriba: ahí se exige que el seed DEVUELVA un rol de sistema a la definición del
+   * código; aquí se exige que NO toque un perfil de puesto que alguien ya editó.
+   *
+   * Sin esto, el diseño se vuelve a caer al lado destructivo con un cambio de una línea (pasar los
+   * 15 por `definirRoles()`, que es como estaban escritos en la primera versión de esta fila) y
+   * nadie se enteraría hasta que el dueño reclamara que «se borraron los permisos que puse».
+   */
+  it('⭐ un perfil que el dueño YA EDITÓ sobrevive intacto a re-sembrar', async () => {
+    const antes = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Diseño Gráfico' },
+      select: { id: true },
+    });
+    // El dueño lo edita a mano desde la pantalla: le cambia la descripción y le deja UN permiso
+    // que el seed no le dio (`clientes.ver`) quitándole los demás. Es el caso peor: no se parece
+    // en nada a lo que dice el código.
+    const clientesVer = await prisma.permiso.findUniqueOrThrow({
+      where: { clave: 'clientes.ver' },
+      select: { id: true },
+    });
+    await prisma.rolPermiso.deleteMany({ where: { idRol: antes.id } });
+    await prisma.rolPermiso.create({ data: { idRol: antes.id, idPermiso: clientesVer.id } });
+    await prisma.rol.update({
+      where: { id: antes.id },
+      data: { descripcion: 'Lo que el dueño escribió en la pantalla' },
+    });
+
+    await sembrar(prisma);
+
+    const despues = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Diseño Gráfico' },
+      select: {
+        id: true,
+        descripcion: true,
+        esSistema: true,
+        permisos: { select: { permiso: { select: { clave: true } } } },
+      },
+    });
+    expect(despues.id, 'no se recrea: es la misma fila').toBe(antes.id);
+    expect(
+      despues.permisos.map((rp) => rp.permiso.clave),
+      'el seed NO puede devolverle los permisos del código: el dueño los quitó a propósito',
+    ).toEqual(['clientes.ver']);
+    expect(despues.descripcion, 'el seed tampoco pisa la descripción').toBe(
+      'Lo que el dueño escribió en la pantalla',
+    );
+    expect(despues.esSistema, 'y sigue sin ser de sistema').toBe(false);
+  });
+
+  /**
+   * ⭐⭐ **LA OTRA CARA DE LA MONEDA, Y HACEN FALTA LAS DOS.**
+   *
+   * La prueba de arriba mide que un rol existente **con permisos** no se toca. Ésta mide que uno
+   * existente **vacío** SÍ se llena. Si sólo existiera una de las dos, la condición
+   * `existente !== null && existente._count.permisos > 0` se podría recortar por cualquiera de sus
+   * dos mitades sin que nada fallara — y es justo la lección de la cicatriz del 17-sep-2026: cubrir
+   * los dos extremos y dejar el de en medio sin medir.
+   *
+   * 🔑 El caso no es hipotético, es el de `prueba`: la Ruta Crítica siembra **17 de sus 18** roles
+   * funcionales con `esSistema: false` y **cero permisos** (cascarones para `ProcesoDefRol`; el 18.º es
+   * `Ventas`, que ya es rol de sistema y conserva los suyos), y dos de esos nombres son perfiles de
+   * puesto. Sin esta rama, «Habilitaciones» y «Entregas» se quedarían sin
+   * sus 11 y 9 permisos, en silencio.
+   */
+  it('⭐ un rol preexistente VACÍO (cascarón) SÍ recibe los permisos de su perfil', async () => {
+    // Se fabrica el caso exacto de `prueba`: el rol existe, con su descripción, sin un solo permiso.
+    const perfil = PERFILES_DE_PUESTO.find((p) => p.nombre === 'Auxiliar');
+    expect(perfil, 'falta el perfil Auxiliar').toBeDefined();
+    const cascaron = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Auxiliar' },
+      select: { id: true, descripcion: true },
+    });
+    await prisma.rolPermiso.deleteMany({ where: { idRol: cascaron.id } });
+    await prisma.rol.update({
+      where: { id: cascaron.id },
+      data: { descripcion: 'Rol funcional Auxiliar (Ruta Crítica)' },
+    });
+
+    await sembrar(prisma);
+
+    const despues = await prisma.rol.findUniqueOrThrow({
+      where: { nombre: 'Auxiliar' },
+      select: {
+        id: true,
+        descripcion: true,
+        esSistema: true,
+        permisos: { select: { permiso: { select: { clave: true } } } },
+      },
+    });
+    expect(despues.id, 'se LLENA la fila que ya estaba: no se crea otra').toBe(cascaron.id);
+    expect(
+      despues.permisos.map((rp) => rp.permiso.clave).sort(),
+      'un rol sin un solo permiso es un cascarón, no una decisión del dueño: se llena',
+    ).toEqual([...(perfil?.permisos ?? [])].sort());
+    // Y del cascarón SÓLO se llenan los permisos: la descripción que tenía se respeta.
+    expect(despues.descripcion, 'no se pisa la descripción al llenar el cascarón').toBe(
+      'Rol funcional Auxiliar (Ruta Crítica)',
+    );
+    expect(despues.esSistema, 'ni la bandera').toBe(false);
+  });
+
+  it('⭐ las DOS colisiones con la Ruta Crítica comparten fila, Y la fila queda con sus permisos', async () => {
+    // «Habilitaciones» y «Entregas» son a la vez perfil de puesto de Daniel y rol funcional de la
+    // Ruta Crítica (`ROLES_FUNCIONALES_RC` en `prisma/seed-ruta-critica.ts`), y `Rol.nombre` es
+    // ÚNICO ⇒ son la MISMA fila. Y eso es correcto: el rol de la RC es un cascarón vacío (sólo
+    // existe para colgarle la responsabilidad de un proceso) y son la misma persona.
+    //
+    // 🔑 Lo que esta prueba fija es el RESULTADO, que es el mismo en una base limpia y en `prueba`:
+    // UNA fila, con los permisos del puesto. Antes de llenar los cascarones, en `prueba` esos dos
+    // perfiles se quedaban en cero y en silencio.
+    //
+    // La lista se CALCULA (no se escribe a mano), así que una colisión nueva rompe la primera
+    // aserción en vez de colarse.
+    expect(NOMBRES_QUE_CHOCAN_CON_LA_RC).toEqual(['Habilitaciones', 'Entregas']);
+    for (const nombre of NOMBRES_QUE_CHOCAN_CON_LA_RC) {
+      const filas = await prisma.rol.findMany({
+        where: { nombre },
+        select: { esSistema: true, permisos: { select: { permiso: { select: { clave: true } } } } },
+      });
+      expect(filas, `${nombre} tendría que ser UNA sola fila`).toHaveLength(1);
+      const perfil = PERFILES_EDITABLES.find((p) => p.nombre === nombre);
+      expect(perfil, `${nombre} tendría que ser un perfil de puesto`).toBeDefined();
+      expect(
+        (filas[0]?.permisos ?? []).map((rp) => rp.permiso.clave).sort(),
+        `${nombre} comparte fila con el rol de la RC, y la fila tiene que llevar los permisos del puesto`,
+      ).toEqual([...(perfil?.permisos ?? [])].sort());
+      expect(filas[0]?.esSistema, `${nombre} no puede quedar como rol de sistema`).toBe(false);
+    }
   });
 });
 

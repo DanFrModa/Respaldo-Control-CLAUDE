@@ -61,7 +61,7 @@ import { describe, expect, it } from 'vitest';
 import { definirRoles, PERFILES_ACCESO_TOTAL, SOLO_ADMINISTRADOR } from '../../prisma/seed.js';
 import { CLAVES_PERMISO, type ClavePermiso } from '../contrato/index.js';
 
-/** Los perfiles que declaran permisos uno por uno (todos menos los dos de acceso total). */
+/** Los perfiles de SISTEMA que declaran permisos uno por uno (todos menos los de acceso total). */
 function perfilesExplicitos(): { nombre: string; permisos: ClavePermiso[] }[] {
   const total: readonly string[] = PERFILES_ACCESO_TOTAL;
   return definirRoles().filter((rol) => !total.includes(rol.nombre));
@@ -132,9 +132,13 @@ describe('⛔ atribución de permisos: el silencio NIEGA (Daniel, 3-sep-2026)', 
     }
   });
 
-  it('los dos perfiles de acceso total sí llevan el catálogo COMPLETO', () => {
+  it('los perfiles de acceso total sí llevan el catálogo COMPLETO', () => {
     // Es la premisa que justifica excluirlos de la prueba de huérfanas: si alguno dejara de
     // llevarlo todo, excluirlo abriría un agujero silencioso.
+    //
+    // ⭐ Desde los perfiles de puesto son TRES: se les sumó `Director General`, el perfil del dueño
+    // (Daniel lo definió con «todos los permisos» y por eso deriva el catálogo entero, igual que
+    // los otros dos). Esta prueba es justamente la que impide que entre en la lista sin llevarlo.
     for (const nombre of PERFILES_ACCESO_TOTAL) {
       const rol = definirRoles().find((r) => r.nombre === nombre);
       expect(rol, `no existe el perfil "${nombre}"`).toBeDefined();
@@ -419,8 +423,23 @@ function repartoEsperadoHoy(): Record<string, string[]> {
 describe('📸 equivalencia: nadie se mueve de sitio salvo por un retiro DECLARADO', () => {
   const foto = repartoEsperadoHoy();
 
-  it('los 9 perfiles siguen existiendo, con su nombre exacto', () => {
-    expect(definirRoles().map((rol) => rol.nombre)).toEqual(Object.keys(foto));
+  it('los 9 perfiles siguen existiendo, con su nombre exacto y EN SU ORDEN', () => {
+    // ⚠️ Ya no se compara la lista ENTERA de `definirRoles()`: desde los perfiles de puesto hay un
+    // décimo rol de sistema detrás de los 9 (`Director General`, el del dueño). Lo que la foto
+    // puede exigir —y lo que aquí se exige— es que los 9 de aquel día sigan **a la cabeza, en el
+    // mismo orden y con el mismo nombre**: un renombre, un borrado o un reordenamiento siguen
+    // matando esta prueba, que es para lo que existe.
+    const nombres = definirRoles().map((rol) => rol.nombre);
+    const losNueve = Object.keys(foto);
+    expect(nombres.slice(0, losNueve.length)).toEqual(losNueve);
+  });
+
+  it('⭐ …y lo que se agregó DETRÁS de los 9 no se cuela sin nombrarse', () => {
+    // La otra mitad: sin esto, `slice(0, 9)` dejaría entrar cualquier cantidad de roles de sistema
+    // nuevos sin que nada lo notara — y un rol de sistema se re-sincroniza en cada deploy, así que
+    // agregar uno es una decisión, no un detalle. Hoy el único es el perfil de puesto del dueño.
+    const nombres = definirRoles().map((rol) => rol.nombre);
+    expect(nombres.slice(Object.keys(foto).length)).toEqual(['Director General']);
   });
 
   it.each(Object.keys(foto))('%s conserva EXACTAMENTE los permisos que tenía', (nombre) => {

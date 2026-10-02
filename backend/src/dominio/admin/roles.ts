@@ -2,11 +2,21 @@
  * Administración de roles y sus permisos (MEJORAS A4, PLANMAESTRO §4
  * "Seguridad": `Rol` + `RolPermiso` contra el catálogo `Permiso`).
  *
- * Los roles del sistema (`esSistema=true`, sembrados desde los 9 niveles del
- * sistema viejo — doc 00 §2: Administrador, Directivo, Gerencial, …) son la
- * red de seguridad de la migración: NO se renombran NI se borran, pero sus
- * permisos SÍ se ajustan (el mapeo nivel→permisos del seed es aproximado y
- * Daniel lo afinará en pantalla).
+ * Los roles del sistema (`esSistema=true`: los 9 niveles del sistema viejo
+ * — doc 00 §2: Administrador, Directivo, Gerencial, … — más `Director General`)
+ * son la red de seguridad de la migración: NO se renombran NI se borran.
+ *
+ * ⚠️ Y sus PERMISOS **se re-sincronizan con la definición del seed en cada
+ * arranque** (`sembrarRoles`: `deleteMany({ notIn })`), salvo las claves de
+ * GOBIERNO, que el seed nunca revoca. `asignarPermisos` **no mira `esSistema`**,
+ * así que afinarlos en pantalla sí se guarda… pero **no sobrevive al siguiente
+ * despliegue** con `SEED_ON_START=true` (encendido permanentemente en `prueba`).
+ * La pantalla de Roles lo avisa. Para un ajuste permanente están los **perfiles
+ * de PUESTO** (`PERFILES_DE_PUESTO` en `prisma/seed.ts`): existen precisamente
+ * para eso — nacen `esSistema=false` y el seed no los vuelve a tocar
+ * mientras les quede al menos un permiso.
+ * *(Esta cabecera prometía lo contrario —«sus permisos SÍ se ajustan… y Daniel
+ * lo afinará en pantalla»— y era falso desde que el seed sincroniza.)*
  *
  * El catálogo de permisos es CÓDIGO (`src/contrato`) materializado en la
  * tabla `Permiso` por el seed; aquí se valida contra esa tabla: una clave que

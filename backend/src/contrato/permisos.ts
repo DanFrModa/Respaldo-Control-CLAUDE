@@ -188,10 +188,25 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Meter o modificar el precio de maquila',
     },
   },
+  // ⚠️ **SU DESCRIPCIÓN DECÍA «Capturar o modificar los avíos de la orden» Y ERA FALSA: no la
+  // restaures.** Esa redacción es la transcripción del acceso #31 del Access (`origen`, abajo:
+  // *"Poder meter o modificar habilitacion"*) y **prometía una escritura que en v2 nunca existió**:
+  // medido sobre las rutas, esta llave gobierna **UN SOLO endpoint y es un `GET`**
+  // (`GET /ordenes/:id/habilitacion` → `dominio/produccion/habilitacion-orden.ts`, requerido vs.
+  // enviado por avío; capturar avíos va por `notas.administrar` y `modelos.administrar`).
+  //
+  // 🔑 Y por qué se corrigió AHORA y no «algún día»: desde el piso de lectura esta llave vive dentro
+  // del rol **«Consulta general»** (`PERMISOS_DE_SALDOS_Y_MOVIMIENTOS`/`PERFIL_CONSULTA_GENERAL` en
+  // `prisma/seed.ts`), así que la pantalla de Roles pintaba un renglón que dice *capturar* dentro de
+  // un rol de **consulta** — un aviso engañoso justo donde se toma la decisión. El seed sincroniza
+  // `descripcion` en cada arranque, así que `prueba` toma el texto nuevo sola.
+  //
+  // El `origen` se queda tal cual: es la evidencia de DE DÓNDE venía la promesa falsa, no una
+  // descripción de lo que hace hoy.
   {
     clave: 'ordenes.habilitacion',
     modulo: 'ordenes',
-    descripcion: 'Capturar o modificar los avíos de la orden',
+    descripcion: 'Consultar la habilitación / surtido de avíos de la orden (requerido vs. enviado)',
     origen: {
       idAcceso: 31,
       formulario: 'OrdenVer',
@@ -377,7 +392,7 @@ export const CATALOGO_PERMISOS = [
   // regla, se deshace el hecho que la creó (el principio de D3 aplicado a la firma de compra).
   // Daniel: *"es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga
   // acceso"* → vive en el PERFIL (§Post-F9.67), sin excepciones por usuario: el seed lo deja solo en
-  // Administrador y AdministracionDireccion.
+  // los perfiles de acceso total (Administrador, AdministracionDireccion y Director General).
   {
     clave: 'compras.desautorizar',
     modulo: 'compras',
@@ -1148,8 +1163,9 @@ export const CATALOGO_PERMISOS = [
   // 🔑 POR QUÉ ES UN PERMISO PROPIO Y NO `inventario-telas.mover` / `inventario-avios.mover`: esos
   // dos los lleva hoy medio organigrama (hasta `Secretarial`, herencia de la cascada vieja — ver
   // `prisma/seed.ts`), así que reusarlos habría sido justo lo contrario de lo que Daniel pidió.
-  // Éste nace en `SOLO_ADMINISTRADOR`: sólo `Administrador` y `AdministracionDireccion` (los
-  // niveles 1 y 20 del sistema viejo) lo llevan; ningún perfil operativo lo otorga.
+  // Éste nace en `SOLO_ADMINISTRADOR`: sólo lo llevan los perfiles de ACCESO TOTAL (`Administrador`
+  // y `AdministracionDireccion`, niveles 1 y 20 del viejo, y `Director General`, el perfil de puesto
+  // del dueño); ningún perfil operativo lo otorga.
   //
   // 🔑 Y GOBIERNA TAMBIÉN LA CANCELACIÓN de esas salidas: cancelar es el movimiento INVERSO que
   // vuelve a meter el material al inventario (D3), o sea deshacer la decisión de sacarlo. Si eso

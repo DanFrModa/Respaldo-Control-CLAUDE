@@ -1652,8 +1652,9 @@ export type EntradaAgregarColorTela = z.input<typeof esquemaTelaColorAgregar>;
  * de un color del catálogo —para todos— con este mismo permiso (§Post-F9.89(b)): si comprando ya
  * se puede fijar el precio de un color, dar de alta el color es del mismo orden.
  *
- * Y el hecho que lo decidió, el 25-ago-2026: `telas.administrar` **sólo lo llevan Administrador y
- * AdministracionDireccion** (`prisma/seed.ts`), como el resto de los catálogos maestros.
+ * Y el hecho que lo decidió, el 25-ago-2026: `telas.administrar` **no lo lleva ningún perfil de
+ * compras** (`prisma/seed.ts`: sólo los de acceso total y, desde los perfiles de puesto de Daniel,
+ * «Desarrollo de Producto»), como el resto de los catálogos maestros.
  * Daniel acababa de dar de alta a **Aurora con rol Gerencial** para que probara compras — con el
  * permiso del catálogo **habría visto el desplegable y no la puerta**, y esta función existiría
  * para una sola persona: el dueño. Un permiso que deja fuera justo a quien la etapa está destinada

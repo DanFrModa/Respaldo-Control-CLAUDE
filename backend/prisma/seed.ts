@@ -158,18 +158,39 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  * y `Secretarial`, que es donde la cascada los había dejado sin que nadie lo decidiera. La lista
  * `RETIRADOS_DESDE_LA_FOTO` de `reparto-de-permisos.test.ts` lo deja escrito renglón por renglón.
  *
+ * ⭐ **Y «AL FINAL» YA LLEGÓ: los perfiles por puesto real EXISTEN** — {@link PERFILES_DE_PUESTO}.
+ * Eso NO recorta estas seis listas (los 9 heredados siguen igual, con su foto y su equivalencia:
+ * son los que tienen los usuarios de hoy); lo que hace es dar el sitio donde el reparto por puesto
+ * vive de verdad, sin que el seed lo pise en cada deploy.
+ *
  * ⚠️ **Y esto se APLICA SOLO en `prueba` con `SEED_ON_START=true`**, sin migración de datos:
- * {@link sembrarRoles} SINCRONIZA los 9 roles de sistema (borra lo que sobra), no sólo agrega.
+ * {@link sembrarRoles} SINCRONIZA los 10 roles de sistema (borra lo que sobra), no sólo agrega.
  */
 
 /**
- * Claves que **ningún perfil** otorga: sólo las llevan `Administrador` y
- * `AdministracionDireccion` (niveles 1 y 20 del sistema viejo, que tenían el sistema entero).
+ * Claves que **ningún ROL DE SISTEMA reparte**: de los de {@link definirRoles} sólo las llevan los
+ * de {@link PERFILES_ACCESO_TOTAL}, que se llevan el catálogo entero.
  *
  * No es una lista de descarte: es la **atribución explícita** de esas claves. Está aquí —y no
  * simplemente ausente de los perfiles— para que la prueba de atribución pueda distinguir
  * «decidimos que es sólo del administrador, y por esto» de «a nadie se le ocurrió repartirlo». La
  * `razon` es obligatoria por el tipo, no por convención.
+ *
+ * ⚠️ **PERO OCHO DE ELLAS SÍ LAS REPARTE UN PERFIL DE PUESTO, y hay que leerlo bien.** Los 15
+ * perfiles de {@link PERFILES_DE_PUESTO} **no son roles de sistema** (nacen `esSistema: false`, el
+ * seed no los re-sincroniza y el dueño los edita desde la pantalla de Roles), así que no entran en
+ * esta lista ni en la prueba de atribución — pero el seed **los crea con esas llaves dentro**:
+ *
+ *  • `telas.administrar` y `avios.administrar` → «Desarrollo de Producto» (los avíos, también
+ *    «Compras»);
+ *  • `proveedores.administrar`, `terceros.administrar`, `terceros.fiscal`, `cxp.administrar`,
+ *    `cxc.administrar` y `conceptos-pago.administrar` → «Administración y Finanzas».
+ *
+ * Las ocho eran **defaults del lead** («catálogo maestro: el `.ver` sí baja, el alta no»), no
+ * reservas que Daniel hubiera pedido para sí. De las que él reservó con nombre y apellido
+ * —`salida-material.registrar`, `pagos.corrida-armar`, `compras.desautorizar`, los cuatro poderes de
+ * la fila 0.120 y el gobierno de usuarios/roles— **ningún perfil de puesto lleva ninguna** salvo el
+ * del propio dueño ({@link PERFIL_DIRECTOR_GENERAL}, que lleva el catálogo completo).
  */
 export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }[] = [
   // ── Administración del propio sistema (en el viejo, botón exclusivo de nivel ≤20, doc 00 §3.1) ──
@@ -189,6 +210,8 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
   { clave: 'almacenes.administrar', razon: 'Catálogo maestro: el `.ver` sí baja, el alta no.' },
   {
     clave: 'proveedores.administrar',
+    // 🤝 También lo lleva el perfil de puesto «Administración y Finanzas» (ver la nota ⚠️ de la
+    // cabecera de esta lista): eso es un rol EDITABLE del negocio, no un rol de sistema.
     razon: 'Catálogo maestro; además absorbió maquileros y cortadores (D12/R15).',
   },
   { clave: 'temporadas.administrar', razon: 'Catálogo maestro (ADR-0007).' },
@@ -196,6 +219,8 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
   { clave: 'colores.administrar', razon: 'Catálogo maestro (ADR-0007).' },
   { clave: 'tallas.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
   { clave: 'clientes.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
+  // 🤝 `telas.administrar` y `avios.administrar` los lleva además «Desarrollo de Producto» (y los
+  // avíos, también «Compras») — perfiles de puesto EDITABLES, no roles de sistema.
   { clave: 'telas.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
   { clave: 'avios.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
   { clave: 'tipos-proceso.administrar', razon: 'Catálogo maestro de producción (F3-E1).' },
@@ -215,6 +240,11 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       '(fix de pentest — antes se colaba a roles clericales).',
   },
   // ── Finanzas: capturar/cancelar dinero y la vista fiscal (F9, D12/D15) ──
+  //
+  // 🤝 Las CINCO las lleva además el perfil de puesto «Administración y Finanzas» (Daniel): el área
+  // que lleva la cuenta corriente es la que la captura. Siguen aquí porque esta lista habla de los
+  // ROLES DE SISTEMA, y un perfil de puesto no es uno (ver la nota ⚠️ de la cabecera). Lo que NO se
+  // movió es lo que Daniel reservó por su nombre: `pagos.corrida-armar`, abajo.
   {
     clave: 'terceros.administrar',
     razon: 'Capturar y cancelar movimientos de cuenta corriente mueve saldos reales (F9-E1).',
@@ -303,11 +333,20 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
 ];
 
 /**
- * Los dos perfiles que llevan el catálogo COMPLETO (niveles 1 y 20 del sistema viejo). Se nombran
- * aparte porque la prueba de atribución tiene que EXCLUIRLOS: si contara sus permisos, la unión
- * sería siempre el catálogo entero y la prueba no podría fallar nunca.
+ * Los perfiles que llevan el catálogo COMPLETO. Se nombran aparte porque la prueba de atribución
+ * tiene que EXCLUIRLOS: si contara sus permisos, la unión sería siempre el catálogo entero y la
+ * prueba no podría fallar nunca.
+ *
+ * Son los dos niveles 1 y 20 del sistema viejo **y `Director General`**, el perfil de puesto del
+ * dueño ({@link PERFIL_DIRECTOR_GENERAL}): Daniel lo definió con *«todos los permisos»*, así que lleva
+ * el catálogo entero por derivación, igual que los otros dos. Entra aquí por eso y no por rango:
+ * esta lista significa «tiene TODO el catálogo», no «es jefe».
  */
-export const PERFILES_ACCESO_TOTAL = ['Administrador', 'AdministracionDireccion'] as const;
+export const PERFILES_ACCESO_TOTAL = [
+  'Administrador',
+  'AdministracionDireccion',
+  'Director General',
+] as const;
 
 /**
  * **Directivo** (nivel 30 del viejo) — dirige el negocio, no administra el sistema.
@@ -901,10 +940,639 @@ const SECRETARIAL: readonly ClavePermiso[] = [
 ];
 
 /**
- * Los 9 perfiles de sistema (`esSistema: true`) que absorben los niveles del viejo (doc 00 §2, A4).
+ * ⭐⭐ LOS 16 PERFILES DE PUESTO REALES (decisión de Daniel) — el reparto por PUESTO, al fin.
+ *
+ * Esto es lo que las seis listas de arriba estaban esperando. Al quitar la cascada (3-sep-2026)
+ * quedó escrito que *«Daniel decidió armar los perfiles concretos AL FINAL, con los puestos reales
+ * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
+ * llaves que él palomeó, puesto por puesto.
+ *
+ * **306 asignaciones**: las 134 del catálogo para `Director General` y 172 repartidas entre los
+ * otros 15. Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
+ * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
+ *
+ * ## 🔴 LOS 16 SE SIEMBRAN POR DOS CAMINOS DISTINTOS, Y LA DIFERENCIA ES EL PUNTO
+ *
+ * | | Quién | Cómo se siembra | `esSistema` | ¿El deploy lo pisa? |
+ * |---|---|---|---|---|
+ * | {@link PERFIL_DIRECTOR_GENERAL} | el dueño | por {@link definirRoles} → {@link sembrarRoles} | `true` | **sí**, se re-sincroniza en cada arranque |
+ * | estos 15 | los demás puestos | por {@link sembrarPerfilesDePuesto} | `false` | **no**: crear-si-no-existe |
+ *
+ * **Por qué no van los 16 juntos.** `sembrarRoles` SINCRONIZA (su `deleteMany({ notIn })` borra lo
+ * que la definición no nombre) y `SEED_ON_START=true` está encendido **permanentemente** en
+ * `prueba` ⇒ todo lo que pase por ahí se reescribe en CADA despliegue, en silencio. En
+ * `Director General` eso es justo lo que se quiere: significa «todos los permisos», se deriva del
+ * catálogo y no hay nada que afinar. En los otros 15 sería destructivo: el dueño va a ajustarlos
+ * desde Administración › Roles en cuanto arranquen las pruebas —y `asignarPermisos`
+ * (`dominio/admin/roles.ts`) **se lo permite, no distingue `esSistema`**—, así que pasarlos por
+ * `sembrarRoles` le **borraría ese trabajo** en el siguiente deploy sin avisarle.
+ *
+ * ## Qué NO hace este bloque
+ *
+ * **No toca los 9 perfiles heredados** (`Administrador` … `Basico`): se agrega ADEMÁS. Los 9 siguen
+ * siendo la transcripción de los niveles del viejo —con su foto del 3-sep y sus pruebas de
+ * equivalencia— porque son los que tienen los usuarios de hoy. Ningún nombre nuevo choca con uno de
+ * esos 9 (lo mide `roles-perfiles-puesto.test.ts`).
+ *
+ * ## ⭐ DOS NOMBRES COMPARTEN FILA CON UN ROL DE LA RUTA CRÍTICA — y está bien
+ *
+ * `Rol.nombre` es ÚNICO y los roles funcionales de la RC viven en la MISMA tabla
+ * (`ROLES_FUNCIONALES_RC`, `prisma/seed-ruta-critica.ts`). **«Habilitaciones» y «Entregas»** están en
+ * las dos listas, al carácter ⇒ el perfil de puesto y el rol de la RC **son la misma fila**.
+ *
+ * 🔑 **Y eso es lo correcto, no un choque que haya que deshacer:** **17 de los 18** roles funcionales
+ * de la RC nacen `esSistema: false` y **con CERO permisos** —son cascarones para colgarles la
+ * responsabilidad de un proceso (`ProcesoDefRol`)—, así que «Entregas» el rol de la RC y «Entregas» el
+ * puesto son **la misma persona**. *(El 18.º es `Ventas`, que además es uno de los 9 heredados: el
+ * upsert de la RC lleva `update: {}`, así que se queda `esSistema: true` con sus 85 permisos. No
+ * afecta: ningún perfil de puesto se llama `Ventas`.)* {@link sembrarPerfilesDePuesto} llena el cascarón (sólo los permisos; no toca
+ * `nombre`, `descripcion` ni `esSistema`) y el resultado es el mismo en una base limpia y en `prueba`:
+ * la fila queda **con los permisos del puesto** y además sigue siendo responsable de su proceso de la
+ * RC. Es puramente aditivo.
+ *
+ * ⚠️ **Lo que sí sigue siendo decisión del dueño** son los dos nombres que se distinguen de uno de la
+ * RC **sólo por el ACENTO**: `Producción`/`Produccion` y `Diseño Gráfico`/`Diseño Grafico`. **NO** son
+ * colisión (la columna distingue acentos) ⇒ son filas SEPARADAS, y se van a ver juntas y confusas en
+ * Administración › Roles. No se tocan desde el código: renombrar un rol de la RC crearía una fila
+ * nueva y dejaría huérfanas sus referencias.
+ *
+ * Las pruebas que fijan las colisiones —para que no se olviden ni crezcan en silencio— están en
+ * `roles-perfiles-puesto.test.ts` y en `seed.int.test.ts`.
+ *
+ * ## El `slug`
+ *
+ * Es la llave con la que Daniel los revisó y **no viaja a la base de datos** (`Rol` no tiene esa
+ * columna; se siembran por `nombre`). Se conserva aquí porque es lo que ata cada renglón a su
+ * decisión, y porque las pruebas lo usan para nombrar el perfil sin depender de la redacción del
+ * `nombre`.
+ */
+export type PerfilDePuesto = {
+  slug: string;
+  nombre: string;
+  descripcion: string;
+  permisos: readonly ClavePermiso[];
+};
+
+/**
+ * ⭐ El perfil de puesto del DUEÑO — y el ÚNICO de los 16 que es rol de sistema.
+ *
+ * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
+ * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
+ * llegarle solo. Una lista literal de 134 claves quedaría obsoleta en el siguiente `clave:` que
+ * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
+ *
+ * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
+ * el único de los 16 en el que la re-sincronización es lo deseable, porque no hay nada que afinar.
+ * Entra también en {@link PERFILES_ACCESO_TOTAL} por eso mismo.
+ */
+export const PERFIL_DIRECTOR_GENERAL: PerfilDePuesto = {
+  slug: 'director',
+  nombre: 'Director General',
+  descripcion: 'Dirección general: lleva el catálogo de permisos COMPLETO',
+  // ⭐ DERIVADO, NUNCA una lista literal — el porqué, arriba. Es el mismo `[...CLAVES_PERMISO]` con
+  // el que se definen `Administrador` y `AdministracionDireccion`.
+  permisos: [...CLAVES_PERMISO],
+};
+
+/**
+ * ⭐⭐ Los otros **15 perfiles de puesto**: catálogo del NEGOCIO, no roles de sistema.
+ *
+ * Nacen `esSistema: false` y se siembran **crear-si-no-existe** ({@link sembrarPerfilesDePuesto}): el
+ * seed los pone la primera vez y después **no los vuelve a tocar mientras les quede al menos un
+ * permiso** (un rol en CERO es un cascarón, y ésos sí se llenan — el porqué, allí). Los reparte
+ * Daniel y los afina él desde Administración › Roles: sus ajustes tienen que sobrevivir al
+ * despliegue.
+ *
+ * ⚠️ `esSistema: false` **no es un detalle**: en `dominio/admin/roles.ts`, `eliminarRol` prohíbe
+ * BORRAR un rol de sistema y `actualizarRol` prohíbe RENOMBRARLO. Si estos 15 nacieran en `true`, el
+ * dueño se quedaría con 15 perfiles que no podría ni borrar ni corregirles el nombre.
+ *
+ * El orden es el que él revisó (ver {@link PERFILES_DE_PUESTO_TODOS} para la lista completa de 16).
+ */
+export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
+  {
+    slug: 'ventas',
+    nombre: 'Gerente de Ventas',
+    descripcion:
+      'Gerencia de ventas: clientes, pedidos y listas de precios, con los importes del pedido',
+    permisos: [
+      'avios.ver',
+      'clientes.modificar',
+      'clientes.ver',
+      'colores.ver',
+      'consultas.ver-importes',
+      'desarrollo.precostear',
+      'desarrollo.ver',
+      'etiquetas-marca.ver',
+      'indicadores.ver',
+      'listas.administrar',
+      'listas.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'ordenes.ver-precio-real-maquila',
+      'pedidos.importes',
+      'pedidos.modificar-reales',
+      'pedidos.ver',
+      'precostos.consultar',
+      'produccion.wip-ver',
+      'proveedores.ver',
+      'tallas.ver',
+      'telas.ver',
+      'telas.ver-totales',
+      'temporadas.ver',
+    ],
+  },
+  {
+    slug: 'desarrollo',
+    nombre: 'Desarrollo de Producto',
+    descripcion:
+      'Desarrollo de producto: modelos y su receta, catálogo de materiales y precosteo de proyectos',
+    permisos: [
+      'avios.administrar',
+      'avios.ver',
+      'colores.ver',
+      'desarrollo.administrar',
+      'desarrollo.precostear',
+      'desarrollo.ver',
+      'etiquetas-marca.ver',
+      'etiquetas.modificar',
+      'modelos.administrar',
+      'modelos.aprobar-receta',
+      'modelos.ver',
+      'ordenes.ver',
+      'precostos.consultar',
+      'tallas.ver',
+      'telas.administrar',
+      'telas.ver',
+      'temporadas.ver',
+    ],
+  },
+  {
+    slug: 'finanzas',
+    nombre: 'Administración y Finanzas',
+    descripcion:
+      'Administración y finanzas: cuenta corriente de terceros, cuentas por pagar y por cobrar, y la vista fiscal',
+    permisos: [
+      'clientes.ver',
+      'conceptos-pago.administrar',
+      'conceptos-pago.ver',
+      'cxc.administrar',
+      'cxc.ver',
+      'cxp.administrar',
+      'cxp.ver',
+      'esma.revisar',
+      'esma.ver-pagos',
+      'inventario-pt.ver',
+      'ordenes.ver',
+      'pagos.corrida-ver',
+      'produccion.wip-ver',
+      'proveedores.administrar',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'terceros.administrar',
+      'terceros.fiscal',
+      'terceros.ver',
+    ],
+  },
+  {
+    slug: 'produccion',
+    nombre: 'Producción',
+    descripcion:
+      'Producción: corte, envío y recibo de maquila, empaque y captura de la Ruta Crítica',
+    permisos: [
+      'compras.recibir',
+      'inventario-pt.ver',
+      'inventario-telas.mover',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'ordenes.modificar',
+      'ordenes.precio-maquila',
+      'ordenes.ver',
+      'produccion.cancelar',
+      'produccion.corte',
+      'produccion.corte-salidas',
+      'produccion.empaque',
+      'produccion.entradas-maquila',
+      'produccion.envio',
+      'produccion.recibo',
+      'produccion.wip-ver',
+      'rc.capturar',
+      'rc.fechas-retraso',
+      'rc.ruta-ver',
+      'rc.ver-botones',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'compras',
+    nombre: 'Compras',
+    descripcion: 'Compras: órdenes de compra y catálogo de avíos, con los datos de los proveedores',
+    permisos: [
+      'almacenes.ver',
+      'avios.administrar',
+      'avios.ver',
+      'compras.administrar',
+      'compras.ver',
+      'inventario-avios.ver',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'notas.ver',
+      'ordenes.ver',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'habilitaciones',
+    nombre: 'Habilitaciones',
+    descripcion: 'Habilitaciones: notas de salida de avíos y movimientos del inventario de avíos',
+    permisos: [
+      'almacenes.ver',
+      'avios.ver',
+      'inventario-avios.mover',
+      'inventario-avios.ver',
+      'modelos.ver',
+      'notas.administrar',
+      'notas.cancelar',
+      'notas.ver',
+      'ordenes.habilitacion',
+      'ordenes.ver',
+      'proveedores.ver',
+    ],
+  },
+  {
+    slug: 'telas',
+    nombre: 'Encargado de Telas',
+    descripcion: 'Encargado de telas: inventario de telas y recepción del material comprado',
+    permisos: [
+      'almacenes.ver',
+      'compras.recibir',
+      'inventario-telas.mover',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'notas.ver',
+      'ordenes.ver',
+      'proveedores.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'corte',
+    nombre: 'Encargado de Corte',
+    descripcion: 'Encargado de corte: captura del corte y de sus salidas de tela',
+    permisos: [
+      'inventario-telas.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.corte',
+      'produccion.corte-salidas',
+      'produccion.wip-ver',
+      'rc.ruta-ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'almacen-pt',
+    nombre: 'Almacén de Producto Terminado',
+    descripcion:
+      'Almacén de producto terminado: movimientos, existencias, conteos cíclicos y recibo de maquila',
+    permisos: [
+      'almacenes.ver',
+      'indicadores.almacen-productividad',
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-consulta',
+      'indicadores.ciclicos-conteo',
+      'inventario-pt.mover',
+      'inventario-pt.ver',
+      'ipt.consultar-existencias',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.recibo',
+    ],
+  },
+  {
+    slug: 'entregas',
+    nombre: 'Entregas',
+    descripcion: 'Entregas: entrega de producto terminado al cliente y consulta de existencias',
+    permisos: [
+      'almacenes.ver',
+      'clientes.ver',
+      'inventario-pt.ver',
+      'ipt.consultar-existencias',
+      'ordenes.ver',
+      'pedidos.ver',
+      'produccion.entrega',
+      'produccion.wip-ver',
+      'rc.ruta-ver',
+    ],
+  },
+  {
+    slug: 'calidad-lider',
+    nombre: 'Líder de Calidad',
+    descripcion: 'Líder de calidad: genera y actualiza las auditorías de calidad',
+    permisos: [
+      'calidad.actualizar-auditorias',
+      'calidad.generar-auditorias',
+      'calidad.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.wip-ver',
+      'proveedores.ver',
+      'rc.ruta-ver',
+    ],
+  },
+  {
+    slug: 'calidad-sup',
+    nombre: 'Supervisor de Calidad',
+    descripcion: 'Supervisor de calidad: actualiza las auditorías de calidad ya generadas',
+    permisos: [
+      'calidad.actualizar-auditorias',
+      'calidad.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.wip-ver',
+      'proveedores.ver',
+    ],
+  },
+  {
+    slug: 'tecnica',
+    nombre: 'Gestión Técnica',
+    descripcion: 'Gestión técnica: administra la ficha de los modelos y consulta el desarrollo',
+    permisos: [
+      'avios.ver',
+      'colores.ver',
+      'desarrollo.ver',
+      'modelos.administrar',
+      'modelos.ver',
+      'ordenes.ver',
+      'tallas.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'grafico',
+    nombre: 'Diseño Gráfico',
+    descripcion: 'Diseño gráfico: consulta de modelos y órdenes, y captura de datos de proveedores',
+    permisos: ['modelos.ver', 'ordenes.ver', 'proveedores.modificar', 'proveedores.ver'],
+  },
+  {
+    slug: 'auxiliar',
+    nombre: 'Auxiliar',
+    descripcion:
+      'Auxiliar: consulta de modelos, órdenes, avance de producción y existencias de producto terminado',
+    permisos: ['inventario-pt.ver', 'modelos.ver', 'ordenes.ver', 'produccion.wip-ver'],
+  },
+];
+
+/**
+ * Los **16 perfiles de puesto** de Daniel, juntos y en el orden en que él los revisó.
+ *
+ * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
+ * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
+ * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
+ * un puesto**, y meterlo aquí falsearía las 306 marcas que él revisó.
+ */
+export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
+  PERFIL_DIRECTOR_GENERAL,
+  ...PERFILES_DE_PUESTO,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3a-bis. EL PISO DE LECTURA — «casi todo lo operativo lo puede consultar cualquiera»
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ **LAS 16 LLAVES QUE SON DINERO.** La raya que puso el dueño, textual:
+ *
+ * > *«lo que sea dinero no debe estar en el piso»*
+ *
+ * Están aquí —con nombre y como constante— porque son **la primera de las dos exclusiones** que el
+ * piso de lectura tiene que respetar para no convertirse en un agujero: los dos conjuntos tienen que
+ * ser **disjuntos**. (La segunda es {@link PERMISOS_DE_SALDOS_Y_MOVIMIENTOS}, y va aparte porque es
+ * otra decisión, con otra razón y otra cita.) Una lista enterrada en una prueba se borra sin que
+ * nadie note que se borró la decisión; ésta tiene su razón pegada y su prueba de intersección vacía
+ * (`roles-perfiles-puesto.test.ts`).
+ *
+ * No es «todo lo que toca dinero»: es **lo que lo DEJA VER** —precios, importes, costos, márgenes,
+ * el estado de resultados, los saldos de terceros, la relación de pagos y el estado de cuenta de
+ * maquileros—. Escribirlo es otra cosa y
+ * ya estaba cerrado (`*.administrar`, `SOLO_ADMINISTRADOR`).
+ */
+export const PERMISOS_DE_DINERO: readonly ClavePermiso[] = [
+  'ordenes.ver-precio-real-maquila',
+  'pedidos.importes',
+  'telas.ver-totales',
+  'consultas.ver-importes',
+  'costos.ver',
+  'precostos.consultar',
+  'edr.ver',
+  'desarrollo.ver',
+  'listas.ver',
+  'terceros.ver',
+  'terceros.fiscal',
+  'cxp.ver',
+  'cxc.ver',
+  'conceptos-pago.ver',
+  'pagos.corrida-ver',
+  // ⚠️ `esma.ver-pagos` cierra la lista, y faltaba: *«Acceder al estado de cuenta de maquileros solo
+  // para ver y registrar pagos»* es dinero de cabo a rabo. No había brecha —nunca estuvo en el piso—
+  // pero la lista decía que cubría los pagos y no los cubría todos.
+  'esma.ver-pagos',
+];
+
+/**
+ * ⭐⭐ **LAS 4 LLAVES QUE SON SALDOS Y MOVIMIENTOS.** La segunda raya del piso, y la puso el dueño
+ * mirando las existencias: *«creo que no tiene caso»*.
+ *
+ * No son dinero y no son vocabulario: son **el estado de hoy de un material** —existencias de
+ * producto terminado, de telas y de avíos, y las notas de salida que las mueven—. **Cambian cada
+ * día y responde por ellas quien las mueve**, así que no se reparten de piso: el dueño le dio cada
+ * inventario exactamente a quien mueve ese material (PT a 5 puestos, telas a 4, avíos a 2, notas a
+ * 3). **Nadie pierde nada**: quien las necesita ya las tiene por su puesto.
+ *
+ * Están aquí como constante, con su razón pegada, por el mismo motivo que {@link PERMISOS_DE_DINERO}:
+ * para que una prueba pueda exigir que el piso y ellas sean **disjuntos**, y para que borrar la
+ * decisión cueste borrar algo que se ve.
+ */
+export const PERMISOS_DE_SALDOS_Y_MOVIMIENTOS: readonly ClavePermiso[] = [
+  'inventario-pt.ver',
+  'inventario-telas.ver',
+  'inventario-avios.ver',
+  'notas.ver',
+];
+
+/**
+ * ⭐⭐ **LAS 5 LLAVES OPERATIVAS QUE, DE PASO, FILTRAN UN PRECIO.** La tercera raya del piso, y la
+ * decidió el dueño mirando la medición: **«Súbelo con 16 ahora»**.
+ *
+ * ⚠️ **NO son lo mismo que {@link PERMISOS_DE_DINERO}, y la diferencia es el criterio entero:**
+ *
+ * | | Qué son |
+ * |---|---|
+ * | {@link PERMISOS_DE_DINERO} | llaves **cuyo PROPÓSITO es** el dinero (costos, importes, saldos, EDR) |
+ * | **estas cinco** | llaves **OPERATIVAS** —vocabulario del negocio puro— que **de paso devuelven un precio metido dentro de otro dato, sin taparlo** |
+ *
+ * Por eso no se pueden juntar: las primeras no entran al piso **nunca**; estas cinco entran **el día
+ * que sus campos estén tapados**, y entonces salen de aquí.
+ *
+ * **Lo que filtra cada una, medido sobre el dominio y no supuesto:**
+ *  • `telas.ver` → el precio sugerido, por color y por proveedor (**27 apariciones de
+ *    `precioSugerido` en `dominio/catalogos/telas.ts` y CERO rejas**);
+ *  • `avios.ver` → precio y precio de referencia;
+ *  • `modelos.ver` → `maquilaBase`, `corteBase` y el `precioCosteo` del BOM, y el precio del arte;
+ *  • `proveedores.ver` → **datos bancarios completos** (banco, CLABE, cuenta): la UI los enmascara,
+ *    **el API los devuelve enteros**;
+ *  • `ordenes.ver` → `maquilaReferencia`, el único campo de ese endpoint que no se tapa.
+ *
+ * Choca de frente con la regla del dueño (*«lo que sea dinero no debe estar en el piso»*) y con la
+ * descripción del propio rol, que dice *«sin dinero»*. **El patrón para taparlo YA EXISTE**
+ * (`puedeVerCostoRealDeModelo`, `consultas.ver-importes`); simplemente no se aplicó a estos campos, y
+ * aplicarlo son **96 apariciones en 4 archivos del dominio y 8 pantallas** — demasiado para meterlo
+ * deprisa en esta fila. Va en una fila aparte, y al cerrarse estas cinco vuelven al piso.
+ *
+ * 🔑 **Y POR QUÉ ESTA SALIDA CUESTA CASI NADA, que es lo que la hizo la buena:** el dueño **ya les
+ * había dado estas cinco a quien las necesita**. Medido sobre sus 15 puestos: `ordenes.ver` la tienen
+ * **15 de 15** (sacarla del piso **no le quita nada a nadie**), `modelos.ver` **13 de 15**,
+ * `proveedores.ver` 8, `telas.ver` 7, `avios.ver` 5. Los permisos efectivos promedio por puesto
+ * (su puesto ∪ el piso) bajan de **26.9 a 25.1**: menos de dos permisos. **El piso valía por las
+ * llaves que él repartió POCO, y las que filtran dinero son justo las que repartió MUCHO.**
+ */
+export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
+  'telas.ver',
+  'avios.ver',
+  'proveedores.ver',
+  'modelos.ver',
+  'ordenes.ver',
+];
+
+/**
+ * ⭐⭐ **«Consulta general» — EL PISO DE LECTURA.** Decisión del dueño, replanteando el modelo
+ * entero: **casi todo lo operativo lo puede consultar cualquiera; lo que se niega es ESCRIBIR, el
+ * DINERO y los poderes de EXCEPCIÓN.**
+ *
+ * Nació de una medición, **re-hecha con el escáner de rutas arreglado** (el que resuelve también
+ * `conAlgunPermiso` y los guards declarados en variable) y con el criterio dicho, porque sin criterio
+ * no se reproduce: de las **134** claves del catálogo, **sólo 34 son de PURA LECTURA** —todas sus
+ * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
+ * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no
+ * guardan ninguna ruta** (se verifican en el dominio o gobiernan un campo o un botón). Total 666
+ * bloques `app.route`, 664 con reja. ⇒ repartir la consulta permiso por permiso, puesto por puesto,
+ * era repartirla con cuentagotas. Este rol da esas 16 de una vez y **se mueve desde la pantalla**
+ * (Administración › Roles), que es lo que el dueño pidió: ver y ajustar el piso, no descubrirlo
+ * escondido en una regla del código. Por eso es **un rol**, no un `if` en el guard de permisos.
+ *
+ * ## 🔑 EL CRITERIO DE QUÉ ENTRA (la regla que gobierna esto de aquí en adelante)
+ *
+ * Al piso va el **VOCABULARIO DEL NEGOCIO**: catálogos, modelos, órdenes, pedidos, el avance, la
+ * ruta crítica — **el idioma con el que se leen las demás pantallas**. Sin eso, media aplicación se
+ * ve en blanco o con códigos en vez de nombres.
+ *
+ * **NO va lo que son SALDOS Y MOVIMIENTOS** ({@link PERMISOS_DE_SALDOS_Y_MOVIMIENTOS}: existencias
+ * de PT, telas y avíos, y las notas de salida), porque **cambian cada día y responde por ellos quien
+ * los mueve**. El dueño, de las existencias: *«creo que no tiene caso»*.
+ *
+ * Y **NUNCA va el DINERO** ({@link PERMISOS_DE_DINERO}). Textual: *«lo que sea dinero no debe estar
+ * en el piso»*.
+ *
+ * ⚠️ **Y TAMPOCO —POR AHORA— las cinco llaves OPERATIVAS QUE FILTRAN UN PRECIO**
+ * ({@link PERMISOS_QUE_FILTRAN_PRECIO}: `telas.ver`, `avios.ver`, `proveedores.ver`, `modelos.ver`,
+ * `ordenes.ver`). Son vocabulario del negocio y **deberían** estar aquí; salen porque devuelven
+ * precios metidos dentro de otros datos **sin taparlos**, y taparlos no cabía en esta fila.
+ * **Volverán al piso cuando sus campos estén tapados** — lo que filtra cada una, y por qué sacarlas
+ * cuesta casi nada, está en el TSDoc de esa lista.
+ *
+ * Las tres exclusiones son **invariantes medidas, no intenciones**: tres pruebas exigen intersección
+ * vacía en `roles-perfiles-puesto.test.ts`.
+ *
+ * ⚠️ **UNA DE LAS 16 NO ES `GET` PURO, Y ES DELIBERADO — no la "limpies":**
+ *  • **`indicadores.ver`** → su único no-GET es `POST /indicadores/refrescar`, que **encola un
+ *    refresco de las vistas de KPIs**. No es dato del negocio.
+ *
+ * *(Eran dos: `POST /ordenes/impresos` por `ordenes.ver`, que es POST sólo porque la lista de ids
+ * viaja en el cuerpo. Esa excepción desapareció sola al salir `ordenes.ver` del piso.)*
+ *
+ * Medido sobre las rutas, no supuesto: las 16 guardan **93 endpoints** (96 pares endpoint-llave) y
+ * **exactamente ése** no es GET. Lo vigila el guardián de `roles-perfiles-puesto.test.ts`, que vuelve a escanear
+ * los `*.rutas.ts` de `src/api` en cada corrida: si alguien cuelga una escritura de una llave del piso, se
+ * pone rojo.
+ *
+ * ⭐ **Y UNA TERCERA, `ordenes.habilitacion`, que obligó a corregir el catálogo.** Gobierna **un solo
+ * endpoint y es un `GET`** (`GET /ordenes/:id/habilitacion`: requerido vs. surtido por avío), así que
+ * en el piso es lectura pura — pero **su descripción decía «Capturar o modificar los avíos de la
+ * orden»**, heredada del acceso #31 del Access, o sea un renglón que dice *capturar* dentro de un rol
+ * de **consulta**. Era falsa (ningún endpoint de escritura cuelga de esa llave) y se corrigió en
+ * `src/contrato/permisos.ts` en este mismo cambio, con la nota de por qué, para que nadie la
+ * restaure. ⚠️ Lo que sigue en pie: **el día que alguien cuelgue un POST de esa llave, el piso se
+ * vuelve escritura para todos** — y el guardián de arriba es justo lo que lo cazará.
+ *
+ * ## Qué NO hace este rol
+ *
+ * **No adelgaza los 15 perfiles de puesto.** Siguen con las llaves que el dueño marcó aunque **12 de
+ * las 16 del piso** estén también en algún puesto: los permisos efectivos son la **UNIÓN** de los
+ * roles del usuario (`comun/permisos.ts`), así que la redundancia no cambia el comportamiento, las
+ * 172 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
+ * llave la conserva.
+ *
+ * 🔑 **Y eso es lo que hace inocuo recortar el piso.** Las cuatro llaves de saldos y movimientos que
+ * salieron de aquí (`PERMISOS_DE_SALDOS_Y_MOVIMIENTOS`) **no se le quitaron a nadie**: el dueño ya le
+ * había dado cada inventario a quien mueve ese material — medido en los puestos: PT a **5**, telas a
+ * **4**, avíos a **2**, notas de salida a **3**.
+ *
+ * Se siembra por el **mismo camino** que los 15 ({@link sembrarPerfilesDePuesto}: `esSistema: false`,
+ * crear-si-no-existe, y si existe con permisos no se toca). No es un mecanismo nuevo.
+ */
+export const PERFIL_CONSULTA_GENERAL: PerfilDePuesto = {
+  slug: 'consulta-general',
+  nombre: 'Consulta general',
+  descripcion:
+    'Piso de lectura: consultar lo operativo (órdenes, pedidos, producción, inventarios, catálogos y calidad), sin escribir y sin dinero',
+  permisos: [
+    'ordenes.habilitacion',
+    'pedidos.ver',
+    'rc.catalogo-ver',
+    'rc.ruta-ver',
+    'calidad.ver',
+    'indicadores.ver',
+    'almacenes.ver',
+    'temporadas.ver',
+    'etiquetas-marca.ver',
+    'colores.ver',
+    'tallas.ver',
+    'clientes.ver',
+    'tipos-proceso.ver',
+    'concepto-costo.ver',
+    'estado-lista.ver',
+    'produccion.wip-ver',
+  ],
+};
+
+/**
+ * Los roles que {@link sembrarPerfilesDePuesto} siembra: los 15 perfiles de puesto **y** el piso de
+ * lectura. Todos `esSistema: false`, todos crear-si-no-existe, ninguno re-sincronizado.
+ *
+ * Se deriva por spread a propósito: agregar un perfil a {@link PERFILES_DE_PUESTO} lo mete aquí solo,
+ * sin que nadie tenga que acordarse de una segunda lista.
+ */
+export const PERFILES_EDITABLES: readonly PerfilDePuesto[] = [
+  ...PERFILES_DE_PUESTO,
+  PERFIL_CONSULTA_GENERAL,
+];
+
+/**
+ * Los perfiles de sistema (`esSistema: true`), en dos bloques que NO se mezclan:
+ *
+ *  1. **Los 9 HEREDADOS** (`Administrador` … `Basico`), que absorben los NIVELES del viejo
+ *     (doc 00 §2, A4) y son los que tienen los usuarios de hoy. Se escriben aquí, literales.
+ *  2. **`Director General`** ({@link PERFIL_DIRECTOR_GENERAL}), el perfil de puesto del dueño: el
+ *     ÚNICO de los 16 que es rol de sistema, porque es el único en el que re-sincronizar es lo
+ *     deseable. Los otros 15 NO pasan por aquí — van por {@link sembrarPerfilesDePuesto}, que no
+ *     sincroniza nada.
+ *
+ * Ninguno de los 9 se toca, se renombra ni se reordena.
  *
  * ⚠️ `sembrarRoles` los **re-sincroniza** en cada arranque con `SEED_ON_START=true`: lo que se
- * palomee a mano en la pantalla de Roles sobre uno de estos 9 se pierde en el siguiente deploy
+ * palomee a mano en la pantalla de Roles sobre cualquiera de ellos se pierde en el siguiente deploy
  * (salvo las llaves de gobierno, que el seed nunca revoca — ver `sembrarRoles`). La pantalla lo
  * avisa; para un permiso permanente hay que crear un perfil propio.
  */
@@ -965,6 +1633,18 @@ export function definirRoles(): {
       descripcion: 'Acceso básico sin permisos especiales (absorbe el nivel 100)',
       permisos: [],
     },
+    // ── ⭐ Y ADEMÁS, el perfil de puesto del DUEÑO (ver PERFIL_DIRECTOR_GENERAL) ──
+    //
+    // Va DESPUÉS y aparte a propósito: los 9 de arriba son la transcripción de los niveles del
+    // viejo —con su foto del 3-sep y sus pruebas de equivalencia— y mezclarlos obligaría a retocar
+    // esa foto, que es justo lo que no se hace. Los otros 15 perfiles de puesto NO están aquí: van
+    // por `sembrarPerfilesDePuesto`, que crea-si-no-existe y nunca pisa lo que el dueño ajuste.
+    // El `slug` no viaja a la BD (`Rol` no tiene esa columna; se siembra por `nombre`).
+    {
+      nombre: PERFIL_DIRECTOR_GENERAL.nombre,
+      descripcion: PERFIL_DIRECTOR_GENERAL.descripcion,
+      permisos: [...PERFIL_DIRECTOR_GENERAL.permisos],
+    },
   ];
 }
 
@@ -1007,6 +1687,99 @@ async function sembrarRoles(
     });
     await prisma.rolPermiso.createMany({
       data: idsPermisos.map((idPermiso) => ({ idRol: fila.id, idPermiso })),
+      skipDuplicates: true,
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3a-ter. Siembra de los roles EDITABLES (15 puestos + el piso) — CREAR-SI-NO-EXISTE, nunca sincroniza
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Siembra los roles EDITABLES del negocio —{@link PERFILES_EDITABLES}: los 15 perfiles de puesto de
+ * {@link PERFILES_DE_PUESTO} **más** el piso de lectura {@link PERFIL_CONSULTA_GENERAL}— con
+ * `esSistema: false` y **sin sincronizar nunca**. Son TRES casos y conviene leerlos juntos, porque el
+ * de en medio es el que protege al dueño:
+ *
+ * | Estado del rol (por `nombre`) | Qué hace |
+ * |---|---|
+ * | **no existe** | lo CREA (`esSistema: false`) con sus permisos |
+ * | **existe y tiene ≥1 permiso** | ⛔ **se SALTA intacto**: ni descripción, ni permisos, ni bandera |
+ * | **existe con CERO permisos** | le asigna los permisos del perfil (**sólo** eso) |
+ *
+ * 🔴 **POR QUÉ NO SINCRONIZA, Y POR QUÉ NO PASA POR {@link definirRoles}.** Son catálogo del
+ * NEGOCIO: el dueño los va a afinar desde Administración › Roles en cuanto arranquen las pruebas, y
+ * sus ajustes tienen que sobrevivir al despliegue. {@link sembrarRoles} hace lo contrario —su
+ * `deleteMany({ notIn })` devuelve el rol a la definición del código— y `SEED_ON_START=true` está
+ * encendido **permanentemente** en `prueba`, así que pasarlos por ahí le borraría el trabajo en cada
+ * deploy, **en silencio**: `asignarPermisos` (`dominio/admin/roles.ts`) le deja editarlos sin
+ * mirar `esSistema`, así que nada le avisaría de que lo que palomeó tiene fecha de caducidad. Por eso
+ * un rol que YA tiene permisos no se toca ni para "completar" lo que falte: un permiso que el dueño
+ * quitó a mano es una decisión suya.
+ *
+ * ⭐ **POR QUÉ EL CASO DE LOS CERO PERMISOS SÍ SE LLENA.** Porque **un rol sin un solo permiso no es
+ * una decisión del dueño, es un cascarón** — y es exactamente lo que la Ruta Crítica siembra
+ * (`seed-ruta-critica.ts`: **17 de sus 18** roles funcionales nacen `esSistema: false` y **vacíos** —el
+ * otro es `Ventas`, que ya es rol de sistema—, sólo para
+ * colgarles la responsabilidad de un proceso con `ProcesoDefRol`). Dos de esos nombres son también
+ * perfiles de puesto —**«Habilitaciones»** y **«Entregas»**— y `Rol.nombre` es ÚNICO, así que son la
+ * MISMA fila… que es correcto, porque son la misma persona. Si esta función se saltara cualquier rol
+ * existente, en `prueba` —donde los roles de la RC ya están sembrados— esos dos perfiles se quedarían
+ * **sin permisos y en silencio**, que es el peor resultado posible. Llenar el cascarón **no pisa nada
+ * de nadie**: es puramente aditivo.
+ *
+ * ⚠️ **El filo de ese caso, dicho para que nadie se sorprenda:** si alguien vacía un perfil de puesto
+ * del TODO desde la pantalla, el siguiente arranque se lo vuelve a llenar. Dejarle un solo permiso
+ * sí se respeta. Es el precio de no poder distinguir «cascarón de la RC» de «lo vacié a propósito», y
+ * se eligió a favor de no dejar un perfil mudo sin avisar.
+ *
+ * ⚠️ `esSistema: false` tampoco es cosmético: `eliminarRol` prohíbe BORRAR un rol de sistema y
+ * `actualizarRol` prohíbe RENOMBRARLO, así que en `true` el dueño se quedaría con 15 perfiles que no
+ * podría ni quitar ni corregir.
+ *
+ * La VALIDACIÓN de que toda clave exista en el catálogo se mantiene igual que en `sembrarRoles`
+ * (lanza con el nombre del perfil y de la clave): un `createMany` contra un permiso inexistente
+ * truena igual, y más tarde y peor.
+ */
+async function sembrarPerfilesDePuesto(
+  prisma: PrismaClient,
+  idPermisoPorClave: Map<ClavePermiso, number>,
+): Promise<void> {
+  for (const perfil of PERFILES_EDITABLES) {
+    const existente = await prisma.rol.findUnique({
+      where: { nombre: perfil.nombre },
+      select: { id: true, _count: { select: { permisos: true } } },
+    });
+
+    // ⛔ Ya existe Y TIENE PERMISOS: se deja INTACTO y se sigue. Es la garantía que protege lo que
+    // el dueño afine en la pantalla, y no se relaja. No hay rama de actualización, a propósito.
+    if (existente !== null && existente._count.permisos > 0) continue;
+
+    // La clave se resuelve ANTES de tocar el rol: si falta, el seed truena sin dejar a medias un
+    // rol vacío que luego parecería "el perfil que el dueño ya editó".
+    const idsPermisos = perfil.permisos.map((clave) => {
+      const id = idPermisoPorClave.get(clave);
+      if (id === undefined) {
+        throw new Error(
+          `Permiso "${clave}" del perfil de puesto ${perfil.nombre} no está sembrado`,
+        );
+      }
+      return id;
+    });
+
+    // Del cascarón sólo se LLENAN los permisos: ni `nombre`, ni `descripcion`, ni `esSistema`, ni se
+    // borra nada (`skipDuplicates` cubre la carrera). Si no existía, se crea completo.
+    const idRol =
+      existente?.id ??
+      (
+        await prisma.rol.create({
+          data: { nombre: perfil.nombre, descripcion: perfil.descripcion, esSistema: false },
+        })
+      ).id;
+
+    await prisma.rolPermiso.createMany({
+      data: idsPermisos.map((idPermiso) => ({ idRol, idPermiso })),
       skipDuplicates: true,
     });
   }
@@ -1829,6 +2602,8 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarEmpresa(prisma);
   const idPermisoPorClave = await sembrarPermisos(prisma);
   await sembrarRoles(prisma, idPermisoPorClave);
+  // Después de los de sistema y aparte de ellos: crear-si-no-existe, nunca sincronizar.
+  await sembrarPerfilesDePuesto(prisma, idPermisoPorClave);
   await sembrarRolesProveedor(prisma);
   await sembrarTiposProceso(prisma);
   await sembrarGeneros(prisma);
