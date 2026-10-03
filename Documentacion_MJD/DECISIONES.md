@@ -18300,3 +18300,22 @@ construyen funciones. Como los 15 puestos son roles `esSistema: false` que el se
 permisos**, ⚠️ **agregar las llaves a la definición del seed NO llega a `prueba`** (los roles ya existen allí con
 permisos). Hay que decidir cómo se aplican —en pantalla, o con un paso explícito—, y eso es lo primero que tiene que
 resolver quien construya la 0.250.
+
+**(f) Cómo se aplicó — decisión de Gabriel, 3-oct-2026 (fila 0.250, v0.189).** Entre *«a mano en Administración ›
+Roles»* y *«un paso explícito de una sola vez»*, Gabriel eligió el segundo: **una migración única**
+(`20261003120000_las_11_llaves_de_daniel`). Al preguntarle si alguien había tocado ya esos roles en `prueba`, la
+respuesta fue *«puede que Daniel ya tocó cosas, no lo sé»* ⇒ la migración es **estrictamente aditiva**:
+
+- **Sólo AGREGA** cada uno de los 11 pares (rol por nombre, permiso por clave) **si falta**; nunca quita ni cambia nada.
+  Lo que Daniel haya movido en pantalla —puesto o quitado— se respeta. Si quitó a propósito una de estas 11 después de
+  decidirla, vuelve a aparecer una sola vez y la puede quitar otra vez: la migración no se repite.
+- **Sólo toca roles que ya tienen al menos un permiso.** Un rol existente con cero permisos es un cascarón que el seed
+  llena entero; si la migración le metiera sus llaves, el seed lo daría por «afinado» y lo dejaría a medias (2 de 13 en
+  el caso de Habilitaciones). Lo cazó el coder construyéndola.
+- **Deja rastro (A7):** una entrada de bitácora por rol al que de verdad le agregó algo —entidad `Rol`, acción
+  `MODIFICAR`, como la pantalla de Roles—, **sin usuario** (la escribe el despliegue, no una persona), con las claves
+  agregadas y el motivo *«fila 0.250 · decisiones de Daniel §Post-F9.260»*.
+- **En una base nueva** (producción, CI) corre antes del seed y no inserta nada; el seed crea los puestos ya con las 11.
+
+**Lo que NO cambió:** las llaves muertas (`clientes.modificar`, `proveedores.modificar`) siguen donde estaban —quitarlas
+es la fila 0.244—, y la pregunta (e) sigue abierta.

@@ -3,8 +3,9 @@
  * y que el del dueño siga DERIVÁNDOSE del catálogo.
  *
  * Esto es la decisión de Daniel transcrita a código, y lo que se mide aquí es la transcripción, no
- * si la decisión es buena: **306 asignaciones** —las 134 del catálogo para `Director General` y 172
- * repartidas entre los otros 15—, con sus nombres y su orden.
+ * si la decisión es buena: **317 asignaciones** —las 134 del catálogo para `Director General` y 183
+ * repartidas entre los otros 15—, con sus nombres y su orden. *(Eran 306 = 134 + 172; las 11 de más
+ * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final.)*
  *
  * ## ⚠️ POR QUÉ ESTE ARCHIVO EXISTE APARTE (hay otros tres que hablan de roles)
  *
@@ -45,34 +46,295 @@ import { ROLES_FUNCIONALES_RC } from '../../prisma/seed-ruta-critica.js';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO } from '../contrato/index.js';
 
 /**
- * La FOTO de la decisión de Daniel: `slug` → `nombre` → cuántas llaves palomeó, en el orden en que
- * los revisó.
+ * La FOTO de la decisión de Daniel: `slug` → `nombre` → **QUÉ llaves palomeó, una por una**, en el
+ * orden en que revisó los puestos.
  *
  * ⚠️ Se escribe a mano A PROPÓSITO (no se deriva de `PERFILES_DE_PUESTO`): es la contraparte
  * independiente contra la que se compara el código. Si se calculara, recortar un perfil ajustaría
  * "lo esperado" solo y la prueba no podría fallar nunca — el mismo motivo por el que la foto de
  * `reparto-de-permisos.test.ts` tampoco se lee de `CLAVES_PERMISO`.
  *
- * El `director` va con `null`: su cuenta no es un número escrito, es «el catálogo entero» (ver la
- * batería de derivación más abajo).
+ * 🔑 **Son LISTAS, no conteos, y es la diferencia entre medir y adornar.** Hasta la fila 0.250 esta
+ * foto guardaba sólo cuántas llaves tenía cada puesto, y un reviewer midió que no bastaba: cambiar
+ * en «Líder de Calidad» `rc.ruta-ver` por `temporadas.ver` deja el mismo conteo y pasaba en verde.
+ * Con la lista entera, cualquier llave que se quite, se agregue o se cambie por otra rompe aquí.
+ *
+ * El `director` va con `null`: su lista no se escribe, es «el catálogo entero» (ver la batería de
+ * derivación más abajo).
+ *
+ * Las listas incluyen las 11 llaves que Daniel aceptó en §Post-F9.260 (fila 0.250): Ventas +1,
+ * Producción +2, Compras +2, Habilitaciones +2, Telas +1, Almacén de PT +1 y cada Calidad +1. Cuáles
+ * son las de esa decisión, separadas del resto, lo fija la batería 9.
  */
-const DECISION_DE_DANIEL: readonly { slug: string; nombre: string; llaves: number | null }[] = [
+const DECISION_DE_DANIEL: readonly {
+  slug: string;
+  nombre: string;
+  llaves: readonly string[] | null;
+}[] = [
   { slug: 'director', nombre: 'Director General', llaves: null },
-  { slug: 'ventas', nombre: 'Gerente de Ventas', llaves: 24 },
-  { slug: 'desarrollo', nombre: 'Desarrollo de Producto', llaves: 17 },
-  { slug: 'finanzas', nombre: 'Administración y Finanzas', llaves: 19 },
-  { slug: 'produccion', nombre: 'Producción', llaves: 21 },
-  { slug: 'compras', nombre: 'Compras', llaves: 13 },
-  { slug: 'habilitaciones', nombre: 'Habilitaciones', llaves: 11 },
-  { slug: 'telas', nombre: 'Encargado de Telas', llaves: 9 },
-  { slug: 'corte', nombre: 'Encargado de Corte', llaves: 8 },
-  { slug: 'almacen-pt', nombre: 'Almacén de Producto Terminado', llaves: 11 },
-  { slug: 'entregas', nombre: 'Entregas', llaves: 9 },
-  { slug: 'calidad-lider', nombre: 'Líder de Calidad', llaves: 8 },
-  { slug: 'calidad-sup', nombre: 'Supervisor de Calidad', llaves: 6 },
-  { slug: 'tecnica', nombre: 'Gestión Técnica', llaves: 8 },
-  { slug: 'grafico', nombre: 'Diseño Gráfico', llaves: 4 },
-  { slug: 'auxiliar', nombre: 'Auxiliar', llaves: 4 },
+  {
+    slug: 'ventas',
+    nombre: 'Gerente de Ventas',
+    llaves: [
+      'avios.ver',
+      'clientes.administrar',
+      'clientes.modificar',
+      'clientes.ver',
+      'colores.ver',
+      'consultas.ver-importes',
+      'desarrollo.precostear',
+      'desarrollo.ver',
+      'etiquetas-marca.ver',
+      'indicadores.ver',
+      'listas.administrar',
+      'listas.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'ordenes.ver-precio-real-maquila',
+      'pedidos.importes',
+      'pedidos.modificar-reales',
+      'pedidos.ver',
+      'precostos.consultar',
+      'produccion.wip-ver',
+      'proveedores.ver',
+      'tallas.ver',
+      'telas.ver',
+      'telas.ver-totales',
+      'temporadas.ver',
+    ],
+  },
+  {
+    slug: 'desarrollo',
+    nombre: 'Desarrollo de Producto',
+    llaves: [
+      'avios.administrar',
+      'avios.ver',
+      'colores.ver',
+      'desarrollo.administrar',
+      'desarrollo.precostear',
+      'desarrollo.ver',
+      'etiquetas-marca.ver',
+      'etiquetas.modificar',
+      'modelos.administrar',
+      'modelos.aprobar-receta',
+      'modelos.ver',
+      'ordenes.ver',
+      'precostos.consultar',
+      'tallas.ver',
+      'telas.administrar',
+      'telas.ver',
+      'temporadas.ver',
+    ],
+  },
+  {
+    slug: 'finanzas',
+    nombre: 'Administración y Finanzas',
+    llaves: [
+      'clientes.ver',
+      'conceptos-pago.administrar',
+      'conceptos-pago.ver',
+      'cxc.administrar',
+      'cxc.ver',
+      'cxp.administrar',
+      'cxp.ver',
+      'esma.revisar',
+      'esma.ver-pagos',
+      'inventario-pt.ver',
+      'ordenes.ver',
+      'pagos.corrida-ver',
+      'produccion.wip-ver',
+      'proveedores.administrar',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'terceros.administrar',
+      'terceros.fiscal',
+      'terceros.ver',
+    ],
+  },
+  {
+    slug: 'produccion',
+    nombre: 'Producción',
+    llaves: [
+      'compras.recibir',
+      'compras.ver',
+      'inventario-pt.ver',
+      'inventario-telas.mover',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'ordenes.modificar',
+      'ordenes.precio-maquila',
+      'ordenes.ver',
+      'produccion.cancelar',
+      'produccion.corte',
+      'produccion.corte-salidas',
+      'produccion.empaque',
+      'produccion.entradas-maquila',
+      'produccion.envio',
+      'produccion.recibo',
+      'produccion.wip-ver',
+      'rc.bandeja-completa',
+      'rc.capturar',
+      'rc.fechas-retraso',
+      'rc.ruta-ver',
+      'rc.ver-botones',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'compras',
+    nombre: 'Compras',
+    llaves: [
+      'almacenes.ver',
+      'avios.administrar',
+      'avios.ver',
+      'compras.administrar',
+      'compras.cancelar',
+      'compras.ver',
+      'inventario-avios.ver',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'notas.ver',
+      'ordenes.ver',
+      'proveedores.administrar',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'habilitaciones',
+    nombre: 'Habilitaciones',
+    llaves: [
+      'almacenes.ver',
+      'avios.ver',
+      'compras.recibir',
+      'compras.ver',
+      'inventario-avios.mover',
+      'inventario-avios.ver',
+      'modelos.ver',
+      'notas.administrar',
+      'notas.cancelar',
+      'notas.ver',
+      'ordenes.habilitacion',
+      'ordenes.ver',
+      'proveedores.ver',
+    ],
+  },
+  {
+    slug: 'telas',
+    nombre: 'Encargado de Telas',
+    llaves: [
+      'almacenes.ver',
+      'compras.recibir',
+      'compras.ver',
+      'inventario-telas.mover',
+      'inventario-telas.ver',
+      'modelos.ver',
+      'notas.ver',
+      'ordenes.ver',
+      'proveedores.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'corte',
+    nombre: 'Encargado de Corte',
+    llaves: [
+      'inventario-telas.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.corte',
+      'produccion.corte-salidas',
+      'produccion.wip-ver',
+      'rc.ruta-ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'almacen-pt',
+    nombre: 'Almacén de Producto Terminado',
+    llaves: [
+      'almacenes.ver',
+      'indicadores.almacen-productividad',
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-consulta',
+      'indicadores.ciclicos-conteo',
+      'inventario-pt.mover',
+      'inventario-pt.ver',
+      'ipt.consultar-existencias',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.empaque',
+      'produccion.recibo',
+    ],
+  },
+  {
+    slug: 'entregas',
+    nombre: 'Entregas',
+    llaves: [
+      'almacenes.ver',
+      'clientes.ver',
+      'inventario-pt.ver',
+      'ipt.consultar-existencias',
+      'ordenes.ver',
+      'pedidos.ver',
+      'produccion.entrega',
+      'produccion.wip-ver',
+      'rc.ruta-ver',
+    ],
+  },
+  {
+    slug: 'calidad-lider',
+    nombre: 'Líder de Calidad',
+    llaves: [
+      'calidad.actualizar-auditorias',
+      'calidad.administrar-catalogo',
+      'calidad.generar-auditorias',
+      'calidad.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.wip-ver',
+      'proveedores.ver',
+      'rc.ruta-ver',
+    ],
+  },
+  {
+    slug: 'calidad-sup',
+    nombre: 'Supervisor de Calidad',
+    llaves: [
+      'calidad.actualizar-auditorias',
+      'calidad.generar-auditorias',
+      'calidad.ver',
+      'modelos.ver',
+      'ordenes.ver',
+      'produccion.wip-ver',
+      'proveedores.ver',
+    ],
+  },
+  {
+    slug: 'tecnica',
+    nombre: 'Gestión Técnica',
+    llaves: [
+      'avios.ver',
+      'colores.ver',
+      'desarrollo.ver',
+      'modelos.administrar',
+      'modelos.ver',
+      'ordenes.ver',
+      'tallas.ver',
+      'telas.ver',
+    ],
+  },
+  {
+    slug: 'grafico',
+    nombre: 'Diseño Gráfico',
+    llaves: ['modelos.ver', 'ordenes.ver', 'proveedores.modificar', 'proveedores.ver'],
+  },
+  {
+    slug: 'auxiliar',
+    nombre: 'Auxiliar',
+    llaves: ['inventario-pt.ver', 'modelos.ver', 'ordenes.ver', 'produccion.wip-ver'],
+  },
 ];
 
 /** Los 9 roles que ya existían antes de los perfiles de puesto, en su orden exacto. */
@@ -89,7 +351,7 @@ const LOS_NUEVE_HEREDADOS: readonly string[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. LA TRANSCRIPCIÓN — los 16, con su nombre, su orden y su conteo exacto
+// 1. LA TRANSCRIPCIÓN — los 16, con su nombre, su orden y sus llaves exactas
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('⭐ los 16 perfiles de puesto están completos y en el orden que Daniel los revisó', () => {
@@ -100,26 +362,35 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     ).toEqual(DECISION_DE_DANIEL.map(({ slug, nombre }) => ({ slug, nombre })));
   });
 
-  it('⭐ cada perfil lleva EXACTAMENTE las llaves que él palomeó', () => {
+  it('⭐ cada perfil lleva EXACTAMENTE las llaves que él palomeó — las mismas, no sólo las mismas en número', () => {
     for (const esperado of DECISION_DE_DANIEL) {
       const perfil = PERFILES_DE_PUESTO_TODOS.find((p) => p.slug === esperado.slug);
       expect(perfil, `falta el perfil "${esperado.slug}"`).toBeDefined();
-      const llaves = esperado.llaves ?? CLAVES_PERMISO.length;
+      if (esperado.llaves === null) {
+        // El dueño: su lista es el catálogo entero (la batería 3 mide además que se DERIVE).
+        expect(perfil?.permisos.length, `${esperado.nombre} tiene que llevar el catálogo`).toBe(
+          CLAVES_PERMISO.length,
+        );
+        continue;
+      }
+      // Como conjuntos ordenados: el orden de la lista en el seed no es la decisión, el contenido sí.
       expect(
-        perfil?.permisos.length,
-        `${esperado.nombre} (${esperado.slug}) cambió de conteo: tenía ${String(llaves)} llaves`,
-      ).toBe(llaves);
+        [...(perfil?.permisos ?? [])].sort(),
+        `${esperado.nombre} (${esperado.slug}) ya no lleva las llaves que Daniel palomeó`,
+      ).toEqual([...esperado.llaves].sort());
     }
   });
 
-  it('⭐ y en total son 306 asignaciones: 134 del dueño + 172 de los otros 15', () => {
+  it('⭐ y en total son 317 asignaciones: 134 del dueño + 183 de los otros 15', () => {
     // El número que Daniel revisó. Partido en dos porque las dos mitades se rompen distinto: la
     // primera si alguien deja de derivar el catálogo, la segunda si alguien recorta un perfil.
     const delDueno = PERFIL_DIRECTOR_GENERAL.permisos.length;
     const deLosQuince = PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0);
     expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(134);
-    expect(deLosQuince, 'los otros 15 suman 172 asignaciones').toBe(172);
-    expect(delDueno + deLosQuince).toBe(306);
+    expect(deLosQuince, 'los otros 15 suman 183 asignaciones (172 + las 11 de §Post-F9.260)').toBe(
+      183,
+    );
+    expect(delDueno + deLosQuince).toBe(317);
   });
 
   it('ningún perfil repite una llave, y ningún slug ni nombre está duplicado', () => {
@@ -364,22 +635,27 @@ describe('⚠️ lo que los perfiles de puesto cambian respecto a decisiones ant
     ).toEqual([]);
   });
 
-  it('⚠️ ocho llaves declaradas `SOLO_ADMINISTRADOR` las lleva un perfil de puesto', () => {
+  it('⚠️ once llaves declaradas `SOLO_ADMINISTRADOR` las lleva un perfil de puesto', () => {
     // `SOLO_ADMINISTRADOR` dice «ningún perfil reparte esta llave», y para los roles de SISTEMA
     // sigue siendo verdad (lo mide `reparto-de-permisos.test.ts`, que sólo ve `definirRoles()`).
     // Para los perfiles de PUESTO no lo es, y es decisión de Daniel: el área que administra un
-    // catálogo maestro lo administra. Las ocho eran DEFAULTS DEL LEAD («catálogo maestro: el `.ver`
-    // sí baja, el alta no»), no llaves que él hubiera reservado para sí.
+    // catálogo maestro lo administra. Las ocho primeras eran DEFAULTS DEL LEAD («catálogo maestro:
+    // el `.ver` sí baja, el alta no»), no llaves que él hubiera reservado para sí. Las tres de más
+    // —`calidad.administrar-catalogo` (Líder de Calidad), `clientes.administrar` (Gerente de Ventas)
+    // y `rc.bandeja-completa` (Producción)— las decidió él en §Post-F9.260 (fila 0.250).
     const soloAdmin = new Set<string>(SOLO_ADMINISTRADOR.map((entrada) => entrada.clave));
     const cruces = PERFILES_DE_PUESTO.flatMap((perfil) =>
       perfil.permisos.filter((clave) => soloAdmin.has(clave)).map((clave) => `${clave}`),
     );
     expect([...new Set(cruces)].sort()).toEqual([
       'avios.administrar',
+      'calidad.administrar-catalogo',
+      'clientes.administrar',
       'conceptos-pago.administrar',
       'cxc.administrar',
       'cxp.administrar',
       'proveedores.administrar',
+      'rc.bandeja-completa',
       'telas.administrar',
       'terceros.administrar',
       'terceros.fiscal',
@@ -395,9 +671,10 @@ describe('⚠️ lo que los perfiles de puesto cambian respecto a decisiones ant
     // ⚠️ Y hay un detalle que conviene tener a la vista, no escondido: Daniel le dio
     // `rc.fechas-retraso`, que es la clave gemela que **NO GOBIERNA NADA** (fila 0.175: el catálogo
     // viejo traía la misma capacidad descrita dos veces y sólo `rc.fecha-libre-cumplimiento` tiene
-    // efecto). Si lo que quiso fue que Producción capture sólo dentro de la ventana, está correcto
-    // tal cual. Si lo que quiso fue dejarla capturar fechas atrasadas, le falta la otra llave. Esta
-    // prueba fija el estado medido para que ese cambio, si llega, sea una decisión visible.
+    // efecto). ✅ **Ya no es una duda: Daniel RECHAZÓ darle `rc.fecha-libre-cumplimiento`**
+    // (§Post-F9.260(d), con la explicación delante, incluida la de que `rc.fechas-retraso` no
+    // gobierna nada) ⇒ Producción captura la RC sólo dentro de la ventana —los últimos 2 días, nunca
+    // a futuro—, y es lo que él quiso. Esta prueba lo fija para que un cambio sea decisión visible.
     const produccion = PERFILES_DE_PUESTO.find((p) => p.nombre === 'Producción');
     expect(produccion, 'falta el perfil Producción').toBeDefined();
     expect(produccion?.permisos as string[]).toContain('rc.capturar');
@@ -426,9 +703,10 @@ describe('⚠️ lo que los perfiles de puesto cambian respecto a decisiones ant
       'salida-material.registrar',
       'pagos.corrida-armar',
       'compras.desautorizar',
-      // Los cuatro poderes que la fila 0.120 sacó de debajo de `roles.administrar`.
+      // Tres de los cuatro poderes que la fila 0.120 sacó de debajo de `roles.administrar`. El
+      // cuarto, `rc.bandeja-completa`, ya NO está aquí: Daniel se lo dio a «Producción» en
+      // §Post-F9.260 (fila 0.250) — lo fija la prueba de abajo, y la batería 9.
       'rc.capturar-cualquiera',
-      'rc.bandeja-completa',
       'compras.editar-autorizada',
       'tipos-proceso.marcar-entrada-pt',
     ];
@@ -446,6 +724,20 @@ describe('⚠️ lo que los perfiles de puesto cambian respecto a decisiones ant
     for (const clave of RESERVADAS_CON_SU_NOMBRE) {
       expect(PERFIL_DIRECTOR_GENERAL.permisos as string[], clave).toContain(clave);
     }
+  });
+
+  it('⭐ `rc.bandeja-completa` salió de las reservadas: la lleva «Producción», y SÓLO ella', () => {
+    // Decisión de Daniel (§Post-F9.260): la bandeja de Producción salía VACÍA —no parcial— porque un
+    // puesto nace sin roles funcionales de la RC. Es exactamente para lo que la fila 0.120 separó los
+    // cuatro poderes en renglones distintos: dar uno sin los otros. Que sea SÓLO Producción es lo
+    // que hay que fijar: si se le colara a otro puesto, nadie lo habría decidido.
+    const conBandejaCompleta = PERFILES_DE_PUESTO.filter((perfil) =>
+      (perfil.permisos as string[]).includes('rc.bandeja-completa'),
+    ).map((perfil) => perfil.nombre);
+    expect(conBandejaCompleta).toEqual(['Producción']);
+    // …y ver la bandeja de todos NO le da capturar por otros: son dos llaves distintas.
+    const produccion = PERFILES_DE_PUESTO.find((p) => p.nombre === 'Producción');
+    expect(produccion?.permisos as string[]).not.toContain('rc.capturar-cualquiera');
   });
 });
 
@@ -532,12 +824,12 @@ describe('⭐⭐ «Consulta general»: el piso de lectura', () => {
       PERFILES_DE_PUESTO.some((p) => (p.permisos as string[]).includes(clave)),
     );
     expect(enAlgunPuesto).toHaveLength(12);
-    // Y el total del dueño sigue intacto: el piso NO entra en sus 306 marcas.
+    // Y el total del dueño sigue intacto: el piso NO entra en sus 317 marcas.
     expect(PERFILES_DE_PUESTO_TODOS.map((p) => p.nombre)).not.toContain('Consulta general');
     expect(
       PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0),
-      'el piso no puede haber recortado las 172 marcas de los puestos',
-    ).toBe(172);
+      'el piso no puede haber recortado las 183 marcas de los puestos',
+    ).toBe(183);
   });
 });
 
@@ -981,5 +1273,98 @@ describe('⭐⭐ guardián: el piso de lectura NO abre ninguna escritura', () =>
       ).toContain(entrada.clave);
     }
     expect(NO_GET_ACEPTADOS).toHaveLength(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. ⭐⭐ LAS 17 DECISIONES DE DANIEL SOBRE EL REPARTO (§Post-F9.260, fila 0.250)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Las **11 llaves que ACEPTÓ**, puesto por puesto, escritas a mano.
+ *
+ * ⚠️ No se derivan de {@link PERFILES_DE_PUESTO} por el mismo motivo que la foto de arriba: es la
+ * contraparte independiente. La foto de la batería 1 dice qué lleva HOY cada puesto; esta lista dice
+ * cuáles de esas llaves son las de ESTA decisión — si mañana Daniel mueve un puesto en otra fila, la
+ * foto cambia, pero lo que él aceptó y rechazó aquí sigue escrito y medido.
+ */
+const ACEPTADAS_EN_POST_F9_260: readonly { puesto: string; clave: string }[] = [
+  { puesto: 'Encargado de Telas', clave: 'compras.ver' },
+  { puesto: 'Producción', clave: 'compras.ver' },
+  { puesto: 'Producción', clave: 'rc.bandeja-completa' },
+  { puesto: 'Supervisor de Calidad', clave: 'calidad.generar-auditorias' },
+  { puesto: 'Habilitaciones', clave: 'compras.recibir' },
+  { puesto: 'Habilitaciones', clave: 'compras.ver' },
+  { puesto: 'Líder de Calidad', clave: 'calidad.administrar-catalogo' },
+  { puesto: 'Gerente de Ventas', clave: 'clientes.administrar' },
+  { puesto: 'Compras', clave: 'proveedores.administrar' },
+  { puesto: 'Compras', clave: 'compras.cancelar' },
+  { puesto: 'Almacén de Producto Terminado', clave: 'produccion.empaque' },
+];
+
+/**
+ * Las **6 que RECHAZÓ**. Que no estén es tan decisión suya como que las otras sí: una recomendación
+ * rechazada que reaparece en un perfil es un permiso que nadie dio.
+ */
+const RECHAZADAS_EN_POST_F9_260: readonly { puesto: string; clave: string }[] = [
+  // Le advertí que son de OPERAR los indicadores de Ingeniería de Producto, no de verlos.
+  { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-productividad' },
+  { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-confiabilidad' },
+  { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-muestrarios' },
+  // Su regla del dinero. ⚠️ El efecto colateral de `edr.ver` (Administración se queda sin la
+  // pantalla de facturación) es la fila 0.251, no un motivo para dársela aquí.
+  { puesto: 'Administración y Finanzas', clave: 'costos.ver' },
+  { puesto: 'Administración y Finanzas', clave: 'edr.ver' },
+  // Producción captura la RC sólo dentro de la ventana (§Post-F9.260(d)).
+  { puesto: 'Producción', clave: 'rc.fecha-libre-cumplimiento' },
+];
+
+describe('⭐⭐ las 17 decisiones de Daniel sobre el reparto (§Post-F9.260)', () => {
+  const perfilDe = (nombre: string): readonly string[] => {
+    const perfil = PERFILES_DE_PUESTO.find((p) => p.nombre === nombre);
+    expect(perfil, `falta el perfil de puesto «${nombre}»`).toBeDefined();
+    return perfil?.permisos ?? [];
+  };
+
+  it('son 11 aceptadas y 6 rechazadas, todas del catálogo y ninguna en las dos listas', () => {
+    // Sanidad de las dos listas: si se vaciaran o nombraran fantasmas, las pruebas de abajo
+    // pasarían comparando nada contra nada.
+    expect(ACEPTADAS_EN_POST_F9_260).toHaveLength(11);
+    expect(RECHAZADAS_EN_POST_F9_260).toHaveLength(6);
+    const catalogo = new Set<string>(CLAVES_PERMISO);
+    const todas = [...ACEPTADAS_EN_POST_F9_260, ...RECHAZADAS_EN_POST_F9_260];
+    const fantasmas = todas.filter((d) => !catalogo.has(d.clave)).map((d) => d.clave);
+    expect(fantasmas, `claves que ya no existen: ${fantasmas.join(', ')}`).toEqual([]);
+    const llave = (d: { puesto: string; clave: string }): string => `${d.puesto} → ${d.clave}`;
+    const aceptadas = new Set(ACEPTADAS_EN_POST_F9_260.map(llave));
+    expect(RECHAZADAS_EN_POST_F9_260.map(llave).filter((k) => aceptadas.has(k))).toEqual([]);
+    expect(aceptadas.size, 'hay una aceptada repetida').toBe(11);
+  });
+
+  it.each(ACEPTADAS_EN_POST_F9_260)('✅ $puesto lleva $clave (la aceptó)', ({ puesto, clave }) => {
+    expect(
+      perfilDe(puesto),
+      `Daniel aceptó darle ${clave} a «${puesto}» (§Post-F9.260) y el perfil no la lleva`,
+    ).toContain(clave);
+  });
+
+  it.each(RECHAZADAS_EN_POST_F9_260)(
+    '⛔ $puesto NO lleva $clave (la rechazó)',
+    ({ puesto, clave }) => {
+      expect(
+        perfilDe(puesto),
+        `Daniel RECHAZÓ darle ${clave} a «${puesto}» (§Post-F9.260): que esté es un permiso que ` +
+          `nadie dio`,
+      ).not.toContain(clave);
+    },
+  );
+
+  it('las llaves muertas que Ventas y Compras ya tenían siguen ahí (quitarlas es la fila 0.244)', () => {
+    // `clientes.modificar` y `proveedores.modificar` no gobiernan nada —por eso Daniel les dio la
+    // `.administrar`—, pero retirarlas es OTRA fila y OTRA decisión. Esta prueba mide SÓLO esas dos
+    // llaves; que agregar las 11 no le quitó NADA a ningún puesto lo mide la foto completa de la
+    // batería 1 (`DECISION_DE_DANIEL`), llave por llave.
+    expect(perfilDe('Gerente de Ventas')).toContain('clientes.modificar');
+    expect(perfilDe('Compras')).toContain('proveedores.modificar');
   });
 });

@@ -593,6 +593,9 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'nadie de sitio, precisamente para que el reparto por puesto del arranque pueda dárselo a ' +
       'un coordinador sin regalarle además la administración del sistema.',
   },
+  // ⚠️ «SÓLO» habla de los roles de SISTEMA (esta prueba sólo ve `definirRoles()`). Entre los
+  // perfiles de PUESTO, que son editables y no pasan por aquí, la lleva además «Producción» por
+  // decisión de Daniel (§Post-F9.260, fila 0.250) — lo fija `roles-perfiles-puesto.test.ts`.
   {
     clave: 'rc.bandeja-completa',
     razon:

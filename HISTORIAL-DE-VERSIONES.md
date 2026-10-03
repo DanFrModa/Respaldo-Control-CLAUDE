@@ -71,6 +71,64 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.189 · 3-oct-2026 · **en prueba** — **Tus 17 decisiones de permisos, aplicadas: Telas, Producción y el Supervisor de Calidad ya pueden trabajar**
+
+> **La v0.189 cierra una fila del programa —la 0.250—.** Aplica las 17 respuestas que diste en la página de
+> permisos: las **11 que aceptaste** ya están puestas en sus puestos, y las **6 que rechazaste** se quedan fuera.
+> No se construyó ninguna función nueva: sólo se repartieron llaves.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El Encargado de Telas y Producción ya pueden recibir compras.** Antes entraban a «Recepción de compras» y no había
+ninguna orden de compra que escoger, porque les faltaba poder consultarlas.
+
+**Habilitaciones también recibe ahora las compras de avíos**, que es lo que lleva. Antes ni siquiera tenía esa
+pantalla en el menú.
+
+**El Supervisor de Calidad ya puede levantar una auditoría**, no sólo actualizarla.
+
+**Y el resto de lo que aceptaste:**
+
+- el **Líder de Calidad** escribe los catálogos de calidad, incluidos los planes AQL;
+- el **Gerente de Ventas** administra clientes;
+- **Compras** administra proveedores y **puede cancelar una orden de compra mientras no se haya recibido material**
+  (eso ya lo hacía cumplir el sistema: con material recibido no deja);
+- **Producción** ve su bandeja de la ruta crítica completa (antes le salía vacía);
+- el **Almacén de Producto Terminado** empaca. Con eso queda contestada tu pregunta: **el almacén empaca**.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Si ya habías movido casillas en esos puestos, no se perdió nada.** El cambio **sólo agrega** las 11 llaves que
+faltaran; no quita ni toca lo demás. Si quitaste a propósito alguna de esas 11 después de decidirla, va a
+reaparecer **una sola vez**: la quitas otra vez y ya no vuelve.
+
+**En la bitácora vas a ver una entrada por cada puesto al que se le agregó algo, sin usuario.** Es el despliegue
+el que la escribe, no una persona, y dice qué llaves agregó y por qué.
+
+**Producción captura la ruta crítica sólo al día.** Como no le diste la fecha libre, puede fechar un cumplimiento
+dentro de los **últimos 2 días** y nunca a futuro.
+
+**Telas y Habilitaciones también pueden correr la explosión de materiales de una orden.** Viene pegado a poder
+consultar compras. En Producción tiene sentido; en los otros dos es de más, y separarlo queda pendiente sin prisa.
+
+### ⏳ Sigue pendiente o roto
+
+**Administración y Finanzas se quedó sin la pantalla de Ventas (la de facturación).** Le negaste el estado de
+resultados, y es la misma llave que abre Ventas. Separarlas es la fila 0.251; mientras la facturación no sea del
+día a día, se aguanta.
+
+**Diseño Gráfico sigue sin poder meter artes**: no existe un permiso de arte, hay que construirlo.
+
+**Una pregunta tuya abierta:** cuando el cortador acaba, ¿quién teclea la salida de tela?
+
+⚠️ **Si renombraste alguno de esos ocho puestos, ese puesto se quedó sin sus llaves nuevas.** El cambio los busca
+por su nombre exacto. Se comprueba en un minuto: en la bitácora tiene que haber **una entrada por cada puesto** al
+que le faltaba algo (ocho, si nadie los había tocado). Si ves menos, revisa los nombres en Administración › Roles y
+palomea a mano lo que falte.
+
+🔑 **Los pasos manuales siguen igual:** asignarle a cada persona su puesto **y** «Consulta general» en
+Administración › Usuarios, y cambiar la contraseña de `admin`.
+
 ## 0.188 · 1-oct-2026 · **en prueba** — **Ya puedes repartir usuarios, y la gente ve lo operativo sin pedir permiso**
 
 > **La v0.188 cierra una fila del programa —la 0.243—** y es la primera que cambia **quién ve qué** en todo el
