@@ -74,12 +74,18 @@ export const DIAS_VENTANA_CAPTURA_RC = 2;
  * retraso, así que aceptaba una fecha futura sin chistar. Un proceso «cumplido» mañana envenena el
  * KPI de D11 —sale a tiempo algo que no ha pasado—, y el molde compartido ya lo rechaza.
  *
- * 🔴 **Y hay que decirlo aquí, pegado a la guarda: con el seed de HOY esta puerta no le cierra a
- * nadie.** Medido importando `definirRoles()` (no leyendo el archivo): de los 9 perfiles, **OCHO**
- * llevan `rc.capturar` —`Administrador` y `AdministracionDireccion`, que reciben el catálogo
- * ENTERO (`seed.ts:879-890`), más `Directivo`, `Gerencial`, `Ventas`, `Logística`, `Asistente` y
- * `Secretarial`—, y **los OCHO llevan también `rc.fecha-libre-cumplimiento`**: los que capturan sin
- * la llave son **CERO**. Es herencia de la cascada del sistema viejo, el mismo defecto que las
+ * ⭐ **Y ESTO CAMBIÓ CON LOS PERFILES DE PUESTO: la puerta YA le cierra a alguien.** Medido
+ * importando las definiciones del seed (no leyendo el archivo): el perfil de puesto **`Producción`**
+ * lleva `rc.capturar` y **NO** lleva `rc.fecha-libre-cumplimiento` ⇒ es el **primer y único** rol del
+ * sistema que captura dentro de la ventana y no puede salirse de ella. (Lleva `rc.fechas-retraso`,
+ * que es la clave gemela que **no gobierna nada** — ver su nota en `src/contrato/permisos.ts`.)
+ *
+ * 🔴 De los **9 perfiles HEREDADOS**, en cambio, la puerta sigue sin cerrarle a nadie: **OCHO**
+ * llevan `rc.capturar` —`Administrador` y `AdministracionDireccion`, que reciben el catálogo ENTERO,
+ * más `Directivo`, `Gerencial`, `Ventas`, `Logística`, `Asistente` y `Secretarial`— (y también
+ * `Director General`, el perfil de puesto del dueño, que igualmente lleva el catálogo entero), y
+ * **los OCHO llevan también `rc.fecha-libre-cumplimiento`**. Es herencia de la cascada del sistema
+ * viejo, el mismo defecto que las
  * filas 0.105/0.128 vienen podando de a uno, y calcado del gemelo de PT. El MECANISMO ya existe
  * (que es lo que faltaba); a QUIÉN se le quita la llave es una decisión de perfiles que le toca a
  * Daniel, no a esta fila.

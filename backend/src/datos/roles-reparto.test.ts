@@ -163,12 +163,19 @@ describe('reparto de las DOS aprobaciones (§Post-F9.110 (b) + F8-E4 (h))', () =
  * archivo por un `.concat` que coló un permiso a cuatro roles derivados.
  */
 describe('⭐ V1-E8b — `listas.aprobar` es la reja de los FACTORES (§Post-F9.125)', () => {
-  it('lo tienen EXACTAMENTE los tres roles del dueño y la dirección, y nadie más', () => {
+  it('lo tienen EXACTAMENTE los roles del dueño y la dirección, y nadie más', () => {
     const conElPermiso = definirRoles()
       .filter((r) => r.permisos.includes('listas.aprobar'))
       .map((r) => r.nombre)
       .sort();
-    expect(conElPermiso).toEqual(['AdministracionDireccion', 'Administrador', 'Directivo']);
+    // ⭐ El cuarto es `Director General`, el perfil de PUESTO del dueño (lleva el catálogo entero).
+    // Que aparezca aquí NO relaja la decisión de Daniel: es él mismo, con otro nombre de rol.
+    expect(conElPermiso).toEqual([
+      'AdministracionDireccion',
+      'Administrador',
+      'Directivo',
+      'Director General',
+    ]);
   });
 
   it('⭐ los roles que SÍ administran listas (pero no aprueban) quedan fuera de los factores', () => {
@@ -214,14 +221,29 @@ describe('⭐ V1-E8b — `listas.aprobar` es la reja de los FACTORES (§Post-F9.
  * es exactamente el acto de convertir un renglón en deuda —o en pago— real.
  */
 describe('⭐ fila 0.128 — validar es de Daniel; capturar lo recibido es de quien recibe', () => {
-  /** Los tres perfiles del dueño y la dirección: el "círculo" al que Daniel deja validar. */
-  const CIRCULO = ['AdministracionDireccion', 'Administrador', 'Directivo'];
+  /**
+   * Los perfiles del dueño y la dirección: el "círculo" al que Daniel deja validar.
+   *
+   * ⭐ `Director General` es el cuarto desde los perfiles de puesto: es el perfil de PUESTO del
+   * dueño y lleva el catálogo completo, así que validar le toca por definición.
+   */
+  const CIRCULO = ['AdministracionDireccion', 'Administrador', 'Directivo', 'Director General'];
   /** Los perfiles operativos: capturan, no validan. */
   const OPERATIVOS = ['Gerencial', 'Ventas', 'Logistica', 'Asistente', 'Secretarial'];
 
   it.each(['esma.cargo-validar', 'esma.revisar'])(
-    '`%s` lo tienen EXACTAMENTE los tres roles del círculo, y nadie más',
+    '`%s` lo tienen EXACTAMENTE los roles del círculo entre los de SISTEMA, y nadie más',
     (clave) => {
+      // ⚠️ «Y NADIE MÁS» SE LIMITA A LOS ROLES DE SISTEMA, y hay que leerlo así: `definirRoles()`
+      // ya no son todos los perfiles que siembra el seed. Los 15 perfiles de PUESTO de Daniel van
+      // por `sembrarPerfilesDePuesto` y uno de ellos —«Administración y Finanzas»— SÍ lleva
+      // `esma.revisar` por decisión suya, confirmada.
+      //
+      // 🔑 **Y eso NO rompe esta fila**: son dos llaves distintas. Lo que su frase *«la validación
+      // sólo la doy yo»* protege es `esma.cargo-validar` (fijar cantidad y precio reales del cargo),
+      // y ÉSA no se movió: ningún perfil de puesto la lleva. Revisar una partida para que entre al
+      // saldo sí se la dio al área que lleva la cuenta corriente. Las dos mitades están medidas y
+      // nombradas en `roles-perfiles-puesto.test.ts`, para que esto no parezca un agujero de aquí.
       const conElPermiso = definirRoles()
         .filter((r) => (r.permisos as string[]).includes(clave))
         .map((r) => r.nombre)

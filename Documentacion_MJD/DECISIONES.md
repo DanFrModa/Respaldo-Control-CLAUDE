@@ -18016,3 +18016,224 @@ funciona si alguien se acuerda de buscarlo**. Es chico (una lectura sobre el ras
 lo que hace que elegir la (b) no sea bajar la guardia. ⚠️ **Y lo que NO se recomienda:** un aviso automático por
 correo o notificación — **no existe infraestructura de avisos** en el backend (medido en §Post-F9.248(d)), así que
 eso sería otra fila, más grande.
+
+#### (Post-F9.256) — UNA PERSONA, UN USUARIO. Nadie comparte, y la única excepción es `admin` (1-oct-2026)
+
+> *«La primera regla es que no pueden compartir usuarios ninguna persona.»*
+> *«Fuera de admin. Cada usuario es una persona.»*
+
+⇒ **REGLA DEL PROYECTO, dicha por Daniel como «la primera regla».** Cada persona del negocio tiene **su
+propio** usuario. Lo que está prohibido es que **dos personas usen uno**; lo contrario sí se permite y él mismo
+lo decidió antes (§Post-F9.248): **una persona puede tener varios usuarios** —él lleva dos— y varios perfiles
+a la vez (`UsuarioRol` es N:M real, con la unión de permisos resuelta en un solo sitio, `comun/permisos.ts`).
+
+**La única excepción es `admin`**, la cuenta que siembra el arranque (`prisma/seed.ts`, `sembrarAdmin`): no es
+de nadie y **se queda** como cuenta técnica. Daniel lo decidió al acotar la regla con *«fuera de admin»*, lo
+que **retira** la recomendación del lead de darla de baja una vez que él tuviera su propio usuario.
+
+⚠️ **Lo que esa excepción deja en pie, y es el único pendiente que nace de aquí:** la contraseña de `admin`
+sigue siendo la del arranque, **escrita en el repositorio**. Si la cuenta se queda de forma permanente y lleva
+las llaves de gobierno, cambiarla es el paso manual que importa — es de Gabriel, en Railway. 📐 **Medido:** el
+seed **nunca** la restablece (la cuenta de credenciales se siembra con `update: {}`), así que una vez cambiada
+los despliegues no la revierten; y tampoco reactiva ni renombra un usuario que ya existe.
+
+📐 **Y medido para que nadie lo vuelva a preguntar: el alta de una persona no necesita correo ni confirmación.**
+Con usuario, nombre y contraseña basta —el sistema genera un correo interno y lo marca verificado— y en el
+**mismo diálogo** se le asignan uno o varios perfiles, en la misma transacción. La bitácora guarda quién lo
+creó y con qué perfiles, **sin la contraseña**.
+
+---
+
+#### (Post-F9.257) — ⭐⭐ EL MODELO DE PERMISOS SE INVIERTE: un PISO de lectura para todos, y se piensa en qué NEGAR (1-oct-2026)
+
+> *«En el sistema que tenemos hoy, la mayoría de la gente puede ver casi todo. La lógica fue al revés… Qué cosas
+> están hechas para solo un grupo de gente?… y esas son las que bloquean a las demás. Pero la mayoría de la
+> información tienen acceso todos.»*
+>
+> *«Por qué construiste muchísimos permisos y si solo tienen acceso a 20 en promedio, seguramente al rato van a
+> haber muchas cosas que la gente no va a poder ver que creo que son cosas de valor.»*
+>
+> *«Quisiera que analices a fondo en lugar de pensar en qué accesos dar. Pensar en qué accesos negar. Creo que va
+> a dar mejores resultados.»*
+
+⇒ **DECIDIDO, y es un cambio de modelo, no un ajuste.** El reparto se hacía preguntando *«¿quién necesita
+esto?»* puesto por puesto, así que **cada respuesta nacía angosta por la forma de la pregunta** — y el propio
+Daniel lo diagnosticó. Se invierte: **lo operativo se consulta por omisión; lo que se niega es escribir, el
+dinero y los poderes de excepción.**
+
+**📐 LA MEDICIÓN QUE LO SOSTIENE** (barrido de los `*.rutas.ts` de `src/api`, **666 endpoints**, resolviendo las
+variables de guard —`const captura = app.conAlgunPermiso(…)`— porque sin eso los `indicadores.*` salían mal
+clasificados): de las **134 claves del catálogo**, **sólo 34 son de pura lectura** (*todas* sus rutas son `GET`); **76
+escriben** (al menos una ruta no-`GET`) y **24 no guardan ningún endpoint** (se verifican dentro del dominio, o
+gobiernan un campo o un botón). 🔑 **El criterio, dicho porque sin él la cifra no se reproduce: una clave MIXTA
+—que guarda `GET` *y* no-`GET`— cuenta como ESCRITURA**, porque tener la llave deja escribir; y las mixtas son **24 de esas 76**, o sea el caso frecuente, no el raro. ⚠️ Sobre el universo de las **119 vivas** las dos primeras cifras son las mismas y
+la tercera baja a 9: la diferencia son exactamente las 15 muertas de §Post-F9.259. ⇒ **el 70 % del catálogo nunca iba a ser de «ver»**, y el reparto con cuentagotas se estaba
+haciendo sobre el 30 % que sí lo es.
+
+**EL PISO — 16 permisos, en un rol llamado «Consulta general»** (`esSistema: false`, por el mismo camino que los
+perfiles de puesto, así que Daniel lo edita desde Administración › Roles y el despliegue no lo pisa). Se asigna
+a todo el mundo **además** de su puesto.
+
+**EL CRITERIO, que es la regla para lo que venga:**
+- **Al piso va el VOCABULARIO DEL NEGOCIO** — catálogos, modelos y su receta, órdenes, pedidos, el avance (WIP),
+  la ruta crítica: *el idioma con el que se leen las demás pantallas*. Esconderlo deja a la gente viendo claves
+  en lugar de nombres.
+- **NO van los SALDOS Y MOVIMIENTOS** — existencias y kardex de PT, telas y avíos, y las notas de salida:
+  cambian cada día y responde por ellos quien los mueve.
+- **NUNCA va el DINERO.**
+
+**(a) La raya del dinero, textual:** *«Temas de dinero (costos, importes, saldos, etc) son cosas que sí deben de
+tener restricción de quien puede ver y quien no. **Lo que sea dinero no debe de estar en el piso.**»* ⇒ **15
+llaves restringidas**, incluidas las tres que el lead dudaba —`listas.ver` (precios al cliente),
+`desarrollo.ver` (proyectos con precosteo) y `terceros.ver` (saldos)—, porque las tres revelan precios o saldos.
+`conceptos-pago.ver` queda restringida aunque **no** cumple el criterio al pie de la letra (es un catálogo de
+nombres, sin importes): se deja fuera porque nadie afuera de Administración la necesita, así que restringirla no
+le cuesta nada a nadie.
+
+**(b) Las cuatro de saldos, y el patrón que las decidió:** Daniel dudó de una —*«Me quedo con la duda si todos
+deberían de tener acceso al inventario de PT. No estoy seguro. **Creo que no tiene caso**»*— y el lead extendió
+la duda a las cuatro al medir sus **propias marcas**: le dio `inventario-pt.ver` a **5** de 15 puestos,
+`inventario-telas.ver` a **4**, `inventario-avios.ver` a **2** y `notas.ver` a **3** — **cuatro veces, cada
+inventario exactamente a quien mueve ese material.** Nadie pierde nada: ya las tienen por su puesto.
+
+⚠️ **Y lo que el lead NO hizo con esas marcas, a propósito:** usarlas como **techo** del piso. Medido, de las 25
+llaves que el piso tenía entonces, Daniel sólo le había dado **5 a seis o más puestos** y **cuatro a nadie** —
+así que un piso «según sus marcas» serían 5 llaves. **No se usan para eso porque él mismo explicó por qué no
+valen:** nacieron de la pregunta equivocada. Valen donde fue deliberado y se repitió, que es el caso de las
+cuatro de arriba.
+
+**(c) 🔴 CINCO LLAVES SALIERON DEL PISO PORQUE FILTRABAN PRECIOS — el hallazgo de la revisión
+independiente, y lo que decidió el dueño.** El piso nació con **21** y quedó en **16**. 📐 Medido: cinco llaves
+operativas **devuelven dinero metido dentro de otros datos, sin taparlo** — `telas.ver` (precio sugerido, por
+color y **por proveedor**: `dominio/catalogos/telas.ts` lo menciona en **27 líneas** —33 ocurrencias— **y no tiene ni una reja**), `avios.ver`
+(precio y precio de referencia), `modelos.ver` (`maquilaBase`, `corteBase` y el `precioCosteo` del BOM),
+`proveedores.ver` (**banco, CLABE y cuenta**, que la UI enmascara y **el API devuelve completos**) y
+`ordenes.ver` (`maquilaReferencia`, el único campo de ese endpoint que no se tapa). Choca de frente con la regla
+de (a), y **el patrón para taparlo ya existe en el código** (`puedeVerCostoRealDeModelo`,
+`consultas.ver-importes`): simplemente no se aplicó a estos campos.
+
+⚠️ **Y la frase del rol decía «sin dinero» con una columna «Precio sug.» a la vista** — una promesa falsa en el
+sitio donde se toma la decisión, que es exactamente lo que §Post-F9.259 vino a corregir para otro permiso.
+
+**La decisión del dueño, textual: «Súbelo con 16 ahora».** Las cinco entran al piso cuando sus campos estén
+tapados (fila 0.249; medido: **96 líneas que mencionan esos campos, en 4 archivos del dominio, y 8 pantallas** (es una estimación de esfuerzo medida con `grep -c`; el método y su límite están en la fila 0.249), demasiado para meterlo
+deprisa). Van fijadas en una tercera lista de exclusión, `PERMISOS_QUE_FILTRAN_PRECIO`, con su prueba de
+intersección vacía y su mutación. 🔑 **Es distinta de `PERMISOS_DE_DINERO`:** aquéllas son llaves **cuyo
+propósito es** el dinero; éstas son llaves **operativas que de paso filtran** un precio.
+
+🔑 **Y el dato que hizo que esta salida cueste casi nada — las propias marcas del dueño:** ya les había dado esas
+cinco a quien las necesita — `ordenes.ver` a **15 de 15** puestos (sacarla del piso **no le quita nada a
+nadie**), `modelos.ver` a **13 de 15**, `proveedores.ver` a 8, `telas.ver` a 7, `avios.ver` a 5. El promedio por
+puesto baja de 26.9 a **25.1**: menos de dos permisos. ⇒ **el piso valía por las llaves que él repartió poco, y
+las que filtran dinero son justo las que repartió mucho.**
+
+**(c-bis) Una del piso no es `GET` puro, y es deliberado:** `indicadores.ver`, cuyo único no-`GET` encola un
+refresco de las vistas de KPIs. No toca un dato del negocio y queda declarada con su razón. *(La otra excepción
+era `ordenes.ver` —su POST es imprimir varias órdenes en un PDF, por llevar la lista de ids en el cuerpo— y
+sobró al salir ésta del piso.)*
+
+**(d) ⭐⭐ Y lo que convierte esto en una garantía y no en una promesa escrita en prosa: DOS guardianes en el
+CI.** El riesgo real no era hoy: era que **en seis meses alguien le cuelgue un botón de guardar a una pantalla
+que todos pueden abrir**, y el piso se vuelva escritura sin que nadie lo decida.
+1. Una prueba recorre **todos** los `*.rutas.ts` y exige que **cada endpoint protegido por una llave del piso
+   sea `GET`**, salvo el único declarado. Mutada en vivo (se le colgó un `POST` a una llave del piso): **la caza
+   nombrando al culpable**. Y lleva una segunda prueba de que **la red mide algo** (encuentra los **93** endpoints que el piso alcanza —**96** pares (endpoint, clave)— y ninguna llave queda sin ruta), para que no se vuelva adorno si un día deja de encontrar archivos.
+2. Otra recorre las descripciones de las 16 y **rechaza cualquier verbo de escritura** —*capturar, modificar,
+   administrar, dar de alta, cancelar, borrar, autorizar, aprobar*—, porque **el aviso que importa es el que
+   está pegado a la casilla que se palomea**, no el que vive en un documento. Fue la que obligó a corregir la
+   descripción falsa de `ordenes.habilitacion` (ver §Post-F9.259).
+3. ⭐⭐ **Y una tercera, que cierra el agujero de las otras dos:** cuenta **todas** las rutas del sistema
+   —**666** bloques `app.route`, **664** con reja de permiso— y exige que el número no baje. Existe porque las
+   dos anteriores sólo miran las rutas **del piso**: si el escáner se queda ciego, esas rutas **desaparecen de
+   su vista** y el guardián **se pone verde por ceguera**, que es literalmente lo que pasó con
+   `conAlgunPermiso`. Ésta cuenta sobre el total, así que la ceguera sale en **rojo**. Probada lisiando **sólo**
+   la resolución de variables —un punto que el canario del piso no puede ver, porque todos los guards en
+   variable son `indicadores.*` y ninguno es del piso— y murió **sólo ella**: la demostración de que no es
+   redundante. ⚠️ **Y el aviso para quien la encuentre roja algún día:** si una ruta nueva y legítima la pone
+   roja, lo correcto es **mirar por qué bajó el 664**, no subirle el número ni borrar la prueba. Ese reflejo es
+   justo lo que viene a impedir.
+
+**(e) Efecto sobre el reparto:** el promedio por puesto pasa de **11.5 a 25.1** permisos (📐 medido como la unión de cada puesto con el piso de 16; con las 21 del piso original habría sido 26.9), y **8 de las 25
+recomendaciones del lead se disolvieron** (el piso ya las cubre), **4 de los 7 bloqueos incluidos**. Quedan
+**17 decisiones** y **3 bloqueos**. Las marcas de los 15 puestos **NO se adelgazaron**: **12** quedan repetidas en el piso, los permisos se **suman**, y así las 172 decisiones de Daniel siguen literales — si algún día el piso
+encoge, el puesto que de verdad necesitaba la llave la conserva.
+
+---
+
+#### (Post-F9.258) — LOS PERFILES DE PUESTO SON ROLES DEL DUEÑO, NO DEL SISTEMA (1-oct-2026)
+
+**Decisión técnica con causa de negocio, tomada al medir una trampa.** Daniel preguntó: *«Yo puedo dar de alta
+nuevos roles en el futuro desde administración, o eso lo tienes que hacer tú?»*
+
+📐 **Medido, y la respuesta tiene dos mitades:**
+- **Un rol que él cree es suyo del todo** (`crearRol` lo nace `esSistema: false`): nombre, descripción, árbol de
+  permisos y borrado, y **el seed nunca lo toca**. Además **no hay tope de escalada**: con `roles.administrar`
+  puede otorgar **cualquiera** de los 134 permisos, incluidos los que hoy sólo tiene él — la única validación es
+  que el permiso exista.
+- **Un rol de sistema NO:** `asignarPermisos` **no mira `esSistema`**, así que editar sus permisos en pantalla
+  *parece* funcionar… y `sembrarRoles` lo **revierte en el siguiente arranque** (`deleteMany({ notIn })`). Con
+  `SEED_ON_START=true` permanente en `prueba`, eso pasa en **cada** despliegue, en silencio. Y un rol de sistema
+  **no se puede borrar ni renombrar** desde la pantalla.
+
+⇒ **Por eso los 15 perfiles de puesto y «Consulta general» se siembran como roles NORMALES** (`esSistema:
+false`, crear-si-no-existe, y si ya existe con permisos **no se tocan**): son catálogo del negocio, Daniel los
+va a afinar en cuanto arranquen las pruebas, y **sus ajustes tienen que sobrevivir al despliegue**. Es también la
+dirección **reversible**: congelarlos después es fácil; al revés se pierde trabajo sin enterarse.
+
+**La excepción, deliberada: `Director General` SÍ es rol de sistema** y se re-sincroniza, con sus permisos
+**derivados del catálogo** (no una lista literal) para que **cualquier permiso nuevo del futuro le llegue solo**.
+Es el único donde eso conviene: significa «todos los permisos» y no hay nada que afinar.
+
+⚠️ **El filo que trae, dicho y no escondido:** si alguien vacía un perfil **del todo** desde la pantalla, el
+siguiente arranque se lo vuelve a llenar; dejarle **un solo permiso** sí se respeta. Es el precio de no poder
+distinguir «cascarón» de «lo vacié a propósito», y se eligió a favor de no dejar un perfil mudo sin avisar.
+
+**Y el cascarón importa porque existe de verdad:** 📐 **17 de los 18** roles funcionales de la Ruta
+Crítica (`seed-ruta-critica.ts`) se crean **sin un solo permiso**, para colgarles la responsabilidad de un
+proceso. ⚠️ **El 18º es la excepción y conviene decirla:** `Ventas` es **además** uno de los 9 roles de sistema,
+así que el upsert de la RC (`update: {}`) lo deja `esSistema: true` **con 85 permisos**. No afecta la conclusión
+—ningún perfil de puesto se llama `Ventas`— pero la premisa es «17 de 18», no «los 18». Dos
+de ellos —**«Habilitaciones»** y **«Entregas»**— se llaman **igual** que dos puestos de Daniel, y `Rol.nombre`
+es único ⇒ **son la misma fila**. Sin el arreglo, esos dos puestos nacían **mudos en `prueba`, en silencio**.
+Como el rol de la RC y el puesto **son la misma persona**, llenar ese cascarón es puramente aditivo. ⚠️ **Dos
+nombres más sólo se distinguen por el ACENTO** de un rol de la RC (`Producción`/`Produccion`,
+`Diseño Gráfico`/`Diseño Grafico`): se dejan como están —renombrar un rol de la RC dejaría huérfanas sus
+referencias a los procesos— y queda como fila para Daniel, no para el código.
+
+---
+
+#### (Post-F9.259) — 📐 15 DE LOS 134 PERMISOS NO GOBIERNAN NADA, y uno mentía en su descripción (1-oct-2026)
+
+**Hallazgo de la revisión independiente, reproducido por el lead con su propia medición** (referencias en
+`src/api`, `src/dominio` y `frontend/src/modulos`, **excluyendo pruebas** — un conteo que las incluya da falsos
+positivos, y al lead le pasó): **15 claves tienen CERO referencias en código de producción.** Son transcripción
+de `Accesos.csv` del sistema viejo que nunca se conectó a v2.
+
+`ordenes.modificar` · `ordenes.ver-costos` · `pedidos.modificar` · `pedidos.modificar-reales` ·
+`clientes.modificar` · `proveedores.modificar` · `etiquetas.modificar` · `produccion.corte-salidas` ·
+`produccion.entradas-maquila` · `ipt.clasificar-modelos` · `ipt.consultar-existencias` ·
+`ipt.modificar-movimientos` · `ipt.cantidades-negativas` · `rc.ver-botones` · `rc.fechas-retraso`
+
+⚠️ **El daño no es cosmético: varios puestos cargan llaves que no hacen nada, y eso llevó a cuatro
+afirmaciones falsas del lead** (todas corregidas en el entregable que Daniel revisa):
+- **Telas** se declaró «completo» y **hoy no puede recibir nada**: la pantalla se abre con `compras.recibir`
+  pero **todo lo que lista exige `compras.ver`**. *Recibir telas es literalmente su puesto.*
+- **Corte**: se dio por cerrada la duda del consumo de tela diciendo que la registra `produccion.corte-salidas`
+  «que ya tiene» — **esa clave está muerta**; lo que descuenta tela hacia una orden es `inventario-telas.mover`,
+  que a Corte se le negó. ⇒ **la pregunta sigue abierta y es de Daniel:** cuando el cortador acaba, ¿quién
+  teclea la salida?
+- **Producción**: se le ofreció quitarle `ordenes.modificar` «en una línea» — no había nada que quitar.
+- **Diseño Gráfico**: se dijo que `proveedores.modificar` era «la mitad de su trabajo» — está muerta, y lo real
+  es `proveedores.administrar`. ⇒ está bloqueado en **los tres** trabajos que lo definen, no en dos.
+
+**Y una descripción que mentía, corregida en este mismo cambio:** `ordenes.habilitacion` decía *«Capturar o
+modificar los avíos de la orden»* (transcripción del acceso #31 del Access) cuando gobierna **un solo `GET`**.
+Se corrigió porque desde el piso **vive dentro de un rol llamado «Consulta general»**, y un renglón que dice
+*capturar* dentro de un rol de consulta es un aviso engañoso en el sitio donde se toma la decisión. 📐 Verificado
+de punta a punta que `prueba` toma el texto nuevo **sola** en el próximo despliegue (se puso el texto falso en una
+base sembrada y se re-corrió el seed).
+
+**Lo que NO se hace:** no se tocan las 15 en esta fila. Sus **consecuencias** ya están cubiertas por las
+recomendaciones que Daniel revisa (darles la llave viva en lugar de la muerta). **Limpiar el catálogo** —quitarlas
+para que nadie vuelva a asignar algo que no hace nada— es fila aparte, y la recomendación del lead es que **puede
+esperar a después de arrancar**.

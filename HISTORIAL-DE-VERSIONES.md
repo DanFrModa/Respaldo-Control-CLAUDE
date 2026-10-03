@@ -71,6 +71,77 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.188 · 1-oct-2026 · **en prueba** — **Ya puedes repartir usuarios, y la gente ve lo operativo sin pedir permiso**
+
+> **La v0.188 cierra una fila del programa —la 0.243—** y es la primera que cambia **quién ve qué** en todo el
+> sistema. Trae dos cosas: tus 16 puestos existen ya como perfiles que puedes asignar, y el reparto de permisos
+> se dio vuelta: lo operativo se consulta por omisión, y lo que se niega es escribir, el dinero y los permisos
+> de excepción.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Tus 16 puestos ya existen y se los puedes asignar a la gente.** Director General, Gerente de Ventas,
+Desarrollo de Producto, Administración y Finanzas, Producción, Compras, Habilitaciones, Encargado de Telas,
+Encargado de Corte, Almacén de Producto Terminado, Entregas, Líder de Calidad, Supervisor de Calidad, Gestión
+Técnica, Diseño Gráfico y Auxiliar. Aparecen solos en Administración › Roles al desplegarse.
+
+**Y son TUYOS, no del sistema.** Les puedes cambiar los permisos desde la pantalla, renombrarlos o borrarlos, y
+**tus cambios ya no se borran en el siguiente despliegue** — que es lo que habría pasado con el diseño que
+llevábamos. El único que se queda «de fábrica» es Director General, a propósito: así cualquier permiso nuevo que
+se construya en el futuro te llega solo, sin que nadie se acuerde de dártelo.
+
+⭐ **Todo el mundo ve lo operativo, sin pedirle permiso a nadie.** Hay un perfil nuevo, **«Consulta general»**,
+con **16 permisos de consulta**, que se le asigna a cada persona además de su puesto: pedidos, el avance de
+producción, la ruta crítica con su catálogo de procesos, los avíos que lleva cada orden, y los catálogos de
+clientes, colores, tallas, temporadas, etiquetas de marca, almacenes, tipos de proceso, calidad, indicadores y
+los dos del precosteo. Con eso, **cada puesto pasa de unos 12 permisos a unos 25**, y el Auxiliar deja de ser una lista corta para ser *«ve todo lo
+operativo, no escribe nada»*.
+
+**Lo que NO está en ese piso, y es a propósito:** el **dinero** —costos, importes, márgenes, saldos, estados de
+cuenta, listas de precios, datos fiscales— que sigue restringido a quien tú decidas; y las **existencias e
+inventarios**, que son de quien mueve ese material. Y nadie escribe nada por estar en el piso: es sólo consulta.
+
+⚠️ **Y cinco catálogos que parecían obvios para el piso se quedaron fuera, porque filtraban precios:** telas,
+avíos, proveedores, modelos y órdenes. Los cinco devuelven cifras metidas dentro de otros datos —lo que pagas por
+una tela, la maquila base de un modelo, y en el caso de proveedores **el banco y el número de cuenta**— y taparlas
+es trabajo aparte. **No pierdes nada hoy:** tú ya les habías dado esas cinco a los puestos que las necesitan (las
+órdenes, a los 15; los modelos, a 13), así que el piso de 16 deja el promedio en 25 en lugar de 27. Entrarán al
+piso cuando sus cifras estén tapadas.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Vas a ver más renglones de los que esperas en Administración › Roles.** Son 41 en total, porque además de tus
+16 y del piso están los 9 del arranque viejo y 18 roles internos que usa la Ruta Crítica para saber quién
+responde por cada proceso. Dos cosas de ahí te van a chocar y las dejamos así a propósito: **«Producción» con acento y «Produccion» sin él**, y **«Diseño Gráfico» y «Diseño Grafico»**, son parejas distintas —la base distingue
+acentos— y juntarlas rompería las referencias de la Ruta Crítica a sus procesos. Y **«Habilitaciones» y
+«Entregas»** son **un solo renglón** que hace de puesto y de rol de la Ruta Crítica al mismo tiempo (es la misma
+persona, así que está bien), sólo que conservan la **descripción** de la Ruta Crítica: si te molesta, se corrige
+en un minuto desde la pantalla.
+
+**Hay 15 permisos del sistema que no hacen nada.** Son herencia del sistema viejo que nunca se conectó. No es
+nuevo —venían de antes— pero ahora está medido y dicho, porque hizo que varios puestos cargaran llaves inertes.
+Los que importan ya tienen su recomendación de cambio esperando tu sí o tu no.
+
+**Y un aviso de pantalla que decía una mentira, corregido:** un permiso prometía *«capturar o modificar los avíos
+de la orden»* y en realidad sólo deja consultarlos. Importaba porque ahora vive dentro de un perfil que se llama
+«Consulta general».
+
+### ⏳ Sigue pendiente o roto
+
+**Hay tres cosas que impiden trabajar completo a cuatro puestos**, y las tres esperan una decisión tuya o una pieza nueva:
+**Telas y Producción no pueden recibir una compra** (hay que partir en dos un permiso que hoy junta la consulta
+de órdenes de compra con la explosión del MRP); el **Supervisor de Calidad no puede levantar una auditoría**; y
+**Diseño Gráfico no puede meter artes** porque no existe ningún permiso de arte en el sistema — eso hay que
+construirlo.
+
+**Dos preguntas tuyas abiertas:** cuando el cortador acaba, ¿quién teclea la salida de tela? Y Producción, ¿debe
+poder meter fechas atrasadas en la ruta crítica, o sólo capturar al día (hoy serían los últimos 2 días)?
+
+🔑 **Y los pasos manuales, que el sistema no hace por ti.** El primero es el que enciende todo lo de arriba:
+**hay que asignarle a cada persona su puesto Y «Consulta general»** desde Administración › Usuarios. Los perfiles
+aparecen solos al desplegarse, pero **nadie queda asignado automáticamente**: mientras no lo hagas, el piso no
+existe para nadie. Y el segundo: **la contraseña del usuario `admin` sigue siendo la del arranque**. Esa cuenta se queda como cuenta técnica —lo decidiste así— y lleva las llaves de gobierno, así que cambiarla es urgente.
+
 ## 0.187 · 30-sep-2026 · **en prueba** — **Contestaste los 16 puestos, y al cruzarlos aparecieron cuatro cosas que hoy sólo podrías hacer tú**
 
 > **La v0.187 cierra una fila del programa —la 0.240— sin construir nada**, porque tu respuesta la disolvió. No

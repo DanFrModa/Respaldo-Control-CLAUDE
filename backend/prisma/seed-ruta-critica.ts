@@ -25,8 +25,13 @@ import type { PrismaClient } from '../src/datos/index.js';
  * Roles funcionales del sistema viejo (`RC_TipoUsuarios.csv`), con los NOMBRES EXACTOS del CSV
  * (sin acentos salvo "Diseño"). "Administrador" NO va aquí (ya lo siembra el seed de F0; se reúsa).
  * NO son `esSistema` (los puede editar la administración de roles). Idempotente por `nombre`.
+ *
+ * ⚠️ Se EXPORTA sólo para que las pruebas puedan CRUZAR estos nombres contra los perfiles de puesto
+ * de Daniel (`PERFILES_DE_PUESTO` en `prisma/seed.ts`): dos de ellos —«Habilitaciones» y
+ * «Entregas»— coinciden al carácter, y `Rol.nombre` es único, así que comparten fila. Cruzarlo a
+ * mano fue justo lo que no se hizo al escribir aquella lista.
  */
-const ROLES_FUNCIONALES_RC: string[] = [
+export const ROLES_FUNCIONALES_RC: string[] = [
   'Ventas',
   'Ingenieria del Producto',
   'Diseño',

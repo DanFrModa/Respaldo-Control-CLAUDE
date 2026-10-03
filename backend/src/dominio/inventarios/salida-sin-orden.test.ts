@@ -405,8 +405,10 @@ describe('⛔ el SEED siembra lo que la guarda exige (la cicatriz del despliegue
 
   it('⭐ «NADIE MÁS»: el permiso es del administrador y NINGÚN perfil operativo lo otorga', () => {
     // Daniel, 3-sep-2026: *«siempre autorizada sólo por mí. Nadie más»*. `SOLO_ADMINISTRADOR` es
-    // la forma de decirlo en el seed: lo llevan `Administrador` y `AdministracionDireccion` (los
-    // niveles 1 y 20 del viejo, que tienen el catálogo entero) y nadie más lo nombra.
+    // la forma de decirlo en el seed: lo llevan los perfiles de acceso total —`Administrador` y
+    // `AdministracionDireccion` (niveles 1 y 20 del viejo) y `Director General`, el perfil de puesto
+    // del dueño, los tres con el catálogo entero— y ningún otro rol de sistema lo nombra. Ninguno de
+    // los 15 perfiles de PUESTO lo lleva tampoco: Daniel lo reservó para sí y así quedó.
     const declarado = SOLO_ADMINISTRADOR.find((e) => e.clave === PERMISO_SALIDA_SIN_ORDEN);
     expect(
       declarado,
