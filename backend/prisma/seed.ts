@@ -176,7 +176,7 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  * «decidimos que es sólo del administrador, y por esto» de «a nadie se le ocurrió repartirlo». La
  * `razon` es obligatoria por el tipo, no por convención.
  *
- * ⚠️ **PERO OCHO DE ELLAS SÍ LAS REPARTE UN PERFIL DE PUESTO, y hay que leerlo bien.** Los 15
+ * ⚠️ **PERO ONCE DE ELLAS SÍ LAS REPARTE UN PERFIL DE PUESTO, y hay que leerlo bien.** Los 15
  * perfiles de {@link PERFILES_DE_PUESTO} **no son roles de sistema** (nacen `esSistema: false`, el
  * seed no los re-sincroniza y el dueño los edita desde la pantalla de Roles), así que no entran en
  * esta lista ni en la prueba de atribución — pero el seed **los crea con esas llaves dentro**:
@@ -184,13 +184,24 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  *  • `telas.administrar` y `avios.administrar` → «Desarrollo de Producto» (los avíos, también
  *    «Compras»);
  *  • `proveedores.administrar`, `terceros.administrar`, `terceros.fiscal`, `cxp.administrar`,
- *    `cxc.administrar` y `conceptos-pago.administrar` → «Administración y Finanzas».
+ *    `cxc.administrar` y `conceptos-pago.administrar` → «Administración y Finanzas» (los
+ *    proveedores, también «Compras»);
+ *  • `clientes.administrar` → «Gerente de Ventas»; `calidad.administrar-catalogo` → «Líder de
+ *    Calidad»; `rc.bandeja-completa` → «Producción».
  *
- * Las ocho eran **defaults del lead** («catálogo maestro: el `.ver` sí baja, el alta no»), no
- * reservas que Daniel hubiera pedido para sí. De las que él reservó con nombre y apellido
- * —`salida-material.registrar`, `pagos.corrida-armar`, `compras.desautorizar`, los cuatro poderes de
- * la fila 0.120 y el gobierno de usuarios/roles— **ningún perfil de puesto lleva ninguna** salvo el
- * del propio dueño ({@link PERFIL_DIRECTOR_GENERAL}, que lleva el catálogo completo).
+ * Las ocho primeras eran **defaults del lead** («catálogo maestro: el `.ver` sí baja, el alta no»),
+ * no reservas que Daniel hubiera pedido para sí. Las tres últimas —y `proveedores.administrar` para
+ * «Compras»— **las decidió él**, una por una, al contestar las recomendaciones del lead
+ * (§Post-F9.260 de `DECISIONES.md`, fila 0.250): `clientes.administrar` y `calidad.administrar-catalogo`
+ * con la advertencia delante (dan de alta y desactivan clientes; escriben los planes AQL), y
+ * `rc.bandeja-completa` porque la bandeja de Producción salía **vacía**. Es justo para lo que la fila
+ * 0.120 separó los cuatro poderes en renglones distintos: dar uno sin los otros.
+ *
+ * De las que él reservó con nombre y apellido —`salida-material.registrar`, `pagos.corrida-armar`,
+ * `compras.desautorizar`, los otros tres poderes de la fila 0.120 (`rc.capturar-cualquiera`,
+ * `compras.editar-autorizada`, `tipos-proceso.marcar-entrada-pt`) y el gobierno de usuarios/roles—
+ * **ningún perfil de puesto lleva ninguna** salvo el del propio dueño
+ * ({@link PERFIL_DIRECTOR_GENERAL}, que lleva el catálogo completo).
  */
 export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }[] = [
   // ── Administración del propio sistema (en el viejo, botón exclusivo de nivel ≤20, doc 00 §3.1) ──
@@ -210,20 +221,23 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
   { clave: 'almacenes.administrar', razon: 'Catálogo maestro: el `.ver` sí baja, el alta no.' },
   {
     clave: 'proveedores.administrar',
-    // 🤝 También lo lleva el perfil de puesto «Administración y Finanzas» (ver la nota ⚠️ de la
-    // cabecera de esta lista): eso es un rol EDITABLE del negocio, no un rol de sistema.
+    // 🤝 También lo llevan los perfiles de puesto «Administración y Finanzas» y «Compras» (éste por
+    // decisión de Daniel, §Post-F9.260) — ver la nota ⚠️ de la cabecera de esta lista: son roles
+    // EDITABLES del negocio, no roles de sistema.
     razon: 'Catálogo maestro; además absorbió maquileros y cortadores (D12/R15).',
   },
   { clave: 'temporadas.administrar', razon: 'Catálogo maestro (ADR-0007).' },
   { clave: 'etiquetas-marca.administrar', razon: 'Catálogo maestro (ADR-0007).' },
   { clave: 'colores.administrar', razon: 'Catálogo maestro (ADR-0007).' },
   { clave: 'tallas.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
+  // 🤝 También lo lleva el perfil de puesto «Gerente de Ventas» (Daniel, §Post-F9.260): rol EDITABLE.
   { clave: 'clientes.administrar', razon: 'Catálogo maestro estructurado (F1-E2).' },
   // 🤝 `telas.administrar` y `avios.administrar` los lleva además «Desarrollo de Producto» (y los
   // avíos, también «Compras») — perfiles de puesto EDITABLES, no roles de sistema.
   { clave: 'telas.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
   { clave: 'avios.administrar', razon: 'Catálogo maestro de materiales (F1-E3).' },
   { clave: 'tipos-proceso.administrar', razon: 'Catálogo maestro de producción (F3-E1).' },
+  // 🤝 También lo lleva el perfil de puesto «Líder de Calidad» (Daniel, §Post-F9.260): rol EDITABLE.
   {
     clave: 'calidad.administrar-catalogo',
     razon: 'Defectos, tipos de producto y planes AQL son catálogo maestro (F6-E1).',
@@ -301,6 +315,8 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       'que NO es de mis roles). Hereda el reparto que tenía colgado de `roles.administrar` hasta ' +
       'la fila 0.120; se reparte por puesto cuando Daniel arme los perfiles reales.',
   },
+  // 🤝 También lo lleva el perfil de puesto «Producción» (Daniel, §Post-F9.260): sin ella su bandeja
+  // de la RC salía VACÍA, porque un puesto nace sin roles funcionales de la RC. Rol EDITABLE.
   {
     clave: 'rc.bandeja-completa',
     razon:
@@ -947,9 +963,21 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **306 asignaciones**: las 134 del catálogo para `Director General` y 172 repartidas entre los
+ * **317 asignaciones**: las 134 del catálogo para `Director General` y 183 repartidas entre los
  * otros 15. Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
  * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
+ *
+ * *(Eran 306 = 134 + 172 en su primera revisión. Las **11 llaves de más** las agregó él mismo al
+ * contestar las 17 recomendaciones del lead — §Post-F9.260 de `DECISIONES.md`, fila 0.250—: 11 que
+ * aceptó y 6 que rechazó. Las 6 rechazadas NO están en ningún perfil y una prueba lo exige:
+ * `indicadores.ip-productividad`/`-confiabilidad`/`-muestrarios` para Desarrollo, `costos.ver` y
+ * `edr.ver` para Administración y Finanzas, y `rc.fecha-libre-cumplimiento` para Producción.)*
+ *
+ * ⚠️ **Agregarlas aquí NO las lleva a una base donde los perfiles ya existen** (como `prueba`): el
+ * seed no pisa un perfil de puesto que ya tenga permisos (ver {@link sembrarPerfilesDePuesto}). Esta
+ * lista es lo que nace en una base limpia; a los perfiles ya sembrados las 11 las lleva la migración
+ * `20261003120000_las_11_llaves_de_daniel`, que SÓLO AGREGA (respeta lo que el dueño movió en
+ * pantalla) y no toca un rol con cero permisos, porque ése lo llena entero este seed.
  *
  * ## 🔴 LOS 16 SE SIEMBRAN POR DOS CAMINOS DISTINTOS, Y LA DIFERENCIA ES EL PUNTO
  *
@@ -1057,6 +1085,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'Gerencia de ventas: clientes, pedidos y listas de precios, con los importes del pedido',
     permisos: [
       'avios.ver',
+      'clientes.administrar',
       'clientes.modificar',
       'clientes.ver',
       'colores.ver',
@@ -1141,6 +1170,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'Producción: corte, envío y recibo de maquila, empaque y captura de la Ruta Crítica',
     permisos: [
       'compras.recibir',
+      'compras.ver',
       'inventario-pt.ver',
       'inventario-telas.mover',
       'inventario-telas.ver',
@@ -1156,6 +1186,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'produccion.envio',
       'produccion.recibo',
       'produccion.wip-ver',
+      'rc.bandeja-completa',
       'rc.capturar',
       'rc.fechas-retraso',
       'rc.ruta-ver',
@@ -1172,12 +1203,14 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'avios.administrar',
       'avios.ver',
       'compras.administrar',
+      'compras.cancelar',
       'compras.ver',
       'inventario-avios.ver',
       'inventario-telas.ver',
       'modelos.ver',
       'notas.ver',
       'ordenes.ver',
+      'proveedores.administrar',
       'proveedores.modificar',
       'proveedores.ver',
       'telas.ver',
@@ -1190,6 +1223,8 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
     permisos: [
       'almacenes.ver',
       'avios.ver',
+      'compras.recibir',
+      'compras.ver',
       'inventario-avios.mover',
       'inventario-avios.ver',
       'modelos.ver',
@@ -1208,6 +1243,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
     permisos: [
       'almacenes.ver',
       'compras.recibir',
+      'compras.ver',
       'inventario-telas.mover',
       'inventario-telas.ver',
       'modelos.ver',
@@ -1248,6 +1284,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'ipt.consultar-existencias',
       'modelos.ver',
       'ordenes.ver',
+      'produccion.empaque',
       'produccion.recibo',
     ],
   },
@@ -1273,6 +1310,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
     descripcion: 'Líder de calidad: genera y actualiza las auditorías de calidad',
     permisos: [
       'calidad.actualizar-auditorias',
+      'calidad.administrar-catalogo',
       'calidad.generar-auditorias',
       'calidad.ver',
       'modelos.ver',
@@ -1288,6 +1326,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
     descripcion: 'Supervisor de calidad: actualiza las auditorías de calidad ya generadas',
     permisos: [
       'calidad.actualizar-auditorias',
+      'calidad.generar-auditorias',
       'calidad.ver',
       'modelos.ver',
       'ordenes.ver',
@@ -1331,7 +1370,7 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 306 marcas que él revisó.
+ * un puesto**, y meterlo aquí falsearía las 317 marcas que él revisó.
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1437,6 +1476,10 @@ export const PERMISOS_DE_SALDOS_Y_MOVIMIENTOS: readonly ClavePermiso[] = [
  * `proveedores.ver` 8, `telas.ver` 7, `avios.ver` 5. Los permisos efectivos promedio por puesto
  * (su puesto ∪ el piso) bajan de **26.9 a 25.1**: menos de dos permisos. **El piso valía por las
  * llaves que él repartió POCO, y las que filtran dinero son justo las que repartió MUCHO.**
+ * *(Medido con los puestos de entonces. Con las 11 llaves que el dueño agregó en §Post-F9.260 —fila
+ * 0.250, ninguna de ellas del piso ni de estas cinco— la misma cuenta da **27.6 → 25.8**: la
+ * diferencia que costó sacarlas sigue siendo menos de dos permisos, y los conteos por llave de
+ * arriba no se movieron.)*
  */
 export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
   'telas.ver',
@@ -1511,7 +1554,7 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * **No adelgaza los 15 perfiles de puesto.** Siguen con las llaves que el dueño marcó aunque **12 de
  * las 16 del piso** estén también en algún puesto: los permisos efectivos son la **UNIÓN** de los
  * roles del usuario (`comun/permisos.ts`), así que la redundancia no cambia el comportamiento, las
- * 172 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
+ * 183 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
  * llave la conserva.
  *
  * 🔑 **Y eso es lo que hace inocuo recortar el piso.** Las cuatro llaves de saldos y movimientos que
