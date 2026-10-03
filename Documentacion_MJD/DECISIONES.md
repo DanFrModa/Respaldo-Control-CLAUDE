@@ -18237,3 +18237,66 @@ base sembrada y se re-corrió el seed).
 recomendaciones que Daniel revisa (darles la llave viva en lugar de la muerta). **Limpiar el catálogo** —quitarlas
 para que nadie vuelva a asignar algo que no hace nada— es fila aparte, y la recomendación del lead es que **puede
 esperar a después de arrancar**.
+
+---
+
+#### (Post-F9.260) — LAS 17 DECISIONES DE DANIEL SOBRE EL REPARTO DE PERMISOS, y lo que sale de dos de sus «no» (1-3 oct-2026)
+
+**Dónde se capturaron:** en la página de revisión **https://claude.ai/artifact/5QGdWL8xFMq5WctzzZh8d2**, colección
+`decisiones` de su base (16 decisiones, leídas el 3-oct y sin cambios entre dos lecturas), más **una por chat**
+(cancelar OC). Son sus respuestas a las **17 recomendaciones vivas** del lead, que quedaron de 25 después de que
+el piso de lectura disolviera 8 (§Post-F9.257(e)). ⚠️ **La página es la interfaz, no la fuente:** esta sección
+es la que manda, y existe para que una sesión nueva no tenga que saber que la página existe.
+
+**Las 11 que ACEPTÓ:**
+
+| Puesto | Permiso | Qué destraba |
+|---|---|---|
+| Encargado de Telas | `compras.ver` | 🔴 **hoy no puede recibir nada**: la pantalla de recepción se abre con `compras.recibir` pero todo lo que lista exige `compras.ver` |
+| Producción | `compras.ver` | 🔴 mismo caso exacto |
+| Supervisor de Calidad | `calidad.generar-auditorias` | 🔴 **quien audita no podía levantar la auditoría** — sólo actualizarla |
+| Habilitaciones | `compras.recibir` + `compras.ver` | recibir las compras de avíos, que es lo que lleva |
+| Líder de Calidad | `calidad.administrar-catalogo` | escribir **cuatro** catálogos de calidad, **incluidos los planes AQL** (aceptó con esa advertencia delante) |
+| Gerente de Ventas | `clientes.administrar` | la llave que tenía (`clientes.modificar`) no gobierna nada. ⚠️ Ésta **también da de alta y desactiva clientes**, y aceptó con esa advertencia delante |
+| Compras | `proveedores.administrar` | mismo caso: su `proveedores.modificar` no gobierna nada |
+| Compras | `compras.cancelar` | ver (a) abajo |
+| Producción | `rc.bandeja-completa` | su bandeja de la Ruta Crítica sale **vacía** (no parcial) porque un puesto nace sin roles funcionales de la RC |
+| Almacén de Producto Terminado | `produccion.empaque` | ⇒ **contesta la pregunta abierta: el almacén empaca** |
+
+**Las 6 que RECHAZÓ:** los tres indicadores de Ingeniería de Producto para Desarrollo
+(`indicadores.ip-productividad`, `-confiabilidad`, `-muestrarios` — le advertí que son de **operar**, no de ver);
+`costos.ver` y `edr.ver` para Administración y Finanzas; y `rc.fecha-libre-cumplimiento` para Producción.
+
+**(a) Cancelar OC, con su condición — textual:** *«Sí puede mientras no se haya recibido el material.»*
+📐 **Medido: el código YA lo hace cumplir, y bien.** `cancelarOC` (`dominio/compras/ordenes-compra.ts`) cuenta las
+`RecepcionCompra` activas y se niega si hay alguna —*«el conteo es la verdad y cubre cualquier desfase»*, no se fía
+del estatus— más una defensa adicional si el estatus quedó en `recibida_*`. Y si se reversan todas las recepciones,
+la OC vuelve a `autorizada` y entonces sí se puede cancelar. ⇒ **basta con darle la llave**: la condición es
+estructural, no de confianza.
+
+**(b) 🔴 Lo que sale de rechazar `edr.ver`: Administración se queda SIN la pantalla de facturación.** Su «no» es
+coherente con su regla del dinero —esa llave abre el estado de resultados completo, a costo actual, con utilidad
+bruta—, pero 📐 **es la misma llave que abre la pantalla Ventas, la de facturación por modelo** (`catalogo.ts`,
+ruta `/ventas`). Y él dijo de Lupita que *«eventualmente generará las facturas»*. No eligió mal: **la llave hace
+dos cosas que no deberían ir juntas.** ⇒ **fila 0.251**.
+
+**(c) Lo que sale de aceptar `compras.ver` completo: la 0.245 deja de bloquear.** Esa fila iba a partir `compras.ver`
+porque sus 16 lecturas estaban presas de 2 escrituras, y por eso Telas y Producción no podían recibir. Al darles la
+llave completa, **ya pueden recibir sin partir nada**. ⚠️ **El efecto colateral, dicho:** la misma llave les deja
+**correr y guardar la explosión del MRP** de una orden. En Producción tiene sentido; en Telas y Habilitaciones es de
+más. ⇒ la 0.245 baja a «puede esperar», como higiene.
+
+**(d) Producción captura la ruta crítica sólo al día.** Al rechazar `rc.fecha-libre-cumplimiento`, Producción puede
+fechar un cumplimiento **sólo dentro de los últimos 2 días y nunca a futuro** (el 2 sale literal del Access viejo).
+Lo decidió con la explicación delante, incluida la de que `rc.fechas-retraso` —que ya le había dado— **no gobierna
+nada** (§Post-F9.259).
+
+**(e) Sigue abierta una pregunta, y es de Daniel:** cuando el cortador acaba, **¿quién teclea la salida de tela?**
+Si es Corte, necesita `inventario-telas.mover`; si es Telas o Producción, que ya la tienen, no hay nada que hacer
+(§Post-F9.259).
+
+**Lo que falta para que esto exista:** sembrarlo. Es la **fila 0.250**, y es chica — se reparten permisos, no se
+construyen funciones. Como los 15 puestos son roles `esSistema: false` que el seed **no pisa si ya tienen
+permisos**, ⚠️ **agregar las llaves a la definición del seed NO llega a `prueba`** (los roles ya existen allí con
+permisos). Hay que decidir cómo se aplican —en pantalla, o con un paso explícito—, y eso es lo primero que tiene que
+resolver quien construya la 0.250.
