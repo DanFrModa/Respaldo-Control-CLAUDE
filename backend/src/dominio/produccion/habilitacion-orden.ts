@@ -61,6 +61,8 @@ const TOLERANCIA = 1e-6;
 const seleccionOrdenHabilitacion = {
   id: true,
   folio: true,
+  // 0.226b: la pantalla de surtido avisa y apaga «Pasar a nota» con la orden CERRADA.
+  cerradaEn: true,
   idEmpresa: true,
   idModelo: true,
   idMaquilero: true,
@@ -281,6 +283,7 @@ export async function habilitacionOrden(
   return {
     idOrden: orden.id,
     folioOrden: Number(orden.folio),
+    ordenCerrada: orden.cerradaEn !== null,
     idModelo: orden.idModelo,
     modelo: orden.modelo.codigo,
     totalPiezas,

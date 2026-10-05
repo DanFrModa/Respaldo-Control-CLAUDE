@@ -27,6 +27,8 @@ import {
   ETIQUETA_ESTADO_DESARROLLO,
   VARIANTE_ESTADO_DESARROLLO,
 } from '@/modulos/desarrollo/estados';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 
 /** Badge del estado derivado de un desarrollo. */
 function BadgeEstadoDesarrollo({ estado }: { estado: EstadoDesarrollo }): React.JSX.Element {
@@ -75,6 +77,11 @@ export function SeccionDesarrolloOrden({
   const ligar = useLigarOrden();
   const quitar = useQuitarLiga();
   const [confirmarQuitar, setConfirmarQuitar] = useState(false);
+  // ⭐ 0.226b (C5 de §Post-F9.261, default BLOQUEAR): ligar o quitar la liga de una orden CERRADA
+  // es modificarla; el servidor lo rechaza (A1). El expediente se consulta igual.
+  const cerrada = estaCerrada(orden);
+  const avisoCerrada =
+    puedeAdministrar && cerrada ? <AvisoOrdenCerrada folios={[orden.folio]} /> : null;
 
   function alLigar(idDesarrollo: number, precio: number | null): void {
     ligar.mutate(
@@ -203,11 +210,13 @@ export function SeccionDesarrolloOrden({
           </div>
         ) : null}
 
+        {avisoCerrada}
         {puedeAdministrar ? (
           <Button
             variant="outline"
             size="sm"
             onClick={() => setConfirmarQuitar(true)}
+            disabled={cerrada}
             data-testid="quitar-liga-desarrollo"
           >
             <Link2Off aria-hidden />
@@ -281,11 +290,12 @@ export function SeccionDesarrolloOrden({
         </RejillaCampos>
       </div>
 
+      {avisoCerrada}
       {puedeAdministrar ? (
         <Button
           size="sm"
           onClick={() => alLigar(candidato.idDesarrollo, candidato.precioSugeridoPedido)}
-          disabled={ligar.isPending}
+          disabled={ligar.isPending || cerrada}
           data-testid="ligar-desarrollo"
         >
           <Link2 aria-hidden />

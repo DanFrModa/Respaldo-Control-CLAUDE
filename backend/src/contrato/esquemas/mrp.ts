@@ -335,6 +335,12 @@ export const esquemaOrdenExplosionada = z
   .object({
     idOrden: z.number().int().describe('Orden de producción.'),
     folio: z.number().int().describe('Folio de la orden.'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b (§Post-F9.244): ¿la orden está CERRADA? Se explota igual (decisión 3: marca, no ' +
+          'esconde), pero no se le asigna proveedor ni color de tela (la pantalla lo avisa antes).',
+      ),
     idModelo: z.number().int().describe('Modelo de la orden.'),
     modelo: z.string().describe('Código del modelo (para la UI).'),
     totalPiezas: z.number().int().describe('Σ piezas color×talla de ESA orden.'),

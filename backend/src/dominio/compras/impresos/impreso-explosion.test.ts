@@ -35,6 +35,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
       {
         idOrden: 50,
         folio: 1001,
+        ordenCerrada: false,
         idModelo: 9,
         modelo: 'A-100',
         totalPiezas: 30,

@@ -33,6 +33,7 @@ import {
   esquemaListarOrdenes,
   esquemaOrdenCancelarCuerpo,
   esquemaOrdenCerrarCuerpo,
+  esquemaOrdenPreviaCierre,
   esquemaOrdenComentarioCuerpo,
   esquemaOrdenCopiarMatrizCuerpo,
   esquemaOrdenCrear,
@@ -59,7 +60,11 @@ import {
   listarOrdenes,
   obtenerOrden,
 } from '../../dominio/produccion/ordenes.js';
-import { cerrarOrden, reabrirOrden } from '../../dominio/produccion/cierre-orden.js';
+import {
+  cerrarOrden,
+  previaCierreOrden,
+  reabrirOrden,
+} from '../../dominio/produccion/cierre-orden.js';
 import {
   actualizarPreciosOrden,
   listarEventosPrecioOrden,
@@ -254,6 +259,25 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return cerrarOrden(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐ 0.226b (C8): la PREVIA del cierre — el producto terminado que todavía queda etiquetado con la
+  // orden, para que el diálogo de cerrar AVISE antes (no bloquea). Mismo permiso que cerrar.
+  app.route({
+    method: 'GET',
+    url: '/ordenes/:id/previa-cierre',
+    preHandler: app.conPermiso('ordenes.cerrar'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Lo que conviene saber antes de cerrar una orden (producto terminado que queda)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaOrdenPreviaCierre, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return previaCierreOrden(sesion, request.params.id);
     },
   });
 

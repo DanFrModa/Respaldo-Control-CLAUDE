@@ -70,6 +70,12 @@ export const esquemaHabilitacionOrden = z
   .object({
     idOrden: z.number().int().describe('Orden de producción.'),
     folioOrden: z.number().int().describe('Folio de la orden.'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b (§Post-F9.244): ¿la orden está CERRADA? Entonces se consulta, pero no se le pasan ' +
+          'avíos a una nota de salida (la pantalla lo avisa antes).',
+      ),
     idModelo: z.number().int().describe('Modelo de la orden.'),
     modelo: z.string().describe('Código del modelo.'),
     totalPiezas: z

@@ -1,5 +1,5 @@
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -1288,6 +1288,29 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
 
     const [args] = asignarMutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
     expect(args.cuerpo).not.toHaveProperty('precio');
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA avisa y no deja asignar proveedor (abierta, sí)', async () => {
+    const usuario = userEvent.setup();
+    const base = explosionDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: { ...base, ordenes: base.ordenes.map((o) => ({ ...o, ordenCerrada: true })) },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    // Se explota y se consulta (decisión 3: marca, no esconde), con el aviso arriba.
+    expect(screen.getAllByTestId('aviso-orden-cerrada')[0]).toHaveTextContent(
+      /La orden 7 está cerrada/,
+    );
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    expect(screen.getByTestId('exp-guardar-proveedor')).toBeDisabled();
+    expect(asignarMutateMock).not.toHaveBeenCalled();
   });
 
   it('⭐ si el proveedor propuesto está DE BAJA, la pantalla SÍ ofrece reasignarlo', async () => {
@@ -3562,6 +3585,26 @@ describe('ExplosionMaterialesPagina — V1-E3x: proveedor a varios de un golpe (
     });
   });
 
+  it('⭐ 0.226b: en BLOQUE, la orden CERRADA se queda fuera y se dice (si sólo era ella, apagado)', async () => {
+    const usuario = userEvent.setup();
+    const base = explosionConDosHuecos();
+    useExplosionMock.mockReturnValue({
+      data: { ...base, ordenes: base.ordenes.map((o) => ({ ...o, ordenCerrada: true })) },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    await usuario.click(screen.getByTestId('exp-bloque-todos'));
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    expect(screen.getByTestId('aviso-orden-cerrada-bloque')).toHaveTextContent(/orden 7/);
+    expect(screen.getByTestId('exp-bloque-asignar')).toBeDisabled();
+    expect(bloqueMutateMock).not.toHaveBeenCalled();
+  });
+
   it('sin nada marcado el botón queda apagado (no se manda un acto vacío)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
@@ -4041,6 +4084,27 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     const bloqueado = screen.getByTestId('exp-color-bloqueado');
     expect(bloqueado).toHaveTextContent('DES-AUTORIZAR');
     expect(bloqueado).toHaveTextContent('#812');
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA el color de su tela no se dice (y se avisa)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, idTelaColor: 77, telaColor: 'Grana 7700' }),
+      ]),
+    ]);
+    const base = explosionConTela({
+      idTelaColor: 77,
+      telaColor: 'Grana 7700',
+      idProveedorSugerido: 11,
+    });
+    await abrirElBloqueDeColor({
+      ...base,
+      ordenes: base.ordenes.map((o) => ({ ...o, ordenCerrada: true })),
+    });
+    expect(screen.getByTestId('exp-color-select')).toBeDisabled();
+    expect(
+      within(screen.getByTestId('exp-forma-color')).getByTestId('aviso-orden-cerrada'),
+    ).toBeInTheDocument();
   });
 
   it('con la OC en BORRADOR el campo sigue abierto (ahí no hay compromiso con nadie)', async () => {

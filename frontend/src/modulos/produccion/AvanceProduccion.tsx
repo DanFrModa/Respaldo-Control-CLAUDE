@@ -48,6 +48,7 @@ import { CLAVE_WIP, useWipOrden } from '@/api/wip';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { claveCelda, MatrizColorTalla } from '@/components/dominio/MatrizColorTalla';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { StepperEtapas, type PasoEtapa } from '@/components/dominio/StepperEtapas';
 import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ import { useDebounce } from '@/lib/useDebounce';
 import { type ClaveEtapaAvance } from './etapas-avance';
 import { ejesDeOrden, ejesDeOrdenPlegados, piezasRecibibles } from './matriz-orden';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -362,6 +364,11 @@ export function AvanceProduccion({
   const esEtapaEntrega = etapaActiva === 'entrega-cliente';
   const entregas = useEntregasOrden(idOrden, esEtapaEntrega);
 
+  // ⭐ 0.226b (§Post-F9.244): la orden CERRADA se consulta libre (stepper, listas, impresos) pero no
+  // admite movimientos: se apagan los botones que abren una captura —y los atajos a inventario, que
+  // llevan a capturar contra ella— y se avisa ARRIBA, para que nadie llene la matriz y se entere al
+  // guardar. El servidor rechaza igual (A1).
+  const cerrada = estaCerrada(orden.data);
   const pasos = wip.data === undefined ? null : pasosDesdeWip(wip.data);
   const definicion = ETAPAS.find((e) => e.clave === etapaActiva) ?? {
     clave: 'corte' as const,
@@ -443,6 +450,10 @@ export function AvanceProduccion({
             <p className="text-sm text-muted-foreground">Cargando avance…</p>
           )}
 
+          {cerrada && orden.data !== undefined ? (
+            <AvisoOrdenCerrada folios={[orden.data.folio]} />
+          ) : null}
+
           {/* Etapa activa: encabezado + captura + lista de movimientos. */}
           <section className="rounded-xl border bg-card">
             <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
@@ -486,6 +497,7 @@ export function AvanceProduccion({
                       },
                     });
                   }}
+                  disabled={cerrada}
                   data-testid="avance-descargar-tela"
                 >
                   <Scissors aria-hidden />
@@ -516,6 +528,7 @@ export function AvanceProduccion({
                       state: { idCortador: proveedorEnCaptura },
                     });
                   }}
+                  disabled={cerrada}
                   data-testid="avance-traspasar-tela"
                 >
                   <Scissors aria-hidden />
@@ -531,6 +544,7 @@ export function AvanceProduccion({
                       : 'ml-auto',
                   )}
                   onClick={() => setCapturaAbierta((v) => !v)}
+                  disabled={cerrada}
                   data-testid="avance-abrir-captura"
                 >
                   <Plus aria-hidden />
@@ -554,7 +568,7 @@ export function AvanceProduccion({
               </div>
             ) : null}
 
-            {capturaAbierta && orden.data !== undefined && wip.data !== undefined ? (
+            {capturaAbierta && !cerrada && orden.data !== undefined && wip.data !== undefined ? (
               esEtapaEntrega ? (
                 <CapturaEntregaCliente
                   orden={orden.data}
@@ -589,7 +603,7 @@ export function AvanceProduccion({
                 entregas={entregas.data?.entregas ?? []}
                 cargando={entregas.isPending}
                 puedeImprimir={tienePermiso('produccion.wip-ver')}
-                puedeCancelar={tienePermiso('produccion.cancelar')}
+                puedeCancelar={tienePermiso('produccion.cancelar') && !cerrada}
                 alCancelar={setACancelar}
               />
             ) : (
@@ -601,7 +615,7 @@ export function AvanceProduccion({
                 }
                 cargando={etapas.isPending}
                 etiquetaEtapa={definicion.etiqueta}
-                puedeCancelar={tienePermiso('produccion.cancelar')}
+                puedeCancelar={tienePermiso('produccion.cancelar') && !cerrada}
                 alCancelar={setACancelar}
               />
             )}

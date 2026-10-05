@@ -30,6 +30,7 @@ function crearAuditoria(): Auditoria {
     idEmpresa: 1,
     idOrden: 3,
     folioOrden: 100,
+    ordenCerrada: false,
     codigoModelo: 'A-100',
     idMaquilero: 5,
     maquilero: 'Maquila SA',
@@ -139,5 +140,33 @@ describe('CapturaAuditoriaPagina', () => {
     renderCaptura(estadoSesionDePrueba(['calidad.ver']));
     expect(screen.queryByTestId('auditoria-agregar-defecto')).toBeNull();
     expect(screen.queryByTestId('reclasif-sentido')).toBeNull();
+  });
+});
+
+describe('⭐ 0.226b — la orden auditada CERRADA apaga la captura (§Post-F9.244)', () => {
+  it('cerrada: avisa, apaga «Guardar» y las fallas, y no ofrece reclasificar', () => {
+    auditoriaResult = {
+      data: { ...crearAuditoria(), ordenCerrada: true },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderCaptura();
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 100 está cerrada/,
+    );
+    expect(screen.getByTestId('auditoria-guardar')).toBeDisabled();
+    expect(screen.getByTestId('auditoria-fallas-1')).toBeDisabled();
+    expect(screen.queryByTestId('auditoria-agregar-defecto')).toBeNull();
+    expect(screen.queryByTestId('reclasif-sentido')).toBeNull();
+  });
+
+  it('abierta: sin aviso, y la captura y la reclasificación siguen vivas', () => {
+    renderCaptura();
+
+    expect(screen.queryByTestId('aviso-orden-cerrada')).toBeNull();
+    expect(screen.getByTestId('auditoria-guardar')).toBeEnabled();
+    expect(screen.getByTestId('reclasif-sentido')).toBeInTheDocument();
   });
 });

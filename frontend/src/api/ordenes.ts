@@ -23,6 +23,7 @@ import type {
   OrdenesPagina,
   OrdenesQuery,
   OrdenMatriz,
+  OrdenPreviaCierre,
   OrdenReferencias,
 } from './tipos';
 
@@ -62,6 +63,17 @@ async function listarOrdenes(query: OrdenesQuery): Promise<OrdenesPagina> {
 /** Obtiene una orden por id (encabezado + matriz + referencias + comentarios). */
 async function obtenerOrden(id: number): Promise<Orden> {
   const { data, error } = await api.GET('/api/ordenes/{id}', { params: { path: { id } } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** ⭐ 0.226b (C8): la previa del cierre de UNA orden (producto terminado que queda). */
+async function obtenerPreviaCierre(id: number): Promise<OrdenPreviaCierre> {
+  const { data, error } = await api.GET('/api/ordenes/{id}/previa-cierre', {
+    params: { path: { id } },
+  });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -189,6 +201,23 @@ export function useOrden(id: number | undefined): UseQueryResult<Orden, ErrorDeA
     queryKey: claveOrden(id ?? 0),
     queryFn: () => obtenerOrden(id as number),
     enabled: id !== undefined,
+  });
+}
+
+/**
+ * ⭐ 0.226b (C8): la previa del cierre — cuántas piezas de PT siguen etiquetadas con la orden. Se
+ * pide SÓLO con el diálogo de cerrar abierto (`habilitado`): es un aviso, no un dato de la ficha. Sin
+ * caché larga (`staleTime: 0`): el aviso tiene que contar lo de AHORA.
+ */
+export function usePreviaCierreOrden(
+  id: number | undefined,
+  habilitado: boolean,
+): UseQueryResult<OrdenPreviaCierre, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_ORDENES, 'previa-cierre', id ?? 0],
+    queryFn: () => obtenerPreviaCierre(id as number),
+    enabled: id !== undefined && habilitado,
+    staleTime: 0,
   });
 }
 

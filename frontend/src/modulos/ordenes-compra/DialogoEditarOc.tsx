@@ -24,6 +24,8 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { capturaDesdeOc, renglonApi, renglonVacio, type RenglonOcCaptura } from './captura';
 import { EditorLineasOc } from './EditorLineasOc';
 
@@ -191,6 +193,28 @@ export function DialogoEditarOc({
       setRenglones([renglonVacio()]);
     }
   }, [abierto, oc]);
+
+  /**
+   * ⭐ 0.226b (§Post-F9.244): las órdenes CERRADAS que tocan los renglones. No se le compra a una
+   * orden cerrada (el servidor rechaza la OC, A1): se avisa ARRIBA de los renglones y se apaga el
+   * guardar hasta quitarlos. Se sabe por la orden de la lista (`estado`) y, en una OC ya guardada,
+   * por el `ordenCerrada` de cada renglón (por si su orden no viene en la página de órdenes).
+   */
+  const foliosCerrados = useMemo(() => {
+    const cerradas = new Map<number, number | string>();
+    for (const o of ordenes.data?.datos ?? []) {
+      if (estaCerrada(o)) cerradas.set(o.id, Number(o.folio));
+    }
+    for (const l of oc?.lineas ?? []) {
+      if (l.ordenCerrada && l.idOrden !== null) cerradas.set(l.idOrden, l.folioOrden ?? l.idOrden);
+    }
+    const folios: (number | string)[] = [];
+    for (const r of renglones) {
+      const folio = r.idOrden === null ? undefined : cerradas.get(r.idOrden);
+      if (folio !== undefined) folios.push(folio);
+    }
+    return [...new Set(folios)];
+  }, [renglones, ordenes.data, oc]);
 
   function confirmar(): void {
     if (idProveedor === null) {
@@ -373,6 +397,13 @@ export function DialogoEditarOc({
             </Field>
           </div>
 
+          {!soloLectura && foliosCerrados.length > 0 ? (
+            <AvisoOrdenCerrada
+              folios={foliosCerrados}
+              detalle="Quita sus renglones para poder guardar la orden de compra."
+            />
+          ) : null}
+
           {/* Renglones */}
           <div>
             <h3 className="mb-2 text-sm font-medium text-muted-foreground">Renglones</h3>
@@ -406,7 +437,7 @@ export function DialogoEditarOc({
             <Button
               type="button"
               onClick={confirmar}
-              disabled={guardando || idProveedor === null}
+              disabled={guardando || idProveedor === null || foliosCerrados.length > 0}
               data-testid="confirmar-oc"
             >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}

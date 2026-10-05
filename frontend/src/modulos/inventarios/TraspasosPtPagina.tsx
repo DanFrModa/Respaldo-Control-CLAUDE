@@ -17,6 +17,7 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
@@ -130,6 +131,11 @@ export function TraspasosPtPagina(): React.JSX.Element {
   const bucketValido =
     ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
   const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
+  // ⭐ 0.226b (§Post-F9.244): el bucket elegido es de una orden CERRADA ⇒ sus piezas no se mueven
+  // (el servidor lo rechaza, A1). Se avisa junto al selector y se apaga el guardar.
+  const opcionCerrada = opcionesOrden.find(
+    (o) => o.ordenCerrada === true && String(o.idOrden) === ordenElegida,
+  );
   const idOrdenElegida = aIdOrden(ordenElegida);
 
   // Disponible por artículo DENTRO del bucket elegido: el aviso de sobre-traspaso tiene que
@@ -234,6 +240,7 @@ export function TraspasosPtPagina(): React.JSX.Element {
   const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
     puedeMover &&
+    opcionCerrada === undefined &&
     idAlmacenOrigen !== '' &&
     idAlmacenDestino !== '' &&
     !mismoAlmacen &&
@@ -420,6 +427,12 @@ export function TraspasosPtPagina(): React.JSX.Element {
                   }
                   testid="traspaso-orden"
                 />
+                {opcionCerrada !== undefined ? (
+                  <AvisoOrdenCerrada
+                    folios={[opcionCerrada.folioOrden ?? opcionCerrada.idOrden ?? '—']}
+                    className="sm:col-span-2"
+                  />
+                ) : null}
                 <Field data-invalid={!motivoOk}>
                   <FieldLabel htmlFor="traspaso-motivo">Motivo (obligatorio)</FieldLabel>
                   <Input

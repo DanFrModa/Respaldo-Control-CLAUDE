@@ -483,6 +483,43 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
   });
 
+  it('⭐ 0.226b: el bucket de una orden CERRADA se ofrece MARCADO; elegirlo avisa y apaga guardar', async () => {
+    useExistenciasPtMock.mockImplementation((_query: Record<string, unknown>, hab?: boolean) => {
+      if (hab === false) return SIN_DATOS;
+      return {
+        ...EXISTENCIAS_SALIDA,
+        data: {
+          filas: [{ ...fila(55, 9001, 20), ordenCerrada: true }, fila(null, null, 6)],
+          totalExistencia: 26,
+        },
+      };
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+    // Informativo, NUNCA un filtro: la orden cerrada sigue en la lista, rotulada.
+    const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
+    expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
+    expect(opciones[1]?.textContent).toContain('Cerrada');
+
+    await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
+    const celda = screen.getByTestId('mov-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '4');
+    await ponerMotivo(usuario);
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 9001 está cerrada/,
+    );
+    expect(screen.getByTestId('mov-guardar')).toBeDisabled();
+
+    // El bucket «sin orden» (abierto): el aviso se va y se puede guardar.
+    await usuario.selectOptions(screen.getByTestId('mov-orden'), 'sin');
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+  });
+
   it('por default el movimiento sale del bucket «sin orden» (no manda idOrden)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });

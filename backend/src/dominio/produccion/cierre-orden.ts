@@ -63,7 +63,7 @@
  * con el motivo y los números congelados) · A9 (empresa activa) · D3 (nada se edita ni se borra;
  * reabrir es el acto inverso auditado).
  */
-import type { OrdenSalida } from '../../contrato/index.js';
+import type { OrdenPreviaCierre, OrdenSalida } from '../../contrato/index.js';
 import { esquemaOrdenCerrarCuerpo, esquemaOrdenReabrirCuerpo } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
@@ -71,7 +71,7 @@ import type { z } from 'zod';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
+import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -448,4 +448,67 @@ export async function reabrirOrden(
   }, bd);
 
   return obtenerOrden(sesion, id, bd);
+}
+
+/**
+ * ⭐ 0.226b (C8 de §Post-F9.261) — LA PREVIA DEL CIERRE: el producto terminado que todavía queda
+ * etiquetado con la orden. Cerrada, esas piezas ya no se mueven a mano, no se traspasan ni se
+ * reclasifican (sólo el conteo cíclico o reabrir pueden), así que el diálogo de cerrar AVISA antes
+ * —no bloquea: cerrar con piezas puede ser legítimo y cuánto pasa es dato de Daniel—.
+ *
+ * Lectura pura, sin candado (es un aviso: quien manda es el cierre). La existencia es la SUMA
+ * DIRECTA de `movimiento_det_pt` (D3, ADR-0010 §3), nunca la vista, agrupada por artículo×almacén y
+ * contando sólo los saldos POSITIVOS: un bucket en negativo (anomalía) no puede «esconder» las
+ * piezas que sí hay en otro. Permiso `ordenes.cerrar`: es información para quien va a cerrar.
+ */
+export async function previaCierreOrden(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<OrdenPreviaCierre> {
+  verificarPermiso(sesion, 'ordenes.cerrar');
+  const idEmpresa = sesion.idEmpresaActiva;
+  const cliente = clienteLectura(bd);
+  // A9: una orden de otra empresa, para esta sesión, no existe.
+  const orden = await cliente.orden.findFirst({
+    where: { id, idEmpresa },
+    select: { id: true, folio: true },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', id);
+  }
+  const filas = await cliente.$queryRaw<
+    { idAlmacen: number; almacen: string; piezas: bigint }[]
+  >(Prisma.sql`
+    SELECT s."id_almacen" AS "idAlmacen", a."nombre" AS "almacen", SUM(s."saldo")::bigint AS "piezas"
+    FROM (
+      SELECT m."id_almacen", d."id_modelo", d."id_color", d."id_talla",
+             SUM(d."cantidad" * CASE t."direccion"
+               WHEN 'entrada' THEN 1
+               WHEN 'salida'  THEN -1
+               ELSE 0
+             END) AS "saldo"
+      FROM "movimiento_det_pt" d
+      JOIN "movimientos" m ON m."id" = d."id_movimiento"
+      JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+      WHERE m."id_empresa" = ${idEmpresa}
+        AND d."id_orden" = ${id}
+      GROUP BY m."id_almacen", d."id_modelo", d."id_color", d."id_talla"
+    ) s
+    JOIN "almacenes" a ON a."id" = s."id_almacen"
+    WHERE s."saldo" > 0
+    GROUP BY s."id_almacen", a."nombre"
+    ORDER BY a."nombre" ASC, s."id_almacen" ASC
+  `);
+  const porAlmacen = filas.map((f) => ({
+    idAlmacen: f.idAlmacen,
+    almacen: f.almacen,
+    piezas: Number(f.piezas),
+  }));
+  return {
+    idOrden: orden.id,
+    folio: Number(orden.folio),
+    piezasPt: porAlmacen.reduce((s, f) => s + f.piezas, 0),
+    porAlmacen,
+  };
 }

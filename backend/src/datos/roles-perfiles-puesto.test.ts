@@ -999,8 +999,8 @@ describe('🔴 el PISO y las cinco que FILTRAN PRECIO son disjuntos (decisión d
  *
  * Escanea los `*.rutas.ts` de `src/api` y mide, no supone. Es **una red, no un teorema**: reparte por
  * bloque `app.route({…})` y de ahí saca el `method:` y las claves de su `preHandler:`. Si el día de
- * mañana se declara una ruta de otra forma, esta red no la ve — pero cubre los **666** bloques
- * `app.route` que hay hoy (664 llevan reja de permiso; los 2 restantes no, y son de sesión).
+ * mañana se declara una ruta de otra forma, esta red no la ve — pero cubre los **667** bloques
+ * `app.route` que hay hoy (665 llevan reja de permiso; los 2 restantes no, y son de sesión).
  *
  * 🔴 **Y la red nació ANGOSTA: esto es la segunda versión.** La primera buscaba
  * `conPermiso\('clave'\)` con una regex de una línea, y por ahí se le escapaban DOS formas que el
@@ -1196,14 +1196,14 @@ describe('⭐⭐ guardián: el piso de lectura NO abre ninguna escritura', () =>
     ).toEqual([]);
   });
 
-  it('⭐⭐ la red ve TODAS las rutas: 666 bloques y 664 con reja de permiso', () => {
+  it('⭐⭐ la red ve TODAS las rutas: 667 bloques y 665 con reja de permiso', () => {
     // 🔴 **ESTO ES LO QUE CONVIERTE LA RED EN REJA.** Las pruebas de arriba miran sólo las rutas del
     // PISO: si la red dejara de reconocer una forma de declarar el guard, esas rutas desaparecerían
     // de su vista y el guardián se pondría **verde por ceguera** — exactamente lo que pasó con
     // `conAlgunPermiso`. Aquí se cuenta sobre el TOTAL: cualquier forma que la red no vea saca
-    // bloques de los 664 y esto se pone **rojo en vez de callarse**.
+    // bloques de los 665 y esto se pone **rojo en vez de callarse**.
     //
-    // Medido: **666** bloques `app.route`, **664** con al menos una clave de permiso y **2** sin
+    // Medido: **667** bloques `app.route`, **665** con al menos una clave de permiso y **2** sin
     // ninguna (de sesión). Si el total cambia porque se agregaron rutas, se actualiza; si cambia la
     // PROPORCIÓN sin que nadie haya tocado rutas, es que la red dejó de ver algo.
     let bloques = 0;
@@ -1230,12 +1230,12 @@ describe('⭐⭐ guardián: el piso de lectura NO abre ninguna escritura', () =>
         if (tieneReja) conReja++;
       }
     }
-    expect(bloques, 'cambió el número de rutas del API').toBe(666);
+    expect(bloques, 'cambió el número de rutas del API').toBe(667);
     expect(
       conReja,
       'bajó el número de rutas con reja de permiso: o alguien le quitó el guard a una ruta, o la ' +
         'red dejó de reconocer una forma de declararlo (y entonces el guardián del piso está ciego)',
-    ).toBe(664);
+    ).toBe(665);
   });
 
   it('⭐ y lo que el dueño LEE tampoco promete escritura: la descripción de cada llave del piso', () => {

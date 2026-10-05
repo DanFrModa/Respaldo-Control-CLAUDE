@@ -1644,6 +1644,14 @@ export async function lineasTelaPendientesDeProveedor(
     cantidadComplemento: number | null;
     recibidoComplemento: number;
     pendienteComplemento: number;
+    /** 0.226b: folio de la orden de PRODUCCIÓN a la que se le compró, o null si no lleva. */
+    folioOrden: number | null;
+    /**
+     * 0.226b (§Post-F9.244): ¿esa orden está CERRADA? Entonces el renglón no se puede surtir (la
+     * guarda de la entrada lo rechaza); la captura lo avisa ANTES en vez de dejarlo llegar al
+     * Guardar. Se OFRECE igual —el estado es informativo, no una llave para esconder—.
+     */
+    ordenCerrada: boolean;
   }[]
 > {
   verificarPermiso(sesion, 'compras.ver');
@@ -1672,6 +1680,7 @@ export async function lineasTelaPendientesDeProveedor(
       idTelaColor: true,
       telaColor: { select: { nombre: true, pantone: true } },
       ordenCompra: { select: { numCompra: true } },
+      orden: { select: { folio: true, cerradaEn: true } },
     },
     orderBy: [{ idOrdenCompra: 'asc' }, { id: 'asc' }],
   });
@@ -1729,6 +1738,8 @@ export async function lineasTelaPendientesDeProveedor(
           cantidadComplemento,
           recibidoComplemento,
           pendienteComplemento: falta.complemento,
+          folioOrden: l.orden === null ? null : Number(l.orden.folio),
+          ordenCerrada: l.orden !== null && l.orden.cerradaEn !== null,
         };
       })
       // Se ofrece el renglón mientras falte CUERPO o COMPLEMENTO (uno puede haber llegado sin el otro).

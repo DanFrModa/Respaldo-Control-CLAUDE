@@ -1,8 +1,8 @@
-import { Loader2Icon } from 'lucide-react';
+import { AlertTriangle, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useCerrarOrden, useReabrirOrden } from '@/api/ordenes';
+import { useCerrarOrden, usePreviaCierreOrden, useReabrirOrden } from '@/api/ordenes';
 import type { Orden } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +54,19 @@ export function DialogoCerrarOrden({
   }, [abierto]);
 
   const esCerrar = modo === 'cerrar';
+  /**
+   * ⭐ 0.226b (C8 de §Post-F9.261, default del lead pendiente de Daniel): ANTES de cerrar se avisa si
+   * todavía queda PRODUCTO TERMINADO de la orden. Cerrada, esas piezas ya no se mueven a mano, no se
+   * traspasan ni se reclasifican (sólo el conteo cíclico o reabrir), así que conviene moverlas antes.
+   * NO bloquea: cerrar con piezas puede ser legítimo. Lo cuenta el servidor (suma directa, D3).
+   */
+  const previa = usePreviaCierreOrden(orden?.id, abierto && esCerrar);
+  const piezasPt = esCerrar ? (previa.data?.piezasPt ?? 0) : 0;
+  // El aviso C8 tiene que poder LLEGAR antes de cerrar: mientras la previa va en camino, «Cerrar»
+  // espera (si no, se podría cerrar sin haberlo visto). Si la previa FALLA se dice y se deja cerrar:
+  // C8 avisa, no bloquea.
+  const esperandoPrevia = esCerrar && previa.isPending && !previa.isError;
+  const previaFallo = esCerrar && previa.isError;
   const enCurso = esCerrar ? cerrar.isPending : reabrir.isPending;
   // Al cerrar el motivo es opcional; al reabrir es obligatorio (misma regla que el backend).
   const faltaMotivo = !esCerrar && motivo.trim().length === 0;
@@ -113,6 +126,36 @@ export function DialogoCerrarOrden({
           </DialogDescription>
         </DialogHeader>
 
+        {previaFallo ? (
+          <p
+            className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm"
+            role="status"
+            data-testid="aviso-cierre-pt-error"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            No se pudo revisar si queda producto terminado de esta orden. Puedes cerrarla de todos
+            modos.
+          </p>
+        ) : null}
+        {piezasPt > 0 && previa.data !== undefined ? (
+          <div
+            className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm"
+            role="status"
+            data-testid="aviso-cierre-pt"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <p>
+              Todavía quedan <b>{piezasPt.toLocaleString('es-MX')} pzas</b> de producto terminado de
+              esta orden (
+              {previa.data.porAlmacen
+                .map((a) => `${a.almacen}: ${a.piezas.toLocaleString('es-MX')}`)
+                .join(' · ')}
+              ). Cerrada, ya no se podrán mover, traspasar ni reclasificar; si hay que moverlas,
+              hazlo antes de cerrar. Puedes cerrarla de todos modos.
+            </p>
+          </div>
+        ) : null}
+
         <div className="py-2">
           <Field data-invalid={faltaMotivo}>
             <FieldLabel htmlFor="orden-motivo-cierre">
@@ -142,7 +185,7 @@ export function DialogoCerrarOrden({
           <Button
             type="button"
             onClick={confirmar}
-            disabled={enCurso || faltaMotivo}
+            disabled={enCurso || faltaMotivo || esperandoPrevia}
             data-testid={esCerrar ? 'confirmar-cerrar-orden' : 'confirmar-reabrir-orden'}
           >
             {enCurso ? <Loader2Icon className="animate-spin" aria-hidden /> : null}

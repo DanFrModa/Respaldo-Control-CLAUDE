@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { DialogoEditarNota, type PrefillNota } from './DialogoEditarNota';
 import {
   ETIQUETA_ESTADO_HAB,
@@ -67,10 +68,15 @@ export function PanelHabilitacionOrden({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
-  const puedeAdministrar = tienePermiso('notas.administrar');
-
   const consulta = useHabilitacionOrden(idOrden, { habilitado: abierto && idOrden !== undefined });
   const hab = consulta.data;
+  /**
+   * ⭐ 0.226b (§Post-F9.244): a una orden CERRADA no se le hace nota de salida (el servidor la
+   * rechaza, A1). El tablero se CONSULTA igual; lo que se apaga es la captura de «A surtir» y
+   * «Pasar a nota», con el aviso arriba. Lo dice el servidor (`ordenCerrada` de la habilitación).
+   */
+  const ordenCerrada = hab?.ordenCerrada === true;
+  const puedeAdministrar = tienePermiso('notas.administrar') && !ordenCerrada;
 
   // Captura por avío (default: A surtir = la falta; sin marcar).
   const [seleccion, setSeleccion] = useState<Record<number, FilaSurtido>>({});
@@ -134,6 +140,8 @@ export function PanelHabilitacionOrden({
       recetaPorOrden: {
         [hab.idOrden]: hab.avios.filter((a) => !a.esExtra).map((a) => a.idAvio),
       },
+      // 0.226b: el constructor tiene que saber del cierre aunque la orden no venga en su lista.
+      ordenesCerradas: hab.ordenCerrada ? [{ idOrden: hab.idOrden, folio: hab.folioOrden }] : [],
     };
     setPrefill(payload);
   }
@@ -185,6 +193,7 @@ export function PanelHabilitacionOrden({
           </p>
         ) : hab === undefined ? null : (
           <div className="space-y-4" data-testid="panel-habilitacion">
+            {ordenCerrada ? <AvisoOrdenCerrada folios={[hab.folioOrden]} /> : null}
             {/* Resumen: % global + barra + stats. */}
             <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-panel-2 p-3">
               <div className="flex flex-col items-center">
@@ -308,10 +317,12 @@ export function PanelHabilitacionOrden({
                   <FileText aria-hidden />
                   Ver notas de esta orden
                 </Button>
-                {puedeAdministrar ? (
+                {tienePermiso('notas.administrar') ? (
                   <Button
                     size="sm"
                     onClick={pasarANota}
+                    // 0.226b: con la orden cerrada no hay nada marcado (las casillas se apagan y cada
+                    // habilitación nueva re-siembra la selección vacía), así que basta `marcados`.
                     disabled={marcados === 0}
                     data-testid="hab-pasar-nota"
                   >

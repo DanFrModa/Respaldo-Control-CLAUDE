@@ -48,6 +48,8 @@ import { ChipFiltro } from '@/components/dominio/ChipsFiltro';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { DialogoCancelarAuditoria } from './DialogoCancelarAuditoria';
 import { DialogoModificarAuditoria } from './DialogoModificarAuditoria';
 
@@ -567,6 +569,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
                     variant="outline"
                     size="sm"
                     onClick={() => setModificar(seleccion)}
+                    disabled={estaCerrada(seleccion)}
                     data-testid="modificar-consulta-auditoria"
                   >
                     <FileEdit aria-hidden />
@@ -576,6 +579,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
                     variant="destructive"
                     size="sm"
                     onClick={() => setCancelar(seleccion)}
+                    disabled={estaCerrada(seleccion)}
                     data-testid="cancelar-consulta-auditoria"
                   >
                     <XCircle aria-hidden />
@@ -587,6 +591,11 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
           ) : undefined
         }
       >
+        {/* ⭐ 0.226b: con la orden CERRADA la auditoría se consulta e imprime, pero no se modifica
+            ni se cancela (el servidor rechaza igual, A1). */}
+        {seleccion !== null && estaCerrada(seleccion) ? (
+          <AvisoOrdenCerrada folios={[seleccion.folioOrden ?? '—']} className="mb-3" />
+        ) : null}
         {seleccion !== null ? <DetalleAuditoria auditoria={seleccion} /> : null}
       </CajonDetalle>
 

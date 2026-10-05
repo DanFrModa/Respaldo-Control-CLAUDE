@@ -289,3 +289,29 @@ describe('<EditorLineasOc> · el color de la matriz (fila 0.192)', () => {
     expect(await screen.findByText('No hay colores que coincidan.')).toBeInTheDocument();
   });
 });
+
+describe('<EditorLineasOc> · 0.226b — la orden CERRADA se ofrece, rotulada (nunca filtrada)', () => {
+  it('rotula «· Cerrada» sólo a la cerrada', () => {
+    renderConProveedores(
+      <EditorLineasOc
+        renglones={[{ ...renglonVacio(), idTela: 30 }]}
+        alCambiar={vi.fn()}
+        telas={TELAS as never}
+        mensajeSinTelas="sin telas"
+        avios={[]}
+        ordenes={
+          [
+            { id: 50, folio: 900, codigoModelo: 'A-1', estado: 'cerrada' },
+            { id: 51, folio: 901, codigoModelo: 'A-2', estado: 'completa' },
+          ] as never
+        }
+        tallas={[]}
+      />,
+    );
+    const opciones = Array.from(
+      screen.getByLabelText('Orden de producción ligada del renglón 1').querySelectorAll('option'),
+    ).map((o) => o.textContent);
+    expect(opciones).toContain('Orden 900 · A-1 · Cerrada');
+    expect(opciones).toContain('Orden 901 · A-2');
+  });
+});

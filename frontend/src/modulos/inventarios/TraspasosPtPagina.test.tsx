@@ -243,6 +243,39 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
   });
 
+  it('⭐ 0.226b: el bucket de una orden CERRADA se ofrece marcado; elegirlo avisa y apaga guardar', async () => {
+    const usuario = userEvent.setup();
+    useExistenciasPtMock.mockReturnValue({
+      ...EXISTENCIAS_CON_ORDEN,
+      data: {
+        filas: [
+          { ...filaPt({ idOrden: 55, folioOrden: 9001, existencia: 15 }), ordenCerrada: true },
+          filaPt(),
+        ],
+        totalExistencia: 19,
+      },
+    });
+    renderConProveedores(<TraspasosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
+    await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+    const opciones = [...screen.getByTestId('traspaso-orden').querySelectorAll('option')];
+    expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
+    expect(opciones[1]?.textContent).toContain('Cerrada');
+
+    await usuario.selectOptions(screen.getByTestId('traspaso-orden'), '55');
+    const celda = screen.getByTestId('traspaso-matriz-celda');
+    await usuario.clear(celda);
+    await usuario.type(celda, '5');
+    await ponerMotivo(usuario);
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 9001 está cerrada/,
+    );
+    expect(screen.getByTestId('traspaso-guardar')).toBeDisabled();
+  });
+
   /**
    * ⭐ FILA 0.164 — EL COLOR RETIRADO CON PIEZAS EN EL ORIGEN SE PUEDE TRASPASAR.
    *

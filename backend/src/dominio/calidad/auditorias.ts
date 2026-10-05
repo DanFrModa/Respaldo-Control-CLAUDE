@@ -248,7 +248,10 @@ async function maquilerosDeOrden(tx: ClienteBd, idOrden: number): Promise<Maquil
 /** `include` para proyectar una auditoría con su detalle + datos legibles. */
 const incluirAuditoria = {
   maquilero: { select: { nombre: true } },
-  orden: { select: { folio: true, idModelo: true, modelo: { select: { codigo: true } } } },
+  // 0.226b: `cerradaEn` para que la pantalla apague la captura ANTES de guardar (§Post-F9.244).
+  orden: {
+    select: { folio: true, idModelo: true, cerradaEn: true, modelo: { select: { codigo: true } } },
+  },
   defectos: {
     orderBy: [{ defecto: { nivelAQL: 'asc' } }, { idDefecto: 'asc' }],
     include: {
@@ -291,6 +294,7 @@ function aAuditoriaSalida(
     idEmpresa: a.idEmpresa,
     idOrden: a.idOrden,
     folioOrden: a.orden.folio === null ? null : Number(a.orden.folio),
+    ordenCerrada: a.orden.cerradaEn !== null,
     codigoModelo: a.orden.modelo.codigo,
     idMaquilero: a.idMaquilero,
     maquilero: a.maquilero?.nombre ?? null,
@@ -875,7 +879,7 @@ const seleccionResumen = {
   tamanoMuestra: true,
   cancelada: true,
   maquilero: { select: { nombre: true } },
-  orden: { select: { folio: true, modelo: { select: { codigo: true } } } },
+  orden: { select: { folio: true, cerradaEn: true, modelo: { select: { codigo: true } } } },
 } satisfies Prisma.AuditoriaSelect;
 
 type AuditoriaResumenBd = Prisma.AuditoriaGetPayload<{ select: typeof seleccionResumen }>;
@@ -890,6 +894,7 @@ function aResumenSalida(
     id: a.id,
     numAuditoria: Number(a.numAuditoria),
     folioOrden: a.orden.folio === null ? null : Number(a.orden.folio),
+    ordenCerrada: a.orden.cerradaEn !== null,
     codigoModelo: a.orden.modelo.codigo,
     idMaquilero: a.idMaquilero,
     maquilero: a.maquilero?.nombre ?? null,

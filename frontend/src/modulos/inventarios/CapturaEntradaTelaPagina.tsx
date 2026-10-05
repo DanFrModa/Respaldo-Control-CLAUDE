@@ -23,6 +23,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 import type { EstadoPendientesOc, LineaOcPendiente } from './CapturaRenglonesTelaColor';
 
@@ -243,7 +244,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
    * habría convertido «Nueva entrada de tela» en un muro. Elegir el proveedor ahora ENSEÑA lo que
    * tiene pendiente, que es el camino que la decisión exige recorrer.
    */
-  const lineasParaCapturar: LineaOcPendiente[] =
+  const lineasParaCapturarSinCierre: LineaOcPendiente[] =
     propuesta !== null
       ? propuesta.conceptos
           .filter((c) => c.sugerencia !== null)
@@ -268,6 +269,24 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             };
           })
       : (lineasOc.data ?? []);
+
+  /**
+   * ⭐ 0.226b (§Post-F9.244): de qué orden de PRODUCCIÓN es cada renglón de OC y si está CERRADA. Lo
+   * trae la consulta de pendientes del proveedor; por el camino del XML los renglones salen de la
+   * factura y se cruzan aquí por su `idOrdenCompraLinea`. Una orden cerrada no se surte (el servidor
+   * rechaza la entrada, A1): se marca en el panel y, si ya hay un renglón capturado contra ella, se
+   * avisa y se apaga Guardar hasta quitarlo.
+   */
+  const cierrePorLineaOc = new Map(
+    (lineasOc.data ?? []).map((l) => [
+      l.idOrdenCompraLinea,
+      { ordenCerrada: l.ordenCerrada, folioOrden: l.folioOrden },
+    ]),
+  );
+  const lineasParaCapturar: LineaOcPendiente[] = lineasParaCapturarSinCierre.map((l) => ({
+    ...l,
+    ...cierrePorLineaOc.get(l.idOrdenCompraLinea),
+  }));
 
   /**
    * 🔴 **EL SEGUNDO EJE, Y VA APARTE A PROPÓSITO** (hallazgo del reviewer de esta etapa): qué tiene
@@ -397,6 +416,17 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
    * se limpia, no se arregla). La salida es cancelarlo y capturarlo desde su OC.
    */
   const renglonesSinOc = renglones.filter((r) => r.idOrdenCompraLinea === undefined).length;
+  const foliosCerrados = [
+    ...new Set(
+      renglones.flatMap((r) => {
+        const cierre =
+          r.idOrdenCompraLinea === undefined
+            ? undefined
+            : cierrePorLineaOc.get(r.idOrdenCompraLinea);
+        return cierre?.ordenCerrada === true ? [cierre.folioOrden ?? '—'] : [];
+      }),
+    ),
+  ];
 
   const puedeGuardar =
     editable &&
@@ -405,6 +435,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
     idAlmacen !== '' &&
     renglones.length > 0 &&
     renglonesSinOc === 0 &&
+    foliosCerrados.length === 0 &&
     !guardando;
 
   const cuerpo: EntradaTelaCrear | undefined = useMemo(() => {
@@ -738,6 +769,12 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               capturó cuando eso todavía se permitía. Cancélalo y vuelve a capturarlo desde lo que
               tenga pendiente su orden de compra.
             </p>
+          ) : null}
+          {editable ? (
+            <AvisoOrdenCerrada
+              folios={foliosCerrados}
+              detalle="Quita sus renglones para poder guardar la entrada."
+            />
           ) : null}
           <div className="flex items-center justify-end gap-3">
             <Button onClick={guardar} disabled={!puedeGuardar} data-testid="entrada-guardar">

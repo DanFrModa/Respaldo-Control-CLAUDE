@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -348,6 +348,27 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
     fireEvent.change(screen.getByTestId('selector-tela-oc'), { target: { value: '40' } });
     expect(screen.getByTestId('complemento-oc')).toHaveTextContent('Cardigan');
     expect(screen.getByTestId('cantidad-complemento-oc')).toBeInTheDocument();
+  });
+
+  it('⭐ 0.226b: EDITAR una OC con un renglón de una orden CERRADA avisa y no guarda (abierta, sí)', () => {
+    const base = ocDePrueba();
+    const renglon = base.lineas[0];
+    if (renglon === undefined) throw new Error('fixture sin renglones');
+    const conOrden = (ordenCerrada: boolean): ReturnType<typeof ocDePrueba> => ({
+      ...base,
+      lineas: [{ ...renglon, idOrden: 50, folioOrden: 900, ordenCerrada }],
+    });
+
+    montar(conOrden(true));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 900 está cerrada/,
+    );
+    expect(screen.getByTestId('confirmar-oc')).toBeDisabled();
+    cleanup();
+
+    montar(conOrden(false));
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confirmar-oc')).toBeEnabled();
   });
 
   it('dice que cada renglón se liga a su propia OP (una OC puede surtir varias)', () => {

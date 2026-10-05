@@ -341,7 +341,8 @@ describe('CosteoOrdenPagina — orden CERRADA y costo congelado (0.061)', () => 
       },
     });
 
-    expect(screen.getByTestId('costeo-orden-cerrada')).toHaveTextContent(/CERRADA/);
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/está cerrada/);
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/costo quedó congelado/);
     // Solo lectura: ni los campos ni el botón de guardar.
     expect(screen.getByTestId('costeo-tela')).toBeDisabled();
     expect(screen.getByTestId('costeo-avios')).toBeDisabled();
@@ -360,7 +361,7 @@ describe('CosteoOrdenPagina — orden CERRADA y costo congelado (0.061)', () => 
 
   it('la orden ABIERTA no avisa nada ni congela (la rama gemela)', () => {
     montar(costoOrden());
-    expect(screen.queryByTestId('costeo-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
     expect(screen.queryByTestId('costeo-congelado')).not.toBeInTheDocument();
     expect(screen.getByTestId('costeo-tela')).toBeEnabled();
   });

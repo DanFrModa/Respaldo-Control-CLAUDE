@@ -480,6 +480,12 @@ export type OrdenCerrar =
  */
 export type OrdenReabrir =
   paths['/api/ordenes/{id}/reabrir']['post']['requestBody']['content']['application/json'];
+/**
+ * ⭐ 0.226b (C8): la PREVIA del cierre (`GET /api/ordenes/{id}/previa-cierre`) — el producto
+ * terminado que todavía queda etiquetado con la orden, para avisar antes de cerrarla.
+ */
+export type OrdenPreviaCierre =
+  paths['/api/ordenes/{id}/previa-cierre']['get']['responses']['200']['content']['application/json'];
 /** Cuerpo del set COMPLETO de referencias D7 (`PUT /api/ordenes/{id}/referencias`). */
 export type OrdenReferencias =
   paths['/api/ordenes/{id}/referencias']['put']['requestBody']['content']['application/json'];

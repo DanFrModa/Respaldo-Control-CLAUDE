@@ -221,6 +221,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
           subtotal: 200,
           idOrden: null,
           folioOrden: null,
+          ordenCerrada: false,
           tallas: [],
         },
       ],
@@ -293,6 +294,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
           subtotal: 200,
           idOrden: null,
           folioOrden: null,
+          ordenCerrada: false,
           tallas: [],
         },
       ],
@@ -368,6 +370,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
           subtotal: 200,
           idOrden: null,
           folioOrden: null,
+          ordenCerrada: false,
           tallas: [],
         },
       ],
@@ -553,6 +556,7 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
         subtotal: precio * 100,
         idOrden: null,
         folioOrden: null,
+        ordenCerrada: false,
         tallas: [],
       };
     }
@@ -592,6 +596,154 @@ describe('RecepcionComprasPagina (F4-E3)', () => {
         isFetching: false,
       });
     }
+
+    it('⭐ 0.226b: el renglón de una orden CERRADA avisa y no se puede marcar ni recibir', async () => {
+      prepararOc('sin-factura', 2);
+      useOrdenCompraMock.mockImplementation(
+        detalleDeOc(
+          ocDePrueba({
+            id: 7,
+            numCompra: 1007,
+            estatus: 'autorizada',
+            proveedor: 'Avíos del Centro',
+            lineas: [{ ...lineaAvio(2), idOrden: 50, folioOrden: 900, ordenCerrada: true }],
+          }),
+        ),
+      );
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+
+      expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+        /La orden 900 está cerrada/,
+      );
+      expect(screen.getByTestId('rec-incluir-20')).toBeDisabled();
+      expect(screen.getByTestId('rec-guardar')).toBeDisabled();
+    });
+
+    it('⭐ 0.226b: con la orden ABIERTA no hay aviso y el renglón se marca', async () => {
+      prepararOc('sin-factura', 2);
+      useOrdenCompraMock.mockImplementation(
+        detalleDeOc(
+          ocDePrueba({
+            id: 7,
+            numCompra: 1007,
+            estatus: 'autorizada',
+            proveedor: 'Avíos del Centro',
+            lineas: [{ ...lineaAvio(2), idOrden: 50, folioOrden: 900, ordenCerrada: false }],
+          }),
+        ),
+      );
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+
+      expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+      expect(screen.getByTestId('rec-incluir-20')).toBeEnabled();
+    });
+
+    /** OC 1007 MIXTA: el renglón 20 (orden 900) y el 21 (orden 901), cada uno con 60 pendientes. */
+    function ocMixta(cerrada20: boolean): void {
+      useOrdenCompraMock.mockImplementation(
+        detalleDeOc(
+          ocDePrueba({
+            id: 7,
+            numCompra: 1007,
+            estatus: 'autorizada',
+            proveedor: 'Avíos del Centro',
+            modalidadFacturaProveedor: 'sin-factura',
+            lineas: [
+              { ...lineaAvio(2), idOrden: 50, folioOrden: 900, ordenCerrada: cerrada20 },
+              { ...lineaAvio(2), id: 21, idOrden: 51, folioOrden: 901, ordenCerrada: false },
+            ],
+          }),
+        ),
+      );
+    }
+
+    it('⭐ 0.226b: OC MIXTA — el renglón de la orden ABIERTA se recibe; el de la CERRADA no viaja', async () => {
+      prepararOc('sin-factura', 2);
+      usePendientesMock.mockReturnValue({
+        data: [20, 21].map((id) => ({
+          idOrdenCompraLinea: id,
+          tipo: 'avio',
+          cantidad: 100,
+          recibido: 40,
+          pendiente: 60,
+          cantidadComplemento: null,
+          recibidoComplemento: 0,
+          pendienteComplemento: 0,
+          surtido: false,
+        })),
+        isPending: false,
+        isFetching: false,
+      });
+      // Las dos órdenes abiertas al marcar…
+      ocMixta(false);
+      const usuario = userEvent.setup();
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      await usuario.click(screen.getByTestId('rec-incluir-20'));
+      await usuario.click(screen.getByTestId('rec-incluir-21'));
+      expect(screen.getByTestId('rec-importe-total')).toHaveTextContent('$240.00');
+
+      // …y la 900 se CIERRA mientras la captura sigue abierta (llega en el siguiente render): su
+      // renglón queda marcado en el estado local, pero NO cuenta ni viaja (filtro defensivo).
+      ocMixta(true);
+      await usuario.selectOptions(screen.getByTestId('rec-almacen'), '1');
+      expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 900/);
+      expect(screen.getByTestId('rec-incluir-20')).toBeDisabled();
+      expect(screen.getByTestId('rec-incluir-21')).toBeEnabled();
+      expect(screen.getByTestId('rec-importe-total')).toHaveTextContent('$120.00');
+
+      await usuario.click(screen.getByTestId('rec-guardar'));
+      expect(recibirMutate).toHaveBeenCalledTimes(1);
+      const [args] = recibirMutate.mock.calls[0] as [
+        { cuerpo: { lineas: { idOrdenCompraLinea: number }[] } },
+      ];
+      expect(args.cuerpo.lineas.map((l) => l.idOrdenCompraLinea)).toEqual([21]);
+    });
+
+    it('⭐ 0.226b: «Reversar» se apaga si la recepción toca una orden CERRADA (abierta, no)', async () => {
+      const recepcion = {
+        id: 9,
+        folio: 509,
+        fecha: '2026-09-04',
+        factura: null,
+        almacen: 'Bodega',
+        lineas: [{ id: 1, idOrdenCompraLinea: 20 }],
+        reversada: false,
+        importe: 120,
+        deuda: 'cargo-no-fiscal',
+      };
+      useRecepcionesDeOcMock.mockReturnValue({
+        data: { recepciones: [recepcion] },
+        isPending: false,
+        isError: false,
+      });
+      prepararOc('sin-factura', 2);
+      ocMixta(true);
+      const usuario = userEvent.setup();
+      const { unmount } = renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      expect(screen.getByTestId('rec-reversar-9')).toBeDisabled();
+      unmount();
+
+      ocMixta(false);
+      renderConProveedores(<RecepcionComprasPagina />, {
+        sesion: estadoSesionDePrueba(['compras.recibir']),
+      });
+      await usuario.click(screen.getByTestId('rec-oc-7'));
+      expect(screen.getByTestId('rec-reversar-9')).toBeEnabled();
+    });
 
     it('el precio arranca con el de la OC y el importe se ve por renglón y en el total', async () => {
       prepararOc('sin-factura', 2);

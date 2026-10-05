@@ -42,6 +42,7 @@ describe('DetalleRenglonesOc (F4-E2)', () => {
           subtotal: 8,
           idOrden: null,
           folioOrden: null,
+          ordenCerrada: false,
           tallas: [
             { idColor: 1, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 5 },
             { idColor: 1, color: 'Rojo', idTalla: 12, etiquetaTalla: 'M', cantidad: 3 },
@@ -163,6 +164,7 @@ describe('DetalleRenglonesOc — V1-E8c: el color y el desglose por medida del a
           subtotal: 12000,
           idOrden: null,
           folioOrden: null,
+          ordenCerrada: false,
           tallas: [],
         },
       ],

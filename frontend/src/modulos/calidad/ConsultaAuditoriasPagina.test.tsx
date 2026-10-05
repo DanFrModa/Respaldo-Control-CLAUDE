@@ -44,6 +44,7 @@ function fila(numAuditoria: number, extra: Partial<AuditoriaResumen> = {}): Audi
     id: numAuditoria,
     numAuditoria,
     folioOrden: 100 + numAuditoria,
+    ordenCerrada: false,
     codigoModelo: 'A-100',
     idMaquilero: 5,
     maquilero: 'Maquila SA',
@@ -172,6 +173,26 @@ describe('ConsultaAuditoriasPagina', () => {
     await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
     expect(screen.getByTestId('modificar-consulta-auditoria')).toBeDefined();
     expect(screen.getByTestId('cancelar-consulta-auditoria')).toBeDefined();
+  });
+
+  it('⭐ 0.226b: con la orden auditada CERRADA avisa y apaga Modificar y Cancelar (imprime igual)', async () => {
+    auditoriasResult = { ...auditoriasResult, data: pagina([fila(2, { ordenCerrada: true })]) };
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/está cerrada/);
+    expect(screen.getByTestId('modificar-consulta-auditoria')).toBeDisabled();
+    expect(screen.getByTestId('cancelar-consulta-auditoria')).toBeDisabled();
+    expect(screen.getByTestId('imprimir-consulta-auditoria')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: con la orden ABIERTA no hay aviso y Modificar/Cancelar siguen vivos', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
+    expect(screen.queryByTestId('aviso-orden-cerrada')).toBeNull();
+    expect(screen.getByTestId('modificar-consulta-auditoria')).toBeEnabled();
+    expect(screen.getByTestId('cancelar-consulta-auditoria')).toBeEnabled();
   });
 
   it('sin calidad.modificar-auditorias oculta Modificar y Cancelar pero deja Imprimir', async () => {

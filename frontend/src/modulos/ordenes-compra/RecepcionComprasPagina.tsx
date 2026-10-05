@@ -23,6 +23,8 @@ import { useDebounce } from '@/lib/useDebounce';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { descripcionMaterial, EstatusOcBadge, fechaCortaOc } from './piezas';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local). */
@@ -332,16 +334,22 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     });
   }
 
+  // ⭐ 0.226b (§Post-F9.244): un renglón ligado a una orden CERRADA no se recibe (el servidor lo
+  // rechaza, A1). Se avisa arriba, su casilla se apaga y NUNCA cuenta como incluido; los demás
+  // renglones de la misma OC se reciben normal.
   const lineasIncluidas = ocSeleccionada
-    ? ocSeleccionada.lineas.filter((l) => captura[l.id]?.incluir)
+    ? ocSeleccionada.lineas.filter((l) => captura[l.id]?.incluir === true && !l.ordenCerrada)
     : [];
+  const idsLineaCerrada = new Set(
+    (ocSeleccionada?.lineas ?? []).filter((l) => l.ordenCerrada).map((l) => l.id),
+  );
 
   function guardar(): void {
     if (ocSeleccionada === undefined || idAlmacen === '') return;
     const lineas: RecepcionLineaEntrada[] = [];
     for (const linea of ocSeleccionada.lineas) {
       const r = captura[linea.id];
-      if (r === undefined || !r.incluir) continue;
+      if (r === undefined || !r.incluir || linea.ordenCerrada) continue;
       const cantidad = Number(r.cantidad);
       if (!Number.isFinite(cantidad) || cantidad <= 0) {
         toast.error(`Captura una cantidad válida para "${descripcionMaterial(linea)}".`);
@@ -723,6 +731,11 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                   </div>
                 ) : null}
 
+                <AvisoOrdenCerrada
+                  folios={foliosDeOrdenesCerradas(ocSeleccionada.lineas)}
+                  detalle="Sus renglones no se pueden recibir; los demás, sí."
+                />
+
                 <ul className="space-y-3">
                   {ocSeleccionada.lineas.map((linea) => {
                     const r = captura[linea.id];
@@ -742,7 +755,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                               type="checkbox"
                               checked={r.incluir}
                               onChange={(e) => actualizar(linea.id, { incluir: e.target.checked })}
-                              disabled={!puedeRecibir || esTela}
+                              disabled={!puedeRecibir || esTela || linea.ordenCerrada}
                               data-testid={`rec-incluir-${linea.id}`}
                             />
                             {descripcionMaterial(linea)}
@@ -929,7 +942,11 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                         size="sm"
                         variant="outline"
                         onClick={() => reversarRecepcion(rec)}
-                        disabled={reversar.isPending}
+                        // 0.226b: reversar SACA lo recibido de una orden; con una cerrada, no.
+                        disabled={
+                          reversar.isPending ||
+                          rec.lineas.some((l) => idsLineaCerrada.has(l.idOrdenCompraLinea))
+                        }
                         data-testid={`rec-reversar-${rec.id}`}
                       >
                         <RotateCcw className="size-4" aria-hidden /> Reversar

@@ -33,6 +33,8 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorModelo } from './SelectorModelo';
@@ -287,6 +289,12 @@ function KardexPorFolio(): React.JSX.Element {
 
   const consulta = useMovimientoPtPorFolio(folioBuscado);
   const movimiento = consulta.data;
+  // ⭐ 0.226b (§Post-F9.244): cancelar genera el INVERSO sobre los buckets de sus órdenes; si alguna
+  // está CERRADA el servidor lo rechaza (A1). Se avisa y se apaga el botón; consultar sigue libre.
+  const foliosCerrados =
+    movimiento === undefined || movimiento.cancelado
+      ? []
+      : foliosDeOrdenesCerradas(movimiento.lineas);
 
   function buscar(): void {
     const valor = Number(texto.trim());
@@ -331,6 +339,7 @@ function KardexPorFolio(): React.JSX.Element {
             <p className="text-sm text-muted-foreground">No se encontró ese folio.</p>
           ) : (
             <div className="space-y-4" data-testid="kardex-folio-detalle">
+              <AvisoOrdenCerrada folios={foliosCerrados} />
               <div className="grid gap-2 text-sm sm:grid-cols-2">
                 <p>
                   <span className="text-muted-foreground">Folio:</span>{' '}
@@ -417,6 +426,7 @@ function KardexPorFolio(): React.JSX.Element {
                   <Button
                     variant="outline"
                     onClick={() => setACancelar(movimiento)}
+                    disabled={foliosCerrados.length > 0}
                     data-testid="kardex-folio-cancelar"
                   >
                     <Ban className="mr-1.5 size-4" aria-hidden /> Cancelar movimiento

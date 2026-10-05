@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 
 /**
  * ⭐⭐ **DE QUÉ COLOR SE COMPRA CADA TELA** (V1-E3u, `DECISIONES.md` §Post-F9.89).
@@ -41,6 +42,7 @@ export function DialogoColoresDeTela({
   idOrden,
   folioOrden,
   puedeEditar,
+  ordenCerrada,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
@@ -48,6 +50,13 @@ export function DialogoColoresDeTela({
   folioOrden: number | undefined;
   /** ¿Esta sesión puede escribir (`compras.administrar`)? §Post-F9.68: esconder Y bloquear. */
   puedeEditar: boolean;
+  /**
+   * ⭐ 0.226b (§Post-F9.244): la orden está CERRADA ⇒ su color de tela no se dice (lo rechaza el
+   * servidor). Se consulta igual. El PRECIO del color es del CATÁLOGO, no de la orden: ése sigue
+   * con `puedeEditar`. OBLIGATORIO a propósito: un default `false` fallaría ABIERTO si un llamador
+   * lo olvida; así el typecheck amarra el cableado.
+   */
+  ordenCerrada: boolean;
 }): React.JSX.Element {
   const consulta = useColoresDeTela(abierto ? idOrden : undefined);
   const asignar = useAsignarColorTela();
@@ -68,6 +77,8 @@ export function DialogoColoresDeTela({
             quien recibe no tenga que adivinar la correspondencia.
           </DialogDescription>
         </DialogHeader>
+
+        {ordenCerrada ? <AvisoOrdenCerrada folios={[folioOrden ?? idOrden ?? '—']} /> : null}
 
         {consulta.isPending ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
@@ -101,7 +112,8 @@ export function DialogoColoresDeTela({
                 key={tela.idOrdenTela}
                 tela={tela}
                 idOrden={idOrden as number}
-                puedeEditar={puedeEditar}
+                puedeEditar={puedeEditar && !ordenCerrada}
+                puedeFijarPrecio={puedeEditar}
                 guardando={asignar.isPending}
                 onAsignar={(idColor, idTelaColor) => {
                   asignar.mutate(
@@ -132,12 +144,15 @@ function BloqueTela({
   tela,
   idOrden,
   puedeEditar,
+  puedeFijarPrecio,
   guardando,
   onAsignar,
 }: {
   tela: TelaConColores;
   idOrden: number;
   puedeEditar: boolean;
+  /** 0.226b: el precio es del catálogo; no se apaga por el cierre de la orden. */
+  puedeFijarPrecio: boolean;
   guardando: boolean;
   onAsignar: (idColor: number, idTelaColor: number | null) => void;
 }): React.JSX.Element {
@@ -218,6 +233,7 @@ function BloqueTela({
             tela={tela}
             idOrden={idOrden}
             puedeEditar={puedeEditar}
+            puedeFijarPrecio={puedeFijarPrecio}
             puedeDarDeAlta={puedeDarDeAlta}
             guardando={guardando}
             onAsignar={onAsignar}
@@ -266,6 +282,7 @@ function FilaColor({
   tela,
   idOrden,
   puedeEditar,
+  puedeFijarPrecio,
   puedeDarDeAlta,
   guardando,
   onAsignar,
@@ -275,6 +292,7 @@ function FilaColor({
   tela: TelaConColores;
   idOrden: number;
   puedeEditar: boolean;
+  puedeFijarPrecio: boolean;
   /** ⭐ V1-E8o: ¿se pinta «＋ Nuevo color…»? Es el MISMO booleano que `puedeEditar`. */
   puedeDarDeAlta: boolean;
   guardando: boolean;
@@ -394,7 +412,7 @@ function FilaColor({
             nombre={elegido.nombre}
             precio={elegido.precio}
             idOrden={idOrden}
-            puedeEditar={puedeEditar}
+            puedeEditar={puedeFijarPrecio}
           />
         )}
       </div>

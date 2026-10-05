@@ -240,6 +240,12 @@ const esquemaMovPtLineaSalida = z.object({
     .int()
     .nullable()
     .describe('Folio de la orden del renglón, o null si es del bucket sin orden.'),
+  ordenCerrada: z
+    .boolean()
+    .describe(
+      '0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso ' +
+        'movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden».',
+    ),
   tallas: z.array(esquemaMovPtTallaSalida).describe('Cantidades por talla.'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
 });
@@ -383,6 +389,12 @@ const esquemaExistenciaPtFila = z.object({
     .int()
     .nullable()
     .describe('Folio de la orden, o null si es del bucket sin orden.'),
+  ordenCerrada: z
+    .boolean()
+    .describe(
+      '0.226b (§Post-F9.244): ¿la orden de este bucket está CERRADA? Sus piezas se consultan, pero ' +
+        'no se mueven a mano ni se traspasan (la captura lo avisa antes). false en «sin orden».',
+    ),
   existencia: z.number().int().describe('Existencia actual (Σ de movimientos, D3).'),
 });
 

@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { fechaCortaOc } from './piezas';
 
@@ -173,6 +175,9 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
                 ) : null}
 
                 <AvisoDesvioOc oc={oc} />
+                {/* ⭐ 0.226b: con una orden CERRADA ligada, la OC no se autoriza (A1: lo rechaza el
+                    servidor); se avisa aquí y se apaga el botón. */}
+                <AvisoOrdenCerrada folios={foliosDeOrdenesCerradas(oc.lineas)} className="mt-3" />
 
                 {/* ⭐ V1-E3u: con un desvío en la OC el detalle nace ABIERTO. El aviso de arriba
                     dice que algo se apartó de lo calculado; el detalle dice QUÉ renglón y por
@@ -190,7 +195,7 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
                   <Button
                     className="mt-4 w-full"
                     onClick={() => autorizarOc(oc)}
-                    disabled={autorizar.isPending}
+                    disabled={autorizar.isPending || foliosDeOrdenesCerradas(oc.lineas).length > 0}
                     data-testid="autorizar-oc-bandeja"
                   >
                     {autorizar.isPending && autorizar.variables === oc.id ? (

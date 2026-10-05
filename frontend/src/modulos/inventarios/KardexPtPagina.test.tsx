@@ -184,6 +184,69 @@ describe('KardexPtPagina · modo por folio — fila 0.100 (reimpresión de la ho
     expect(screen.getByTestId('kardex-folio-detalle')).toBeInTheDocument();
   });
 
+  it('⭐ 0.226b: un movimiento de una orden CERRADA avisa y no se cancela (abierta, sí)', async () => {
+    usePorFolioMock.mockReturnValue({
+      data: movimiento({
+        lineas: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idOrden: 55,
+            folioOrden: 1515,
+            ordenCerrada: true,
+            tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 5 }],
+            totalPiezas: 5,
+          },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    const { unmount } = renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await buscarFolio(usuario);
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1515 está cerrada/,
+    );
+    expect(screen.getByTestId('kardex-folio-cancelar')).toBeDisabled();
+    // Consultar y reimprimir siguen libres.
+    expect(screen.getByTestId('kardex-folio-imprimir')).toBeEnabled();
+    unmount();
+
+    usePorFolioMock.mockReturnValue({ data: movimiento(), isPending: false, isError: false });
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await buscarFolio(usuario);
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('kardex-folio-cancelar')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: un movimiento YA CANCELADO de una orden cerrada no repite el aviso', async () => {
+    // Ya no hay nada que cancelar: el aviso sólo tiene sentido junto a un botón que se apaga.
+    usePorFolioMock.mockReturnValue({
+      data: movimiento({
+        cancelado: true,
+        lineas: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idOrden: 55,
+            folioOrden: 1515,
+            ordenCerrada: true,
+            tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 5 }],
+            totalPiezas: 5,
+          },
+        ],
+      }),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<KardexPtPagina />, { sesion: sesion() });
+    await buscarFolio(usuario);
+    expect(screen.getByTestId('kardex-folio-detalle')).toBeInTheDocument();
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+  });
+
   it('la hoja se ofrece con SOLO `inventario-pt.ver` (leer y reimprimir no es mover)', async () => {
     // La reimpresión va con el permiso de VER, igual que la ruta del backend. Quien no puede mover
     // sigue pudiendo sacar el papel — y no ve el botón de cancelar.

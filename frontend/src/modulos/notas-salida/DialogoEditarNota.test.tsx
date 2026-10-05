@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -73,9 +73,18 @@ vi.mock('@/api/avios', () => ({
 vi.mock('@/api/telas', () => ({
   useTelas: () => ({ data: { datos: [{ id: 7, nombre: 'Felpa francesa' }] } }),
 }));
+/**
+ * Las órdenes del selector. ⭐ 0.226b: la 51 está CERRADA (`estado: 'cerrada'`): se OFRECE (el
+ * selector no filtra, sólo la marca) pero la nota no se guarda con un renglón suyo.
+ */
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => ({
-    data: { datos: [{ id: 50, folio: 1001, codigoModelo: 'MOD-1', cliente: 'Cliente A' }] },
+    data: {
+      datos: [
+        { id: 50, folio: 1001, codigoModelo: 'MOD-1', cliente: 'Cliente A', estado: 'completa' },
+        { id: 51, folio: 1002, codigoModelo: 'MOD-2', cliente: 'Cliente A', estado: 'cerrada' },
+      ],
+    },
   }),
 }));
 /**
@@ -208,6 +217,91 @@ describe('DialogoEditarNota (F4-E5)', () => {
     expect(crearMutate).toHaveBeenCalledTimes(1);
     const cuerpo = crearMutate.mock.calls.at(0)?.[0] as { lineas: { idAvio?: number }[] };
     expect(cuerpo.lineas.at(0)?.idAvio).toBe(3);
+  });
+
+  it('⭐ 0.226b: un renglón para una orden CERRADA avisa y apaga crear; con la abierta, no', async () => {
+    renderConProveedores(
+      <DialogoEditarNota abierto alCambiarAbierto={() => undefined} alGuardada={() => undefined} />,
+      { sesion: estadoSesionDePrueba(['notas.administrar']) },
+    );
+    await elegirEnCombobox('nota-maquilero', 'bajío', 'Costuras del Bajío');
+    fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+    // La cerrada se ofrece, MARCADA (informativo, nunca un filtro).
+    expect(
+      within(screen.getByTestId('selector-orden-nota')).getByRole('option', {
+        name: /Orden 1002 · MOD-2 · Cerrada/,
+      }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('selector-orden-nota'), { target: { value: '51' } });
+    elegirAvioBoton();
+    fireEvent.change(screen.getByTestId('cantidad-nota'), { target: { value: '5' } });
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1002 está cerrada/,
+    );
+    expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
+
+    // Mismo renglón, orden ABIERTA: el aviso se va y crear vuelve.
+    fireEvent.change(screen.getByTestId('selector-orden-nota'), { target: { value: '50' } });
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confirmar-nota')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: EDITAR una nota cuyo renglón ya viene marcado `ordenCerrada` avisa y no guarda', () => {
+    const nota = notaDePrueba();
+    const primera = nota.lineas[0];
+    if (primera === undefined) throw new Error('fixture sin renglones');
+    renderConProveedores(
+      <DialogoEditarNota
+        abierto
+        alCambiarAbierto={() => undefined}
+        alGuardada={() => undefined}
+        nota={{
+          ...nota,
+          lineas: [{ ...primera, idOrden: 77, folioOrden: 4321, ordenCerrada: true }],
+        }}
+      />,
+      { sesion: estadoSesionDePrueba(['notas.administrar']) },
+    );
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 4321/);
+    expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
+  });
+
+  it('⭐ 0.226b: el PREFILL dice qué orden está cerrada aunque no venga en la lista de órdenes', () => {
+    renderConProveedores(
+      <DialogoEditarNota
+        abierto
+        alCambiarAbierto={() => undefined}
+        alGuardada={() => undefined}
+        prefill={{
+          idMaquilero: 9,
+          idAlmacen: 2,
+          renglones: [{ idOrden: 77, idAvio: 3, clave: 'BOT-01', cantidad: 5, unidad: 'pza' }],
+          ordenesCerradas: [{ idOrden: 77, folio: 4321 }],
+        }}
+      />,
+      { sesion: estadoSesionDePrueba(['notas.administrar']) },
+    );
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 4321/);
+    expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
+  });
+
+  it('⭐ 0.226b: un PREFILL sin órdenes cerradas no inventa el aviso', () => {
+    renderConProveedores(
+      <DialogoEditarNota
+        abierto
+        alCambiarAbierto={() => undefined}
+        alGuardada={() => undefined}
+        prefill={{
+          idMaquilero: 9,
+          idAlmacen: 2,
+          renglones: [{ idOrden: 77, idAvio: 3, clave: 'BOT-01', cantidad: 5, unidad: 'pza' }],
+          ordenesCerradas: [],
+        }}
+      />,
+      { sesion: estadoSesionDePrueba(['notas.administrar']) },
+    );
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
   });
 
   it('el constructor es SOLO-AVÍOS: no ofrece renglones de tela (§4.6 dec. 2)', () => {

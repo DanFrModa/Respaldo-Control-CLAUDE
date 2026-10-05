@@ -177,6 +177,41 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     expect(autorizarMutate).toHaveBeenCalledWith(1, expect.anything());
   });
 
+  it('⭐ 0.226b: un BORRADOR con una orden CERRADA ligada avisa y no se autoriza', () => {
+    const oc = ocDePrueba({ estatus: 'borrador' });
+    useOrdenesCompraMock.mockReturnValue({
+      data: {
+        datos: [
+          {
+            ...oc,
+            lineas: oc.lineas.map((l) => ({
+              ...l,
+              idOrden: 50,
+              folioOrden: 900,
+              ordenCerrada: true,
+            })),
+          },
+        ],
+        total: 1,
+        pagina: 1,
+        porPagina: 10,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'compras.autorizar']),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    const detalle = screen.getByTestId('detalle-oc');
+    expect(within(detalle).getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 900 está cerrada/,
+    );
+    expect(within(detalle).getByTestId('autorizar-oc')).toBeDisabled();
+  });
+
   it('el botón Autorizar SOLO aparece con compras.autorizar (borrador y pendiente)', () => {
     // Sigue apareciendo en `pendiente_autorizacion` por si algún dato migrado quedara ahí.
     paginaConUna('pendiente_autorizacion');
@@ -387,6 +422,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
                   subtotal: 60950,
                   idOrden: null,
                   folioOrden: null,
+                  ordenCerrada: false,
                   tallas: [],
                 },
               ],

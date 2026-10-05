@@ -250,6 +250,19 @@ export const esquemaEntradaTelaLineaSalida = z
       .int()
       .nullable()
       .describe('Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null.'),
+    folioOrden: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null.',
+      ),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se ' +
+          'cancela ya confirmada (la pantalla lo avisa antes). false sin orden.',
+      ),
   })
   .describe('Renglón (partida) de una entrada de tela.');
 

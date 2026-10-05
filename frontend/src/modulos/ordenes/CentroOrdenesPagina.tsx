@@ -50,6 +50,7 @@ import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacion
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { ChipHermanas } from './AvisoHermanas';
 import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
@@ -1576,7 +1577,11 @@ function DetalleCentroOrden({
           <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Precios
           </h4>
-          <PanelPreciosOrden idOrden={orden.id} />
+          <PanelPreciosOrden
+            idOrden={orden.id}
+            folioOrden={orden.folio}
+            ordenCerrada={estaCerrada(orden)}
+          />
         </section>
 
         <section>

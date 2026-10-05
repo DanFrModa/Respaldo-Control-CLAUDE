@@ -30,6 +30,23 @@ type ArgsCierre = { id: number; cuerpo: { motivo?: string } };
 const cerrarOrden = vi.fn<(args: ArgsCierre) => void>();
 const reabrirOrden = vi.fn<(args: ArgsCierre) => void>();
 
+/**
+ * ⭐ 0.226b (C8) — la PREVIA del cierre: cuántas piezas de PT siguen con la orden. Se capturan los
+ * argumentos para afirmar que SÓLO se pide con el diálogo de CERRAR abierto (no al reabrir).
+ */
+type PreviaCierre = {
+  idOrden: number;
+  folio: number;
+  piezasPt: number;
+  porAlmacen: { idAlmacen: number; almacen: string; piezas: number }[];
+};
+const usePreviaCierreOrden = vi.fn<
+  (
+    id: number | undefined,
+    habilitado: boolean,
+  ) => { data: PreviaCierre | undefined; isPending?: boolean; isError?: boolean }
+>(() => ({ data: undefined }));
+
 vi.mock('@/api/ordenes', () => ({
   useOrden: () => useOrden(),
   useActualizarOrden: () => ({ mutateAsync: actualizarOrden, isPending: false }),
@@ -38,6 +55,8 @@ vi.mock('@/api/ordenes', () => ({
   useCancelarOrden: () => ({ mutate: vi.fn(), isPending: false }),
   useCerrarOrden: () => ({ mutate: cerrarOrden, isPending: false }),
   useReabrirOrden: () => ({ mutate: reabrirOrden, isPending: false }),
+  usePreviaCierreOrden: (id: number | undefined, habilitado: boolean) =>
+    usePreviaCierreOrden(id, habilitado),
   useGuardarReferencias: () => ({ mutateAsync: guardarReferencias, isPending: false }),
   useAgregarComentario: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -409,6 +428,8 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
     useOrden.mockReset();
     cerrarOrden.mockClear();
     reabrirOrden.mockClear();
+    usePreviaCierreOrden.mockReset();
+    usePreviaCierreOrden.mockImplementation(() => ({ data: undefined }));
     useCamposCliente.mockReturnValue({ data: [], isPending: false, isError: false, error: null });
   });
 
@@ -456,6 +477,121 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
     expect(cerrarOrden).toHaveBeenCalledTimes(1);
     // Cuerpo VACÍO (no un motivo en blanco): el contrato lo declara opcional.
     expect(cerrarOrden.mock.calls[0]?.[0]).toMatchObject({ id: 4, cuerpo: {} });
+  });
+
+  it('⭐ C8: si queda PRODUCTO TERMINADO de la orden, CERRAR lo avisa con cuántas piezas — y no bloquea', async () => {
+    usePreviaCierreOrden.mockImplementation((id, habilitado) => ({
+      data:
+        habilitado && id === 6
+          ? {
+              idOrden: 6,
+              folio: 106,
+              piezasPt: 1250,
+              porAlmacen: [
+                { idAlmacen: 1, almacen: 'Primeras', piezas: 1200 },
+                { idAlmacen: 2, almacen: 'Segundas', piezas: 50 },
+              ],
+            }
+          : undefined,
+    }));
+    const usuario = userEvent.setup();
+    renderDialogo(orden(6, 106), [...PERM_CON_CIERRE]);
+
+    // Antes de abrir el diálogo de cerrar NO se pregunta nada (no es un dato de la ficha).
+    expect(usePreviaCierreOrden.mock.calls.every(([, habilitado]) => !habilitado)).toBe(true);
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    const aviso = screen.getByTestId('aviso-cierre-pt');
+    expect(aviso).toHaveTextContent(/1,250 pzas/);
+    expect(aviso).toHaveTextContent(/Primeras: 1,200/);
+    expect(aviso).toHaveTextContent(/Segundas: 50/);
+    // Avisa, NO bloquea: cerrar sigue disponible.
+    expect(screen.getByTestId('confirmar-cerrar-orden')).toBeEnabled();
+  });
+
+  it('⭐ C8: con existencia de PT en CERO, el aviso NO sale', async () => {
+    usePreviaCierreOrden.mockImplementation((id, habilitado) => ({
+      data:
+        habilitado && id === 7
+          ? { idOrden: 7, folio: 107, piezasPt: 0, porAlmacen: [] }
+          : undefined,
+    }));
+    const usuario = userEvent.setup();
+    renderDialogo(orden(7, 107), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    expect(screen.getByTestId('confirmar-cerrar-orden')).toBeInTheDocument();
+    expect(screen.queryByTestId('aviso-cierre-pt')).not.toBeInTheDocument();
+  });
+
+  it('⭐ H3: mientras la previa C8 va en camino, «Cerrar orden» ESPERA (no se cierra sin el aviso)', async () => {
+    usePreviaCierreOrden.mockImplementation((_id, habilitado) =>
+      habilitado ? { data: undefined, isPending: true, isError: false } : { data: undefined },
+    );
+    const usuario = userEvent.setup();
+    renderDialogo(orden(9, 109), [...PERM_CON_CIERRE]);
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    expect(screen.getByTestId('confirmar-cerrar-orden')).toBeDisabled();
+  });
+
+  it('⭐ H3: si la previa C8 FALLA lo dice y deja cerrar igual (C8 avisa, no bloquea)', async () => {
+    usePreviaCierreOrden.mockImplementation((_id, habilitado) =>
+      habilitado ? { data: undefined, isPending: false, isError: true } : { data: undefined },
+    );
+    const usuario = userEvent.setup();
+    renderDialogo(orden(10, 110), [...PERM_CON_CIERRE]);
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    expect(screen.getByTestId('aviso-cierre-pt-error')).toHaveTextContent(
+      'No se pudo revisar si queda producto terminado',
+    );
+    expect(screen.getByTestId('confirmar-cerrar-orden')).toBeEnabled();
+  });
+
+  it('⭐ H3: con la previa ya respondida (sin PT) no hay espera ni mensaje de error', async () => {
+    usePreviaCierreOrden.mockImplementation((id, habilitado) =>
+      habilitado
+        ? {
+            data: { idOrden: id ?? 0, folio: 111, piezasPt: 0, porAlmacen: [] },
+            isPending: false,
+            isError: false,
+          }
+        : { data: undefined },
+    );
+    const usuario = userEvent.setup();
+    renderDialogo(orden(11, 111), [...PERM_CON_CIERRE]);
+    await usuario.click(screen.getByTestId('cerrar-orden'));
+
+    expect(screen.getByTestId('confirmar-cerrar-orden')).toBeEnabled();
+    expect(screen.queryByTestId('aviso-cierre-pt-error')).not.toBeInTheDocument();
+  });
+
+  it('⭐ H3: REABRIR no espera a la previa (no la pide)', async () => {
+    usePreviaCierreOrden.mockImplementation(() => ({
+      data: undefined,
+      isPending: true,
+      isError: false,
+    }));
+    const usuario = userEvent.setup();
+    renderDialogo(orden(12, 112, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+    await usuario.click(screen.getByTestId('reabrir-orden'));
+    await usuario.type(screen.getByTestId('orden-motivo-cierre'), 'motivo');
+    expect(screen.getByTestId('confirmar-reabrir-orden')).toBeEnabled();
+  });
+
+  it('⭐ C8: REABRIR no pregunta por el PT (el aviso es sólo del cierre)', async () => {
+    usePreviaCierreOrden.mockImplementation(() => ({
+      data: { idOrden: 8, folio: 108, piezasPt: 99, porAlmacen: [] },
+    }));
+    const usuario = userEvent.setup();
+    renderDialogo(orden(8, 108, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+
+    await usuario.click(screen.getByTestId('reabrir-orden'));
+
+    expect(usePreviaCierreOrden.mock.calls.every(([, habilitado]) => !habilitado)).toBe(true);
+    expect(screen.queryByTestId('aviso-cierre-pt')).not.toBeInTheDocument();
   });
 
   it('REABRIR exige motivo: el botón arranca deshabilitado y manda lo escrito', async () => {

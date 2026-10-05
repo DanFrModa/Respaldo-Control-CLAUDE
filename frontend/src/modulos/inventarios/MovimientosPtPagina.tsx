@@ -18,6 +18,7 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { AvisoExistenciasRecortadas } from './AvisoExistenciasRecortadas';
 import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
@@ -167,6 +168,11 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const bucketValido =
     ordenBucket === SIN_ORDEN || opcionesOrden.some((o) => String(o.idOrden) === ordenBucket);
   const ordenElegida = bucketValido ? ordenBucket : SIN_ORDEN;
+  // ⭐ 0.226b (§Post-F9.244): el bucket elegido es de una orden CERRADA ⇒ sus piezas no se mueven
+  // (el servidor lo rechaza, A1). Se avisa junto al selector y se apaga el guardar.
+  const opcionCerrada = opcionesOrden.find(
+    (o) => o.ordenCerrada === true && String(o.idOrden) === ordenElegida,
+  );
   const idOrdenElegida = aIdOrden(ordenElegida);
 
   // Fila 0.164 — los colores RETIRADOS que tienen mercancía en este contexto (el mismo
@@ -257,6 +263,7 @@ export function MovimientosPtPagina(): React.JSX.Element {
   const motivoOk = motivo.trim().length >= 3;
   const puedeGuardar =
     puedeMover &&
+    opcionCerrada === undefined &&
     idTipoMov !== '' &&
     idAlmacen !== '' &&
     modelo !== undefined &&
@@ -443,6 +450,12 @@ export function MovimientosPtPagina(): React.JSX.Element {
                   }
                   testid="mov-orden"
                 />
+                {opcionCerrada !== undefined ? (
+                  <AvisoOrdenCerrada
+                    folios={[opcionCerrada.folioOrden ?? opcionCerrada.idOrden ?? '—']}
+                    className="sm:col-span-2"
+                  />
+                ) : null}
               </div>
               {/* ⭐ Fila 0.143 — esta pantalla arma la lista de órdenes con las FILAS de existencias,
                   y desde la 0.143 esas filas vienen topadas. Con un modelo de muchas órdenes×

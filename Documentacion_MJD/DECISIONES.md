@@ -18381,3 +18381,12 @@ Daniel: **(1)** ¿la deuda de un maquilero que factura son sus recibos validados
 comprobante? *(default: sí ⇒ la factura se guarda como comprobante fiscal y no suma al saldo)*; **(2)** ¿algún maquilero
 factura algo que no sea maquila? *(pregunta de frecuencia: no se supone)*; y **(3)** que confirme la prioridad
 recomendada, **bloquea el arranque**.
+
+**(f) La parte b (v0.191): la pantalla apaga y avisa antes de capturar.** Sin decisiones nuevas de negocio; dos
+criterios que conviene que queden escritos:
+- **El selector de órdenes no se filtra**: la cerrada aparece rotulada «· Cerrada» y, al elegirla, la captura se
+  apaga con el aviso. Filtrar las listas es la fila 0.227 y lleva su interruptor y su aviso (§Post-F9.244).
+- **C8 se construyó con su default** (avisar al cerrar si queda producto terminado de la orden, sin bloquear), con
+  la existencia calculada por **suma directa de movimientos**, nunca la vista (D3). Sigue siendo default hasta que
+  Daniel conteste.
+

@@ -49,6 +49,8 @@ import { cn } from '@/lib/utils';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { DetalleRenglonesOc, type AvanceRecepcionOc } from './DetalleRenglonesOc';
 import { DialogoCancelarOc } from './DialogoCancelarOc';
 import { DialogoDesautorizarOc } from './DialogoDesautorizarOc';
@@ -638,7 +640,11 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                 <Button
                   size="sm"
                   onClick={() => autorizarOc(seleccion)}
-                  disabled={autorizar.isPending}
+                  // ⭐ 0.226b: autorizar compromete el dinero contra sus órdenes; con una CERRADA el
+                  // servidor lo rechaza (A1). El aviso va en el cuerpo del cajón.
+                  disabled={
+                    autorizar.isPending || foliosDeOrdenesCerradas(seleccion.lineas).length > 0
+                  }
                   data-testid="autorizar-oc"
                 >
                   <CheckCircle2 aria-hidden />
@@ -673,6 +679,11 @@ export function OrdenesCompraPagina(): React.JSX.Element {
               ) : null}
             </div>
 
+            {/* ⭐ 0.226b (§Post-F9.244): se avisa sólo mientras falta la firma —es la acción que la
+                orden cerrada frena aquí—; recibir tiene su propio aviso en su pantalla. */}
+            {seleccion.estatus === 'borrador' || seleccion.estatus === 'pendiente_autorizacion' ? (
+              <AvisoOrdenCerrada folios={foliosDeOrdenesCerradas(seleccion.lineas)} />
+            ) : null}
             <DetalleOc oc={seleccion} />
           </div>
         ) : null}

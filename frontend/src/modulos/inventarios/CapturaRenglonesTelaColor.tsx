@@ -64,6 +64,14 @@ export interface LineaOcPendiente {
   /** Complemento que pidió la OC, y lo que falta por recibir de él. */
   cantidadComplemento: number | null;
   pendienteComplemento: number;
+  /**
+   * ⭐ 0.226b (§Post-F9.244): ¿la orden de PRODUCCIÓN de ese renglón de OC está CERRADA? Entonces
+   * no se surte (el servidor lo rechaza): se enseña marcado y su «Capturar» se apaga. Ausente =
+   * no se sabe (se ofrece igual; el servidor decide).
+   */
+  ordenCerrada?: boolean;
+  /** Folio de esa orden de producción, para decir CUÁL está cerrada. */
+  folioOrden?: number | null;
 }
 
 /**
@@ -475,12 +483,21 @@ export function CapturaRenglonesTelaColor({
                       </span>
                     ) : null}
                     <span className="text-muted-foreground"> · OC {l.numCompra}</span>
+                    {l.ordenCerrada === true ? (
+                      <span
+                        className="text-muted-foreground"
+                        data-testid={`captura-color-oc-cerrada-${l.idOrdenCompraLinea}`}
+                      >
+                        {' '}
+                        · orden {l.folioOrden ?? ''} cerrada
+                      </span>
+                    ) : null}
                   </span>
                   <Button
                     type="button"
                     size="sm"
                     variant={yaCapturado ? 'ghost' : 'outline'}
-                    disabled={soloLectura}
+                    disabled={soloLectura || l.ordenCerrada === true}
                     onClick={() => setPendientePrecargando(l)}
                     data-testid={`captura-color-capturar-oc-${l.idOrdenCompraLinea}`}
                   >

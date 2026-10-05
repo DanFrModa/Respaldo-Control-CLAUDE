@@ -260,6 +260,12 @@ export const esquemaAuditoriaSalida = z
     idEmpresa: z.number().int(),
     idOrden: z.number().int().describe('Orden auditada.'),
     folioOrden: z.number().int().nullable().describe('Folio de la orden (legible).'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, ' +
+          'reclasificación, modificación ni cancelación (la pantalla lo avisa antes).',
+      ),
     codigoModelo: z.string().nullable().describe('Código del modelo de la orden (legible).'),
     idMaquilero: z.number().int().nullable().describe('Maquilero auditado, o null.'),
     maquilero: z.string().nullable().describe('Nombre del maquilero, o null.'),
@@ -352,6 +358,9 @@ export const esquemaAuditoriaResumen = z
     id: z.number().int().describe('Id de la auditoría.'),
     numAuditoria: z.number().int().describe('Folio consecutivo por empresa.'),
     folioOrden: z.number().int().nullable().describe('Folio de la orden auditada (legible).'),
+    ordenCerrada: z
+      .boolean()
+      .describe('0.226b: ¿la orden auditada está CERRADA? (no se modifica ni se cancela).'),
     codigoModelo: z.string().nullable().describe('Código del modelo de la orden (legible).'),
     idMaquilero: z.number().int().nullable().describe('Maquilero auditado, o null.'),
     maquilero: z.string().nullable().describe('Nombre del maquilero, o null.'),

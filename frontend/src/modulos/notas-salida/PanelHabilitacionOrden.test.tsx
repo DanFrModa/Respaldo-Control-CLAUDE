@@ -18,6 +18,7 @@ function habDePrueba(over: Partial<HabilitacionOrden> = {}): HabilitacionOrden {
   return {
     idOrden: 50,
     folioOrden: 1001,
+    ordenCerrada: false,
     idModelo: 5,
     modelo: 'MOD-1',
     totalPiezas: 30,
@@ -185,6 +186,31 @@ describe('PanelHabilitacionOrden (R6, B13)', () => {
     expect(chk).not.toBeChecked();
     fireEvent.change(screen.getByLabelText('A surtir de ELA-01'), { target: { value: '10' } });
     expect(chk).toBeChecked();
+    expect(screen.getByTestId('hab-pasar-nota')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA avisa y apaga la captura y «Pasar a nota»', () => {
+    useHabilitacionOrdenMock.mockReturnValue({
+      data: habDePrueba({ ordenCerrada: true }),
+      isPending: false,
+    });
+    renderPanel();
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1001 está cerrada/,
+    );
+    expect(screen.getByLabelText('Surtir BOT-01')).toBeDisabled();
+    expect(screen.getByLabelText('A surtir de BOT-01')).toBeDisabled();
+    expect(screen.getByTestId('hab-pasar-nota')).toBeDisabled();
+    // Consultar sigue libre.
+    expect(screen.getByTestId('hab-ver-notas')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: con la orden ABIERTA no hay aviso y se marca y pasa a nota', () => {
+    useHabilitacionOrdenMock.mockReturnValue({ data: habDePrueba(), isPending: false });
+    renderPanel();
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Surtir BOT-01'));
     expect(screen.getByTestId('hab-pasar-nota')).toBeEnabled();
   });
 

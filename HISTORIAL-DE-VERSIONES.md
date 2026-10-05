@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.191 · 5-oct-2026 · **en prueba** — **La pantalla te avisa que la orden está cerrada antes de que captures**
+
+> **La v0.191 cierra una fila del programa: la 0.226.** Con la v0.190 el sistema ya rechazaba cualquier movimiento
+> sobre una orden cerrada; ahora la pantalla te lo dice desde el principio y apaga los botones.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Si eliges una orden cerrada, lo ves de inmediato.** Aparece un aviso de que la orden está cerrada y que hay que
+reabrirla para moverla, y los botones de guardar, confirmar, autorizar o cancelar salen apagados. Ya no llenas un
+formulario entero para que te lo rechace al final. Vale en producción, entregas, telas, producto terminado,
+auditorías, notas de salida (también las que haces desde la orden), órdenes de compra, recepciones, la explosión de materiales (asignar proveedor y color), la receta y los precios de la orden, y ligar el desarrollo.
+
+**Al cerrar una orden, te avisa si todavía le queda producto terminado**, con cuántas piezas y en qué almacén, para
+que lo muevas antes. No te impide cerrarla. Es la recomendación que te hice sobre ese caso; si prefieres otra cosa,
+se cambia.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Las órdenes cerradas siguen apareciendo en las listas**, marcadas «· Cerrada». Así puedes consultarlas siempre.
+Quitarlas de las listas donde se captura, con un interruptor para verlas, es otra fila (la 0.227).
+
+**En una recepción de compras, si una orden de compra trae renglones de varias órdenes y una está cerrada**, sólo
+ese renglón queda apagado: los demás se reciben normal. Lo mismo al **asignar proveedor en bloque** desde la
+explosión: las órdenes cerradas se quedan fuera y te dice cuáles.
+
+### ⏳ Sigue pendiente o roto
+
+**Si alguien cierra una orden mientras tú la tienes abierta en otra pantalla**, tu pantalla no se entera hasta
+que la recargas; si intentas guardar, el sistema lo rechaza igual con el mensaje de orden cerrada.
+
+**Siguen esperando tus respuestas:** los ocho casos dudosos de la orden cerrada y la factura del maquilero contada
+dos veces (fila 0.252).
+
 ## 0.190 · 5-oct-2026 · **en prueba** — **Una orden cerrada ya no deja moverle nada**
 
 > **La v0.190 no cierra ninguna fila del programa**: entrega la primera mitad de la 0.226, el bloqueo en el

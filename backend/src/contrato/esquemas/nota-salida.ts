@@ -160,6 +160,12 @@ export const esquemaNotaSalidaLineaSalida = z
     id: z.number().int().describe('Id del renglón.'),
     idOrden: z.number().int().describe('Orden de producción destino.'),
     folioOrden: z.number().int().nullable().describe('Folio de la orden destino, o null.'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni ' +
+          'cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes).',
+      ),
     /**
      * Qué es el renglón: `avio` (el único que se captura hoy), `tela` (histórico de notas viejas —
      * su captura se retiró, §Post-F9.38) o `historico`: un renglón MIGRADO del sistema anterior,
