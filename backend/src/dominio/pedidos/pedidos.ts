@@ -53,7 +53,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
-import { exigirOrdenAbierta } from '../produccion/cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 // ⭐⭐ 0.150: el criterio ÚNICO de «esta orden ya tiene vida» + el lock que lo hace confiable (A2).
 import { senalesDeActividadOrden, textoSenalesActividad } from '../produccion/actividad-orden.js';
 import { bloquearEtapasDeOrden } from '../produccion/recibos.js';
@@ -848,6 +848,22 @@ export async function cancelarPedido(
 
       const motivoOrden = `Pedido ${Number(actual.folio)} cancelado: ${motivo}`;
       for (const orden of ordenesVivas) {
+        // ⭐ 0.226a: la guarda de la orden CERRADA va ANTES del candado de etapas, y no por estilo:
+        // todas las puertas de captura toman primero el compartido del cierre y DESPUÉS el de
+        // etapas. Tomarlos al revés aquí, con un recibo en vuelo y un `cerrarOrden` esperando, podía
+        // DEMORAR la cascada: Postgres lo resuelve reordenando la cola tras el `deadlock_timeout`
+        // (medido por el reviewer con psql: una espera, no un error). Sólo para las que se leyeron
+        // ABIERTAS: la cerrada se conserva por `senales` (no es error), y si se cerró entre la
+        // lectura y este punto, la guarda RE-LEE `cerradaEn` bajo su candado y rechaza el acto
+        // entero — el pedido no se cancela a medias.
+        if (orden.cerradaEn === null) {
+          await exigirOrdenAbiertaPorId(
+            tx,
+            sesion.idEmpresaActiva,
+            orden.id,
+            'puede cancelar en cascada al cancelar su pedido',
+          );
+        }
         // ⚠️ A2: el MISMO advisory lock del envío/recibo, tomado ANTES de mirar la actividad. Sin
         // él, un corte capturado entre el conteo y el `update` se perdería en silencio.
         await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, orden.id);
@@ -864,10 +880,9 @@ export async function cancelarPedido(
           continue;
         }
 
-        // Cinturón: la orden CERRADA ya salió por `senales` (`cerrada` es una de ellas); esta
-        // guarda —la ÚNICA del sistema para el estado cerrado— sigue aquí para que un cambio futuro
-        // en el criterio no vuelva a abrir el agujero en silencio.
-        exigirOrdenAbierta(orden, 'puede cancelar en cascada al cancelar su pedido');
+        // Cinturón: la orden CERRADA ya salió por `senales` (`cerrada` es una de ellas), y la que
+        // se leyó abierta ya pasó la guarda con candado de arriba (0.226a) — el candado sigue
+        // tomado hasta el final de la transacción, así que nadie la cierra entre medias.
         await tx.orden.update({
           where: { id: orden.id },
           data: {

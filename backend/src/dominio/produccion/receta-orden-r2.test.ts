@@ -163,9 +163,15 @@ function bdParaQuitarArte(opciones: {
   };
 
   const tx = {
+    // 0.226a: el candado compartido de la guarda de la orden CERRADA.
+    $executeRaw: vi.fn(() => Promise.resolve(0)),
     orden: {
       findFirst: vi.fn(() => Promise.resolve(orden)),
-      findMany: vi.fn(() => Promise.resolve([ordenDelLinaje])),
+      // 0.226a: la guarda pregunta por las CERRADAS (`cerradaEn: { not: null }`) y el doble dice
+      // «ninguna»; cualquier otra lectura sigue viendo el linaje de siempre.
+      findMany: vi.fn((args?: { where?: { cerradaEn?: unknown } }) =>
+        Promise.resolve(args?.where?.cerradaEn === undefined ? [ordenDelLinaje] : []),
+      ),
       findUniqueOrThrow: vi.fn(() =>
         Promise.resolve({ recetaLiberadaEn: null, recetaLiberadaPorId: null }),
       ),

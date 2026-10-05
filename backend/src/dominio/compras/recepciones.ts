@@ -136,6 +136,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 import {
   faltantePorRecibir,
   renglonSurtido,
@@ -689,6 +690,18 @@ export async function recibirCompra(
         throw new ErrorNoEncontrado('OrdenCompraLinea', linea.idOrdenCompraLinea);
       }
     }
+    // ⭐ 0.226a (§Post-F9.244): recibir material de un renglón ligado a una orden CERRADA es un
+    // movimiento sobre esa orden — no se hace (decisión 5 de Daniel: «una vez que se cierra es
+    // porque ya se recibió todo»). Guarda ÚNICA en lote por los renglones que se RECIBEN, antes del
+    // folio, de cualquier escritura y del kardex. (El candado de la OC de arriba es de otro recurso
+    // que ningún cierre toma. Todas las puertas que tocan los dos los toman en el mismo orden:
+    // primero la OC, luego la orden.)
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => lineasPorId.get(l.idOrdenCompraLinea)?.idOrden),
+      'le puede recibir material',
+    );
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_RECEPCION);
     const recepcion = await tx.recepcionCompra.create({
@@ -1393,7 +1406,14 @@ export async function reversarRecepcion(
         folio: true,
         idOrdenCompra: true,
         reversadaEn: true,
-        lineas: { select: { id: true, idMovimiento: true } },
+        lineas: {
+          select: {
+            id: true,
+            idMovimiento: true,
+            // 0.226a: la orden de producción del renglón de OC, para la guarda de la cerrada.
+            ordenCompraLinea: { select: { idOrden: true } },
+          },
+        },
       },
     });
     if (recepcion === null) {
@@ -1402,6 +1422,18 @@ export async function reversarRecepcion(
     // B2: serializa el recálculo del estatus de la OC contra recepciones/reversos concurrentes
     // (lock por idOrdenCompra, ANTES de leer la OC y sus sumas). Mismo namespace que recibir.
     await bloquearOrdenCompra(tx, recepcion.idOrdenCompra);
+    // ⭐ 0.226a: reversar SACA del kardex lo recibido (inverso auditado) contra las órdenes de esos
+    // renglones: sobre una orden CERRADA no se hace. Va DESPUÉS del candado de la OC y antes de
+    // cualquier escritura: es el MISMO orden de candados que `recibirCompra` y la entrada de tela
+    // (primero la OC, luego la orden). Al revés, con un `cerrarOrden` esperando en medio, reversar y
+    // recibir podían DEMORARSE: Postgres lo resuelve reordenando la cola, pero tras esperar el
+    // `deadlock_timeout` (lo midió el reviewer con psql; no es un error, es una espera).
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      recepcion.lineas.map((l) => l.ordenCompraLinea.idOrden),
+      'le puede reversar una recepción de material',
+    );
     // Re-lee la bandera de reverso BAJO el lock: dos reversos concurrentes de la MISMA recepción se
     // serializan aquí; el segundo ya ve `reversadaEn` y se rechaza (no doble-revierte el kardex).
     const reversadaEn = (

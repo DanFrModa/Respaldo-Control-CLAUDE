@@ -85,6 +85,7 @@ import {
   recortarPorLaCola,
   resolverVentanaKardex,
 } from './periodo-kardex.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import { exigirPermisoParaCancelarSalidaSinOrden } from './salida-sin-orden.js';
 import { rechazarTipoReservado } from './tipos-reservados.js';
@@ -467,6 +468,9 @@ export async function registrarSalidaTelaAOrden(
   validarRenglonesTelaUnicos(datos.lineas);
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): la gemela legada (sin ruta REST desde 0.170) lleva la MISMA guarda
+    // que la vigente: si algún día se reconecta, no puede volver como puerta trasera.
+    await exigirOrdenAbiertaPorId(tx, idEmpresa, datos.idOrden, 'le puede sacar tela');
     const orden = await tx.orden.findFirst({
       where: { id: datos.idOrden, idEmpresa },
       select: { id: true },
@@ -602,6 +606,7 @@ export async function cancelarMovimientoTela(
       select: {
         id: true,
         origenTipo: true,
+        origenId: true,
         idMovimientoInverso: true,
         tipoMov: { select: { direccion: true } },
         detallesTela: { select: { id: true } },
@@ -609,6 +614,16 @@ export async function cancelarMovimientoTela(
     });
     if (original === null || original.detallesTela.length === 0) {
       throw new ErrorNoEncontrado('Movimiento de tela', idMovimiento);
+    }
+    // ⭐ 0.226a: misma regla que la puerta por color — cancelar una SALIDA A ORDEN de una orden
+    // CERRADA no se hace (la puerta legada no puede ser la trasera).
+    if (original.origenTipo === ORIGEN.salidaTelaOrden) {
+      await exigirOrdenAbiertaPorId(
+        tx,
+        idEmpresa,
+        Number(original.origenId),
+        'le puede cancelar una salida de tela',
+      );
     }
     // 🔴 Fila 0.104 — LA PUERTA DE ATRÁS. Esta cancelación LEGADA acepta cualquier movimiento con
     // renglones de tela, y los del flujo por COLOR también lo son: sin esta línea, una salida sin

@@ -120,10 +120,14 @@ function bdParaCrear(origenModelo: 'desarrollo' | 'produccion' = 'produccion'): 
         }),
       ),
     },
+    // 0.226a: la guarda de la orden CERRADA toma su candado compartido (`$executeRaw`) y después
+    // busca las cerradas (`findMany` con `cerradaEn: { not: null }`): el doble dice «ninguna».
+    $executeRaw: vi.fn(() => Promise.resolve(0)),
     orden: {
       create: vi.fn(() => Promise.resolve({ id: 1 })),
       update: vi.fn(() => Promise.resolve({})),
       findFirst: vi.fn(() => Promise.resolve(ordenDetallada)),
+      findMany: vi.fn(() => Promise.resolve([])),
       findUnique: vi.fn(() => Promise.resolve({ recetaLiberadaEn: null })),
     },
     // Insumos de la regla de "orden completa": el alta la recalcula en la misma tx.

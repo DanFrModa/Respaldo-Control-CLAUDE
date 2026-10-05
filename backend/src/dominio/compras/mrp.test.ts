@@ -1083,9 +1083,15 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
       orden: {
         // Honra el `where`: sólo devuelve la OP si de verdad la están pidiendo (y de su empresa).
         findMany: (args?: never) => {
-          const w = (args as unknown as { where: { id: { in: number[] }; idEmpresa: number } })
-            .where;
+          const w = (
+            args as unknown as {
+              where: { id: { in: number[] }; idEmpresa: number; cerradaEn?: unknown };
+            }
+          ).where;
           const casa = w.id.in.includes(ID_ORDEN) && w.idEmpresa === orden.idEmpresa;
+          // 0.226a: la previa pregunta por las CERRADAS (`cerradaEn: { not: null }`); esta OP está
+          // abierta, así que esa pregunta no la devuelve.
+          if (w.cerradaEn !== undefined) return Promise.resolve([]);
           return Promise.resolve(casa ? [orden] : []);
         },
         findFirst: (args?: never) => {
@@ -1409,7 +1415,15 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
           ),
       },
       orden: {
-        findMany: () => Promise.resolve([orden]),
+        // 0.226a: la pregunta por las CERRADAS (`cerradaEn` en el where) no devuelve nada: la OP
+        // de esta batería está abierta.
+        findMany: (args?: never) =>
+          Promise.resolve(
+            (args as unknown as { where?: { cerradaEn?: unknown } } | undefined)?.where
+              ?.cerradaEn === undefined
+              ? [orden]
+              : [],
+          ),
         // ⭐⭐ V1-E8z: las columnas del candado de compra, en NULL (receta no reabierta).
         findFirst: () =>
           Promise.resolve({

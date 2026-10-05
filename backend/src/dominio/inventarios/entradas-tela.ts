@@ -122,6 +122,7 @@ import {
   cancelarMovimientoTerceroInterno,
   registrarMovimientoTerceroInterno,
 } from '../terceros/cuenta-terceros.js';
+import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 import { exigirProveedorQueFactura } from '../terceros/facturacion-proveedor.js';
 import {
   cargoDeEntradaDeProveedor,
@@ -298,6 +299,34 @@ function aEntradaTelaSalida(
     creadoEn: e.creadoEn.toISOString(),
     creadoPorId: e.creadoPorId,
   };
+}
+
+/**
+ * ⭐ 0.226a (§Post-F9.244) — la guarda de la orden CERRADA para una entrada de tela. La entrada no
+ * nombra la orden: cada renglón surte un renglón de OC, y ESE renglón es el que lleva la orden de
+ * producción (`OrdenCompraLinea.idOrden`). Se resuelve en una consulta y se delega en la guarda
+ * ÚNICA en lote (candado compartido + mensaje central con todos los folios cerrados).
+ */
+async function exigirOrdenesAbiertasDeRenglonesOC(
+  tx: Tx,
+  idEmpresa: number,
+  idsOrdenCompraLinea: readonly (number | null | undefined)[],
+  queSeIntenta: string,
+): Promise<void> {
+  const ids = [
+    ...new Set(idsOrdenCompraLinea.filter((idLinea): idLinea is number => idLinea != null)),
+  ];
+  if (ids.length === 0) return;
+  const lineasOC = await tx.ordenCompraLinea.findMany({
+    where: { id: { in: ids } },
+    select: { idOrden: true },
+  });
+  await exigirOrdenesAbiertas(
+    tx,
+    idEmpresa,
+    lineasOC.map((l) => l.idOrden),
+    queSeIntenta,
+  );
 }
 
 /** Lo mínimo que el detector de duplicados necesita de un documento. */
@@ -635,6 +664,13 @@ export async function crearEntradaTela(
   }
 
   const id = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: no se le recibe tela a una orden CERRADA. Guarda ÚNICA en lote, PRIMERA instrucción.
+    await exigirOrdenesAbiertasDeRenglonesOC(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => l.idOrdenCompraLinea),
+      'le puede recibir tela',
+    );
     const colores = await validarCabeceraYLineas(
       tx,
       idEmpresa,
@@ -743,6 +779,14 @@ export async function actualizarEntradaTela(
   );
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: los renglones que se ESCRIBEN no pueden surtir a una orden CERRADA. PRIMERA
+    // instrucción (antes de borrar y recrear los renglones).
+    await exigirOrdenesAbiertasDeRenglonesOC(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => l.idOrdenCompraLinea),
+      'le puede recibir tela',
+    );
     const anterior = await exigirBorrador(tx, id, idEmpresa);
     // Sin XML nuevo, el sello guardado manda — y tiene que seguir cuadrando con el proveedor con el
     // que va a quedar el documento (si no, el cargo fiscal nacería contra quien no facturó).
@@ -986,6 +1030,15 @@ async function confirmarEnTransaccion(
       .map((l) => l.idOrdenCompraLinea)
       .filter((id): id is number => id !== null);
     await bloquearOrdenesDeRenglones(tx, idsLineaOC);
+    // ⭐ 0.226a: confirmar METE la tela al kardex y recibe contra las OC de esas órdenes. Si alguna
+    // se cerró mientras la entrada era borrador, no se confirma (y se dice cuáles). Antes de crear
+    // partidas y de mover el kardex.
+    await exigirOrdenesAbiertasDeRenglonesOC(
+      tx,
+      idEmpresa,
+      idsLineaOC,
+      'le puede confirmar una entrada de tela',
+    );
 
     const fecha = documento.fecha.toISOString().slice(0, 10);
     // La liga con la OC VIAJA en el renglón que se le pasa al embudo (antes se caía en este mapeo):
@@ -1200,6 +1253,17 @@ export async function cancelarEntradaTela(
         .map((l) => l.idOrdenCompraLinea)
         .filter((idLinea): idLinea is number => idLinea !== null),
     );
+    // ⭐ 0.226a: cancelar una entrada CONFIRMADA saca la tela del kardex y reversa lo recibido
+    // contra las órdenes de sus renglones: sobre una orden CERRADA no se hace. Cancelar un BORRADOR
+    // no mueve nada y queda libre (mismo criterio que la nota de salida en borrador).
+    if (documento.estatus === EstatusEntradaTela.confirmada) {
+      await exigirOrdenesAbiertasDeRenglonesOC(
+        tx,
+        idEmpresa,
+        documento.lineas.map((l) => l.idOrdenCompraLinea),
+        'le puede cancelar una entrada de tela',
+      );
+    }
 
     // El WHERE con el estatus previo serializa dos cancelaciones concurrentes: la segunda no
     // encuentra fila y truena ANTES de generar un segundo inverso.

@@ -25,9 +25,13 @@
  *     toda lectura del costo de esa orden devuelve lo congelado; las órdenes abiertas siguen
  *     calculando en vivo. Ver {@link congelarCostoDeOrden}.
  *  3. **Cierra la puerta a la captura**: ninguna etapa nueva (corte, empaque, envío, recibo,
- *     entrega), ninguna cancelación de etapa, ningún cierre con maquilero y ninguna edición del
- *     costo. La guarda es UNA SOLA ({@link exigirOrdenAbierta}) aplicada en cada punto de
- *     escritura; consultar e imprimir siguen libres.
+ *     entrega), ninguna cancelación de etapa, ningún cierre con maquilero, ninguna edición del
+ *     costo — y desde 0.226a (§Post-F9.244) tampoco salidas de tela, movimientos de PT, notas de
+ *     salida, compras, recepciones, entradas de tela ni auditorías. La guarda es UNA SOLA
+ *     ({@link exigirOrdenesAbiertas}, con su candado compartido) aplicada en cada punto de
+ *     escritura, y el guardián `orden-cerrada-guardian.test.ts` obliga a declarar cada función que
+ *     escribe con una orden. Consultar e imprimir siguen libres; Finanzas (EsMa, EDR, CxP), el MRP y
+ *     la RC quedan FUERA a propósito (decisiones 2 y 3 de Daniel).
  *
  * QUÉ **NO** HACE CERRAR, y es a propósito:
  *  • NO recalcula el costo (no re-costea nada: congela lo que ya había).
@@ -61,7 +65,7 @@
  */
 import type { OrdenSalida } from '../../contrato/index.js';
 import { esquemaOrdenCerrarCuerpo, esquemaOrdenReabrirCuerpo } from '../../contrato/index.js';
-import { Prisma, type EstadoOrden } from '../../datos/index.js';
+import { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -77,48 +81,147 @@ import { redondear4 } from '../costos/decimales.js';
 import { obtenerOrden } from './ordenes.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 
-/** Lo mínimo que hay que saber de una orden para decidir si admite escritura. */
-export interface OrdenCerrable {
-  folio: bigint;
-  estado: EstadoOrden;
-  cerradaEn: Date | null;
+/**
+ * ⭐⭐ 0.226a (§Post-F9.244) — NAMESPACE del candado consultivo que ordena el CIERRE contra la CAPTURA.
+ *
+ * Forma de DOS claves `pg_advisory_xact_lock[_shared](int4 NAMESPACE, int4 idOrden)`. `0x4f524443`
+ * son los bytes de `'ORDC'` (ORDen Cerrada). Se eligió midiendo el repo: NO es ninguno de los
+ * namespaces fijos (`20_5xx`, `20_641`, `0x52440001/2`, `0x54430001`, `0x54454c41`, `0x524f4c45535f41`)
+ * ni ninguna de las BASES que se mezclan con la empresa (`0x4f000000`, `0x50000000`, `0x51000000`).
+ * ⚠️ **Sobre las colisiones, dicho exacto.** Si otra llave de DOS claves del repo valiera lo mismo
+ * (`NAMESPACE`, `idOrden`), una puerta que sostiene el COMPARTIDO de esta orden y otra transacción que
+ * pidiera el EXCLUSIVO de esa llave ajena sí podrían esperarse mutuamente — no es sólo «serializar de
+ * más». Medido contra las fórmulas que existen: las de etapas/RC/precios/EsMa son
+ * `(idEmpresa × 1 000 003) XOR base` con base `0x4f000000`/`0x50000000`/`0x51000000`, y para dar
+ * `0x4f524443` la empresa tendría que ser 5.39 / 525.48 / 508.71 — ningún entero ⇒ **imposible**.
+ * Las del kardex salen de un hash de seis dimensiones: coincidir exige que el hash caiga justo en
+ * este valor de 32 bits Y que su segunda clave sea un `idOrden` vivo — probabilidad del orden de
+ * 1 en 4 mil millones por llave. Despreciable, pero no cero; por eso queda escrito.
+ *
+ * 🔑 EL REPARTO, y por qué así:
+ *  • `cerrarOrden` / `reabrirOrden` toman el candado **EXCLUSIVO** como PRIMERA instrucción.
+ *  • Cada puerta de captura toma el **COMPARTIDO** (vía {@link exigirOrdenesAbiertas}) como PRIMERA
+ *    instrucción de su transacción, y sólo DESPUÉS lee `cerradaEn`.
+ * ⇒ dos capturas de la misma orden NO se estorban entre sí (compartido + compartido), pero el cierre
+ * espera a que terminen las capturas en vuelo, y una captura que llega durante el cierre espera a que
+ * el cierre confirme — y entonces LEE `cerradaEn` ya puesta y se rechaza. Sin esto, una captura que
+ * leyó «abierta» un instante antes del cierre escribía DESPUÉS del congelado y el costo congelado no
+ * la incluía (la carrera que el congelado de 0.061 vino a matar, por la puerta de al lado).
+ *
+ * ⚠️ Advisory y NO un candado de FILA sobre la orden. `FOR KEY SHARE` no serviría: no choca con el
+ * `UPDATE` de `cerrarOrden` (no toca la llave), así que no lo haría esperar. `FOR SHARE` sí lo haría
+ * esperar, pero varias puertas reescriben esa misma fila después (`recalcularEstadoOrden`,
+ * `rcActiva`, `pagada`): dos capturas de la misma orden con `FOR SHARE` que luego la actualizan se
+ * interbloquearían entre sí. El candado consultivo no tiene ninguno de los dos problemas.
+ */
+export const NAMESPACE_LOCK_CIERRE_ORDEN = 0x4f524443 | 0;
+
+/** Une folios en español: «12», «12 y 15», «12, 15 y 20». */
+function listaDeFolios(folios: readonly string[]): string {
+  if (folios.length <= 1) return folios.join('');
+  return `${folios.slice(0, -1).join(', ')} y ${folios.at(-1) ?? ''}`;
 }
 
 /**
- * ⭐ LA GUARDA ÚNICA: rechaza escribir sobre una orden CERRADA (0.061). Todas las puertas de
- * captura de la orden la llaman con la misma orden que ya leyeron —no hace una consulta propia— y
- * dicen en `queSeIntenta` qué se estaba haciendo, para que el mensaje sirva.
- *
- * 🔑 Mira `cerradaEn`, NO el `estado`. El estado es un espejo (lo pinta el badge y lo filtran las
- * consultas) y lo recalculan varios caminos; la columna es la verdad del acto. Si alguna vez los
- * dos se desalinearan, esta guarda falla del lado SEGURO: sigue protegiendo la orden cerrada.
- *
- * NO habla de `cancelada`: ésa la rechaza cada puerta con su propio mensaje desde F2/F3, y son cosas
- * distintas (una cancelada nunca se produjo; una cerrada terminó su vida normal).
- *
- * El mensaje nombra la salida —reabrir— porque el usuario no puede adivinarla: cerrar es reversible,
- * pero sólo por el acto inverso y con permiso.
+ * ⭐ EL MENSAJE ÚNICO Y CENTRAL de la orden cerrada. Nombra TODAS las órdenes cerradas que tocaba
+ * la operación (una nota o una OC pueden llevar varias) y la salida —reabrir— porque el usuario no
+ * puede adivinarla: cerrar es reversible, pero sólo por el acto inverso y con permiso.
  */
-export function exigirOrdenAbierta(orden: OrdenCerrable, queSeIntenta: string): void {
-  if (orden.cerradaEn === null) return;
-  throw new ErrorConflicto(
-    `La orden ${String(orden.folio)} está CERRADA (su costo quedó congelado): no se ${queSeIntenta}. ` +
-      'Si de verdad hay que moverla, reábrela primero (permiso "ordenes.cerrar") — queda auditado.',
+export function mensajeOrdenCerrada(
+  folios: readonly (bigint | number | string)[],
+  queSeIntenta: string,
+): string {
+  const lista = [...new Set(folios.map(String))];
+  if (lista.length <= 1) {
+    return (
+      `La orden ${lista[0] ?? ''} está CERRADA (su costo quedó congelado): no se ${queSeIntenta}. ` +
+      'Si de verdad hay que moverla, reábrela primero (permiso "ordenes.cerrar") — queda auditado.'
+    );
+  }
+  return (
+    `Las órdenes ${listaDeFolios(lista)} están CERRADAS (su costo quedó congelado): no se ` +
+    `${queSeIntenta}. Si de verdad hay que moverlas, reábrelas primero (permiso "ordenes.cerrar") ` +
+    '— queda auditado.'
   );
 }
 
-/** Igual que {@link exigirOrdenAbierta}, pero leyendo la orden por id (para puertas que no la traen). */
-export async function exigirOrdenAbiertaPorId(
+/**
+ * ⭐ El error de la orden cerrada. Es un {@link ErrorConflicto} (409, código `CONFLICTO`: el contrato
+ * de errores no cambia y todo `instanceof ErrorConflicto` que ya existía lo sigue atrapando), con
+ * nombre propio para que las pruebas y la pantalla lo distingan de cualquier otro conflicto.
+ */
+export class ErrorOrdenCerrada extends ErrorConflicto {
+  /** Los folios de las órdenes cerradas que bloquearon la operación (como texto: son BigInt). */
+  readonly folios: string[];
+
+  constructor(folios: readonly (bigint | number | string)[], queSeIntenta: string) {
+    super(mensajeOrdenCerrada(folios, queSeIntenta));
+    this.folios = [...new Set(folios.map(String))];
+  }
+}
+
+/**
+ * ⭐⭐ LA GUARDA ÚNICA, EN LOTE Y CON CANDADO (0.226a, §Post-F9.244). Es lo PRIMERO que hace cada
+ * puerta de captura dentro de su transacción, antes de cualquier escritura o candado de inventario:
+ *
+ *  1. toma `pg_advisory_xact_lock_shared(NAMESPACE, idOrden)` por cada orden, en orden ASCENDENTE
+ *     (el MISMO orden en todas las puertas);
+ *  2. DESPUÉS lee `folio` + `cerradaEn` de esas órdenes (dentro de la empresa activa, A9: una orden
+ *     de otra empresa no existe para esta sesión, y su folio no se dice);
+ *  3. si alguna está cerrada, lanza UN {@link ErrorOrdenCerrada} que nombra TODAS.
+ *
+ * 🔑 Mira `cerradaEn`, NO el `estado`. El estado es un espejo (lo pinta el badge y lo filtran las
+ * consultas) y lo recalculan varios caminos; la columna es la verdad del acto. Si alguna vez los dos
+ * se desalinearan, la guarda falla del lado SEGURO. NO habla de `cancelada`: ésa la rechaza cada
+ * puerta con su propio mensaje (una cancelada nunca se produjo; una cerrada terminó su vida normal).
+ *
+ * ⚠️ 0.226a: la guarda «pura» de 0.061 (`exigirOrdenAbierta`, sin candado) **se borró**: ya nadie la
+ * usaba y dejarla exportada era una trampa a un import de distancia. Ésta es la ÚNICA forma.
+ *
+ * Las órdenes que no existen (o son de otra empresa) se ignoran: el NO ENCONTRADO lo da la puerta,
+ * con su propio mensaje. `null`/`undefined` en la lista también se ignoran (renglones sin orden).
+ */
+export async function exigirOrdenesAbiertas(
   tx: Tx,
-  idOrden: number,
+  idEmpresa: number,
+  idsOrden: readonly (number | null | undefined)[],
   queSeIntenta: string,
 ): Promise<void> {
-  const orden = await tx.orden.findUnique({
-    where: { id: idOrden },
-    select: { folio: true, estado: true, cerradaEn: true },
+  const ids = [...new Set(idsOrden.filter((id): id is number => Number.isInteger(id)))].toSorted(
+    (a, b) => a - b,
+  );
+  if (ids.length === 0) return;
+  for (const id of ids) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(${NAMESPACE_LOCK_CIERRE_ORDEN}::int, ${id}::int)`;
+  }
+  const cerradas = await tx.orden.findMany({
+    where: { id: { in: ids }, idEmpresa, cerradaEn: { not: null } },
+    select: { folio: true },
+    orderBy: { folio: 'asc' },
   });
-  if (orden === null) return; // que el NO ENCONTRADO lo dé la puerta, con su propio mensaje
-  exigirOrdenAbierta(orden, queSeIntenta);
+  if (cerradas.length === 0) return;
+  throw new ErrorOrdenCerrada(
+    cerradas.map((o) => o.folio),
+    queSeIntenta,
+  );
+}
+
+/** {@link exigirOrdenesAbiertas} para UNA orden (la forma más común de las puertas). */
+export async function exigirOrdenAbiertaPorId(
+  tx: Tx,
+  idEmpresa: number,
+  idOrden: number | null | undefined,
+  queSeIntenta: string,
+): Promise<void> {
+  await exigirOrdenesAbiertas(tx, idEmpresa, [idOrden], queSeIntenta);
+}
+
+/**
+ * El candado EXCLUSIVO del cierre/reapertura. Espera a que terminen las capturas en vuelo de esa
+ * orden (que sostienen el compartido) y hace esperar a las que lleguen mientras tanto.
+ */
+async function bloquearOrdenParaCierre(tx: Tx, idOrden: number): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_CIERRE_ORDEN}::int, ${idOrden}::int)`;
 }
 
 /** Lo que quedó congelado (o los NULL que dicen que no había qué congelar). */
@@ -194,6 +297,9 @@ export async function cerrarOrden(
   const datos = validarEntrada(esquemaOrdenCerrarCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: el candado EXCLUSIVO es la PRIMERA instrucción. Espera a las capturas en vuelo
+    // (que sostienen el compartido) para que el congelado de abajo las INCLUYA.
+    await bloquearOrdenParaCierre(tx, id);
     const actual = await tx.orden.findFirst({
       where: { id, idEmpresa: sesion.idEmpresaActiva },
       select: { id: true, folio: true, estado: true, cerradaEn: true },
@@ -274,6 +380,8 @@ export async function reabrirOrden(
   const datos = validarEntrada(esquemaOrdenReabrirCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: mismo candado EXCLUSIVO que el cierre, como PRIMERA instrucción.
+    await bloquearOrdenParaCierre(tx, id);
     const actual = await tx.orden.findFirst({
       where: { id, idEmpresa: sesion.idEmpresaActiva },
       select: {

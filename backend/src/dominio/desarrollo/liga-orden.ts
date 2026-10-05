@@ -53,6 +53,7 @@ import { aEventoSalida, incluirEvento, nombresDeAutores } from './negociacion.js
 import { calcularEstadoDesarrollo, incluirEstadoDesarrollo } from './desarrollos.js';
 import { conteosDesarrollos } from './proyectos.js';
 import { idModeloDeLaReceta, SELECT_LINAJE_RECETA } from '../modelos/receta-compartida.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 
 /** Cliente de lectura (tx o Prisma), para los helpers de proyección. */
 type ClienteBd = ReturnType<typeof clienteLectura>;
@@ -117,6 +118,11 @@ export async function ligarOrdenNucleo(
   idDesarrollo: number,
   idEmpresa: number,
 ): Promise<void> {
+  // ⭐ 0.226a (§Post-F9.244, duda C5 — DEFAULT: BLOQUEAR, pendiente de que Daniel lo confirme):
+  // ligar una orden CERRADA a un desarrollo cambia de qué negociación «salió» su precio. Guarda
+  // ÚNICA con candado, PRIMERA instrucción. Para `salidaAProduccion` la orden acaba de nacer en la
+  // misma transacción: nunca está cerrada y el candado compartido no estorba a nadie.
+  await exigirOrdenAbiertaPorId(tx, idEmpresa, idOrden, 'puede ligar a un desarrollo');
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
     select: {
@@ -246,6 +252,9 @@ export async function quitarLiga(
   const idEmpresa = sesion.idEmpresaActiva;
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (duda C5 — DEFAULT: BLOQUEAR, pendiente de Daniel): desligar una orden CERRADA
+    // tampoco. Guarda ÚNICA con candado, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(tx, idEmpresa, idOrden, 'puede desligar de su desarrollo');
     const liga = await tx.desarrolloOrden.findFirst({
       where: { idOrden, orden: { idEmpresa } },
       select: { id: true, idDesarrollo: true, orden: { select: { folio: true } } },

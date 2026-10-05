@@ -104,7 +104,7 @@ import {
   normalizarPack,
   ordenManejaPacks,
 } from './packs.js';
-import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import {
   darSalidaMermaIncompletas,
   devolverPrendasDeTransito,
@@ -193,14 +193,15 @@ async function resolverOrden(
   idOrden: number,
   idEmpresaActiva: number,
 ): Promise<ContextoOrden> {
+  // ⭐ 0.061 / 0.226a: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda
+  // ÚNICA con candado compartido: lo PRIMERO de la transacción del recibo.
+  await exigirOrdenAbiertaPorId(tx, idEmpresaActiva, idOrden, 'le pueden capturar recibos');
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
       idEmpresa: true,
       folio: true,
       estado: true,
-      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
-      cerradaEn: true,
       lineas: { select: { idColor: true, pack: true, tallas: { select: { idTalla: true } } } },
     },
   });
@@ -210,8 +211,6 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
-  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
-  exigirOrdenAbierta(orden, 'le pueden capturar recibos');
   const colores = new Set<number>();
   const tallasPorColor = new Map<number, Set<number>>();
   const packsPorColor = new Map<number, Set<string>>();
@@ -1176,7 +1175,12 @@ export async function cancelarReciboMaquila(
     }
     // ⭐ 0.061: cancelar un recibo mueve el inventario Y el divisor del costo. Sobre una orden
     // CERRADA hay que reabrirla primero (acto inverso auditado, no una edición).
-    await exigirOrdenAbiertaPorId(tx, recibo.idOrden, 'puede cancelar su recibo');
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      recibo.idOrden,
+      'puede cancelar su recibo',
+    );
 
     // Serializa la orden para que la reversión del kardex y la verificación del cargo sean coherentes.
     await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, recibo.idOrden);

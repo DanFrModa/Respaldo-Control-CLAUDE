@@ -88,7 +88,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { claveCeldaPack, esSinPack, normalizarPack, ordenManejaPacks } from './packs.js';
 import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
 // `metaPara`/`MetaCelda` viven en `wip.ts` (una sola copia, §Post-F9.10). Sin ciclo: el cierre
@@ -220,6 +220,9 @@ async function resolverOrden(
   idOrden: number,
   idEmpresaActiva: number,
 ): Promise<ContextoOrden> {
+  // ⭐ 0.061 / 0.226a: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda
+  // ÚNICA con candado compartido: es lo PRIMERO de la transacción de cada puerta que pasa por aquí.
+  await exigirOrdenAbiertaPorId(tx, idEmpresaActiva, idOrden, 'le pueden capturar etapas');
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
@@ -227,8 +230,6 @@ async function resolverOrden(
       idModelo: true,
       folio: true,
       estado: true,
-      // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
-      cerradaEn: true,
       lineas: {
         select: {
           idColor: true,
@@ -244,8 +245,6 @@ async function resolverOrden(
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar etapas.');
   }
-  // ⭐ 0.061: una orden CERRADA no admite captura nueva (su costo quedó congelado). Guarda ÚNICA.
-  exigirOrdenAbierta(orden, 'le pueden capturar etapas');
 
   const pedido: Celda[] = [];
   const colores = new Set<number>();
@@ -1197,7 +1196,12 @@ export async function cancelarEtapaMovimiento(
     }
     // ⭐ 0.061: cancelar una etapa MUEVE las cantidades de la orden (y con ellas su costo). Sobre
     // una orden CERRADA hay que reabrirla primero — el acto inverso auditado, no una edición.
-    await exigirOrdenAbiertaPorId(tx, etapa.idOrden, 'pueden cancelar sus etapas');
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      etapa.idOrden,
+      'pueden cancelar sus etapas',
+    );
     // Esta operación cancela corte, envío y EMPAQUE (0.114); recibo/entrega (con efectos de kardex)
     // los cancela su propio módulo (E4/E5), que además revierte el inventario.
     if (

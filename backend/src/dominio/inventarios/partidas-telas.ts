@@ -89,6 +89,7 @@ import {
   recortarPorLaCola,
   resolverVentanaKardex,
 } from './periodo-kardex.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 import { exigirCancelableFueraDelCiclico } from './cancelacion-comun.js';
 import {
   CODIGO_TIPO_MOV_POR_CONCEPTO,
@@ -1513,6 +1514,9 @@ export async function registrarSalidaTelaColorAOrden(
   const verImportes = tienePermiso(sesion, 'telas.ver-totales');
 
   const idMovimiento = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): a una orden CERRADA no se le saca tela. Guarda ÚNICA con candado
+    // compartido, PRIMERA instrucción (antes del lock de existencias del motor).
+    await exigirOrdenAbiertaPorId(tx, idEmpresa, datos.idOrden, 'le puede sacar tela');
     const orden = await tx.orden.findFirst({
       where: { id: datos.idOrden, idEmpresa },
       select: { id: true },
@@ -1754,6 +1758,7 @@ export async function cancelarMovimientoTelaColor(
       select: {
         id: true,
         origenTipo: true,
+        origenId: true,
         tipoMov: { select: { direccion: true } },
         idMovimientoInverso: true,
         detallesTela: { select: { idTelaColor: true } },
@@ -1761,6 +1766,17 @@ export async function cancelarMovimientoTelaColor(
     });
     if (original === null || !original.detallesTela.some((d) => d.idTelaColor !== null)) {
       throw new ErrorNoEncontrado('Movimiento de tela por color', idMovimiento);
+    }
+    // ⭐ 0.226a: cancelar una SALIDA A ORDEN devuelve tela al almacén y le quita consumo a la
+    // orden. Sobre una orden CERRADA no se hace (D3: es un movimiento, y la orden ya no admite
+    // movimientos). Es lo primero tras leer de qué orden es — antes de cualquier candado o escritura.
+    if (original.origenTipo === ORIGEN.salidaTelaOrden) {
+      await exigirOrdenAbiertaPorId(
+        tx,
+        idEmpresa,
+        Number(original.origenId),
+        'le puede cancelar una salida de tela',
+      );
     }
     // Fila 0.104: la marcha atrás de una salida sin orden —y la marcha atrás de esa marcha atrás—
     // piden la MISMA llave que la salida.

@@ -85,6 +85,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 import {
   exigirComprasNoCongeladas,
   exigirMaterialesLiberados,
@@ -991,6 +992,16 @@ export async function crearOC(
   const datos = validarEntrada(esquemaCompraCrear, entrada);
 
   const idOC = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): no se le compra a una orden CERRADA. Guarda ÚNICA en lote (nombra
+    // todas las cerradas), con candado compartido, PRIMERA instrucción. Cubre también la OC que
+    // genera la explosión (`generarOCDesdeExplosion` → aquí): el MRP sigue LIBRE para explotar
+    // (decisión 3 de Daniel), pero comprar ya es una captura sobre la orden.
+    await exigirOrdenesAbiertas(
+      tx,
+      sesion.idEmpresaActiva,
+      datos.lineas.map((l) => l.idOrden),
+      'le puede comprar material',
+    );
     await exigirProveedorExiste(tx, datos.idProveedor);
     const direccion = await exigirDireccionEntregaValida(tx, datos.idDireccionEntrega);
     const { idsOrden, lineas } = await validarLineas(
@@ -1071,6 +1082,16 @@ export async function actualizarOC(
   const datos = validarEntrada(esquemaCompraEditarCuerpo, entrada);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: las líneas que se ESCRIBEN no pueden comprarle a una orden CERRADA. Guarda ÚNICA
+    // en lote, PRIMERA instrucción (antes de tocar el encabezado). Quitarle TODAS sus líneas a una
+    // orden cerrada sí pasa (su id ya no está entre las entrantes): es la misma vía de escape que
+    // ya tiene el candado de compra, y no compra nada (duda C2, default LIBRE).
+    await exigirOrdenesAbiertas(
+      tx,
+      sesion.idEmpresaActiva,
+      (datos.lineas ?? []).map((l) => l.idOrden),
+      'le puede comprar material',
+    );
     const actual = await exigirOC(tx, id, sesion.idEmpresaActiva);
     if (actual.estatus === 'cancelada') {
       throw new ErrorConflicto('La orden de compra está cancelada; no se puede modificar.');
@@ -1206,6 +1227,14 @@ export async function autorizarOC(
       select: { idOrden: true },
       distinct: ['idOrden'],
     });
+    // ⭐ 0.226a: autorizar COMPROMETE el dinero contra las órdenes ligadas: si alguna está CERRADA
+    // no se autoriza. Antes de cualquier escritura.
+    await exigirOrdenesAbiertas(
+      tx,
+      sesion.idEmpresaActiva,
+      ligadas.map((l) => l.idOrden),
+      'le puede autorizar una orden de compra',
+    );
     await exigirComprasNoCongeladas(
       tx,
       ligadas.flatMap((l) => (l.idOrden === null ? [] : [l.idOrden])),

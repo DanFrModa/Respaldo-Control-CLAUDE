@@ -47,7 +47,7 @@ import { verificarPermiso, tienePermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { exigirOrdenAbierta } from '../produccion/cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 import { armarBusquedaConSinonimos } from '../produccion/ordenes.js';
 
 import {
@@ -400,6 +400,9 @@ export async function guardarCostoOrden(
   const calcularReal = opciones.calcularReal ?? true;
 
   return enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: la orden CERRADA tiene el costo congelado — capturarlo lo movería. Guarda
+    // ÚNICA con candado compartido, PRIMERA instrucción de la transacción.
+    await exigirOrdenAbiertaPorId(tx, sesion.idEmpresaActiva, idOrden, 'puede capturar su costo');
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: seleccionOrdenCosto,
@@ -412,8 +415,6 @@ export async function guardarCostoOrden(
         'Esta orden está marcada como "no costear": no se puede capturar su costo.',
       );
     }
-    // ⭐ 0.061: la orden CERRADA tiene el costo congelado — capturarlo lo movería. Guarda ÚNICA.
-    exigirOrdenAbierta(orden, 'puede capturar su costo');
 
     // Teórico congelado (× cortado) al momento de guardar (usa la MISMA transacción, A2).
     const cant = await cantidadesDeOrden(idOrden, { tx });
