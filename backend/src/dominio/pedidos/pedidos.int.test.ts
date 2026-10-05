@@ -626,6 +626,7 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
       ...PERM_CON_CANCELAR,
       'ordenes.cancelar',
       'ordenes.cerrar',
+      'ordenes.reabrir',
     ];
 
     it('🔴 el pedido SÍ se cancela, la OP cerrada queda INTACTA y el aviso la nombra', async () => {

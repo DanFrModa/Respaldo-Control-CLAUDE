@@ -71,6 +71,32 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.192 · 5-oct-2026 · **en prueba** — **Reabrir una orden cerrada ya es sólo tuyo**
+
+> **La v0.192 cierra una fila del programa: la 0.228.** Lo decidiste el 30-sep: *«solo yo (o el que yo autorice)»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Cerrar y reabrir ya son dos permisos distintos.** Hasta hoy, quien podía cerrar una orden también podía
+reabrirla. Ahora reabrir tiene su propio permiso, y de entrada sólo lo tienes tú (Director General) y los dos
+perfiles de acceso total del sistema. Quien cierra órdenes sigue cerrándolas igual.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El rol «Directivo» puede cerrar, pero ya no reabrir.** Si alguien lo usaba para reabrir, en una orden cerrada
+ya no le aparece el botón de reabrir; cerrar las órdenes abiertas, sí puede.
+
+**El aviso de orden cerrada ya no dice «hay que reabrirla» a secas:** dice que reabrirla es de quien tiene ese
+permiso, para que nadie busque un botón que no le va a aparecer.
+
+### ⏳ Sigue pendiente o roto
+
+**«Sólo yo» se cumple sólo si nadie más tiene los perfiles de acceso total** (Administrador, Administración y
+Dirección, o Director General). Revísalo en Administración › Usuarios.
+
+**«O el que yo autorice»:** hoy se lo das a alguien poniéndole un perfil que lleve ese permiso. Dárselo a una
+persona suelta, sin cambiarle el perfil, es parte de la revisión de perfiles pendiente (fila 0.234).
+
 ## 0.191 · 5-oct-2026 · **en prueba** — **La pantalla te avisa que la orden está cerrada antes de que captures**
 
 > **La v0.191 cierra una fila del programa: la 0.226.** Con la v0.190 el sistema ya rechazaba cualquier movimiento

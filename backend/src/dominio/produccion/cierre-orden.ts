@@ -46,8 +46,8 @@
  *      `> 0`) en vez de recaer en el cálculo vivo cuando lleguen recibos tardíos.
  *    En ambos casos la lectura sigue diciendo por qué no hay unitario (`unitarioODeuda`).
  *
- * REVERSIBLE SÓLO POR REAPERTURA AUDITADA (D3): {@link reabrirOrden}, con el MISMO permiso, su
- * motivo y su bitácora. Al reabrir, el costo vuelve a calcularse en vivo, el estado derivado se
+ * REVERSIBLE SÓLO POR REAPERTURA AUDITADA (D3): {@link reabrirOrden}, con su PROPIO permiso
+ * (`ordenes.reabrir`, fila 0.228 — de Daniel, §Post-F9.244(4)), su motivo y su bitácora. Al reabrir, el costo vuelve a calcularse en vivo, el estado derivado se
  * recalcula desde los requisitos y **lo congelado NO se borra: se MARCA** (`descongeladoEn`), para
  * que quede constancia de con qué números se había cerrado. Nada se edita ni se borra: el historial
  * completo de cierres y reaperturas vive en la Bitácora (A7).
@@ -59,7 +59,8 @@
  * deja hacer.
  *
  * Innegociables aplicados: A1 (toda la regla aquí; las rutas sólo validan y delegan) · A2 (marca +
- * congelado + bitácora en UNA transacción) · A4 (`ordenes.cerrar`, permiso propio) · A7 (bitácora
+ * congelado + bitácora en UNA transacción) · A4 (`ordenes.cerrar` para cerrar y `ordenes.reabrir`
+ * para reabrir, dos permisos propios — 0.228) · A7 (bitácora
  * con el motivo y los números congelados) · A9 (empresa activa) · D3 (nada se edita ni se borra;
  * reabrir es el acto inverso auditado).
  */
@@ -126,6 +127,10 @@ function listaDeFolios(folios: readonly string[]): string {
  * ⭐ EL MENSAJE ÚNICO Y CENTRAL de la orden cerrada. Nombra TODAS las órdenes cerradas que tocaba
  * la operación (una nota o una OC pueden llevar varias) y la salida —reabrir— porque el usuario no
  * puede adivinarla: cerrar es reversible, pero sólo por el acto inverso y con permiso.
+ *
+ * ⭐ 0.228 (§Post-F9.244(4)): reabrir dejó de ir con la llave de cerrar — es de Daniel. Por eso el
+ * mensaje ya no nombra una clave técnica que además mandaba a quien cierra: dice, en lenguaje de
+ * negocio, que la reapertura la autoriza quien tiene el permiso de REABRIR órdenes.
  */
 export function mensajeOrdenCerrada(
   folios: readonly (bigint | number | string)[],
@@ -135,13 +140,14 @@ export function mensajeOrdenCerrada(
   if (lista.length <= 1) {
     return (
       `La orden ${lista[0] ?? ''} está CERRADA (su costo quedó congelado): no se ${queSeIntenta}. ` +
-      'Si de verdad hay que moverla, reábrela primero (permiso "ordenes.cerrar") — queda auditado.'
+      'Si de verdad hay que moverla, primero hay que reabrirla; eso sólo lo puede hacer quien ' +
+      'tiene el permiso de reabrir órdenes cerradas — queda auditado.'
     );
   }
   return (
     `Las órdenes ${listaDeFolios(lista)} están CERRADAS (su costo quedó congelado): no se ` +
-    `${queSeIntenta}. Si de verdad hay que moverlas, reábrelas primero (permiso "ordenes.cerrar") ` +
-    '— queda auditado.'
+    `${queSeIntenta}. Si de verdad hay que moverlas, primero hay que reabrirlas; eso sólo lo puede ` +
+    'hacer quien tiene el permiso de reabrir órdenes cerradas — queda auditado.'
   );
 }
 
@@ -356,8 +362,8 @@ export async function cerrarOrden(
 }
 
 /**
- * ⭐ REABRE una orden cerrada (A4 `ordenes.cerrar` — el mismo permiso: quien puede cerrar el costo
- * puede volver a abrirlo; A2, A7, A9). Es el ACTO INVERSO AUDITADO que exige D3, no una edición:
+ * ⭐ REABRE una orden cerrada (A4 `ordenes.reabrir`; A2, A7, A9). Es el ACTO INVERSO AUDITADO que
+ * exige D3, no una edición:
  *  • el costo vuelve a calcularse EN VIVO;
  *  • lo congelado **no se borra**, se MARCA con `descongeladoEn` (queda la constancia de con qué
  *    números se había cerrado);
@@ -374,7 +380,11 @@ export async function reabrirOrden(
   cuerpo: z.input<typeof esquemaOrdenReabrirCuerpo>,
   bd?: ContextoBd,
 ): Promise<OrdenSalida> {
-  verificarPermiso(sesion, 'ordenes.cerrar');
+  // ⭐ 0.228 (§Post-F9.244(4)): reabrir YA NO va con la llave de cerrar. Daniel: *«solo yo (o el que
+  // yo autorice… un permiso que de entrada solo yo tengo activo)»*. `ordenes.reabrir` vive en
+  // `SOLO_ADMINISTRADOR` (`prisma/seed.ts`); `Directivo` cierra pero no reabre. Y NO se exige además
+  // `ordenes.cerrar`: son dos facultades separables, y pedir las dos ataría reabrir a cerrar otra vez.
+  verificarPermiso(sesion, 'ordenes.reabrir');
   // Mismo motivo que en {@link cerrarOrden}: el 403 de la lectura tiene que salir ANTES del commit.
   verificarPermiso(sesion, 'ordenes.ver');
   const datos = validarEntrada(esquemaOrdenReabrirCuerpo, cuerpo);

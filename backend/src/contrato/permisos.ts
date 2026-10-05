@@ -301,7 +301,18 @@ export const CATALOGO_PERMISOS = [
     clave: 'ordenes.cerrar',
     modulo: 'ordenes',
     descripcion:
-      'CERRAR una orden de producción (deja de admitir captura y CONGELA su costo unitario) y reabrirla — acto explícito y auditado (0.061)',
+      'CERRAR una orden de producción (deja de admitir captura y CONGELA su costo unitario) — acto explícito y auditado (0.061). Reabrirla es otro permiso',
+  },
+  // ⭐ 0.228 (§Post-F9.244 decisión 4) — REABRIR ES DE DANIEL. Hasta aquí cerrar y reabrir iban con
+  // la MISMA llave (`ordenes.cerrar`); Daniel las separó: *«solo yo (o el que yo autorice… debería
+  // de ser un permiso que de entrada solo yo tengo activo)»*. Nace en `SOLO_ADMINISTRADOR`
+  // (`prisma/seed.ts`): la llevan sólo los perfiles de ACCESO TOTAL; `Directivo` conserva cerrar y
+  // NO lleva reabrir, y ningún perfil de puesto la reparte.
+  {
+    clave: 'ordenes.reabrir',
+    modulo: 'ordenes',
+    descripcion:
+      'REABRIR una orden de producción cerrada: vuelve a admitir captura y su costo deja de estar congelado. Acto de excepción, con motivo obligatorio y auditado (0.228)',
   },
 
   // ── Clientes / Proveedores ───────────────────────────────────────────────────

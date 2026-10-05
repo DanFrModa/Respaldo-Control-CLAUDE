@@ -3445,8 +3445,8 @@ model PedidoRealLinea {
 ///
 /// ⭐⭐ `cerrada` ES DE 0.061 (§Post-F9.154(c), DANIEL 30-ago-2026: *«¿en qué momento se define que
 /// ya se cerró el costo? ¿O va cambiando?»*) Y ES LA ÚNICA QUE NO SE DERIVA. La ponen y la quitan
-/// DOS ACTOS EXPLÍCITOS con permiso propio (`ordenes.cerrar`): `cerrarOrden` y `reabrirOrden`
-/// (`dominio/produccion/cierre-orden.ts`). Cerrar deja la orden en solo-lectura y **CONGELA su
+/// DOS ACTOS EXPLÍCITOS, cada uno con su permiso propio: `cerrarOrden` (`ordenes.cerrar`) y
+/// `reabrirOrden` (`ordenes.reabrir`, de Daniel desde 0.228) (`dominio/produccion/cierre-orden.ts`). Cerrar deja la orden en solo-lectura y **CONGELA su
 /// costo unitario**; reabrir lo devuelve a cálculo vivo.
 ///
 /// 🔑 **`cerrada` NO redefine ni sustituye a `completa`, y NO SE DEBE COLGAR NADA DE `completa`.**
@@ -3584,8 +3584,8 @@ model Orden {
   // captura (etapas y costos) y su costo unitario queda CONGELADO. Nunca es automático — un
   // cierre por "100% entregado" no funcionaría, porque los faltantes se cobran y las
   // incompletas se merman, así que una orden que perdió piezas NUNCA llega al 100% y su costo
-  // no se congelaría jamás. Lo hacen `cerrarOrden`/`reabrirOrden` con el permiso
-  // `ordenes.cerrar` (`dominio/produccion/cierre-orden.ts`), en transacción y con bitácora.
+  // no se congelaría jamás. Lo hacen `cerrarOrden` (permiso `ordenes.cerrar`) y `reabrirOrden`
+  // (`ordenes.reabrir`, 0.228) — `dominio/produccion/cierre-orden.ts` —, en transacción y con bitácora.
   /// CUÁNDO se cerró. **Es la verdad autoritativa de "esta orden está cerrada"**; `estado =
   /// cerrada` es su espejo visible (para el badge y los filtros). NULL = abierta. Reabrir la
   /// vuelve a NULL: el historial de cierres y reaperturas vive en la Bitácora (A7), que es

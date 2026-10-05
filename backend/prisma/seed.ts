@@ -198,8 +198,9 @@ async function sembrarPermisos(prisma: PrismaClient): Promise<Map<ClavePermiso, 
  * 0.120 separó los cuatro poderes en renglones distintos: dar uno sin los otros.
  *
  * De las que él reservó con nombre y apellido —`salida-material.registrar`, `pagos.corrida-armar`,
- * `compras.desautorizar`, los otros tres poderes de la fila 0.120 (`rc.capturar-cualquiera`,
- * `compras.editar-autorizada`, `tipos-proceso.marcar-entrada-pt`) y el gobierno de usuarios/roles—
+ * `compras.desautorizar`, `ordenes.reabrir` (fila 0.228), los otros tres poderes de la fila 0.120
+ * (`rc.capturar-cualquiera`, `compras.editar-autorizada`, `tipos-proceso.marcar-entrada-pt`) y el
+ * gobierno de usuarios/roles—
  * **ningún perfil de puesto lleva ninguna** salvo el del propio dueño
  * ({@link PERFIL_DIRECTOR_GENERAL}, que lleva el catálogo completo).
  */
@@ -346,6 +347,16 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       'desautorizar las órdenes, que solo yo tenga acceso"*. Autorizar sí se reparte; ' +
       'des-autorizar no.',
   },
+  // ── ⭐ La marcha atrás del cierre de la orden (fila 0.228) ──
+  {
+    clave: 'ordenes.reabrir',
+    razon:
+      'Daniel la pidió para él (§Post-F9.244 decisión 4, 30-sep-2026): *"solo yo (o el que yo ' +
+      'autorice… debería de ser un permiso que de entrada solo yo tengo activo)"*. Reabrir una ' +
+      'orden cerrada descongela su costo y vuelve a abrir la captura, o sea deshace el cierre. ' +
+      'Cerrar sí se reparte (`ordenes.cerrar`, que conserva `Directivo`); reabrir no — es la ' +
+      'misma asimetría que autorizar / des-autorizar una compra.',
+  },
 ];
 
 /**
@@ -440,6 +451,8 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   // ⭐ 0.061: cerrar la orden CONGELA su costo ⇒ va al círculo que ya cierra dinero. `Administrador`
   // y `AdministracionDireccion` lo toman solos ([...CLAVES_PERMISO]); aquí se le da al `Directivo`.
   // Default del lead — Daniel confirma.
+  // ✂️ 0.228 (§Post-F9.244(4)): `Directivo` CONSERVA cerrar pero NO lleva `ordenes.reabrir` — reabrir
+  // es de Daniel y vive en SOLO_ADMINISTRADOR.
   'ordenes.cerrar',
   'ordenes.habilitacion',
   'ordenes.modificar',
@@ -963,8 +976,9 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **317 asignaciones**: las 134 del catálogo para `Director General` y 183 repartidas entre los
- * otros 15. Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
+ * **318 asignaciones**: las 135 del catálogo para `Director General` y 183 repartidas entre los
+ * otros 15 (eran 317 = 134 + 183 hasta la fila 0.228, que estrenó `ordenes.reabrir` en el catálogo:
+ * el dueño la recibe por derivación y ninguno de los otros 15). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
  * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
  *
  * *(Eran 306 = 134 + 172 en su primera revisión. Las **11 llaves de más** las agregó él mismo al
@@ -1046,7 +1060,7 @@ export type PerfilDePuesto = {
  *
  * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
  * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
- * llegarle solo. Una lista literal de 134 claves quedaría obsoleta en el siguiente `clave:` que
+ * llegarle solo. Una lista literal de 135 claves quedaría obsoleta en el siguiente `clave:` que
  * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
  *
  * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
@@ -1370,7 +1384,8 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 317 marcas que él revisó.
+ * un puesto**, y meterlo aquí falsearía las 318 asignaciones de los 16 puestos (las 317 que él
+ * revisó, más `ordenes.reabrir`, que la fila 0.228 le sumó al dueño por derivación).
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1496,7 +1511,9 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  *
  * Nació de una medición, **re-hecha con el escáner de rutas arreglado** (el que resuelve también
  * `conAlgunPermiso` y los guards declarados en variable) y con el criterio dicho, porque sin criterio
- * no se reproduce: de las **134** claves del catálogo, **sólo 34 son de PURA LECTURA** —todas sus
+ * no se reproduce *(medido ANTES de la fila 0.228; esa fila sumó `ordenes.reabrir`, que guarda un
+ * `POST` ⇒ hoy son 135 claves y una más que ESCRIBE; las de pura lectura no cambian)*: de las
+ * **134** claves que tenía entonces el catálogo, **sólo 34 son de PURA LECTURA** —todas sus
  * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
  * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no
  * guardan ninguna ruta** (se verifican en el dominio o gobiernan un campo o un botón). Total 666

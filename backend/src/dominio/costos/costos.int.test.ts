@@ -611,7 +611,8 @@ describe('cerrarOrden / reabrirOrden: el costo deja de "ir cambiando"', () => {
    * orden** y la leen con `obtenerOrden`, que lo exige. Sin él el acto lanza `ErrorPermiso` —y
    * ahora lo lanza ANTES de escribir nada, ver la prueba del «403-tras-commit» de más abajo—.
    */
-  const sesionCierre = () => sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.ver']);
+  const sesionCierre = () =>
+    sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.reabrir', 'ordenes.ver']);
 
   /** Mete OTRO recibo de costura de `piezas` — lo que movería el divisor si no estuviera congelado. */
   async function otroReciboDeCostura(piezas: number, folio: bigint): Promise<void> {
@@ -826,11 +827,30 @@ describe('cerrarOrden / reabrirOrden: el costo deja de "ir cambiando"', () => {
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
-  it('SIN `ordenes.cerrar` no se cierra ni se reabre (A4)', async () => {
+  it('SIN `ordenes.cerrar` no se cierra, y SIN `ordenes.reabrir` no se reabre (A4)', async () => {
     await expect(cerrarOrden(sesion(), idOrden, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
     await expect(reabrirOrden(sesion(), idOrden, { motivo: 'x' }, bd())).rejects.toBeInstanceOf(
       ErrorPermiso,
     );
+  });
+
+  it('⭐ 0.228: quien CIERRA no por eso REABRE — la orden se queda cerrada (§Post-F9.244(4))', async () => {
+    // Daniel: *«solo yo (o el que yo autorice…)»*. Es el caso de `Directivo`: lleva `ordenes.cerrar`
+    // y NO `ordenes.reabrir`. Cierra bien, y al intentar reabrir rebota SIN tocar nada.
+    const soloCierra = sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.ver']);
+    await cerrarOrden(soloCierra, idOrden, {}, bd());
+
+    await expect(
+      reabrirOrden(soloCierra, idOrden, { motivo: 'quiero moverla' }, bd()),
+    ).rejects.toMatchObject({ permiso: 'ordenes.reabrir' });
+    const sigue = await cliente.orden.findUniqueOrThrow({ where: { id: idOrden } });
+    expect(sigue.cerradaEn, 'la orden se reabrió sin `ordenes.reabrir`').not.toBeNull();
+    expect(sigue.estado).toBe('cerrada');
+
+    // …y quien lleva `ordenes.reabrir` la reabre aunque NO tenga la llave de cerrar.
+    const soloReabre = sesion([...PERM_TODOS, 'ordenes.reabrir', 'ordenes.ver']);
+    const abierta = await reabrirOrden(soloReabre, idOrden, { motivo: 'faltaba algo' }, bd());
+    expect(abierta.cerradaEn).toBeNull();
   });
 
   it('🔴 SIN `ordenes.ver` el 403 sale ANTES de escribir: la orden NO queda cerrada', async () => {

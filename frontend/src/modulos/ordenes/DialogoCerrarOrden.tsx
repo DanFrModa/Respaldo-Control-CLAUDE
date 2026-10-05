@@ -29,7 +29,8 @@ import { Field, FieldLabel } from '@/components/ui/field';
  * orden) y OBLIGATORIO al reabrir (es la excepción, y se justifica). El backend lo re-valida (A1);
  * aquí sólo se deshabilita el botón para no mandar algo que va a rebotar.
  *
- * El permiso `ordenes.cerrar` lo comprueba quien monta este diálogo (y lo decide el backend).
+ * Los permisos —`ordenes.cerrar` para cerrar, `ordenes.reabrir` para reabrir (0.228)— los comprueba
+ * quien monta este diálogo (y los decide el backend).
  */
 export function DialogoCerrarOrden({
   abierto,
@@ -113,8 +114,9 @@ export function DialogoCerrarOrden({
               <>
                 La orden dejará de admitir captura —corte, envío, recibo, empaque, entrega, cierres
                 con maquileros y su costo— y su <b>costo por prenda queda congelado</b> con las
-                piezas que tiene hoy. Se puede seguir consultando e imprimiendo. Es reversible:
-                reabrirla queda auditado.
+                piezas que tiene hoy. Se puede seguir consultando e imprimiendo. Es reversible, pero
+                reabrirla sólo lo puede hacer quien tiene el permiso de reabrir órdenes, y queda
+                auditado.
               </>
             ) : (
               <>

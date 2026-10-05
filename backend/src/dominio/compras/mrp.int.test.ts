@@ -4770,7 +4770,8 @@ describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión',
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 describe('0.226a — orden CERRADA en la compra desde la explosión', () => {
-  const conCierre = (): SesionUsuario => sesion([...PERM, 'ordenes.cerrar', 'ordenes.ver']);
+  const conCierre = (): SesionUsuario =>
+    sesion([...PERM, 'ordenes.cerrar', 'ordenes.reabrir', 'ordenes.ver']);
   const cuerpo = (ids: number[]) => ({
     fechaEntrega: '2026-09-30',
     idsOrden: ids,

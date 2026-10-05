@@ -1513,7 +1513,8 @@ describe('La prenda INCOMPLETA sale sola del tránsito, como merma', () => {
 describe('La guarda de la orden CERRADA, puerta por puerta', () => {
   // ⚠️ Lleva TAMBIÉN `ordenes.ver`: `cerrarOrden`/`reabrirOrden` devuelven la orden y la leen con
   // `obtenerOrden`, que lo exige (y lo comprueba ANTES de escribir — ver `costos.int.test.ts`).
-  const sesionCierre = () => sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.ver']);
+  const sesionCierre = () =>
+    sesion([...PERM_TODOS, 'ordenes.cerrar', 'ordenes.reabrir', 'ordenes.ver']);
 
   it('cerrar la orden RECHAZA corte, envío, recibo, entrega y las cancelaciones', async () => {
     // La guarda es UNA sola (`exigirOrdenAbierta`) aplicada en cada puerta de escritura. Esta
@@ -1607,6 +1608,7 @@ describe('La guarda de la orden CERRADA, puerta por puerta', () => {
     const s = sesion([
       ...PERM_TODOS,
       'ordenes.cerrar',
+      'ordenes.reabrir',
       'ordenes.ver',
       'ordenes.administrar',
       'ordenes.cancelar',
@@ -1665,6 +1667,6 @@ describe('La guarda de la orden CERRADA, puerta por puerta', () => {
         },
         bd(),
       ),
-    ).rejects.toThrow(/reábrela/i);
+    ).rejects.toThrow(/primero hay que reabrirla/i);
   });
 });

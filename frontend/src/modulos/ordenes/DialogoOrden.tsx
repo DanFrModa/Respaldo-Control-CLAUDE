@@ -152,6 +152,9 @@ export function DialogoOrden({
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   // ⭐ 0.061: cerrar la orden congela su costo y cierra la captura ⇒ permiso propio.
   const puedeCerrar = tienePermiso('ordenes.cerrar');
+  // ⭐ 0.228 (§Post-F9.244(4)): REABRIRLA es OTRA llave, de Daniel («solo yo, o el que yo
+  // autorice»). Antes el botón de reabrir colgaba de `ordenes.cerrar` — el espejo que la 0.120 dejó.
+  const puedeReabrir = tienePermiso('ordenes.reabrir');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
   // Hitos de la orden (post-F9): capturar/cancelar exige `rc.capturar` (es un avance de RC).
@@ -263,9 +266,12 @@ export function DialogoOrden({
             </p>
           </div>
           {/* ⭐ 0.061: Cerrar / Reabrir la orden. Cerrar CONGELA su costo y cierra la captura; la
-              confirmación lo dice. Exige `ordenes.cerrar`; el backend re-decide (A1). Una orden
-              CANCELADA no se cierra (no hay nada que cerrar). */}
-          {orden !== undefined && puedeCerrar && orden.estado !== 'cancelada' ? (
+              confirmación lo dice. Cerrar exige `ordenes.cerrar` y REABRIR exige `ordenes.reabrir`
+              (0.228, de Daniel); el backend re-decide (A1). Una orden CANCELADA no se cierra (no
+              hay nada que cerrar). */}
+          {orden !== undefined &&
+          (estaCerrada ? puedeReabrir : puedeCerrar) &&
+          orden.estado !== 'cancelada' ? (
             <Button
               variant="outline"
               size="sm"

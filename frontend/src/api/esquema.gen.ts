@@ -96,6 +96,7 @@ export interface paths {
                 | 'ordenes.administrar'
                 | 'ordenes.cancelar'
                 | 'ordenes.cerrar'
+                | 'ordenes.reabrir'
                 | 'clientes.modificar'
                 | 'proveedores.modificar'
                 | 'etiquetas.modificar'
