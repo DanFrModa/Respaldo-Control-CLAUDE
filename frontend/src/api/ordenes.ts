@@ -147,7 +147,8 @@ async function cerrarOrden(id: number, cuerpo: OrdenCerrar): Promise<Orden> {
 
 /**
  * ⭐ REABRE una orden cerrada (`POST /api/ordenes/{id}/reabrir`, 0.061): acto INVERSO auditado (D3),
- * con motivo obligatorio. El costo vuelve a calcularse en vivo. Mismo permiso `ordenes.cerrar`.
+ * con motivo obligatorio. El costo vuelve a calcularse en vivo. Permiso PROPIO `ordenes.reabrir`
+ * (0.228, de Daniel — ya no el de cerrar).
  */
 async function reabrirOrden(id: number, cuerpo: OrdenReabrir): Promise<Orden> {
   const { data, error } = await api.POST('/api/ordenes/{id}/reabrir', {

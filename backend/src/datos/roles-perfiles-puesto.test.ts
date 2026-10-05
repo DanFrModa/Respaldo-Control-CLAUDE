@@ -3,9 +3,10 @@
  * y que el del dueño siga DERIVÁNDOSE del catálogo.
  *
  * Esto es la decisión de Daniel transcrita a código, y lo que se mide aquí es la transcripción, no
- * si la decisión es buena: **317 asignaciones** —las 134 del catálogo para `Director General` y 183
+ * si la decisión es buena: **318 asignaciones** —las 135 del catálogo para `Director General` y 183
  * repartidas entre los otros 15—, con sus nombres y su orden. *(Eran 306 = 134 + 172; las 11 de más
- * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final.)*
+ * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final. Y 317 = 134 + 183
+ * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño.)*
  *
  * ## ⚠️ POR QUÉ ESTE ARCHIVO EXISTE APARTE (hay otros tres que hablan de roles)
  *
@@ -381,16 +382,18 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     }
   });
 
-  it('⭐ y en total son 317 asignaciones: 134 del dueño + 183 de los otros 15', () => {
+  it('⭐ y en total son 318 asignaciones: 135 del dueño + 183 de los otros 15', () => {
     // El número que Daniel revisó. Partido en dos porque las dos mitades se rompen distinto: la
     // primera si alguien deja de derivar el catálogo, la segunda si alguien recorta un perfil.
+    // ⭐ 0.228: el dueño pasó de 134 a 135 —`ordenes.reabrir` le llega SOLO, por derivación— y los
+    // otros 15 se quedan en 183: ningún puesto la recibe.
     const delDueno = PERFIL_DIRECTOR_GENERAL.permisos.length;
     const deLosQuince = PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0);
-    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(134);
+    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(135);
     expect(deLosQuince, 'los otros 15 suman 183 asignaciones (172 + las 11 de §Post-F9.260)').toBe(
       183,
     );
-    expect(delDueno + deLosQuince).toBe(317);
+    expect(delDueno + deLosQuince).toBe(318);
   });
 
   it('ningún perfil repite una llave, y ningún slug ni nombre está duplicado', () => {
@@ -703,6 +706,10 @@ describe('⚠️ lo que los perfiles de puesto cambian respecto a decisiones ant
       'salida-material.registrar',
       'pagos.corrida-armar',
       'compras.desautorizar',
+      // ⭐ 0.228 (§Post-F9.244(4)): *«solo yo (o el que yo autorice…)»*. Ningún puesto la reparte;
+      // «el que yo autorice» se resuelve HOY con un perfil EDITABLE que la lleve (no hay permiso
+      // suelto por persona hasta la fila 0.234) — nunca con uno de los 15 que siembra el seed.
+      'ordenes.reabrir',
       // Tres de los cuatro poderes que la fila 0.120 sacó de debajo de `roles.administrar`. El
       // cuarto, `rc.bandeja-completa`, ya NO está aquí: Daniel se lo dio a «Producción» en
       // §Post-F9.260 (fila 0.250) — lo fija la prueba de abajo, y la batería 9.
@@ -824,7 +831,7 @@ describe('⭐⭐ «Consulta general»: el piso de lectura', () => {
       PERFILES_DE_PUESTO.some((p) => (p.permisos as string[]).includes(clave)),
     );
     expect(enAlgunPuesto).toHaveLength(12);
-    // Y el total del dueño sigue intacto: el piso NO entra en sus 317 marcas.
+    // Y el total de los puestos sigue intacto: el piso NO entra en sus 318 asignaciones.
     expect(PERFILES_DE_PUESTO_TODOS.map((p) => p.nombre)).not.toContain('Consulta general');
     expect(
       PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0),
@@ -1366,5 +1373,31 @@ describe('⭐⭐ las 17 decisiones de Daniel sobre el reparto (§Post-F9.260)', 
     // batería 1 (`DECISION_DE_DANIEL`), llave por llave.
     expect(perfilDe('Gerente de Ventas')).toContain('clientes.modificar');
     expect(perfilDe('Compras')).toContain('proveedores.modificar');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ⭐ FILA 0.228 — reabrir una orden: ningún perfil EDITABLE la reparte; el dueño sí
+// ─────────────────────────────────────────────────────────────────────────────
+describe('🔒 0.228: `ordenes.reabrir` no llega a ningún puesto (§Post-F9.244(4))', () => {
+  it('⭐ ninguno de los 15 puestos ni el piso de lectura la lleva; `Director General` sí', () => {
+    // Daniel: *«solo yo (o el que yo autorice… un permiso que de entrada solo yo tengo activo)»*.
+    // «De entrada» = el seed no se la da a nadie más; «el que yo autorice» = hoy, Daniel crea o
+    // edita un perfil que la lleve y se lo asigna a esa persona (el permiso suelto por persona es
+    // la fila 0.234).
+    const conReabrir = PERFILES_EDITABLES.filter((perfil) =>
+      (perfil.permisos as string[]).includes('ordenes.reabrir'),
+    ).map((perfil) => perfil.nombre);
+    expect(conReabrir, 'un perfil editable reparte `ordenes.reabrir`').toEqual([]);
+    expect(PERFIL_DIRECTOR_GENERAL.permisos as string[]).toContain('ordenes.reabrir');
+  });
+
+  it('…y quien llevaba `ordenes.cerrar` en un puesto lo conserva (cerrar no se movió)', () => {
+    // Hoy ningún puesto lleva cerrar; si alguno lo llevara, NO por eso llevaría reabrir. Se fija la
+    // cifra para que un cambio de reparto de cerrar sea visible, no un efecto colateral de la 0.228.
+    const conCerrar = PERFILES_EDITABLES.filter((perfil) =>
+      (perfil.permisos as string[]).includes('ordenes.cerrar'),
+    ).map((perfil) => perfil.nombre);
+    expect(conCerrar).toEqual([]);
   });
 });

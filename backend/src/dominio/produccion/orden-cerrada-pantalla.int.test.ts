@@ -59,6 +59,7 @@ let clienteNegocioId: number;
 
 const PERMISOS: ClavePermiso[] = [
   'ordenes.cerrar',
+  'ordenes.reabrir',
   'ordenes.ver',
   'inventario-pt.ver',
   'inventario-pt.mover',

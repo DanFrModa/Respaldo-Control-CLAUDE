@@ -136,10 +136,12 @@ describe('catálogo de permisos', () => {
       'notas.ver',
       // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
       // ⭐ `ordenes.cerrar` es de la fila 0.061 (§Post-F9.154(c)): CERRAR la orden (solo lectura +
-      // costo unitario CONGELADO) y REABRIRLA, las dos con el mismo permiso.
+      // costo unitario CONGELADO). ⭐ `ordenes.reabrir` es de la fila 0.228 (§Post-F9.244(4)):
+      // REABRIRLA dejó de ir con la misma llave — es de Daniel («solo yo, o el que yo autorice»).
       'ordenes.administrar',
       'ordenes.cancelar',
       'ordenes.cerrar',
+      'ordenes.reabrir',
       'ordenes.ver',
       // La corrida semanal de pagos (fila 0.113, §Post-F9.189(g)): armarla/cerrarla/ejecutarla es
       // de Daniel; verla es de finanzas (sólo lectura).

@@ -14,7 +14,8 @@ import { esquemaPackEntrada, esquemaPackSalida } from './pack.js';
  *    pedido = solo histórico (lo migra el ETL), JAMÁS captura nueva (decisión Gabriel 16-jun-2026).
  *  • El `estado` lo DERIVAN los servicios y ningún cuerpo lo lleva como campo. Desde 0.061 hay un
  *    cuarto valor, `cerrada`, que NO se deriva: lo ponen y lo quitan `POST /ordenes/:id/cerrar` y
- *    `/reabrir` (permiso `ordenes.cerrar`), que tampoco lo reciben como campo — lo hacen ellos.
+ *    `/reabrir` (permisos `ordenes.cerrar` y `ordenes.reabrir` — éste de Daniel desde 0.228), que
+ *    tampoco lo reciben como campo — lo hacen ellos.
  *  • El TOTAL de la orden y de cada color se DERIVA por suma de cantidades (D4 + espíritu D3):
  *    NUNCA viaja un `total` de entrada, y en la salida sale calculado.
  *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; tallasV1 crudo)
@@ -392,8 +393,9 @@ export type DatosOrdenComentario = z.infer<typeof esquemaOrdenComentarioCuerpo>;
  *
  * `capturada`/`completa` son DERIVADOS (los calcula `requisitos-orden.ts` de tallas + receta
  * liberada + arte); `cancelada` es la cancelación suave; y `cerrada` (⭐ 0.061 — §Post-F9.154(c))
- * es el ÚNICO que pone y quita una PERSONA, con el permiso `ordenes.cerrar`: la orden terminó su
- * vida administrativa, ya no admite captura y su costo unitario quedó CONGELADO.
+ * es el ÚNICO que pone y quita una PERSONA —con `ordenes.cerrar` lo pone y con `ordenes.reabrir`
+ * (0.228) lo quita—: la orden terminó su vida administrativa, ya no admite captura y su costo
+ * unitario quedó CONGELADO.
  *
  * ⚠️ `cerrada` NO sustituye ni redefine a `completa`: `completa` habla de la completitud de la
  * CAPTURA (tallas + receta + arte) y `cerrada` de que la orden terminó. Una orden se puede cerrar

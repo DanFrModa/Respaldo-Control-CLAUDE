@@ -5,7 +5,8 @@
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
  *     `ordenes.ver` para leer, `ordenes.administrar` para mutar, `ordenes.cancelar` para cancelar
- *     y `ordenes.cerrar` para CERRAR/REABRIR la orden (0.061: congela y descongela su costo).
+ *     `ordenes.cerrar` para CERRAR la orden (0.061: congela su costo) y `ordenes.reabrir` para
+ *     REABRIRLA (0.228: es de Daniel, §Post-F9.244(4) — descongela su costo).
  *  3. **Delega** a los servicios de dominio (`dominio/produccion/ordenes.ts`).
  *
  * Endpoints: `GET /ordenes` (listado/búsqueda combinada, incl. valor de OrdenReferencia D7),
@@ -282,11 +283,12 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
   });
 
   // ⭐⭐ REABRIR una orden cerrada (0.061): acto INVERSO auditado (D3) — el costo vuelve a
-  // calcularse en vivo y lo congelado queda marcado. Motivo OBLIGATORIO. Mismo permiso.
+  // calcularse en vivo y lo congelado queda marcado. Motivo OBLIGATORIO. ⭐ 0.228: permiso PROPIO
+  // `ordenes.reabrir` (de Daniel, §Post-F9.244(4)), ya NO el de cerrar; el dominio lo re-exige (A1).
   app.route({
     method: 'POST',
     url: '/ordenes/:id/reabrir',
-    preHandler: app.conPermiso('ordenes.cerrar'),
+    preHandler: app.conPermiso('ordenes.reabrir'),
     schema: {
       tags: ['ordenes'],
       summary: 'Reabrir una orden cerrada (el costo vuelve a calcularse en vivo)',

@@ -326,7 +326,8 @@ unitario habría quedado **vivo hasta el último recibo, para siempre**.
   ÚNICA operación de receta que una orden cerrada admite: si la orden se cierra con la receta
   ABIERTA, ésa es la única forma de soltar el candado de la compra, y un candado que sólo se abre es
   una trampa (ver `permitirOrdenNoViva` en `receta-orden.ts`). No toca ni un renglón ni un peso.
-- **Reversible sólo por reapertura auditada (D3):** `reabrirOrden`, **mismo permiso**, **motivo
+- **Reversible sólo por reapertura auditada (D3):** `reabrirOrden`, que desde la fila 0.228 exige **su propio permiso, `ordenes.reabrir`** (decisión de Daniel,
+  §Post-F9.244(4): *«solo yo, o el que yo autorice»*), con **motivo
   obligatorio** (el del cierre es opcional: cerrar es el final normal de una orden). Lo congelado
   **no se borra: se MARCA** (`descongeladoEn`), para que quede constancia de con qué números se
   cerró. Cerrar dos veces se rechaza; una orden **cancelada** no se cierra.
@@ -338,7 +339,8 @@ unitario habría quedado **vivo hasta el último recibo, para siempre**.
 
 `produccion.corte` · `produccion.envio` · `produccion.recibo` · `produccion.entrega` ·
 `produccion.cancelar` · `produccion.wip-ver` · `esma.cargo-validar` · ⭐ **`ordenes.cerrar`** (0.061 —
-cerrar y reabrir la orden entera; el mismo permiso para las dos direcciones).
+cerrar la orden entera) · ⭐ **`ordenes.reabrir`** (0.228 — reabrirla; está en `SOLO_ADMINISTRADOR`, así que de
+entrada sólo la llevan los perfiles de acceso total y Director General; `Directivo` cierra pero no reabre).
 
 ## El `generaEntradaPt` — qué decide, y qué NO decide
 

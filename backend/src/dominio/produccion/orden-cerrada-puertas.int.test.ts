@@ -94,6 +94,7 @@ let clienteNegocioId: number;
 
 const PERMISOS: ClavePermiso[] = [
   'ordenes.cerrar',
+  'ordenes.reabrir',
   'ordenes.ver',
   'produccion.corte',
   'produccion.cancelar',
@@ -142,7 +143,7 @@ async function rechazaPorCerrada(promesa: Promise<unknown>): Promise<void> {
   expect(error).toBeInstanceOf(ErrorConflicto);
   // …y le dice al usuario QUÉ orden y CÓMO salir.
   expect((error as Error).message).toContain(`La orden ${String(folioOrden)} está CERRADA`);
-  expect((error as Error).message).toContain('reábrela primero');
+  expect((error as Error).message).toContain('primero hay que reabrirla');
 }
 
 async function cerrar(): Promise<void> {

@@ -40,18 +40,24 @@ function listaDeFolios(folios: readonly string[]): string {
 /**
  * ⭐ EL TEXTO ÚNICO del aviso de orden cerrada en pantalla (lenguaje de negocio, sin permisos ni
  * jerga). Vive aquí, en un solo lugar, para que todas las pantallas digan lo mismo. Sin repetidos.
+ *
+ * ⭐ 0.228 (§Post-F9.244(4)): reabrir es de Daniel —permiso propio, ya no el de cerrar—, así que el
+ * aviso dice lo mismo que el servidor (`mensajeOrdenCerrada`): quién puede reabrir, no «desde la
+ * ficha», porque quien no tenga ese permiso no verá ahí el botón.
  */
 export function textoAvisoOrdenCerrada(folios: readonly (number | string)[]): string {
   const lista = [...new Set(folios.map(String))];
   if (lista.length <= 1) {
     return (
       `La orden ${lista[0] ?? ''} está cerrada: se puede consultar, pero no admite movimientos. ` +
-      'Para moverla hay que reabrirla desde la ficha de la orden.'
+      'Para moverla primero hay que reabrirla, y eso sólo lo puede hacer quien tiene el permiso ' +
+      'de reabrir órdenes cerradas.'
     );
   }
   return (
     `Las órdenes ${listaDeFolios(lista)} están cerradas: se pueden consultar, pero no admiten ` +
-    'movimientos. Para moverlas hay que reabrirlas desde la ficha de cada orden.'
+    'movimientos. Para moverlas primero hay que reabrirlas, y eso sólo lo puede hacer quien tiene ' +
+    'el permiso de reabrir órdenes cerradas.'
   );
 }
 

@@ -423,6 +423,8 @@ describe('<DialogoOrden>', () => {
 describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
   /** Los de siempre MÁS el permiso propio del cierre. */
   const PERM_CON_CIERRE = [...PERM_TODOS, 'ordenes.cerrar'] as const;
+  /** ⭐ 0.228: los de siempre MÁS la llave de REABRIR, que ya no es la de cerrar (es de Daniel). */
+  const PERM_CON_REABRIR = [...PERM_TODOS, 'ordenes.reabrir'] as const;
 
   beforeEach(() => {
     useOrden.mockReset();
@@ -440,7 +442,7 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
     expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
   });
 
-  it('SIN `ordenes.cerrar` no ofrece ni cerrar ni reabrir (es permiso PROPIO)', () => {
+  it('SIN `ordenes.cerrar` ni `ordenes.reabrir` no ofrece ni cerrar ni reabrir (permisos PROPIOS)', () => {
     // La rama que importa: `ordenes.administrar` + `ordenes.cancelar` NO alcanzan. Sin esto, el
     // botón podría colgar de «administrar» y nadie lo notaría hasta que el backend rebotara.
     renderDialogo(orden(1, 101), [...PERM_TODOS]);
@@ -450,8 +452,23 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
     expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
   });
 
-  it('la orden CERRADA ofrece «Reabrir», y ya no deja cancelar ni guardar', () => {
-    renderDialogo(orden(3, 103, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+  it('⭐ 0.228: con SÓLO `ordenes.cerrar`, la orden CERRADA NO ofrece «Reabrir» (es de Daniel)', () => {
+    // §Post-F9.244(4): *«solo yo (o el que yo autorice…)»*. Es el caso de `Directivo`: cierra, pero
+    // reabrir no es suyo. Antes de la 0.228 este botón colgaba de `ordenes.cerrar`.
+    renderDialogo(orden(13, 113, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+  });
+
+  it('⭐ 0.228: con SÓLO `ordenes.reabrir`, la orden ABIERTA NO ofrece «Cerrar»', () => {
+    // Las dos llaves son separables en las dos direcciones: reabrir no regala cerrar.
+    renderDialogo(orden(14, 114), [...PERM_CON_REABRIR]);
+    expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reabrir-orden')).not.toBeInTheDocument();
+  });
+
+  it('la orden CERRADA ofrece «Reabrir» con `ordenes.reabrir`, y ya no deja cancelar ni guardar', () => {
+    renderDialogo(orden(3, 103, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_REABRIR]);
 
     expect(screen.getByTestId('reabrir-orden')).toBeInTheDocument();
     expect(screen.queryByTestId('cerrar-orden')).not.toBeInTheDocument();
@@ -575,7 +592,7 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
       isError: false,
     }));
     const usuario = userEvent.setup();
-    renderDialogo(orden(12, 112, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+    renderDialogo(orden(12, 112, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_REABRIR]);
     await usuario.click(screen.getByTestId('reabrir-orden'));
     await usuario.type(screen.getByTestId('orden-motivo-cierre'), 'motivo');
     expect(screen.getByTestId('confirmar-reabrir-orden')).toBeEnabled();
@@ -586,7 +603,7 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
       data: { idOrden: 8, folio: 108, piezasPt: 99, porAlmacen: [] },
     }));
     const usuario = userEvent.setup();
-    renderDialogo(orden(8, 108, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+    renderDialogo(orden(8, 108, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_REABRIR]);
 
     await usuario.click(screen.getByTestId('reabrir-orden'));
 
@@ -596,7 +613,7 @@ describe('<DialogoOrden> — cerrar y reabrir la orden (0.061)', () => {
 
   it('REABRIR exige motivo: el botón arranca deshabilitado y manda lo escrito', async () => {
     const usuario = userEvent.setup();
-    renderDialogo(orden(5, 105, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_CIERRE]);
+    renderDialogo(orden(5, 105, { cerradaEn: '2026-09-01T10:00:00.000Z' }), [...PERM_CON_REABRIR]);
 
     await usuario.click(screen.getByTestId('reabrir-orden'));
 

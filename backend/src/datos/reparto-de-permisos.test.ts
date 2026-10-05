@@ -629,10 +629,22 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
     razon:
       'Administrador, Administración/Dirección y Directivo — el mismo círculo que ya cierra ' +
       'dinero (`costos.capturar`, `edr.*`). Cerrar una orden CONGELA su costo unitario y la deja ' +
-      'en solo lectura (ninguna etapa, ningún costo, ninguna cancelación), y REABRIRLA va con el ' +
-      'MISMO permiso: quien puede congelar el costo es quien puede descongelarlo. NO baja a ' +
-      'producción ni a Ventas — el piso captura, no decide que una orden terminó. Default del ' +
-      'lead; Daniel confirma.',
+      'en solo lectura (ninguna etapa, ningún costo, ninguna cancelación). NO baja a producción ' +
+      'ni a Ventas — el piso captura, no decide que una orden terminó. Default del lead; Daniel ' +
+      'confirma. ✂️ Hasta la fila 0.228 esta llave también REABRÍA; desde ahí reabrir tiene la ' +
+      'suya (`ordenes.reabrir`, abajo) y `Directivo` se queda sólo con cerrar.',
+  },
+  // ── ⭐⭐ Reabrir la orden es de Daniel (fila 0.228), §Post-F9.244 decisión 4 ─────────────────
+  {
+    clave: 'ordenes.reabrir',
+    razon:
+      'SÓLO los perfiles de acceso total (va también en SOLO_ADMINISTRADOR del seed). DANIEL, ' +
+      '30-sep-2026: *«solo yo (o el que yo autorice… debería de ser un permiso que de entrada ' +
+      'solo yo tengo activo)»*. Reabrir descongela el costo y vuelve a abrir la captura, o sea ' +
+      'deshace el cierre. `Directivo` CONSERVA `ordenes.cerrar` y NO recibe ésta — es el cambio ' +
+      'de reparto que la decisión dijo en voz alta. «El que yo autorice» se resuelve HOY con un ' +
+      'PERFIL que lleve la llave (Daniel crea o edita uno en Administración › Roles y se lo ' +
+      'asigna a esa persona): el permiso suelto por persona no existe todavía (fila 0.234).',
   },
 ];
 
@@ -741,5 +753,43 @@ describe('🔌 fila 0.120: los cinco interruptores que colgaban de `roles.admini
       expect(catalogo.has(clave), `${clave} no está en el catálogo de src/contrato`).toBe(true);
     }
     expect(new Set(LLAVES_DE_LA_0120).size).toBe(4);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. LA FILA 0.228 — reabrir la orden dejó de ir con la llave de cerrar
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ §Post-F9.244 decisión 4: *«solo yo (o el que yo autorice… un permiso que de entrada solo yo
+ * tengo activo)»*. Hasta la 0.228, cerrar y reabrir iban con `ordenes.cerrar`, así que `Directivo`
+ * podía descongelar el costo de cualquier orden. La batería fija el reparto NUEVO contra el seed —
+ * no «por construcción»—: quién lleva cada una de las dos llaves, nombre por nombre.
+ */
+describe('🔒 fila 0.228: REABRIR una orden es de Daniel, CERRAR no', () => {
+  it('⭐ `ordenes.reabrir` la llevan SÓLO los tres perfiles de acceso total', () => {
+    expect(perfilesQueOtorgan('ordenes.reabrir')).toEqual(
+      ['Administrador', 'AdministracionDireccion', 'Director General'].sort(),
+    );
+  });
+
+  it('⭐ `Directivo` CONSERVA cerrar y NO recibe reabrir (el cambio de reparto dicho en voz alta)', () => {
+    const directivo = definirRoles().find((rol) => rol.nombre === 'Directivo');
+    expect(directivo, 'no existe el perfil "Directivo"').toBeDefined();
+    const suyas = new Set<string>(directivo?.permisos ?? []);
+    expect(suyas.has('ordenes.cerrar'), 'Directivo perdió `ordenes.cerrar`').toBe(true);
+    expect(suyas.has('ordenes.reabrir'), 'Directivo lleva `ordenes.reabrir`').toBe(false);
+  });
+
+  it('quien tenía `ordenes.cerrar` lo conserva: el reparto de cerrar NO se movió', () => {
+    expect(perfilesQueOtorgan('ordenes.cerrar')).toEqual(
+      ['Administrador', 'AdministracionDireccion', 'Director General', 'Directivo'].sort(),
+    );
+  });
+
+  it('…y la reserva está ESCRITA: `ordenes.reabrir` vive en SOLO_ADMINISTRADOR con la cita de Daniel', () => {
+    const declarado = SOLO_ADMINISTRADOR.find((entrada) => entrada.clave === 'ordenes.reabrir');
+    expect(declarado, '`ordenes.reabrir` no está en SOLO_ADMINISTRADOR').toBeDefined();
+    expect(declarado?.razon).toContain('solo yo');
   });
 });

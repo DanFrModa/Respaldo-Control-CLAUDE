@@ -21,9 +21,18 @@ describe('estaCerrada (0.226b)', () => {
 describe('textoAvisoOrdenCerrada (0.226b)', () => {
   it('una orden: la nombra, dice que se consulta y cómo se mueve', () => {
     expect(textoAvisoOrdenCerrada([101])).toBe(
-      'La orden 101 está cerrada: se puede consultar, pero no admite movimientos. Para moverla hay ' +
-        'que reabrirla desde la ficha de la orden.',
+      'La orden 101 está cerrada: se puede consultar, pero no admite movimientos. Para moverla ' +
+        'primero hay que reabrirla, y eso sólo lo puede hacer quien tiene el permiso de reabrir ' +
+        'órdenes cerradas.',
     );
+  });
+
+  it('⭐ 0.228: dice QUIÉN puede reabrir, sin clave técnica (igual que el servidor)', () => {
+    for (const texto of [textoAvisoOrdenCerrada([101]), textoAvisoOrdenCerrada([101, 102])]) {
+      expect(texto).toContain('permiso de reabrir órdenes cerradas');
+      expect(texto).not.toContain('ordenes.');
+      expect(texto).not.toContain('desde la ficha');
+    }
   });
 
   it('varias: las nombra TODAS una sola vez, en español', () => {

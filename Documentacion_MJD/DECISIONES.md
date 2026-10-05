@@ -18390,3 +18390,10 @@ criterios que conviene que queden escritos:
   la existencia calculada por **suma directa de movimientos**, nunca la vista (D3). Sigue siendo default hasta que
   Daniel conteste.
 
+**(g) Reabrir es llave propia — fila 0.228 (v0.192), aplica §Post-F9.244(4).** Nace `ordenes.reabrir` en
+`SOLO_ADMINISTRADOR`; cerrar sigue con `ordenes.cerrar`. La llevan los perfiles de acceso total (Administrador,
+AdministracionDireccion) y Director General; **Directivo conserva cerrar y pierde reabrir**; ningún puesto la lleva.
+El mensaje de orden cerrada deja de nombrar una clave técnica. ⏳ Lo que sigue siendo de Daniel: comprobar en
+Administración › Usuarios que nadie más tiene esos tres perfiles (si no, «sólo yo» no se cumple), y que «el que yo
+autorice» hoy se da con un perfil que lleve la llave (dársela a una persona suelta es la fila 0.234).
+
