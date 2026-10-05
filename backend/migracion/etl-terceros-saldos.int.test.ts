@@ -234,6 +234,64 @@ describe('ETL de saldos iniciales F9-E6 (integración)', () => {
     expect(folios).toEqual([1, 2, 3]); // captura(1) + 2 aperturas contiguas, sin solape
   });
 
+  it('⭐ fila 0.252: la NC de apertura de un CLIENTE no se marca aunque su id sea el de un maquilero', async () => {
+    const rol = await cliente.rolProveedor.upsert({
+      where: { codigo: 'maquila-costura' },
+      update: {},
+      create: { codigo: 'maquila-costura', nombre: 'Maquila costura' },
+    });
+    const maquilero = await cliente.proveedor.create({
+      data: {
+        modalidadFacturacion: 'solo_con',
+        nombre: 'Maquilero Apertura',
+        diasCredito: 8,
+        roles: { create: { idRolProveedor: rol.id } },
+      },
+    });
+    // El cliente lleva el MISMO número de id que el maquilero: si el ETL leyera roles por id sin
+    // mirar el tipo de tercero, le leería los del maquilero.
+    const espejo =
+      idC1 === maquilero.id
+        ? idC1
+        : (await cliente.cliente.create({ data: { id: maquilero.id, nombre: 'Cliente Espejo' } }))
+            .id;
+    expect(espejo).toBe(maquilero.id);
+
+    const nc = (claveFuente: string) => ({
+      origen: 'nota_credito' as const,
+      fecha: new Date('2026-05-01T00:00:00.000Z'),
+      importe: 300,
+      esFiscal: false,
+      claveFuente,
+    });
+    await insertarAperturasMigradas(
+      sesionEtl(idEmpresa),
+      idEmpresa,
+      { tipoTercero: 'cliente', idTercero: espejo, diasCredito: 15 },
+      ENTIDAD_MAPEO.aperturaTercero,
+      [nc('espejo:cli')],
+      { cliente },
+    );
+    // Gemela: la misma NC, ahora del maquilero, SÍ queda como comprobante de EsMa.
+    await insertarAperturasMigradas(
+      sesionEtl(idEmpresa),
+      idEmpresa,
+      { tipoTercero: 'proveedor', idTercero: maquilero.id, diasCredito: 8 },
+      ENTIDAD_MAPEO.aperturaTercero,
+      [nc('espejo:prov')],
+      { cliente },
+    );
+
+    const delCliente = await cliente.movimientoTercero.findFirstOrThrow({
+      where: { idCliente: espejo },
+    });
+    const delMaquilero = await cliente.movimientoTercero.findFirstOrThrow({
+      where: { idProveedor: maquilero.id },
+    });
+    expect(delCliente.amparaEsMa).toBe(false);
+    expect(delMaquilero.amparaEsMa).toBe(true);
+  });
+
   it('CUADRE F9: el corte (saldoEsperado) cuadra contra las aperturas cargadas', async () => {
     await ejecutarEtlTercerosSaldos(cliente, FIXTURE, { corte: CORTE });
     const c = await calcularCuadreF9(cliente, FIXTURE, { corte: CORTE });

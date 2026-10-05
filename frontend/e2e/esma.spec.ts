@@ -38,7 +38,9 @@ test.describe('EsMa — corazón contable (F6-E4)', () => {
     await entrarComoAdmin(page);
     await page.goto('/esma/abonos');
 
-    await expect(page.getByRole('heading', { name: 'Abonos' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Cargos adicionales (abonos)', exact: true }),
+    ).toBeVisible();
     await expect(page.getByTestId('mov-maquilero')).toBeVisible();
     // Sin maquilero ni importe, Guardar arranca deshabilitado.
     await expect(page.getByTestId('mov-guardar')).toBeDisabled();

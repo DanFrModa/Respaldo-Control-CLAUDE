@@ -41,6 +41,7 @@ import { clienteLectura, enTransaccion, type ContextoBd } from '../../../comun/t
 import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma, type EstatusOrdenCompra } from '../../../datos/index.js';
 
+import { esProveedorDeMaquila } from '../ampara-esma.js';
 import { registrarMovimientoTercero } from '../cuenta-terceros.js';
 import { rfcEmpresaActiva, uuidYaImportado } from './cfdi-comun.js';
 import {
@@ -62,6 +63,22 @@ const ESTATUS_OC_CONCILIABLES: readonly EstatusOrdenCompra[] = [
 
 /** Máximo de OCs candidatas devueltas (las más cercanas por total). */
 const MAX_CANDIDATOS_OC = 8;
+
+/**
+ * Aviso de la fila 0.252: el CFDI quedó como COMPROBANTE de la deuda de EsMa. Se exporta para que
+ * las pruebas lo pinen por su texto completo.
+ */
+export const AVISO_AMPARA_ESMA =
+  'Este proveedor es de MAQUILA: su deuda vive en su estado de cuenta de EsMa. La factura quedó ' +
+  'como COMPROBANTE — se ve en su estado de cuenta y en el reporte del contador, pero NO suma al ' +
+  'saldo por pagar (sumarla contaría la misma deuda dos veces). Lo que facture de más se captura ' +
+  'en EsMa como cargo adicional.';
+
+/** El mismo aviso, en la PREVISUALIZACIÓN: todavía no se sabe si se ligará una OC. */
+export const AVISO_PREVIO_AMPARA_ESMA =
+  'Este proveedor es de MAQUILA: su deuda vive en su estado de cuenta de EsMa. Si importas la ' +
+  'factura SIN orden de compra, quedará como COMPROBANTE de esa deuda y no sumará al saldo por ' +
+  'pagar. Lo que facture de más se captura en EsMa como cargo adicional.';
 
 /** Umbral relativo para AVISAR de diferencia OC↔CFDI (0.005 = 0.5%). */
 const UMBRAL_DIFERENCIA_OC = 0.005;
@@ -218,6 +235,9 @@ export async function previsualizarCfdi(
       `Ningún proveedor del catálogo tiene el RFC del emisor (${parsed.emisorRfc}). ` +
         `Elige el proveedor a mano o captura su RFC en el catálogo.`,
     );
+  } else if (await esProveedorDeMaquila(cliente, candidatoProveedor.idProveedor)) {
+    // Fila 0.252: se avisa ANTES de importar, que es cuando todavía se puede decidir algo.
+    avisos.push(AVISO_PREVIO_AMPARA_ESMA);
   }
 
   const candidatosOc =
@@ -350,6 +370,8 @@ export async function importarCfdi(
 
       // 2) Cargo FISCAL de CxP por el TOTAL del CFDI (delega al motor: folio A3, signo por origen,
       //    bitácora A7). El importe llega POSITIVO; el motor le pone el signo (factura + / NC −).
+      //    ⭐ Fila 0.252: el MOTOR decide si es COMPROBANTE de una deuda de EsMa (factura de un
+      //    maquilero sin OC) — la regla vive allí para que valga por cualquier camino de alta.
       return registrarMovimientoTercero(
         sesion,
         {
@@ -379,6 +401,10 @@ export async function importarCfdi(
     throw error;
   }
 
+  // Fila 0.252: si quedó como comprobante, se dice (es justo lo que el usuario no espera ver).
+  if (movimiento.amparaEsMa) {
+    avisos.push(AVISO_AMPARA_ESMA);
+  }
   return { movimiento, avisos };
 }
 

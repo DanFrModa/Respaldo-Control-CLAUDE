@@ -54,7 +54,8 @@ import { moneda, type PartidaInicial } from './comun';
 /** Etiquetas legibles de cada concepto. */
 const ETIQUETA_CONCEPTO: Record<EsMaEstadoCuentaMovimiento['concepto'], string> = {
   cargo: 'Cargo',
-  abono: 'Abono',
+  // Fila 0.252: en EsMa el abono SUMA a la deuda (lo que el maquilero cobra aparte de la maquila).
+  abono: 'Cargo adicional (abono)',
   descuento: 'Descuento',
   pago: 'Pago',
 };
@@ -186,7 +187,8 @@ export function EstadoCuentaPagina(): React.JSX.Element {
             Estado de cuenta
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
-            La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha.
+            La cuenta corriente de un maquilero: cargos, cargos adicionales (abonos), descuentos y
+            pagos por fecha.
           </p>
         </div>
       </header>
@@ -263,7 +265,7 @@ export function EstadoCuentaPagina(): React.JSX.Element {
               disabled={!puedeModificar}
               data-testid="edc-agregar-abono"
             >
-              <PlusCircle aria-hidden /> Abono
+              <PlusCircle aria-hidden /> Cargo adicional (abono)
             </Button>
             <Button
               type="button"

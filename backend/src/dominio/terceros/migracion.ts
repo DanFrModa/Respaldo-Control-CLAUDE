@@ -32,6 +32,7 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import { reservarBloqueFolios } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 
+import { debeAmpararEsMa, rolesDeProveedor } from './ampara-esma.js';
 import { signoDeOrigen } from './origen-tercero.js';
 import { CLAVE_SECUENCIA_TERCERO, calcularVencimiento } from './cuenta-terceros.js';
 
@@ -141,6 +142,12 @@ export async function insertarAperturasMigradas(
 
     const auditoria = datosCreacion(sesion);
     const { idCliente, idProveedor } = camposTercero(tercero.tipoTercero, tercero.idTercero);
+    // ⭐ Fila 0.252: el ETL NO pasa por el alta del motor, así que la regla de maquila se aplica
+    // AQUÍ, con la MISMA pieza (`debeAmpararEsMa`): la factura/NC sin ref de un maquilero es
+    // COMPROBANTE de su deuda de EsMa (el único libro de esa deuda) y no suma. Los roles se leen
+    // una vez por bloque (es un tercero por bloque), dentro de esta tx.
+    const codigosDeRol =
+      tercero.tipoTercero === 'proveedor' ? await rolesDeProveedor(tx, tercero.idTercero) : [];
 
     // 2) Arma las filas con su folio pre-asignado, el signo por origen y el vencimiento derivado.
     const data: Prisma.MovimientoTerceroCreateManyInput[] = entradas.map((e, i) => {
@@ -158,6 +165,10 @@ export async function insertarAperturasMigradas(
         monto,
         fechaVencimiento,
         esFiscal: e.esFiscal,
+        // Un cliente no tiene roles de proveedor (`codigosDeRol` vacío) ⇒ nunca se marca.
+        ...(debeAmpararEsMa({ origen: e.origen, refTipo: e.refTipo, codigosDeRol })
+          ? { amparaEsMa: true }
+          : {}),
         ...(e.uuidCfdi == null ? {} : { uuidCfdi: e.uuidCfdi }),
         ...(e.rfcTercero == null ? {} : { rfcTercero: e.rfcTercero }),
         ...(e.refTipo == null ? {} : { refTipo: e.refTipo }),

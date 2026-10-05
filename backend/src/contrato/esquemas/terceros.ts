@@ -214,6 +214,13 @@ export const esquemaMovimientoTerceroSalida = z
       .nullable()
       .describe('Fecha de vencimiento derivada (aging D15d) o null.'),
     esFiscal: z.boolean().describe('¿Movimiento fiscal (con CFDI)?'),
+    amparaEsMa: z
+      .boolean()
+      .describe(
+        'Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). ' +
+          'Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en ' +
+          'los renglones que vienen de EsMa.',
+      ),
     uuidCfdi: z.string().nullable().describe('UUID del CFDI o null.'),
     rfcTercero: z.string().nullable().describe('RFC del tercero o null.'),
     idArchivoCfdi: z.string().nullable().describe('Id del Archivo R2 del CFDI o null.'),

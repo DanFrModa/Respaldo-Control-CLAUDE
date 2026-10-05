@@ -599,6 +599,35 @@ describe('(g) ⭐ ejecutar: nacen los movimientos', () => {
     expect(movimientos[0]?.refTipo).toBe('corrida-pago');
   });
 
+  it('fila 0.252: si al proveedor le agregan un rol de maquila DESPUÉS de capturar, el pago sale igual', async () => {
+    // El libro del renglón («proveedores» ⇒ CxP) se congeló al capturarlo. La guarda del motor —que
+    // a un maquilero no le deja pagos en CxP— no revoca esa decisión al ejecutar: tumbaría la
+    // ejecución entera de la corrida por un cambio de catálogo posterior.
+    const id = await abrirCorrida(false);
+    await guardarRenglonCorrida(
+      sesion(),
+      id,
+      { idProveedor: transportista.id, monto: 2_300, formaPago: 'efectivo' },
+      undefined,
+      bd(),
+    );
+    await cerrarCorrida(sesion(), id, bd());
+    const rol = await cliente.rolProveedor.findUniqueOrThrow({
+      where: { codigo: 'maquila-costura' },
+    });
+    await cliente.proveedorRol.create({
+      data: { idProveedor: transportista.id, idRolProveedor: rol.id },
+    });
+
+    await ejecutarCorrida(sesion(), id, bd());
+    const movimientos = await cliente.movimientoTercero.findMany({
+      where: { idProveedor: transportista.id },
+    });
+    expect(movimientos).toHaveLength(1);
+    expect(movimientos[0]?.origen).toBe('pago');
+    expect(movimientos[0]?.monto.toNumber()).toBe(-2_300);
+  });
+
   it('un renglón de CONCEPTO no crea ningún movimiento (no tiene cuenta corriente)', async () => {
     const concepto = await crearConceptoPago(
       sesion(),

@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CfdiPrevisualizacion, ClavePermiso } from '@/api/tipos';
@@ -56,6 +57,12 @@ const PREVIEW: CfdiPrevisualizacion = {
 };
 
 const importarSpy = vi.fn();
+/** Lo que «responde» el servidor al importar (la fila 0.252 cambia la marca por prueba). */
+const salidaImportar: { valor: { movimiento: { origen: string; amparaEsMa: boolean } } } = {
+  valor: { movimiento: { origen: 'factura_proveedor', amparaEsMa: false } },
+};
+
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock('@/api/cfdi', () => ({
   usePrevisualizarCfdi: () => ({
@@ -67,7 +74,7 @@ vi.mock('@/api/cfdi', () => ({
     mutate: (vars: unknown, opts: { onSuccess: (r: unknown) => void }) => {
       importarSpy(vars);
       // El servidor sube el XML; el hook resuelve con la salida (el cargo), sin flag de subida.
-      opts.onSuccess({ movimiento: { origen: 'factura_proveedor' } });
+      opts.onSuccess(salidaImportar.valor);
     },
     isPending: false,
   }),
@@ -96,6 +103,8 @@ async function subirXml(usuario: ReturnType<typeof userEvent.setup>): Promise<vo
 describe('ImportarCfdiPagina (F9-E3)', () => {
   beforeEach(() => {
     importarSpy.mockClear();
+    vi.mocked(toast.success).mockClear();
+    salidaImportar.valor = { movimiento: { origen: 'factura_proveedor', amparaEsMa: false } };
   });
 
   // §Post-F9.68 — esconder, no negar: sin `cxp.administrar` la pantalla NO se
@@ -170,6 +179,36 @@ describe('ImportarCfdiPagina (F9-E3)', () => {
     await usuario.click(screen.getByTestId('cfdi-importar-confirmar'));
     expect(importarSpy).toHaveBeenCalledWith(
       expect.objectContaining({ idProveedor: 7, refTipo: 'orden-compra', refId: 5 }),
+    );
+  });
+
+  it('fila 0.252: si el CFDI quedó como COMPROBANTE de EsMa, el mensaje lo dice (y si no, no)', async () => {
+    const usuario = userEvent.setup();
+    salidaImportar.valor = { movimiento: { origen: 'factura_proveedor', amparaEsMa: true } };
+    renderConProveedores(<ImportarCfdiPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+
+    await subirXml(usuario);
+    await usuario.click(screen.getByTestId('cfdi-previsualizar'));
+    await screen.findByTestId('cfdi-datos');
+    await usuario.click(screen.getByTestId('cfdi-importar-confirmar'));
+
+    expect(toast.success).toHaveBeenCalledWith(
+      'CFDI importado (Ingreso (factura)) como COMPROBANTE — la deuda vive en EsMa: se ve en el ' +
+        'estado de cuenta, pero no suma al saldo.',
+    );
+  });
+
+  it('fila 0.252 (control): un CFDI normal conserva el mensaje del cargo fiscal', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ImportarCfdiPagina />, { sesion: estadoSesionDePrueba(ADMIN) });
+
+    await subirXml(usuario);
+    await usuario.click(screen.getByTestId('cfdi-previsualizar'));
+    await screen.findByTestId('cfdi-datos');
+    await usuario.click(screen.getByTestId('cfdi-importar-confirmar'));
+
+    expect(toast.success).toHaveBeenCalledWith(
+      'CFDI importado (Ingreso (factura)). El cargo fiscal quedó en el estado de cuenta.',
     );
   });
 });

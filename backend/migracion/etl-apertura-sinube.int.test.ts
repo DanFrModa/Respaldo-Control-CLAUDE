@@ -225,6 +225,30 @@ describe('ETL de apertura desde SINUBE', () => {
     expect(porUuid.has('F-0004')).toBe(false);
   });
 
+  it('⭐ fila 0.252: la factura viva de un MAQUILERO entra como COMPROBANTE (EsMa es su único libro)', async () => {
+    // El proveedor de contado pasa a ser maquilero (rol de EsMa); el de 90 días queda de control.
+    const rol = await cliente.rolProveedor.upsert({
+      where: { codigo: 'lavado' },
+      update: {},
+      create: { codigo: 'lavado', nombre: 'Lavado' },
+    });
+    await cliente.proveedorRol.create({ data: { idProveedor: idP0, idRolProveedor: rol.id } });
+
+    const r = await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
+    expect(r.creados).toBe(4);
+
+    const movs = await cliente.movimientoTercero.findMany({
+      select: { uuidCfdi: true, amparaEsMa: true },
+    });
+    const marca = new Map(movs.map((m) => [m.uuidCfdi, m.amparaEsMa]));
+    // La factura del maquilero se carga (el contador la ve) pero marcada: no suma al saldo.
+    expect(marca.get('F-0003')).toBe(true);
+    // Control: las del proveedor que no es de maquila (factura y nota de crédito) siguen siendo deuda.
+    expect(marca.get('F-0001')).toBe(false);
+    expect(marca.get('F-0002')).toBe(false);
+    expect(marca.get('E-0001')).toBe(false);
+  });
+
   it('el reporte de cuadre trae los conteos, la suma cargada y los descartes con su motivo', async () => {
     const r = await ejecutarEtlAperturaSinube(cliente, archivoFixture(listadoBueno()));
     expect(r.cuadre).toContain('Renglones leídos del archivo : 6');

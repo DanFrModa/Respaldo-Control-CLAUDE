@@ -78,6 +78,7 @@ const cuenta: CxpEstadoCuenta = {
       monto: 1000,
       fechaVencimiento: '2026-07-16',
       esFiscal: false,
+      amparaEsMa: false,
       uuidCfdi: null,
       rfcTercero: null,
       idArchivoCfdi: null,
@@ -125,6 +126,50 @@ describe('EstadoCuentaProveedorPagina (F9-E2)', () => {
     const fila = screen.getByTestId('cxp-edc-fila');
     expect(fila).toHaveTextContent('Entrada sin factura');
     expect(fila).toHaveTextContent('$1,000.00');
+  });
+
+  it('fila 0.252: el CFDI de un maquilero se marca como COMPROBANTE y el abono de EsMa como cargo adicional', () => {
+    const [base] = cuenta.movimientos;
+    if (base === undefined) throw new Error('El fixture trae un movimiento.');
+    estado.valor = {
+      data: {
+        ...cuenta,
+        movimientos: [
+          {
+            ...base,
+            id: 12,
+            origen: 'factura_proveedor',
+            monto: 11600,
+            esFiscal: true,
+            amparaEsMa: true,
+            fechaVencimiento: '2026-08-31',
+            uuidCfdi: 'AAAAAAAA-0000-0000-0000-000000000252',
+          },
+          { ...base, id: 13, fuente: 'esma', origen: 'abono', monto: 300 },
+          base,
+        ],
+        total: 3,
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(<EstadoCuentaProveedorPagina />, {
+      sesion: estadoSesionDePrueba(['cxp.ver', 'consultas.ver-importes']),
+      rutaInicial: conProveedor,
+    });
+    const [comprobante, abonoEsMa, normal] = screen.getAllByTestId('cxp-edc-fila');
+    expect(comprobante).toHaveTextContent('Factura de proveedor');
+    expect(comprobante).toHaveTextContent('Comprobante — la deuda vive en EsMa');
+    expect(abonoEsMa).toHaveTextContent('Cargo adicional (abono)');
+    // El control: un renglón normal no lleva la marca.
+    expect(normal).not.toHaveTextContent('Comprobante — la deuda vive en EsMa');
+    expect(screen.getAllByTestId('cxp-edc-ampara-esma')).toHaveLength(1);
+    // El comprobante NO vence (vence la deuda, en EsMa): «—» aunque traiga la fecha guardada.
+    const [venceComprobante, , venceNormal] = screen.getAllByTestId('cxp-edc-vence');
+    expect(venceComprobante).toHaveTextContent(/^—$/);
+    expect(comprobante).not.toHaveTextContent('2026-08-31');
+    expect(venceNormal).toHaveTextContent('2026-07-16');
   });
 
   it('el botón de capturar solo aparece con `cxp.administrar`', () => {

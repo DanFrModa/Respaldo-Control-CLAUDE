@@ -43,7 +43,10 @@ export function CapturaMovimientoPagina({
   const verPagos = tienePermiso('esma.ver-pagos');
 
   const esAbono = concepto === 'abonos';
-  const etiqueta = esAbono ? 'abono' : 'descuento';
+  // Fila 0.252: en EsMa el «abono» SUMA a lo que se le debe al maquilero (es lo que cobra aparte de
+  // la maquila: transporte, corte, reparaciones). En CxP «abono» resta, así que en pantalla se
+  // rotula por lo que es. Sólo el rótulo: la ruta, el dato y el API siguen llamándose «abono».
+  const etiqueta = esAbono ? 'cargo adicional (abono)' : 'descuento';
 
   // "Duplicar partida" (F6-E5): valores iniciales por router state (pre-llenan el formulario).
   const inicial = (location.state ?? null) as PartidaInicial | null;
@@ -85,7 +88,7 @@ export function CapturaMovimientoPagina({
       },
       {
         onSuccess: () => {
-          toast.success(`${esAbono ? 'Abono' : 'Descuento'} capturado.`);
+          toast.success(`${esAbono ? 'Cargo adicional (abono)' : 'Descuento'} capturado.`);
           setMonto('');
           setObservaciones('');
         },
@@ -102,10 +105,14 @@ export function CapturaMovimientoPagina({
       <header className="flex items-center gap-3">
         <div>
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            {esAbono ? 'Abonos' : 'Descuentos'}
+            {esAbono ? 'Cargos adicionales (abonos)' : 'Descuentos'}
           </h1>
           <p className="text-[12.5px] text-muted-foreground">
             Captura un {etiqueta} a la cuenta corriente de un maquilero.
+            {esAbono
+              ? ' Es lo que cobra aparte de la maquila (transporte, corte, reparaciones): suma a ' +
+                'lo que se le debe.'
+              : null}
           </p>
         </div>
       </header>
@@ -190,7 +197,9 @@ export function CapturaMovimientoPagina({
 
           <Card>
             <CardHeader>
-              <CardTitle>Últimos {esAbono ? 'abonos' : 'descuentos'}</CardTitle>
+              <CardTitle>
+                Últimos {esAbono ? 'cargos adicionales (abonos)' : 'descuentos'}
+              </CardTitle>
               <CardDescription>Movimientos capturados del maquilero elegido.</CardDescription>
             </CardHeader>
             <CardContent>

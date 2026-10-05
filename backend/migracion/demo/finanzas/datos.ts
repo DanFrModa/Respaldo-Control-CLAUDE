@@ -388,8 +388,14 @@ export interface MovimientoDemoFin {
  *  • **+60**: FPROV-03 (−140 d, 30 de crédito ⇒ 110 de atraso) y FPROV-06 (−95 d, contado).
  *  • **31–60**: FPROV-03 (−85 ⇒ 55) y FPROV-04 (−70 + 15 ⇒ 55).
  *  • **1–30**: FPROV-03 (−50 ⇒ 20), FPROV-04 (−20 + 15 ⇒ 5) y FPROV-06 (−3).
- *  • **por vencer**: FPROV-03 (−10 + 30 ⇒ vence en 20) y FPROV-05 (−20 + 45 ⇒ vence en 25).
+ *  • **por vencer**: FPROV-03 (−10 + 30 ⇒ vence en 20).
  * Los abonos dejan saldos PARCIALES (ni cero ni el cargo entero), que es lo que hay que poder mirar.
+ *
+ * 🔴 **Ninguno es de un MAQUILERO (fila 0.252), y es la regla, no un descuido.** A un maquilero no se
+ * le capturan en CxP cargos, pagos, abonos ni descuentos: su deuda vive en EsMa y el motor los
+ * rechaza (`reglaDeMaquilaDelMotor`). El lavado sin factura de `FPROV-05` que aquí vivía como
+ * `FMOV-CXP-13` es ahora `FESMA-05`, un CARGO ADICIONAL de EsMa. Lo pinza
+ * `sembrar-demo-finanzas.test.ts`.
  */
 export const MOVIMIENTOS_CXP_DEMO: MovimientoDemoFin[] = [
   {
@@ -491,14 +497,6 @@ export const MOVIMIENTOS_CXP_DEMO: MovimientoDemoFin[] = [
     origen: 'pago',
     importe: 1_800,
     observaciones: 'Pago parcial en efectivo (dato de prueba).',
-  },
-  {
-    clave: 'FMOV-CXP-13',
-    tercero: 'FPROV-05',
-    dias: -20,
-    origen: 'entrada_sin_factura',
-    importe: 7_450,
-    observaciones: 'Lavado de una partida, sin factura (dato de prueba) — todavía no vence.',
   },
 ];
 
@@ -628,7 +626,7 @@ export interface MovimientoEsMaDemoFin {
  * ⚠️ En EsMa el **abono SUBE** lo que se le debe al maquilero y el **descuento lo BAJA** (convención
  * propia de F6, distinta de la del motor). Los importes de aquí están elegidos para dejar saldo.
  *
- * ⚠️ Y sólo lo **REVISADO** suma (fila 0.115): de los cuatro, dos nacen revisados —cuentan al
+ * ⚠️ Y sólo lo **REVISADO** suma (fila 0.115): de los cinco, tres nacen revisados —cuentan al
  * saldo— y dos se quedan CAPTURADOS, que es como se ve un renglón que espera el visto bueno de
  * Daniel (sale en el estado de cuenta con el importe vacío y en el contador «por revisar» de la
  * bandeja de CxP). Sembrar sólo revisados escondería justo esa mitad de la pantalla.
@@ -676,6 +674,19 @@ export const MOVIMIENTOS_ESMA_DEMO: MovimientoEsMaDemoFin[] = [
     revisar: false,
     observaciones:
       'Descuento por reproceso, SIN revisar (dato de prueba): espera el visto bueno para contar.',
+  },
+  {
+    // Fila 0.252: hasta aquí vivía en CxP como `FMOV-CXP-13` (entrada sin factura). A un maquilero
+    // lo adicional se le captura en EsMa, como CARGO ADICIONAL — el motor ya no lo admite.
+    clave: 'FESMA-05',
+    maquilero: 'FPROV-05',
+    tipo: 'abono',
+    dias: -20,
+    importe: 7_450,
+    conFactura: false, // segmento: no particiona — es el VALOR del movimiento ficticio, no un filtro
+    revisar: true,
+    observaciones:
+      'Lavado de una partida, sin factura: CARGO ADICIONAL de EsMa, ya revisado (dato de prueba).',
   },
 ];
 
@@ -853,6 +864,12 @@ export interface FacturaCotejoDemoFin {
  *  3. **En rojo, atendida** — cobra 3,500 de más, pero alguien escribió por qué y deja de frenar.
  *  4. **En rojo, sin ninguna liga** — llegó una factura que no corresponde a ningún documento.
  *
+ * ⭐ **Tres son de MAQUILEROS** (`FPROV-01` y `FPROV-05`), y desde la fila 0.252 entran como
+ * **COMPROBANTE** de la deuda de EsMa (`amparaEsMa`): se ven en el estado de cuenta —con su marca y
+ * sin vencimiento— y en el reporte del contador, siguen sujetas al cotejo, pero **NO suman** al saldo
+ * por pagar (la deuda del maquilero ya está en EsMa; sumarla la contaba dos veces). La de `FPROV-03`
+ * (servicios, no maquila) sí es deuda del motor: así el demo enseña los dos casos lado a lado.
+ *
  * ⚠️ Ninguna es de `FPROV-01` salvo la que cuadra, y es a propósito: una factura en rojo de un
  * proveedor **impide EJECUTAR** cualquier corrida donde ese proveedor tenga renglón (§Post-F9.232
  * (c)), y la corrida en borrador `FCOR-03` es suya. Si se le colgara una factura en rojo, Daniel no
@@ -865,7 +882,8 @@ export const FACTURAS_COTEJO_DEMO: FacturaCotejoDemoFin[] = [
     dias: -18,
     importe: 45_000,
     uuidCfdi: 'DFF10001-0000-4000-8000-000000000201',
-    observaciones: 'Factura de maquila que CUADRA con el documento emitido (dato de prueba).',
+    observaciones:
+      'Factura de maquila que CUADRA con el documento emitido (dato de prueba): COMPROBANTE, no suma.',
     aplicaA: { corrida: 'FCOR-01', proveedor: 'FPROV-01', importe: 45_000 },
   },
   {
@@ -875,7 +893,8 @@ export const FACTURAS_COTEJO_DEMO: FacturaCotejoDemoFin[] = [
     importe: 21_000,
     uuidCfdi: 'DFF10002-0000-4000-8000-000000000202',
     observaciones:
-      'Factura que cobra 2,400 MÁS que el documento emitido (dato de prueba): queda EN ROJO.',
+      'Factura que cobra 2,400 MÁS que el documento emitido (dato de prueba): queda EN ROJO. ' +
+      'Es de un maquilero: COMPROBANTE, no suma al saldo.',
     aplicaA: { corrida: 'FCOR-01', proveedor: 'FPROV-05', importe: 18_600 },
   },
   {
@@ -897,7 +916,8 @@ export const FACTURAS_COTEJO_DEMO: FacturaCotejoDemoFin[] = [
     importe: 7_900,
     uuidCfdi: 'DFF10004-0000-4000-8000-000000000204',
     observaciones:
-      'Factura SIN ningún documento que la ampare (dato de prueba): en rojo y sin explicación.',
+      'Factura SIN ningún documento que la ampare (dato de prueba): en rojo y sin explicación. ' +
+      'Es de un maquilero: COMPROBANTE, no suma al saldo.',
     aplicaA: null,
   },
 ];

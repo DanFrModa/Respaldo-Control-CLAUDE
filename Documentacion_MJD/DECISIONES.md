@@ -18397,3 +18397,35 @@ El mensaje de orden cerrada deja de nombrar una clave técnica. ⏳ Lo que sigue
 Administración › Usuarios que nadie más tiene esos tres perfiles (si no, «sólo yo» no se cumple), y que «el que yo
 autorice» hoy se da con un perfil que lleve la llave (dársela a una persona suelta es la fila 0.234).
 
+#### (Post-F9.262) — LA FACTURA DEL MAQUILERO ES COMPROBANTE, NO DEUDA: EsMa ES EL ÚNICO LIBRO (5-oct-2026, decisiones de Daniel)
+
+Contesta las preguntas de §Post-F9.261(e) sobre la fila **0.252** (la factura de un maquilero que factura se contaba
+como deuda dos veces). Textual:
+
+> *«Sí. Se valida la recepción en EsMa. Ahí se sube a su estado de cuenta lo que debemos de pagar. Y de ahí confirmamos
+> con él los montos para que haga su factura. Sí pueden facturar cosas adicionales a la maquila (transporte, corte, o
+> cualquier otro concepto de reparaciones, etc). Bloquea el arranque si no podemos llevar cuentas de maquileros.
+> Recuerda que en EsMa llevamos también maquileros que no nos facturan. Y también proveedores de corte, estampado,
+> cualquier arte, etc. ¿No sé si ahí también está pensado llevar cuentas de maquilas de empaque? (Creo que sí)»*
+
+**(a) La deuda del rubro maquila vive SÓLO en EsMa.** Lo que se le debe a un maquilero —costura, corte, estampado,
+bordado, lavado, aplicación y **empaque** (sí está en EsMa desde la fila 0.114, medido)— son sus recepciones
+validadas en EsMa. Su factura (CFDI) es el **comprobante** de lo que ya se confirmó con él: sirve para el cotejo y
+para el contador, pero **no suma a la deuda**. Quién es «rubro maquila» lo decide el **rol** del proveedor (la misma
+lista que usa la corrida para pagar por EsMa).
+
+**(b) Lo adicional (transporte, reparaciones, otros conceptos) se captura ANTES como cargo adicional en su estado de
+cuenta de EsMa** — *«Sí. Como lo propones. Se captura como cargo adicional.»* Es el movimiento que EsMa llama
+«abono» (a favor del maquilero, suma a su saldo), que Daniel autoriza; en pantalla se rotula «Cargo adicional
+(abono)» para que no se confunda con el abono de CxP, que resta. Si un maquilero factura algo que nadie capturó, su
+factura no cuadra en el cotejo, sale en rojo y frena el pago: ése es el aviso.
+
+**(c) El proveedor mixto NO se desarrolla.** Un maquilero que además vende material con orden de compra: *«Podría
+pasar pero es extremadamente remoto… menos del 1% de las veces. Lo meteríamos como cargo adicional. No tiene caso
+hacer todo el desarrollo para 50 metros de elástico.»* ⇒ esa compra se carga como cargo adicional en EsMa y su
+factura se importa **sin ligarla a la OC** (así queda como comprobante). ⚠️ Lo que el sistema hace si SÍ se liga a la
+OC: la factura con OC de un maquilero sigue siendo deuda del motor, que la corrida no paga (le paga por EsMa) ⇒ se
+contaría dos veces. Es consecuencia de no desarrollar el caso (decisión 3 de arriba); no se construye nada para impedirlo.
+
+**(d) Prioridad: bloquea el arranque** (confirmado por Daniel).
+

@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.193 · 5-oct-2026 · **en prueba** — **La factura del maquilero ya no se cuenta dos veces**
+
+> **La v0.193 cierra una fila del programa: la 0.252**, que bloqueaba el arranque. Se hizo como lo decidiste: lo
+> que se le debe a un maquilero vive sólo en EsMa, y su factura es el comprobante.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Importar la factura de un maquilero ya no infla lo que le debes.** Antes, si le debías $11,600 y Finanzas
+importaba su factura para el cotejo, Cuentas por pagar decía $23,200; y al pagarle quedaba un saldo fantasma de
+$11,600 que envejecía como vencido. Ahora dice $11,600, y al pagarle queda en cero.
+
+**La factura sigue sirviendo para todo lo demás:** se coteja contra el documento que le mandaste, frena el pago si no
+cuadra, y le aparece al contador en el reporte fiscal. Vale para todos los que llevan cuenta en EsMa: costura, corte,
+estampado, bordado, lavado, aplicación y empaque.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**En el estado de cuenta del proveedor, la factura de un maquilero sale marcada «Comprobante — la deuda vive en
+EsMa»**, con el importe en gris y sin fecha de vencimiento: está ahí para que la veas, pero no suma.
+
+**En EsMa, el botón «Abono» ahora dice «Cargo adicional (abono)».** Es lo mismo de siempre —lo que se le suma al
+maquilero por transporte, reparaciones u otro concepto—; sólo cambió el nombre para que no se confunda con el abono
+de Cuentas por pagar, que resta. **Ahí es donde se captura lo adicional, antes de que te facture.**
+
+**A un maquilero ya no se le capturan cargos, pagos ni descuentos a mano desde Cuentas por pagar:** el sistema te pide
+hacerlo en su estado de cuenta de EsMa, que es donde vive su cuenta. Si no, su saldo quedaría descuadrado.
+
+**Los saldos iniciales que se carguen de SINUBE el día del arranque siguen la misma regla**: las facturas abiertas de
+maquileros entran como comprobante, no como deuda.
+
+### ⏳ Sigue pendiente o roto
+
+**El caso del maquilero que además te vende material con orden de compra no se desarrolló**, como decidiste: esa
+compra se captura como cargo adicional en su estado de cuenta de EsMa, y su factura se importa **sin ligarla a la orden
+de compra**. Si se liga a la orden de compra, el sistema la vuelve a contar como deuda aparte.
+
 ## 0.192 · 5-oct-2026 · **en prueba** — **Reabrir una orden cerrada ya es sólo tuyo**
 
 > **La v0.192 cierra una fila del programa: la 0.228.** Lo decidiste el 30-sep: *«solo yo (o el que yo autorice)»*.

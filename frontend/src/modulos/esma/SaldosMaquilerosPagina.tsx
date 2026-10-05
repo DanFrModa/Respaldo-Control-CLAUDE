@@ -76,7 +76,7 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
             <div>
               <CardTitle>Saldos</CardTitle>
               <CardDescription>
-                Σ cargos + abonos − pagos − descuentos, por maquilero.
+                Σ cargos + cargos adicionales − pagos − descuentos, por maquilero.
               </CardDescription>
             </div>
             <Field className="w-44">
@@ -173,7 +173,7 @@ export function SaldosMaquilerosPagina(): React.JSX.Element {
                     <TablaDensaFila>
                       <TablaDensaHead>Maquilero</TablaDensaHead>
                       <TablaDensaHead numerica>Cargos</TablaDensaHead>
-                      <TablaDensaHead numerica>Abonos</TablaDensaHead>
+                      <TablaDensaHead numerica>Cargos adic. (abonos)</TablaDensaHead>
                       <TablaDensaHead numerica>Pagos</TablaDensaHead>
                       <TablaDensaHead numerica>Descuentos</TablaDensaHead>
                       <TablaDensaHead

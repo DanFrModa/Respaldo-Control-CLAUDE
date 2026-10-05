@@ -12,7 +12,8 @@ import { hayPendienteDeRevision, moneda, partidas, textoCargosPorValidar } from 
 type Segmento = '' | 'con' | 'sin';
 
 /**
- * Tarjeta de apoyo con el SALDO DERIVADO de un maquilero (Σcargos + Σabonos − Σpagos − Σdescuentos),
+ * Tarjeta de apoyo con el SALDO DERIVADO de un maquilero (Σcargos + Σcargos adicionales —los
+ * «abonos» de EsMa— − Σpagos − Σdescuentos),
  * segmentable con/sin factura. Es LECTURA DE CUENTA (`esma.ver-pagos`); quien la monta ya validó ese
  * permiso. Los importes se muestran como "—" si el backend los oculta (sin `consultas.ver-importes`).
  *
@@ -38,7 +39,7 @@ export function SaldoMaquilero({ idMaquilero }: { idMaquilero: number }): React.
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <CardTitle>Saldo del maquilero</CardTitle>
-            <CardDescription>Σ cargos + abonos − pagos − descuentos.</CardDescription>
+            <CardDescription>Σ cargos + cargos adicionales − pagos − descuentos.</CardDescription>
           </div>
           <Field className="w-44">
             <FieldLabel htmlFor="saldo-segmento">Facturación</FieldLabel>
@@ -66,7 +67,7 @@ export function SaldoMaquilero({ idMaquilero }: { idMaquilero: number }): React.
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <Metrica etiqueta="Cargos" valor={moneda(saldo.totalCargos)} />
-              <Metrica etiqueta="Abonos" valor={moneda(saldo.totalAbonos)} />
+              <Metrica etiqueta="Cargos adicionales" valor={moneda(saldo.totalAbonos)} />
               <Metrica etiqueta="Pagos" valor={moneda(saldo.totalPagos)} />
               <Metrica etiqueta="Descuentos" valor={moneda(saldo.totalDescuentos)} />
               <Metrica etiqueta="Saldo" valor={moneda(saldo.saldo)} destacado />
@@ -82,7 +83,7 @@ export function SaldoMaquilero({ idMaquilero }: { idMaquilero: number }): React.
                   <>
                     Además hay <strong>{moneda(saldo.pendienteRevision.neto)}</strong> pendiente de
                     revisión en {partidas(saldo.pendienteRevision.partidas)}, que <b>no</b> entra al
-                    saldo: abonos {moneda(saldo.pendienteRevision.abonos)} · pagos{' '}
+                    saldo: cargos adicionales {moneda(saldo.pendienteRevision.abonos)} · pagos{' '}
                     {moneda(saldo.pendienteRevision.pagos)} · descuentos{' '}
                     {moneda(saldo.pendienteRevision.descuentos)} · cargos por validar{' '}
                     {moneda(saldo.pendienteRevision.cargos)}. Se suma en cuanto se revise cada

@@ -94,7 +94,8 @@ export function catalogoCfdiFinanzas(fecha: (dias: number) => string): CfdiDemoF
       subtotal: 10_344.83,
       concepto: 'Maquila de costura (datos de prueba)',
       nota:
-        'CxP: al importarlo nace una factura del proveedor de maquila y ENTRA a la bandeja de ' +
+        'CxP: al importarlo nace una factura del proveedor de maquila como COMPROBANTE de su ' +
+        'deuda de EsMa (se ve en el estado de cuenta, NO suma al saldo) y ENTRA a la bandeja de ' +
         'cotejo en ROJO (no trae documento que la ampare). ⚠️ Mientras siga en rojo y sin ' +
         'atender FRENA la ejecución de la corrida en borrador de ese mismo proveedor: no es un ' +
         'defecto, es la regla del cotejo funcionando — lígala o atiéndela y se destraba.',
