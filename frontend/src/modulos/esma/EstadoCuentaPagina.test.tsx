@@ -118,7 +118,8 @@ describe('EstadoCuentaPagina (F6-E5)', () => {
       rutaInicial: { pathname: '/esma/estado-cuenta', state: { idMaquilero: 5 } },
     });
     const fila = screen.getByTestId('edc-fila');
-    expect(fila).toHaveTextContent('Abono');
+    // Fila 0.252: en EsMa el abono se rotula por lo que es (suma a la deuda del maquilero).
+    expect(fila).toHaveTextContent('Cargo adicional (abono)');
     expect(fila).toHaveTextContent('Anticipo');
     // Con esma.revisar y partida pendiente, aparece el botón de autorizar (vista móvil).
     expect(screen.getByTestId('edc-autorizar')).toBeInTheDocument();

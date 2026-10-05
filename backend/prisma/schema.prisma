@@ -5625,6 +5625,14 @@ model MovimientoTercero {
   /// credito no se coteja contra nada. Lo recalcula el dominio, nunca se teclea.
   estadoCotejo EstadoCotejoFactura? @map("estado_cotejo")
 
+  /// ⭐ Fila 0.252 — este movimiento AMPARA deuda que vive en EsMa: es el CFDI (factura o nota de
+  /// crédito) de un proveedor de rubro MAQUILA importado SIN orden de compra. La deuda nació en EsMa
+  /// al validar el recibo; la factura es su comprobante, no deuda nueva ⇒ se ve en el estado de
+  /// cuenta y en el reporte del contador, pero NO suma a ningún saldo, aging ni días vencidos (el
+  /// predicado único vive en `dominio/terceros/ampara-esma.ts`). Se GUARDA al importar —no se deriva
+  /// de los roles en vivo— y el inverso de cancelación la COPIA. Default false: sin backfill.
+  amparaEsMa Boolean @default(false) @map("ampara_esma")
+
   /// ATENDIDA: cuando, quien y con que explicacion alguien con `cxp.administrar` se hizo cargo del
   /// descuadre. Daniel (Post-F9.232 (c)): *"se queda en rojo hasta que atiendan el problema"* - la
   /// factura NO se rechaza, entra marcada y deja de frenar el pago cuando alguien la atiende y dice

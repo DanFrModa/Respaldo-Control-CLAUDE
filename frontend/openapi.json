@@ -163886,6 +163886,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -164036,6 +164040,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -164346,6 +164351,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -164496,6 +164505,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -164831,6 +164841,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -164981,6 +164995,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -165820,6 +165835,10 @@
                             "type": "boolean",
                             "description": "¿Movimiento fiscal (con CFDI)?"
                           },
+                          "amparaEsMa": {
+                            "type": "boolean",
+                            "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                          },
                           "uuidCfdi": {
                             "anyOf": [
                               {
@@ -165970,6 +165989,7 @@
                           "monto",
                           "fechaVencimiento",
                           "esFiscal",
+                          "amparaEsMa",
                           "uuidCfdi",
                           "rfcTercero",
                           "idArchivoCfdi",
@@ -167234,6 +167254,10 @@
                             "type": "boolean",
                             "description": "¿Movimiento fiscal (con CFDI)?"
                           },
+                          "amparaEsMa": {
+                            "type": "boolean",
+                            "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                          },
                           "uuidCfdi": {
                             "anyOf": [
                               {
@@ -167384,6 +167408,7 @@
                           "monto",
                           "fechaVencimiento",
                           "esFiscal",
+                          "amparaEsMa",
                           "uuidCfdi",
                           "rfcTercero",
                           "idArchivoCfdi",
@@ -168043,6 +168068,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -168193,6 +168222,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -168503,6 +168533,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -168653,6 +168687,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -168988,6 +169023,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -169138,6 +169177,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -181110,6 +181150,10 @@
                           "type": "boolean",
                           "description": "¿Movimiento fiscal (con CFDI)?"
                         },
+                        "amparaEsMa": {
+                          "type": "boolean",
+                          "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                        },
                         "uuidCfdi": {
                           "anyOf": [
                             {
@@ -181260,6 +181304,7 @@
                         "monto",
                         "fechaVencimiento",
                         "esFiscal",
+                        "amparaEsMa",
                         "uuidCfdi",
                         "rfcTercero",
                         "idArchivoCfdi",
@@ -183809,6 +183854,10 @@
                             "type": "boolean",
                             "description": "¿Movimiento fiscal (con CFDI)?"
                           },
+                          "amparaEsMa": {
+                            "type": "boolean",
+                            "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                          },
                           "uuidCfdi": {
                             "anyOf": [
                               {
@@ -183959,6 +184008,7 @@
                           "monto",
                           "fechaVencimiento",
                           "esFiscal",
+                          "amparaEsMa",
                           "uuidCfdi",
                           "rfcTercero",
                           "idArchivoCfdi",
@@ -184619,6 +184669,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -184769,6 +184823,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -185079,6 +185134,10 @@
                       "type": "boolean",
                       "description": "¿Movimiento fiscal (con CFDI)?"
                     },
+                    "amparaEsMa": {
+                      "type": "boolean",
+                      "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                    },
                     "uuidCfdi": {
                       "anyOf": [
                         {
@@ -185229,6 +185288,7 @@
                     "monto",
                     "fechaVencimiento",
                     "esFiscal",
+                    "amparaEsMa",
                     "uuidCfdi",
                     "rfcTercero",
                     "idArchivoCfdi",
@@ -186049,6 +186109,10 @@
                           "type": "boolean",
                           "description": "¿Movimiento fiscal (con CFDI)?"
                         },
+                        "amparaEsMa": {
+                          "type": "boolean",
+                          "description": "Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa."
+                        },
                         "uuidCfdi": {
                           "anyOf": [
                             {
@@ -186199,6 +186263,7 @@
                         "monto",
                         "fechaVencimiento",
                         "esFiscal",
+                        "amparaEsMa",
                         "uuidCfdi",
                         "rfcTercero",
                         "idArchivoCfdi",

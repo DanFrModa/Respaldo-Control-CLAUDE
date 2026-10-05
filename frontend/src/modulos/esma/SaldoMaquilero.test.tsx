@@ -78,6 +78,8 @@ describe('SaldoMaquilero · el pendiente de revisión acompaña al saldo', () =>
     const aviso = screen.getByTestId('saldo-pendiente');
     expect(aviso).toHaveTextContent('$50.00');
     expect(aviso).toHaveTextContent(/pendiente de revisión/i);
+    // Fila 0.252: el abono de EsMa se nombra por lo que es.
+    expect(aviso).toHaveTextContent(/cargos adicionales \$/);
     // Y el desglose por concepto, para saber de dónde sale ese neto.
     expect(aviso).toHaveTextContent('$100.00');
     expect(aviso).toHaveTextContent('$30.00');

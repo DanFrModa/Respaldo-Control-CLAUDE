@@ -61,6 +61,7 @@ import {
   type SegmentoFactura,
 } from '../esma/formula-saldo.js';
 import { sumarPlazo } from './aging-comun.js';
+import { SQL_SUMA_AL_SALDO } from './ampara-esma.js';
 
 /**
  * Un cargo (o el montón de cargos que vencen el MISMO día) con su edad ya calculada por Postgres.
@@ -177,6 +178,8 @@ export async function diasVencidosPorProveedor(
           AND m."id_proveedor" IS NOT NULL
           AND m."monto" > 0
           AND m."fecha_vencimiento" IS NOT NULL
+          -- Fila 0.252: el comprobante de una deuda de EsMa no envejece aquí (la deuda sí, abajo).
+          AND ${SQL_SUMA_AL_SALDO}
           ${facturaMotor}
         UNION ALL
         -- EsMa CARGO: sin columna de fecha propia, la del renglon es creado_en, la MISMA que
@@ -218,6 +221,8 @@ export async function diasVencidosPorProveedor(
         WHERE m."id_empresa" = ${idEmpresa}
           AND m."id_proveedor" IS NOT NULL
           AND m."monto" < 0
+          -- Fila 0.252: tampoco su nota de crédito ni el inverso que cancela un comprobante.
+          AND ${SQL_SUMA_AL_SALDO}
           ${facturaMotor}
         UNION ALL
         SELECT "id_maquilero", "monto"

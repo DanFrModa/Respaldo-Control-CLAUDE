@@ -107,7 +107,14 @@ export function ImportarCfdiPagina(): React.JSX.Element {
       {
         onSuccess: (salida) => {
           const tipo = etiquetaTipo(salida.movimiento.origen === 'nota_credito' ? 'E' : 'I');
-          toast.success(`CFDI importado (${tipo}). El cargo fiscal quedó en el estado de cuenta.`);
+          // Fila 0.252: el CFDI de un maquilero sin OC es COMPROBANTE de su deuda de EsMa, no un
+          // cargo más. El mensaje tiene que decirlo: el saldo no va a subir y eso es lo correcto.
+          toast.success(
+            salida.movimiento.amparaEsMa
+              ? `CFDI importado (${tipo}) como COMPROBANTE — la deuda vive en EsMa: se ve en el ` +
+                  'estado de cuenta, pero no suma al saldo.'
+              : `CFDI importado (${tipo}). El cargo fiscal quedó en el estado de cuenta.`,
+          );
           void navigate('/cxp/estado-cuenta', { state: { idProveedor } });
         },
         onError: (error) => toast.error(error.message),

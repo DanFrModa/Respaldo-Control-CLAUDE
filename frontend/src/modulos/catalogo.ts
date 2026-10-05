@@ -1066,8 +1066,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           {
             clave: 'esma-abonos',
-            titulo: 'Abonos',
-            descripcion: 'Captura abonos a la cuenta corriente de un maquilero',
+            titulo: 'Cargos adicionales (abonos)',
+            descripcion:
+              'Lo que el maquilero cobra aparte de la maquila (transporte, corte, reparaciones)',
             ruta: '/esma/abonos',
             icono: 'billete',
             permisos: ['esma.modificar'],

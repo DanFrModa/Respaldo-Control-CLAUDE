@@ -1234,6 +1234,9 @@ export async function ejecutarCorrida(
             ...(observaciones === undefined ? {} : { observaciones }),
           },
           { tx },
+          // Fila 0.252: el libro de este renglón se congeló al capturarlo («proveedores»). Si
+          // después le agregaron un rol de maquila, la guarda del motor no revoca esa decisión.
+          { pagoDeRenglonCongelado: true },
         );
         await tx.renglonCorridaPago.update({
           where: { id: renglon.id },

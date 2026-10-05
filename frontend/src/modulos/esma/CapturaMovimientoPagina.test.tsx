@@ -88,6 +88,16 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
     crearMutate.mockReset();
   });
 
+  it('fila 0.252: el abono de EsMa se rotula «Cargo adicional (abono)» en pantalla', () => {
+    renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {
+      sesion: estadoSesionDePrueba(['esma.ver-pagos', 'esma.modificar']),
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Cargos adicionales (abonos)', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('mov-guardar')).toHaveTextContent('Guardar cargo adicional (abono)');
+  });
+
   it('sin esma.modificar el botón Guardar queda deshabilitado', async () => {
     const user = userEvent.setup();
     renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {

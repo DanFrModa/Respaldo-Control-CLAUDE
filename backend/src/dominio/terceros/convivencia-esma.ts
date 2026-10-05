@@ -297,6 +297,8 @@ export async function proyectarMovimientosEsMa(
     // los créditos (pago/descuento) no vencen nunca.
     fechaVencimiento: null as string | null,
     esFiscal: conFactura === true,
+    // Fila 0.252: un renglón de EsMa ES la deuda, nunca el comprobante de otra.
+    amparaEsMa: false,
     uuidCfdi: null,
     rfcTercero: null,
     idArchivoCfdi: null,

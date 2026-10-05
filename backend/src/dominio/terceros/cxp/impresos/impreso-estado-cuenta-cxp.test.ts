@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EstadoCuentaTerceroSalida } from '../../../../contrato/index.js';
+import { extraerTextoPdf } from '../../../../comun/pdf-texto.js';
 
 import { generarPdfCxp, type DatosImpresoCxp } from './impreso-estado-cuenta-cxp.js';
 
@@ -42,6 +43,7 @@ function cuentaDePrueba(): EstadoCuentaTerceroSalida {
         monto: 1000,
         fechaVencimiento: '2026-07-16',
         esFiscal: false,
+        amparaEsMa: false,
         uuidCfdi: null,
         rfcTercero: null,
         idArchivoCfdi: null,
@@ -71,6 +73,7 @@ function cuentaDePrueba(): EstadoCuentaTerceroSalida {
         monto: -300,
         fechaVencimiento: null,
         esFiscal: false,
+        amparaEsMa: false,
         uuidCfdi: null,
         rfcTercero: null,
         idArchivoCfdi: null,
@@ -104,5 +107,37 @@ describe('impreso estado de cuenta de CxP (F9-E2)', () => {
     const buffer = await generarPdfCxp(datos);
     expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
     expect(buffer.length).toBeGreaterThan(500);
+  });
+});
+
+/** Todo el texto del PDF, con los saltos normalizados a espacios (react-pdf parte las líneas). */
+async function textoDelPdf(buffer: Buffer): Promise<string> {
+  const paginas = await extraerTextoPdf(buffer);
+  return paginas.join(' ').replace(/\s+/g, ' ');
+}
+
+describe('fila 0.252: el comprobante de EsMa en el impreso', () => {
+  it('se rotula como comprobante y NO enseña vencimiento; el renglón normal sí lo enseña', async () => {
+    const cuenta = cuentaDePrueba();
+    const [normal] = cuenta.movimientos;
+    if (normal === undefined) throw new Error('El fixture trae movimientos.');
+    const comprobante = {
+      ...normal,
+      id: 12,
+      origen: 'factura_proveedor',
+      fechaVencimiento: '2026-08-31',
+      esFiscal: true,
+      amparaEsMa: true,
+    };
+    const texto = await textoDelPdf(
+      await generarPdfCxp({
+        pagador: 'FR MODA SA DE CV',
+        cuenta: { ...cuenta, movimientos: [comprobante, normal] },
+      }),
+    );
+    expect(texto).toContain('comprobante, la deuda vive en EsMa');
+    // La fecha guardada del comprobante no se imprime; la del renglón normal, sí.
+    expect(texto).not.toContain('2026-08-31');
+    expect(texto).toContain('2026-07-16');
   });
 });

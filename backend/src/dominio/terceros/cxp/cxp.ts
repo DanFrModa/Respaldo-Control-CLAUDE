@@ -41,7 +41,7 @@ import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma } from '../../../datos/index.js';
 
 import {
-  registrarMovimientoTercero,
+  registrarMovimientoTerceroInterno,
   cancelarMovimientoTercero,
   corregirMovimientoTercero,
   estadoDeCuentaTercero,
@@ -56,6 +56,7 @@ import {
   type SegmentoFactura,
 } from '../../esma/formula-saldo.js';
 import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
+import { SQL_SUMA_AL_SALDO, type OpcionesReglaMaquila } from '../ampara-esma.js';
 import { leerLimitesAging } from '../config-aging.js';
 import { type LimitesAging } from '../aging-comun.js';
 import { diasVencidosPorProveedor } from '../dias-vencidos.js';
@@ -88,8 +89,16 @@ export async function registrarMovimientoCxp(
   idProveedor: number,
   entrada: z.input<typeof esquemaMovimientoCxpCrear>,
   bd?: ContextoBd,
+  /**
+   * Fila 0.252 — SÓLO del dominio (ninguna ruta lo pasa): la corrida ejecuta el pago de un renglón
+   * congelado en «proveedores» (ver `OpcionesReglaMaquila.pagoDeRenglonCongelado`).
+   */
+  reglaMaquila?: OpcionesReglaMaquila,
 ): Promise<MovimientoTerceroSalida> {
   verificarPermiso(sesion, 'cxp.administrar');
+  // Defensa en profundidad del motor (mismo reparto en el seed): se exige aquí porque abajo se usa
+  // su variante interna, la única que acepta las opciones del dominio.
+  verificarPermiso(sesion, 'terceros.administrar');
   const datos: DatosMovimientoCxpCrear = validarEntrada(esquemaMovimientoCxpCrear, entrada);
 
   // La modalidad se lee DENTRO de la misma transacción en la que se escribe el movimiento (A2): si
@@ -101,6 +110,8 @@ export async function registrarMovimientoCxp(
       where: { id: idProveedor },
       select: { modalidadFacturacion: true },
     });
+    // ⭐ Fila 0.252: el cargo, pago, abono o descuento manual a un maquilero lo rechaza el MOTOR
+    // (`reglaDeMaquilaDelMotor`), no este camino: así vale también por la ruta genérica.
     // Si el proveedor no existe se deja pasar: el motor responde 404 con su mensaje (A9).
     const esFiscal = resolverSegmentoCxp(
       datos.origen,
@@ -108,7 +119,7 @@ export async function registrarMovimientoCxp(
       datos.esFiscal,
     );
 
-    return registrarMovimientoTercero(
+    return registrarMovimientoTerceroInterno(
       sesion,
       {
         tipoTercero: 'proveedor',
@@ -122,6 +133,7 @@ export async function registrarMovimientoCxp(
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
       },
       { tx },
+      reglaMaquila,
     );
   }, bd);
 }
@@ -352,6 +364,9 @@ async function agregarPorProveedor(
     FROM movimientos_tercero m
     JOIN proveedores p ON p.id = m.id_proveedor
     WHERE m.id_empresa = ${idEmpresa} AND m.id_proveedor IS NOT NULL ${factura}
+      -- Fila 0.252: fuera los comprobantes de deuda que vive en EsMa (ésa entra por la cubeta
+      -- de maquila, abajo). Mismo predicado que el saldo del tercero y los días vencidos.
+      AND ${SQL_SUMA_AL_SALDO}
     GROUP BY m.id_proveedor, p.nombre, p.nombre_corto, p.dias_credito
   `);
   return crudas.map((f) => ({

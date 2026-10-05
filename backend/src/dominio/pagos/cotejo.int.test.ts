@@ -288,11 +288,17 @@ describe('(b) la factura sin orden de compra nace en rojo', () => {
   });
 
   it('un PAGO no se coteja contra nada: no entra a la bandeja', async () => {
+    // Fila 0.252: a un MAQUILERO el motor ya no le admite pagos (se le paga en EsMa), así que el
+    // pago va a un proveedor que no es de maquila. Lo que se mide —un pago no se coteja— no
+    // depende del proveedor.
+    const transportista = await cliente.proveedor.create({
+      data: { nombre: 'TRANSPORTES DEMO', modalidadFacturacion: 'ambos' },
+    });
     await registrarMovimientoTercero(
       sesion(),
       {
         tipoTercero: 'proveedor',
-        idTercero: taller.id,
+        idTercero: transportista.id,
         fecha: '2026-09-05',
         origen: 'pago',
         importe: 500,

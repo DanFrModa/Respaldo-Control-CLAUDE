@@ -63787,6 +63787,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -63978,6 +63980,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -64181,6 +64185,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -64579,6 +64585,8 @@ export interface paths {
                 fechaVencimiento: string | null;
                 /** @description ¿Movimiento fiscal (con CFDI)? */
                 esFiscal: boolean;
+                /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+                amparaEsMa: boolean;
                 /** @description UUID del CFDI o null. */
                 uuidCfdi: string | null;
                 /** @description RFC del tercero o null. */
@@ -65067,6 +65075,8 @@ export interface paths {
                 fechaVencimiento: string | null;
                 /** @description ¿Movimiento fiscal (con CFDI)? */
                 esFiscal: boolean;
+                /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+                amparaEsMa: boolean;
                 /** @description UUID del CFDI o null. */
                 uuidCfdi: string | null;
                 /** @description RFC del tercero o null. */
@@ -65419,6 +65429,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -65610,6 +65622,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -65813,6 +65827,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -70081,6 +70097,8 @@ export interface paths {
                 fechaVencimiento: string | null;
                 /** @description ¿Movimiento fiscal (con CFDI)? */
                 esFiscal: boolean;
+                /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+                amparaEsMa: boolean;
                 /** @description UUID del CFDI o null. */
                 uuidCfdi: string | null;
                 /** @description RFC del tercero o null. */
@@ -71191,6 +71209,8 @@ export interface paths {
                 fechaVencimiento: string | null;
                 /** @description ¿Movimiento fiscal (con CFDI)? */
                 esFiscal: boolean;
+                /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+                amparaEsMa: boolean;
                 /** @description UUID del CFDI o null. */
                 uuidCfdi: string | null;
                 /** @description RFC del tercero o null. */
@@ -71546,6 +71566,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -71737,6 +71759,8 @@ export interface paths {
               fechaVencimiento: string | null;
               /** @description ¿Movimiento fiscal (con CFDI)? */
               esFiscal: boolean;
+              /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+              amparaEsMa: boolean;
               /** @description UUID del CFDI o null. */
               uuidCfdi: string | null;
               /** @description RFC del tercero o null. */
@@ -72145,6 +72169,8 @@ export interface paths {
                 fechaVencimiento: string | null;
                 /** @description ¿Movimiento fiscal (con CFDI)? */
                 esFiscal: boolean;
+                /** @description Fila 0.252: COMPROBANTE de deuda que vive en EsMa (CFDI de un maquilero importado sin OC). Se lista, pero NO suma al saldo, al aging ni a los días vencidos. Siempre false en los renglones que vienen de EsMa. */
+                amparaEsMa: boolean;
                 /** @description UUID del CFDI o null. */
                 uuidCfdi: string | null;
                 /** @description RFC del tercero o null. */

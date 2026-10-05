@@ -184,3 +184,90 @@ describe('rutas del motor de terceros', () => {
     expect(fiscal.statusCode).toBe(403);
   });
 });
+
+// ⭐ Fila 0.252 — la ruta genérica es OTRA puerta al mismo defecto: la regla de maquila vive en el
+// motor, así que vale también aquí (y no sólo en CxP y en el importador de CFDI).
+describe('ruta genérica: la regla de maquila (fila 0.252)', () => {
+  /** Un maquilero (rol de EsMa) con el rol que siembra el seed. */
+  async function crearMaquilero(): Promise<number> {
+    const rol = await cliente.rolProveedor.findUniqueOrThrow({
+      where: { codigo: 'maquila-costura' },
+    });
+    const maq = await cliente.proveedor.create({
+      data: {
+        nombre: 'Maquilero HTTP',
+        diasCredito: 8,
+        modalidadFacturacion: 'ambos',
+        roles: { create: { idRolProveedor: rol.id } },
+      },
+    });
+    return maq.id;
+  }
+
+  function alta(cookie: string, idTercero: number, extra: Record<string, unknown>) {
+    return app.inject({
+      method: 'POST',
+      url: '/api/terceros/movimientos',
+      headers: { cookie },
+      payload: {
+        tipoTercero: 'proveedor',
+        idTercero,
+        fecha: '2026-07-01',
+        importe: 500,
+        esFiscal: false,
+        ...extra,
+      },
+    });
+  }
+
+  it('rechaza el cargo manual (entrada sin factura) a un maquilero, sin escribir nada', async () => {
+    const cookie = await cookieAdmin();
+    const idMaquilero = await crearMaquilero();
+
+    const res = await alta(cookie, idMaquilero, { origen: 'entrada_sin_factura' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      mensaje:
+        'Este proveedor es de maquila: sus cargos adicionales, pagos y descuentos se capturan en su ' +
+        'estado de cuenta de EsMa (la corrida le paga allí). Capturados aquí quedarían en un libro ' +
+        'aparte que nunca se salda, y su deuda contada en dos lados.',
+    });
+    expect(await cliente.movimientoTercero.count()).toBe(0);
+  });
+
+  it('marca como COMPROBANTE la factura sin ref de un maquilero: se registra pero no suma', async () => {
+    const cookie = await cookieAdmin();
+    const idMaquilero = await crearMaquilero();
+
+    const res = await alta(cookie, idMaquilero, {
+      origen: 'factura_proveedor',
+      importe: 11600,
+      esFiscal: true,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ amparaEsMa: true, monto: 11600 });
+
+    const saldo = await app.inject({
+      method: 'GET',
+      url: `/api/terceros/proveedor/${idMaquilero}/saldo`,
+      headers: { cookie },
+    });
+    expect(saldo.json()).toMatchObject({ saldo: 0, saldoMovimientos: 0 });
+  });
+
+  it('control: el mismo cargo y la misma factura a un proveedor que NO es de maquila entran', async () => {
+    const cookie = await cookieAdmin();
+    const cargo = await alta(cookie, idProveedor, { origen: 'entrada_sin_factura' });
+    expect(cargo.statusCode).toBe(201);
+    const factura = await alta(cookie, idProveedor, { origen: 'factura_proveedor' });
+    expect(factura.statusCode).toBe(201);
+    expect(factura.json()).toMatchObject({ amparaEsMa: false });
+
+    const saldo = await app.inject({
+      method: 'GET',
+      url: `/api/terceros/proveedor/${idProveedor}/saldo`,
+      headers: { cookie },
+    });
+    expect(saldo.json()).toMatchObject({ saldo: 1000 });
+  });
+});

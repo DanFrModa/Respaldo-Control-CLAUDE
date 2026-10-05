@@ -15,6 +15,8 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { rubroDeProveedor } from '../src/dominio/pagos/beneficiarios.js';
+import { MOVIMIENTOS_CXP_DEMO, PROVEEDORES_DEMO_FIN } from './demo/finanzas/datos.js';
 import { CONCURRENCIA_FIN_POR_OMISION } from './demo/finanzas/sembrar.js';
 import { DIR_CFDI_FINANZAS_POR_OMISION } from './sembrar-demo-finanzas.js';
 import {
@@ -53,5 +55,27 @@ describe('concurrenciaPedida reusada con el default de finanzas', () => {
     // Estaba en 10 (`LOTE_CATALOGOS`) y eso es lo que ahogaba al gemelo contra una base remota.
     expect(CONCURRENCIA_FIN_POR_OMISION).toBeLessThanOrEqual(4);
     expect(CONCURRENCIA_FIN_POR_OMISION).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ⭐ Fila 0.252 — a un maquilero no se le capturan en CxP cargos, pagos, abonos ni descuentos: el
+// motor los rechaza (su deuda vive en EsMa). Si el demo los trajera, el sembrador tronaría en una
+// base nueva a la mitad de la corrida. Se cruza contra los ROLES declarados en el propio demo.
+describe('datos del demo de finanzas: nada manual de CxP a un maquilero', () => {
+  const ORIGENES_SOLO_EN_ESMA = ['entrada_sin_factura', 'pago', 'abono', 'descuento'];
+  const rolesPorClave = new Map(PROVEEDORES_DEMO_FIN.map((p) => [p.clave, p.roles]));
+
+  it('el demo SÍ trae maquileros (si no, la prueba de abajo no mediría nada)', () => {
+    const maquileros = PROVEEDORES_DEMO_FIN.filter((p) => rubroDeProveedor(p.roles) === 'maquila');
+    expect(maquileros.length).toBeGreaterThan(0);
+  });
+
+  it('ningún movimiento de CxP de esos orígenes va a un proveedor de rubro maquila', () => {
+    const indebidos = MOVIMIENTOS_CXP_DEMO.filter((mv) => {
+      const roles = rolesPorClave.get(mv.tercero);
+      if (roles === undefined) throw new Error(`${mv.clave}: proveedor ${mv.tercero} no existe.`);
+      return ORIGENES_SOLO_EN_ESMA.includes(mv.origen) && rubroDeProveedor(roles) === 'maquila';
+    }).map((mv) => mv.clave);
+    expect(indebidos).toEqual([]);
   });
 });

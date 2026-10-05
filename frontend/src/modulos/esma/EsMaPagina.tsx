@@ -37,7 +37,7 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     clave: 'estado-cuenta',
     titulo: 'Estado de cuenta',
     descripcion:
-      'La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha.',
+      'La cuenta corriente de un maquilero: cargos, cargos adicionales (abonos), descuentos y pagos por fecha.',
     ruta: '/esma/estado-cuenta',
     icono: Wallet,
     permiso: 'esma.ver-pagos',
@@ -93,8 +93,10 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
   },
   {
     clave: 'abonos',
-    titulo: 'Abonos',
-    descripcion: 'Captura abonos a la cuenta de un maquilero (a favor del maquilero).',
+    titulo: 'Cargos adicionales (abonos)',
+    descripcion:
+      'Lo que el maquilero cobra aparte de la maquila (transporte, corte, reparaciones): suma a ' +
+      'lo que se le debe.',
     ruta: '/esma/abonos',
     icono: PlusCircle,
     permiso: 'esma.modificar',
@@ -128,7 +130,8 @@ export function EsMaPagina(): React.JSX.Element {
           <div>
             <h1 className="text-[21px] leading-tight font-semibold tracking-tight">EsMa</h1>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Estados de cuenta de maquileros: cargos, conciliación, abonos, descuentos y pagos.
+              Estados de cuenta de maquileros: cargos, conciliación, cargos adicionales, descuentos
+              y pagos.
             </p>
           </div>
         </div>

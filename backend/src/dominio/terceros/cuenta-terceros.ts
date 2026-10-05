@@ -12,6 +12,9 @@
  *  • Cancelación = movimiento INVERSO auditado (D3/A7), NUNCA edición/borrado (patrón kardex).
  *  • Para un PROVEEDOR, el saldo y el estado de cuenta INCLUYEN EsMa (convivencia, opción b) sin
  *    migrar datos: `convivencia-esma.ts` reusa la fórmula de F6 → no-regresión de los saldos.
+ *  • ⭐ Fila 0.252: un movimiento `amparaEsMa` (el CFDI de un maquilero, que COMPRUEBA deuda de EsMa)
+ *    se lista pero NO suma: toda suma de saldo, aging o días vencidos lleva el predicado único de
+ *    `ampara-esma.ts`. Si no, la deuda del maquilero salía dos veces (EsMa + su factura).
  *
  * Innegociables: A1 (lógica aquí), A2 (alta/cancelación en una transacción con bitácora), A3 (folio
  * por secuencia atómica), A4 (`terceros.ver`/`.administrar`/`.fiscal`), A7 (bitácora), A9 (empresa
@@ -64,6 +67,7 @@ import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { resolverEsFiscalMotor } from './segmento-motor.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
 import { aporteEsMaSaldo, proyectarMovimientosEsMa } from './convivencia-esma.js';
+import { reglaDeMaquilaDelMotor, SUMA_AL_SALDO, type OpcionesReglaMaquila } from './ampara-esma.js';
 import { segmentoWhere } from './cxp/facturacion-cxp.js';
 
 /**
@@ -134,6 +138,7 @@ function aMovimientoSalida(
     fechaVencimiento:
       m.fechaVencimiento === null ? null : m.fechaVencimiento.toISOString().slice(0, 10),
     esFiscal: m.esFiscal,
+    amparaEsMa: m.amparaEsMa,
     uuidCfdi: m.uuidCfdi,
     rfcTercero: m.rfcTercero,
     idArchivoCfdi: m.idArchivoCfdi,
@@ -229,8 +234,16 @@ export async function registrarMovimientoTerceroInterno(
    *    fecha** de un movimiento migrado con una nota larga devolvería **400 por un campo que el
    *    usuario ni tocó** — el mismo defecto que el cajón tenía con el importe, ahora del lado del
    *    servidor. Lo que el usuario PROPONE sí viaja por `entrada` y sí se valida: es entrada suya.
+   *
+   *  • `amparaEsMa` (fila 0.252): ver `OpcionesReglaMaquila`
+   *    (`ampara-esma.ts`). Normalmente NO se pasan: la regla de maquila la aplica este mismo motor
+   *    con los roles del proveedor, para TODO camino de alta. Si viajaran por el API, cualquiera
+   *    podría sacar una factura de la deuda —o colar un cargo a un maquilero— con un campo del cuerpo.
    */
-  extras?: { idMovimientoCorregido?: number; observacionesConservadas?: string },
+  extras?: {
+    idMovimientoCorregido?: number;
+    observacionesConservadas?: string;
+  } & OpcionesReglaMaquila,
 ): Promise<MovimientoTerceroSalida> {
   const datos: DatosMovimientoTerceroCrear = validarEntrada(esquemaMovimientoTerceroCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
@@ -240,6 +253,19 @@ export async function registrarMovimientoTerceroInterno(
     const tercero = await exigirTercero(tx, datos.tipoTercero, datos.idTercero);
 
     const origen = datos.origen;
+    // ⭐ FILA 0.252 — la regla de maquila, AQUÍ y no en cada camino: rechaza el cargo manual a un
+    // maquilero y decide si el movimiento es COMPROBANTE de una deuda de EsMa. Así vale igual por la
+    // ruta genérica, por CxP y por el importador de CFDI.
+    const amparaEsMa = await reglaDeMaquilaDelMotor(
+      tx,
+      {
+        tipoTercero: datos.tipoTercero,
+        idTercero: datos.idTercero,
+        origen,
+        refTipo: datos.refTipo,
+      },
+      extras,
+    );
     const fecha = aDateColumna(datos.fecha);
     // El signo lo pone el origen; el importe llega positivo (validado por Zod).
     const monto = redondear2(signoDeOrigen(origen) * datos.importe);
@@ -280,6 +306,7 @@ export async function registrarMovimientoTerceroInterno(
         ...(extras?.idMovimientoCorregido === undefined
           ? {}
           : { idMovimientoCorregido: extras.idMovimientoCorregido }),
+        ...(amparaEsMa ? { amparaEsMa: true } : {}),
         ...datosCreacion(sesion),
       },
       include: incluirTercero,
@@ -302,6 +329,7 @@ export async function registrarMovimientoTerceroInterno(
         origen,
         monto,
         esFiscal,
+        ...(fila.amparaEsMa ? { amparaEsMa: true } : {}),
       },
     });
 
@@ -369,6 +397,7 @@ export async function cancelarMovimientoTerceroInterno(
         origen: true,
         monto: true,
         esFiscal: true,
+        amparaEsMa: true,
         rfcTercero: true,
         cancelado: true,
         idMovimientoInverso: true,
@@ -401,6 +430,9 @@ export async function cancelarMovimientoTerceroInterno(
         // El reverso no vence; conserva la marca fiscal para que la vista fiscal también nete.
         fechaVencimiento: null,
         esFiscal: original.esFiscal,
+        // Fila 0.252: el inverso de un comprobante de EsMa tampoco cuenta. Si no copiara la marca,
+        // cancelar la factura de un maquilero RESTARÍA del saldo un cargo que nunca sumó.
+        amparaEsMa: original.amparaEsMa,
         ...(original.rfcTercero === null ? {} : { rfcTercero: original.rfcTercero }),
         refTipo: 'cancelacion',
         refId: original.id,
@@ -519,6 +551,7 @@ export async function corregirMovimientoTercero(
         origen: true,
         monto: true,
         esFiscal: true,
+        amparaEsMa: true,
         uuidCfdi: true,
         idArchivoCfdi: true,
         refTipo: true,
@@ -593,6 +626,10 @@ export async function corregirMovimientoTercero(
       { tx },
       {
         idMovimientoCorregido: original.id,
+        // Fila 0.252: corregir no cambia el significado del renglón: conserva su marca aunque
+        // los roles del proveedor hayan cambiado. (La guarda de maquila SÍ aplica: un cargo
+        // manual a un maquilero no se recaptura en el motor, se captura en EsMa.)
+        amparaEsMa: original.amparaEsMa,
         ...(!propusoObservaciones && cambios.observaciones !== null
           ? { observacionesConservadas: cambios.observaciones }
           : {}),
@@ -643,13 +680,15 @@ export async function calcularSaldoTercero(
 
   const filtroTercero = camposTercero(tipoTercero, idTercero);
   // Σ monto del motor: TODOS los movimientos netean (original + inverso suman 0), así el saldo cuadra.
+  // Fila 0.252: menos los comprobantes de deuda que vive en EsMa (`SUMA_AL_SALDO`) — esa deuda ya
+  // entra abajo por la convivencia, y contarla también aquí la duplicaba.
   const [operativo, fiscal] = await Promise.all([
     cliente.movimientoTercero.aggregate({
-      where: { idEmpresa, ...filtroTercero },
+      where: { idEmpresa, ...filtroTercero, ...SUMA_AL_SALDO },
       _sum: { monto: true },
     }),
     cliente.movimientoTercero.aggregate({
-      where: { idEmpresa, ...filtroTercero, esFiscal: true },
+      where: { idEmpresa, ...filtroTercero, ...SUMA_AL_SALDO, esFiscal: true },
       _sum: { monto: true },
     }),
   ]);

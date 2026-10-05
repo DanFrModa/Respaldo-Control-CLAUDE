@@ -170,6 +170,10 @@ describe('⭐ un cargo de MAQUILA envejece (antes se iba a una cubeta sin edad)'
         idTercero: maquilero.id,
         fecha: haceDias(50).toISOString().slice(0, 10),
         origen: 'factura_proveedor',
+        // Fila 0.252: CON OC (el caso mixto): sin ella, la factura de un maquilero es sólo
+        // COMPROBANTE de su deuda de EsMa y no envejece aquí. Lo que se mide es el motor.
+        refTipo: 'orden-compra',
+        refId: 1,
         importe: 500,
         // El proveedor es `ambos`: el motor exige decir de qué lado va (no lo elige en silencio).
         esFiscal: false,
@@ -189,6 +193,10 @@ describe('⭐ un cargo de MAQUILA envejece (antes se iba a una cubeta sin edad)'
         idTercero: maquilero.id,
         fecha: haceDias(50).toISOString().slice(0, 10),
         origen: 'factura_proveedor',
+        // Fila 0.252: CON OC (el caso mixto): sin ella, la factura de un maquilero es sólo
+        // COMPROBANTE de su deuda de EsMa y no envejece aquí. Lo que se mide es el motor.
+        refTipo: 'orden-compra',
+        refId: 1,
         importe: 500,
         // El proveedor es `ambos`: el motor exige decir de qué lado va (no lo elige en silencio).
         esFiscal: false,
@@ -222,7 +230,8 @@ describe('los pagos se aplican de más viejo a más nuevo (convención de las cu
 
   it('⭐ y el CRÉDITO DEL MOTOR salda igual — la quinta fuente del agregado', async () => {
     // Gemela de las dos de arriba, con la ÚLTIMA fuente que quedaba sin medir: el movimiento
-    // negativo del motor (`origen: 'pago'`), no un pago de EsMa. Existe porque neutralizar esa rama
+    // negativo del motor —aquí una NOTA DE CRÉDITO con OC (caso mixto, fila 0.252: a un maquilero
+    // el motor ya no le admite pagos)—, no un pago de EsMa. Existe porque neutralizar esa rama
     // con `AND FALSE` dejaba las 17 pruebas en verde. ⚠️ La consecuencia es la misma que la del
     // descuento: **un proveedor de CxP ya pagado arrastraría días vencidos para siempre** en la
     // pantalla con la que Daniel decide a quién le paga.
@@ -239,10 +248,14 @@ describe('los pagos se aplican de más viejo a más nuevo (convención de las cu
         tipoTercero: 'proveedor',
         idTercero: maquilero.id,
         fecha: haceDias(1).toISOString().slice(0, 10),
-        origen: 'pago',
+        // Fila 0.252: a un maquilero el motor ya no le admite un PAGO (se le paga en EsMa). El
+        // crédito del motor que sí puede tener es la NOTA DE CRÉDITO del caso mixto —con OC—, que
+        // no es comprobante de EsMa y SÍ resta. Es la misma rama del agregado (`monto < 0`).
+        origen: 'nota_credito',
+        refTipo: 'orden-compra',
+        refId: 1,
         importe: 1000,
-        // El proveedor es `ambos`: el motor exige decir de qué lado va (no lo elige en silencio).
-        esFiscal: false,
+        esFiscal: true,
       },
       bd(),
     );
@@ -409,6 +422,10 @@ describe('segmento y empresa', () => {
         idTercero: maquilero.id,
         fecha: haceDias(100).toISOString().slice(0, 10),
         origen: 'factura_proveedor',
+        // Fila 0.252: CON OC (el caso mixto): sin ella, la factura de un maquilero es sólo
+        // COMPROBANTE de su deuda de EsMa y no envejece aquí. Lo que se mide es el motor.
+        refTipo: 'orden-compra',
+        refId: 1,
         importe: 700,
         esFiscal: true,
       },

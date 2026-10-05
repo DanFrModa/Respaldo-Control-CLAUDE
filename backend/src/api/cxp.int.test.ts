@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 
 import { construirApp } from '../app.js';
+import { MENSAJE_MAQUILA_SE_CAPTURA_EN_ESMA } from '../dominio/terceros/ampara-esma.js';
 import type { PrismaClient } from '../datos/index.js';
 import { clientePruebas, limpiarBaseDatos } from '../pruebas/contexto.js';
 import { sembrar } from '../../prisma/seed.js';
@@ -196,5 +197,38 @@ describe('rutas de CxP', () => {
       headers: { cookie: viewer },
     });
     expect(fiscal.statusCode).toBe(403);
+  });
+});
+
+// ⭐ Fila 0.252 — por la RUTA de CxP, a un maquilero no se le captura nada que se le captura en
+// EsMa. La exención de la corrida (`pagoDeRenglonCongelado`) es sólo del dominio: ninguna ruta la
+// pasa, así que el pago manual también se rechaza.
+describe('ruta de CxP: la guarda de maquila (fila 0.252)', () => {
+  it('rechaza el pago y la entrada sin factura a un maquilero, sin escribir nada', async () => {
+    const cookie = await cookieAdmin();
+    const rol = await cliente.rolProveedor.findUniqueOrThrow({
+      where: { codigo: 'maquila-costura' },
+    });
+    const maquilero = await cliente.proveedor.create({
+      data: {
+        nombre: 'Maquilero CxP HTTP',
+        diasCredito: 8,
+        modalidadFacturacion: 'solo_sin',
+        roles: { create: { idRolProveedor: rol.id } },
+      },
+    });
+    const antes = await cliente.movimientoTercero.count();
+
+    for (const origen of ['pago', 'entrada_sin_factura'] as const) {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/cxp/proveedores/${maquilero.id}/movimientos`,
+        headers: { cookie },
+        payload: { fecha: '2026-07-01', origen, importe: 500 },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ mensaje: MENSAJE_MAQUILA_SE_CAPTURA_EN_ESMA });
+    }
+    expect(await cliente.movimientoTercero.count()).toBe(antes);
   });
 });

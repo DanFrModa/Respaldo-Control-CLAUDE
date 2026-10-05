@@ -160,9 +160,21 @@ function tablaMovimientos(datos: DatosImpresoCxp): ReactElement {
       View,
       { style: estilosDoc.filaTabla, key: `m-${i}` },
       h(Text, { style: [...estiloCelda, estilos.colFecha] }, m.fecha),
-      h(Text, { style: [...estiloCelda, estilos.colConcepto] }, origenTexto(m.origen)),
+      h(
+        Text,
+        { style: [...estiloCelda, estilos.colConcepto] },
+        // Fila 0.252: el comprobante de un maquilero se imprime, pero dice que no suma al saldo.
+        m.amparaEsMa
+          ? `${origenTexto(m.origen)} · comprobante, la deuda vive en EsMa`
+          : origenTexto(m.origen),
+      ),
       h(Text, { style: [...estiloCelda, estilos.colFlex] }, m.observaciones ?? '—'),
-      h(Text, { style: [...estiloCelda, estilos.colFecha] }, m.fechaVencimiento ?? '—'),
+      // Fila 0.252: el comprobante de EsMa no vence (la deuda vence en EsMa).
+      h(
+        Text,
+        { style: [...estiloCelda, estilos.colFecha] },
+        m.amparaEsMa ? '—' : (m.fechaVencimiento ?? '—'),
+      ),
       h(Text, { style: [...estiloCelda, estilos.colMarca] }, m.esFiscal ? 'Sí' : '—'),
       h(Text, { style: [...estiloCelda, estilos.colNum] }, pesos(m.monto)),
     );

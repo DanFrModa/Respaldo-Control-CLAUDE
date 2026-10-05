@@ -33,6 +33,8 @@ import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma } from '../../../datos/index.js';
 
+import { SQL_SUMA_AL_SALDO } from '../ampara-esma.js';
+
 /** Redondeo monetario a 2 decimales; normaliza el cero negativo (-0 → 0). */
 function redondear2(n: number): number {
   const r = Math.round(n * 100) / 100;
@@ -262,7 +264,9 @@ export async function saludFiscal(
       COALESCE(m.id_cliente, m.id_proveedor) AS "idTercero",
       COALESCE(c.nombre, p.nombre)         AS "tercero",
       COALESCE(c.rfc, p.rfc)               AS "rfc",
-      SUM(m.monto)::numeric                AS "saldoFiscal",
+      -- Fila 0.252: el comprobante de un maquilero se CUENTA (es un CFDI vivo) pero no SUMA al
+      -- saldo: su deuda vive en EsMa. El listado del contador (\`reporteFiscal\`) no cambia.
+      COALESCE(SUM(m.monto) FILTER (WHERE ${SQL_SUMA_AL_SALDO}), 0)::numeric AS "saldoFiscal",
       COUNT(*)::int                        AS "movimientos"
     FROM movimientos_tercero m
     LEFT JOIN clientes c    ON c.id = m.id_cliente

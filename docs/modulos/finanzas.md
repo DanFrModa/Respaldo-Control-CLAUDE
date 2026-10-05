@@ -353,6 +353,29 @@ tres movimientos planos en la definición única (`dominio/esma/formula-saldo.ts
 alimenta a la vez a Prisma y al SQL crudo, viaja sola a **las cinco sumas del saldo** y a las listas: un
 movimiento cancelado **ni suma al saldo ni sigue apareciendo como «esperando tu decisión»**.
 
+## ⭐ La factura del maquilero es COMPROBANTE, no deuda (fila 0.252, §Post-F9.262)
+
+**Regla:** la deuda del **rubro maquila** —proveedores con un rol de EsMa (`ROLES_MAQUILA_ESMA`: costura, estampado,
+bordado, lavado, aplicación, corte, empaque), el mismo criterio con el que la corrida paga por EsMa— vive **sólo en
+EsMa**. Su CFDI de proveedor **sin OC** (factura o nota de crédito) se registra en el motor con
+`MovimientoTercero.amparaEsMa = true`: conserva UUID, XML, cotejo y reporte fiscal, pero **no suma al saldo**.
+
+- **La marca se guarda al registrar**, no se deriva en vivo: si un proveedor cambia de roles, el historial no cambia.
+  El inverso de una cancelación la hereda.
+- **Un solo predicado** (`dominio/terceros/ampara-esma.ts`: `SUMA_AL_SALDO` para Prisma y `SQL_SUMA_AL_SALDO` para SQL
+  crudo con alias `m`) en todas las sumas de saldo: saldo operativo y fiscal del tercero, bandeja de CxP y su
+  resumen, cartera de la corrida, días vencidos (cargos y créditos) y saldo de salud fiscal. **El listado del
+  reporte fiscal del contador no lo usa**: la factura sigue listada.
+- **Guarda:** un movimiento manual del motor a un proveedor de rubro maquila —`entrada_sin_factura`, `pago`, `abono`,
+  `descuento`— se rechaza en el motor (`reglaDeMaquilaDelMotor`), por cualquier camino: lo adicional se captura en
+  EsMa como «cargo adicional» (el movimiento que EsMa llama abono), y se le paga y descuenta en EsMa. Única exención
+  (sólo de dominio, `pagoDeRenglonCongelado`): la corrida que ejecuta un renglón capturado cuando el proveedor aún no
+  tenía rol de maquila. El ETL de apertura (`insertarAperturasMigradas`) aplica la misma marca a las facturas y notas
+  de crédito sin referencia de maquileros.
+- **No cubierto, por decisión:** la factura **con OC** de un maquilero (proveedor mixto, <1 % según Daniel) sigue
+  creando deuda en el motor, que la corrida no paga. ⇒ esa compra se captura como cargo adicional en EsMa y su factura
+  se importa **sin ligar la OC**; si se liga, se cuenta dos veces.
+
 ## Decisiones (DECISIONES.md §D15)
 
 - **D15a** — el movimiento referencia al tercero por **tipo + id** (dos FKs nullable + CHECK de

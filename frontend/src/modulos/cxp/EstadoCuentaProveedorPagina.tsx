@@ -290,11 +290,32 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                           data-testid="cxp-edc-fila"
                         >
                           <TablaDensaCelda>{m.fecha}</TablaDensaCelda>
-                          <TablaDensaCelda>{etiquetaOrigen(m.origen)}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            {/* Fila 0.252: el «abono» que viene de EsMa SUMA (es un cargo adicional
+                                del maquilero); en CxP «abono» resta. Se rotula por lo que es. */}
+                            {m.fuente === 'esma' && m.origen === 'abono'
+                              ? 'Cargo adicional (abono)'
+                              : etiquetaOrigen(m.origen)}
+                            {/* Fila 0.252: el CFDI de un maquilero COMPRUEBA la deuda de EsMa; se
+                                lista, pero su importe NO suma al saldo de arriba. */}
+                            {m.amparaEsMa ? (
+                              <Badge
+                                variant="outline"
+                                className="ml-1.5"
+                                title="Es el CFDI de una deuda que ya está en su estado de cuenta de EsMa: no suma al saldo."
+                                data-testid="cxp-edc-ampara-esma"
+                              >
+                                Comprobante — la deuda vive en EsMa
+                              </Badge>
+                            ) : null}
+                          </TablaDensaCelda>
                           <TablaDensaCelda className="max-w-xs truncate">
                             {m.observaciones ?? '—'}
                           </TablaDensaCelda>
-                          <TablaDensaCelda>{m.fechaVencimiento ?? '—'}</TablaDensaCelda>
+                          {/* Fila 0.252: el comprobante de EsMa no vence (vence la deuda, en EsMa). */}
+                          <TablaDensaCelda data-testid="cxp-edc-vence">
+                            {m.amparaEsMa ? '—' : (m.fechaVencimiento ?? '—')}
+                          </TablaDensaCelda>
                           <TablaDensaCelda>
                             {m.esFiscal ? (
                               <Badge variant="secondary">Fiscal</Badge>
@@ -302,7 +323,12 @@ export function EstadoCuentaProveedorPagina(): React.JSX.Element {
                               <span className="text-faint">—</span>
                             )}
                           </TablaDensaCelda>
-                          <TablaDensaCelda numerica className="font-medium">
+                          <TablaDensaCelda
+                            numerica
+                            className={
+                              m.amparaEsMa ? 'font-medium text-muted-foreground' : 'font-medium'
+                            }
+                          >
                             {moneda(m.monto)}
                           </TablaDensaCelda>
                           {puedeAdministrar ? (
