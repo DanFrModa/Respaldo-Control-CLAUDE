@@ -177,6 +177,7 @@ import {
   requeridoAvioReceta,
   requeridoContradictorioPorMedida,
 } from '../produccion/receta-avios.js';
+import { mensajeOrdenCerrada } from '../produccion/cierre-orden.js';
 import {
   desalineacionDeOrden,
   exigirMaterialesLiberados,
@@ -3332,6 +3333,37 @@ async function planearCompra(
       delPlan,
     ),
   );
+
+  // ⭐⭐ 0.226a (§Post-F9.244) — 🔴 LA PREVIA NO PROMETE UNA COMPRA QUE LA GENERACIÓN VA A RECHAZAR.
+  // Explotar una orden CERRADA sigue libre (decisión 3: el MRP «marca, no esconde»), pero COMPRARLE
+  // no: `crearOC` la rechaza con su guarda. Sin esto, la previa enseñaba la OC entera y «Generar»
+  // reventaba TODO el acto con un 409 —también las líneas de las órdenes hermanas abiertas—, que es
+  // justo lo que V1-E3z prohíbe: *la previa dice exactamente qué líneas van a existir*. Se mira sólo
+  // a las órdenes que de verdad tienen una línea que SE ESCRIBE (`seEscribe`), con el MISMO mensaje
+  // central de la guarda, y se dice la salida: quitarla de la selección o reabrirla.
+  const conLineaQueSeEscribe = [
+    ...new Set(
+      proveedores.flatMap((p) =>
+        p.renglones.flatMap((r) => r.porOrden.filter((l) => l.seEscribe).map((l) => l.idOrden)),
+      ),
+    ),
+  ];
+  if (conLineaQueSeEscribe.length > 0) {
+    const cerradas = await tx.orden.findMany({
+      where: { id: { in: conLineaQueSeEscribe }, idEmpresa, cerradaEn: { not: null } },
+      select: { folio: true },
+      orderBy: { folio: 'asc' },
+    });
+    if (cerradas.length > 0) {
+      bloqueos.push(
+        `${mensajeOrdenCerrada(
+          cerradas.map((o) => o.folio),
+          'le puede comprar material',
+        )} O quíta${cerradas.length === 1 ? 'la' : 'las'} de las órdenes de esta compra para ` +
+          `generar la de las demás.`,
+      );
+    }
+  }
   proveedores.sort((a, b) => a.proveedor.localeCompare(b.proveedor, 'es'));
   omitidos.sort(
     (a, b) => a.folioOrden - b.folioOrden || a.material.localeCompare(b.material, 'es'),

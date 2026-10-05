@@ -35,6 +35,7 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { numOrNull } from '../costos/decimales.js';
+import { exigirOrdenAbiertaPorId, exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 
 /** El renglón de receta afectado, en la forma mínima que esta operación necesita. */
 interface RenglonReceta {
@@ -144,7 +145,16 @@ export async function asignarProveedorDeMaterial(
   const idEmpresa = sesion.idEmpresaActiva;
 
   return enTransaccion(async (tx) => {
-    // A9 primero: si la orden es de otra empresa se responde 404 y no se dice nada más de ella.
+    // ⭐ 0.226a (§Post-F9.244): asignar proveedor/precio escribe la receta CONGELADA de la orden
+    // (puerta trasera de la receta). Sobre una orden CERRADA no. Guarda ÚNICA con candado, PRIMERA
+    // instrucción (una orden de otra empresa la ignora: el 404 de abajo lo dice).
+    await exigirOrdenAbiertaPorId(
+      tx,
+      idEmpresa,
+      idOrden,
+      'le puede asignar proveedor de compra a un material',
+    );
+    // A9: si la orden es de otra empresa se responde 404 y no se dice nada más de ella.
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa },
       select: { id: true, folio: true },
@@ -312,10 +322,19 @@ export async function asignarProveedorDeMaterialEnBloque(
   const unicos = renglonesUnicos(datos.asignaciones);
 
   return enTransaccion(async (tx) => {
+    const idsOrden = [...new Set(unicos.map((a) => a.idOrden))];
+    // ⭐ 0.226a: la guarda de la orden CERRADA en LOTE, PRIMERA instrucción: si varias de las
+    // órdenes del acto están cerradas, el mensaje las nombra TODAS (no sólo la primera que el bucle
+    // de abajo tropezaría). Todo o nada, como el resto del acto.
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      idsOrden,
+      'le puede asignar proveedor de compra a un material',
+    );
     // A9 de entrada y para TODAS las órdenes: si una sola es de otra empresa se responde 404 y no se
     // escribe nada (ni siquiera de las que sí eran suyas). Se leen aquí, de una, también porque el
     // folio hace falta para el mensaje de confirmación.
-    const idsOrden = [...new Set(unicos.map((a) => a.idOrden))];
     const ordenes = await tx.orden.findMany({
       where: { id: { in: idsOrden }, idEmpresa },
       select: { id: true, folio: true },

@@ -55,6 +55,7 @@ import {
   canonizarLineasDeColor,
   resolverColoresCanonicos,
 } from '../catalogos/colores-canonicos.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from './comprometido-en-oc.js';
 import { proponerColorDeTela, type ColorDeTelaCandidato } from './casar-color-de-tela.js';
 
@@ -403,6 +404,14 @@ export async function asignarColorDeTela(
   const idEmpresa = sesion.idEmpresaActiva;
 
   return enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): amarrar el color de compra escribe la receta CONGELADA de la orden
+    // (puerta trasera de la receta). Sobre una orden CERRADA no. Guarda ÚNICA, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      idEmpresa,
+      idOrden,
+      'le puede amarrar el color de compra de una tela',
+    );
     const orden = await cargarOrden(tx, idOrden, idEmpresa);
 
     const renglon = orden.recetaTelas.find((t) => t.idTela === datos.idTela);

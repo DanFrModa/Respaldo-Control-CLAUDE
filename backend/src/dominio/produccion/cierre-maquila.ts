@@ -76,7 +76,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { resolverConFactura } from '../esma/facturacion.js';
 
-import { exigirOrdenAbierta, exigirOrdenAbiertaPorId } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { celdasSaldables, saldadosPorCelda } from './faltantes-saldados.js';
 import { pendientePorCelda } from './incompletas.js';
 import { claveCeldaPack, normalizarPack } from './packs.js';
@@ -438,9 +438,19 @@ export async function cerrarOrdenMaquila(
   const datos = validarEntrada(esquemaCierreMaquilaCrear, entrada);
 
   const idCierre = await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: cerrar con un maquilero SALDA su pendiente y puede proponer un cobro — es
+    // escritura sobre la orden. Sobre una orden CERRADA no se hace: lo natural es saldar a los
+    // maquileros ANTES de cerrar la orden (o reabrirla, que queda auditado). Guarda con candado,
+    // PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      idOrden,
+      'puede cerrar con un maquilero',
+    );
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
-      select: { id: true, idEmpresa: true, folio: true, estado: true, cerradaEn: true },
+      select: { id: true, idEmpresa: true, folio: true, estado: true },
     });
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', idOrden);
@@ -448,10 +458,6 @@ export async function cerrarOrdenMaquila(
     if (orden.estado === 'cancelada') {
       throw new ErrorConflicto('Esa orden está cancelada: no hay saldo que cerrar.');
     }
-    // ⭐ 0.061: cerrar con un maquilero SALDA su pendiente y puede proponer un cobro — es escritura
-    // sobre la orden. Sobre una orden CERRADA no se hace: lo natural es saldar a los maquileros
-    // ANTES de cerrar la orden (o reabrirla, que queda auditado).
-    exigirOrdenAbierta(orden, 'puede cerrar con un maquilero');
 
     const proceso = await tx.tipoProceso.findUnique({
       where: { id: datos.idTipoProceso },
@@ -649,7 +655,12 @@ export async function deshacerCierreMaquila(
     }
     // ⭐ 0.061: deshacer devuelve el pendiente y cancela el descuento propuesto — escritura sobre la
     // orden. Sobre una orden CERRADA hay que reabrirla primero.
-    await exigirOrdenAbiertaPorId(tx, cierre.idOrden, 'puede deshacer su cierre con un maquilero');
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      cierre.idOrden,
+      'puede deshacer su cierre con un maquilero',
+    );
 
     // Mismo lock que el cierre y el recibo: mientras se des-salda, nadie más mueve el saldo.
     await bloquearEtapasDeOrden(tx, cierre.idEmpresa, cierre.idOrden);

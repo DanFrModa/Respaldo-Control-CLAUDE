@@ -95,6 +95,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 
 /** Clave de la secuencia de folios de notas de salida (A3 — por empresa). */
 export const CLAVE_SECUENCIA_NOTA_SALIDA = 'nota-salida';
@@ -601,6 +602,14 @@ export async function crearNotaSalida(
   rechazarTelaEnAlta(datos.lineas);
 
   const idNota = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): una nota que SURTE a una orden CERRADA no se crea. Guarda ÚNICA en
+    // lote (nombra todas las cerradas), con candado compartido, PRIMERA instrucción.
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => l.idOrden),
+      'le puede hacer una nota de salida',
+    );
     await exigirMaquileroExiste(tx, datos.idMaquilero);
     // Almacén origen en el encabezado (decisión g): existe + activo + global o de la empresa (A9)
     // y —fila 0.137— de AVIO: desde §Post-F9.38 la nota es SOLO de avíos, así que de ahí salen.
@@ -662,6 +671,14 @@ export async function actualizarNotaSalida(
   const idEmpresa = sesion.idEmpresaActiva;
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.226a: los renglones NUEVOS no pueden surtir a una orden CERRADA. Guarda ÚNICA en lote,
+    // PRIMERA instrucción (antes de tocar el encabezado). Sin `lineas` no se escribe ningún renglón.
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      (datos.lineas ?? []).map((l) => l.idOrden),
+      'le puede hacer una nota de salida',
+    );
     const actual = await exigirNota(tx, id, idEmpresa);
     if (actual.estatus !== EstatusNotaSalida.borrador) {
       throw new ErrorConflicto(
@@ -747,7 +764,7 @@ export async function confirmarNotaSalida(
         idAlmacen: true,
         fechaElaboracion: true,
         lineas: {
-          select: { id: true, idAvio: true, idTela: true, cantidad: true },
+          select: { id: true, idAvio: true, idTela: true, cantidad: true, idOrden: true },
           orderBy: { id: 'asc' },
         },
       },
@@ -760,6 +777,15 @@ export async function confirmarNotaSalida(
         `La nota de salida ${Number(nota.numNota)} ya está ${nota.estatus}; solo se confirma desde borrador.`,
       );
     }
+    // ⭐ 0.226a: confirmar DESCUENTA avíos contra las órdenes de sus renglones. Si alguna se cerró
+    // mientras la nota era borrador, no se confirma (y se dice cuáles). Antes de los candados de
+    // existencia y de cualquier escritura.
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      nota.lineas.map((l) => l.idOrden),
+      'le puede confirmar una nota de salida',
+    );
 
     // Almacén ORIGEN del encabezado (decisión g): de aquí salen los avíos. Validado al crear/editar,
     // pero un almacén puede DESACTIVARSE entre el borrador y la confirmación: se re-valida aquí (mismo
@@ -892,7 +918,7 @@ export async function cancelarNotaSalida(
         id: true,
         numNota: true,
         estatus: true,
-        lineas: { select: { idMovimientoAvio: true } },
+        lineas: { select: { idMovimientoAvio: true, idOrden: true } },
       },
     });
     if (nota === null) {
@@ -900,6 +926,17 @@ export async function cancelarNotaSalida(
     }
     if (nota.estatus === EstatusNotaSalida.cancelada) {
       throw new ErrorConflicto(`La nota de salida ${Number(nota.numNota)} ya está cancelada.`);
+    }
+    // ⭐ 0.226a: cancelar una nota CONFIRMADA genera inversos de kardex (devuelve avíos) contra sus
+    // órdenes: sobre una orden CERRADA no se hace. Cancelar un BORRADOR no mueve nada y queda
+    // LIBRE (duda C2 de §Post-F9.244, default de Daniel pendiente).
+    if (nota.estatus === EstatusNotaSalida.confirmada) {
+      await exigirOrdenesAbiertas(
+        tx,
+        idEmpresa,
+        nota.lineas.map((l) => l.idOrden),
+        'le puede cancelar una nota de salida confirmada',
+      );
     }
 
     // Si estaba confirmada, reversa los movimientos de avío (inverso auditado, D3). La tela NO se

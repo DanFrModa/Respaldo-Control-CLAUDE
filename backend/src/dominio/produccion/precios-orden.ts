@@ -39,7 +39,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
-import { exigirOrdenAbierta } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 
 /** Fila cruda de un evento con sus nombres (proveedor incluido). */
 interface EventoCrudo {
@@ -203,7 +203,16 @@ export async function actualizarPreciosOrden(
   const datos = validarEntrada(esquemaOrdenPreciosPatchCuerpo, entrada);
 
   await enTransaccion(async (tx) => {
-    // PRIMERO el lock (antes de leer el anterior): serializa capturas concurrentes de la misma
+    // ⭐ 0.061 / 0.226a: el precio de maquila ES un componente del costo. Sobre una orden CERRADA
+    // —cuyo unitario quedó congelado— no se captura: primero se reabre (queda auditado). Guarda
+    // ÚNICA con candado compartido, lo PRIMERO de la transacción (antes que el lock de precios).
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      idOrden,
+      'le pueden capturar precios',
+    );
+    // Luego el lock (antes de leer el anterior): serializa capturas concurrentes de la misma
     // orden para que el encadenado anterior→nuevo del historial sea real (ver el TSDoc del lock).
     await bloquearPreciosDeOrden(tx, sesion.idEmpresaActiva, idOrden);
 
@@ -213,8 +222,6 @@ export async function actualizarPreciosOrden(
         id: true,
         folio: true,
         estado: true,
-        // 0.061: la guarda de la orden CERRADA mira esta columna, no el estado.
-        cerradaEn: true,
         maquilaOrd: true,
         aplicacionOrd: true,
       },
@@ -225,9 +232,6 @@ export async function actualizarPreciosOrden(
     if (orden.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se le pueden capturar precios.');
     }
-    // ⭐ 0.061: el precio de maquila ES un componente del costo. Sobre una orden CERRADA —cuyo
-    // unitario quedó congelado— no se captura: primero se reabre (queda auditado). Guarda ÚNICA.
-    exigirOrdenAbierta(orden, 'le pueden capturar precios');
     if (datos.idProveedor != null) {
       await exigirProveedorActivo(tx, datos.idProveedor);
     }

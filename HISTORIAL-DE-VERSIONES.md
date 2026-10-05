@@ -71,6 +71,59 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.190 · 5-oct-2026 · **en prueba** — **Una orden cerrada ya no deja moverle nada**
+
+> **La v0.190 no cierra ninguna fila del programa**: entrega la primera mitad de la 0.226, el bloqueo en el
+> sistema. La otra mitad, que la pantalla te avise antes de capturar, viene en la siguiente.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Cerrar una orden ya significa algo.** Hasta hoy, sólo algunas pantallas respetaban el cierre. En otras se podía
+sacar tela, mover producto terminado, hacer notas de salida de avíos, crear o autorizar compras, recibir material
+o levantar auditorías **contra una orden cerrada**, sin que nada protestara. Ahora el sistema lo rechaza en todas
+esas pantallas y te dice qué orden está cerrada y que hay que reabrirla.
+
+**Y cerrar una orden mientras alguien captura ya no se cruza.** Si alguien está guardando un movimiento en el
+momento en que cierras, el cierre espera a que termine, y el costo que se congela ya lo incluye.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El aviso llega al Guardar, no antes.** La pantalla todavía te deja llenar el formulario de una orden cerrada,
+y el rechazo aparece al pulsar Guardar, con el mensaje claro. Que el botón salga apagado desde el principio es la
+siguiente entrega.
+
+**Lo que tú dejaste fuera sigue funcionando sobre órdenes cerradas:** finanzas y EsMa (validar cargos y pagar a
+los maquileros), la explosión de materiales y la captura atrasada de la ruta crítica. **Ojo con la explosión:** se
+puede explotar una orden cerrada, pero **no generar compras para ella**. La revisión previa te lo dice antes de
+generar, y las órdenes abiertas que vengan en el mismo pedido se compran normal.
+
+**Siete casos dudosos quedaron con mi recomendación mientras me contestas:**
+- **Siguen libres sobre una orden cerrada:**
+  - el conteo cíclico;
+  - cancelar una compra que nunca llegó;
+  - ajustar el plan de la ruta crítica;
+  - comentarios, adjuntos y fotos;
+  - «con esto queda cubierto»;
+  - las fichas de confiabilidad.
+- **Queda bloqueado:** ligar o desligar la orden de su desarrollo.
+- **Y una más que te pregunto aparte:** si a una orden cerrada le **sobra producto terminado**, hoy sólo se puede
+  mover con el conteo cíclico o reabriéndola. Te propongo que el sistema **avise al cerrar** si todavía queda.
+
+### ⏳ Sigue pendiente o roto
+
+**Que la pantalla apague el botón y avise antes de capturar** (la parte b de esta misma fila).
+
+**Que las órdenes cerradas no aparezcan en las listas donde se captura**, con un interruptor para verlas. Es otra
+fila (la 0.227). Hasta entonces siguen apareciendo, pero ya no se les puede mover nada.
+
+**Reabrir sigue siendo con el permiso de cerrar.** Que reabrir sea sólo tuyo es la fila 0.228.
+
+**🔴 Encontramos que la factura de un maquilero que factura se cuenta como deuda dos veces.** La deuda nace en EsMa
+con el recibo, y al importar su factura el sistema registra otra. Al pagarle, se descuenta sólo una, y queda un saldo
+fantasma en Cuentas por pagar que crece cada semana. **No está arreglado todavía**: es la fila 0.252 y espera tus dos
+respuestas. Mientras tanto, si importas facturas de maquileros, el saldo de Cuentas por pagar de esos maquileros sale
+inflado.
+
 ## 0.189 · 3-oct-2026 · **en prueba** — **Tus 17 decisiones de permisos, aplicadas: Telas, Producción y el Supervisor de Calidad ya pueden trabajar**
 
 > **La v0.189 cierra una fila del programa —la 0.250—.** Aplica las 17 respuestas que diste en la página de

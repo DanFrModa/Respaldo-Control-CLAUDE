@@ -83,6 +83,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { resolverPlanPorLote, type RenglonPlanResuelto } from './planes-aql.js';
+import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 
 /** Clave de la secuencia de folios de auditorías (A3, por empresa). Exportada para que el ETL del
  * histórico (F6-E6) recalibre la serie al máximo folio migrado tras preservar los folios viejos. */
@@ -361,6 +362,9 @@ export async function crearAuditoria(
   const hoy = aFechaIso(new Date());
 
   const idAuditoria = await enTransaccion(async (tx) => {
+    // ⭐ 0.226a (§Post-F9.244): no se audita una orden CERRADA. Guarda ÚNICA con candado
+    // compartido, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(tx, idEmpresa, datos.idOrden, 'le puede generar una auditoría');
     const orden = await tx.orden.findFirst({
       where: { id: datos.idOrden, idEmpresa },
       select: { id: true },
@@ -478,6 +482,14 @@ export async function capturarResultado(
     if (actual.cancelada) {
       throw new ErrorConflicto('La auditoría está cancelada; no se puede capturar.');
     }
+    // ⭐ 0.226a: el resultado de la auditoría es captura sobre la orden. Sobre una CERRADA, no.
+    // Lo primero tras saber de qué orden es — antes de cualquier escritura.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      idEmpresa,
+      actual.idOrden,
+      'le puede capturar el resultado de una auditoría',
+    );
 
     // Los defectos capturados deben existir en el catálogo (activos o ya cargados).
     if (ids.length > 0) {
@@ -688,6 +700,14 @@ export async function reclasificar(
     if (auditoria.cancelada) {
       throw new ErrorConflicto('La auditoría está cancelada; no se puede reclasificar.');
     }
+    // ⭐ 0.226a: reclasificar MUEVE producto terminado entre Primeras y Segundas en el bucket de la
+    // orden. Sobre una CERRADA, no. Antes de los candados de existencia y de cualquier escritura.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      idEmpresa,
+      auditoria.idOrden,
+      'le puede reclasificar producto terminado',
+    );
 
     const idModelo = auditoria.orden.idModelo;
     const celdas = aplanarReclasif(datos.lineas, idModelo, auditoria.idOrden);
@@ -1191,6 +1211,13 @@ export async function modificarAuditoria(
     if (actual.cancelada) {
       throw new ErrorConflicto('La auditoría está cancelada; no se puede modificar.');
     }
+    // ⭐ 0.226a: modificar la auditoría de una orden CERRADA, no. Antes de cualquier escritura.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      idEmpresa,
+      actual.idOrden,
+      'le puede modificar una auditoría',
+    );
 
     // Maquilero: si viene (no null), debe ser de los propuestos de la orden (mismo criterio que el alta).
     if (datos.idMaquilero != null) {
@@ -1283,6 +1310,9 @@ export async function cancelarAuditoria(
     if (actual.cancelada) {
       throw new ErrorConflicto('La auditoría ya está cancelada.');
     }
+    // ⭐ 0.226a: cancelar una auditoría de una orden CERRADA, tampoco (D3 + precedente 0.061: las
+    // cancelaciones también se bloquean). Antes de cualquier escritura.
+    await exigirOrdenAbiertaPorId(tx, idEmpresa, actual.idOrden, 'le puede cancelar una auditoría');
 
     const nota = `[Cancelada: ${datos.motivo}]`;
     const observaciones =

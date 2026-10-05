@@ -143,7 +143,7 @@ import {
 // la VERTICAL, contra la receta del modelo) y mezclarlas es como se apagaría el aviso justo en el
 // caso que lo justifica — ver el encabezado de `hermanas-de-la-op.ts`.
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
-import { exigirOrdenAbierta } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
@@ -254,7 +254,8 @@ function exigirOrdenViva(orden: OrdenParaReceta): void {
   if (orden.estado === 'cancelada') {
     throw new ErrorConflicto('La orden está cancelada: su receta ya no se puede modificar.');
   }
-  exigirOrdenAbierta(orden, 'puede modificar su receta');
+  // La mitad CERRADA de la guarda (0.061) se toma ANTES, con candado compartido, en
+  // `enRecetaEditable` (0.226a): es lo primero de su transacción y relee `cerradaEn` bajo el candado.
 }
 
 // ── 1. COPIAR la receta del modelo al crear la orden ───────────────────────────────────────
@@ -1829,6 +1830,17 @@ async function enRecetaEditable<T>(
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
   return enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: la orden CERRADA no admite mover su receta. Guarda ÚNICA con candado
+    // compartido, PRIMERA instrucción. `permitirOrdenNoViva` (cerrar la receta) la salta entera, a
+    // propósito — ver el TSDoc de la opción.
+    if (opciones.permitirOrdenNoViva !== true) {
+      await exigirOrdenAbiertaPorId(
+        tx,
+        sesion.idEmpresaActiva,
+        idOrden,
+        'puede modificar su receta',
+      );
+    }
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
     if (opciones.permitirOrdenNoViva !== true) exigirOrdenViva(orden);
     let sobreLapida = false;

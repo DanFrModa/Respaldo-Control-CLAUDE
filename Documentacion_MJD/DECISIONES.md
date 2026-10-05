@@ -18319,3 +18319,65 @@ respuesta fue *«puede que Daniel ya tocó cosas, no lo sé»* ⇒ la migración
 
 **Lo que NO cambió:** las llaves muertas (`clientes.modificar`, `proveedores.modificar`) siguen donde estaban —quitarlas
 es la fila 0.244—, y la pregunta (e) sigue abierta.
+
+#### (Post-F9.261) — LA ORDEN CERRADA BLOQUEA DE VERDAD (parte a), SIETE DUDAS CON SU DEFAULT, Y QUIÉN TECLEA LA SALIDA DE TELA (5-oct-2026)
+
+**(a) Quién teclea la salida de tela cuando el cortador acaba — contesta la pregunta abierta de §Post-F9.260(e).**
+Daniel, textual: *«Por ahora lo dejamos así. Si vemos que es necesario, después asignamos permiso a corte.»* ⇒ la
+teclean **Telas o Producción**, que ya tienen `inventario-telas.mover`. **Corte no recibe la llave.** No hay nada que
+construir.
+
+**(b) La fila 0.226, parte a (v0.190): el bloqueo en el sistema.** Aplica §Post-F9.244 sin cambiar ninguna de sus
+decisiones. Dos piezas técnicas que conviene que queden escritas aquí porque gobiernan cualquier puerta nueva:
+
+- **La guarda es UNA y va con CANDADO.** `exigirOrdenesAbiertas(tx, idEmpresa, ids, …)` (`produccion/cierre-orden.ts`)
+  toma un candado consultivo **compartido** por orden (en orden ascendente) antes de leer `cerradaEn`; `cerrarOrden` y
+  `reabrirOrden` toman el **exclusivo** como primera instrucción. Antes no había candado: una captura y un cierre
+  simultáneos podían confirmarse los dos y el costo congelado no veía la captura. Lleva `idEmpresa` para no revelar el
+  folio de una orden de otra empresa (A9). El error es `ErrorOrdenCerrada` (sigue siendo 409 `CONFLICTO`: el contrato
+  de errores no cambia) y su mensaje vive en un solo lugar.
+- **Orden único de candados: OC o nota → orden → etapas → kardex.** Con un cierre en la cola, el orden anterior de
+  `cancelarPedido` (etapas → orden) y el de `reversarRecepcion` **podían demorar** a un recibo: el reviewer lo midió con
+  psql y Postgres resuelve ese ciclo solo, reordenando la cola, a costa de una espera de `deadlock_timeout` (no es un
+  error). El orden único evita esa espera. Toda puerta nueva lo respeta; «la guarda es lo PRIMERO» quiere decir *después
+  de leer de qué orden es y del candado de su OC o nota, y antes de los candados de etapas y kardex y de cualquier
+  escritura*.
+- **La previa de compra desde la explosión lo dice antes.** Generar una OC para una orden cerrada se rechaza (pasa por
+  `crearOC`); para que la previa no prometa algo que luego revienta, la previa marca la orden cerrada como bloqueo. Explotar
+  sigue libre (decisión 3: *marca, no esconde*).
+- **El guardián** (`produccion/orden-cerrada-guardian.test.ts`) exige que toda función de `src/dominio` que escribe
+  con una orden esté declarada con su disciplina (`guarda`, `finanzas`, `mrp`, `rc`, `migracion`, `pendiente-daniel`,
+  …); las excepciones de Daniel están obligadas a **NO** llamar la guarda, y ninguna función de migración puede
+  llamarla.
+
+**(c) ⏳ Siete dudas a Daniel, construidas con el DEFAULT del lead** (preguntadas el 5-oct; mientras no conteste, rigen
+estos defaults, y cambiarlos es un renglón cada uno):
+
+| # | Caso | Default |
+|---|---|---|
+| C1 | Conteo cíclico (PT, tela y avío) que encuentra mercancía de una orden cerrada | **libre**: el conteo corrige el anaquel, no captura contra la orden |
+| C2 | Cancelar o desautorizar una OC que nunca llegó (y una nota o entrada de tela en borrador) | **libre**: es limpieza, no compra ni mueve |
+| C3 | Ajustar el plan de la ruta crítica (quitar procesos, secuencia de estampado) | **libre**: la RC quedó fuera |
+| C4 | Comentarios, adjuntos y fotos en la ficha | **libre**: es la memoria de la orden |
+| C5 | Ligar o desligar la orden de su desarrollo | **BLOQUEADO**: es modificar la orden |
+| C6 | «Con esto queda cubierto» sobre un faltante | **libre**: no compra, sólo marca |
+| C7 | Fichas de confiabilidad | **libre**: indicador que se llena después |
+| C8 | Producto terminado que **sobra** en una orden cerrada (hoy sólo el conteo cíclico o reabrir pueden moverlo; también la reclasificación a segundas queda bloqueada) | **avisar al cerrar** si queda existencia de esa orden, para que se mueva antes; el aviso va con la parte b (pantalla). *Lo levantó el reviewer; cuánto pasa es dato de Daniel* |
+
+**Lo que también queda libre, y se dice:** editar sólo el encabezado de una OC o de una nota (o quitarle a una orden
+cerrada todos sus renglones) — es la misma vía que ya tenía el candado de compra; y cancelar movimientos de tela cuyo
+origen **no** es una salida a orden.
+
+**(d) Las preguntas sobre datos personales en la documentación, todavía abiertas.** El 5-oct se le preguntó a Daniel
+qué datos personales caben en la documentación del repositorio, que **sigue PÚBLICO** pese a su decisión del 3-sep
+(§Post-F9.188(c)). Su respuesta entendió la pregunta como del **sistema** (*«dejar los nombres como están con un alias
+opcional y poder buscarlos por cualquier campo»*, *«quisiera poder evaluar a la gente más que el puesto»*); se le
+aclaró que era de la **documentación** y se le recomendó poner el repositorio en privado, con lo que las tres
+preguntas pierden objeto. ⏳ Pendiente de su respuesta, y de si lo del alias es una petición para CONTROL.
+
+**(e) ⏳ La factura del maquilero contada como deuda dos veces — fila 0.252 (5-oct).** Salió de armar el repaso de
+Finanzas y se midió en el código (el detalle, con su traza, en la fila 0.252 de `HOJA-DE-RUTA.md`). Se le preguntó a
+Daniel: **(1)** ¿la deuda de un maquilero que factura son sus recibos validados en EsMa, y su factura sólo el
+comprobante? *(default: sí ⇒ la factura se guarda como comprobante fiscal y no suma al saldo)*; **(2)** ¿algún maquilero
+factura algo que no sea maquila? *(pregunta de frecuencia: no se supone)*; y **(3)** que confirme la prioridad
+recomendada, **bloquea el arranque**.

@@ -73,6 +73,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
 import { DONDE_CANCELAR_AJUSTE_CICLICO } from './cancelacion-comun.js';
 import {
   camposPeriodoKardex,
@@ -190,6 +191,11 @@ async function validarOrdenesDeLaEmpresa(
   if (ids.length === 0) {
     return;
   }
+  // ⭐ 0.226a (§Post-F9.244): mover PT del bucket de una orden CERRADA (entrada, salida o traspaso)
+  // es un movimiento sobre esa orden, y la orden cerrada ya no admite movimientos. Guarda ÚNICA en
+  // lote, con candado compartido, ANTES de los candados de existencia del motor. El bucket «sin
+  // orden» (null) no se toca.
+  await exigirOrdenesAbiertas(tx, idEmpresa, ids, 'puede mover producto terminado de su bucket');
   const ordenes = await tx.orden.findMany({
     where: { id: { in: ids }, idEmpresa },
     select: { id: true },
@@ -637,7 +643,8 @@ export async function cancelarMovimientoPt(
         origenTipo: true,
         origenId: true,
         tipoMov: { select: { direccion: true } },
-        detallesPt: { select: { id: true } },
+        // 0.226a: el bucket de ORDEN de cada renglón, para la guarda de la orden cerrada.
+        detallesPt: { select: { id: true, idOrden: true } },
       },
     });
     if (original === null) {
@@ -647,6 +654,14 @@ export async function cancelarMovimientoPt(
       throw new ErrorValidacion('Solo se pueden cancelar movimientos de producto terminado en F3.');
     }
     exigirMovimientoCancelableAMano(original.origenTipo, original.origenId);
+    // ⭐ 0.226a: cancelar es un movimiento inverso (D3) sobre el bucket de esa orden. Si alguna de
+    // las órdenes del movimiento está CERRADA, no se hace. Va antes del motor (candados y escritura).
+    await exigirOrdenesAbiertas(
+      tx,
+      idEmpresa,
+      original.detallesPt.map((d) => d.idOrden),
+      'le puede cancelar un movimiento de producto terminado',
+    );
 
     // entrada → inverso de SALIDA (error-entrada); salida → inverso de ENTRADA (error-salida).
     const codigoInverso =

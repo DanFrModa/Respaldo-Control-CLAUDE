@@ -143,7 +143,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
 
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
-import { exigirOrdenAbierta } from './cierre-orden.js';
+import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import {
   SIN_PACK,
   coloresReempacados,
@@ -1092,12 +1092,13 @@ export async function actualizarOrden(
   const datos = validarEntrada(esquemaOrdenEditar, entrada);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: la orden CERRADA es de solo lectura (su costo quedó congelado). Guarda
+    // ÚNICA, con su candado compartido, como PRIMERA instrucción de la transacción.
+    await exigirOrdenAbiertaPorId(tx, sesion.idEmpresaActiva, datos.id, 'puede modificar');
     const actual = await exigirOrden(tx, datos.id, sesion.idEmpresaActiva);
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar.');
     }
-    // ⭐ 0.061: la orden CERRADA es de solo lectura (su costo quedó congelado). Guarda ÚNICA.
-    exigirOrdenAbierta(actual, 'puede modificar');
 
     const cambios: Prisma.OrdenUncheckedUpdateInput = { ...datosModificacion(sesion) };
 
@@ -1174,12 +1175,13 @@ export async function guardarMatrizOrden(
   const datos = validarEntrada(esquemaOrdenMatrizCuerpo, entrada);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: la matriz manda las cantidades pedidas — sobre una orden CERRADA no se
+    // toca. Guarda con candado, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(tx, sesion.idEmpresaActiva, id, 'puede modificar su matriz');
     const actual = await exigirOrden(tx, id, sesion.idEmpresaActiva);
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar su matriz.');
     }
-    // ⭐ 0.061: la matriz manda las cantidades pedidas — sobre una orden CERRADA no se toca.
-    exigirOrdenAbierta(actual, 'puede modificar su matriz');
 
     const renglones = await sincronizarMatriz(tx, sesion, id, datos.lineas);
 
@@ -1224,12 +1226,13 @@ export async function copiarDetalleOrden(
   }
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: copiar una matriz ENCIMA es escribir la matriz. Sobre la CERRADA, no.
+    // (El ORIGEN sólo se lee: copiar DESDE una cerrada es consulta y sigue libre.)
+    await exigirOrdenAbiertaPorId(tx, sesion.idEmpresaActiva, id, 'puede copiarle una matriz');
     const destino = await exigirOrden(tx, id, sesion.idEmpresaActiva);
     if (destino.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se puede modificar su matriz.');
     }
-    // ⭐ 0.061: copiar una matriz ENCIMA es escribir la matriz. Sobre la CERRADA, no.
-    exigirOrdenAbierta(destino, 'puede copiarle una matriz');
     // El origen debe existir y ser de la misma empresa (A9); incluye su matriz con las tallas.
     const origen = await tx.orden.findFirst({
       where: { id: datos.idOrdenOrigen, idEmpresa: sesion.idEmpresaActiva },
@@ -1298,13 +1301,14 @@ export async function cancelarOrden(
   const datos = validarEntrada(esquemaOrdenCancelarCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: cancelar una orden CERRADA dejaría el `estado` diciendo «cancelada»
+    // mientras `cerradaEn` sigue puesta —dos finales a la vez, y el badge mintiendo—. Primero se
+    // reabre. Guarda con candado, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(tx, sesion.idEmpresaActiva, id, 'puede cancelar');
     const actual = await exigirOrden(tx, id, sesion.idEmpresaActiva);
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto(`La orden ${Number(actual.folio)} ya está cancelada.`);
     }
-    // ⭐ 0.061: cancelar una orden CERRADA dejaría el `estado` diciendo «cancelada» mientras
-    // `cerradaEn` sigue puesta —dos finales a la vez, y el badge mintiendo—. Primero se reabre.
-    exigirOrdenAbierta(actual, 'puede cancelar');
     await tx.orden.update({
       where: { id },
       data: { estado: 'cancelada', motivoCancelada: datos.motivo, ...datosModificacion(sesion) },
@@ -1343,12 +1347,18 @@ export async function guardarReferenciasOrden(
   const datos = validarEntrada(esquemaOrdenReferenciasCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ 0.061 / 0.226a: las referencias del cliente son captura de la orden. Sobre la CERRADA,
+    // no. Guarda con candado, PRIMERA instrucción.
+    await exigirOrdenAbiertaPorId(
+      tx,
+      sesion.idEmpresaActiva,
+      id,
+      'pueden modificar sus referencias',
+    );
     const actual = await exigirOrden(tx, id, sesion.idEmpresaActiva);
     if (actual.estado === 'cancelada') {
       throw new ErrorConflicto('La orden está cancelada; no se pueden modificar sus referencias.');
     }
-    // ⭐ 0.061: las referencias del cliente son captura de la orden. Sobre la CERRADA, no.
-    exigirOrdenAbierta(actual, 'pueden modificar sus referencias');
     await validarReferencias(tx, actual.idCliente, datos.referencias);
     await sincronizarReferencias(tx, sesion, id, datos.referencias);
 

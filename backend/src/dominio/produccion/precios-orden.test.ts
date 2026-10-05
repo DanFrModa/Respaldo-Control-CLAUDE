@@ -131,16 +131,19 @@ describe('precios de la orden — captura con rastro (A2/A7, D3)', () => {
   function bdCaptura() {
     const creado: unknown[] = [];
     const tx = {
-      // El lock de concurrencia (pg_advisory_xact_lock) va PRIMERO en la tx.
+      // Los DOS candados van PRIMERO en la tx (0.226a): el compartido de la orden cerrada y el de
+      // concurrencia de los precios (pg_advisory_xact_lock).
       $executeRaw: vi.fn(() => Promise.resolve(0)),
       orden: {
+        // 0.226a: la guarda busca las órdenes CERRADAS; el doble dice «ninguna».
+        findMany: vi.fn(() => Promise.resolve([])),
         findFirst: vi.fn(() =>
           Promise.resolve({
             id: 5,
             folio: 5424n,
             estado: 'completa',
-            // 0.061: ABIERTA. La guarda del cierre mira esta columna y trata «no viene» como
-            // CERRADA (falla del lado seguro): un doble que la calle mentiría sobre el dato.
+            // 0.061: ABIERTA. (Desde 0.226a la guarda ya no lee esta fila: pregunta aparte, bajo su
+            // candado, por las cerradas — el `findMany` de arriba —; el dato se deja por fidelidad.)
             cerradaEn: null,
             maquilaOrd: null,
             aplicacionOrd: null,
@@ -177,9 +180,10 @@ describe('precios de la orden — captura con rastro (A2/A7, D3)', () => {
       orden: { update: ReturnType<typeof vi.fn>; findFirst: ReturnType<typeof vi.fn> };
       bitacora: { create: ReturnType<typeof vi.fn> };
     };
-    // El LOCK (pg_advisory_xact_lock) corre ANTES de leer el precio anterior: es lo que
-    // serializa dos capturas concurrentes y hace real el encadenado anterior→nuevo.
-    expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+    // Los LOCKS corren ANTES de leer el precio anterior: el compartido de la orden cerrada
+    // (0.226a) y el de precios, que serializa dos capturas concurrentes y hace real el encadenado
+    // anterior→nuevo.
+    expect(txMock.$executeRaw).toHaveBeenCalledTimes(2);
     expect(txMock.$executeRaw.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER).toBeLessThan(
       txMock.orden.findFirst.mock.invocationCallOrder[0] ?? 0,
     );

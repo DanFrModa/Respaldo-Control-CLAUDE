@@ -25,7 +25,8 @@ import type {
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
-import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { cerrarOrden, ErrorOrdenCerrada, reabrirOrden } from '../produccion/cierre-orden.js';
 // ⭐⭐ fila 0.159 (§Post-F9.222): la explosión resuelve el color por el CANÓNICO tras una fusión.
 import { fusionarColores } from '../catalogos/colores.js';
 import { darPorCubierto } from './dado-por-cubierto.js';
@@ -4761,5 +4762,116 @@ describe('⭐⭐ fila 0.159 — colores duplicados fusionados en la explosión',
         .flatMap((p) => p.renglones)
         .filter((r) => r.tipo === 'avio' && r.idMaterial === avioBoton.id),
     ).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ 0.226a (§Post-F9.244) — LA PREVIA AVISA LA ORDEN CERRADA (y la generación dice lo mismo)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+describe('0.226a — orden CERRADA en la compra desde la explosión', () => {
+  const conCierre = (): SesionUsuario => sesion([...PERM, 'ordenes.cerrar', 'ordenes.ver']);
+  const cuerpo = (ids: number[]) => ({
+    fechaEntrega: '2026-09-30',
+    idsOrden: ids,
+    idsRequerimiento: [],
+  });
+
+  it('🔴 la previa la marca como BLOQUEO; generar se rechaza con esa frase y no crea NADA', async () => {
+    // Dos OP del mismo pedido de compra: la 1 (que se cierra) y una hermana ABIERTA.
+    const hermana = await ordenExtraSimple(2n, 10);
+    await explosionarConRecetaFresca();
+    await explosionarOrden(sesion(), hermana, bd());
+    await cerrarOrden(conCierre(), idOrden, { motivo: 'ya terminó' }, bd());
+
+    // El MRP sigue LIBRE con la cerrada (decisión 3: marca, no esconde)…
+    const previa = await previoCompraDesdeExplosion(sesion(), cuerpo([idOrden, hermana]), bd());
+    // …pero la previa NO promete la compra: dice cuál orden la impide, con el mensaje central.
+    const bloqueo = previa.bloqueos.find((b) => b.includes('CERRADA'));
+    expect(bloqueo, 'la previa prometió la compra sin avisar la orden CERRADA').toBeDefined();
+    expect(bloqueo).toContain('La orden 1 está CERRADA');
+    expect(bloqueo).not.toContain('La orden 2');
+    expect(bloqueo).toContain('quítala de las órdenes de esta compra');
+
+    // Generar dice EXACTAMENTE lo mismo (es el mismo plan), como bloqueo de la previa — no como un
+    // 409 de la guarda a media generación.
+    const error: unknown = await generarOCDesdeExplosion(
+      sesion(),
+      cuerpo([idOrden, hermana]),
+      bd(),
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    expect(error).not.toBeInstanceOf(ErrorOrdenCerrada);
+    expect((error as Error).message).toContain(bloqueo ?? '∅');
+    expect(await cliente.ordenCompra.count()).toBe(0);
+
+    // La salida que el mensaje promete: sin la cerrada, la hermana SÍ se compra.
+    const soloHermana = await previoCompraDesdeExplosion(sesion(), cuerpo([hermana]), bd());
+    expect(soloHermana.bloqueos.some((b) => b.includes('CERRADA'))).toBe(false);
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo([hermana]), bd())).resolves.toBeDefined();
+  });
+
+  it('una cerrada YA COMPRADA del todo no bloquea a su hermana abierta (marca, no esconde)', async () => {
+    const hermana = await ordenExtraSimple(2n, 100);
+    await explosionarConRecetaFresca();
+    await explosionarOrden(sesion(), hermana, bd());
+    // La 1 se compra completa MIENTRAS está abierta, y luego se cierra.
+    await generarOCDesdeExplosion(sesion(), cuerpo([idOrden]), bd());
+    await cerrarOrden(conCierre(), idOrden, {}, bd());
+
+    const previa = await previoCompraDesdeExplosion(sesion(), cuerpo([idOrden, hermana]), bd());
+    expect(previa.bloqueos.some((b) => b.includes('CERRADA'))).toBe(false);
+    await expect(
+      generarOCDesdeExplosion(sesion(), cuerpo([idOrden, hermana]), bd()),
+    ).resolves.toBeDefined();
+  });
+
+  it('🔴 una cerrada cuya línea NO se escribe (el reparto la deja en 0) tampoco bloquea', async () => {
+    // El comprador baja el total del botón a 0.01: repartido en proporción (180 de la 1 contra 600
+    // de la hermana), a la 1 le toca 0.002 → 0 a la escala de la columna ⇒ su línea NO se escribe
+    // (`seEscribe: false`). La compra no le toca a la cerrada, así que no hay nada que bloquear.
+    // Ésta es la prueba que amarra el filtro `seEscribe` del bloqueo: sin él, la cerrada bloquearía
+    // a la hermana por una línea que nunca iba a existir.
+    const hermana = await ordenExtraSimple(2n, 100);
+    await explosionarConRecetaFresca();
+    await explosionarOrden(sesion(), hermana, bd());
+    await cerrarOrden(conCierre(), idOrden, {}, bd());
+    const conAjuste = {
+      ...cuerpo([idOrden, hermana]),
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.01,
+        },
+      ],
+    };
+
+    const previa = await previoCompraDesdeExplosion(sesion(), conAjuste, bd());
+    const lineas = previa.proveedores.flatMap((p) => p.renglones.flatMap((r) => r.porOrden));
+    // El escenario es el que se dice: la cerrada SÍ está en el reparto, pero su línea no se escribe.
+    expect(lineas.find((l) => l.idOrden === idOrden)?.seEscribe).toBe(false);
+    expect(lineas.find((l) => l.idOrden === hermana)?.seEscribe).toBe(true);
+    expect(previa.bloqueos.some((b) => b.includes('CERRADA'))).toBe(false);
+    await expect(generarOCDesdeExplosion(sesion(), conAjuste, bd())).resolves.toBeDefined();
+  });
+
+  it('CONTROL: reabierta, la misma compra ya no lleva el bloqueo y se genera', async () => {
+    await explosionarConRecetaFresca();
+    await cerrarOrden(conCierre(), idOrden, {}, bd());
+    expect(
+      (await previoCompraDesdeExplosion(sesion(), cuerpo([idOrden]), bd())).bloqueos.some((b) =>
+        b.includes('CERRADA'),
+      ),
+    ).toBe(true);
+    await reabrirOrden(conCierre(), idOrden, { motivo: 'faltaba comprar' }, bd());
+    const previa = await previoCompraDesdeExplosion(sesion(), cuerpo([idOrden]), bd());
+    expect(previa.bloqueos.some((b) => b.includes('CERRADA'))).toBe(false);
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo([idOrden]), bd())).resolves.toBeDefined();
   });
 });
