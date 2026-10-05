@@ -26,6 +26,8 @@ import {
   totalMatriz,
 } from '@/modulos/produccion/matriz-orden';
 import { useSesion } from '@/sesion/useSesion';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 
 /** Una fila editable del grid de defectos (idDefecto + datos del defecto + fallas locales). */
 type FilaDefecto = Pick<
@@ -58,6 +60,10 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
   const consulta = useAuditoria(id);
   const capturar = useCapturarResultado();
   const auditoria = consulta.data;
+  // ⭐ 0.226b (§Post-F9.244): con la orden auditada CERRADA la auditoría se consulta pero no admite
+  // captura ni reclasificación (el servidor rechaza igual, A1). Lo dice el campo `ordenCerrada`.
+  const ordenCerrada = estaCerrada(auditoria);
+  const puedeCapturar = puedeActualizar && !ordenCerrada;
 
   // Estado local de captura, sembrado del detalle (una vez por auditoría).
   const [cargado, setCargado] = useState<number | undefined>(undefined);
@@ -190,6 +196,8 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
         </div>
       </header>
 
+      {ordenCerrada ? <AvisoOrdenCerrada folios={[auditoria.folioOrden ?? '—']} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         {/* Grid de defectos × fallas */}
         <Card>
@@ -232,7 +240,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
                             className="ml-auto w-20 text-right"
                             value={String(f.numFallas)}
                             onChange={(e) => cambiarFallas(f.idDefecto, e.target.value)}
-                            disabled={!puedeActualizar}
+                            disabled={!puedeCapturar}
                             aria-label={`Fallas de ${f.clave}`}
                             data-testid={`auditoria-fallas-${String(f.idDefecto)}`}
                           />
@@ -254,7 +262,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
               </table>
             </div>
 
-            {puedeActualizar ? (
+            {puedeCapturar ? (
               <Field>
                 <FieldLabel htmlFor="agregar-defecto">Agregar defecto</FieldLabel>
                 <SelectNativo
@@ -338,7 +346,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
                   id="resultado"
                   value={resultado}
                   onChange={(e) => setResultado(e.target.value as ResultadoAuditoria)}
-                  disabled={!puedeActualizar}
+                  disabled={!puedeCapturar}
                   data-testid="auditoria-resultado"
                 >
                   {RESULTADOS_AUDITORIA.map((r) => (
@@ -355,7 +363,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
                   placeholder="Justifica el veredicto (opcional)"
-                  disabled={!puedeActualizar}
+                  disabled={!puedeCapturar}
                   data-testid="auditoria-observaciones"
                 />
               </Field>
@@ -367,7 +375,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
                   min={1}
                   value={muestra}
                   onChange={(e) => setMuestra(e.target.value)}
-                  disabled={!puedeActualizar}
+                  disabled={!puedeCapturar}
                   data-testid="auditoria-muestra-override"
                 />
                 {auditoria.muestraManual ? (
@@ -378,7 +386,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
               </Field>
               <Button
                 onClick={guardar}
-                disabled={!puedeActualizar || capturar.isPending}
+                disabled={!puedeCapturar || capturar.isPending}
                 className="w-full"
                 data-testid="auditoria-guardar"
               >
@@ -389,9 +397,7 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
         </div>
       </div>
 
-      {puedeActualizar ? (
-        <ReclasificacionCard idAuditoria={id} idOrden={auditoria.idOrden} />
-      ) : null}
+      {puedeCapturar ? <ReclasificacionCard idAuditoria={id} idOrden={auditoria.idOrden} /> : null}
     </div>
   );
 }

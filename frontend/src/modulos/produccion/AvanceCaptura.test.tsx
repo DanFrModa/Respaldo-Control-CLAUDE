@@ -2861,3 +2861,106 @@ describe('⭐ Cerrar la orden con un maquilero (V1, fila 0.109)', () => {
     expect(screen.getByTestId('cierre-maquila-deshacer-32')).toBeDisabled();
   });
 });
+
+describe('⭐ 0.226b — la orden CERRADA apaga la captura del avance (§Post-F9.244)', () => {
+  it('cerrada: avisa ARRIBA y apaga «Registrar» y el atajo a descargar tela', () => {
+    useOrden.mockReturnValue({
+      data: { ...orden(77, 'Maquila del Norte'), cerradaEn: '2026-10-01T10:00:00.000Z' },
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    pintar();
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 5424 está cerrada/,
+    );
+    expect(screen.getByTestId('avance-abrir-captura')).toBeDisabled();
+    expect(screen.getByTestId('avance-descargar-tela')).toBeDisabled();
+  });
+
+  it('abierta: sin aviso, y la captura se puede abrir', () => {
+    pintar();
+
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-abrir-captura')).toBeEnabled();
+    expect(screen.getByTestId('avance-descargar-tela')).toBeEnabled();
+  });
+
+  it('cerrada: los movimientos se consultan, pero ya no se ofrece cancelarlos (abierta sí)', () => {
+    const corte = {
+      id: 900,
+      folio: 31,
+      tipo: 'corte',
+      fecha: '2026-09-20',
+      tercero: 'Cortes Lupita',
+      idTipoProceso: null,
+      tipoProceso: null,
+      totalPiezas: 10,
+      creadoEn: '2026-09-20T10:00:00.000Z',
+      creadoPorNombre: 'Ana',
+      observaciones: null,
+      motivoCancelacion: null,
+      cancelado: false,
+    };
+    useEtapasOrden.mockReturnValue({ data: { etapas: [corte] }, isPending: false });
+
+    // Abierta: el renglón se ve y se puede cancelar (la red de abajo no es vacía).
+    const { unmount } = renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+    expect(screen.getByText('Cortes Lupita')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-cancelar-movimiento')).toBeInTheDocument();
+    unmount();
+
+    useOrden.mockReturnValue({
+      data: { ...orden(77, 'Maquila del Norte'), cerradaEn: '2026-10-01T10:00:00.000Z' },
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    pintar();
+    expect(screen.getByText('Cortes Lupita')).toBeInTheDocument();
+    expect(screen.queryByTestId('avance-cancelar-movimiento')).not.toBeInTheDocument();
+  });
+
+  it('cerrada: las ENTREGAS a cliente se consultan pero no se ofrece cancelarlas (abierta, sí)', async () => {
+    useEntregasOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        entregas: [
+          {
+            id: 71,
+            folio: 3,
+            cliente: 'C&A',
+            almacen: 'Primeras',
+            fecha: '2026-08-13',
+            totalPiezas: 4,
+            observaciones: null,
+            cancelado: false,
+            motivoCancelacion: null,
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+
+    const { unmount } = renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+    await usuario.click(screen.getByTestId('avance-stepper-entrega-cliente'));
+    expect(screen.getByTestId('avance-cancelar-entrega')).toBeInTheDocument();
+    unmount();
+
+    useOrden.mockReturnValue({
+      data: { ...orden(77, 'Maquila del Norte'), cerradaEn: '2026-10-01T10:00:00.000Z' },
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    pintar();
+    await usuario.click(screen.getByTestId('avance-stepper-entrega-cliente'));
+    expect(screen.getByTestId('avance-entrega')).toBeInTheDocument();
+    expect(screen.queryByTestId('avance-cancelar-entrega')).not.toBeInTheDocument();
+  });
+});

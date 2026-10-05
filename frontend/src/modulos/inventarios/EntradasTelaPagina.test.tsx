@@ -149,6 +149,48 @@ describe('EntradasTelaPagina (B1)', () => {
     preguntar.mockRestore();
   });
 
+  it('⭐ 0.226b: un BORRADOR que surte a una orden CERRADA avisa y no se confirma (cancelar, libre)', async () => {
+    const base = entradaDePrueba();
+    useEntradasTelaMock.mockReturnValue(
+      pagina([
+        {
+          ...base,
+          lineas: base.lineas.map((l) => ({ ...l, folioOrden: 1515, ordenCerrada: true })),
+        },
+      ]),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<EntradasTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    await usuario.click(screen.getByTestId('fila-entrada-5'));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1515 está cerrada/,
+    );
+    expect(screen.getByTestId('entrada-confirmar')).toBeDisabled();
+    // Cancelar un BORRADOR no mueve nada: sigue libre (duda C2).
+    expect(screen.getByTestId('entrada-cancelar')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: una CONFIRMADA de una orden CERRADA no se cancela', async () => {
+    const base = entradaDePrueba({ estatus: 'confirmada', idMovimiento: 44, folioMovimiento: 9 });
+    useEntradasTelaMock.mockReturnValue(
+      pagina([
+        {
+          ...base,
+          lineas: base.lineas.map((l) => ({ ...l, folioOrden: 1515, ordenCerrada: true })),
+        },
+      ]),
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<EntradasTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    await usuario.click(screen.getByTestId('fila-entrada-5'));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    expect(screen.getByTestId('entrada-cancelar')).toBeDisabled();
+  });
+
   it('B1: el AVISO de factura repetida se ve en el cajón (informa, no bloquea)', async () => {
     const usuario = userEvent.setup();
     useEntradasTelaMock.mockReturnValue(

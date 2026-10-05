@@ -45,10 +45,14 @@ vi.mock('@/api/empresas', () => ({
 vi.mock('./DialogoEditarNota', () => ({ DialogoEditarNota: () => null }));
 vi.mock('./DialogoCancelarNota', () => ({ DialogoCancelarNota: () => null }));
 
-function paginaConUna(estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'borrador') {
+function paginaConUna(
+  estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'borrador',
+  ordenCerrada = false,
+) {
+  const base = notaDePrueba({ estatus });
   useNotasSalidaMock.mockReturnValue({
     data: {
-      datos: [notaDePrueba({ estatus })],
+      datos: [{ ...base, lineas: base.lineas.map((l) => ({ ...l, ordenCerrada })) }],
       total: 1,
       pagina: 1,
       porPagina: 20,
@@ -222,6 +226,39 @@ describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
     const detalle = await abrirDetalle();
     expect(within(detalle).queryByTestId('editar-nota')).not.toBeInTheDocument();
     expect(within(detalle).getByTestId('imprimir-nota')).toBeInTheDocument();
+  });
+
+  it('⭐ 0.226b: un BORRADOR que surte a una orden CERRADA avisa y no se confirma (abierta, sí)', async () => {
+    paginaConUna('borrador', true);
+    const { unmount } = renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar', 'notas.cancelar']),
+    });
+    let detalle = await abrirDetalle();
+    expect(within(detalle).getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1001 está cerrada/,
+    );
+    expect(within(detalle).getByTestId('confirmar-nota-accion')).toBeDisabled();
+    // Cancelar un BORRADOR no mueve nada: sigue libre (duda C2, default pendiente de Daniel).
+    expect(within(detalle).getByTestId('cancelar-nota')).toBeEnabled();
+    unmount();
+
+    paginaConUna('borrador', false);
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
+    });
+    detalle = await abrirDetalle();
+    expect(within(detalle).queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(within(detalle).getByTestId('confirmar-nota-accion')).toBeEnabled();
+  });
+
+  it('⭐ 0.226b: una CONFIRMADA de una orden CERRADA no se cancela (devolvería avíos a la orden)', async () => {
+    paginaConUna('confirmada', true);
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar', 'notas.cancelar']),
+    });
+    const detalle = await abrirDetalle();
+    expect(within(detalle).getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    expect(within(detalle).getByTestId('cancelar-nota')).toBeDisabled();
   });
 
   it('el botón Cancelar aparece con notas.cancelar y la nota no cancelada', async () => {

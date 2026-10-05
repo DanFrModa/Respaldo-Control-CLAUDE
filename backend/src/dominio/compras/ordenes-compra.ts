@@ -146,7 +146,8 @@ type OCConDetalle = OrdenCompra & {
     avio: { clave: string; descripcion: string } | null;
     /** ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA con el que se pidió el avío. */
     colorPrenda: { nombre: string } | null;
-    orden: { folio: bigint } | null;
+    /** 0.226b: `cerradaEn` para que la pantalla avise ANTES de autorizar o recibir. */
+    orden: { folio: bigint; cerradaEn: Date | null } | null;
     tallas: (OrdenCompraLineaTalla & {
       color: { nombre: string };
       talla: { etiqueta: string };
@@ -177,7 +178,7 @@ const incluirDetalle = {
       colorPrenda: { select: { nombre: true } },
       // ⭐⭐ V1-E8c: y su desglose por medida, en el orden del catálogo del avío.
       medidas: { orderBy: [{ orden: 'asc' }, { etiqueta: 'asc' }] },
-      orden: { select: { folio: true } },
+      orden: { select: { folio: true, cerradaEn: true } },
       tallas: {
         orderBy: [{ talla: { orden: 'asc' } }, { id: 'asc' }],
         include: {
@@ -856,6 +857,7 @@ function aCompraSalida(
       subtotal,
       idOrden: l.idOrden,
       folioOrden: l.orden === null ? null : Number(l.orden.folio),
+      ordenCerrada: l.orden !== null && l.orden.cerradaEn !== null,
       tallas: l.tallas.map((t) => ({
         idColor: t.idColor,
         color: t.color.nombre,

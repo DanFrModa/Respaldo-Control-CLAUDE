@@ -55,6 +55,7 @@ export function ocDePrueba(sobrescribir: Partial<OrdenCompra> = {}): OrdenCompra
         subtotal: 2500,
         idOrden: null,
         folioOrden: null,
+        ordenCerrada: false,
         tallas: [],
       },
     ],

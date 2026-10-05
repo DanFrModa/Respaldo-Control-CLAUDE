@@ -37,6 +37,7 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
 import { BotonUbicacion, DialogoUbicacionMaterial } from './DialogoUbicacionMaterial';
 import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
@@ -675,6 +676,20 @@ function CajonKardexTelaColor({
   const hayAcciones =
     puedeMover ||
     (kardex?.renglones ?? []).some((r) => r.origenTipo === 'traspaso' && !r.cancelado);
+  /**
+   * ⭐ 0.226b (§Post-F9.244): las SALIDAS DE TELA A UNA ORDEN que hoy está CERRADA no se cancelan
+   * (el inverso le devolvería tela y el servidor lo rechaza, A1). Se avisa arriba de la tabla y se
+   * apaga su botón; el renglón se consulta igual. Lo dice el servidor por renglón.
+   */
+  const foliosCerrados = puedeMover
+    ? [
+        ...new Set(
+          (kardex?.renglones ?? [])
+            .filter((r) => r.ordenCerrada && !r.cancelado)
+            .map((r) => r.folioOrden ?? '—'),
+        ),
+      ]
+    : [];
   const llevaComplemento = color?.nombreComplemento !== null && color !== undefined;
   const encCuerpo = color?.nombreCuerpo ?? 'Cuerpo';
   const encComplemento = color?.nombreComplemento ?? 'Complemento';
@@ -739,81 +754,87 @@ function CajonKardexTelaColor({
           Este color no tiene movimientos en el periodo (amplía las fechas para ver más atrás).
         </p>
       ) : (
-        <div className="overflow-x-auto" data-testid="kardex-color-tabla">
-          <TablaDensa>
-            <TablaDensaEncabezado>
-              <TablaDensaFila>
-                <TablaDensaHead>Folio</TablaDensaHead>
-                <TablaDensaHead>Fecha</TablaDensaHead>
-                <TablaDensaHead>Movimiento</TablaDensaHead>
-                <TablaDensaHead>Almacén</TablaDensaHead>
-                <TablaDensaHead>Partida</TablaDensaHead>
-                <TablaDensaHead numerica>{`${encCuerpo} +`}</TablaDensaHead>
-                <TablaDensaHead numerica>{`${encCuerpo} −`}</TablaDensaHead>
-                <TablaDensaHead numerica>Saldo</TablaDensaHead>
-                {llevaComplemento ? (
-                  <>
-                    <TablaDensaHead numerica>{`${encComplemento} +`}</TablaDensaHead>
-                    <TablaDensaHead numerica>{`${encComplemento} −`}</TablaDensaHead>
-                    <TablaDensaHead numerica>Saldo</TablaDensaHead>
-                  </>
-                ) : null}
-                {/* ⭐ Fila 0.176 — el MOTIVO se LEE, y ÉSTE es el kardex donde de verdad importa:
+        <>
+          <AvisoOrdenCerrada
+            folios={foliosCerrados}
+            detalle="Sus salidas de tela no se pueden cancelar."
+            className="mb-3"
+          />
+          <div className="overflow-x-auto" data-testid="kardex-color-tabla">
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Folio</TablaDensaHead>
+                  <TablaDensaHead>Fecha</TablaDensaHead>
+                  <TablaDensaHead>Movimiento</TablaDensaHead>
+                  <TablaDensaHead>Almacén</TablaDensaHead>
+                  <TablaDensaHead>Partida</TablaDensaHead>
+                  <TablaDensaHead numerica>{`${encCuerpo} +`}</TablaDensaHead>
+                  <TablaDensaHead numerica>{`${encCuerpo} −`}</TablaDensaHead>
+                  <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                  {llevaComplemento ? (
+                    <>
+                      <TablaDensaHead numerica>{`${encComplemento} +`}</TablaDensaHead>
+                      <TablaDensaHead numerica>{`${encComplemento} −`}</TablaDensaHead>
+                      <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                    </>
+                  ) : null}
+                  {/* ⭐ Fila 0.176 — el MOTIVO se LEE, y ÉSTE es el kardex donde de verdad importa:
                     el traspaso de tela por color es la captura a la que la 0.172 le puso el motivo
                     OBLIGATORIO (`traspasarTelaColor` lo guarda en las `observaciones` de las DOS
                     patas). Sin esta columna se seguía exigiendo una explicación que después no
                     salía en ninguna pantalla — y una explicación que nadie consulta se degrada a
                     «.» en dos semanas. Mismo patrón que el estado de cuenta de proveedores
                     (`cxp/EstadoCuentaProveedorPagina.tsx`) y que el kardex de materiales. */}
-                <TablaDensaHead>Observaciones</TablaDensaHead>
-                {/* Acciones: imprimir la hoja del traspaso (§Post-F9.38, con `inventario-telas.ver`)
+                  <TablaDensaHead>Observaciones</TablaDensaHead>
+                  {/* Acciones: imprimir la hoja del traspaso (§Post-F9.38, con `inventario-telas.ver`)
                     y cancelar (con `.mover`). Solo si hay alguna que ofrecer. */}
-                {hayAcciones ? <TablaDensaHead className="w-16" /> : null}
-              </TablaDensaFila>
-            </TablaDensaEncabezado>
-            <TablaDensaCuerpo>
-              {/* SALDO ANTERIOR por almacén (fila 0.173): lo que ya había ANTES del primer renglón
+                  {hayAcciones ? <TablaDensaHead className="w-16" /> : null}
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {/* SALDO ANTERIOR por almacén (fila 0.173): lo que ya había ANTES del primer renglón
                   que se ve. Va arriba, como en cualquier kardex de papel, porque es de donde
                   arrancan las DOS columnas «Saldo» — sin él, en cuanto el periodo o el tope
                   recortan algo, las dos mentirían desde el primer renglón. */}
-              {kardex.saldosIniciales.map((si) => (
-                <TablaDensaFila
-                  key={`ini-${String(si.idAlmacen)}`}
-                  className="bg-primary-soft text-primary-soft-foreground"
-                  data-testid="kardex-color-saldo-inicial"
-                >
-                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
-                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
-                  <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
-                  <TablaDensaCelda>{si.almacen}</TablaDensaCelda>
-                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
-                  <TablaDensaCelda numerica className="text-muted-foreground">
-                    —
-                  </TablaDensaCelda>
-                  <TablaDensaCelda numerica className="text-muted-foreground">
-                    —
-                  </TablaDensaCelda>
-                  <TablaDensaCelda numerica className="font-semibold">
-                    {num(si.saldoCuerpo)}
-                  </TablaDensaCelda>
-                  {llevaComplemento ? (
-                    <>
-                      <TablaDensaCelda numerica className="text-muted-foreground">
-                        —
-                      </TablaDensaCelda>
-                      <TablaDensaCelda numerica className="text-muted-foreground">
-                        —
-                      </TablaDensaCelda>
-                      <TablaDensaCelda numerica className="font-semibold">
-                        {num(si.saldoComplemento)}
-                      </TablaDensaCelda>
-                    </>
-                  ) : null}
-                  <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
-                  {hayAcciones ? <TablaDensaCelda /> : null}
-                </TablaDensaFila>
-              ))}
-              {/* Fila 0.177 — la llave lleva el ÍNDICE, como en los otros cinco kardex de la
+                {kardex.saldosIniciales.map((si) => (
+                  <TablaDensaFila
+                    key={`ini-${String(si.idAlmacen)}`}
+                    className="bg-primary-soft text-primary-soft-foreground"
+                    data-testid="kardex-color-saldo-inicial"
+                  >
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    <TablaDensaCelda className="font-medium">Saldo anterior</TablaDensaCelda>
+                    <TablaDensaCelda>{si.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      —
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {num(si.saldoCuerpo)}
+                    </TablaDensaCelda>
+                    {llevaComplemento ? (
+                      <>
+                        <TablaDensaCelda numerica className="text-muted-foreground">
+                          —
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-muted-foreground">
+                          —
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
+                          {num(si.saldoComplemento)}
+                        </TablaDensaCelda>
+                      </>
+                    ) : null}
+                    <TablaDensaCelda className="text-muted-foreground">—</TablaDensaCelda>
+                    {hayAcciones ? <TablaDensaCelda /> : null}
+                  </TablaDensaFila>
+                ))}
+                {/* Fila 0.177 — la llave lleva el ÍNDICE, como en los otros cinco kardex de la
                   familia (`KardexMaterialesPagina` ×4, `KardexPtPagina`). Sin él colisionaba justo
                   en el caso que el sistema ya documenta: un traspaso que se reparte FIFO entre
                   partidas escribe VARIOS detalles del MISMO `Movimiento`
@@ -828,99 +849,101 @@ function CajonKardexTelaColor({
                   ⚠️ Es lo que la pantalla PINTA, no lo que vale la existencia (el saldo es Σ de
                   movimientos en el servidor, D3) — pero un kardex que repite un renglón se lee
                   como doble conteo, y eso nadie debería tener que descartarlo a ojo. */}
-              {kardex.renglones.map((r, i) => (
-                <TablaDensaFila
-                  key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}-${i}`}
-                  className={r.cancelado ? 'opacity-50' : undefined}
-                >
-                  <TablaDensaCelda className="num">#{r.folio}</TablaDensaCelda>
-                  <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
-                  <TablaDensaCelda>
-                    {r.tipoMov}
-                    {r.cancelado ? (
-                      <span className="ml-1 text-xs text-destructive">(cancelado)</span>
-                    ) : null}
-                  </TablaDensaCelda>
-                  <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
-                  <TablaDensaCelda className="text-xs text-muted-foreground">
-                    {r.partidaFolio !== null
-                      ? `#${r.partidaFolio}${r.loteProveedor !== null ? ` · ${r.loteProveedor}` : ''}`
-                      : '—'}
-                  </TablaDensaCelda>
-                  <TablaDensaCelda numerica>
-                    {r.entradaCuerpo > 0 ? num(r.entradaCuerpo) : ''}
-                  </TablaDensaCelda>
-                  <TablaDensaCelda numerica>
-                    {r.salidaCuerpo > 0 ? num(r.salidaCuerpo) : ''}
-                  </TablaDensaCelda>
-                  <TablaDensaCelda numerica className="font-semibold">
-                    {num(r.saldoCuerpo)}
-                  </TablaDensaCelda>
-                  {llevaComplemento ? (
-                    <>
-                      <TablaDensaCelda numerica>
-                        {r.entradaComplemento > 0 ? num(r.entradaComplemento) : ''}
-                      </TablaDensaCelda>
-                      <TablaDensaCelda numerica>
-                        {r.salidaComplemento > 0 ? num(r.salidaComplemento) : ''}
-                      </TablaDensaCelda>
-                      <TablaDensaCelda numerica className="font-semibold">
-                        {num(r.saldoComplemento)}
-                      </TablaDensaCelda>
-                    </>
-                  ) : null}
-                  <TablaDensaCelda
-                    className="max-w-xs truncate"
-                    title={r.observaciones ?? undefined}
-                    data-testid="kardex-color-obs"
+                {kardex.renglones.map((r, i) => (
+                  <TablaDensaFila
+                    key={`${r.idMovimiento}-${r.idAlmacen}-${r.folio}-${i}`}
+                    className={r.cancelado ? 'opacity-50' : undefined}
                   >
-                    {r.observaciones ?? '—'}
-                  </TablaDensaCelda>
-                  {hayAcciones ? (
-                    <TablaDensaCelda className="p-0 pr-1 text-right">
-                      <span className="flex items-center justify-end">
-                        {/* REIMPRESIÓN de la hoja del traspaso (§Post-F9.38): el papel que se fue
+                    <TablaDensaCelda className="num">#{r.folio}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      {r.tipoMov}
+                      {r.cancelado ? (
+                        <span className="ml-1 text-xs text-destructive">(cancelado)</span>
+                      ) : null}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda className="text-xs text-muted-foreground">
+                      {r.partidaFolio !== null
+                        ? `#${r.partidaFolio}${r.loteProveedor !== null ? ` · ${r.loteProveedor}` : ''}`
+                        : '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.entradaCuerpo > 0 ? num(r.entradaCuerpo) : ''}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {r.salidaCuerpo > 0 ? num(r.salidaCuerpo) : ''}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {num(r.saldoCuerpo)}
+                    </TablaDensaCelda>
+                    {llevaComplemento ? (
+                      <>
+                        <TablaDensaCelda numerica>
+                          {r.entradaComplemento > 0 ? num(r.entradaComplemento) : ''}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {r.salidaComplemento > 0 ? num(r.salidaComplemento) : ''}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
+                          {num(r.saldoComplemento)}
+                        </TablaDensaCelda>
+                      </>
+                    ) : null}
+                    <TablaDensaCelda
+                      className="max-w-xs truncate"
+                      title={r.observaciones ?? undefined}
+                      data-testid="kardex-color-obs"
+                    >
+                      {r.observaciones ?? '—'}
+                    </TablaDensaCelda>
+                    {hayAcciones ? (
+                      <TablaDensaCelda className="p-0 pr-1 text-right">
+                        <span className="flex items-center justify-end">
+                          {/* REIMPRESIÓN de la hoja del traspaso (§Post-F9.38): el papel que se fue
                             con la tela se recupera desde aquí, no solo al guardarlo. Un traspaso
                             CANCELADO no se imprime — su papel no vuelve a salir con un bulto (el
                             backend también lo rechaza; hoy además una pata de traspaso no se puede
                             anular sola: se revierte con un traspaso inverso, con su propia hoja). */}
-                        {r.origenTipo === 'traspaso' && !r.cancelado ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.open(
-                                urlImpresoTraspasoTela(r.idMovimiento),
-                                '_blank',
-                                'noopener',
-                              )
-                            }
-                            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                            aria-label={`Hoja del traspaso #${r.folio}`}
-                            title="Hoja del traspaso"
-                            data-testid={`kardex-color-imprimir-${r.idMovimiento}`}
-                          >
-                            <Printer className="size-4" aria-hidden />
-                          </button>
-                        ) : null}
-                        {puedeMover && !r.cancelado ? (
-                          <button
-                            type="button"
-                            onClick={() => setACancelar(r)}
-                            className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                            aria-label={`Cancelar movimiento #${r.folio}`}
-                            data-testid={`kardex-color-cancelar-${r.idMovimiento}`}
-                          >
-                            <Ban className="size-4" aria-hidden />
-                          </button>
-                        ) : null}
-                      </span>
-                    </TablaDensaCelda>
-                  ) : null}
-                </TablaDensaFila>
-              ))}
-            </TablaDensaCuerpo>
-          </TablaDensa>
-        </div>
+                          {r.origenTipo === 'traspaso' && !r.cancelado ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                window.open(
+                                  urlImpresoTraspasoTela(r.idMovimiento),
+                                  '_blank',
+                                  'noopener',
+                                )
+                              }
+                              className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label={`Hoja del traspaso #${r.folio}`}
+                              title="Hoja del traspaso"
+                              data-testid={`kardex-color-imprimir-${r.idMovimiento}`}
+                            >
+                              <Printer className="size-4" aria-hidden />
+                            </button>
+                          ) : null}
+                          {puedeMover && !r.cancelado ? (
+                            <button
+                              type="button"
+                              onClick={() => setACancelar(r)}
+                              disabled={r.ordenCerrada}
+                              className="grid size-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                              aria-label={`Cancelar movimiento #${r.folio}`}
+                              data-testid={`kardex-color-cancelar-${r.idMovimiento}`}
+                            >
+                              <Ban className="size-4" aria-hidden />
+                            </button>
+                          ) : null}
+                        </span>
+                      </TablaDensaCelda>
+                    ) : null}
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          </div>
+        </>
       )}
 
       {/* Cancelar = INVERSO auditado (D3): mismo diálogo/contrato que el kardex de materiales. */}

@@ -34,6 +34,8 @@ import {
 } from '@/componentes/matriz-color-talla/MatrizColorTalla';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { SelectorOrden } from './SelectorOrden';
 import { coloresDeOrden, lineasVaciasDeOrden, tallasDeOrden, totalMatriz } from './matriz-orden';
 
@@ -99,6 +101,10 @@ export function EntregaClientePagina(): React.JSX.Element {
 
   const orden = useOrden(idOrden);
   const crear = useCrearEntrega();
+  // ⭐ 0.226b (§Post-F9.244): con la orden CERRADA la captura se APAGA y se avisa arriba; la
+  // consulta (seguimiento, historial, comprobantes) sigue libre. El servidor rechaza igual (A1).
+  const cerrada = estaCerrada(orden.data);
+  const puedeCapturar = puedeEntregar && !cerrada;
 
   const almacenes = useAlmacenes({
     pagina: 1,
@@ -193,7 +199,7 @@ export function EntregaClientePagina(): React.JSX.Element {
 
   const total = totalMatriz(lineas);
   const puedeGuardar =
-    puedeEntregar &&
+    puedeCapturar &&
     idOrden !== undefined &&
     idAlmacen !== '' &&
     total > 0 &&
@@ -287,6 +293,9 @@ export function EntregaClientePagina(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Sin orden seleccionada.</p>
             ) : (
               <>
+                {cerrada && orden.data !== undefined ? (
+                  <AvisoOrdenCerrada folios={[orden.data.folio]} />
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field>
                     <FieldLabel htmlFor="almacen-origen">Almacén de salida</FieldLabel>
@@ -294,7 +303,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                       id="almacen-origen"
                       value={idAlmacen}
                       onChange={(e) => setIdAlmacen(e.target.value)}
-                      disabled={!puedeEntregar}
+                      disabled={!puedeCapturar}
                       data-testid="entrega-almacen"
                     >
                       <option value="">Elige un almacén…</option>
@@ -312,7 +321,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                       type="date"
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
-                      disabled={!puedeEntregar}
+                      disabled={!puedeCapturar}
                       data-testid="entrega-fecha"
                     />
                   </Field>
@@ -325,7 +334,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                       value={observaciones}
                       onChange={(e) => setObservaciones(e.target.value)}
                       placeholder="Opcional (p. ej. número de pedido del cliente)"
-                      disabled={!puedeEntregar}
+                      disabled={!puedeCapturar}
                       data-testid="entrega-observaciones"
                     />
                   </Field>
@@ -361,7 +370,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                     tallasDisponibles={tallas}
                     onLineasChange={setLineas}
                     onTallasChange={setTallas}
-                    soloLectura={!puedeEntregar || idAlmacen === ''}
+                    soloLectura={!puedeCapturar || idAlmacen === ''}
                   />
                 </div>
 
@@ -409,13 +418,15 @@ export function EntregaClientePagina(): React.JSX.Element {
                         <Printer className="mr-1.5 size-4" aria-hidden /> Comprobante PDF
                       </Button>
                     ) : null}
-                    <BotonCancelarEntrega
-                      entrega={ultimaEntrega}
-                      alCancelar={() => {
-                        setUltimaEntrega(null);
-                        void seguimiento.refetch();
-                      }}
-                    />
+                    {cerrada ? null : (
+                      <BotonCancelarEntrega
+                        entrega={ultimaEntrega}
+                        alCancelar={() => {
+                          setUltimaEntrega(null);
+                          void seguimiento.refetch();
+                        }}
+                      />
+                    )}
                   </div>
                 ) : null}
               </>
@@ -424,7 +435,9 @@ export function EntregaClientePagina(): React.JSX.Element {
         </Card>
       </div>
 
-      {idOrden !== undefined ? <HistorialEntregasOrden idOrden={idOrden} /> : null}
+      {idOrden !== undefined ? (
+        <HistorialEntregasOrden idOrden={idOrden} ordenCerrada={cerrada} />
+      ) : null}
     </div>
   );
 }
@@ -435,9 +448,16 @@ export function EntregaClientePagina(): React.JSX.Element {
  * revierte la salida de kardex con un inverso). `produccion.wip-ver` ve el historial;
  * `produccion.cancelar`, los botones.
  */
-function HistorialEntregasOrden({ idOrden }: { idOrden: number }): React.JSX.Element {
+function HistorialEntregasOrden({
+  idOrden,
+  ordenCerrada,
+}: {
+  idOrden: number;
+  /** 0.226b: cancelar una entrega DEVUELVE piezas a la orden — con la orden cerrada no se ofrece. */
+  ordenCerrada: boolean;
+}): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  const puedeCancelar = tienePermiso('produccion.cancelar');
+  const puedeCancelar = tienePermiso('produccion.cancelar') && !ordenCerrada;
   // Fila 0.200: mismo permiso que la ruta del comprobante y que ESTA consulta (`wip-ver`). Aquí el
   // gate es defensivo —sin `wip-ver` la lista llega vacía y no hay fila que pintar—, pero se pone
   // igual para que las dos puertas al mismo PDF digan lo mismo.

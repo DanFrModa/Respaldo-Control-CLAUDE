@@ -375,6 +375,22 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
     expect(screen.getByText(/Jareta/)).toBeInTheDocument();
   });
 
+  it('⭐ 0.226b: con la orden CERRADA la receta es de SOLO LECTURA y lo avisa (abierta, editable)', () => {
+    render(recetaDePrueba({ estado: 'cerrada' }));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/está cerrada/);
+    expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('liberar-receta-avio-3')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('quitar-receta-avio-3')).not.toBeInTheDocument();
+    // Se sigue viendo lo que la orden lleva.
+    expect(screen.getByText(/Jareta/)).toBeInTheDocument();
+  });
+
+  it('⭐ 0.226b: con la orden ABIERTA no hay aviso y se edita', () => {
+    render(recetaDePrueba());
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('receta-marcar-revisado')).toBeInTheDocument();
+  });
+
   it('⭐ el renglón EXCLUIDO se ve tachado y NO ofrece "quitar" otra vez', () => {
     const base = recetaDePrueba();
     const receta = {
@@ -1488,6 +1504,18 @@ describe('<PanelRecetaOrden> · el candado de compra (V1-E8z)', () => {
   it('abierta: se ofrece CERRAR y desaparece «Abrir» (son los dos lados del mismo interruptor)', () => {
     render(liberadaCompleta({ abiertaEn: '2026-08-31T09:00:00.000Z', puedeComprar: false }));
 
+    expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
+    expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
+  });
+
+  it('⭐ 0.226b: con la ORDEN cerrada, CERRAR la receta abierta sigue libre (exenta) y ABRIR no', () => {
+    render(
+      liberadaCompleta({
+        abiertaEn: '2026-08-31T09:00:00.000Z',
+        puedeComprar: false,
+        estado: 'cerrada',
+      }),
+    );
     expect(screen.getByTestId('receta-cerrar')).toBeInTheDocument();
     expect(screen.queryByTestId('receta-abrir')).not.toBeInTheDocument();
   });

@@ -15,6 +15,8 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { AvisoSobreSalidaTela } from './AvisoSobreSalidaTela';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 
@@ -180,8 +182,13 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
 
   const totalCuerpo = renglones.reduce((s, r) => s + r.cantidad, 0);
   const totalComplemento = renglones.reduce((s, r) => s + r.cantidadComplemento, 0);
+  // ⭐ 0.226b (§Post-F9.244): a una orden CERRADA no se le saca tela. Se avisa arriba y se apaga la
+  // captura, en vez de dejar que alguien llene los renglones y se entere al guardar (A1: el servidor
+  // rechaza igual).
+  const cerrada = estaCerrada(orden);
+  const puedeCapturar = puedeMover && !cerrada;
   const puedeGuardar =
-    puedeMover &&
+    puedeCapturar &&
     orden !== undefined &&
     idAlmacen !== '' &&
     renglones.length > 0 &&
@@ -254,6 +261,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Sin orden seleccionada.</p>
             ) : (
               <>
+                {cerrada ? <AvisoOrdenCerrada folios={[orden.folio]} /> : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field>
                     <FieldLabel htmlFor="salida-color-almacen">Almacén de origen</FieldLabel>
@@ -261,7 +269,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                       id="salida-color-almacen"
                       value={idAlmacen}
                       onChange={(e) => setIdAlmacen(e.target.value)}
-                      disabled={!puedeMover}
+                      disabled={!puedeCapturar}
                       data-testid="salida-color-almacen"
                     >
                       <option value="">Elige el almacén…</option>
@@ -279,7 +287,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                       type="date"
                       value={fecha}
                       onChange={(e) => setFecha(e.target.value)}
-                      disabled={!puedeMover}
+                      disabled={!puedeCapturar}
                       data-testid="salida-color-fecha"
                     />
                   </Field>
@@ -292,7 +300,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                     value={observaciones}
                     onChange={(e) => setObservaciones(e.target.value)}
                     placeholder="Opcional"
-                    disabled={!puedeMover}
+                    disabled={!puedeCapturar}
                   />
                 </Field>
 
@@ -301,7 +309,7 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
                   <CapturaRenglonesTelaColor
                     renglones={renglones}
                     onChange={setRenglones}
-                    soloLectura={!puedeMover}
+                    soloLectura={!puedeCapturar}
                   />
                 </div>
 

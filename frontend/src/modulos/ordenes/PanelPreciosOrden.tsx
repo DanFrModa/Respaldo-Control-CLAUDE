@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 
 /**
  * PANEL DE PRECIOS de la orden (rediseño R2, §4.4.3 — proto `precioEditable`): venta / maquila /
@@ -33,9 +34,25 @@ import { useSesion } from '@/sesion/useSesion';
  *    aquí se pintan •••••).
  *  - `pedidos.importes` → ver el precio de venta.
  */
-export function PanelPreciosOrden({ idOrden }: { idOrden: number }): React.JSX.Element {
+export function PanelPreciosOrden({
+  idOrden,
+  folioOrden,
+  ordenCerrada,
+}: {
+  idOrden: number;
+  /** 0.226b: el folio, para que el aviso de orden cerrada diga cuál. */
+  folioOrden: number;
+  /**
+   * ⭐ 0.226b (§Post-F9.244): con la orden CERRADA el precio real se CONSULTA (y su historial), pero
+   * no se captura: el servidor lo rechaza (A1). Lo pasa quien monta el panel, que tiene la orden.
+   * OBLIGATORIO a propósito: un default `false` fallaría ABIERTO si un llamador nuevo lo olvida; así
+   * el typecheck amarra el cableado.
+   */
+  ordenCerrada: boolean;
+}): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  const puedeEditar = tienePermiso('ordenes.precio-maquila');
+  const tienePermisoCaptura = tienePermiso('ordenes.precio-maquila');
+  const puedeEditar = tienePermisoCaptura && !ordenCerrada;
   const puedeVerImportes = tienePermiso('pedidos.importes');
   const precios = usePreciosOrden(idOrden);
   const [editando, setEditando] = useState<CampoPrecioOrden | null>(null);
@@ -55,6 +72,9 @@ export function PanelPreciosOrden({ idOrden }: { idOrden: number }): React.JSX.E
 
   return (
     <>
+      {tienePermisoCaptura && ordenCerrada ? (
+        <AvisoOrdenCerrada folios={[folioOrden]} className="mb-3" />
+      ) : null}
       <div className="grid grid-cols-2 gap-3" data-testid="panel-precios">
         {/* ••••• SOLO cuando el monto está oculto por PERMISO; si el pedido no trae precio se
             dice "Sin precio" (no es un secreto, es una ausencia — hallazgo del reviewer). */}

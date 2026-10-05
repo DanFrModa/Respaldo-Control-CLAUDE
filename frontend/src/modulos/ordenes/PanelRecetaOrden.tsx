@@ -78,6 +78,8 @@ import { ChipsOcComprometidas } from '@/modulos/ordenes-compra/piezas';
 import { DialogoDesautorizarOc } from '@/modulos/ordenes-compra/DialogoDesautorizarOc';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { AvisoHermanas } from './AvisoHermanas';
 import { FotosArteOrden } from './FotosArteOrden';
 import { BadgeFirmaReceta, estadoFirmaReceta, faltantesDelModelo } from './receta-piezas';
@@ -294,7 +296,12 @@ export function PanelRecetaOrden({
   // V1-E3j: la orden CANCELADA la declara el servidor dentro de la propia receta (`estado`), no un
   // prop que el llamador tenga que acordarse de pasar. Una pantalla con dos puertas de entrada no
   // puede depender de que las dos coincidan en un dato que el backend ya sabe (A1).
-  const editable = puedeAdministrar && d.estado !== 'cancelada';
+  // ⭐ 0.226b (§Post-F9.244): la orden CERRADA tampoco se edita — la receta se consulta, pero
+  // marcar, liberar, quitar, agregar o abrirla lo rechaza el servidor (A1). CERRAR la receta sigue
+  // libre a propósito (`cerrarReceta` es exenta-decidida): su botón no cuelga de `editable` a secas
+  // (ver `enCorreccion && puedeAdministrar` abajo).
+  const cerrada = estaCerrada(d);
+  const editable = puedeAdministrar && d.estado !== 'cancelada' && !cerrada;
   const ocupado =
     marcar.isPending ||
     liberar.isPending ||
@@ -419,6 +426,7 @@ export function PanelRecetaOrden({
 
   return (
     <div className="space-y-4" data-testid="receta-orden">
+      {puedeAdministrar && cerrada ? <AvisoOrdenCerrada folios={[d.folio]} /> : null}
       {/* ⭐ V1-E3j — LA SALIDA VA PRIMERO. Lo que le falta a esta receta y el modelo sí tiene se
           anuncia ARRIBA DE TODO, con su botón. Ése fue el hallazgo de Daniel: el remedio estaba en
           pantalla, debajo de un mensaje más ruidoso, y no lo vio. */}

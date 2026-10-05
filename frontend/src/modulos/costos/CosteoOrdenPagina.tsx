@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useCostoOrden, useCostoRealOrden, useGuardarCostoOrden } from '@/api/costos';
 import { useBuscarOrdenes } from '@/api/ordenes-consulta';
 import type { BaseProrrateo, CostoOrden, CostoOrdenGuardar, CostoRealMaterial } from '@/api/tipos';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import {
   TablaDensa,
@@ -274,17 +275,10 @@ export function CosteoOrdenPagina(): React.JSX.Element {
             )}
 
             {/* ⭐ 0.061: la orden CERRADA es de solo lectura y su costo está congelado. Se avisa
-                arriba del todo para que nadie teclee y se entere al guardar. */}
+                arriba del todo para que nadie teclee y se entere al guardar. 0.226b: con el aviso
+                ÚNICO de orden cerrada (`AvisoOrdenCerrada`), más la frase propia del costeo. */}
             {ordenCerrada && (
-              <p
-                className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm"
-                role="status"
-                data-testid="costeo-orden-cerrada"
-              >
-                <AlertTriangle className="size-4" aria-hidden />
-                Esta orden está <b>CERRADA</b>: su costo quedó congelado y no se puede capturar.
-                Para cambiarlo hay que reabrirla desde la ficha de la orden (queda auditado).
-              </p>
+              <AvisoOrdenCerrada folios={[data.folio]} detalle="Su costo quedó congelado." />
             )}
 
             <div className="overflow-x-auto">

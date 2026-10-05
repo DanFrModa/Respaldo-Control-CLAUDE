@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 
 /** Fecha de hoy en YYYY-MM-DD (zona local), para el default de los campos fecha. */
 function hoy(): string {
@@ -33,6 +35,9 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
 
   const [idOrden, setIdOrden] = useState<number | undefined>(undefined);
   const [folioOrden, setFolioOrden] = useState<number | null>(null);
+  // ⭐ 0.226b (§Post-F9.244): ¿la orden elegida está CERRADA? Lo trae la propia orden del selector
+  // (`cerradaEn`). Una cerrada no admite auditoría nueva: se avisa y se apaga el alta.
+  const [ordenCerrada, setOrdenCerrada] = useState(false);
   const [idMaquilero, setIdMaquilero] = useState<string>('');
   const [fechaElaboracion, setFechaElaboracion] = useState(hoy());
   const [fechaAuditoria, setFechaAuditoria] = useState(hoy());
@@ -55,12 +60,14 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
   function alElegirOrden(o: Orden): void {
     setIdOrden(o.id);
     setFolioOrden(Number(o.folio));
+    setOrdenCerrada(estaCerrada(o));
     setIdMaquilero('');
   }
 
   const datos = contexto.data;
   const muestra = datos?.muestra;
-  const puedeCrear = puedeGenerar && idOrden !== undefined && !crear.isPending;
+  const puedeCapturar = puedeGenerar && !ordenCerrada;
+  const puedeCrear = puedeCapturar && idOrden !== undefined && !crear.isPending;
 
   function crearAuditoria(): void {
     if (idOrden === undefined) return;
@@ -135,6 +142,9 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
               </p>
             ) : datos !== undefined ? (
               <>
+                {ordenCerrada && folioOrden !== null ? (
+                  <AvisoOrdenCerrada folios={[folioOrden]} />
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div
                     className="rounded-lg border bg-muted/30 p-3"
@@ -169,7 +179,7 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
                     id="maquilero"
                     value={idMaquilero}
                     onChange={(e) => setIdMaquilero(e.target.value)}
-                    disabled={!puedeGenerar}
+                    disabled={!puedeCapturar}
                     data-testid="auditoria-maquilero"
                   >
                     <option value="">Sin maquilero</option>
@@ -194,7 +204,7 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
                       id="tipo"
                       value={tipoAuditoria}
                       onChange={(e) => setTipoAuditoria(e.target.value as TipoAuditoria)}
-                      disabled={!puedeGenerar}
+                      disabled={!puedeCapturar}
                       data-testid="auditoria-tipo"
                     >
                       {TIPOS_AUDITORIA.map((t) => (
@@ -211,7 +221,7 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
                       type="date"
                       value={fechaElaboracion}
                       onChange={(e) => setFechaElaboracion(e.target.value)}
-                      disabled={!puedeGenerar}
+                      disabled={!puedeCapturar}
                       data-testid="auditoria-fecha-elaboracion"
                     />
                   </Field>
@@ -222,7 +232,7 @@ export function AltaAuditoriaPagina(): React.JSX.Element {
                       type="date"
                       value={fechaAuditoria}
                       onChange={(e) => setFechaAuditoria(e.target.value)}
-                      disabled={!puedeGenerar}
+                      disabled={!puedeCapturar}
                       data-testid="auditoria-fecha-auditoria"
                     />
                   </Field>

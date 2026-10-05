@@ -122,6 +122,8 @@ vi.mock('@/api/almacenes', () => ({
     };
   },
 }));
+/** 0.226b: `cerradaEn` de la orden que emite el selector simulado (null = abierta). */
+let cerradaEnEmitida: string | null = null;
 // SelectorOrden emite una orden al hacer click.
 vi.mock('@/modulos/produccion/SelectorOrden', () => ({
   SelectorOrden: ({
@@ -132,13 +134,20 @@ vi.mock('@/modulos/produccion/SelectorOrden', () => ({
       folio: number;
       codigoModelo: string;
       cliente: string;
+      cerradaEn: string | null;
     }) => void;
   }) => (
     <button
       type="button"
       data-testid="sel-orden"
       onClick={() =>
-        alSeleccionar({ id: 9, folio: 123, codigoModelo: 'M-1', cliente: 'Cliente X' })
+        alSeleccionar({
+          id: 9,
+          folio: 123,
+          codigoModelo: 'M-1',
+          cliente: 'Cliente X',
+          cerradaEn: cerradaEnEmitida,
+        })
       }
     >
       elegir orden
@@ -179,6 +188,33 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
     respuestaPrevia = undefined;
     useOrden.mockReset();
     useOrden.mockReturnValue({ data: undefined, isError: false });
+    cerradaEnEmitida = null;
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA avisa y apaga almacén y «Guardar» (abierta, no)', () => {
+    cerradaEnEmitida = '2026-10-01T10:00:00.000Z';
+    respuestaPrevia = previa({});
+    const { unmount } = renderConProveedores(<SalidaTelaColorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+    });
+    fireEvent.click(screen.getByTestId('sel-orden'));
+    fireEvent.click(screen.getByTestId('captura-color-simulada'));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 123 está cerrada/,
+    );
+    expect(screen.getByTestId('salida-color-almacen')).toBeDisabled();
+    expect(screen.getByTestId('salida-color-guardar')).toBeDisabled();
+    unmount();
+
+    cerradaEnEmitida = null;
+    renderConProveedores(<SalidaTelaColorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
+    });
+    fireEvent.click(screen.getByTestId('sel-orden'));
+    fireEvent.click(screen.getByTestId('captura-color-simulada'));
+    fireEvent.change(screen.getByTestId('salida-color-almacen'), { target: { value: '5' } });
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('salida-color-guardar')).toBeEnabled();
   });
 
   it('pide elegir una orden antes de capturar', () => {

@@ -484,7 +484,8 @@ const incluirDetalle = {
   lineas: {
     orderBy: { id: 'asc' },
     include: {
-      orden: { select: { folio: true } },
+      // 0.226b: `cerradaEn` para que la pantalla avise ANTES de confirmar (§Post-F9.244).
+      orden: { select: { folio: true, cerradaEn: true } },
       avio: { select: { clave: true, descripcion: true } },
       tela: { select: { nombre: true } },
       lote: { select: { clave: true } },
@@ -510,6 +511,7 @@ function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
       id: l.id,
       idOrden: l.idOrden,
       folioOrden: l.orden === null ? null : Number(l.orden.folio),
+      ordenCerrada: l.orden !== null && l.orden.cerradaEn !== null,
       tipo,
       idAvio: l.idAvio,
       avio: l.avio === null ? null : `${l.avio.clave} — ${l.avio.descripcion}`,

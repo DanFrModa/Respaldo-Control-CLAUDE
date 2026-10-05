@@ -27575,6 +27575,141 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes/{id}/previa-cierre': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Lo que conviene saber antes de cerrar una orden (producto terminado que queda) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Lo que conviene saber antes de cerrar una orden (C8: producto terminado que queda). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folio: number;
+              /** @description Piezas de producto terminado que siguen etiquetadas con esta orden (Σ de los saldos POSITIVOS por artículo y almacén, suma directa de movimientos — D3). 0 = no queda nada. */
+              piezasPt: number;
+              /** @description Dónde están esas piezas (sólo almacenes con saldo positivo). */
+              porAlmacen: {
+                /** @description Id del almacén. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Piezas de la orden en ese almacén (> 0). */
+                piezas: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes/{id}/reabrir': {
     parameters: {
       query?: never;
@@ -28666,6 +28801,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden. */
               folioOrden: number;
+              /** @description 0.226b (§Post-F9.244): ¿la orden está CERRADA? Entonces se consulta, pero no se le pasan avíos a una nota de salida (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Modelo de la orden. */
               idModelo: number;
               /** @description Código del modelo. */
@@ -37225,6 +37362,8 @@ export interface paths {
                   idOrden: number | null;
                   /** @description Folio de la orden ligada (para la UI), o null. */
                   folioOrden: number | null;
+                  /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                  ordenCerrada: boolean;
                   /** @description Matriz talla×color (vacía si no aplica). */
                   tallas: {
                     /** @description Id del color. */
@@ -37559,6 +37698,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -37959,6 +38100,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -38288,6 +38431,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -38664,6 +38809,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -38941,6 +39088,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -39218,6 +39367,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden ligada (para la UI), o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
                 /** @description Matriz talla×color (vacía si no aplica). */
                 tallas: {
                   /** @description Id del color. */
@@ -40613,6 +40764,10 @@ export interface paths {
                 recibidoComplemento: number;
                 /** @description Complemento que falta por recibir. */
                 pendienteComplemento: number;
+                /** @description Folio de la orden de producción ligada al renglón, o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿la orden de producción ligada está CERRADA? Entonces el renglón no se puede surtir; la captura lo avisa antes. false si no lleva orden. */
+                ordenCerrada: boolean;
               }[];
             };
           };
@@ -41495,6 +41650,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden. */
                 folio: number;
+                /** @description 0.226b (§Post-F9.244): ¿la orden está CERRADA? Se explota igual (decisión 3: marca, no esconde), pero no se le asigna proveedor ni color de tela (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /** @description Modelo de la orden. */
                 idModelo: number;
                 /** @description Código del modelo (para la UI). */
@@ -41839,6 +41996,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden. */
                 folio: number;
+                /** @description 0.226b (§Post-F9.244): ¿la orden está CERRADA? Se explota igual (decisión 3: marca, no esconde), pero no se le asigna proveedor ni color de tela (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /** @description Modelo de la orden. */
                 idModelo: number;
                 /** @description Código del modelo (para la UI). */
@@ -42367,6 +42526,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden. */
                 folio: number;
+                /** @description 0.226b (§Post-F9.244): ¿la orden está CERRADA? Se explota igual (decisión 3: marca, no esconde), pero no se le asigna proveedor ni color de tela (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /** @description Modelo de la orden. */
                 idModelo: number;
                 /** @description Código del modelo (para la UI). */
@@ -44288,6 +44449,8 @@ export interface paths {
                   idOrden: number;
                   /** @description Folio de la orden destino, o null. */
                   folioOrden: number | null;
+                  /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                  ordenCerrada: boolean;
                   /**
                    * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                    * @enum {string}
@@ -44516,6 +44679,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /**
                  * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
@@ -44858,6 +45023,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /**
                  * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
@@ -45084,6 +45251,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /**
                  * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
@@ -45402,6 +45571,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /**
                  * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
@@ -45622,6 +45793,8 @@ export interface paths {
                 idOrden: number;
                 /** @description Folio de la orden destino, o null. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden destino está CERRADA? Si lo está, la nota no se puede confirmar ni cancelar ya confirmada, ni conservar el renglón al editarla (la pantalla lo avisa antes). */
+                ordenCerrada: boolean;
                 /**
                  * @description Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.
                  * @enum {string}
@@ -46717,6 +46890,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden». */
+                ordenCerrada: boolean;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -46932,6 +47107,8 @@ export interface paths {
                   idOrden: number | null;
                   /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
                   folioOrden: number | null;
+                  /** @description 0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden». */
+                  ordenCerrada: boolean;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -46999,6 +47176,8 @@ export interface paths {
                   idOrden: number | null;
                   /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
                   folioOrden: number | null;
+                  /** @description 0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden». */
+                  ordenCerrada: boolean;
                   /** @description Cantidades por talla. */
                   tallas: {
                     /** @description Id de la talla. */
@@ -47191,6 +47370,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden». */
+                ordenCerrada: boolean;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -47370,6 +47551,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden, o null si es del bucket sin orden. */
                 folioOrden: number | null;
+                /** @description 0.226b (§Post-F9.244): ¿la orden de este bucket está CERRADA? Sus piezas se consultan, pero no se mueven a mano ni se traspasan (la captura lo avisa antes). false en «sin orden». */
+                ordenCerrada: boolean;
                 /** @description Existencia actual (Σ de movimientos, D3). */
                 existencia: number;
               }[];
@@ -47774,6 +47957,8 @@ export interface paths {
                 idOrden: number | null;
                 /** @description Folio de la orden del renglón, o null si es del bucket sin orden. */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden del renglón está CERRADA? Entonces el movimiento no se cancela (el inverso movería piezas de esa orden); la pantalla lo avisa antes. false en «sin orden». */
+                ordenCerrada: boolean;
                 /** @description Cantidades por talla. */
                 tallas: {
                   /** @description Id de la talla. */
@@ -50654,6 +50839,10 @@ export interface paths {
                 importe: number | null;
                 origenTipo: string | null;
                 origenId: string | null;
+                /** @description 0.226b: folio de la orden de una SALIDA DE TELA A ORDEN; null en el resto. */
+                folioOrden: number | null;
+                /** @description 0.226b (§Post-F9.244): el renglón es una SALIDA DE TELA A UNA ORDEN que hoy está CERRADA ⇒ no se cancela (el inverso le devolvería tela); la pantalla lo avisa antes. false en el resto. */
+                ordenCerrada: boolean;
                 cancelado: boolean;
                 observaciones: string | null;
               }[];
@@ -51245,6 +51434,10 @@ export interface paths {
                   idOrdenCompraLinea: number | null;
                   /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                   numCompra: number | null;
+                  /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                  folioOrden: number | null;
+                  /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                  ordenCerrada: boolean;
                 }[];
                 /** @description Σ de las cantidades de cuerpo (derivada). */
                 totalCuerpo: number;
@@ -51478,6 +51671,10 @@ export interface paths {
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
+                /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -51861,6 +52058,10 @@ export interface paths {
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
+                /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -52088,6 +52289,10 @@ export interface paths {
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
+                /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -52296,6 +52501,10 @@ export interface paths {
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
+                /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -52510,6 +52719,10 @@ export interface paths {
                 idOrdenCompraLinea: number | null;
                 /** @description Folio de la orden de compra surtida (para pintarlo sin otra consulta), o null. */
                 numCompra: number | null;
+                /** @description 0.226b: folio de la orden de PRODUCCIÓN que surte el renglón (vía su renglón de OC), o null. */
+                folioOrden: number | null;
+                /** @description 0.226b: ¿esa orden de producción está CERRADA? Entonces la entrada no se confirma ni se cancela ya confirmada (la pantalla lo avisa antes). false sin orden. */
+                ordenCerrada: boolean;
               }[];
               /** @description Σ de las cantidades de cuerpo (derivada). */
               totalCuerpo: number;
@@ -86132,6 +86345,8 @@ export interface paths {
                 numAuditoria: number;
                 /** @description Folio de la orden auditada (legible). */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden auditada está CERRADA? (no se modifica ni se cancela). */
+                ordenCerrada: boolean;
                 /** @description Código del modelo de la orden (legible). */
                 codigoModelo: string | null;
                 /** @description Maquilero auditado, o null. */
@@ -86307,6 +86522,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */
@@ -86699,6 +86916,8 @@ export interface paths {
                 numAuditoria: number;
                 /** @description Folio de la orden auditada (legible). */
                 folioOrden: number | null;
+                /** @description 0.226b: ¿la orden auditada está CERRADA? (no se modifica ni se cancela). */
+                ordenCerrada: boolean;
                 /** @description Código del modelo de la orden (legible). */
                 codigoModelo: string | null;
                 /** @description Maquilero auditado, o null. */
@@ -86858,6 +87077,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */
@@ -87106,6 +87327,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */
@@ -87359,6 +87582,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */
@@ -87613,6 +87838,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */
@@ -87854,6 +88081,8 @@ export interface paths {
               idOrden: number;
               /** @description Folio de la orden (legible). */
               folioOrden: number | null;
+              /** @description 0.226b: ¿la orden auditada está CERRADA? Entonces la auditoría no admite captura, reclasificación, modificación ni cancelación (la pantalla lo avisa antes). */
+              ordenCerrada: boolean;
               /** @description Código del modelo de la orden (legible). */
               codigoModelo: string | null;
               /** @description Maquilero auditado, o null. */

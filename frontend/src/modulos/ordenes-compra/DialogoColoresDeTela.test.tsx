@@ -96,6 +96,7 @@ function abrir(puedeEditar = true): void {
       idOrden={50}
       folioOrden={7}
       puedeEditar={puedeEditar}
+      ordenCerrada={false}
     />,
     {
       sesion: estadoSesionDePrueba(
@@ -122,6 +123,24 @@ function opcionesDelSelect(): string[] {
 describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede cambiar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA avisa y cierra el color; el PRECIO (catálogo) sigue vivo', () => {
+    useColoresDeTelaMock.mockReturnValue(respuesta([colorDeLaOrden()]));
+    renderConProveedores(
+      <DialogoColoresDeTela
+        abierto
+        alCambiarAbierto={() => {}}
+        idOrden={50}
+        folioOrden={7}
+        puedeEditar
+        ordenCerrada
+      />,
+      { sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']) },
+    );
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 7 está cerrada/);
+    expect(screen.getByTestId('colores-tela-select')).toBeDisabled();
+    expect(screen.getByTestId('colores-tela-precio')).toBeEnabled();
   });
 
   it('un color que SÍ se puede cambiar sale abierto y sin motivo', () => {
@@ -181,6 +200,7 @@ describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede ca
         idOrden={50}
         folioOrden={7}
         puedeEditar={false}
+        ordenCerrada={false}
       />,
       { sesion: estadoSesionDePrueba(['compras.ver']) },
     );

@@ -78,6 +78,9 @@ export function SelectorOrdenPt({
           <option key={o.idOrden ?? 0} value={String(o.idOrden)}>
             Orden {o.folioOrden ?? o.idOrden}
             {piezas(o.existencia)}
+            {/* 0.226b: informativo, NUNCA un filtro — la orden cerrada se ve, pero la pantalla
+                avisa y apaga el guardar si se elige. */}
+            {o.ordenCerrada === true ? ' · Cerrada' : ''}
           </option>
         ))}
       </SelectNativo>

@@ -16,11 +16,18 @@ vi.mock('@/api/ordenes-compra', () => ({
   imprimirOc: vi.fn(),
 }));
 
-function unaPendiente() {
+function unaPendiente(ordenCerrada = false) {
+  const oc = ocDePrueba({ estatus: 'borrador' });
   useOrdenesCompraMock.mockReturnValue({
     data: {
       // BORRADOR: el estatus con el que nacen todas las OC y desde el que se autoriza.
-      datos: [ocDePrueba({ estatus: 'borrador' })],
+      // 0.226b: su renglón liga la orden 900, cerrada o abierta según la prueba.
+      datos: [
+        {
+          ...oc,
+          lineas: oc.lineas.map((l) => ({ ...l, idOrden: 50, folioOrden: 900, ordenCerrada })),
+        },
+      ],
       total: 1,
       pagina: 1,
       porPagina: 20,
@@ -76,6 +83,25 @@ describe('BandejaAutorizacionPagina (F4-E2)', () => {
     });
     await usuario.click(screen.getByTestId('autorizar-oc-bandeja'));
     expect(autorizarMutate).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it('⭐ 0.226b: con una orden CERRADA ligada, avisa y no deja autorizar (abierta, sí)', () => {
+    unaPendiente(true);
+    const { unmount } = renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 900 está cerrada/,
+    );
+    expect(screen.getByTestId('autorizar-oc-bandeja')).toBeDisabled();
+    unmount();
+
+    unaPendiente(false);
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('autorizar-oc-bandeja')).toBeEnabled();
   });
 
   it('SIN compras.autorizar no muestra el botón de autorizar', () => {

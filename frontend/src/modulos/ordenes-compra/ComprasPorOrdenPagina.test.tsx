@@ -46,6 +46,7 @@ function lineaLigada(id: number) {
     subtotal: 2500,
     idOrden: 50,
     folioOrden: 7,
+    ordenCerrada: false,
     tallas: [],
   };
 }

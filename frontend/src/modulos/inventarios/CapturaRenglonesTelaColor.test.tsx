@@ -185,6 +185,34 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
     expect(fila).toHaveTextContent('19-3920');
   });
 
+  it('⭐ 0.226b: un pendiente de una orden CERRADA se ve marcado y no se puede capturar', () => {
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[{ ...pendienteDeOc(11, 'Marino'), folioOrden: 900, ordenCerrada: true }]}
+      />,
+    );
+    expect(screen.getByTestId('captura-color-oc-cerrada-500')).toHaveTextContent(
+      'orden 900 cerrada',
+    );
+    expect(screen.getByTestId('captura-color-capturar-oc-500')).toBeDisabled();
+  });
+
+  it('⭐ 0.226b: abierta (o sin el dato), el pendiente se captura como siempre', () => {
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[{ ...pendienteDeOc(11, 'Marino'), folioOrden: 900, ordenCerrada: false }]}
+      />,
+    );
+    expect(screen.queryByTestId('captura-color-oc-cerrada-500')).toBeNull();
+    expect(screen.getByTestId('captura-color-capturar-oc-500')).toBeEnabled();
+  });
+
   it('🔴 al pulsar «Capturar», el color de la OC viene PRESELECCIONADO', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(

@@ -32,6 +32,8 @@ import {
   renglonVacio,
   type RenglonNotaCaptura,
 } from './captura';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
 
 /** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
@@ -51,6 +53,11 @@ export interface PrefillNota {
   renglones?: PrefillRenglonNota[];
   /** Recetas conocidas (idOrden → ids de avío de su receta) para el flag ✓/⚠ ya pre-cargado. */
   recetaPorOrden?: Record<number, number[]>;
+  /**
+   * ⭐ 0.226b: órdenes CERRADAS que el llamador ya conoce (la habilitación lo sabe por su orden).
+   * Sin esto, el constructor sólo sabría del cierre si la orden viniera en su página de órdenes.
+   */
+  ordenesCerradas?: { idOrden: number; folio: number }[];
 }
 
 /**
@@ -301,8 +308,40 @@ export function DialogoEditarNota({
     }
   }
 
+  /**
+   * ⭐ 0.226b (§Post-F9.244): las órdenes CERRADAS que tocan los renglones. Una nota no se guarda
+   * con un renglón que surta a una orden cerrada (el servidor la rechaza, A1): se avisa ARRIBA de
+   * los renglones y se apaga el guardar hasta quitarlos. Se sabe por dos lados: la orden de la
+   * lista (`estado`) y, en una nota ya guardada, el `ordenCerrada` que trae cada renglón (por si su
+   * orden no viene en la página de órdenes).
+   */
+  const idsOrdenCerradas = useMemo(() => {
+    const ids = new Set<number>();
+    for (const o of ordenes.data?.datos ?? []) if (estaCerrada(o)) ids.add(o.id);
+    for (const l of nota?.lineas ?? []) if (l.ordenCerrada) ids.add(l.idOrden);
+    for (const o of prefill?.ordenesCerradas ?? []) ids.add(o.idOrden);
+    return ids;
+  }, [ordenes.data, nota, prefill]);
+  const foliosCerrados = useMemo(() => {
+    const folioPorId = new Map<number, number>();
+    for (const o of ordenes.data?.datos ?? []) folioPorId.set(o.id, Number(o.folio));
+    for (const l of nota?.lineas ?? []) {
+      if (l.folioOrden !== null) folioPorId.set(l.idOrden, l.folioOrden);
+    }
+    for (const o of prefill?.ordenesCerradas ?? []) folioPorId.set(o.idOrden, o.folio);
+    const folios: (number | string)[] = [];
+    for (const r of renglones) {
+      if (r.idOrden !== null && idsOrdenCerradas.has(r.idOrden)) {
+        folios.push(folioPorId.get(r.idOrden) ?? r.idOrden);
+      }
+    }
+    return [...new Set(folios)];
+  }, [renglones, idsOrdenCerradas, ordenes.data, nota, prefill]);
+  const ordenTraerCerrada = ordenTraer !== null && idsOrdenCerradas.has(ordenTraer);
+
   const renglonesValidos = renglones.length > 0 && renglones.every(renglonCompleto);
   const puedeGuardar =
+    foliosCerrados.length === 0 &&
     !guardando &&
     idMaquilero !== null &&
     idAlmacen !== null &&
@@ -488,6 +527,8 @@ export function DialogoEditarNota({
                     {(ordenes.data?.datos ?? []).map((o) => (
                       <option key={o.id} value={String(o.id)}>
                         Orden {o.folio} · {o.codigoModelo}
+                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
+                        {estaCerrada(o) ? ' · Cerrada' : ''}
                       </option>
                     ))}
                   </SelectNativo>
@@ -497,7 +538,11 @@ export function DialogoEditarNota({
                   variant="outline"
                   size="sm"
                   onClick={traerAvios}
-                  disabled={ordenTraer === null || (ordenTraer !== null && habTraer.isPending)}
+                  disabled={
+                    ordenTraer === null ||
+                    ordenTraerCerrada ||
+                    (ordenTraer !== null && habTraer.isPending)
+                  }
                   data-testid="nota-traer-boton"
                 >
                   <DownloadIcon aria-hidden />
@@ -505,6 +550,13 @@ export function DialogoEditarNota({
                 </Button>
               </div>
             </div>
+          ) : null}
+
+          {!soloLectura && foliosCerrados.length > 0 ? (
+            <AvisoOrdenCerrada
+              folios={foliosCerrados}
+              detalle="Quita sus renglones para poder guardar la nota."
+            />
           ) : null}
 
           {/* Renglones */}

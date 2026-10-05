@@ -22,6 +22,7 @@ import {
   type RenglonOcCaptura,
   type TipoMaterialOc,
 } from './captura';
+import { estaCerrada } from '@/lib/orden-cerrada';
 
 /**
  * EDITOR DE RENGLONES de una OC (F4-E2): cada renglón elige el tipo de material (tela del catálogo /
@@ -502,6 +503,8 @@ export function EditorLineasOc({
                     {ordenes.map((o) => (
                       <option key={o.id} value={String(o.id)}>
                         Orden {o.folio} · {o.codigoModelo}
+                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
+                        {estaCerrada(o) ? ' · Cerrada' : ''}
                       </option>
                     ))}
                   </SelectNativo>

@@ -1097,6 +1097,17 @@ const esquemaKardexTelaColorRenglon = z.object({
     .describe('Importe del renglón (ambos componentes con su propio costo) o null.'),
   origenTipo: z.string().nullable(),
   origenId: z.string().nullable(),
+  folioOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('0.226b: folio de la orden de una SALIDA DE TELA A ORDEN; null en el resto.'),
+  ordenCerrada: z
+    .boolean()
+    .describe(
+      '0.226b (§Post-F9.244): el renglón es una SALIDA DE TELA A UNA ORDEN que hoy está CERRADA ⇒ ' +
+        'no se cancela (el inverso le devolvería tela); la pantalla lo avisa antes. false en el resto.',
+    ),
   cancelado: z.boolean(),
   observaciones: z.string().nullable(),
 });

@@ -175,6 +175,17 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
                   .describe('Complemento que pidió la OC, o null si no lleva.'),
                 recibidoComplemento: z.number().describe('Complemento ya recibido.'),
                 pendienteComplemento: z.number().describe('Complemento que falta por recibir.'),
+                folioOrden: z
+                  .number()
+                  .int()
+                  .nullable()
+                  .describe('Folio de la orden de producción ligada al renglón, o null.'),
+                ordenCerrada: z
+                  .boolean()
+                  .describe(
+                    '0.226b: ¿la orden de producción ligada está CERRADA? Entonces el renglón no ' +
+                      'se puede surtir; la captura lo avisa antes. false si no lleva orden.',
+                  ),
               }),
             ),
           })

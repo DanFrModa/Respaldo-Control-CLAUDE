@@ -199,7 +199,16 @@ const incluirEntradaTela = {
       // `ordenCompra.idEmpresa === cabecera.idEmpresa`, `compras/recepciones.ts:831-834`), así que
       // no puede convertirse en inventario ni en recepción. El arreglo es validar la OC (empresa +
       // proveedor) al capturar; no se hizo en esta etapa para no ampliar su alcance.
-      ordenCompraLinea: { select: { ordenCompra: { select: { numCompra: true } } } },
+      //
+      // 0.226b: también la ORDEN DE PRODUCCIÓN del renglón de OC (folio + si está cerrada), para que
+      // la pantalla avise antes de confirmar o cancelar. Se trae su `idEmpresa` para NO ensanchar la
+      // fuga de arriba: el folio y el cierre sólo viajan si la orden es de la empresa del documento.
+      ordenCompraLinea: {
+        select: {
+          ordenCompra: { select: { numCompra: true } },
+          orden: { select: { folio: true, cerradaEn: true, idEmpresa: true } },
+        },
+      },
     },
   },
   _count: { select: { archivos: true } },
@@ -223,6 +232,10 @@ function aEntradaTelaSalida(
   let hayImporte = false;
 
   const lineas: EntradaTelaLineaSalida[] = e.lineas.map((l) => {
+    // 0.226b: la orden de producción del renglón, SÓLO si es de la empresa del documento (A9).
+    const ordenRenglon = l.ordenCompraLinea?.orden ?? null;
+    const ordenPropia =
+      ordenRenglon !== null && ordenRenglon.idEmpresa === e.idEmpresa ? ordenRenglon : null;
     const cantidad = Number(l.cantidad);
     const cantidadComplemento = aNumero(l.cantidadComplemento);
     totalCuerpo += cantidad;
@@ -265,6 +278,8 @@ function aEntradaTelaSalida(
       idOrdenCompraLinea: l.idOrdenCompraLinea,
       numCompra:
         l.ordenCompraLinea === null ? null : Number(l.ordenCompraLinea.ordenCompra.numCompra),
+      folioOrden: ordenPropia === null ? null : Number(ordenPropia.folio),
+      ordenCerrada: ordenPropia !== null && ordenPropia.cerradaEn !== null,
     };
   });
 

@@ -303,6 +303,8 @@ interface RequerimientoCalculado {
 const seleccionOrdenExplosion = {
   id: true,
   folio: true,
+  // 0.226b: la pantalla apaga asignar proveedor/color de las órdenes CERRADAS (§Post-F9.244).
+  cerradaEn: true,
   idEmpresa: true,
   idModelo: true,
   modelo: { select: { codigo: true } },
@@ -1618,6 +1620,7 @@ function fichaDeOrden(orden: OrdenParaExplosion, totalPiezas: number): OrdenExpl
   return {
     idOrden: orden.id,
     folio: Number(orden.folio),
+    ordenCerrada: orden.cerradaEn !== null,
     idModelo: orden.idModelo,
     modelo: orden.modelo.codigo,
     totalPiezas,
@@ -2729,6 +2732,7 @@ async function planearCompra(
     select: {
       id: true,
       folio: true,
+      cerradaEn: true,
       idModelo: true,
       fechaEntrega: true,
       modelo: { select: { codigo: true } },
@@ -2777,6 +2781,7 @@ async function planearCompra(
   const fichas: OrdenExplosionada[] = ordenes.map((o) => ({
     idOrden: o.id,
     folio: Number(o.folio),
+    ordenCerrada: o.cerradaEn !== null,
     idModelo: o.idModelo,
     modelo: o.modelo.codigo,
     totalPiezas: o.lineas.reduce((s, l) => s + l.tallas.reduce((st, t) => st + t.cantidad, 0), 0),

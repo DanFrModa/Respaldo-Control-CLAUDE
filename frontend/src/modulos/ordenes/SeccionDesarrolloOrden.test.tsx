@@ -21,7 +21,7 @@ vi.mock('@/api/liga-orden', () => ({
 }));
 
 /** Orden mínima (el componente solo usa `id`). */
-const ordenDePrueba = { id: 50 } as unknown as Orden;
+const ordenDePrueba = { id: 50, folio: 7, cerradaEn: null } as unknown as Orden;
 
 /** Candidato de sugerencia con precio propuesto. */
 function sugerenciaConCandidato(precio: number | null) {
@@ -163,6 +163,48 @@ describe('SeccionDesarrolloOrden (F8-E6)', () => {
     expect(screen.getByText(/Precio sugerido al pedido/i)).toBeInTheDocument();
   });
 
+  it('⭐ 0.226b: con la orden CERRADA avisa y apaga ligar (abierta, el de arriba lo deja)', () => {
+    useSugerenciaLigaMock.mockReturnValue({
+      data: sugerenciaConCandidato(150),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(
+      <SeccionDesarrolloOrden
+        orden={{ ...ordenDePrueba, cerradaEn: '2026-10-01T10:00:00.000Z' }}
+        puedeAdministrar
+        verImportes
+      />,
+      { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
+    );
+    expect(screen.getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    expect(screen.getByTestId('ligar-desarrollo')).toBeDisabled();
+  });
+
+  it('⭐ 0.226b: con la orden CERRADA y LIGADA no se ofrece quitar la liga (consulta libre)', () => {
+    useSugerenciaLigaMock.mockReturnValue({
+      data: { idOrden: 50, folioOrden: 7, yaLigada: true, candidato: null },
+      isPending: false,
+      isError: false,
+    });
+    useExpedienteOrdenMock.mockReturnValue({
+      data: expedienteDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(
+      <SeccionDesarrolloOrden
+        orden={{ ...ordenDePrueba, cerradaEn: '2026-10-01T10:00:00.000Z' }}
+        puedeAdministrar
+        verImportes
+      />,
+      { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
+    );
+    expect(screen.getByTestId('desarrollo-orden-ligada')).toBeInTheDocument();
+    expect(screen.getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    expect(screen.getByTestId('quitar-liga-desarrollo')).toBeDisabled();
+  });
+
   it('sin desarrollo.administrar no muestra el botón de ligar', () => {
     useSugerenciaLigaMock.mockReturnValue({
       data: sugerenciaConCandidato(150),
@@ -195,7 +237,8 @@ describe('SeccionDesarrolloOrden (F8-E6)', () => {
     expect(screen.getByTestId('desarrollo-orden-ligada')).toBeInTheDocument();
     expect(screen.getByText('Primavera Liverpool')).toBeInTheDocument();
     expect(screen.getByTestId('acuerdo-negociacion')).toHaveTextContent('Se acordó $200');
-    expect(screen.getByTestId('quitar-liga-desarrollo')).toBeInTheDocument();
+    expect(screen.getByTestId('quitar-liga-desarrollo')).toBeEnabled();
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
   });
 
   /**

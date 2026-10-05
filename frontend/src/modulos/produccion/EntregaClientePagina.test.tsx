@@ -237,3 +237,75 @@ describe('⚠️ Medición: qué tan alcanzable es la barra sin `produccion.wip-
     expect(crearEntrega).not.toHaveBeenCalled();
   });
 });
+
+describe('⭐ 0.226b — la orden CERRADA apaga la entrega (§Post-F9.244)', () => {
+  const PERMISOS = ['produccion.entrega', 'produccion.wip-ver', 'produccion.cancelar'];
+
+  it('cerrada: avisa y apaga almacén, matriz y «Guardar»; el historial ya no ofrece cancelar', async () => {
+    useOrden.mockReturnValue({
+      data: { ...ORDEN, cerradaEn: '2026-10-01T10:00:00.000Z', estado: 'cerrada' },
+      isError: false,
+      isPending: false,
+    });
+    useEntregasOrden.mockReturnValue({
+      data: {
+        entregas: [
+          {
+            id: 70,
+            folio: 2,
+            cliente: 'C&A',
+            totalPiezas: 4,
+            fecha: '2026-09-30',
+            cancelado: false,
+            motivoCancelacion: null,
+          },
+        ],
+      },
+      isError: false,
+      isPending: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await usuario.click(screen.getByTestId('elegir-orden'));
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 5424 está cerrada/,
+    );
+    expect(screen.getByTestId('entrega-almacen')).toBeDisabled();
+    expect(screen.getByTestId('entrega-guardar')).toBeDisabled();
+    // La consulta sigue libre: el historial se ve, pero no se cancela.
+    expect(screen.getByTestId('historial-entrega')).toBeInTheDocument();
+    expect(screen.queryByTestId('historial-entrega-cancelar')).not.toBeInTheDocument();
+  });
+
+  it('abierta: sin aviso, y se captura y guarda', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await usuario.click(screen.getByTestId('elegir-orden'));
+
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    await usuario.selectOptions(screen.getByTestId('entrega-almacen'), '1');
+    await usuario.type(screen.getByTestId('entrega-matriz-celda'), '1');
+    expect(screen.getByTestId('entrega-guardar')).toBeEnabled();
+  });
+
+  it('la ÚLTIMA entrega guardada deja de ofrecer «Cancelar» si la orden se cierra después', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await capturarUnaEntrega(usuario);
+    expect(screen.getByTestId('entrega-cancelar')).toBeInTheDocument();
+
+    // La orden se CIERRA (llega en el siguiente render, p. ej. tras un refetch): el botón se va.
+    useOrden.mockReturnValue({
+      data: { ...ORDEN, cerradaEn: '2026-10-01T10:00:00.000Z', estado: 'cerrada' },
+      isError: false,
+      isPending: false,
+    });
+    await usuario.type(screen.getByTestId('entrega-observaciones'), 'x');
+    expect(screen.getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    expect(screen.queryByTestId('entrega-cancelar')).not.toBeInTheDocument();
+    // El comprobante de la última entrega sigue (consultar es libre).
+    expect(screen.getByTestId('entrega-pdf')).toBeInTheDocument();
+  });
+});

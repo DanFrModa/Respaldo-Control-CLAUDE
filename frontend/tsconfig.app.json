@@ -65,6 +65,7 @@
     "src/cabeceras-seguridad-nginx.test.ts",
     "src/abreviatura-e2e.test.ts",
     "src/selector-proveedor-unico.test.ts",
+    "src/aviso-orden-cerrada-guardian.test.ts",
     "src/ventana-fecha-pt.test.ts",
     "src/tope-existencias-pt.test.ts"
   ]

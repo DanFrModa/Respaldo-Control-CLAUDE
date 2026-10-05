@@ -2117,6 +2117,31 @@ export async function kardexTelaColor(
   );
   const almacenesDelPeriodo = new Set<number>();
 
+  // ⭐ 0.226b (§Post-F9.244): las SALIDAS DE TELA A ORDEN cuya orden hoy está CERRADA — cancelarlas
+  // le devolvería tela a esa orden y el servidor lo rechaza (A1). La pantalla lo avisa antes. Una
+  // sola consulta, sólo si en el periodo hay salidas a orden.
+  const idsOrdenDeSalidas = [
+    ...new Set(
+      enPeriodo
+        .filter(
+          (d) =>
+            d.movimiento.origenTipo === ORIGEN.salidaTelaOrden && d.movimiento.origenId !== null,
+        )
+        .map((d) => Number(d.movimiento.origenId))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  ];
+  const ordenesDeSalidas = new Map(
+    idsOrdenDeSalidas.length === 0
+      ? []
+      : (
+          await cliente.orden.findMany({
+            where: { id: { in: idsOrdenDeSalidas }, idEmpresa },
+            select: { id: true, folio: true, cerradaEn: true },
+          })
+        ).map((o) => [o.id, { folio: Number(o.folio), cerrada: o.cerradaEn !== null }]),
+  );
+
   const renglones: KardexTelaColorRenglon[] = enPeriodo.map((d) => {
     const m = d.movimiento;
     const esEntrada = m.tipoMov.direccion === DireccionMovimiento.entrada;
@@ -2138,6 +2163,11 @@ export async function kardexTelaColor(
 
     const costoUnit = verImportes ? aNumero(d.costoUnit) : null;
     const costoUnitComplemento = verImportes ? aNumero(d.costoUnitComplemento) : null;
+    // 0.226b: la orden de una salida de tela a orden (folio + si está cerrada), o nada.
+    const ordenSalida =
+      m.origenTipo === ORIGEN.salidaTelaOrden && m.origenId !== null
+        ? ordenesDeSalidas.get(Number(m.origenId))
+        : undefined;
     return {
       idMovimiento: m.id,
       folio: Number(m.folio),
@@ -2165,6 +2195,8 @@ export async function kardexTelaColor(
           : (costoUnit ?? 0) * cuerpo + (costoUnitComplemento ?? 0) * complemento,
       origenTipo: m.origenTipo,
       origenId: m.origenId,
+      folioOrden: ordenSalida?.folio ?? null,
+      ordenCerrada: ordenSalida?.cerrada === true,
       cancelado: m.anuladoPor.length > 0,
       observaciones: m.observaciones,
     };

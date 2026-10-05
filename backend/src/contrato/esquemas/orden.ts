@@ -305,6 +305,40 @@ export const esquemaOrdenReabrirCuerpo = z
 /** Datos validados del cuerpo de reabrir. */
 export type DatosOrdenReabrir = z.infer<typeof esquemaOrdenReabrirCuerpo>;
 
+/**
+ * ⭐ 0.226b (C8 de §Post-F9.261) — LA PREVIA DEL CIERRE: lo que conviene saber ANTES de cerrar.
+ *
+ * Hoy, una sola cosa: el PRODUCTO TERMINADO que todavía queda etiquetado con esta orden. Cerrada,
+ * esas piezas ya no se mueven a mano, no se traspasan ni se reclasifican (sólo el conteo cíclico o
+ * reabrir), así que la pantalla AVISA —no bloquea— para que se muevan antes. Es suma directa de los
+ * movimientos de PT (D3), nunca la vista.
+ */
+export const esquemaOrdenPreviaCierre = z
+  .object({
+    idOrden: z.number().int().describe('Id de la orden.'),
+    folio: z.number().int().describe('Folio de la orden.'),
+    piezasPt: z
+      .number()
+      .int()
+      .describe(
+        'Piezas de producto terminado que siguen etiquetadas con esta orden (Σ de los saldos ' +
+          'POSITIVOS por artículo y almacén, suma directa de movimientos — D3). 0 = no queda nada.',
+      ),
+    porAlmacen: z
+      .array(
+        z.object({
+          idAlmacen: z.number().int().describe('Id del almacén.'),
+          almacen: z.string().describe('Nombre del almacén.'),
+          piezas: z.number().int().describe('Piezas de la orden en ese almacén (> 0).'),
+        }),
+      )
+      .describe('Dónde están esas piezas (sólo almacenes con saldo positivo).'),
+  })
+  .describe('Lo que conviene saber antes de cerrar una orden (C8: producto terminado que queda).');
+
+/** Forma de la previa del cierre en la API. */
+export type OrdenPreviaCierre = z.infer<typeof esquemaOrdenPreviaCierre>;
+
 // ── Referencias (D7 — campos de cliente) ─────────────────────────────────────────────
 
 /** Un valor de referencia: el `ClienteCampo` (ACTIVO, del cliente de la orden) + su valor. */

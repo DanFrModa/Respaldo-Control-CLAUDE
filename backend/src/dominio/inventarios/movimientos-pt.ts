@@ -262,8 +262,9 @@ const incluirMovimiento = {
       color: { select: { nombre: true } },
       talla: { select: { etiqueta: true, orden: true } },
       // §Post-F9.40 — el renglón dice de QUÉ orden salieron las piezas: el folio se muestra en la
-      // respuesta (null = bucket «sin orden»).
-      orden: { select: { folio: true } },
+      // respuesta (null = bucket «sin orden»). 0.226b: y si está CERRADA (la pantalla avisa antes de
+      // ofrecer cancelar el movimiento).
+      orden: { select: { folio: true, cerradaEn: true } },
     },
   },
 } satisfies Prisma.MovimientoInclude;
@@ -282,6 +283,7 @@ function aMovimientoSalida(m: MovimientoConDetalle): MovimientoPtSalida {
       color: string;
       idOrden: number | null;
       folioOrden: number | null;
+      ordenCerrada: boolean;
       tallas: MovimientoConDetalle['detallesPt'];
     }
   >();
@@ -294,6 +296,7 @@ function aMovimientoSalida(m: MovimientoConDetalle): MovimientoPtSalida {
       color: det.color.nombre,
       idOrden: det.idOrden,
       folioOrden: det.orden === null ? null : Number(det.orden.folio),
+      ordenCerrada: det.orden !== null && det.orden.cerradaEn !== null,
       tallas: [],
     };
     grupo.tallas.push(det);
@@ -316,6 +319,7 @@ function aMovimientoSalida(m: MovimientoConDetalle): MovimientoPtSalida {
       color: grupo.color,
       idOrden: grupo.idOrden,
       folioOrden: grupo.folioOrden,
+      ordenCerrada: grupo.ordenCerrada,
       tallas,
       totalPiezas: totalLinea,
     };
@@ -939,6 +943,7 @@ export async function consultarExistenciasPt(
       almacen: string;
       idOrden: number | null;
       folioOrden: bigint | null;
+      ordenCerrada: boolean;
       existencia: bigint;
       /** Renglones del UNIVERSO del filtro (window: se cuenta antes del LIMIT). */
       totalFilas: bigint;
@@ -964,6 +969,8 @@ export async function consultarExistenciasPt(
         a."nombre"      AS "almacen",
         e."id_orden"    AS "idOrden",
         o."folio"       AS "folioOrden",
+        -- 0.226b: la captura de PT avisa ANTES si el bucket es de una orden CERRADA (§Post-F9.244).
+        (o."cerrada_en" IS NOT NULL) AS "ordenCerrada",
         e."existencia"  AS "existencia",
         -- Los totales son del UNIVERSO: las funciones de ventana se evalúan ANTES del LIMIT.
         COUNT(*) OVER ()                        AS "totalFilas",
@@ -1012,6 +1019,7 @@ export async function consultarExistenciasPt(
       almacen: f.almacen,
       idOrden: f.idOrden,
       folioOrden: f.folioOrden === null ? null : Number(f.folioOrden),
+      ordenCerrada: f.ordenCerrada,
       existencia,
     };
   });

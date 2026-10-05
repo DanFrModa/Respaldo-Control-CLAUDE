@@ -124,6 +124,8 @@ const kardex: KardexTelaColor = {
       importe: null,
       origenTipo: 'movimiento-manual',
       origenId: null,
+      folioOrden: null,
+      ordenCerrada: false,
       cancelado: false,
       observaciones: 'Conteo físico inicial',
     },
@@ -487,6 +489,39 @@ describe('ExistenciasTelasColorPagina (A2 — inventario nuevo por color)', () =
     });
     fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
     expect(encabezados()).toBe(13);
+  });
+
+  it('⭐ 0.226b: la SALIDA a una orden CERRADA avisa y no se cancela (la abierta, sí)', () => {
+    const salida = {
+      ...renglonBase,
+      idMovimiento: 2,
+      folio: 2,
+      tipoMov: 'Salida a Orden',
+      direccion: 'salida' as const,
+      origenTipo: 'salida-tela-orden',
+      origenId: '50',
+      folioOrden: 1515,
+      ordenCerrada: true,
+    };
+    useKardexTelaColor.mockImplementation((q) =>
+      q === undefined
+        ? { data: undefined, isPending: true, isError: false }
+        : {
+            data: { ...kardex, renglones: [renglonBase, salida] },
+            isPending: false,
+            isError: false,
+          },
+    );
+    renderConProveedores(<ExistenciasTelasColorPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    fireEvent.doubleClick(screen.getByTestId('telas-color-fila-11'));
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1515 está cerrada/,
+    );
+    expect(screen.getByTestId('kardex-color-cancelar-2')).toBeDisabled();
+    // El movimiento manual (sin orden) se sigue cancelando.
+    expect(screen.getByTestId('kardex-color-cancelar-1')).toBeEnabled();
   });
 
   it('sin permiso de mover, el kardex NO ofrece cancelar', () => {

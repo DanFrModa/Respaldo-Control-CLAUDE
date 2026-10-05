@@ -79,6 +79,12 @@ export interface OpcionOrdenExistencia {
    * un tope: a una orden vacía sí se le pueden meter piezas—, por eso ahí no se muestra.
    */
   existencia: number;
+  /**
+   * ⭐ 0.226b (§Post-F9.244): la orden de ese bucket está CERRADA — sus piezas se consultan pero no
+   * se mueven ni se traspasan. Se OFRECE igual (marcada), nunca se esconde: el estado es
+   * informativo, no una llave (ver `SelectorOrden`). Ausente = abierta o «sin orden».
+   */
+  ordenCerrada?: boolean;
 }
 
 /**
@@ -95,7 +101,12 @@ export interface OpcionOrdenExistencia {
  *    diría "no hay existencia" con la mercancía físicamente en el almacén.
  */
 export function ordenesConExistencia(
-  filas: readonly { idOrden: number | null; folioOrden: number | null; existencia: number }[],
+  filas: readonly {
+    idOrden: number | null;
+    folioOrden: number | null;
+    existencia: number;
+    ordenCerrada?: boolean;
+  }[],
   opciones: { incluirCeros?: boolean } = {},
 ): OpcionOrdenExistencia[] {
   const incluirCeros = opciones.incluirCeros ?? false;
@@ -109,6 +120,7 @@ export function ordenesConExistencia(
         idOrden: f.idOrden,
         folioOrden: f.folioOrden,
         existencia: f.existencia,
+        ...(f.ordenCerrada === true ? { ordenCerrada: true } : {}),
       });
     } else {
       acumulado.existencia += f.existencia;

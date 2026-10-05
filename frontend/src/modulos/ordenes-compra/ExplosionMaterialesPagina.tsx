@@ -10,7 +10,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -28,6 +28,7 @@ import {
   imprimirExplosion,
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 // ⭐ V1-E4d (§Post-F9.96): el alta de dirección se hace con EL MISMO diálogo del catálogo. Una
 // segunda forma de capturar lo mismo es cómo dos pantallas acaban validando distinto.
@@ -108,6 +109,15 @@ const OPCION_NUEVA_DIRECCION = 'nueva';
  * ⭐ V1-E3h (§Post-F9.72): la explosión sale SOLO de los renglones que Desarrollo firmó — y lo que
  * quedó fuera se enseña aquí, con nombre y cantidad.
  */
+/**
+ * ⭐ 0.226b (§Post-F9.244) — las órdenes CERRADAS de la explosión (id → folio). Se explotan y se
+ * consultan igual (decisión 3 de Daniel: *marca, no esconde*), pero asignarles proveedor —de a uno o
+ * en bloque— o decir el color de su tela lo rechaza el servidor desde la 0.226a. La página lo sabe
+ * por `ordenCerrada` de cada OP y lo reparte por contexto a las formas de los renglones, para que
+ * apaguen esas acciones y lo digan ANTES, en vez de dejar que el comprador se entere al guardar.
+ */
+const OrdenesCerradasDeLaExplosion = createContext<ReadonlyMap<number, number>>(new Map());
+
 export function ExplosionMaterialesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const { tienePermiso } = useSesion();
@@ -916,6 +926,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   }
 
   const datos = explosion.data;
+  const cerradas: ReadonlyMap<number, number> = new Map(
+    (datos?.ordenes ?? []).filter((o) => o.ordenCerrada).map((o) => [o.idOrden, o.folio]),
+  );
   const renglones = (datos?.grupos ?? []).flatMap((g) => g.renglones);
   // ⭐ V1-E3q — lo COMPRABLE es lo PENDIENTE (ya neteado contra las OC vivas), no lo requerido.
   const comprables = renglones.filter(
@@ -1012,179 +1025,180 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         'grupo de materiales.';
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            Explosión de materiales · MRP
-          </h1>
-          <p className="truncate text-[12.5px] text-muted-foreground">
-            Qué y cuánto comprar (make-to-order), agrupado por proveedor — una compra puede cubrir
-            varias órdenes de producción
-          </p>
+    <OrdenesCerradasDeLaExplosion.Provider value={cerradas}>
+      <div className="flex h-full flex-col">
+        <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Explosión de materiales · MRP
+            </h1>
+            <p className="truncate text-[12.5px] text-muted-foreground">
+              Qué y cuánto comprar (make-to-order), agrupado por proveedor — una compra puede cubrir
+              varias órdenes de producción
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
-        {plan !== null ? (
-          <RevisionPrevia
-            plan={plan}
-            revision={revisionPlan}
-            generando={generar.isPending}
-            recalculando={previo.isPending}
-            errorRecalculo={previo.isError ? previo.error.message : null}
-            error={generar.isError ? generar.error.message : null}
-            onVolver={cerrarPrevia}
-            onConfirmar={confirmarGeneracion}
-            onAjustar={ajustarDesdeLaPrevia}
-          />
-        ) : (
-          <>
-            {/* Paso 1: armar el conjunto de OP */}
-            <div className="max-w-3xl space-y-2">
-              <label htmlFor="exp-buscar-orden" className="text-sm font-medium">
-                Órdenes de producción de esta compra
-              </label>
-              <Input
-                id="exp-buscar-orden"
-                type="search"
-                placeholder="Buscar por folio, modelo o cliente…"
-                value={textoBusqueda}
-                onChange={(e) => setTextoBusqueda(e.target.value)}
-                data-testid="exp-buscar-orden"
-              />
-              <div className="max-h-48 overflow-y-auto rounded-md border">
-                {ordenes.isPending ? (
-                  <p className="p-3 text-sm text-muted-foreground">Cargando órdenes…</p>
-                ) : ordenes.isError ? (
-                  <p className="p-3 text-sm text-destructive">{ordenes.error.message}</p>
-                ) : (ordenes.data?.datos ?? []).length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">
-                    No hay órdenes que coincidan con la búsqueda.
-                  </p>
-                ) : (
-                  <ul data-testid="exp-lista-ordenes">
-                    {(ordenes.data?.datos ?? []).map((o) => {
-                      const yaEsta = idsOrden.includes(o.id);
-                      return (
-                        <li key={o.id}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              idsOrden.length === 0 ? elegirOrdenBase(o.id) : agregarOrden(o.id)
-                            }
-                            disabled={yaEsta}
-                            aria-pressed={yaEsta}
-                            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50 ${
-                              yaEsta ? 'bg-primary-soft' : ''
-                            }`}
-                            data-testid="exp-orden-opcion"
-                            data-orden={o.id}
-                          >
-                            <span className="flex items-center gap-1.5 font-medium">
-                              {idsOrden.length > 0 && !yaEsta ? (
-                                <Plus className="size-3.5" aria-hidden />
-                              ) : null}
-                              Orden {o.folio}
-                            </span>
-                            <span className="truncate text-muted-foreground">
-                              {o.codigoModelo} · {o.cliente}
-                              {yaEsta ? ' · ya está en la compra' : ''}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+          {plan !== null ? (
+            <RevisionPrevia
+              plan={plan}
+              revision={revisionPlan}
+              generando={generar.isPending}
+              recalculando={previo.isPending}
+              errorRecalculo={previo.isError ? previo.error.message : null}
+              error={generar.isError ? generar.error.message : null}
+              onVolver={cerrarPrevia}
+              onConfirmar={confirmarGeneracion}
+              onAjustar={ajustarDesdeLaPrevia}
+            />
+          ) : (
+            <>
+              {/* Paso 1: armar el conjunto de OP */}
+              <div className="max-w-3xl space-y-2">
+                <label htmlFor="exp-buscar-orden" className="text-sm font-medium">
+                  Órdenes de producción de esta compra
+                </label>
+                <Input
+                  id="exp-buscar-orden"
+                  type="search"
+                  placeholder="Buscar por folio, modelo o cliente…"
+                  value={textoBusqueda}
+                  onChange={(e) => setTextoBusqueda(e.target.value)}
+                  data-testid="exp-buscar-orden"
+                />
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {ordenes.isPending ? (
+                    <p className="p-3 text-sm text-muted-foreground">Cargando órdenes…</p>
+                  ) : ordenes.isError ? (
+                    <p className="p-3 text-sm text-destructive">{ordenes.error.message}</p>
+                  ) : (ordenes.data?.datos ?? []).length === 0 ? (
+                    <p className="p-3 text-sm text-muted-foreground">
+                      No hay órdenes que coincidan con la búsqueda.
+                    </p>
+                  ) : (
+                    <ul data-testid="exp-lista-ordenes">
+                      {(ordenes.data?.datos ?? []).map((o) => {
+                        const yaEsta = idsOrden.includes(o.id);
+                        return (
+                          <li key={o.id}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                idsOrden.length === 0 ? elegirOrdenBase(o.id) : agregarOrden(o.id)
+                              }
+                              disabled={yaEsta}
+                              aria-pressed={yaEsta}
+                              className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50 ${
+                                yaEsta ? 'bg-primary-soft' : ''
+                              }`}
+                              data-testid="exp-orden-opcion"
+                              data-orden={o.id}
+                            >
+                              <span className="flex items-center gap-1.5 font-medium">
+                                {idsOrden.length > 0 && !yaEsta ? (
+                                  <Plus className="size-3.5" aria-hidden />
+                                ) : null}
+                                Orden {o.folio}
+                              </span>
+                              <span className="truncate text-muted-foreground">
+                                {o.codigoModelo} · {o.cliente}
+                                {yaEsta ? ' · ya está en la compra' : ''}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
 
-              {/* ⭐ V1-E3q — LAS OP ELEGIDAS, con su pedido interno y el botón de quitar. */}
-              {idsOrden.length > 0 ? (
-                <div className="space-y-1" data-testid="exp-ops-elegidas">
-                  <p className="text-xs text-muted-foreground">
-                    {idsOrden.length === 1
-                      ? 'Comprando para 1 orden de producción.'
-                      : `Comprando para ${String(idsOrden.length)} órdenes de producción — las cantidades se agrupan, pero cada una se guarda con su OP.`}
-                    {delPedido.data?.folioPedido != null && idsOrden.length > 1
-                      ? ` Precargadas del pedido interno ${String(delPedido.data.folioPedido)}; quita las que no vayan.`
-                      : ''}
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {/* ⚠️ Los chips salen de `idsOrden` —lo que el usuario eligió—, NO de la
+                {/* ⭐ V1-E3q — LAS OP ELEGIDAS, con su pedido interno y el botón de quitar. */}
+                {idsOrden.length > 0 ? (
+                  <div className="space-y-1" data-testid="exp-ops-elegidas">
+                    <p className="text-xs text-muted-foreground">
+                      {idsOrden.length === 1
+                        ? 'Comprando para 1 orden de producción.'
+                        : `Comprando para ${String(idsOrden.length)} órdenes de producción — las cantidades se agrupan, pero cada una se guarda con su OP.`}
+                      {delPedido.data?.folioPedido != null && idsOrden.length > 1
+                        ? ` Precargadas del pedido interno ${String(delPedido.data.folioPedido)}; quita las que no vayan.`
+                        : ''}
+                    </p>
+                    <ul className="flex flex-wrap gap-1.5">
+                      {/* ⚠️ Los chips salen de `idsOrden` —lo que el usuario eligió—, NO de la
                         respuesta de la explosión: mientras ésta se recalcula (o si falla) la
                         respuesta trae el conjunto ANTERIOR, y pintar eso enseñaría OP que ya se
                         quitaron y escondería las recién agregadas. El nombre bonito se busca en la
                         respuesta cuando ya llegó; si no, se dice el id y no se inventa nada. */}
-                    {idsOrden
-                      .map((id) => {
-                        const ficha = ordenesElegidas.find((o) => o.idOrden === id);
-                        return {
-                          id,
-                          etiqueta:
-                            ficha === undefined
-                              ? `Orden #${String(id)}`
-                              : `Orden ${String(ficha.folio)} · ${ficha.modelo}`,
-                        };
-                      })
-                      .map((o) => (
-                        <li
-                          key={o.id}
-                          className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
-                          data-testid="exp-op-chip"
-                          data-orden={o.id}
-                        >
-                          <span>{o.etiqueta}</span>
-                          <button
-                            type="button"
-                            aria-label={`Quitar ${o.etiqueta} de la compra`}
-                            onClick={() => quitarOrden(o.id)}
-                            data-testid="exp-quitar-op"
+                      {idsOrden
+                        .map((id) => {
+                          const ficha = ordenesElegidas.find((o) => o.idOrden === id);
+                          return {
+                            id,
+                            etiqueta:
+                              ficha === undefined
+                                ? `Orden #${String(id)}`
+                                : `Orden ${String(ficha.folio)} · ${ficha.modelo}`,
+                          };
+                        })
+                        .map((o) => (
+                          <li
+                            key={o.id}
+                            className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                            data-testid="exp-op-chip"
+                            data-orden={o.id}
                           >
-                            <X className="size-3.5" aria-hidden />
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
+                            <span>{o.etiqueta}</span>
+                            <button
+                              type="button"
+                              aria-label={`Quitar ${o.etiqueta} de la compra`}
+                              onClick={() => quitarOrden(o.id)}
+                              data-testid="exp-quitar-op"
+                            >
+                              <X className="size-3.5" aria-hidden />
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
 
-            {/* Paso 2: explosión */}
-            {idsOrden.length > 0 ? (
-              <div className="mt-6">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <ShoppingCart className="size-4" aria-hidden />
-                    Materiales requeridos
-                    {datos
-                      ? ` · ${String(datos.ordenes.length)} OP · ${datos.totalPiezas} pzas`
-                      : ''}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
+              {/* Paso 2: explosión */}
+              {idsOrden.length > 0 ? (
+                <div className="mt-6">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <ShoppingCart className="size-4" aria-hidden />
+                      Materiales requeridos
+                      {datos
+                        ? ` · ${String(datos.ordenes.length)} OP · ${datos.totalPiezas} pzas`
+                        : ''}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
                         liberada el servidor contesta 409 y la descarga reventaba sin decir por qué.
                         Si la explosión no cargó, el botón se apaga y lo explica en el tooltip.
                         Con varias OP imprime la PRIMERA (el impreso es de una orden). */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={datos === undefined}
-                      title={
-                        datos === undefined
-                          ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
-                          : idsOrden.length > 1
-                            ? 'El impreso es por orden: se imprime la primera del conjunto.'
-                            : undefined
-                      }
-                      onClick={() => {
-                        if (datos !== undefined) imprimirExplosion(datos.idOrden);
-                      }}
-                      data-testid="exp-imprimir"
-                    >
-                      <Printer aria-hidden /> Imprimir
-                    </Button>
-                    {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={datos === undefined}
+                        title={
+                          datos === undefined
+                            ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
+                            : idsOrden.length > 1
+                              ? 'El impreso es por orden: se imprime la primera del conjunto.'
+                              : undefined
+                        }
+                        onClick={() => {
+                          if (datos !== undefined) imprimirExplosion(datos.idOrden);
+                        }}
+                        data-testid="exp-imprimir"
+                      >
+                        <Printer aria-hidden /> Imprimir
+                      </Button>
+                      {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
                         §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
                         llevar la suya en su propio grupo, y la suya GANA.
 
@@ -1197,24 +1211,24 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         dice cuándo se le entrega al CLIENTE, no cuándo tiene que llegar la TELA.
                         Ahora se reclama SIEMPRE que falte —gris al abrir, amarillo al intentar
                         generar (§Post-F9.96)—, traigan o no fecha las OP. */}
-                    <label className="text-xs text-muted-foreground">
-                      Entrega (inicial)
-                      <Input
-                        ref={campoFecha}
-                        className="mt-1"
-                        type="date"
-                        value={fechaEntrega}
-                        onChange={(e) => {
-                          // Tocar la fecha baja la marca del intento: el amarillo es la consecuencia
-                          // de no llenarla, no una etiqueta permanente (M12/M13 de V1-E4d).
-                          setIntentoSinFecha(false);
-                          setFechaEntrega(e.target.value);
-                        }}
-                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha. Obligatoria: no se hereda de la orden de producción."
-                        data-testid="exp-fecha-entrega"
-                      />
-                    </label>
-                    {/* ⭐⭐ **V1-E4d (§Post-F9.96) — EL LUGAR PARA DECIR A DÓNDE SE ENTREGA ESTÁ
+                      <label className="text-xs text-muted-foreground">
+                        Entrega (inicial)
+                        <Input
+                          ref={campoFecha}
+                          className="mt-1"
+                          type="date"
+                          value={fechaEntrega}
+                          onChange={(e) => {
+                            // Tocar la fecha baja la marca del intento: el amarillo es la consecuencia
+                            // de no llenarla, no una etiqueta permanente (M12/M13 de V1-E4d).
+                            setIntentoSinFecha(false);
+                            setFechaEntrega(e.target.value);
+                          }}
+                          title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha. Obligatoria: no se hereda de la orden de producción."
+                          data-testid="exp-fecha-entrega"
+                        />
+                      </label>
+                      {/* ⭐⭐ **V1-E4d (§Post-F9.96) — EL LUGAR PARA DECIR A DÓNDE SE ENTREGA ESTÁ
                         AQUÍ, NO EN OTRA PANTALLA.** Daniel: *"primero que dé la opción de meterlo"*.
                         El selector ya existía; lo que faltaba era **la salida cuando el catálogo
                         está vacío**, que hasta hoy era un enlace que te sacaba de la compra (y al
@@ -1238,63 +1252,66 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         dirección real, y **se pinta aunque el catálogo esté vacío** —es justo
                         cuando más se necesita: esconder la única puerta detrás de una lista sin
                         elementos dejaría al comprador sin salida—. */}
-                    <label className="text-xs text-muted-foreground">
-                      Entregar en
-                      <SelectNativo
-                        ref={selectDireccion}
-                        className="mt-1"
-                        value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
-                        onChange={(e) => {
-                          if (e.target.value === OPCION_NUEVA_DIRECCION) {
-                            // No se elige nada: se abre el alta. El `value` sigue controlado por
-                            // `direccionEfectiva`, así que si el diálogo se cancela el desplegable
-                            // vuelve solo a lo que estaba —nunca se queda mostrando «＋ Nueva…».
-                            setAltaDireccion(true);
-                            return;
-                          }
-                          setIntentoSinDireccion(false);
-                          setIdDireccionEntrega(
-                            e.target.value === '' ? null : Number(e.target.value),
-                          );
-                        }}
-                        data-testid="exp-direccion-entrega"
-                      >
-                        <option value="">
-                          {direcciones.isError
-                            ? 'No se pudo consultar el catálogo'
-                            : listaDirecciones.length === 0
-                              ? 'Sin direcciones dadas de alta'
-                              : 'La de siempre'}
-                        </option>
-                        {listaDirecciones.map((d) => (
-                          <option key={d.id} value={String(d.id)}>
-                            {d.nombre}
+                      <label className="text-xs text-muted-foreground">
+                        Entregar en
+                        <SelectNativo
+                          ref={selectDireccion}
+                          className="mt-1"
+                          value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
+                          onChange={(e) => {
+                            if (e.target.value === OPCION_NUEVA_DIRECCION) {
+                              // No se elige nada: se abre el alta. El `value` sigue controlado por
+                              // `direccionEfectiva`, así que si el diálogo se cancela el desplegable
+                              // vuelve solo a lo que estaba —nunca se queda mostrando «＋ Nueva…».
+                              setAltaDireccion(true);
+                              return;
+                            }
+                            setIntentoSinDireccion(false);
+                            setIdDireccionEntrega(
+                              e.target.value === '' ? null : Number(e.target.value),
+                            );
+                          }}
+                          data-testid="exp-direccion-entrega"
+                        >
+                          <option value="">
+                            {direcciones.isError
+                              ? 'No se pudo consultar el catálogo'
+                              : listaDirecciones.length === 0
+                                ? 'Sin direcciones dadas de alta'
+                                : 'La de siempre'}
                           </option>
-                        ))}
-                        {/* §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` la opción
+                          {listaDirecciones.map((d) => (
+                            <option key={d.id} value={String(d.id)}>
+                              {d.nombre}
+                            </option>
+                          ))}
+                          {/* §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` la opción
                             no se pinta (mismo trato que el botón al que sustituye), y el servidor
                             rechaza el alta igual. */}
-                        {puedeComprar ? (
-                          <>
-                            {listaDirecciones.length > 0 ? (
-                              <option disabled data-testid="exp-separador-direccion">
-                                ──────────
+                          {puedeComprar ? (
+                            <>
+                              {listaDirecciones.length > 0 ? (
+                                <option disabled data-testid="exp-separador-direccion">
+                                  ──────────
+                                </option>
+                              ) : null}
+                              <option
+                                value={OPCION_NUEVA_DIRECCION}
+                                data-testid="exp-alta-direccion"
+                              >
+                                ＋ Nueva dirección…
                               </option>
-                            ) : null}
-                            <option value={OPCION_NUEVA_DIRECCION} data-testid="exp-alta-direccion">
-                              ＋ Nueva dirección…
-                            </option>
-                          </>
-                        ) : null}
-                      </SelectNativo>
-                    </label>
-                    {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
-                     *"Una revisión previa es indispensable"* (Daniel). */}
-                    {puedeComprar ? (
-                      <Button
-                        size="sm"
-                        onClick={revisar}
-                        /* ⭐⭐ **V1-E4d — EL BOTÓN YA NO SE APAGA POR NO TENER NADA QUE COMPRAR, Y
+                            </>
+                          ) : null}
+                        </SelectNativo>
+                      </label>
+                      {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
+                       *"Una revisión previa es indispensable"* (Daniel). */}
+                      {puedeComprar ? (
+                        <Button
+                          size="sm"
+                          onClick={revisar}
+                          /* ⭐⭐ **V1-E4d — EL BOTÓN YA NO SE APAGA POR NO TENER NADA QUE COMPRAR, Y
                            ÉSA ES LA MITAD DEL ARREGLO.** Mientras estuvo apagado, la única manera
                            de decir por qué era un cartel amarillo en la entrada
                            (`exp-motivo-sin-oc`) — el regaño antes del trabajo. Ahora el clic va al
@@ -1305,31 +1322,31 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
                            Sigue apagado mientras el servidor prepara el plan (`isPending`): dos
                            planes en vuelo es justo lo que V1-E3z vino a cerrar. */
-                        disabled={previo.isPending}
-                        // V1-E3m: el botón dice qué falta también al pasar el ratón.
-                        title={
-                          avisoFecha !== null
-                            ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
-                            : (avisoDireccion?.bloquea ?? false)
-                              ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
-                              : (motivoSinOc ?? undefined)
-                        }
-                        data-testid="exp-generar-oc"
-                      >
-                        <ClipboardCheck aria-hidden />
-                        {previo.isPending ? 'Preparando…' : 'Revisar y generar OC'}
-                      </Button>
-                    ) : null}
+                          disabled={previo.isPending}
+                          // V1-E3m: el botón dice qué falta también al pasar el ratón.
+                          title={
+                            avisoFecha !== null
+                              ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
+                              : (avisoDireccion?.bloquea ?? false)
+                                ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
+                                : (motivoSinOc ?? undefined)
+                          }
+                          data-testid="exp-generar-oc"
+                        >
+                          <ClipboardCheck aria-hidden />
+                          {previo.isPending ? 'Preparando…' : 'Revisar y generar OC'}
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
 
-                {previo.isError ? (
-                  <p className="mb-3 text-sm text-destructive" data-testid="exp-error-previo">
-                    {previo.error.message}
-                  </p>
-                ) : null}
+                  {previo.isError ? (
+                    <p className="mb-3 text-sm text-destructive" data-testid="exp-error-previo">
+                      {previo.error.message}
+                    </p>
+                  ) : null}
 
-                {/* ⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA: EL SEGUNDO QUE BLOQUEA.**
+                  {/* ⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA: EL SEGUNDO QUE BLOQUEA.**
                     Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha
                     de entrega a fuerzas**"*. Una OC sin fecha no le pide nada al proveedor: dice
                     *qué* y *cuánto*, pero no *cuándo* — y sin *cuándo* no hay compromiso que
@@ -1339,22 +1356,22 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     instrucción gris al abrir, amarillo sólo al intentar generar sin llenarla, y el
                     foco al campo. Va justo encima de la dirección porque ése es el orden de la
                     barra. */}
-                {avisoFecha !== null ? (
-                  <p
-                    className={
-                      intentoSinFecha
-                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
-                        : 'mb-3 text-xs text-muted-foreground'
-                    }
-                    data-testid="exp-falta-fecha"
-                    data-tono={intentoSinFecha ? 'aviso' : 'instruccion'}
-                  >
-                    {intentoSinFecha ? <b>No se pueden generar las OC todavía: </b> : null}
-                    {avisoFecha}
-                  </p>
-                ) : null}
+                  {avisoFecha !== null ? (
+                    <p
+                      className={
+                        intentoSinFecha
+                          ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                          : 'mb-3 text-xs text-muted-foreground'
+                      }
+                      data-testid="exp-falta-fecha"
+                      data-tono={intentoSinFecha ? 'aviso' : 'instruccion'}
+                    >
+                      {intentoSinFecha ? <b>No se pueden generar las OC todavía: </b> : null}
+                      {avisoFecha}
+                    </p>
+                  ) : null}
 
-                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL OTRO QUE BLOQUEA (V1-E4f le sumó
+                  {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL OTRO QUE BLOQUEA (V1-E4f le sumó
                     la fecha, aquí arriba), Y SE RESUELVE AQUÍ.** Daniel, 23-ago-2026, confirmando
                     la regla: **no se genera una OC sin decir a dónde se entrega**. Lo que cambió no es que bloquee, es DÓNDE se
                     arregla y CUÁNDO se dice:
@@ -1370,41 +1387,41 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     🔴 No es cosmética: recibir de amarillo a alguien que **acaba de abrir la
                     pantalla** es afirmar que ya hizo algo mal. Va justo debajo de su control, NO
                     apilado antes del primer renglón con los demás. */}
-                {avisoDireccion !== null ? (
-                  <p
-                    className={
-                      avisoDireccion.bloquea && intentoSinDireccion
-                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
-                        : 'mb-3 text-xs text-muted-foreground'
-                    }
-                    data-testid="exp-falta-direccion"
-                    data-tono={
-                      avisoDireccion.bloquea && intentoSinDireccion ? 'aviso' : 'instruccion'
-                    }
-                  >
-                    {avisoDireccion.bloquea && intentoSinDireccion ? (
-                      <b>No se pueden generar las OC todavía: </b>
-                    ) : null}
-                    {avisoDireccion.texto}{' '}
-                    {avisoDireccion.enlace ? (
-                      <Link className="underline" to="/catalogos/direcciones-entrega">
-                        Abrir el catálogo de direcciones de entrega
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        className="underline"
-                        onClick={() => void direcciones.refetch()}
-                        data-testid="exp-reintentar-direcciones"
-                      >
-                        Reintentar
-                      </button>
-                    )}
-                    .
-                  </p>
-                ) : null}
+                  {avisoDireccion !== null ? (
+                    <p
+                      className={
+                        avisoDireccion.bloquea && intentoSinDireccion
+                          ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                          : 'mb-3 text-xs text-muted-foreground'
+                      }
+                      data-testid="exp-falta-direccion"
+                      data-tono={
+                        avisoDireccion.bloquea && intentoSinDireccion ? 'aviso' : 'instruccion'
+                      }
+                    >
+                      {avisoDireccion.bloquea && intentoSinDireccion ? (
+                        <b>No se pueden generar las OC todavía: </b>
+                      ) : null}
+                      {avisoDireccion.texto}{' '}
+                      {avisoDireccion.enlace ? (
+                        <Link className="underline" to="/catalogos/direcciones-entrega">
+                          Abrir el catálogo de direcciones de entrega
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => void direcciones.refetch()}
+                          data-testid="exp-reintentar-direcciones"
+                        >
+                          Reintentar
+                        </button>
+                      )}
+                      .
+                    </p>
+                  ) : null}
 
-                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LOS TRES QUE NO ERAN AVISOS, EN UNA LÍNEA.**
+                  {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LOS TRES QUE NO ERAN AVISOS, EN UNA LÍNEA.**
                     Aquí vivían, en tres cajas de colores apiladas antes del primer renglón:
                     «N material(es) por comprar» (azul), «N ya están cubiertos por OC vivas» (verde)
                     y «El BOM cambió desde la última explosión» (AMARILLO). Ninguno reportaba un
@@ -1417,17 +1434,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     donde de verdad se usa: el nombre de lo ya comprado, en su renglón («Ya
                     comprado») y en los omitidos de la revisión previa; y qué cambió, en la etiqueta
                     del renglón. */}
-                {datos !== undefined ? (
-                  <p className="mb-3 text-xs text-muted-foreground" data-testid="exp-resumen">
-                    {comprables.length > 0 ? (
-                      <>
-                        <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
-                        las OC antes de generarlas (una por proveedor).
-                      </>
-                    ) : (
-                      'No hay nada por comprar en esta selección; cada material dice abajo en qué situación está.'
-                    )}
-                    {/* 🔴 **V1-E4d, 2ª vuelta — EL HECHO QUE NO PODÍA PERDERSE: LA COMPRA PARCIAL.**
+                  {datos !== undefined ? (
+                    <p className="mb-3 text-xs text-muted-foreground" data-testid="exp-resumen">
+                      {comprables.length > 0 ? (
+                        <>
+                          <b>{comprables.length}</b> material(es) por comprar — selecciónalos y
+                          revisa las OC antes de generarlas (una por proveedor).
+                        </>
+                      ) : (
+                        'No hay nada por comprar en esta selección; cada material dice abajo en qué situación está.'
+                      )}
+                      {/* 🔴 **V1-E4d, 2ª vuelta — EL HECHO QUE NO PODÍA PERDERSE: LA COMPRA PARCIAL.**
                         El aviso que se retiró (`exp-parcial-sin-proveedor`) NO era un duplicado del
                         otro: eran **mutuamente excluyentes** —uno salía con `comprables === 0` y
                         éste con `comprables > 0`— y decían cosas distintas. Éste es el caso
@@ -1436,168 +1453,177 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         varios exige dos o más, y el título del botón calla porque sí hay comprables.
                         El aviso amarillo no vuelve —Daniel tiene razón: no es un error, es un
                         hecho—, pero el HECHO sí, en gris y junto a los demás. */}
-                    {sinProveedor.length > 0
-                      ? ` · ${String(sinProveedor.length)} sin proveedor: NO entran en esta compra (asígnaselo en su renglón).`
-                      : ''}
-                    {yaEnOc.length > 0
-                      ? ` · ${String(yaEnOc.length)} ya cubierto(s) por OC vivas: no se vuelven a proponer (si esa OC se cancela, reaparecen).`
-                      : ''}
-                    {datos.huboCambios
-                      ? ' · El BOM cambió desde la última explosión: los renglones afectados están marcados.'
-                      : ''}
-                  </p>
-                ) : null}
-
-                {generar.isError ? (
-                  <p className="mb-3 text-sm text-destructive" data-testid="exp-error-generar">
-                    {generar.error.message}
-                  </p>
-                ) : null}
-                {generar.isSuccess ? (
-                  <div
-                    className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-sm text-ok"
-                    data-testid="exp-ok-generar"
-                  >
-                    <p>
-                      Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
-                      {generar.data.ordenesCompra
-                        .map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`)
-                        .join(', ')}
-                      .
+                      {sinProveedor.length > 0
+                        ? ` · ${String(sinProveedor.length)} sin proveedor: NO entran en esta compra (asígnaselo en su renglón).`
+                        : ''}
+                      {yaEnOc.length > 0
+                        ? ` · ${String(yaEnOc.length)} ya cubierto(s) por OC vivas: no se vuelven a proponer (si esa OC se cancela, reaparecen).`
+                        : ''}
+                      {datos.huboCambios
+                        ? ' · El BOM cambió desde la última explosión: los renglones afectados están marcados.'
+                        : ''}
                     </p>
-                    {/* ⭐ V1-E3q: lo que se quedó fuera se DICE. Antes se omitía en silencio. */}
-                    {generar.data.omitidos.length > 0 ? (
-                      <p className="mt-1 text-xs" data-testid="exp-omitidos-tras-generar">
-                        Se quedaron fuera {generar.data.omitidos.length} renglón(es):{' '}
-                        {generar.data.omitidos.map((o) => o.material).join(', ')}.
+                  ) : null}
+
+                  {generar.isError ? (
+                    <p className="mb-3 text-sm text-destructive" data-testid="exp-error-generar">
+                      {generar.error.message}
+                    </p>
+                  ) : null}
+                  {generar.isSuccess ? (
+                    <div
+                      className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-sm text-ok"
+                      data-testid="exp-ok-generar"
+                    >
+                      <p>
+                        Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
+                        {generar.data.ordenesCompra
+                          .map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`)
+                          .join(', ')}
+                        .
                       </p>
-                    ) : null}
-                  </div>
-                ) : null}
+                      {/* ⭐ V1-E3q: lo que se quedó fuera se DICE. Antes se omitía en silencio. */}
+                      {generar.data.omitidos.length > 0 ? (
+                        <p className="mt-1 text-xs" data-testid="exp-omitidos-tras-generar">
+                          Se quedaron fuera {generar.data.omitidos.length} renglón(es):{' '}
+                          {generar.data.omitidos.map((o) => o.material).join(', ')}.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-                {/* ⭐⭐ V1-E3x (§Post-F9.88) — el mismo proveedor a VARIOS de un golpe. Sólo
+                  {/* ⭐⭐ V1-E3x (§Post-F9.88) — el mismo proveedor a VARIOS de un golpe. Sólo
                     con 2 o más huecos: con uno solo, la forma del renglón ya alcanza. */}
-                {puedeAsignarProveedor && sinProveedor.length > 1 ? (
-                  <PanelProveedorEnBloque
-                    renglones={sinProveedor}
-                    ordenes={ordenesElegidas}
-                    guardando={asignarBloque.isPending}
-                    error={asignarBloque.isError ? asignarBloque.error.message : null}
-                    onAsignar={asignarEnBloque}
-                  />
-                ) : null}
+                  {puedeAsignarProveedor && sinProveedor.length > 1 ? (
+                    <PanelProveedorEnBloque
+                      renglones={sinProveedor}
+                      ordenes={ordenesElegidas}
+                      guardando={asignarBloque.isPending}
+                      error={asignarBloque.isError ? asignarBloque.error.message : null}
+                      onAsignar={asignarEnBloque}
+                    />
+                  ) : null}
 
-                {explosion.isPending ? (
-                  <div className="space-y-2" data-testid="exp-cargando">
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                    <Skeleton className="h-16 w-full rounded-lg" />
-                  </div>
-                ) : explosion.isError ? (
-                  <p className="text-sm text-destructive">{explosion.error.message}</p>
-                ) : (datos?.grupos ?? []).length === 0 ? (
-                  <p
-                    className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
-                    data-testid="exp-vacio"
-                  >
-                    {/* No mentir sobre la causa. */}
-                    {(datos?.pendientesLiberar ?? []).length > 0
-                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver abajo).'
-                      : 'Estas órdenes no requieren materiales (BOM vacío o sin piezas capturadas).'}
-                  </p>
-                ) : (
-                  <div className="space-y-5" data-testid="exp-grupos">
-                    {(datos?.grupos ?? []).map((grupo) => (
-                      <div
-                        key={grupo.idProveedor ?? 'sin-proveedor'}
-                        className="rounded-lg border"
-                        data-testid="exp-grupo"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
-                          <span className="font-medium">{grupo.proveedor}</span>
-                          <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                            {grupo.renglones.length} material(es)
-                            {/* ⭐ §Post-F9.71 — LA FECHA DE ESTA OC. Sólo en los grupos que SÍ
+                  {cerradas.size > 0 ? (
+                    <AvisoOrdenCerrada
+                      folios={[...cerradas.values()]}
+                      detalle="Se explotan y se consultan, pero no se les asigna proveedor ni color de tela."
+                    />
+                  ) : null}
+
+                  {explosion.isPending ? (
+                    <div className="space-y-2" data-testid="exp-cargando">
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                    </div>
+                  ) : explosion.isError ? (
+                    <p className="text-sm text-destructive">{explosion.error.message}</p>
+                  ) : (datos?.grupos ?? []).length === 0 ? (
+                    <p
+                      className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
+                      data-testid="exp-vacio"
+                    >
+                      {/* No mentir sobre la causa. */}
+                      {(datos?.pendientesLiberar ?? []).length > 0
+                        ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver abajo).'
+                        : 'Estas órdenes no requieren materiales (BOM vacío o sin piezas capturadas).'}
+                    </p>
+                  ) : (
+                    <div className="space-y-5" data-testid="exp-grupos">
+                      {(datos?.grupos ?? []).map((grupo) => (
+                        <div
+                          key={grupo.idProveedor ?? 'sin-proveedor'}
+                          className="rounded-lg border"
+                          data-testid="exp-grupo"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+                            <span className="font-medium">{grupo.proveedor}</span>
+                            <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {grupo.renglones.length} material(es)
+                              {/* ⭐ §Post-F9.71 — LA FECHA DE ESTA OC. Sólo en los grupos que SÍ
                                 generan OC: el grupo "sin proveedor sugerido" no nace de aquí. */}
-                            {grupo.idProveedor !== null ? (
-                              <label className="flex items-center gap-1.5">
-                                Entrega
-                                <Input
-                                  type="date"
-                                  className="h-8 w-[9.5rem]"
-                                  value={fechaDe(grupo.idProveedor)}
-                                  onChange={(e) =>
-                                    cambiarFechaDe(grupo.idProveedor as number, e.target.value)
+                              {grupo.idProveedor !== null ? (
+                                <label className="flex items-center gap-1.5">
+                                  Entrega
+                                  <Input
+                                    type="date"
+                                    className="h-8 w-[9.5rem]"
+                                    value={fechaDe(grupo.idProveedor)}
+                                    onChange={(e) =>
+                                      cambiarFechaDe(grupo.idProveedor as number, e.target.value)
+                                    }
+                                    aria-label={`Fecha de entrega de la OC de ${grupo.proveedor}`}
+                                    data-testid="exp-fecha-grupo"
+                                    data-proveedor={grupo.idProveedor}
+                                  />
+                                </label>
+                              ) : null}
+                            </span>
+                          </div>
+                          <ul>
+                            {grupo.renglones.map((r) => {
+                              const clave = claveAjuste(r);
+                              return (
+                                <RenglonRequerimiento
+                                  // ⭐⭐ V1-E3u: el COLOR entra en la clave. Desde §Post-F9.89 la
+                                  // misma tela sale en VARIOS renglones (uno por color) y con el
+                                  // mismo proveedor: sin el color, React ve dos hijos con la misma
+                                  // clave y reusa el DOM del uno para el otro.
+                                  key={claveRenglonExplosion(r)}
+                                  renglon={r}
+                                  multiOp={idsOrden.length > 1}
+                                  seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
+                                  onToggle={() =>
+                                    alternarRenglon(
+                                      r.idsRequerimiento,
+                                      r.idsRequerimiento.some((id) => seleccion.has(id)),
+                                    )
                                   }
-                                  aria-label={`Fecha de entrega de la OC de ${grupo.proveedor}`}
-                                  data-testid="exp-fecha-grupo"
-                                  data-proveedor={grupo.idProveedor}
+                                  ajuste={clave === null ? '' : (ajustes[clave] ?? '')}
+                                  onAjuste={(valor) => {
+                                    if (clave === null) return;
+                                    setAjustes((prev) => {
+                                      const siguiente = { ...prev };
+                                      if (valor.trim() === '') delete siguiente[clave];
+                                      else siguiente[clave] = valor;
+                                      return siguiente;
+                                    });
+                                  }}
+                                  puedeAsignar={puedeAsignarProveedor}
+                                  abierto={asignandoId === r.id}
+                                  guardando={asignar.isPending}
+                                  onAbrir={() => setAsignandoId(asignandoId === r.id ? null : r.id)}
+                                  onGuardar={(idOrden, idProveedor, precio) =>
+                                    guardarProveedor(r, idOrden, idProveedor, precio)
+                                  }
+                                  // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
+                                  puedeDecirColor={puedeComprar}
+                                  colorAbierto={colorAbiertoId === claveRenglonExplosion(r)}
+                                  onAbrirColor={() =>
+                                    setColorAbiertoId(
+                                      colorAbiertoId === claveRenglonExplosion(r)
+                                        ? null
+                                        : claveRenglonExplosion(r),
+                                    )
+                                  }
+                                  onVerTodosLosColores={setIdOrdenColores}
+                                  // ⭐⭐ V1-E8e (§Post-F9.99) — cerrar (o reabrir) el faltante que ya
+                                  // se escapó, desde su propio renglón.
+                                  puedeCubrir={puedeComprar}
+                                  cubriendo={cubrir.isPending}
+                                  onDarPorCubierto={(cubierto) =>
+                                    cambiarDadoPorCubierto(r, cubierto)
+                                  }
                                 />
-                              </label>
-                            ) : null}
-                          </span>
+                              );
+                            })}
+                          </ul>
                         </div>
-                        <ul>
-                          {grupo.renglones.map((r) => {
-                            const clave = claveAjuste(r);
-                            return (
-                              <RenglonRequerimiento
-                                // ⭐⭐ V1-E3u: el COLOR entra en la clave. Desde §Post-F9.89 la
-                                // misma tela sale en VARIOS renglones (uno por color) y con el
-                                // mismo proveedor: sin el color, React ve dos hijos con la misma
-                                // clave y reusa el DOM del uno para el otro.
-                                key={claveRenglonExplosion(r)}
-                                renglon={r}
-                                multiOp={idsOrden.length > 1}
-                                seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
-                                onToggle={() =>
-                                  alternarRenglon(
-                                    r.idsRequerimiento,
-                                    r.idsRequerimiento.some((id) => seleccion.has(id)),
-                                  )
-                                }
-                                ajuste={clave === null ? '' : (ajustes[clave] ?? '')}
-                                onAjuste={(valor) => {
-                                  if (clave === null) return;
-                                  setAjustes((prev) => {
-                                    const siguiente = { ...prev };
-                                    if (valor.trim() === '') delete siguiente[clave];
-                                    else siguiente[clave] = valor;
-                                    return siguiente;
-                                  });
-                                }}
-                                puedeAsignar={puedeAsignarProveedor}
-                                abierto={asignandoId === r.id}
-                                guardando={asignar.isPending}
-                                onAbrir={() => setAsignandoId(asignandoId === r.id ? null : r.id)}
-                                onGuardar={(idOrden, idProveedor, precio) =>
-                                  guardarProveedor(r, idOrden, idProveedor, precio)
-                                }
-                                // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
-                                puedeDecirColor={puedeComprar}
-                                colorAbierto={colorAbiertoId === claveRenglonExplosion(r)}
-                                onAbrirColor={() =>
-                                  setColorAbiertoId(
-                                    colorAbiertoId === claveRenglonExplosion(r)
-                                      ? null
-                                      : claveRenglonExplosion(r),
-                                  )
-                                }
-                                onVerTodosLosColores={setIdOrdenColores}
-                                // ⭐⭐ V1-E8e (§Post-F9.99) — cerrar (o reabrir) el faltante que ya
-                                // se escapó, desde su propio renglón.
-                                puedeCubrir={puedeComprar}
-                                cubriendo={cubrir.isPending}
-                                onDarPorCubierto={(cubierto) => cambiarDadoPorCubierto(r, cubierto)}
-                              />
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
 
-                {/* ── ⭐⭐ **V1-E4d (§Post-F9.96) — LO QUE NO ENTRA Y LO QUE HAY QUE SABER: AL
+                  {/* ── ⭐⭐ **V1-E4d (§Post-F9.96) — LO QUE NO ENTRA Y LO QUE HAY QUE SABER: AL
                     FINAL, DESPUÉS DEL TRABAJO.** Estos tres estaban arriba del primer renglón, en
                     amarillo. Ninguno se pierde: siguen completos, con su acción y sus nombres —pero
                     detrás de la lista, que es a lo que el comprador viene—. El único que conserva el
@@ -1610,142 +1636,144 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     (`avisosDeMaterialSinLiberar`, sólo por lo que de verdad se queda fuera) y las
                     telas sin color ya lo hacían desde V1-E4c. ── */}
 
-                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ (y a dónde ir a resolverlo). */}
-                {(datos?.pendientesLiberar ?? []).length > 0 ? (
-                  <div
-                    className="mt-5 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
-                    data-testid="exp-pendientes-liberar"
-                  >
-                    <p className="flex items-center gap-1.5 font-medium text-foreground">
-                      <LockOpen className="size-4 shrink-0" aria-hidden />
-                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
-                      material(es), así que NO entran en esta explosión:
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.pendientesLiberar ?? []).map((p) => (
-                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
-                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
-                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
-                          )
-                        </li>
-                      ))}
-                    </ul>
-                    {puedeIrALiberar ? (
-                      <button
-                        type="button"
-                        className="mt-1 underline"
-                        onClick={() =>
-                          void navigate('/produccion/ordenes', {
-                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
-                          })
-                        }
-                        data-testid="exp-ir-a-liberar"
-                      >
-                        Abrir la orden para liberar su receta
-                      </button>
-                    ) : (
-                      <p className="mt-1">
-                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                  {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ (y a dónde ir a resolverlo). */}
+                  {(datos?.pendientesLiberar ?? []).length > 0 ? (
+                    <div
+                      className="mt-5 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                      data-testid="exp-pendientes-liberar"
+                    >
+                      <p className="flex items-center gap-1.5 font-medium text-foreground">
+                        <LockOpen className="size-4 shrink-0" aria-hidden />
+                        Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
+                        material(es), así que NO entran en esta explosión:
                       </p>
-                    )}
-                  </div>
-                ) : null}
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {(datos?.pendientesLiberar ?? []).map((p) => (
+                          <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
+                            <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
+                            {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden{' '}
+                            {p.folioOrden})
+                          </li>
+                        ))}
+                      </ul>
+                      {puedeIrALiberar ? (
+                        <button
+                          type="button"
+                          className="mt-1 underline"
+                          onClick={() =>
+                            void navigate('/produccion/ordenes', {
+                              state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
+                            })
+                          }
+                          data-testid="exp-ir-a-liberar"
+                        >
+                          Abrir la orden para liberar su receta
+                        </button>
+                      ) : (
+                        <p className="mt-1">
+                          Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
 
-                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). El caso CRÍTICO —el modelo cambió
+                  {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). El caso CRÍTICO —el modelo cambió
                     cuando esta orden ya tiene compras— sigue en rojo: es el único de este bloque
                     donde el aviso vale más que el silencio. El resto es informativo. */}
-                {(datos?.desalineacion.hayCambios ?? false) ? (
-                  <div
-                    className={
-                      datos?.desalineacion.critico === true
-                        ? 'mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
-                        : 'mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground'
-                    }
-                    data-testid="exp-desalineacion"
-                  >
-                    <p
+                  {(datos?.desalineacion.hayCambios ?? false) ? (
+                    <div
                       className={
                         datos?.desalineacion.critico === true
-                          ? 'font-medium'
-                          : 'font-medium text-foreground'
+                          ? 'mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
+                          : 'mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground'
                       }
+                      data-testid="exp-desalineacion"
                     >
-                      {datos?.desalineacion.critico === true
-                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
-                        : 'El modelo cambió desde que esta orden congeló su receta:'}
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
-                        <li
-                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
-                          data-testid="exp-cambio-receta"
-                        >
-                          {c.detalle}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1">
-                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
-                      debe entrar, se trae a mano desde la receta de la orden.
-                    </p>
-                  </div>
-                ) : null}
+                      <p
+                        className={
+                          datos?.desalineacion.critico === true
+                            ? 'font-medium'
+                            : 'font-medium text-foreground'
+                        }
+                      >
+                        {datos?.desalineacion.critico === true
+                          ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
+                          : 'El modelo cambió desde que esta orden congeló su receta:'}
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {(datos?.desalineacion.cambios ?? []).map((c, i) => (
+                          <li
+                            key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
+                            data-testid="exp-cambio-receta"
+                          >
+                            {c.detalle}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1">
+                        La receta de la orden NO se movió (para eso está congelada). Si algún cambio
+                        debe entrar, se trae a mano desde la receta de la orden.
+                      </p>
+                    </div>
+                  ) : null}
 
-                {/* Notas del enganche (F8-E6): precios de referencia, proveedores inactivos, avíos
+                  {/* Notas del enganche (F8-E6): precios de referencia, proveedores inactivos, avíos
                     sin medida por talla… Nada truena en silencio, pero tampoco es una alarma: son
                     apuntes sobre CÓMO quedó valuada la explosión. */}
-                {(datos?.avisos ?? []).length > 0 ? (
-                  <div
-                    className="mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
-                    data-testid="exp-avisos"
-                  >
-                    <p className="font-medium text-foreground">
-                      Notas de la explosión (precios y proveedores):
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.avisos ?? []).map((aviso, i) => (
-                        <li key={i} data-testid="exp-aviso">
-                          {aviso}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
+                  {(datos?.avisos ?? []).length > 0 ? (
+                    <div
+                      className="mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                      data-testid="exp-avisos"
+                    >
+                      <p className="font-medium text-foreground">
+                        Notas de la explosión (precios y proveedores):
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {(datos?.avisos ?? []).map((aviso, i) => (
+                          <li key={i} data-testid="exp-aviso">
+                            {aviso}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
 
-      {/* ⭐⭐ V1-E4d (§Post-F9.96) — DAR DE ALTA LA DIRECCIÓN SIN SALIR DE LA COMPRA. Se monta
+        {/* ⭐⭐ V1-E4d (§Post-F9.96) — DAR DE ALTA LA DIRECCIÓN SIN SALIR DE LA COMPRA. Se monta
           sólo cuando se abre: es una forma completa (react-hook-form + Zod) y no tiene por qué
           vivir montada en una pantalla que casi siempre ya tiene su dirección. Al crearla queda
           ELEGIDA —para eso se pidió—, sin depender de que alguien acuerde marcarla favorita. */}
-      {altaDireccion ? (
-        <DialogoDireccionEntrega
-          abierto
-          alCambiarAbierto={(abierto) => {
-            if (!abierto) setAltaDireccion(false);
-          }}
-          direccion={undefined}
-          alCrear={(creada) => {
-            setIdDireccionEntrega(creada.id);
-            setIntentoSinDireccion(false);
-          }}
-        />
-      ) : null}
+        {altaDireccion ? (
+          <DialogoDireccionEntrega
+            abierto
+            alCambiarAbierto={(abierto) => {
+              if (!abierto) setAltaDireccion(false);
+            }}
+            direccion={undefined}
+            alCrear={(creada) => {
+              setIdDireccionEntrega(creada.id);
+              setIntentoSinDireccion(false);
+            }}
+          />
+        ) : null}
 
-      {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
-      <DialogoColoresDeTela
-        abierto={idOrdenColores !== null}
-        alCambiarAbierto={(abierto) => {
-          if (!abierto) setIdOrdenColores(null);
-        }}
-        idOrden={idOrdenColores ?? undefined}
-        folioOrden={datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined}
-        puedeEditar={puedeComprar}
-      />
-    </div>
+        {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
+        <DialogoColoresDeTela
+          abierto={idOrdenColores !== null}
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setIdOrdenColores(null);
+          }}
+          idOrden={idOrdenColores ?? undefined}
+          folioOrden={datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined}
+          puedeEditar={puedeComprar}
+          ordenCerrada={idOrdenColores !== null && cerradas.has(idOrdenColores)}
+        />
+      </div>
+    </OrdenesCerradasDeLaExplosion.Provider>
   );
 }
 
@@ -2920,6 +2948,10 @@ function FormaAsignarProveedor({
   const [precio, setPrecio] = useState('');
   const [idOrden, setIdOrden] = useState<number>(renglon.porOrden[0]?.idOrden ?? 0);
   const yaAsignado = renglon.origenProveedor === 'asignado-compras';
+  // ⭐ 0.226b: a una orden CERRADA no se le asigna proveedor (lo rechaza el servidor desde la 0.226a).
+  const cerradas = useContext(OrdenesCerradasDeLaExplosion);
+  const folioCerrada = cerradas.get(idOrden);
+  const ordenCerrada = folioCerrada !== undefined;
 
   function guardar(): void {
     if (elegido === null || idOrden === 0) {
@@ -2949,6 +2981,8 @@ function FormaAsignarProveedor({
             {renglon.porOrden.map((l) => (
               <option key={l.idOrden} value={String(l.idOrden)}>
                 Orden {l.folioOrden}
+                {/* 0.226b: informativo, nunca un filtro. */}
+                {cerradas.has(l.idOrden) ? ' · Cerrada' : ''}
               </option>
             ))}
           </SelectNativo>
@@ -2973,10 +3007,11 @@ function FormaAsignarProveedor({
           data-testid="exp-precio-asignar"
         />
       </div>
+      {ordenCerrada ? <AvisoOrdenCerrada folios={[folioCerrada]} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
-          disabled={elegido === null || guardando}
+          disabled={elegido === null || guardando || ordenCerrada}
           onClick={guardar}
           title={elegido === null ? 'Elige primero un proveedor.' : undefined}
           data-testid="exp-guardar-proveedor"
@@ -2987,7 +3022,7 @@ function FormaAsignarProveedor({
           <Button
             size="sm"
             variant="outline"
-            disabled={guardando}
+            disabled={guardando || ordenCerrada}
             onClick={() => onGuardar(idOrden, null, null)}
             data-testid="exp-quitar-proveedor"
           >
@@ -3047,6 +3082,8 @@ function FormaColorDeLaTela({
   const consultas = useColoresDeVariasOrdenes(idsOrden, true);
   const asignar = useAsignarColorTela();
   const folioDe = new Map(renglon.porOrden.map((l) => [l.idOrden, l.folioOrden]));
+  // ⭐ 0.226b: el color de la tela de una orden CERRADA no se dice (lo rechaza el servidor).
+  const cerradas = useContext(OrdenesCerradasDeLaExplosion);
 
   /**
    * 🔴⭐⭐ **QUÉ CASOS SON DE ESTE RENGLÓN — CONGELADOS AL ABRIR, y ésa es la corrección.**
@@ -3125,6 +3162,7 @@ function FormaColorDeLaTela({
           return (
             <section key={idOrden} data-testid="exp-color-orden" data-orden={idOrden}>
               {idsOrden.length > 1 ? <h4 className="text-xs font-medium">Orden {folio}</h4> : null}
+              {cerradas.has(idOrden) ? <AvisoOrdenCerrada folios={[folio]} /> : null}
               {consulta?.isPending === true ? (
                 <p className="text-xs text-muted-foreground">Cargando los colores…</p>
               ) : consulta?.isError === true ? (
@@ -3181,7 +3219,9 @@ function FormaColorDeLaTela({
                         <SelectNativo
                           className="mt-1"
                           value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
-                          disabled={!color.puedeCambiar || asignar.isPending}
+                          disabled={
+                            !color.puedeCambiar || asignar.isPending || cerradas.has(idOrden)
+                          }
                           data-testid="exp-color-select"
                           onChange={(e) => {
                             // ⭐⭐ V1-E6b — la ÚLTIMA opción no elige nada: abre el alta. El `value`
@@ -3406,16 +3446,21 @@ function PanelProveedorEnBloque({
    * la pantalla diría *"se escribirán 2"* y el servidor escribiría 1. **Un previo que no cuadra con
    * el resultado es peor que no tener previo**, y ésta es la mitad barata de arreglarlo.
    */
+  // ⭐ 0.226b (§Post-F9.244): las órdenes CERRADAS se quedan FUERA del bloque (el servidor rechaza
+  // asignarles proveedor) y se dice cuáles; si sólo quedaban ellas, el botón se apaga.
+  const cerradas = useContext(OrdenesCerradasDeLaExplosion);
+  const enAlcance = renglones
+    .filter((r) => marcados.has(r.id))
+    .flatMap((r) => {
+      const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
+      if (idMaterial === null) return [];
+      return r.porOrden
+        .filter((l) => alcance === 'todas' || l.idOrden === alcance)
+        .map((l) => ({ idOrden: l.idOrden, tipo: r.tipo, idMaterial }));
+    });
+  const foliosFuera = [...new Set(enAlcance.flatMap((p) => cerradas.get(p.idOrden) ?? []))];
   const pares: AsignarProveedorEnBloqueCuerpo['asignaciones'] = sinRepetir(
-    renglones
-      .filter((r) => marcados.has(r.id))
-      .flatMap((r) => {
-        const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
-        if (idMaterial === null) return [];
-        return r.porOrden
-          .filter((l) => alcance === 'todas' || l.idOrden === alcance)
-          .map((l) => ({ idOrden: l.idOrden, tipo: r.tipo, idMaterial }));
-      }),
+    enAlcance.filter((p) => !cerradas.has(p.idOrden)),
   );
   const ordenesTocadas = new Set(pares.map((p) => p.idOrden)).size;
 
@@ -3496,6 +3541,14 @@ function PanelProveedorEnBloque({
         ))}
       </ul>
 
+      {foliosFuera.length > 0 ? (
+        <AvisoOrdenCerrada
+          folios={foliosFuera}
+          detalle="Se quedan fuera de esta asignación."
+          className="mt-3"
+          testid="aviso-orden-cerrada-bloque"
+        />
+      ) : null}
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
         {ordenes.length > 1 ? (
           <label className="block text-xs text-muted-foreground sm:col-span-2">
@@ -3512,6 +3565,7 @@ function PanelProveedorEnBloque({
               {ordenes.map((o) => (
                 <option key={o.idOrden} value={String(o.idOrden)}>
                   Sólo la orden {o.folio}
+                  {cerradas.has(o.idOrden) ? ' · Cerrada' : ''}
                 </option>
               ))}
             </SelectNativo>

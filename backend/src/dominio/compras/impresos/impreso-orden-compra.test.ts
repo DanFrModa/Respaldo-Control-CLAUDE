@@ -640,6 +640,7 @@ describe('armarDatosImpresoOC', () => {
       subtotal: 750,
       idOrden: 50,
       folioOrden: 1001,
+      ordenCerrada: false,
       tallas: [],
       ...over,
     };

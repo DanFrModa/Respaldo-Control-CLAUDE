@@ -27,6 +27,8 @@ import { formatearFecha } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { AdjuntosEntradaTela } from './AdjuntosEntradaTela';
 
 /** Renglones por página del listado. */
@@ -94,6 +96,15 @@ export function EntradasTelaPagina(): React.JSX.Element {
   // El detalle se re-lee de la página (así refleja el cambio de estado tras confirmar/cancelar).
   const detalle =
     seleccionada === null ? null : (filas.find((f) => f.id === seleccionada.id) ?? seleccionada);
+  /**
+   * ⭐ 0.226b (§Post-F9.244): órdenes de PRODUCCIÓN CERRADAS que surten los renglones (vía su renglón
+   * de OC). CONFIRMAR mete la tela contra ellas y CANCELAR una confirmada la saca: con alguna cerrada
+   * el servidor lo rechaza (A1), así que se avisa y se apagan esos botones. Cancelar un BORRADOR no
+   * mueve nada y sigue libre (duda C2, default pendiente de Daniel).
+   */
+  const foliosCerrados = detalle === null ? [] : foliosDeOrdenesCerradas(detalle.lineas);
+  const bloqueaConfirmar = detalle?.estatus === 'borrador' && foliosCerrados.length > 0;
+  const bloqueaCancelar = detalle?.estatus === 'confirmada' && foliosCerrados.length > 0;
 
   function confirmarEntrada(entrada: EntradaTela): void {
     confirmar.mutate(entrada.id, {
@@ -308,7 +319,7 @@ export function EntradasTelaPagina(): React.JSX.Element {
                   </Button>
                   <Button
                     size="sm"
-                    disabled={confirmar.isPending}
+                    disabled={confirmar.isPending || bloqueaConfirmar}
                     onClick={() => confirmarEntrada(detalle)}
                     data-testid="entrada-confirmar"
                   >
@@ -320,7 +331,7 @@ export function EntradasTelaPagina(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={cancelar.isPending}
+                  disabled={cancelar.isPending || bloqueaCancelar}
                   onClick={() => cancelarEntrada(detalle)}
                   data-testid="entrada-cancelar"
                 >
@@ -333,6 +344,9 @@ export function EntradasTelaPagina(): React.JSX.Element {
       >
         {detalle === null ? null : (
           <div className="space-y-5">
+            {bloqueaConfirmar || bloqueaCancelar ? (
+              <AvisoOrdenCerrada folios={foliosCerrados} />
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <ChipEstado tono={tonoEstatus(detalle.estatus)}>
                 {etiquetaEstatus(detalle.estatus)}

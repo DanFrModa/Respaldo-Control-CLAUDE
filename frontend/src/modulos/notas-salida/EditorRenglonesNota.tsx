@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
+import { estaCerrada } from '@/lib/orden-cerrada';
 import { SelectorAvio } from '../inventarios/SelectorAvio';
 
 import { aNumero, hayStockDeAvio, renglonVacio, type RenglonNotaCaptura } from './captura';
@@ -125,6 +126,8 @@ export function EditorRenglonesNota({
                     {ordenes.map((o) => (
                       <option key={o.id} value={String(o.id)}>
                         Orden {o.folio} · {o.codigoModelo}
+                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
+                        {estaCerrada(o) ? ' · Cerrada' : ''}
                       </option>
                     ))}
                   </SelectNativo>

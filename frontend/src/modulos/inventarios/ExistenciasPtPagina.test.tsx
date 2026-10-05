@@ -19,6 +19,7 @@ const filaBase: ExistenciasPt['filas'][number] = {
   almacen: 'Primeras',
   idOrden: 9,
   folioOrden: 42,
+  ordenCerrada: false,
   existencia: 30,
 };
 

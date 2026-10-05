@@ -467,6 +467,12 @@ export const esquemaCompraLineaSalida = z
       .int()
       .nullable()
       .describe('Folio de la orden ligada (para la UI), o null.'),
+    ordenCerrada: z
+      .boolean()
+      .describe(
+        '0.226b: ¿la orden ligada está CERRADA? Si lo está, la OC no se autoriza ni se recibe, ni ' +
+          'se conserva el renglón al editarla (la pantalla lo avisa antes). false sin orden.',
+      ),
     tallas: z
       .array(esquemaCompraLineaTallaSalida)
       .describe('Matriz talla×color (vacía si no aplica).'),

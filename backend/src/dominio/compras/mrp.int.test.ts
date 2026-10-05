@@ -4786,6 +4786,10 @@ describe('0.226a — orden CERRADA en la compra desde la explosión', () => {
 
     // El MRP sigue LIBRE con la cerrada (decisión 3: marca, no esconde)…
     const previa = await previoCompraDesdeExplosion(sesion(), cuerpo([idOrden, hermana]), bd());
+    // ⭐ 0.226b: cada ficha de OP de la previa dice si su orden está CERRADA (la pantalla lo usa
+    // para avisar y apagar); la hermana abierta, no.
+    expect(previa.ordenes.find((o) => o.idOrden === idOrden)?.ordenCerrada).toBe(true);
+    expect(previa.ordenes.find((o) => o.idOrden === hermana)?.ordenCerrada).toBe(false);
     // …pero la previa NO promete la compra: dice cuál orden la impide, con el mensaje central.
     const bloqueo = previa.bloqueos.find((b) => b.includes('CERRADA'));
     expect(bloqueo, 'la previa prometió la compra sin avisar la orden CERRADA').toBeDefined();

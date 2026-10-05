@@ -99,6 +99,7 @@ describe('captura de OC (helpers F4-E2)', () => {
           subtotal: 12,
           idOrden: 4,
           folioOrden: 100,
+          ordenCerrada: false,
           tallas: [
             { idColor: 1, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 5 },
             { idColor: 1, color: 'Rojo', idTalla: 12, etiquetaTalla: 'M', cantidad: 3 },
@@ -155,6 +156,7 @@ describe('captura de OC — V1-E3u: el color y la propuesta viajan de ida y vuel
           subtotal: 3600,
           idOrden: 4,
           folioOrden: 100,
+          ordenCerrada: false,
           tallas: [],
         },
       ],
@@ -220,6 +222,7 @@ describe('captura de OC — V1-E8c: el color del avío y las medidas viajan de i
       subtotal: 180,
       idOrden: 4,
       folioOrden: 100,
+      ordenCerrada: false,
       tallas: [],
       ...over,
     };

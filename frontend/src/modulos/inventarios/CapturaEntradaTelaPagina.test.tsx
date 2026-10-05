@@ -41,10 +41,17 @@ const { estadoConsultaOc } = vi.hoisted(() => {
   const estadoConsultaOc: { valor: 'hay' | 'vacio' | 'error' | 'cargando' } = { valor: 'hay' };
   return { estadoConsultaOc };
 });
+/**
+ * ⭐ 0.226b: el renglón de OC 500 (el que arma el panel simulado) de la orden de producción 900.
+ * `null` = no viene en los pendientes (lo de siempre); `true`/`false` = viene, cerrada o abierta.
+ */
+const { cierreLinea500 } = vi.hoisted(() => ({
+  cierreLinea500: { valor: null as boolean | null },
+}));
 vi.mock('@/api/compras-lineas-tela', () => ({
   useLineasTelaPendientes: (idProveedor: number | undefined, idOrdenCompra?: number) => {
     espiaLineasOc(idProveedor, idOrdenCompra);
-    const pendientes = [
+    const pendientes: Record<string, unknown>[] = [
       {
         idOrdenCompraLinea: 55,
         idOrdenCompra: 7,
@@ -58,6 +65,22 @@ vi.mock('@/api/compras-lineas-tela', () => ({
         precio: 12,
       },
     ];
+    if (cierreLinea500.valor !== null) {
+      pendientes.push({
+        idOrdenCompraLinea: 500,
+        idOrdenCompra: 7,
+        numCompra: 1007,
+        idTela: 3,
+        tela: 'Felpa Suiza',
+        unidad: 'kg',
+        cantidad: 300,
+        recibido: 0,
+        pendiente: 300,
+        precio: 90,
+        folioOrden: 900,
+        ordenCerrada: cierreLinea500.valor,
+      });
+    }
     if (idProveedor === undefined) {
       // Sin proveedor la query ni se habilita: en TanStack v5 eso es `pending` con `data` vacío.
       return { data: undefined, isPending: true, isError: false };
@@ -198,6 +221,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     useEntradaTelaMock.mockReset();
     useEntradaTelaMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     parametrosRuta.valor = {};
+    cierreLinea500.valor = null;
   });
 
   /**
@@ -611,6 +635,35 @@ describe('CapturaEntradaTelaPagina · §Post-F9.159(a): no se recibe tela sin OC
     expect(screen.getByTestId('entrada-guardar')).toBeDisabled();
     await usuario.click(screen.getByTestId('entrada-guardar'));
     expect(actualizarMutate).not.toHaveBeenCalled();
+  });
+
+  it('⭐ 0.226b: un renglón que surte a una orden CERRADA avisa y no deja guardar (abierta, sí)', async () => {
+    cierreLinea500.valor = true;
+    const usuario = userEvent.setup();
+    const { unmount } = renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    await usuario.type(screen.getByTestId('entrada-numero'), 'R-2200');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
+    await usuario.selectOptions(screen.getByTestId('entrada-almacen'), '2');
+    await usuario.click(screen.getByTestId('agregar-renglon'));
+
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 900 está cerrada/,
+    );
+    expect(screen.getByTestId('entrada-guardar')).toBeDisabled();
+    unmount();
+
+    cierreLinea500.valor = false;
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+    await usuario.type(screen.getByTestId('entrada-numero'), 'R-2200');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
+    await usuario.selectOptions(screen.getByTestId('entrada-almacen'), '2');
+    await usuario.click(screen.getByTestId('agregar-renglon'));
+    expect(screen.queryByTestId('aviso-orden-cerrada')).toBeNull();
+    expect(screen.getByTestId('entrada-guardar')).toBeEnabled();
   });
 
   it('CONTROL: con su renglón de OC el mismo borrador sí se guarda (el aviso no es permanente)', async () => {

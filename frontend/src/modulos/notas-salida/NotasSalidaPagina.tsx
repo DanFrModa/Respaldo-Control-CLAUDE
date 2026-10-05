@@ -39,6 +39,7 @@ import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { TarjetaNota } from './TarjetaNota';
 import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
@@ -530,9 +531,22 @@ function DetalleNota({
 }): React.JSX.Element {
   const ordenes = ordenesDeNota(nota);
   const sinOrden = nota.lineas.filter((l) => l.folioOrden === null);
+  /**
+   * ⭐ 0.226b (§Post-F9.244): órdenes CERRADAS que surte la nota (lo dice cada renglón). Con alguna,
+   * confirmar (descuenta avíos) y cancelar una confirmada (los devuelve) se rechazan en el servidor
+   * (A1): aquí se avisa y se apagan esos botones. Cancelar un BORRADOR no mueve nada y sigue libre
+   * (duda C2, default de Daniel pendiente).
+   */
+  const foliosCerrados = [
+    ...new Set(nota.lineas.filter((l) => l.ordenCerrada).map((l) => l.folioOrden ?? l.idOrden)),
+  ];
+  const hayCerradas = foliosCerrados.length > 0;
+  const bloqueaCancelar = hayCerradas && nota.estatus === 'confirmada';
+  const bloqueaConfirmar = hayCerradas && nota.estatus === 'borrador';
 
   return (
     <div className="space-y-4" data-testid="detalle-nota">
+      {bloqueaCancelar || bloqueaConfirmar ? <AvisoOrdenCerrada folios={foliosCerrados} /> : null}
       <section>
         <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           Encabezado
@@ -617,6 +631,7 @@ function DetalleNota({
             size="sm"
             className="text-crit hover:text-crit"
             onClick={alCancelar}
+            disabled={bloqueaCancelar}
             data-testid="cancelar-nota"
           >
             <XCircle aria-hidden />
@@ -628,7 +643,7 @@ function DetalleNota({
             size="sm"
             className="ml-auto"
             onClick={alConfirmar}
-            disabled={confirmando}
+            disabled={confirmando || bloqueaConfirmar}
             data-testid="confirmar-nota-accion"
           >
             <CheckCircle2 aria-hidden />
