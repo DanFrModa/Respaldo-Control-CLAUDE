@@ -111,3 +111,52 @@ test.describe('Administración — Usuarios y RBAC', () => {
     await expect(page.getByTestId('administracion-empresas')).toBeVisible();
   });
 });
+
+test.describe('Administración — Roles', () => {
+  // ⭐ Fila 0.248 (Daniel, 1-oct-2026): «Duplicar» un rol crea uno NUEVO con los mismos permisos
+  // ya palomeados. Se compara por CONTEO de casillas marcadas (no por una lista fija) para que la
+  // prueba no se rompa cada vez que el seed le cambie los permisos al perfil de origen.
+  test('duplicar un rol crea uno nuevo con los mismos permisos', async ({ page }) => {
+    const nombreCopia = `E2E copia ${Date.now().toString().slice(-6)}`;
+
+    await entrarComoAdmin(page);
+    await page.goto('/administracion/roles');
+    await expect(page.getByRole('heading', { name: 'Roles y permisos' })).toBeVisible();
+
+    // Origen: «Entregas», perfil de puesto del seed (con permisos, nombre exacto e inequívoco).
+    await page
+      .getByTestId('fila-rol')
+      .filter({ has: page.getByText('Entregas', { exact: true }) })
+      .click();
+    const detalle = page.getByTestId('detalle-rol');
+    await expect(detalle.getByTestId('grupo-permisos').first()).toBeVisible();
+    const marcadosOrigen = await detalle
+      .locator('[data-testid="permiso-checkbox"]:checked')
+      .count();
+    expect(marcadosOrigen).toBeGreaterThan(0);
+
+    await page.getByTestId('duplicar-rol').click();
+    const dialogo = page.getByRole('dialog', { name: 'Duplicar rol' });
+    await expect(dialogo.getByLabel('Nombre')).toHaveValue('Copia de Entregas');
+    await expect(dialogo.locator('[data-testid="permiso-checkbox"]:checked')).toHaveCount(
+      marcadosOrigen,
+    );
+
+    await dialogo.getByLabel('Nombre').fill(nombreCopia);
+    await dialogo.getByTestId('guardar-rol').click();
+
+    const plural = marcadosOrigen === 1 ? 'permiso' : 'permisos';
+    await expect(
+      page.getByText(`Rol "${nombreCopia}" creado con ${marcadosOrigen} ${plural}.`),
+    ).toBeVisible();
+    // La copia queda en la lista y su detalle trae las mismas casillas marcadas.
+    await expect(
+      page.getByTestId('fila-rol').filter({ has: page.getByText(nombreCopia, { exact: true }) }),
+    ).toBeVisible();
+    // Al crear, el cajón pasa a la COPIA (no se queda en el origen, para no editarlo por error).
+    await expect(page.getByTestId('detalle-rol')).toContainText(nombreCopia);
+    await expect(
+      page.getByTestId('detalle-rol').locator('[data-testid="permiso-checkbox"]:checked'),
+    ).toHaveCount(marcadosOrigen);
+  });
+});

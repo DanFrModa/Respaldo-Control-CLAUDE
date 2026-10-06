@@ -71,6 +71,28 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.202 · 6-oct-2026 · **en prueba** — **Ya puedes duplicar un rol para crear uno nuevo con los mismos permisos**
+
+> **La v0.202 cierra una fila del programa: la 0.248.** Lo pediste el 1-oct: *«pon una opción de copiar un rol en otro
+> que haga nuevo»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**En Administración › Roles, cada rol tiene el botón «Duplicar».** Abre el alta de un rol nuevo con el nombre «Copia de
+…» (lo puedes cambiar), la misma descripción y **el árbol de permisos del original ya marcado**; ajustas lo que quieras y
+lo creas. El original no se toca. Sirve para armar variantes de los perfiles de puesto sin palomear las casillas a mano.
+
+**También se puede duplicar el rol Administrador**: la copia nace como rol normal, editable.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Al crear un rol —duplicado o nuevo— el detalle de la derecha pasa a mostrar el rol recién creado**, para que no sigas
+editando el original creyendo que es la copia.
+
+### ⏳ Sigue pendiente o roto
+
+Nada nuevo de esta fila.
+
 ## 0.201 · 6-oct-2026 · **en prueba** — **Buscas sin acentos en todo el sistema: «nino» encuentra «NIÑO»**
 
 > **La v0.201 cierra una fila del programa: la 0.214.** Desde R2 y la 0.205, proveedores, clientes, colores, telas, avíos
