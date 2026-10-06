@@ -153,7 +153,6 @@ function pendienteDeOc(idTelaColor: number | null, telaColor: string | null) {
     pantoneTelaColor: idTelaColor === null ? null : '19-3920',
     unidad: 'kg',
     pendiente: 80,
-    precio: 12,
     nombreComplemento: 'Cardigan',
     cantidadComplemento: 5,
     pendienteComplemento: 5,
@@ -174,7 +173,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[pendienteDeOc(11, 'Marino')]}
       />,
     );
@@ -190,7 +188,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[{ ...pendienteDeOc(11, 'Marino'), folioOrden: 900, ordenCerrada: true }]}
       />,
     );
@@ -205,7 +202,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[{ ...pendienteDeOc(11, 'Marino'), folioOrden: 900, ordenCerrada: false }]}
       />,
     );
@@ -219,7 +215,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[pendienteDeOc(11, 'Marino')]}
       />,
     );
@@ -238,7 +233,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[pendienteDeOc(null, null)]}
       />,
     );
@@ -254,7 +248,6 @@ describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={vi.fn()}
-        conPrecios
         lineasOc={[pendienteDeOc(11, 'Marino')]}
       />,
     );
@@ -406,41 +399,51 @@ describe('<CapturaRenglonesTelaColor> · cuerpo y complemento juntos (A2)', () =
       expect.objectContaining({ idTelaColor: 11, cantidad: 25, cantidadComplemento: 5 }),
     ]);
   });
-  it('B1 · con `conPrecios` pre-llena los precios del catálogo y los manda en el renglón', async () => {
+  it('⭐ 0.217 · la ENTRADA (con lote del proveedor) ya NO pide precio ni lo manda: lo pone la OC', async () => {
+    // Daniel: *«podemos quitarle el importe y el precio en la entrada. Para cuestión de
+    // inventarios no es necesario saber el importe»*. El color SÍ trae precio de catálogo en el
+    // mock (95 / 130): justo para que una precarga que se colara volviera a pintar el campo.
     const usuario = userEvent.setup();
     const onChange = vi.fn();
     renderConProveedores(
-      <CapturaRenglonesTelaColor renglones={[]} onChange={onChange} conLoteProveedor conPrecios />,
+      <CapturaRenglonesTelaColor renglones={[]} onChange={onChange} conLoteProveedor />,
     );
     await usuario.click(screen.getByTestId('sel-felpa'));
     await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
 
-    // Pre-llenado (SUGERENCIA del catálogo del color; editable — la factura manda, D1).
-    expect(screen.getByTestId('captura-color-precio')).toHaveValue(95);
-    expect(screen.getByTestId('captura-color-precio-compl')).toHaveValue(130);
+    expect(screen.queryByTestId('captura-color-precio')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('captura-color-precio-compl')).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Precio' })).not.toBeInTheDocument();
 
-    // Se corrige el precio del cuerpo con el REAL de la factura y se agrega.
-    await usuario.clear(screen.getByTestId('captura-color-precio'));
-    await usuario.type(screen.getByTestId('captura-color-precio'), '99.5');
     await usuario.type(screen.getByTestId('captura-color-cantidad'), '20');
     await usuario.click(screen.getByTestId('captura-color-agregar'));
 
-    expect(onChange).toHaveBeenCalledWith([
-      expect.objectContaining({
-        idTelaColor: 11,
-        cantidad: 20,
-        precioUnit: 99.5,
-        precioUnitComplemento: 130,
-      }),
-    ]);
+    const renglon = (onChange.mock.calls[0]?.[0] as Record<string, unknown>[])[0];
+    expect(renglon).toMatchObject({ idTelaColor: 11, cantidad: 20 });
+    expect(renglon).not.toHaveProperty('precioUnit');
+    expect(renglon).not.toHaveProperty('precioUnitComplemento');
   });
 
-  it('B1 · sin `conPrecios` no se piden precios (ajustes/traspasos siguen igual)', async () => {
+  it('0.217 · capturar desde el pendiente de la OC tampoco arrastra su precio al renglón', async () => {
     const usuario = userEvent.setup();
-    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
-    await usuario.click(screen.getByTestId('sel-felpa'));
-    await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
-    expect(screen.queryByTestId('captura-color-precio')).not.toBeInTheDocument();
+    const onChange = vi.fn();
+    // La consulta de pendientes del API SÍ trae el precio de la OC; la pantalla lo ignora.
+    const pendienteConPrecio = { ...pendienteDeOc(11, 'Marino'), precio: 12 };
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={onChange}
+        conLoteProveedor
+        exigirOrdenCompra
+        lineasOc={[pendienteConPrecio]}
+      />,
+    );
+    await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
+    await screen.findByTestId('captura-color-color');
+    await usuario.click(screen.getByTestId('captura-color-agregar'));
+    const renglon = (onChange.mock.calls[0]?.[0] as Record<string, unknown>[])[0];
+    expect(renglon).toMatchObject({ idTelaColor: 11, idOrdenCompraLinea: 500 });
+    expect(renglon).not.toHaveProperty('precioUnit');
   });
 });
 
@@ -506,7 +509,6 @@ describe('<CapturaRenglonesTelaColor> · §Post-F9.159(a): el renglón sin OC se
         renglones={[]}
         onChange={onChange}
         conLoteProveedor
-        conPrecios
         exigirOrdenCompra
         lineasOc={[pendienteDeOc(11, 'Marino')]}
       />,
@@ -673,13 +675,12 @@ describe('<CapturaRenglonesTelaColor> · §Post-F9.159(a): el renglón sin OC se
       <CapturaRenglonesTelaColor
         renglones={[]}
         onChange={onChange}
-        conPrecios
         exigirOrdenCompra
         lineasOc={[pendienteDeOc(11, 'Marino')]}
       />,
     );
     await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
-    // La precarga trae tela, color, cantidad y precio de la orden.
+    // La precarga trae tela, color y cantidad de la orden (el precio lo pone el servidor, 0.217).
     expect(screen.queryByTestId('captura-color-exige-oc')).toBeNull();
     expect(screen.getByTestId('captura-color-agregar')).toBeEnabled();
 

@@ -71,6 +71,46 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.196 · 6-oct-2026 · **en prueba** — **Ya no se teclean precios que el sistema ya sabe: ni en el recibo de maquila ni en la entrada de tela**
+
+> **La v0.196 cierra dos filas del programa: la 0.218 y la 0.217.** Son dos puntos de tu repaso de Inventarios:
+> *«no me debe de preguntar el precio del recibo. Eso está en la salida de maquila»* y *«podemos quitarle el importe
+> y el precio en la entrada. Para cuestión de inventarios no es necesario saber el importe»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El recibo de maquila ya no pide precio.** Al registrar un recibo (de costura o de arte), el sistema le pone el precio
+de la **salida a maquila** de esa orden, ese proceso y ese maquilero; si hubo varias salidas con precio, el de la más
+reciente. Una salida cancelada no cuenta. Corte, empaque y envío siguen pidiendo su precio como hasta hoy. Y quien registra el
+recibo **sin** permiso de ver el precio real de maquila no lo ve, ni en pantalla ni en el impreso del recibo: ese precio
+lo puso otro en la salida.
+
+**La entrada de tela ya no pide precio ni importe.** Capturas cantidades y lotes; al **confirmar**, el sistema le pone a
+cada renglón el precio de su **orden de compra** (y al complemento, el precio de complemento de la OC, o el mismo de la
+tela si la OC no lo trae). La lista de entradas ya no muestra la columna «Importe» ni su total.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Con lo que se paga no cambia nada, a propósito:** el recibo sigue llevando su precio (ahora heredado de la salida),
+así que el cargo en EsMa, los recibos semanales y el pago semanal lo siguen viendo. Y al proveedor de tela **que no
+factura** la deuda le sigue naciendo al confirmar la entrada, ahora al precio de la orden de compra; al que **sí**
+factura, por el total de su factura, igual que antes.
+
+**El kardex y las existencias de tela siguen mostrando importes** a quien tiene permiso de ver totales: ahora valuados
+al precio de la orden de compra.
+
+**La recepción de avíos no cambió:** sigue proponiendo el precio de la OC y dejando corregirlo, como quedó en la 0.129.
+
+### ⏳ Sigue pendiente o roto
+
+**Una pregunta que toca dinero** (§Post-F9.266): para el cargo en EsMa, el sistema usa primero el precio de maquila de
+la **orden de producción**; los recibos semanales y el pago semanal usan el de la **salida**. Si no coinciden, el mismo
+recibo sale con dos importes según la pantalla. Propuesta: manda el de la orden de producción.
+
+**Y tres más, ya construidas con su respuesta propuesta** (§Post-F9.266): dos salidas con precios distintos → el recibo
+toma la más reciente; a un proveedor sin factura que se le pagó otro precio → se corrige en Finanzas; y la asimetría
+de que los avíos sí dejen corregir el precio al recibir y la tela no.
+
 ## 0.195 · 6-oct-2026 · **en prueba** — **La orden de compra que ya recibió material no se cambia: para más, se hace otra**
 
 > **La v0.195 cierra una fila del programa: la 0.225.** Es tu regla del 30-sep: *«las OC que ya están recibidas

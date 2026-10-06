@@ -37,8 +37,10 @@ type TipoDocumento = 'factura' | 'remision';
 /**
  * CAPTURA de una ENTRADA DE TELA por FACTURA/REMISIÓN del proveedor (etapa B1). Un documento = una
  * CABECERA (factura|remisión + su número + proveedor + fecha + almacén destino) y N PARTIDAS: cada
- * renglón lleva su color, sus cantidades de cuerpo y complemento (juntas) y sus precios, y al
- * confirmar crea SU partida.
+ * renglón lleva su color y sus cantidades de cuerpo y complemento (juntas), y al confirmar crea SU
+ * partida. **SIN precios** (fila 0.217, Daniel: *«podemos quitarle el importe y el precio en la
+ * entrada. Para cuestión de inventarios no es necesario saber el importe»*): al confirmar, el
+ * servidor toma el precio del renglón de la orden de compra.
  *
  * 🔴 **SIEMPRE CONTRA UNA ORDEN DE COMPRA (§Post-F9.159(a)).** El documento nació como "la vía sin
  * OC" de §Post-F9.9 punto 7; esa línea quedó SUPERADA por Daniel: *«es imposible. Porque sin OC no
@@ -85,7 +87,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   /**
    * §Post-F9.20 — propuesta leída del XML de la factura (Daniel: *"que la información la tomes del
    * XML"*). Mientras exista, el panel de captura ofrece los CONCEPTOS DE LA FACTURA en vez de los
-   * pendientes de la OC: las cantidades y precios que valen son los que el proveedor facturó.
+   * pendientes de la OC: las cantidades que valen son las que el proveedor facturó.
    */
   const [propuesta, setPropuesta] = useState<PropuestaCfdiEntradaTela | null>(null);
   /**
@@ -149,7 +151,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
 
   /**
    * §Post-F9.20 — lee el XML de la factura y llena la captura: proveedor (por RFC), fecha, número de
-   * documento y los renglones con la cantidad y el precio que el proveedor FACTURÓ. Lo único que no
+   * documento y los renglones con la cantidad que el proveedor FACTURÓ. Lo único que no
    * se puede leer del CFDI es el COLOR, que es justo lo que queda por capturar.
    */
   function alElegirXml(archivo: File | undefined): void {
@@ -234,7 +236,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
 
   /**
    * Lo que el panel de captura ofrece para precargar renglones: los CONCEPTOS de la factura si ya se
-   * leyó el XML (con SU cantidad y SU precio — es lo que llegó y lo que se va a pagar), o los
+   * leyó el XML (con SU cantidad — es lo que llegó), o los
    * renglones de OC pendientes del proveedor elegido (§Post-F9.15). **Es lo OFRECIDO aquí y ahora**
    * — para saber qué tiene pendiente el proveedor está `estadoPendientesOc`, más abajo.
    *
@@ -260,9 +262,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               telaColor: s.telaColor,
               pantoneTelaColor: s.pantoneTelaColor,
               unidad: s.unidad,
-              // La cantidad y el precio salen de la FACTURA, no de lo que faltaba en la orden.
+              // La cantidad sale de la FACTURA, no de lo que faltaba en la orden. El precio no
+              // viaja: lo pone la OC al confirmar (fila 0.217).
               pendiente: c.cantidad,
-              precio: c.valorUnitario,
               nombreComplemento: s.nombreComplemento,
               cantidadComplemento: s.nombreComplemento === null ? null : s.pendienteComplemento,
               pendienteComplemento: s.pendienteComplemento,
@@ -347,10 +349,6 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
         cantidadComplemento: l.cantidadComplemento ?? 0,
         ...(l.loteProveedor === null ? {} : { loteProveedor: l.loteProveedor }),
         ...(l.idOrdenCompraLinea === null ? {} : { idOrdenCompraLinea: l.idOrdenCompraLinea }),
-        ...(l.precioUnit === null ? {} : { precioUnit: l.precioUnit }),
-        ...(l.precioUnitComplemento === null
-          ? {}
-          : { precioUnitComplemento: l.precioUnitComplemento }),
       })),
     );
   }, [existente.data]);
@@ -453,10 +451,6 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
         idOrdenCompraLinea,
         ...(r.nombreComplemento !== null ? { cantidadComplemento: r.cantidadComplemento } : {}),
         ...(r.loteProveedor === undefined ? {} : { loteProveedor: r.loteProveedor }),
-        ...(r.precioUnit === undefined ? {} : { precioUnit: r.precioUnit }),
-        ...(r.precioUnitComplemento === undefined
-          ? {}
-          : { precioUnitComplemento: r.precioUnitComplemento }),
       });
     }
     return {
@@ -565,7 +559,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* §Post-F9.20 — LEER LA FACTURA. Del XML del CFDI salen exactos el proveedor (por su
-              RFC), la fecha, el número y cada concepto con su cantidad y precio; el PDF se sigue
+              RFC), la fecha, el número y cada concepto con su cantidad; el PDF se sigue
               adjuntando aparte, como referencia para consultar la factura tal cual. */}
           {editable && proveedorSinFactura ? (
             <p
@@ -576,7 +570,7 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
                 Este proveedor no emite factura.
               </strong>{' '}
               Captura el documento a mano (remisión o nota): no hay XML que leer. Al confirmar la
-              entrada se le genera igual su cuenta por pagar, con el importe de los renglones.
+              entrada se le genera igual su cuenta por pagar, al precio de la orden de compra.
             </p>
           ) : null}
 
@@ -745,7 +739,6 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             onChange={setRenglones}
             soloLectura={!puedeMover}
             conLoteProveedor
-            conPrecios
             // §Post-F9.15 + §Post-F9.159(a): el panel "Pendiente de la orden de compra" es el
             // ÚNICO camino para armar un renglón, así que se pinta siempre (con lo que esté
             // pendiente —de TODO el proveedor, o sólo de la OC del deep-link—, o vacío si no hay

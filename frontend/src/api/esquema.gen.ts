@@ -51438,9 +51438,9 @@ export interface paths {
                   cantidad: number;
                   /** @description Cantidad del COMPLEMENTO o null. */
                   cantidadComplemento: number | null;
-                  /** @description Precio por unidad del cuerpo o null. */
+                  /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                   precioUnit: number | null;
-                  /** @description Precio del complemento o null. */
+                  /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                   precioUnitComplemento: number | null;
                   /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                   importe: number | null;
@@ -51597,10 +51597,6 @@ export interface paths {
               cantidad: number;
               /** @description Cantidad del COMPLEMENTO (sólo telas que lo llevan). */
               cantidadComplemento?: number;
-              /** @description Precio por unidad del CUERPO (viaja al kardex como costo, D1). */
-              precioUnit?: number;
-              /** @description Precio por unidad del COMPLEMENTO (vive en el documento). */
-              precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
               /** @description Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a)). */
@@ -51675,9 +51671,9 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad del COMPLEMENTO o null. */
                 cantidadComplemento: number | null;
-                /** @description Precio por unidad del cuerpo o null. */
+                /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                 precioUnit: number | null;
-                /** @description Precio del complemento o null. */
+                /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                 precioUnitComplemento: number | null;
                 /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                 importe: number | null;
@@ -52062,9 +52058,9 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad del COMPLEMENTO o null. */
                 cantidadComplemento: number | null;
-                /** @description Precio por unidad del cuerpo o null. */
+                /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                 precioUnit: number | null;
-                /** @description Precio del complemento o null. */
+                /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                 precioUnitComplemento: number | null;
                 /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                 importe: number | null;
@@ -52215,10 +52211,6 @@ export interface paths {
               cantidad: number;
               /** @description Cantidad del COMPLEMENTO (sólo telas que lo llevan). */
               cantidadComplemento?: number;
-              /** @description Precio por unidad del CUERPO (viaja al kardex como costo, D1). */
-              precioUnit?: number;
-              /** @description Precio por unidad del COMPLEMENTO (vive en el documento). */
-              precioUnitComplemento?: number;
               /** @description Número de lote del proveedor de esta partida (opcional). */
               loteProveedor?: string;
               /** @description Renglón de OC que surte este renglón. OBLIGATORIO: no se recibe tela sin orden de compra (§Post-F9.159(a)). */
@@ -52293,9 +52285,9 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad del COMPLEMENTO o null. */
                 cantidadComplemento: number | null;
-                /** @description Precio por unidad del cuerpo o null. */
+                /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                 precioUnit: number | null;
-                /** @description Precio del complemento o null. */
+                /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                 precioUnitComplemento: number | null;
                 /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                 importe: number | null;
@@ -52505,9 +52497,9 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad del COMPLEMENTO o null. */
                 cantidadComplemento: number | null;
-                /** @description Precio por unidad del cuerpo o null. */
+                /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                 precioUnit: number | null;
-                /** @description Precio del complemento o null. */
+                /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                 precioUnitComplemento: number | null;
                 /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                 importe: number | null;
@@ -52723,9 +52715,9 @@ export interface paths {
                 cantidad: number;
                 /** @description Cantidad del COMPLEMENTO o null. */
                 cantidadComplemento: number | null;
-                /** @description Precio por unidad del cuerpo o null. */
+                /** @description Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`. */
                 precioUnit: number | null;
-                /** @description Precio del complemento o null. */
+                /** @description Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`. */
                 precioUnitComplemento: number | null;
                 /** @description Importe del renglón (cuerpo × precio + complemento × precio) o null. */
                 importe: number | null;
@@ -56587,7 +56579,7 @@ export interface paths {
             idAlmacenPrimeras?: number;
             /** @description Almacén destino de las segundas (solo si el proceso mete a PT — costura). */
             idAlmacenSegundas?: number;
-            /** @description Precio de maquila (base del cargo EsMa). Opcional; suele heredarse del envío. */
+            /** @description Precio de maquila (base del cargo EsMa). OPCIONAL: si se omite, se hereda del envío (el ligado en `idEtapaEnvio`, o si no, el envío vivo más reciente de esta orden, proceso y maquilero que traiga precio). La pantalla ya no lo pide (fila 0.218). */
             precioPactado?: number | null;
             observaciones?: string;
             /** @description Matriz color×talla del recibo (D4) con su calidad. */

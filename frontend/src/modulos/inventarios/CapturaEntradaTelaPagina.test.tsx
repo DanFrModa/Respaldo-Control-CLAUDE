@@ -198,8 +198,6 @@ vi.mock('./CapturaRenglonesTelaColor', () => ({
               cantidad: 300,
               cantidadComplemento: 45,
               loteProveedor: 'L-A',
-              precioUnit: 90,
-              precioUnitComplemento: 120,
               idOrdenCompraLinea: 500,
             },
           ])
@@ -238,7 +236,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     expect(selector.queryByRole('option', { name: 'Almacén de avíos' })).not.toBeInTheDocument();
   });
 
-  it('manda cabecera + renglones (con precios y lote del proveedor) al guardar el borrador', async () => {
+  it('manda cabecera + renglones (con lote del proveedor y SIN precios, fila 0.217) al guardar el borrador', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
@@ -263,11 +261,69 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
           cantidad: 300,
           cantidadComplemento: 45,
           loteProveedor: 'L-A',
-          precioUnit: 90,
-          precioUnitComplemento: 120,
         },
       ],
     });
+    // ⭐ 0.217 — el precio NO viaja: lo pone el servidor desde la OC al confirmar.
+    const renglon = (crearMutate.mock.calls[0]?.[0] as { lineas: object[] }).lineas[0];
+    expect(renglon).not.toHaveProperty('precioUnit');
+    expect(renglon).not.toHaveProperty('precioUnitComplemento');
+  });
+
+  it('⭐ 0.217 · al EDITAR un borrador viejo que SÍ traía precio, el precio no se reenvía', async () => {
+    parametrosRuta.valor = { id: '6' };
+    useEntradaTelaMock.mockReturnValue({
+      data: {
+        id: 6,
+        folio: 13,
+        estatus: 'borrador',
+        tipoDocumento: 'remision',
+        numeroDocumento: 'R-PRECIO',
+        uuidCfdi: null,
+        totalCfdi: null,
+        idProveedor: 3,
+        proveedor: 'Textiles del Norte',
+        fecha: '2026-08-06',
+        idAlmacen: 2,
+        observaciones: null,
+        avisos: [],
+        lineas: [
+          {
+            id: 1,
+            idTela: 3,
+            tela: 'Felpa Suiza',
+            idTelaColor: 71,
+            telaColor: 'Marino',
+            nombreComplemento: null,
+            cantidad: 100,
+            cantidadComplemento: null,
+            precioUnit: 90,
+            precioUnitComplemento: null,
+            loteProveedor: null,
+            idOrdenCompraLinea: 500,
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('entrada-guardar')).toBeEnabled();
+    });
+    await usuario.click(screen.getByTestId('entrada-guardar'));
+
+    expect(actualizarMutate).toHaveBeenCalledTimes(1);
+    const { cuerpo } = actualizarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { lineas: object[] };
+    };
+    expect(cuerpo.lineas).toHaveLength(1);
+    expect(cuerpo.lineas[0]).toMatchObject({ idTelaColor: 71, idOrdenCompraLinea: 500 });
+    expect(cuerpo.lineas[0]).not.toHaveProperty('precioUnit');
   });
 
   it('sin número de documento o sin renglones no deja guardar', async () => {

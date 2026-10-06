@@ -96,6 +96,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
 import { saldadosPorCelda } from './faltantes-saldados.js';
 import { pendientePorCelda, piezasDevueltas } from './incompletas.js';
+import { precioDelEnvio } from './precio-envio.js';
 import {
   SIN_PACK,
   claveCeldaPack,
@@ -871,6 +872,21 @@ export async function registrarReciboMaquila(
     const idAlmacenPrimeras = meteAPt ? (datos.idAlmacenPrimeras ?? null) : null;
     const idAlmacenSegundas = meteAPt ? (datos.idAlmacenSegundas ?? null) : null;
 
+    // El PRECIO del recibo se HEREDA del envío (fila 0.218, Daniel: *«no me debe de preguntar el
+    // precio del recibo. Eso está en la salida de maquila»*): el del envío ligado si lo hay, si no el
+    // del envío vivo más reciente de esta orden+proceso+maquilero (`precio-envio.ts`, la misma regla
+    // del cierre). Lo leen el cargo EsMa propuesto, los semanales y el pago a beneficiarios, así que
+    // dejarlo vacío porque la pantalla ya no lo pide los pondría en $0 en silencio. Si el llamador lo
+    // manda, manda él (sobrescritura opcional del contrato). Sin envío con precio → `null` (tolerado).
+    const precioPactado =
+      datos.precioPactado ??
+      (await precioDelEnvio(tx, {
+        idOrden: datos.idOrden,
+        idTipoProceso: datos.idTipoProceso,
+        idMaquilero: datos.idMaquilero,
+        idEtapaEnvio: datos.idEtapaEnvio,
+      }));
+
     const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
     const recibo = await tx.etapaMovimiento.create({
       data: {
@@ -884,7 +900,7 @@ export async function registrarReciboMaquila(
         ...(datos.idEtapaEnvio === undefined ? {} : { idEtapaEnvio: datos.idEtapaEnvio }),
         ...(idAlmacenPrimeras === null ? {} : { idAlmacenPrimeras }),
         ...(idAlmacenSegundas === null ? {} : { idAlmacenSegundas }),
-        ...(datos.precioPactado == null ? {} : { precioPactado: datos.precioPactado }),
+        ...(precioPactado === null ? {} : { precioPactado }),
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
         detalles: {
           create: celdas.map((c) => ({
@@ -1102,7 +1118,17 @@ export async function registrarReciboMaquila(
   // ⭐ Fila 0.196: el ECO va por `proyectarRecibo` (sin reja de consulta). Con `obtenerRecibo`, quien
   // lleva `produccion.recibo` pero no `produccion.wip-ver` recibía un 403 con el recibo YA escrito
   // (WIP + kardex PT + cargo EsMa incluidos) y encima sin publicar su evento.
-  const salida = await proyectarRecibo(sesion, idRecibo, bd);
+  //
+  // 🔴 Fila 0.218 (hallazgo H1 del reviewer) — el eco ya NO puede devolver el precio sin mirar el
+  // permiso. Antes se justificaba (*«quien capturó acaba de teclearlo»*), pero ahora el precio se
+  // HEREDA del envío que capturó OTRA persona: devolverlo a quien no tiene
+  // `ordenes.ver-precio-real-maquila` le enseñaría el precio real de maquila (R2 §4.4.3: se puede
+  // TECLEAR el precio, no VER el de otro). Si el llamador SÍ lo tecleó (sobrescritura del contrato),
+  // se le devuelve como antes — es suyo.
+  const salida = await proyectarRecibo(sesion, idRecibo, bd, {
+    ocultarPrecio:
+      datos.precioPactado == null && !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+  });
   dispararPublicacion();
   return salida;
 }
@@ -1266,8 +1292,11 @@ export async function cancelarReciboMaquila(
 
 /**
  * Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
- * `opciones.ocultarPrecio`: el llamador decide si redactar `precioPactado` (lo usa la cancelación
- * para quien no puede ver precios reales; la captura y el impreso lo conservan).
+ * `opciones.ocultarPrecio`: sin opciones, la redacción de `precioPactado` SE DERIVA del permiso
+ * `ordenes.ver-precio-real-maquila` (paridad con `obtenerEtapa`). Antes no se redactaba por
+ * omisión, y el IMPRESO del recibo —que lee por aquí con sólo `produccion.wip-ver`— enseñaba el
+ * precio real de maquila a quien no lo puede ver; desde la fila 0.218 ese precio además es el del
+ * envío, que tecleó otra persona (hallazgo H1 del reviewer).
  *
  * Es la CONSULTA suelta: quien no lleve `produccion.wip-ver` no la obtiene. El ECO de una escritura
  * propia va por {@link proyectarRecibo} (ver su nota).
@@ -1279,7 +1308,10 @@ export async function obtenerRecibo(
   opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<ReciboSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
-  return proyectarRecibo(sesion, idRecibo, bd, opciones);
+  return proyectarRecibo(sesion, idRecibo, bd, {
+    ocultarPrecio:
+      opciones.ocultarPrecio ?? !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+  });
 }
 
 /**

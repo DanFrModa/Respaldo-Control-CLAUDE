@@ -742,7 +742,7 @@ export async function sembrarDemoInventarios(
             ...(llevaComplemento
               ? { cantidadComplemento: cantidadRecibida(spec?.cantidadComplemento ?? 0) }
               : {}),
-            precioUnit: l.precio,
+            // Sin precio (fila 0.217): la entrada lo toma de la OC al confirmar.
             loteProveedor: `${PREFIJO_DEMO}L-${oc.clave}-${String(j + 1)}`,
           };
         }),

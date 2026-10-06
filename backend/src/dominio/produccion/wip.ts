@@ -66,6 +66,7 @@ import {
   totalSaldadoDeOrdenes,
 } from './faltantes-saldados.js';
 import { pendientePorCelda } from './incompletas.js';
+import { preciosDelEnvioPorMaquilero } from './precio-envio.js';
 import { SIN_PACK, claveCeldaPack, normalizarPack } from './packs.js';
 import { armarBusquedaConSinonimos } from './ordenes.js';
 
@@ -275,41 +276,6 @@ async function sumarCeldasPorTercero(
 }
 
 /**
- * El PRECIO PACTADO de cada maquilero en un proceso de la orden: el del ENVÍO vivo más reciente que
- * lo traiga. Es la base del cobro que se PROPONDRÍA al cerrar la orden con él (V1, fila 0.109), y
- * sale del mismo sitio que usa `cierre-maquila.ts` al cerrar de verdad: el envío, no la orden.
- *
- * `null` cuando ninguno de sus envíos trae precio — el caso del histórico migrado (1,309 envíos sin
- * `precioPactado`). Ahí el cierre SALDA igual pero no propone cobro, y la pantalla lo dice con
- * nombre en vez de enseñar un importe inventado.
- */
-async function preciosPorTercero(
-  cliente: ClienteLectura,
-  idOrden: number,
-  idTipoProceso: number,
-): Promise<Map<number, number>> {
-  const envios = await cliente.etapaMovimiento.findMany({
-    where: {
-      idOrden,
-      idTipoProceso,
-      tipo: TipoEtapaMovimiento.envio_maquila,
-      canceladoEn: null,
-      idTercero: { not: null },
-      precioPactado: { not: null },
-    },
-    select: { idTercero: true, precioPactado: true },
-    orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
-  });
-  const precios = new Map<number, number>();
-  for (const e of envios) {
-    // El primero que aparece por tercero es el más reciente (el `orderBy` manda): no se pisa.
-    if (e.idTercero === null || e.precioPactado === null || precios.has(e.idTercero)) continue;
-    precios.set(e.idTercero, e.precioPactado.toNumber());
-  }
-  return precios;
-}
-
-/**
  * Pliega el agrupado por tercero en la matriz TOTAL del proceso (evita repetir la consulta).
  * `campo` elige qué se pliega: las piezas buenas o las prendas incompletas (V1-E8k).
  */
@@ -361,7 +327,9 @@ export async function pendientePorMaquilero(
       sumarCeldasPorTercero(cliente, idOrden, TipoEtapaMovimiento.envio_maquila, idTipoProceso),
       sumarCeldasPorTercero(cliente, idOrden, TipoEtapaMovimiento.recibo_maquila, idTipoProceso),
       saldadosPorTercero(cliente, idOrden, idTipoProceso),
-      preciosPorTercero(cliente, idOrden, idTipoProceso),
+      // El precio de la vista previa del cierre: la MISMA regla que el cierre y el recibo
+      // (`precio-envio.ts`), en su variante en lote — una consulta para todos los maquileros.
+      preciosDelEnvioPorMaquilero(cliente, { idOrden, idTipoProceso }),
     ]);
 
   // Los terceros con envío, con recibo **o con cierre**: quien ya cerró no puede desaparecer del

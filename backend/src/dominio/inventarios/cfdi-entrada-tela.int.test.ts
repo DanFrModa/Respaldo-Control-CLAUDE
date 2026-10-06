@@ -127,7 +127,14 @@ async function ocAutorizada(lineas: { idTela: number; cantidad: number; precio: 
  * siguiente entrada de la misma prueba (`ESTATUS_RECIBIBLES` = autorizada | recibida_parcial).
  */
 async function renglonOc(
-  opciones: { idTela?: number; idProveedor?: number; conComplemento?: boolean } = {},
+  opciones: {
+    idTela?: number;
+    idProveedor?: number;
+    conComplemento?: boolean;
+    /** Fila 0.217: de aquí sale el precio de la entrada al confirmar. */
+    precio?: number;
+    precioComplemento?: number;
+  } = {},
 ): Promise<number> {
   const oc = await crearOC(
     sesion(),
@@ -139,9 +146,12 @@ async function renglonOc(
         {
           idTela: opciones.idTela ?? telaFelpa.id,
           cantidad: 100_000,
-          precio: 1,
+          precio: opciones.precio ?? 1,
           unidad: 'kg',
           ...(opciones.conComplemento === true ? { cantidadComplemento: 5_000 } : {}),
+          ...(opciones.precioComplemento === undefined
+            ? {}
+            : { precioComplemento: opciones.precioComplemento }),
         },
       ],
     },
@@ -449,9 +459,7 @@ describe('§Post-F9.159(a): el aviso de "no hay pendientes" dice hasta dónde se
         idProveedor: proveedor.id,
         fecha: '2026-08-05',
         idAlmacen: almacen.id,
-        lineas: [
-          { idTelaColor: color.id, cantidad: 100, precioUnit: 90, idOrdenCompraLinea: idLineaTela },
-        ],
+        lineas: [{ idTelaColor: color.id, cantidad: 100, idOrdenCompraLinea: idLineaTela }],
       },
       bd(),
       archivosFalsos,
@@ -497,9 +505,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
           uuid,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario }],
         }),
-        lineas: [
-          { idTelaColor: color.id, cantidad: 10, precioUnit: valorUnitario, idOrdenCompraLinea },
-        ],
+        lineas: [{ idTelaColor: color.id, cantidad: 10, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -605,7 +611,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
         idProveedor: proveedor.id,
         fecha: '2026-08-05',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 5, precioUnit: 10, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor: color.id, cantidad: 5, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -642,7 +648,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
             uuid: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -676,7 +682,7 @@ describe('La CxP nace al CONFIRMAR la entrada (§Post-F9.21)', () => {
             uuid: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -711,7 +717,11 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
    * Antes, estas pruebas recibían la felpa de "Textiles del Norte" facturada por el informal —una
    * combinación que ya no puede existir.
    */
-  async function informalListoParaRecibir(nombreTela: string, conComplemento = false) {
+  async function informalListoParaRecibir(
+    nombreTela: string,
+    conComplemento = false,
+    precios: { precio?: number; precioComplemento?: number } = {},
+  ) {
     const informal = await proveedorInformal();
     const tela = await cliente.tela.create({
       data: {
@@ -726,13 +736,19 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
       idTela: tela.id,
       idProveedor: informal.id,
       conComplemento,
+      ...precios,
     });
     return { informal, color, idOrdenCompraLinea };
   }
 
-  it('al confirmar le nace su CxP NO FISCAL, por la suma de los renglones capturados a mano', async () => {
-    const { informal, color, idOrdenCompraLinea } =
-      await informalListoParaRecibir('Manta Don Chuy');
+  it('⭐ al confirmar le nace su CxP NO FISCAL: cantidad recibida × PRECIO DE LA OC (fila 0.217)', async () => {
+    // La entrada ya no pide precio (Daniel: *«para cuestión de inventarios no es necesario saber el
+    // importe»*). Sin esta herencia, al informal —que no manda factura— no le nacería deuda alguna.
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Manta Don Chuy',
+      false,
+      { precio: 45.5 },
+    );
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -741,7 +757,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         idProveedor: informal.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 12, precioUnit: 45.5, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor: color.id, cantidad: 12, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -752,7 +768,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
 
     const cargos = await cliente.movimientoTercero.findMany();
     expect(cargos).toHaveLength(1);
-    // 12 × 45.50 = 546. Sin IVA que sumar: esa suma ES lo que se le debe.
+    // 12 × 45.50 (el precio de la OC) = 546. Sin IVA que sumar: esa suma ES lo que se le debe.
     expect(Number(cargos[0]?.monto)).toBe(546);
     expect(cargos[0]?.esFiscal).toBe(false);
     expect(cargos[0]?.uuidCfdi).toBeNull();
@@ -760,10 +776,11 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
     expect(cargos[0]?.refTipo).toBe('entrada-tela');
   });
 
-  it('el complemento (cardigan) también suma a lo que se le debe', async () => {
+  it('el complemento (cardigan) también suma a lo que se le debe, con SU precio de la OC', async () => {
     const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
       'Felpa con Cardigan',
       true,
+      { precio: 100, precioComplemento: 50 },
     );
     const entrada = await crearEntradaTela(
       sesion(),
@@ -777,9 +794,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
           {
             idTelaColor: color.id,
             cantidad: 10,
-            precioUnit: 100,
             cantidadComplemento: 2,
-            precioUnitComplemento: 50,
             idOrdenCompraLinea,
           },
         ],
@@ -794,8 +809,80 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
     expect(Number(cargos[0]?.monto)).toBe(1100);
   });
 
-  it('sin precios capturados NO se inventa una deuda de cero', async () => {
-    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir('Popelina Chuy');
+  it('⭐ si la OC NO trae precio de complemento, el cardigan se cobra al precio del CUERPO (regla 0.163)', async () => {
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Felpa Cardigan Mismo Precio',
+      true,
+      { precio: 100 },
+    );
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-35',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [
+          { idTelaColor: color.id, cantidad: 10, cantidadComplemento: 2, idOrdenCompraLinea },
+        ],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    // El documento (sellado al confirmar) y el kardex llevan el del cuerpo para el cardigan.
+    const renglon = await cliente.entradaTelaLinea.findFirstOrThrow();
+    expect(Number(renglon.precioUnitComplemento)).toBe(100);
+    const det = await cliente.movimientoDetTela.findFirstOrThrow();
+    expect(Number(det.costoUnitComplemento)).toBe(100);
+    // 10×100 + 2×100 = 1200.
+    const cargos = await cliente.movimientoTercero.findMany();
+    expect(Number(cargos[0]?.monto)).toBe(1200);
+  });
+
+  it('⭐ el precio que mande un cliente viejo se DESCARTA: manda la OC (fila 0.217)', async () => {
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Manta Cliente Viejo',
+      false,
+      { precio: 20 },
+    );
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'remision',
+        numeroDocumento: 'NOTA-36',
+        idProveedor: informal.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        // Un front sin actualizar todavía manda `precioUnit`: el contrato no es estricto y lo tira.
+        lineas: [
+          { idTelaColor: color.id, cantidad: 3, precioUnit: 999, idOrdenCompraLinea },
+        ] as unknown as { idTelaColor: number; cantidad: number; idOrdenCompraLinea: number }[],
+      },
+      bd(),
+      archivosFalsos,
+    );
+    // En borrador el documento NO guarda precio (ni el que mandó el cliente): lo sella la confirmación.
+    const enBorrador = await cliente.entradaTelaLinea.findFirstOrThrow();
+    expect(enBorrador.precioUnit).toBeNull();
+
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
+    const sellado = await cliente.entradaTelaLinea.findFirstOrThrow();
+    expect(Number(sellado.precioUnit)).toBe(20);
+    const det = await cliente.movimientoDetTela.findFirstOrThrow();
+    expect(Number(det.costoUnit)).toBe(20);
+    const cargos = await cliente.movimientoTercero.findMany();
+    expect(Number(cargos[0]?.monto)).toBe(60);
+  });
+
+  it('con la OC a $0 NO se inventa una deuda de cero', async () => {
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Popelina Chuy',
+      false,
+      { precio: 0 },
+    );
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -814,8 +901,11 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
   });
 
   it('cancelar la entrada también revierte el cargo NO fiscal', async () => {
-    const { informal, color, idOrdenCompraLinea } =
-      await informalListoParaRecibir('Gabardina Chuy');
+    const { informal, color, idOrdenCompraLinea } = await informalListoParaRecibir(
+      'Gabardina Chuy',
+      false,
+      { precio: 25 },
+    );
     const entrada = await crearEntradaTela(
       sesion(),
       {
@@ -824,7 +914,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
         idProveedor: informal.id,
         fecha: '2026-08-06',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor: color.id, cantidad: 4, precioUnit: 25, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor: color.id, cantidad: 4, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -848,7 +938,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
           idProveedor: informal.id,
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -882,7 +972,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
             uuid: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
             conceptos: [{ descripcion: 'Felpa', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -913,7 +1003,7 @@ describe('Proveedor que NO factura (§Post-F9.22)', () => {
           fecha: '2026-08-06',
           idAlmacen: almacen.id,
           uuidCfdi: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
-          lineas: [{ idTelaColor: color.id, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor: color.id, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -974,7 +1064,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
         }),
-        lineas: [{ idTelaColor: color.id, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor: color.id, cantidad: 10, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -995,7 +1085,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
         idProveedor: proveedor.id,
         fecha: '2026-08-05',
         idAlmacen: almacen.id,
-        lineas: [{ idTelaColor, cantidad: 12, precioUnit: 92, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor, cantidad: 12, idOrdenCompraLinea }],
       },
       bd(),
     );
@@ -1030,7 +1120,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: otro.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor, cantidad: 10, idOrdenCompraLinea }],
         },
         bd(),
       ),
@@ -1061,7 +1151,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: migrado.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor, cantidad: 10, idOrdenCompraLinea }],
         },
         bd(),
       ),
@@ -1089,7 +1179,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           idProveedor: informal.id,
           fecha: '2026-08-05',
           idAlmacen: almacen.id,
-          lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor, cantidad: 10, idOrdenCompraLinea }],
         },
         bd(),
       ),
@@ -1115,7 +1205,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid: uuidNuevo,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 5, valorUnitario: 100 }],
         }),
-        lineas: [{ idTelaColor, cantidad: 5, precioUnit: 100, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor, cantidad: 5, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,
@@ -1141,7 +1231,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
             uuid: 'f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3',
             conceptos: [{ descripcion: 'FELPA', cantidad: 1, valorUnitario: 1 }],
           }),
-          lineas: [{ idTelaColor, cantidad: 1, precioUnit: 1, idOrdenCompraLinea }],
+          lineas: [{ idTelaColor, cantidad: 1, idOrdenCompraLinea }],
         },
         bd(),
         archivosFalsos,
@@ -1173,7 +1263,6 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
             {
               idTelaColor: segunda.idTelaColor,
               cantidad: 10,
-              precioUnit: 92,
               idOrdenCompraLinea: segunda.idOrdenCompraLinea,
             },
           ],
@@ -1203,7 +1292,7 @@ describe('EDITAR el borrador NO puede perder ni desviar la factura (§Post-F9.21
           uuid: UUID,
           conceptos: [{ descripcion: 'FELPA PERCHADA', cantidad: 10, valorUnitario: 92 }],
         }),
-        lineas: [{ idTelaColor, cantidad: 10, precioUnit: 92, idOrdenCompraLinea }],
+        lineas: [{ idTelaColor, cantidad: 10, idOrdenCompraLinea }],
       },
       bd(),
       archivosFalsos,

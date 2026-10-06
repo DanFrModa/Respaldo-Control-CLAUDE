@@ -97,7 +97,9 @@ Las dos mitades de esa frase importan:
   podía marcar `revisado` uno ya cancelado. La lectura da el MENSAJE; la condición da la GARANTÍA
   (precedente F8-E3, `CLAUDE.md` §7.3). De paso, la revisión de abono y pago quedó con la misma
   guarda de idempotencia.
-- **Precio**: el `precioPactado` del ENVÍO vivo a ese maquilero, congelado en el cierre. Si no lo hay
+- **Precio**: el `precioPactado` del ENVÍO vivo a ese maquilero, congelado en el cierre (regla única
+  `produccion/precio-envio.ts`, que desde la v0.196 —fila 0.218— usa también el RECIBO para heredar su precio: el
+  recibo de maquila ya no lo pide). Si no lo hay
   (histórico migrado), el cierre salda el pendiente pero **no** crea el descuento, y lo dice con
   nombre — no inventa un precio (REGLA 0-B).
 

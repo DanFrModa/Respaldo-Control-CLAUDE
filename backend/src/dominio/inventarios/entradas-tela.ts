@@ -42,14 +42,22 @@
  *  • El MISMO tela+color puede repetirse en varios renglones: una factura con dos lotes del mismo
  *    color son DOS partidas (§Post-F9.11 punto 4).
  *
+ * ⭐ EL PRECIO SALE DE LA ORDEN DE COMPRA, NO DE LA CAPTURA (fila 0.217, §Post-F9.243). Daniel:
+ * *«podemos quitarle el importe y el precio en la entrada. Para cuestión de inventarios no es
+ * necesario saber el importe»*. La entrada ya no pide precio: al CONFIRMAR, dentro de la
+ * transacción, cada renglón toma el de SU renglón de OC (cuerpo = `OrdenCompraLinea.precio`;
+ * complemento = `precioComplemento ?? precio`, la regla de 0.163: *NULL = se cobra al mismo precio
+ * que el cuerpo*) y lo SELLA en `EntradaTelaLinea`. En borrador los precios del documento quedan
+ * NULL. Y no es cosmético quitarlo sin más: el precio lo leen el kardex, la recepción contra la OC y
+ * la cuenta por pagar del proveedor que no factura — sin él, ese proveedor se quedaría sin deuda.
+ *
  * PRECIO → KARDEX (D1 — el costo vive en el movimiento): AMBOS precios viajan al renglón de
- * `MovimientoDetTela`. `precioUnit` (precio por unidad del CUERPO) va como `costoUnit` y
- * `precioUnitComplemento` (*"el cardigan es otro precio que la tela"*) va como
- * `costoUnitComplemento` (columna de B1): el renglón valúa CADA componente con SU costo
- * (`costoUnit × cuerpo` + `costoUnitComplemento × complemento`), así que un renglón de SOLO
- * complemento (cuerpo 0) TAMBIÉN queda valuado y §Post-F9.11 punto 6 (costo por consumo) no nace
- * cojo. Los precios se conservan además en `EntradaTelaLinea` (el documento es el soporte de lo
- * que se pagó, aunque el kardex ya sepa valuarlo).
+ * `MovimientoDetTela`. El del CUERPO va como `costoUnit` y el del COMPLEMENTO (*"el cardigan es otro
+ * precio que la tela"*) como `costoUnitComplemento` (columna de B1): el renglón valúa CADA
+ * componente con SU costo (`costoUnit × cuerpo` + `costoUnitComplemento × complemento`), así que un
+ * renglón de SOLO complemento (cuerpo 0) TAMBIÉN queda valuado y §Post-F9.11 punto 6 (costo por
+ * consumo) no nace cojo. Los precios se conservan además en `EntradaTelaLinea` (el documento es el
+ * soporte de lo que se recibió, aunque el kardex ya sepa valuarlo).
  *
  * RUTA CRÍTICA — esta puerta NO dispara el hito `compraTela`, y es a propósito: ese proceso se
  * completa al **AUTORIZAR la OC** (`reevaluarCompraTela` mira `OrdenCompra`, evento
@@ -647,10 +655,7 @@ function aColumnasLinea(
     cantidad: l.cantidad,
     // NULL distingue "la tela no lleva complemento" de "llevó 0" (mismo criterio que el kardex).
     cantidadComplemento: llevaComplemento(l.idTelaColor) ? (l.cantidadComplemento ?? 0) : null,
-    precioUnit: l.precioUnit ?? null,
-    precioUnitComplemento: llevaComplemento(l.idTelaColor)
-      ? (l.precioUnitComplemento ?? null)
-      : null,
+    // Sin precios (fila 0.217): el borrador NO los guarda; se sellan al CONFIRMAR, desde la OC.
     loteProveedor: l.loteProveedor?.trim() || null,
     // §Post-F9.14 + §Post-F9.159(a): qué renglón de OC surte este renglón. Ya no puede faltar —
     // el contrato lo exige y `validarCabeceraYLineas` lo volvió a verificar antes de llegar aquí.
@@ -968,12 +973,14 @@ interface DocumentoParaCxP {
  * cerrojo del RFC del emisor) vive en `terceros/cargo-de-entrada.ts` desde la fila 0.129, porque la
  * comparten las DOS puertas por las que entra mercancía de un proveedor: esta (tela por
  * factura/remisión) y la recepción de avíos contra la OC. Aquí sólo queda lo que es PROPIO de la
- * tela: de dónde sale el importe capturado a mano.
+ * tela: de dónde sale el importe cuando no hay CFDI.
  *
- * EL IMPORTE DE LA TELA = Σ (cuerpo × su precio) + (complemento × SU precio). El cardigan tiene
- * precio propio (§Post-F9.11), así que un renglón de solo complemento también suma. Un renglón sin
- * precio capturado aporta 0 — y si el documento entero suma menos de un centavo, no nace cargo (lo
- * decide el módulo compartido, que es el que exige el mínimo del motor de terceros).
+ * EL IMPORTE DE LA TELA = Σ (cuerpo × su precio) + (complemento × SU precio), con los precios de la
+ * ORDEN DE COMPRA que `confirmarEnTransaccion` ya selló en los renglones (fila 0.217: la entrada no
+ * los pide). El cardigan tiene precio propio (§Post-F9.11), así que un renglón de solo complemento
+ * también suma. Un renglón sin precio aporta 0 — y si el documento entero suma menos de un
+ * centavo, no nace cargo (lo decide el módulo compartido, que es el que exige el mínimo del motor
+ * de terceros).
  *
  * ⭐ FILA 0.124 — QUIÉN CONTESTA "¿este proveedor factura?": `modalidadFacturacion`, y sólo ella
  * (vía `emiteFactura`). La casilla `Proveedor.factura` quedó retirada como verdad; aquí se pasa la
@@ -983,7 +990,7 @@ function cargoDeCuentaPorPagar(
   documento: DocumentoParaCxP,
   idEntrada: number,
 ): CargoDeEntrada | null {
-  const importeCapturado = documento.lineas.reduce((suma, l) => {
+  const importeRecibido = documento.lineas.reduce((suma, l) => {
     const cuerpo = l.precioUnit === null ? 0 : l.cantidad.toNumber() * l.precioUnit.toNumber();
     const complemento =
       l.cantidadComplemento === null || l.precioUnitComplemento === null
@@ -1006,7 +1013,7 @@ function cargoDeCuentaPorPagar(
     numeroDocumento: documento.numeroDocumento,
     etiqueta: 'Entrada de tela',
     // El camino FISCAL exige las dos mitades del sello (UUID + total): con una sola no se sabe ni
-    // cuánto se debe ni a nombre de quién, así que se cae a los casos de captura a mano.
+    // cuánto se debe ni a nombre de quién, así que se cae a los casos sin CFDI.
     cfdi:
       documento.uuidCfdi === null || documento.totalCfdi === null
         ? null
@@ -1016,7 +1023,56 @@ function cargoDeCuentaPorPagar(
             rfc: documento.rfcCfdi,
             idArchivo: documento.idArchivoCfdi,
           },
-    importeCapturado,
+    importeRecibido,
+  });
+}
+
+/** Lo mínimo de un renglón del documento para valuarlo con su OC. */
+interface RenglonPorValuar {
+  idOrdenCompraLinea: number | null;
+  cantidadComplemento: Prisma.Decimal | null;
+  precioUnit: Prisma.Decimal | null;
+  precioUnitComplemento: Prisma.Decimal | null;
+}
+
+/**
+ * ⭐ FILA 0.217 — VALÚA los renglones con el precio de SU renglón de ORDEN DE COMPRA (una sola
+ * lectura en lote). Daniel: *«podemos quitarle el importe y el precio en la entrada. Para cuestión
+ * de inventarios no es necesario saber el importe»* — el precio ya está en la OC, y la OC que
+ * recibió material ya no se cambia (v0.195), así que es la fuente estable.
+ *
+ *  • CUERPO = `OrdenCompraLinea.precio`.
+ *  • COMPLEMENTO = `precioComplemento ?? precio` (regla de 0.163: *NULL = se cobra al mismo precio
+ *    que el cuerpo*, la misma que usa `costos/costo-real-compras.ts`), y SÓLO si la tela lleva
+ *    complemento (`cantidadComplemento` NULL = no lo lleva ⇒ precio NULL, igual que la cantidad).
+ *  • Un renglón sin OC (borrador anterior a §Post-F9.159(a)) no llega aquí: el embudo lo rechaza
+ *    antes. Si llegara, queda SIN precio — no se inventa ninguno.
+ *
+ * Devuelve los MISMOS renglones con `precioUnit`/`precioUnitComplemento` reemplazados: lo que haya
+ * traído el borrador (nada, desde esta fila) no cuenta.
+ */
+async function valuarConLaOc<R extends RenglonPorValuar>(
+  tx: Tx,
+  lineas: readonly R[],
+): Promise<R[]> {
+  const ids = [
+    ...new Set(lineas.map((l) => l.idOrdenCompraLinea).filter((i): i is number => i !== null)),
+  ];
+  const renglonesOc = await tx.ordenCompraLinea.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, precio: true, precioComplemento: true },
+  });
+  const porId = new Map(renglonesOc.map((r) => [r.id, r]));
+  return lineas.map((l) => {
+    const oc = l.idOrdenCompraLinea === null ? undefined : porId.get(l.idOrdenCompraLinea);
+    return {
+      ...l,
+      precioUnit: oc?.precio ?? null,
+      precioUnitComplemento:
+        oc === undefined || l.cantidadComplemento === null
+          ? null
+          : (oc.precioComplemento ?? oc.precio),
+    };
   });
 }
 
@@ -1148,9 +1204,16 @@ async function confirmarEnTransaccion(
       documento.tipoDocumento,
     );
 
+    // 0) ⭐ Fila 0.217 — los PRECIOS salen de la ORDEN DE COMPRA, no de la captura. Se leen AQUÍ,
+    //    bajo el lock de las OCs que se tomó arriba, y de aquí en adelante TODO lee `lineasValuadas`
+    //    (kardex, recepción contra la OC y cuenta por pagar): los precios que traía `documento`
+    //    eran los del borrador, que ya no los guarda.
+    const lineasValuadas = await valuarConLaOc(tx, documento.lineas);
+
     // 1) Una PARTIDA por renglón (la unidad de entrada; dos lotes del mismo color = dos partidas).
+    //    El mismo UPDATE sella en el renglón el precio de la OC (el documento queda como soporte).
     const idPartidaPorLinea: number[] = [];
-    for (const linea of documento.lineas) {
+    for (const linea of lineasValuadas) {
       const partida = await crearPartidaTela(tx, sesion, {
         idEmpresa,
         idTelaColor: linea.idTelaColor,
@@ -1161,7 +1224,12 @@ async function confirmarEnTransaccion(
       idPartidaPorLinea.push(partida.id);
       await tx.entradaTelaLinea.update({
         where: { id: linea.id },
-        data: { idPartida: partida.id, ...datosModificacion(sesion) },
+        data: {
+          idPartida: partida.id,
+          precioUnit: linea.precioUnit,
+          precioUnitComplemento: linea.precioUnitComplemento,
+          ...datosModificacion(sesion),
+        },
       });
     }
 
@@ -1170,7 +1238,7 @@ async function confirmarEnTransaccion(
     const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_RECEPCION);
     const lineasMotor: LineaMovimientoTela[] = aLineasMotor(lineas, colores, idPartidaPorLinea).map(
       (l, i) => {
-        const origen = documento.lineas[i];
+        const origen = lineasValuadas[i];
         return {
           ...l,
           costoUnit: origen === undefined ? null : aNumero(origen.precioUnit),
@@ -1216,7 +1284,7 @@ async function confirmarEnTransaccion(
     // 4) §Post-F9.14 — RECEPCIÓN contra las OCs surtidas (si algún renglón las trae). No mueve
     //    inventario: reusa la partida y el movimiento que ya se crearon arriba.
     const renglonesConOC: RenglonEntradaTelaRecibido[] = [];
-    documento.lineas.forEach((linea, i) => {
+    lineasValuadas.forEach((linea, i) => {
       if (linea.idOrdenCompraLinea === null) {
         return;
       }
@@ -1264,7 +1332,7 @@ async function confirmarEnTransaccion(
     //    dispara un P2002 y la transacción entera se aborta: la TELA no podría entrar al almacén por
     //    un problema de contabilidad, y con un 500 opaco. Se re-checa aquí dentro (mismo backstop de
     //    `importarCfdi`, F9) para poder explicarlo; el `catch` de abajo cubre la carrera exacta.
-    const cargo = cargoDeCuentaPorPagar(documento, id);
+    const cargo = cargoDeCuentaPorPagar({ ...documento, lineas: lineasValuadas }, id);
     if (cargo !== null) {
       if (documento.uuidCfdi !== null && (await uuidYaImportado(tx, documento.uuidCfdi))) {
         throw new ErrorConflicto(

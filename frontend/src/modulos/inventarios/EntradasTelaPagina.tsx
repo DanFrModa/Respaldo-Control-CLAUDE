@@ -65,8 +65,10 @@ function num(valor: number | null): string {
  * movimiento INVERSO auditado — nada se edita ni se borra, D3).
  *
  * `inventario-telas.ver` gobierna el acceso; `inventario-telas.mover` decide las acciones de
- * escritura (el backend re-decide, A1). Los precios/importes vienen en null sin `telas.ver-totales`
- * (ex-acceso #7): la UI simplemente no los pinta.
+ * escritura (el backend re-decide, A1). **Sin importe** (fila 0.217, Daniel: *«para cuestión de
+ * inventarios no es necesario saber el importe»*): el documento ya no lo captura — el precio lo
+ * pone la orden de compra al confirmar, y quien lo necesita lo ve en el kardex/existencias de tela
+ * (con `telas.ver-totales`).
  */
 export function EntradasTelaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -389,7 +391,6 @@ export function EntradasTelaPagina(): React.JSX.Element {
                       <TablaDensaHead>Lote prov.</TablaDensaHead>
                       <TablaDensaHead numerica>Cuerpo</TablaDensaHead>
                       <TablaDensaHead numerica>Complemento</TablaDensaHead>
-                      <TablaDensaHead numerica>Importe</TablaDensaHead>
                       <TablaDensaHead numerica>Partida</TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -409,7 +410,6 @@ export function EntradasTelaPagina(): React.JSX.Element {
                             ? '—'
                             : num(linea.cantidadComplemento ?? 0)}
                         </TablaDensaCelda>
-                        <TablaDensaCelda numerica>{num(linea.importe)}</TablaDensaCelda>
                         <TablaDensaCelda numerica>
                           {linea.partidaFolio === null ? '—' : `#${linea.partidaFolio}`}
                         </TablaDensaCelda>
@@ -421,9 +421,6 @@ export function EntradasTelaPagina(): React.JSX.Element {
               <div className="flex flex-wrap justify-end gap-4 text-xs text-muted-foreground">
                 <span>Cuerpo: {num(detalle.totalCuerpo)}</span>
                 <span>Complemento: {num(detalle.totalComplemento)}</span>
-                {detalle.totalImporte !== null ? (
-                  <span>Importe: {num(detalle.totalImporte)}</span>
-                ) : null}
               </div>
             </section>
 

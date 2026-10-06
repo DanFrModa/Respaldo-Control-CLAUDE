@@ -16,16 +16,20 @@ import { z } from 'zod';
  *  • CABECERA: tipo (factura|remisión) + número del documento del proveedor + proveedor + fecha +
  *    almacén destino + observaciones. Folio propio consecutivo por empresa (A3) que pone el dominio.
  *  • N RENGLONES = N PARTIDAS: cada uno con su color de tela (`idTelaColor`), la cantidad de CUERPO
- *    (admite 0 = compra de solo complemento) y la de COMPLEMENTO (sólo si la tela lo lleva), su
- *    lote del proveedor (texto opcional) y sus PRECIOS. El MISMO tela+color puede repetirse: una
+ *    (admite 0 = compra de solo complemento) y la de COMPLEMENTO (sólo si la tela lo lleva) y su
+ *    lote del proveedor (texto opcional) — SIN precios (fila 0.217). El MISMO tela+color puede repetirse: una
  *    factura con dos lotes del mismo color son DOS renglones = DOS partidas (A2/§Post-F9.11 p.4).
  *  • CICLO: se captura en `borrador` (no toca inventario, se puede editar y adjuntarle el PDF) →
  *    `confirmada` (crea las partidas + el movimiento de kardex, D3) → `cancelada` (si estaba
  *    confirmada, con su movimiento INVERSO auditado; nunca se edita ni se borra).
  *
- * PRECIOS (D1): `precioUnit` (cuerpo) es el que viaja al kardex como `costoUnit`;
- * `precioUnitComplemento` se captura aparte (*"el cardigan es otro precio que la tela"*) y vive en
- * el documento — el renglón de kardex sólo tiene UNA columna de costo y valúa `costoUnit × cuerpo`.
+ * PRECIOS (D1) — ⭐ FILA 0.217: la entrada YA NO los pide ni los acepta. Daniel: *«podemos
+ * quitarle el importe y el precio en la entrada. Para cuestión de inventarios no es necesario saber
+ * el importe»*. Al CONFIRMAR, el dominio toma el precio del renglón de OC que surte cada renglón
+ * (cuerpo = precio de la OC; complemento = su precio propio o, si no tiene, el del cuerpo), lo sella
+ * en el documento y con él valúa el kardex y la cuenta por pagar del proveedor sin factura. En la
+ * SALIDA los precios siguen viajando (null en borrador). El esquema NO es estricto: un
+ * `precioUnit` que mande un cliente viejo se DESCARTA, no se rechaza.
  */
 
 const idPositivo = (campo: string) =>
@@ -56,7 +60,7 @@ export type EstatusEntradaTela = z.infer<typeof esquemaEstatusEntradaTela>;
 
 /**
  * Un RENGLÓN (= una PARTIDA) del documento: color + ambas cantidades juntas + lote del proveedor +
- * precios. Al menos una de las dos cantidades debe ser mayor que 0 (cuerpo y complemento viajan
+ * su renglón de OC (de donde sale el precio, fila 0.217). Al menos una de las dos cantidades debe ser mayor que 0 (cuerpo y complemento viajan
  * JUNTOS: comprar sólo cardigan = cuerpo en 0). El dominio rechaza cantidad de complemento en una
  * tela que no lo lleva.
  */
@@ -72,16 +76,6 @@ export const esquemaEntradaTelaLineaEntrada = z
       .nonnegative({ error: 'La cantidad de complemento no puede ser negativa' })
       .optional()
       .describe('Cantidad del COMPLEMENTO (sólo telas que lo llevan).'),
-    precioUnit: z
-      .number()
-      .nonnegative({ error: 'El precio no puede ser negativo' })
-      .optional()
-      .describe('Precio por unidad del CUERPO (viaja al kardex como costo, D1).'),
-    precioUnitComplemento: z
-      .number()
-      .nonnegative({ error: 'El precio del complemento no puede ser negativo' })
-      .optional()
-      .describe('Precio por unidad del COMPLEMENTO (vive en el documento).'),
     loteProveedor: z
       .string()
       .trim()
@@ -223,8 +217,20 @@ export const esquemaEntradaTelaLineaSalida = z
       .describe('Nombre del complemento; null = la tela NO lleva complemento.'),
     cantidad: z.number().describe('Cantidad del CUERPO.'),
     cantidadComplemento: z.number().nullable().describe('Cantidad del COMPLEMENTO o null.'),
-    precioUnit: z.number().nullable().describe('Precio por unidad del cuerpo o null.'),
-    precioUnitComplemento: z.number().nullable().describe('Precio del complemento o null.'),
+    precioUnit: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). ' +
+          'null en borrador o sin `telas.ver-totales`.',
+      ),
+    precioUnitComplemento: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), ' +
+          'sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`.',
+      ),
     importe: z
       .number()
       .nullable()

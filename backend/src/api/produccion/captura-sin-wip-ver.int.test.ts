@@ -66,6 +66,7 @@ interface ReciboHttp {
   id: number;
   folio: number;
   totalPiezas: number;
+  precioPactado: number | null;
   idMovimientoEntrada: number | null;
   cancelado: boolean;
 }
@@ -450,5 +451,103 @@ describe('Capturar planta sin poder consultar el WIP (fila 0.196)', () => {
 
     expect(res.statusCode).toBe(403);
     expect(await cliente.etapaMovimiento.count({ where: { idOrden: e.idOrden } })).toBe(0);
+  });
+});
+
+/**
+ * 🔴 Fila 0.218 · hallazgo H1 del reviewer. El recibo ya no pide precio: lo HEREDA del envío. El eco
+ * del POST no podía seguir devolviéndolo sin mirar `ordenes.ver-precio-real-maquila` — antes se
+ * justificaba con *«quien capturó acaba de teclearlo»*, y ahora el precio lo tecleó OTRA persona al
+ * mandar la prenda. R2 §4.4.3: se puede TECLEAR el precio, no VER el de otro.
+ */
+describe('El eco del recibo NO enseña el precio heredado a quien no lo puede ver (fila 0.218)', () => {
+  const CLAVES_JEFE = [...CLAVES_CAPTURA, 'ordenes.ver-precio-real-maquila'];
+
+  /** El jefe corta y manda a maquila con precio 8.25: el capturista no lo tecleó nunca. */
+  async function cortarYEnviarComoJefe(e: Escenario): Promise<void> {
+    const cookie = await cookieDe('jefe');
+    const corte = await app.inject({
+      method: 'POST',
+      url: '/api/produccion/cortes',
+      headers: { cookie },
+      payload: {
+        idOrden: e.idOrden,
+        idCortador: e.idCortador,
+        fecha: '2026-06-18',
+        lineas: matriz(e, 20),
+      },
+    });
+    expect(corte.statusCode).toBe(201);
+    const envio = await app.inject({
+      method: 'POST',
+      url: '/api/produccion/envios',
+      headers: { cookie },
+      payload: {
+        idOrden: e.idOrden,
+        idTipoProceso: e.idTipoProceso,
+        idMaquilero: e.idMaquilero,
+        fecha: '2026-06-19',
+        precioPactado: 8.25,
+        lineas: matriz(e, 20),
+      },
+    });
+    expect(envio.statusCode).toBe(201);
+  }
+
+  async function recibir(e: Escenario, usuario: string, extra: Record<string, unknown> = {}) {
+    return app.inject({
+      method: 'POST',
+      url: '/api/produccion/recibos',
+      headers: { cookie: await cookieDe(usuario) },
+      payload: {
+        idOrden: e.idOrden,
+        idTipoProceso: e.idTipoProceso,
+        idMaquilero: e.idMaquilero,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: e.idAlmacen,
+        lineas: matriz(e, 10),
+        ...extra,
+      },
+    });
+  }
+
+  it('⭐ el CAPTURISTA recibe su recibo SIN el precio heredado; la base sí lo guarda', async () => {
+    await crearUsuarioCon('jefe', CLAVES_JEFE);
+    await crearUsuarioCon('capturista', CLAVES_CAPTURA);
+    const e = await crearEscenario();
+    await cortarYEnviarComoJefe(e);
+
+    const res = await recibir(e, 'capturista');
+
+    expect(res.statusCode).toBe(201);
+    const recibo = res.json<ReciboHttp>();
+    // Rojo con el eco de antes: devolvía 8.25, el precio real que tecleó el jefe.
+    expect(recibo.precioPactado).toBeNull();
+    // Redactar es de la RESPUESTA: el recibo quedó valuado (de ahí salen EsMa, semanales y pago).
+    const fila = await cliente.etapaMovimiento.findUniqueOrThrow({ where: { id: recibo.id } });
+    expect(fila.precioPactado?.toNumber()).toBe(8.25);
+  });
+
+  it('quien SÍ tiene `ordenes.ver-precio-real-maquila` ve el precio heredado en el eco', async () => {
+    await crearUsuarioCon('jefe', CLAVES_JEFE);
+    const e = await crearEscenario();
+    await cortarYEnviarComoJefe(e);
+
+    const res = await recibir(e, 'jefe');
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json<ReciboHttp>().precioPactado).toBe(8.25);
+  });
+
+  it('si el capturista TECLEÓ el precio (sobrescritura del contrato), el eco se lo devuelve: es suyo', async () => {
+    await crearUsuarioCon('jefe', CLAVES_JEFE);
+    await crearUsuarioCon('capturista', CLAVES_CAPTURA);
+    const e = await crearEscenario();
+    await cortarYEnviarComoJefe(e);
+
+    const res = await recibir(e, 'capturista', { precioPactado: 9 });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json<ReciboHttp>().precioPactado).toBe(9);
   });
 });

@@ -35,14 +35,14 @@ function entradaBase(over: Partial<EntradaQueGeneraCargo> = {}): EntradaQueGener
     folio: 15,
     numeroDocumento: 'REM-900',
     etiqueta: 'Recepción de compra',
-    importeCapturado: 100,
+    importeRecibido: 100,
     ...over,
   };
 }
 
 describe('cargoDeEntradaDeProveedor — proveedor que NO factura (cargo no fiscal)', () => {
-  it('nace el cargo por lo capturado a mano, ligado a la operación por refTipo/refId', () => {
-    const cargo = cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 1234.5 }));
+  it('nace el cargo por lo recibido × su precio, ligado a la operación por refTipo/refId', () => {
+    const cargo = cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 1234.5 }));
     expect(cargo).not.toBeNull();
     expect(cargo).toMatchObject({
       tipoTercero: 'proveedor',
@@ -61,7 +61,7 @@ describe('cargoDeEntradaDeProveedor — proveedor que NO factura (cargo no fisca
 
   it('la observación dice de qué documento salió (etiqueta + folio + número del proveedor)', () => {
     expect(cargoDeEntradaDeProveedor(entradaBase())?.observaciones).toBe(
-      'Recepción de compra 15 · REM-900 · proveedor sin factura (importe capturado a mano)',
+      'Recepción de compra 15 · REM-900 · proveedor sin factura (lo recibido × su precio)',
     );
     // Y la MISMA función, con la etiqueta de la otra puerta, escribe lo que la tela escribía antes
     // de extraer la regla (byte por byte: es lo que garantiza que nada cambió al compartirla).
@@ -74,22 +74,22 @@ describe('cargoDeEntradaDeProveedor — proveedor que NO factura (cargo no fisca
           numeroDocumento: 'F-100',
         }),
       )?.observaciones,
-    ).toBe('Entrada de tela 5 · F-100 · proveedor sin factura (importe capturado a mano)');
+    ).toBe('Entrada de tela 5 · F-100 · proveedor sin factura (lo recibido × su precio)');
   });
 
   it('redondea a centavos (el importe vive en DECIMAL(14,2) y cantidad×precio trae cola)', () => {
     // 3 × 33.333 = 99.999 → 100.00 (y no un importe que la base tendría que truncar sola).
-    expect(cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 99.999 }))?.importe).toBe(100);
-    expect(cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 12.344 }))?.importe).toBe(
+    expect(cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 99.999 }))?.importe).toBe(100);
+    expect(cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 12.344 }))?.importe).toBe(
       12.34,
     );
   });
 
   it('un importe menor a un centavo NO genera cargo (registrar una deuda de cero es ruido)', () => {
-    expect(cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 0 }))).toBeNull();
-    expect(cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 0.004 }))).toBeNull();
+    expect(cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 0 }))).toBeNull();
+    expect(cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 0.004 }))).toBeNull();
     // El mínimo del motor de terceros es 0.01: justo ahí SÍ nace.
-    expect(cargoDeEntradaDeProveedor(entradaBase({ importeCapturado: 0.005 }))?.importe).toBe(0.01);
+    expect(cargoDeEntradaDeProveedor(entradaBase({ importeRecibido: 0.005 }))?.importe).toBe(0.01);
   });
 });
 
@@ -151,9 +151,9 @@ describe('cargoDeEntradaDeProveedor — con CFDI sellado: cargo FISCAL por el to
       refTipo: REF_ENTRADA_TELA,
       numeroDocumento: 'F-100',
       cfdi: { uuid: 'UUID-1', total: 5800, rfc: 'AAA010101AAA', idArchivo: 'arch-1' },
-      // El importe capturado a mano se IGNORA cuando hay comprobante: el CFDI trae el total CON
+      // El importe de lo recibido se IGNORA cuando hay comprobante: el CFDI trae el total CON
       // impuestos y la suma de renglones va sin IVA.
-      importeCapturado: 5000,
+      importeRecibido: 5000,
       ...over,
     });
 

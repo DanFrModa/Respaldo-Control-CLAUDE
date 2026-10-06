@@ -11,8 +11,9 @@
  *  (a) folio del DOCUMENTO por secuencia atómica por empresa (A3) y aislamiento por empresa (A9);
  *  (b) el borrador NO toca el inventario; CONFIRMAR crea UNA partida por renglón + UN movimiento
  *      de kardex, y la existencia por color = Σ de movimientos (D3);
- *  (c) el PRECIO viaja al kardex como `costoUnit` del cuerpo; un renglón de SOLO complemento entra
- *      sin costo (el kardex valúa costoUnit × cuerpo) y el precio del cardigan vive en el documento;
+ *  (c) ⭐ fila 0.217 — la entrada NO pide precio: al CONFIRMAR toma el de su renglón de OC (cuerpo
+ *      = precio; complemento = precioComplemento ?? precio), lo sella en el documento y con él
+ *      valúa el kardex (`costoUnit`/`costoUnitComplemento`) y la CxP del proveedor sin factura;
  *  (d) el mismo tela+color repetido en dos renglones = DOS partidas (§Post-F9.11 p.4);
  *  (e) una tela SIN complemento rechaza cantidad de complemento;
  *  (f) CANCELAR una entrada confirmada = movimiento INVERSO auditado (nada se edita/borra, D3) y
@@ -153,6 +154,10 @@ beforeEach(async () => {
  *  • **Renglones SIN color**: el cruce de color de §Post-F9.89 solo aplica cuando la OC lo dice, y
  *    aquí se recibe marino, blanco y negro contra la misma orden.
  */
+/** Precios del renglón de felpa del fixture: de aquí salen los precios de la entrada (fila 0.217). */
+const PRECIO_OC_FELPA = 12;
+const PRECIO_OC_CARDIGAN = 15;
+
 async function ocDeTelasAutorizada(
   idEmpresaActiva?: number,
 ): Promise<{ felpa: number; lisa: number }> {
@@ -165,10 +170,13 @@ async function ocDeTelasAutorizada(
       idProveedor: proveedor.id,
       lineas: [
         // La felpa lleva Cardigan: §Post-F9.18 exige su cantidad en el mismo renglón.
+        // Fila 0.217: el cardigan con precio PROPIO (15 ≠ 12), para que un cruce de precios entre
+        // cuerpo y complemento no pueda pasar en verde.
         {
           idTela: telaFelpa.id,
           cantidad: 100_000,
-          precio: 12,
+          precio: PRECIO_OC_FELPA,
+          precioComplemento: PRECIO_OC_CARDIGAN,
           unidad: 'kg',
           cantidadComplemento: 5_000,
         },
@@ -194,14 +202,11 @@ async function existencia(idTelaColor: number): Promise<{ cuerpo: number; comple
 }
 
 /**
- * Captura una entrada en borrador con un renglón de la felpa marino. `complemento` (cantidad +
- * precio del cardigan) es opcional: los casos que no lo necesitan quedan igual de simples.
+ * Captura una entrada en borrador con un renglón de la felpa marino. `cantidadComplemento` (el
+ * cardigan) es opcional: los casos que no lo necesitan quedan igual de simples. SIN precios: desde
+ * la fila 0.217 los pone la OC al confirmar.
  */
-async function capturarSimple(
-  cantidad = 100,
-  precioUnit = 12,
-  complemento?: { cantidad: number; precio: number },
-) {
+async function capturarSimple(cantidad = 100, cantidadComplemento?: number) {
   return crearEntradaTela(
     sesion(),
     {
@@ -214,15 +219,9 @@ async function capturarSimple(
         {
           idTelaColor: colorMarino.id,
           cantidad,
-          precioUnit,
           loteProveedor: 'L-77',
           idOrdenCompraLinea: lineaOcFelpa,
-          ...(complemento === undefined
-            ? {}
-            : {
-                cantidadComplemento: complemento.cantidad,
-                precioUnitComplemento: complemento.precio,
-              }),
+          ...(cantidadComplemento === undefined ? {} : { cantidadComplemento }),
         },
       ],
     },
@@ -388,15 +387,12 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             idTelaColor: colorMarino.id,
             cantidad: 300,
             cantidadComplemento: 45,
-            precioUnit: 90,
-            precioUnitComplemento: 120,
             loteProveedor: 'L-A',
             idOrdenCompraLinea: lineaOcFelpa,
           },
           {
             idTelaColor: colorBlanco.id,
             cantidad: 100,
-            precioUnit: 85,
             loteProveedor: 'L-B',
             idOrdenCompraLinea: lineaOcFelpa,
           },
@@ -420,11 +416,12 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
     expect(confirmada.lineas.map((l) => l.idPartida)).toEqual(partidas.map((p) => p.id));
     expect(confirmada.lineas[0]!.partidaFolio).toBe(1);
 
-    // UN solo movimiento con los dos renglones y el costo del CUERPO (D1).
+    // UN solo movimiento con los dos renglones y el costo del CUERPO (D1) — el de la OC (0.217).
     expect(await cliente.movimiento.count()).toBe(1);
     const dets = await cliente.movimientoDetTela.findMany({ orderBy: { id: 'asc' } });
     expect(dets).toHaveLength(2);
-    expect(Number(dets[0]!.costoUnit)).toBe(90);
+    expect(Number(dets[0]!.costoUnit)).toBe(PRECIO_OC_FELPA);
+    expect(Number(dets[0]!.costoUnitComplemento)).toBe(PRECIO_OC_CARDIGAN);
     expect(Number(dets[0]!.cantidadComplemento)).toBe(45);
     expect(dets[0]!.idTelaColor).toBe(colorMarino.id);
     expect(dets[0]!.idLote).toBeNull(); // el flujo nuevo NO crea lotes
@@ -433,8 +430,10 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
     expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 300, complemento: 45 });
     expect(await existencia(colorBlanco.id)).toEqual({ cuerpo: 100, complemento: 0 });
 
-    // El importe del documento SÍ suma el complemento con su propio precio (el kardex, no).
-    expect(confirmada.totalImporte).toBe(300 * 90 + 45 * 120 + 100 * 85);
+    // El importe del documento suma el complemento con SU precio de la OC (no el del cuerpo).
+    expect(confirmada.totalImporte).toBe(
+      300 * PRECIO_OC_FELPA + 45 * PRECIO_OC_CARDIGAN + 100 * PRECIO_OC_FELPA,
+    );
   });
 
   it('el MISMO tela+color en dos renglones crea DOS partidas (dos lotes de una factura)', async () => {
@@ -485,7 +484,6 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             idTelaColor: colorMarino.id,
             cantidad: 0,
             cantidadComplemento: 25,
-            precioUnitComplemento: 150,
             idOrdenCompraLinea: lineaOcFelpa,
           },
         ],
@@ -495,11 +493,11 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
     const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
     expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 0, complemento: 25 });
     const det = await cliente.movimientoDetTela.findFirstOrThrow();
-    // Sin cuerpo no hay costo de cuerpo, pero el CARDIGAN sí viaja valuado (ya no se pierde).
-    expect(det.costoUnit).toBeNull();
-    expect(Number(det.costoUnitComplemento)).toBe(150);
-    expect(confirmada.lineas[0]!.precioUnitComplemento).toBe(150);
-    expect(confirmada.totalImporte).toBe(25 * 150);
+    // El CARDIGAN viaja valuado con SU precio de la OC (ya no se pierde). El cuerpo lleva el precio
+    // de la OC también, pero con cantidad 0 no aporta nada al importe.
+    expect(Number(det.costoUnitComplemento)).toBe(PRECIO_OC_CARDIGAN);
+    expect(confirmada.lineas[0]!.precioUnitComplemento).toBe(PRECIO_OC_CARDIGAN);
+    expect(confirmada.totalImporte).toBe(25 * PRECIO_OC_CARDIGAN);
   });
 
   it('los DOS precios viajan al kardex y el kardex por color valúa AMBOS componentes (B1)', async () => {
@@ -516,8 +514,6 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
             idTelaColor: colorMarino.id,
             cantidad: 100,
             cantidadComplemento: 20,
-            precioUnit: 90,
-            precioUnitComplemento: 130,
             idOrdenCompraLinea: lineaOcFelpa,
           },
         ],
@@ -527,8 +523,8 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
     await confirmarEntradaTela(sesion(), entrada.id, bd());
 
     const det = await cliente.movimientoDetTela.findFirstOrThrow();
-    expect(Number(det.costoUnit)).toBe(90);
-    expect(Number(det.costoUnitComplemento)).toBe(130);
+    expect(Number(det.costoUnit)).toBe(PRECIO_OC_FELPA);
+    expect(Number(det.costoUnitComplemento)).toBe(PRECIO_OC_CARDIGAN);
 
     // El KARDEX por color expone ambos costos y su importe suma los dos componentes.
     const kardex = await kardexTelaColor(
@@ -536,9 +532,39 @@ describe('Entrada de tela (B1) — confirmar: partidas + kardex + costo (A2/A3/D
       { idTelaColor: colorMarino.id, desde: PERIODO_COMPLETO },
       bd(),
     );
-    expect(kardex.renglones[0]!.costoUnit).toBe(90);
-    expect(kardex.renglones[0]!.costoUnitComplemento).toBe(130);
-    expect(kardex.renglones[0]!.importe).toBe(100 * 90 + 20 * 130);
+    expect(kardex.renglones[0]!.costoUnit).toBe(PRECIO_OC_FELPA);
+    expect(kardex.renglones[0]!.costoUnitComplemento).toBe(PRECIO_OC_CARDIGAN);
+    expect(kardex.renglones[0]!.importe).toBe(100 * PRECIO_OC_FELPA + 20 * PRECIO_OC_CARDIGAN);
+  });
+
+  it('⭐ 0.217 · una tela SIN complemento queda SIN precio de complemento (documento y kardex), aunque la OC traiga precio', async () => {
+    // La OC de la lisa tiene precio 8 y ningún `precioComplemento`: sin la guarda de
+    // `cantidadComplemento === null`, la regla `precioComplemento ?? precio` le pondría 8 a un
+    // complemento que la tela no tiene (hallazgo H2 del reviewer).
+    const entrada = await crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-LISA',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: colorNegroLisa.id, cantidad: 40, idOrdenCompraLinea: lineaOcLisa }],
+      },
+      bd(),
+    );
+    const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
+
+    const renglon = await cliente.entradaTelaLinea.findFirstOrThrow({
+      where: { idEntradaTela: entrada.id },
+    });
+    expect(Number(renglon.precioUnit)).toBe(8);
+    expect(renglon.precioUnitComplemento).toBeNull();
+    const det = await cliente.movimientoDetTela.findFirstOrThrow();
+    expect(Number(det.costoUnit)).toBe(8);
+    expect(det.costoUnitComplemento).toBeNull();
+    expect(confirmada.lineas[0]!.precioUnitComplemento).toBeNull();
+    expect(confirmada.totalImporte).toBe(40 * 8);
   });
 
   it('una entrada confirmada YA NO se edita ni se re-confirma (inmutable, D3)', async () => {
@@ -661,7 +687,7 @@ describe('Entrada de tela (B1) — cancelación = inverso auditado (D3/A7)', () 
   it('cancelar una CONFIRMADA genera el inverso: existencia a 0, nada se borra', async () => {
     // Con COMPLEMENTO y su propio precio: así el inverso tiene que copiar las CUATRO dimensiones
     // nuevas (color, partida, cantidad y costo del complemento) para neutralizar el par.
-    const entrada = await capturarSimple(200, 10, { cantidad: 30, precio: 140 });
+    const entrada = await capturarSimple(200, 30);
     const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
     expect(await existencia(colorMarino.id)).toEqual({ cuerpo: 200, complemento: 30 });
 
@@ -689,8 +715,8 @@ describe('Entrada de tela (B1) — cancelación = inverso auditado (D3/A7)', () 
     expect(inverso.detallesTela[0]!.idPartida).toBe(confirmada.lineas[0]!.idPartida);
     expect(Number(inverso.detallesTela[0]!.cantidadComplemento)).toBe(30);
     // El inverso copia también AMBOS costos (el par original+inverso se neutraliza también en $).
-    expect(Number(inverso.detallesTela[0]!.costoUnit)).toBe(10);
-    expect(Number(inverso.detallesTela[0]!.costoUnitComplemento)).toBe(140);
+    expect(Number(inverso.detallesTela[0]!.costoUnit)).toBe(PRECIO_OC_FELPA);
+    expect(Number(inverso.detallesTela[0]!.costoUnitComplemento)).toBe(PRECIO_OC_CARDIGAN);
     // La partida se CONSERVA (es la traza de lo que llegó).
     expect(await cliente.partidaTela.count()).toBe(1);
     // El documento tampoco se borró.
@@ -775,14 +801,15 @@ describe('Entrada de tela (B1) — listado: filtros, búsqueda y paginación (A9
   });
 
   it('sin `telas.ver-totales` los precios/importes viajan en null (ex-acceso #7)', async () => {
-    const entrada = await capturarSimple(10, 33);
+    const entrada = await capturarSimple(10);
+    await confirmarEntradaTela(sesion(), entrada.id, bd());
     const sinTotales = await obtenerEntradaTela(sesion(['inventario-telas.ver']), entrada.id, bd());
     expect(sinTotales.lineas[0]!.precioUnit).toBeNull();
     expect(sinTotales.totalImporte).toBeNull();
-    // Con el permiso, sí.
+    // Con el permiso, sí (el precio de la OC, sellado al confirmar — fila 0.217).
     const conTotales = await obtenerEntradaTela(sesion(), entrada.id, bd());
-    expect(conTotales.lineas[0]!.precioUnit).toBe(33);
-    expect(conTotales.totalImporte).toBe(330);
+    expect(conTotales.lineas[0]!.precioUnit).toBe(PRECIO_OC_FELPA);
+    expect(conTotales.totalImporte).toBe(10 * PRECIO_OC_FELPA);
   });
 });
 
@@ -913,7 +940,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
   async function capturarConOC(
     idOrdenCompraLinea: number,
     cantidad: number,
-    precioUnit = 12,
     cantidadComplemento = 5,
   ) {
     return crearEntradaTela(
@@ -928,7 +954,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
           {
             idTelaColor: colorMarino.id,
             cantidad,
-            precioUnit,
             idOrdenCompraLinea,
             ...(cantidadComplemento > 0 ? { cantidadComplemento } : {}),
           },
@@ -939,7 +964,8 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
   }
 
   it('confirmar la factura marca la OC como recibida y NO cuenta la tela dos veces', async () => {
-    const oc = await ocFelpaAutorizada(100, 12);
+    // Precio de la OC distinto del fixture (17): de aquí salen los costos de la entrada (fila 0.217).
+    const oc = await ocFelpaAutorizada(100, 17);
     const idLineaOC = oc.lineas[0]!.id;
     const entrada = await capturarConOC(idLineaOC, 100);
 
@@ -963,6 +989,12 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     expect(recepciones[0]?.idEntradaTela).toBe(entrada.id);
     expect(recepciones[0]?.factura).toBe('F-500');
     expect(Number(recepciones[0]?.lineas[0]?.cantidadRecibida)).toBe(100);
+    // ⭐ Fila 0.217 — la entrada no trae precio: la recepción y el kardex se valúan con el de la OC.
+    expect(Number(recepciones[0]?.lineas[0]?.costoUnit)).toBe(17);
+    const det = await cliente.movimientoDetTela.findFirstOrThrow();
+    expect(Number(det.costoUnit)).toBe(17);
+    // Sin `precioComplemento` en la OC, el cardigan va al precio del cuerpo (regla 0.163).
+    expect(Number(det.costoUnitComplemento)).toBe(17);
 
     // La tela entró UNA sola vez: un movimiento de kardex, cuerpo 100 + cardigan 5 (§Post-F9.19).
     expect(await cliente.movimiento.count({ where: { idEmpresa: empresa.id } })).toBe(1);
@@ -982,7 +1014,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const oc = await ocFelpaAutorizada(100, 12);
     const idLineaOC = oc.lineas[0]!.id;
 
-    const primera = await capturarConOC(idLineaOC, 40, 12, 0);
+    const primera = await capturarConOC(idLineaOC, 40, 0);
     await confirmarEntradaTela(sesion(), primera.id, bd());
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_parcial',
@@ -1000,7 +1032,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
           {
             idTelaColor: colorMarino.id,
             cantidad: 60,
-            precioUnit: 12,
             // La primera factura no trajo cardigan: aquí llega el que la OC pidió.
             cantidadComplemento: 5,
             idOrdenCompraLinea: idLineaOC,
@@ -1022,7 +1053,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const idLineaOC = oc.lineas[0]!.id;
 
     // Llega TODO el cuerpo, cero cardigan.
-    const soloCuerpo = await capturarConOC(idLineaOC, 100, 12, 0);
+    const soloCuerpo = await capturarConOC(idLineaOC, 100, 0);
     await confirmarEntradaTela(sesion(), soloCuerpo.id, bd());
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_parcial',
@@ -1042,7 +1073,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
             idTelaColor: colorMarino.id,
             cantidad: 0,
             cantidadComplemento: 5,
-            precioUnit: 12,
             idOrdenCompraLinea: idLineaOC,
           },
         ],
@@ -1061,7 +1091,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     const idLineaOC = oc.lineas[0]!.id;
 
     // Llegan 380 de 400 (−5%) y el cardigan completo → la OC se da por surtida.
-    const entrada = await capturarConOC(idLineaOC, 380, 12, 5);
+    const entrada = await capturarConOC(idLineaOC, 380, 5);
     await confirmarEntradaTela(sesion(), entrada.id, bd());
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_total',
@@ -1071,7 +1101,7 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
   it('§Post-F9.19: una diferencia MAYOR al 5% deja la orden abierta (aún sin autorización)', async () => {
     // La segunda etapa pedirá autorización para recibirla; hoy simplemente no cierra.
     const oc = await ocFelpaAutorizada(400, 12);
-    const entrada = await capturarConOC(oc.lineas[0]!.id, 300, 12, 5);
+    const entrada = await capturarConOC(oc.lineas[0]!.id, 300, 5);
     await confirmarEntradaTela(sesion(), entrada.id, bd());
     expect((await cliente.ordenCompra.findUnique({ where: { id: oc.id } }))?.estatus).toBe(
       'recibida_parcial',
@@ -1094,14 +1124,12 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
           {
             idTelaColor: colorMarino.id,
             cantidad: 30,
-            precioUnit: 12,
             cantidadComplemento: 5,
             idOrdenCompraLinea: ocA.lineas[0]!.id,
           },
           {
             idTelaColor: colorBlanco.id,
             cantidad: 50,
-            precioUnit: 12,
             cantidadComplemento: 5,
             idOrdenCompraLinea: ocB.lineas[0]!.id,
           },
@@ -1112,7 +1140,6 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
           {
             idTelaColor: colorBlanco.id,
             cantidad: 5,
-            precioUnit: 12,
             idOrdenCompraLinea: ocB.lineas[0]!.id,
           },
         ],
@@ -1287,7 +1314,6 @@ describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden d
           {
             idTelaColor,
             cantidad: 100,
-            precioUnit: 12,
             idOrdenCompraLinea,
             ...(conComplemento ? { cantidadComplemento: 5 } : {}),
           },

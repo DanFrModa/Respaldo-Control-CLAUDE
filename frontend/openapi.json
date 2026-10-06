@@ -133937,7 +133937,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Precio por unidad del cuerpo o null."
+                                  "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                                 },
                                 "precioUnitComplemento": {
                                   "anyOf": [
@@ -133948,7 +133948,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Precio del complemento o null."
+                                  "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                                 },
                                 "importe": {
                                   "anyOf": [
@@ -134424,16 +134424,6 @@
                           "type": "number",
                           "minimum": 0
                         },
-                        "precioUnit": {
-                          "description": "Precio por unidad del CUERPO (viaja al kardex como costo, D1).",
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        "precioUnitComplemento": {
-                          "description": "Precio por unidad del COMPLEMENTO (vive en el documento).",
-                          "type": "number",
-                          "minimum": 0
-                        },
                         "loteProveedor": {
                           "description": "Número de lote del proveedor de esta partida (opcional).",
                           "type": "string",
@@ -134743,7 +134733,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio por unidad del cuerpo o null."
+                            "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                           },
                           "precioUnitComplemento": {
                             "anyOf": [
@@ -134754,7 +134744,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio del complemento o null."
+                            "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                           },
                           "importe": {
                             "anyOf": [
@@ -135831,7 +135821,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio por unidad del cuerpo o null."
+                            "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                           },
                           "precioUnitComplemento": {
                             "anyOf": [
@@ -135842,7 +135832,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio del complemento o null."
+                            "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                           },
                           "importe": {
                             "anyOf": [
@@ -136272,16 +136262,6 @@
                           "type": "number",
                           "minimum": 0
                         },
-                        "precioUnit": {
-                          "description": "Precio por unidad del CUERPO (viaja al kardex como costo, D1).",
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        "precioUnitComplemento": {
-                          "description": "Precio por unidad del COMPLEMENTO (vive en el documento).",
-                          "type": "number",
-                          "minimum": 0
-                        },
                         "loteProveedor": {
                           "description": "Número de lote del proveedor de esta partida (opcional).",
                           "type": "string",
@@ -136604,7 +136584,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio por unidad del cuerpo o null."
+                            "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                           },
                           "precioUnitComplemento": {
                             "anyOf": [
@@ -136615,7 +136595,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio del complemento o null."
+                            "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                           },
                           "importe": {
                             "anyOf": [
@@ -137261,7 +137241,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio por unidad del cuerpo o null."
+                            "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                           },
                           "precioUnitComplemento": {
                             "anyOf": [
@@ -137272,7 +137252,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio del complemento o null."
+                            "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                           },
                           "importe": {
                             "anyOf": [
@@ -137940,7 +137920,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio por unidad del cuerpo o null."
+                            "description": "Precio por unidad del cuerpo: el del renglón de OC, sellado al CONFIRMAR (fila 0.217). null en borrador o sin `telas.ver-totales`."
                           },
                           "precioUnitComplemento": {
                             "anyOf": [
@@ -137951,7 +137931,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio del complemento o null."
+                            "description": "Precio del complemento: el de la OC (o el del cuerpo si la OC no trae uno propio), sellado al CONFIRMAR. null en borrador, sin complemento o sin `telas.ver-totales`."
                           },
                           "importe": {
                             "anyOf": [
@@ -147263,7 +147243,7 @@
                     "maximum": 9007199254740991
                   },
                   "precioPactado": {
-                    "description": "Precio de maquila (base del cargo EsMa). Opcional; suele heredarse del envío.",
+                    "description": "Precio de maquila (base del cargo EsMa). OPCIONAL: si se omite, se hereda del envío (el ligado en `idEtapaEnvio`, o si no, el envío vivo más reciente de esta orden, proceso y maquilero que traiga precio). La pantalla ya no lo pide (fila 0.218).",
                     "anyOf": [
                       {
                         "type": "number",

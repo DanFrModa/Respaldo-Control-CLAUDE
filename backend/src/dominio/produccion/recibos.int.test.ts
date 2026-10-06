@@ -36,6 +36,7 @@ import {
   registrarReciboMaquila,
 } from './recibos.js';
 import { cancelarEtapaMovimiento, registrarCorte, registrarEnvioMaquila } from './etapas.js';
+import { armarDatosImpresoRecibo } from './impresos/impreso-recibo-maquila.js';
 import { wipDeOrden } from './wip.js';
 import { consultarExistenciasPt, registrarMovimientoPt } from '../inventarios/movimientos-pt.js';
 import { listarCargosEsMa, validarCargoEsMa } from '../esma/cargos.js';
@@ -1040,6 +1041,171 @@ describe('Cancelación de ENVÍO con recibos vivos (D1)', () => {
       bd(),
     );
     expect(cancelado.cancelado).toBe(true);
+  });
+});
+
+/**
+ * Fila 0.218 (§Post-F9.243). Daniel: *«no me debe de preguntar el precio del recibo. Eso está en la
+ * salida de maquila»*. El recibo HEREDA el precio del envío en el servidor — y no es cosmético: el
+ * precio del recibo lo leen el cargo EsMa propuesto (cuando la orden no trae `maquilaOrd`), los
+ * semanales y el pago a beneficiarios. Dejarlo vacío porque la pantalla ya no lo pide los pondría en
+ * $0 sin que nadie se enterara.
+ */
+describe('El recibo HEREDA el precio del envío (fila 0.218)', () => {
+  /** Envía `cantidad` de Rojo/CH a costura con el precio y la fecha dados; devuelve el id del envío. */
+  async function enviarCon(
+    precioPactado: number | undefined,
+    fecha: string,
+    cantidad = 10,
+    maquilero: Proveedor = maquileroCostura,
+  ): Promise<number> {
+    const envio = await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquilero.id,
+        fecha,
+        ...(precioPactado === undefined ? {} : { precioPactado }),
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+    return envio.id;
+  }
+
+  /** Recibe `cantidad` de Rojo/CH de costura SIN mandar precio (lo que hace hoy la pantalla). */
+  async function recibirSinPrecio(
+    cantidad: number,
+    extra: { idEtapaEnvio?: number; precioPactado?: number } = {},
+  ) {
+    return registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-22',
+        idAlmacenPrimeras: almPrimeras.id,
+        ...extra,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+      },
+      bd(),
+    );
+  }
+
+  async function precioEnBd(idRecibo: number): Promise<number | null> {
+    const fila = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: idRecibo },
+      select: { precioPactado: true },
+    });
+    return fila.precioPactado === null ? null : fila.precioPactado.toNumber();
+  }
+
+  it('(a) ⭐ recibo SIN precio con envío a $8: guarda 8 y el cargo propuesto sale a 8 (orden sin maquilaOrd)', async () => {
+    await cortarBase();
+    await enviarCon(8, '2026-06-19');
+
+    const recibo = await recibirSinPrecio(10);
+
+    // Se mide lo GUARDADO: el eco se redacta sin `ver-precio-real-maquila` (H1, ver abajo).
+    expect(await precioEnBd(recibo.id)).toBe(8);
+    // La orden de prueba NO trae `maquilaOrd`: el cargo propuesto se valúa con el precio DEL RECIBO,
+    // que es justo el lector que se quedaba en $0 si el recibo no heredara.
+    const orden = await cliente.orden.findUniqueOrThrow({
+      where: { id: idOrden },
+      select: { maquilaOrd: true },
+    });
+    expect(orden.maquilaOrd).toBeNull();
+    const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
+    const deMaquila = cargosDeMaquila(cola.filas);
+    expect(deMaquila).toHaveLength(1);
+    expect(deMaquila[0]?.precioPropuesto).toBe(8);
+    expect(deMaquila[0]?.importePropuesto).toBe(80);
+  });
+
+  it('(b) ligado a un envío CONCRETO toma el de ESE envío; sin liga, el del envío más reciente', async () => {
+    await cortarBase();
+    const idViejo = await enviarCon(8, '2026-06-19', 5);
+    await enviarCon(11, '2026-06-20', 5);
+
+    // Ligado al envío viejo: su precio (8), aunque haya uno más reciente a 11.
+    const ligado = await recibirSinPrecio(5, { idEtapaEnvio: idViejo });
+    expect(await precioEnBd(ligado.id)).toBe(8);
+
+    // Sin liga: el más reciente (11) — el mismo criterio que el cierre con el maquilero.
+    const suelto = await recibirSinPrecio(5);
+    expect(await precioEnBd(suelto.id)).toBe(11);
+  });
+
+  it('(c) un envío CANCELADO no presta su precio', async () => {
+    await cortarBase();
+    await enviarCon(8, '2026-06-19', 5);
+    const idCancelado = await enviarCon(12, '2026-06-20', 5);
+    await cancelarEtapaMovimiento(sesion(), idCancelado, { motivo: 'se capturó doble' }, bd());
+
+    // El más reciente con precio sería el de $12, pero está cancelado: manda el de $8.
+    const recibo = await recibirSinPrecio(5);
+    expect(await precioEnBd(recibo.id)).toBe(8);
+  });
+
+  it('(d) sin ningún envío con precio, el recibo queda SIN precio y no truena (histórico tolerado)', async () => {
+    await cortarBase();
+    await enviarCon(undefined, '2026-06-19');
+
+    const recibo = await recibirSinPrecio(10);
+
+    expect(await precioEnBd(recibo.id)).toBeNull();
+    const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
+    const deMaquila = cargosDeMaquila(cola.filas);
+    expect(deMaquila).toHaveLength(1);
+    expect(deMaquila[0]?.precioPropuesto).toBeNull();
+    expect(deMaquila[0]?.importePropuesto).toBeNull();
+  });
+
+  it('(e) el precio de OTRO maquilero no se hereda', async () => {
+    await cortarBase();
+    const otro = await crearProveedorConRol('Otra Costura SA', 'maquila-costura');
+    await enviarCon(undefined, '2026-06-19', 5);
+    await enviarCon(15, '2026-06-20', 5, otro);
+
+    const recibo = await recibirSinPrecio(5);
+    expect(await precioEnBd(recibo.id)).toBeNull();
+  });
+
+  it('(g) desempate: dos envíos de la MISMA fecha con precios distintos — gana el capturado DESPUÉS (id mayor)', async () => {
+    await cortarBase();
+    const idPrimero = await enviarCon(8, '2026-06-19', 5);
+    const idSegundo = await enviarCon(13, '2026-06-19', 5);
+    expect(idSegundo).toBeGreaterThan(idPrimero);
+
+    const recibo = await recibirSinPrecio(5);
+    expect(await precioEnBd(recibo.id)).toBe(13);
+  });
+
+  it('(h) 🔴 el IMPRESO del recibo NO enseña el precio a quien no tiene `ver-precio-real-maquila` (H1)', async () => {
+    await cortarBase();
+    await enviarCon(8, '2026-06-19');
+    const recibo = await recibirSinPrecio(10);
+
+    // `produccion.wip-ver` basta para imprimir; el precio real de maquila, no.
+    const sinLlave = await armarDatosImpresoRecibo(sesion(), recibo.id, bd());
+    expect(sinLlave.precioPactado).toBeNull();
+    const conLlave = await armarDatosImpresoRecibo(
+      sesion([...PERM_TODOS, 'ordenes.ver-precio-real-maquila']),
+      recibo.id,
+      bd(),
+    );
+    expect(conLlave.precioPactado).toBe(8);
+  });
+
+  it('(f) si el llamador SÍ manda precio, manda él (sobrescritura opcional del contrato)', async () => {
+    await cortarBase();
+    await enviarCon(8, '2026-06-19');
+
+    const recibo = await recibirSinPrecio(10, { precioPactado: 9.5 });
+    expect(recibo.precioPactado).toBe(9.5);
+    expect(await precioEnBd(recibo.id)).toBe(9.5);
   });
 });
 

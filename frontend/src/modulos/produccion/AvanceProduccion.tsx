@@ -1106,10 +1106,10 @@ function CapturaMovimiento({
    */
   const [stockSinOrdenElegido, setStockSinOrdenElegido] = useState<boolean | null>(null);
   /**
-   * PRECIO PACTADO y FECHA COMPROMISO (migrados de las pantallas retiradas en V1-E3a): el precio de
-   * maquila de ESTE movimiento — sin él el cargo EsMa nace sin precio y hay que teclearlo aparte, la
-   * doble captura que v2 elimina. El campo se esconde sin `ordenes.ver-precio-real-maquila` porque
-   * es el precio real de maquila (R2 §4.4.3, mismo gate con el que el backend REDACTA el dato).
+   * PRECIO PACTADO y FECHA COMPROMISO (migrados de las pantallas retiradas en V1-E3a): el precio por
+   * prenda del corte, el empaque y el ENVÍO — sin él el cargo EsMa nace sin precio y hay que
+   * teclearlo aparte, la doble captura que v2 elimina. El RECIBO ya no lo pide (fila 0.218): el
+   * servidor lo hereda del envío. Se captura sin permiso extra — ver `precioApi`.
    */
   const [precioPactado, setPrecioPactado] = useState('');
   const [fechaCompromiso, setFechaCompromiso] = useState('');
@@ -1793,10 +1793,12 @@ function CapturaMovimiento({
    * **no la captura** (así lo fija `recibos.int.test.ts`: *"la captura no"*). Y en el seed ese
    * permiso llega hasta Ventas y no más abajo, mientras `produccion.envio`/`.recibo` los lleva todo
    * perfil menos `Basico`: gatear el campo dejaría SIN precio justo a los roles que capturan la
-   * maquila diaria —Logística, Asistente, Secretarial— y,
-   * como el cargo EsMa cae al `precioPactado` del recibo cuando la OP no trae precio
-   * (`esma/cargos.ts`), el cargo nacería sin precio — la doble captura que v2 elimina.
+   * maquila diaria —Logística, Asistente, Secretarial— y el envío se quedaría sin el precio que
+   * después heredan su recibo y su cargo EsMa (fila 0.218).
    * La regla es: se puede TECLEAR el precio que se pactó hoy; NO se puede VER el que capturó otro.
+   *
+   * ⭐ El RECIBO NO lo manda (fila 0.218). Daniel: *«no me debe de preguntar el precio del recibo.
+   * Eso está en la salida de maquila»*. El servidor lo HEREDA del envío (`precio-envio.ts`).
    */
   function precioApi(): { precioPactado?: number } {
     if (precioPactado.trim() === '') {
@@ -1844,7 +1846,7 @@ function CapturaMovimiento({
           lineas: lineasReciboApi(),
           idTipoProceso: procesoParaGuardar.id,
           idMaquilero: idProveedor,
-          ...precioApi(),
+          // Sin precio: lo hereda el servidor del envío (fila 0.218).
           ...(requiereAlmacen && idAlmacenPrimeras !== ''
             ? { idAlmacenPrimeras: Number(idAlmacenPrimeras) }
             : {}),
@@ -2033,44 +2035,49 @@ function CapturaMovimiento({
         />
       ) : null}
 
-      {/* PRECIO PACTADO (TODAS las etapas de esta captura) + FECHA COMPROMISO (solo el envío).
+      {/* PRECIO PACTADO (corte, empaque y envío) + FECHA COMPROMISO (solo el envío).
           Sin el precio, el cargo EsMa nace SIN precio y hay que teclearlo aparte en su módulo (la
           doble captura que v2 elimina).
+
+          ⭐ 0.218 — el RECIBO (maquila y arte) ya NO lo pide. Daniel: *«no me debe de preguntar el
+          precio del recibo. Eso está en la salida de maquila»*. El servidor lo hereda del envío.
 
           ⭐ 0.114 — el CORTE y el EMPAQUE también lo llevan. Daniel: *«sólo hay que poner su cantidad
           y precio para meterlo en la OP»*. Antes este bloque se escondía en el corte porque el corte
           no generaba cargo; ahora sí lo genera, y su precio es el ÚNICO que ese cargo puede
           proponer (la orden trae `maquilaOrd`/`aplicacionOrd`, que son precios de MAQUILA y no se
           le prestan a un servicio). */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {/* El precio se CAPTURA sin permiso extra: `ordenes.ver-precio-real-maquila` gobierna la
+      {esRecibo ? null : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* El precio se CAPTURA sin permiso extra: `ordenes.ver-precio-real-maquila` gobierna la
             LECTURA (el backend redacta el campo al devolverlo), no la escritura — ver `precioApi`. */}
-        <Field>
-          <FieldLabel htmlFor="avance-precio">Precio pactado por prenda</FieldLabel>
-          <Input
-            id="avance-precio"
-            type="number"
-            min={0}
-            step="0.01"
-            value={precioPactado}
-            onChange={(e) => setPrecioPactado(e.target.value)}
-            placeholder="Opcional"
-            data-testid="avance-precio"
-          />
-        </Field>
-        {esEnvio ? (
           <Field>
-            <FieldLabel htmlFor="avance-fecha-compromiso">Fecha compromiso</FieldLabel>
+            <FieldLabel htmlFor="avance-precio">Precio pactado por prenda</FieldLabel>
             <Input
-              id="avance-fecha-compromiso"
-              type="date"
-              value={fechaCompromiso}
-              onChange={(e) => setFechaCompromiso(e.target.value)}
-              data-testid="avance-fecha-compromiso"
+              id="avance-precio"
+              type="number"
+              min={0}
+              step="0.01"
+              value={precioPactado}
+              onChange={(e) => setPrecioPactado(e.target.value)}
+              placeholder="Opcional"
+              data-testid="avance-precio"
             />
           </Field>
-        ) : null}
-      </div>
+          {esEnvio ? (
+            <Field>
+              <FieldLabel htmlFor="avance-fecha-compromiso">Fecha compromiso</FieldLabel>
+              <Input
+                id="avance-fecha-compromiso"
+                type="date"
+                value={fechaCompromiso}
+                onChange={(e) => setFechaCompromiso(e.target.value)}
+                data-testid="avance-fecha-compromiso"
+              />
+            </Field>
+          ) : null}
+        </div>
+      )}
 
       {/* ── V1-E4b · ¿se mandan prendas YA TERMINADAS? (§Post-F9.61) ───────────────────────────
           Si el proceso va DESPUÉS de la costura, las prendas están en el almacén y salen de él: el

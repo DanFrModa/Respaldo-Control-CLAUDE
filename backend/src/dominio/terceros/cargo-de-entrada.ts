@@ -23,8 +23,8 @@
  *    NO se inventa cargo: se registrará con la factura, que es la que trae el importe bueno. La
  *    entrada queda como *factura pendiente*.
  *  • **Proveedor que NO factura** (`solo_sin`) → nunca va a haber CFDI, así que esperar la factura
- *    sería no registrarle NUNCA la deuda. El cargo nace **NO FISCAL** por lo capturado a mano. Sin
- *    IVA que sumar, esa suma ES lo que se le debe.
+ *    sería no registrarle NUNCA la deuda. El cargo nace **NO FISCAL** por lo recibido × su precio
+ *    (`importeRecibido`). Sin IVA que sumar, esa suma ES lo que se le debe.
  *  • **Proveedor sin la modalidad definida** (los migrados de Access) → se trata como los que
  *    facturan: se espera su CFDI. Nada se inventa sobre un dato que nadie capturó.
  *
@@ -114,11 +114,13 @@ export interface EntradaQueGeneraCargo {
   /** CFDI sellado en el documento, si lo hay. Sin él se cae a los casos 2/3/4. */
   cfdi?: SelloDelCargo | null;
   /**
-   * Importe capturado a mano (Σ cantidad × precio de los renglones), SIN redondear: el redondeo a
-   * centavos lo hace esta función, en un solo lugar. Sólo se usa en el caso del proveedor que NO
-   * factura (con CFDI manda el total del comprobante).
+   * Importe de LO RECIBIDO (Σ cantidad recibida × precio de los renglones), SIN redondear: el
+   * redondeo a centavos lo hace esta función, en un solo lugar. Sólo se usa en el caso del proveedor
+   * que NO factura (con CFDI manda el total del comprobante). De dónde sale el precio lo decide cada
+   * puerta: en la TELA es el de la orden de compra, sellado al confirmar (fila 0.217 — la entrada ya
+   * no lo pide); en los AVÍOS es el que se capturó al recibir o, si no, el de la OC (fila 0.129).
    */
-  importeCapturado: number;
+  importeRecibido: number;
 }
 
 /** El alta de movimiento de terceros que hay que registrar, o `null` si no nace ninguno. */
@@ -199,7 +201,7 @@ export function cargoDeEntradaDeProveedor(entrada: EntradaQueGeneraCargo): Cargo
   }
 
   // Se redondea a centavos: el importe vive en DECIMAL(14,2) y cantidad×precio puede traer cola.
-  const aPagar = Math.round(entrada.importeCapturado * 100) / 100;
+  const aPagar = Math.round(entrada.importeRecibido * 100) / 100;
   if (aPagar < 0.01) return null;
 
   return {
@@ -208,7 +210,7 @@ export function cargoDeEntradaDeProveedor(entrada: EntradaQueGeneraCargo): Cargo
     esFiscal: false,
     observaciones:
       `${etiqueta} ${String(folio)} · ${numeroDocumento} · ` +
-      `proveedor sin factura (importe capturado a mano)`,
+      `proveedor sin factura (lo recibido × su precio)`,
   };
 }
 
