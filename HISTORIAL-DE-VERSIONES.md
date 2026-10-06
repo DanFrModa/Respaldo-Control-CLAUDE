@@ -71,6 +71,35 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.197 · 6-oct-2026 · **en prueba** — **Tampoco en la salida sin orden, el ajuste y el traspaso de avíos te deja elegir lo que no hay**
+
+> **La v0.197 cierra una fila del programa: la 0.233.** Es tu punto 07c del repaso de Inventarios —*«que no deje meter
+> los avíos que no hay stock, ANTES de meterlos»*—, que la v0.185 arregló en la nota de salida, llevado a las tres
+> pantallas que también sacan avíos.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**En Salida sin orden, Ajuste de materiales (de salida) y Traspaso de materiales, ya ves cuánto hay de cada avío antes
+de capturarlo.** Junto al avío elegido y en una columna nueva de la tabla aparece «Hay N», «Excede · hay N» o «Sin
+existencia». Si eliges un avío que no hay en el almacén del que sale, el sistema no lo mete al renglón y te dice por qué.
+En el traspaso cuenta lo que hay en el almacén **de origen**.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El ajuste de ENTRADA no se toca:** ahí puedes elegir cualquier avío, porque así es como entra al almacén uno que no
+estaba.
+
+**Si el sistema no sabe cuánto hay** (todavía no eliges almacén, se está cargando o falló la consulta), te deja capturar:
+bloquear sería inventar un cero. Al guardar, el sistema vuelve a comprobar y rechaza lo que no alcance, igual que antes.
+
+**Guardar no se bloquea** si un renglón ya capturado queda en rojo (por ejemplo, al cambiar de almacén): se ve pintado y
+el sistema decide al guardar, como en la nota de salida.
+
+### ⏳ Sigue pendiente o roto
+
+**Dos criterios con su respuesta propuesta** (§Post-F9.267): que «Guardar» no se bloquee con renglones en rojo, y que en el
+traspaso no haga falta un aviso aparte por la suma de los renglones.
+
 ## 0.196 · 6-oct-2026 · **en prueba** — **Ya no se teclean precios que el sistema ya sabe: ni en el recibo de maquila ni en la entrada de tela**
 
 > **La v0.196 cierra dos filas del programa: la 0.218 y la 0.217.** Son dos puntos de tu repaso de Inventarios:

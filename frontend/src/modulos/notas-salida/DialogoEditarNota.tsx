@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import { useHabilitacionOrden } from '@/api/habilitacion';
-import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
 import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
 import { hoy } from '@/lib/fecha-negocio';
@@ -21,6 +20,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
+import { useStockAvioEnAlmacen } from '@/modulos/inventarios/useStockAvioEnAlmacen';
 
 import {
   capturaDesdeNota,
@@ -40,7 +40,7 @@ import {
   useOrdenesDeCaptura,
   type OrdenElegible,
 } from '@/modulos/produccion/ordenes-de-captura';
-import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
+import { EditorRenglonesNota } from './EditorRenglonesNota';
 
 /** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
 export interface PrefillRenglonNota {
@@ -134,45 +134,19 @@ export function DialogoEditarNota({
   const habLista =
     habTraer.data !== undefined && ordenTraer !== null && habTraer.data.idOrden === ordenTraer;
 
-  // Existencias de avío del almacén origen elegido (aviso "excede"; apagada sin almacén).
-  const existencias = useExistenciasAvio(
-    idAlmacen === null ? {} : { idAlmacen, incluirCeros: 'true' },
-    { habilitado: idAlmacen !== null },
-  );
   /**
-   * ⭐⭐ FILA 0.216 — ¿YA SE SABE QUÉ HAY EN EL ALMACÉN ORIGEN?
+   * Existencia por avío en el almacén origen — o `undefined` cuando **no se sabe** (sin almacén, en
+   * vuelo, con los datos del almacén ANTERIOR o con la consulta en error). La diferencia entre «mapa
+   * vacío» y `undefined` es la que evita que la pantalla frene una captura por un cero que se
+   * inventó: con `undefined`, ni se pinta existencia ni se bloquea nada, y decide el servidor al
+   * confirmar (A1).
    *
-   * Es la pregunta que decide si esta pantalla puede FRENAR un avío sin stock o no. Hacen falta las
-   * tres condiciones y ninguna sobra:
-   *  • **almacén elegido**: sin él no hay a qué preguntarle (y la consulta va apagada);
-   *  • **respuesta en la mano** (`data !== undefined`): mientras carga, todo avío parecería tener
-   *    cero y se bloquearía la captura entera;
-   *  • **dato de ESTE almacén** (`!isPlaceholderData`): la consulta usa `keepPreviousData`, así que
-   *    al cambiar de almacén sigue entregando los renglones del ANTERIOR mientras vuelve la nueva.
-   *    Esos renglones son de otro `idAlmacen`, el filtro de abajo los descarta **todos** y el mapa
-   *    queda vacío ⇒ sin esta condición, cambiar de almacén bloquearía cada avío durante ese hueco.
-   *  • **sin error** (`!isError`): una consulta que falló no es un almacén vacío.
+   * ⭐ Fila 0.216, y desde la 0.233 en un hook compartido con las otras tres pantallas que sacan
+   * avíos: las cuatro condiciones de «ya se sabe qué hay» viven en {@link useStockAvioEnAlmacen}.
    */
-  const stockConocido =
-    idAlmacen !== null &&
-    existencias.data !== undefined &&
-    !existencias.isPlaceholderData &&
-    !existencias.isError;
-  /**
-   * Existencia por avío en el almacén origen — o `undefined` cuando **no se sabe** (ver
-   * {@link stockConocido}). La diferencia entre «mapa vacío» y `undefined` es la que evita que la
-   * pantalla frene una captura por un cero que se inventó: con `undefined`, ni se pinta existencia
-   * ni se bloquea nada, y decide el servidor al confirmar (A1).
-   */
-  const existenciaPorAvio = useMemo(() => {
-    if (!stockConocido) return undefined;
-    const mapa = new Map<number, ExistenciaAvioNota>();
-    for (const f of existencias.data?.filas ?? []) {
-      if (f.idAlmacen === idAlmacen)
-        mapa.set(f.idAvio, { existencia: f.existencia, unidad: f.unidad });
-    }
-    return mapa;
-  }, [existencias.data, idAlmacen, stockConocido]);
+  const existenciaPorAvio = useStockAvioEnAlmacen(idAlmacen);
+  /** ¿Ya se sabe qué hay en el almacén origen? Decide si «Traer avíos» puede filtrar. */
+  const stockConocido = existenciaPorAvio !== undefined;
 
   const recetaPorOrden = useMemo(() => {
     const mapa = new Map<number, Set<number>>();

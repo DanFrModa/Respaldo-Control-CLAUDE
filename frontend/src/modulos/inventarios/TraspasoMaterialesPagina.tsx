@@ -12,6 +12,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
+import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
 
 function hoy(): string {
   return new Date().toISOString().slice(0, 10);
@@ -81,6 +82,15 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
     direccion: 'asc',
     tipo: 'AVIO',
   });
+  /**
+   * ⭐ Fila 0.233 — existencia de avíos del almacén **ORIGEN**, que es de donde sale el material: el
+   * destino sólo recibe y su existencia no limita nada. Con ella la captura no deja elegir un avío
+   * que no hay en el origen (Daniel, §Post-F9.243 punto 07c). Sin origen, sin permiso de lectura o
+   * con la consulta en vuelo, `undefined` = «no se sabe» y decide el servidor al guardar (A1).
+   */
+  const stockOrigen = useStockAvioEnAlmacen(
+    idAlmacenOrigen !== '' && tienePermiso('inventario-avios.ver') ? Number(idAlmacenOrigen) : null,
+  );
   const traspasarAvio = useTraspasarAvio();
 
   const mismoAlmacen = idAlmacenOrigen !== '' && idAlmacenOrigen === idAlmacenDestino;
@@ -227,6 +237,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
               renglones={renglonesAvio}
               onChange={setRenglonesAvio}
               soloLectura={!puedeMover}
+              stockOrigen={stockOrigen}
             />
           </div>
 

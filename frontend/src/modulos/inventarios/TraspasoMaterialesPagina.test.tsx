@@ -20,6 +20,9 @@ const mutate = vi.fn();
 
 vi.mock('@/api/inventario-materiales', () => ({
   useTraspasarAvio: () => ({ mutate, isPending: false }),
+  // Fila 0.233 — la pantalla pide la existencia de avíos para la captura; aquí no se mide (la captura
+  // va simulada), así que la consulta queda «sin respuesta» = no se sabe.
+  useExistenciasAvio: () => ({ data: undefined, isError: false, isPlaceholderData: false }),
 }));
 /**
  * Catálogo de mentiras con LOS TRES tipos de almacén (fila 0.137). El mock de `useAlmacenes` filtra

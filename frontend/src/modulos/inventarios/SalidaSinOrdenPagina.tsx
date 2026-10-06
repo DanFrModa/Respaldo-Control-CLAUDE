@@ -14,6 +14,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
+import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
 
 /** Qué material se está sacando. */
 type Dimension = 'tela' | 'avio';
@@ -71,6 +72,18 @@ export function SalidaSinOrdenPagina(): React.JSX.Element {
     direccion: 'asc',
     tipo: dimension === 'tela' ? 'TELA' : 'AVIO',
   });
+
+  /**
+   * ⭐ Fila 0.233 — existencia de avíos del almacén elegido, para que la captura no deje elegir un
+   * avío que no hay (Daniel, §Post-F9.243 punto 07c: *«que no deje meter los avíos que no hay stock,
+   * ANTES de meterlos»*). Sólo en la pestaña de AVÍOS y sólo si la sesión puede leer existencias; si
+   * no, `undefined` = «no se sabe» y decide el servidor al guardar (A1).
+   */
+  const stockAvio = useStockAvioEnAlmacen(
+    dimension === 'avio' && idAlmacen !== '' && tienePermiso('inventario-avios.ver')
+      ? Number(idAlmacen)
+      : null,
+  );
 
   const salidaTela = useSalidaTelaColorSinOrden();
   const salidaAvio = useSalidaAvioSinOrden();
@@ -245,7 +258,11 @@ export function SalidaSinOrdenPagina(): React.JSX.Element {
                     onChange={setRenglonesTela}
                   />
                 ) : (
-                  <CapturaRenglonesAvio renglones={renglonesAvio} onChange={setRenglonesAvio} />
+                  <CapturaRenglonesAvio
+                    renglones={renglonesAvio}
+                    onChange={setRenglonesAvio}
+                    stockOrigen={stockAvio}
+                  />
                 )}
               </div>
 

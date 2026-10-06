@@ -8,14 +8,15 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { rotuloOrdenElegible, type OrdenElegible } from '@/modulos/produccion/ordenes-de-captura';
 import { SelectorAvio } from '../inventarios/SelectorAvio';
+import type { ExistenciaAvioEnAlmacen } from '../inventarios/stock-avios';
 
 import { aNumero, hayStockDeAvio, renglonVacio, type RenglonNotaCaptura } from './captura';
 
-/** Existencia de un avío en el almacén origen elegido (para el aviso "excede", §4.6). */
-export interface ExistenciaAvioNota {
-  existencia: number;
-  unidad: string | null;
-}
+/**
+ * Existencia de un avío en el almacén origen elegido (para el aviso "excede", §4.6). Desde la fila
+ * 0.233 es un alias del tipo compartido con las otras pantallas que sacan avíos.
+ */
+export type ExistenciaAvioNota = ExistenciaAvioEnAlmacen;
 
 /**
  * EDITOR DE RENGLONES de una nota de salida (F4-E5; rediseño R6 §4.6). La nota de salida es **DE

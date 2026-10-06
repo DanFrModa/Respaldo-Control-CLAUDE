@@ -14,6 +14,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
+import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
 
 type Direccion = 'entrada' | 'salida';
 
@@ -57,6 +58,18 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
     direccion: 'asc',
     tipo: 'AVIO',
   });
+  /**
+   * ⭐ Fila 0.233 — existencia de avíos del almacén elegido, **sólo para un ajuste de SALIDA**: es
+   * lo único que SACA, y por tanto lo único que puede quedarse sin existencia. Un ajuste de ENTRADA
+   * sube la existencia —es justo como entra al almacén un avío que no estaba (conteo físico)—, así
+   * que ahí no se mira el stock y se puede elegir cualquier avío. Sin almacén, sin permiso de lectura
+   * o con la consulta en vuelo, `undefined` = «no se sabe» y decide el servidor al guardar (A1).
+   */
+  const stockAvio = useStockAvioEnAlmacen(
+    direccion === 'salida' && idAlmacen !== '' && tienePermiso('inventario-avios.ver')
+      ? Number(idAlmacen)
+      : null,
+  );
   const tiposMov = useTiposMovimiento();
   const ajustarAvio = useAjustarAvio();
 
@@ -196,6 +209,7 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
               renglones={renglonesAvio}
               onChange={setRenglonesAvio}
               soloLectura={!puedeMover}
+              stockOrigen={stockAvio}
             />
           </div>
 
