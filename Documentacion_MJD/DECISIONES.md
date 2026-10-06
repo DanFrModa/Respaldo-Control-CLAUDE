@@ -18546,3 +18546,23 @@ Tres criterios que el lead dejó con default y que Daniel puede corregir:
 2. **El subtotal suma unidades distintas** (piezas, conos, metros), como el total que la pantalla ya tenía. Alternativa:
    mostrar sólo cuántos renglones hay por grupo.
 3. **No se agrega un filtro por proveedor**, sólo el agrupado que se pidió, mientras Daniel no lo pida.
+
+#### (Post-F9.270) — AL TRAER LOS AVÍOS DE LA ORDEN PRIMERO SE VE LA LISTA, Y SE PROPONE LO QUE FALTA (fila 0.220, v0.200) — dos criterios con su default y dos filas nuevas
+
+Aplica el punto 07b de §Post-F9.243. «Traer avíos de la orden» en la nota de salida abre una lista previa: cada avío de
+la receta con lo que falta por surtir de esa orden y su existencia en el almacén; sólo se pueden marcar los que hay, y
+entran a la nota sólo los marcados. 📐 Al medirla, la cantidad propuesta resultó ser la receta **completa**, de modo que
+una orden surtida a medias volvía a proponer todo; el lead la cambió a **lo que falta por surtir** (la misma cifra que ya
+proponía el panel de habilitación), porque proponer de más es un defecto que lleva a mandar de más. Por la misma razón
+descuenta lo que la propia nota ya lleva de esa orden y ese avío, y no se abre con la receta de la orden a medio
+refrescar.
+
+Dos criterios que el lead dejó con default y que Daniel puede corregir:
+1. **Un avío ya surtido completo no se puede marcar en la lista** («Ya surtido»). Para reponer merma se agrega a mano en la
+   nota (sigue contando como avío de la receta) o se reenvía desde el panel de habilitación.
+2. **Lo que el sistema no sabe si hay se puede marcar, pero no viene marcado**, para no volver a traer de golpe algo que
+   quizá no está.
+
+Y de medir nacen dos filas, las dos 🟢 por recomendación del lead: la **0.253** (lo que falta por surtir no descuenta las
+notas en borrador — ❓ *¿qué tan seguido hay dos notas abiertas a la vez para la misma orden?*) y la **0.254** («Pasar a
+nota de salida» desde el panel de habilitación no revisa existencia).

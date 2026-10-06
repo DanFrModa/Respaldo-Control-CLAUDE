@@ -13,9 +13,12 @@ const actualizarMutate = vi.fn();
 // distinguir «no lo trajo y lo dijo» de «no lo trajo y se calló».
 const toastError = vi.fn();
 const toastWarning = vi.fn();
+const toastSuccess = vi.fn();
 vi.mock('sonner', () => ({
   toast: {
-    success: vi.fn(),
+    success: (mensaje: string): void => {
+      toastSuccess(mensaje);
+    },
     warning: (mensaje: string): void => {
       toastWarning(mensaje);
     },
@@ -63,6 +66,8 @@ vi.mock('@/api/avios', () => ({
       datos: [
         { id: 3, clave: 'BOT-01', descripcion: 'Botón', esGenerico: false },
         { id: 4, clave: 'CIE-02', descripcion: 'Cierre', esGenerico: false },
+        // ⭐ Fila 0.220: un tercero FUERA de la receta de las pruebas, para medir el flag ⚠.
+        { id: 5, clave: 'ETQ-03', descripcion: 'Etiqueta', esGenerico: false },
       ],
     },
     isPending: false,
@@ -175,6 +180,15 @@ function elegirAvioBoton(clave = 'BOT-01'): void {
   fireEvent.mouseDown(elegida);
 }
 
+/** La casilla de un avío en el PRELIMINAR de «Traer avíos» (fila 0.220), por su clave. */
+function casillaPreliminar(clave: string): HTMLInputElement {
+  const fila = screen
+    .getAllByTestId('preliminar-fila')
+    .find((f) => within(f).queryByText(clave) !== null);
+  if (fila === undefined) throw new Error(`El preliminar no enseña "${clave}"`);
+  return within(fila).getByTestId('preliminar-chk');
+}
+
 describe('DialogoEditarNota (F4-E5)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
@@ -185,6 +199,7 @@ describe('DialogoEditarNota (F4-E5)', () => {
     useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO);
     toastError.mockReset();
     toastWarning.mockReset();
+    toastSuccess.mockReset();
   });
 
   it('al ALTA arranca con un renglón vacío y el botón crear deshabilitado', () => {
@@ -375,9 +390,27 @@ describe('DialogoEditarNota (F4-E5)', () => {
         folioOrden: 1001,
         idMaquilero: 9,
         avios: [
-          { idAvio: 3, clave: 'BOT-01', requerido: 180, unidad: 'pza', esExtra: false },
+          {
+            idAvio: 3,
+            clave: 'BOT-01',
+            descripcion: 'Botón',
+            requerido: 180,
+            enviado: 0,
+            falta: 180,
+            unidad: 'pza',
+            esExtra: false,
+          },
           // Un extra NO se trae (solo la receta).
-          { idAvio: 99, clave: 'EXT-99', requerido: 0, unidad: 'pza', esExtra: true },
+          {
+            idAvio: 99,
+            clave: 'EXT-99',
+            descripcion: 'Extra',
+            requerido: 0,
+            enviado: 0,
+            falta: 0,
+            unidad: 'pza',
+            esExtra: true,
+          },
         ],
       },
       isPending: false,
@@ -392,7 +425,13 @@ describe('DialogoEditarNota (F4-E5)', () => {
     fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
     fireEvent.click(screen.getByTestId('nota-traer-boton'));
 
-    // El renglón vacío inicial se descartó y quedó el avío de la receta (cantidad = requerido).
+    // ⭐ Fila 0.220: primero el PRELIMINAR (sólo la receta: el extra no sale), y nada en la nota aún.
+    expect(screen.getAllByTestId('preliminar-fila')).toHaveLength(1);
+    expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('');
+    fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+
+    // El renglón vacío inicial se descartó y quedó el avío de la receta, con lo que le falta a la
+    // orden (aquí nada se ha enviado, así que falta = requerido; la diferencia se mide aparte).
     expect(screen.getByTestId('cantidad-nota')).toHaveValue(180);
     // La clave viaja con el renglón traído: el combobox la muestra sin depender del typeahead.
     expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('BOT-01');
@@ -416,8 +455,26 @@ describe('DialogoEditarNota (F4-E5)', () => {
           folioOrden: 1001,
           idMaquilero: 9,
           avios: [
-            { idAvio: 3, clave: 'BOT-01', requerido: 180, unidad: 'pza', esExtra: false },
-            { idAvio: 4, clave: 'CIE-02', requerido: 60, unidad: 'pza', esExtra: false },
+            {
+              idAvio: 3,
+              clave: 'BOT-01',
+              descripcion: 'Botón',
+              requerido: 180,
+              enviado: 0,
+              falta: 180,
+              unidad: 'pza',
+              esExtra: false,
+            },
+            {
+              idAvio: 4,
+              clave: 'CIE-02',
+              descripcion: 'Cierre',
+              requerido: 60,
+              enviado: 0,
+              falta: 60,
+              unidad: 'pza',
+              esExtra: false,
+            },
           ],
         },
         isPending: false,
@@ -447,6 +504,12 @@ describe('DialogoEditarNota (F4-E5)', () => {
       fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
       fireEvent.click(screen.getByTestId('nota-traer-boton'));
 
+      // ⭐ Fila 0.220: el preliminar lo enseña (no lo esconde), deshabilitado y con sus claves.
+      expect(screen.getAllByTestId('preliminar-fila')).toHaveLength(2);
+      expect(casillaPreliminar('CIE-02')).toBeDisabled();
+      expect(screen.getByTestId('preliminar-sin-existencia')).toHaveTextContent('CIE-02');
+      fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+
       // Un solo renglón: el que sí hay.
       expect(screen.getAllByTestId('renglon-nota')).toHaveLength(1);
       expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('BOT-01');
@@ -461,7 +524,18 @@ describe('DialogoEditarNota (F4-E5)', () => {
           idOrden: 50,
           folioOrden: 1001,
           idMaquilero: 9,
-          avios: [{ idAvio: 4, clave: 'CIE-02', requerido: 60, unidad: 'pza', esExtra: false }],
+          avios: [
+            {
+              idAvio: 4,
+              clave: 'CIE-02',
+              descripcion: 'Cierre',
+              requerido: 60,
+              enviado: 0,
+              falta: 60,
+              unidad: 'pza',
+              esExtra: false,
+            },
+          ],
         },
         isPending: false,
       });
@@ -470,8 +544,17 @@ describe('DialogoEditarNota (F4-E5)', () => {
       fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
       fireEvent.click(screen.getByTestId('nota-traer-boton'));
 
-      expect(toastError).toHaveBeenCalledTimes(1);
-      expect(toastError.mock.calls[0]?.[0]).toContain('no hay nada que mandar');
+      // ⭐ Fila 0.220: el preliminar se abre igual —para que se vea qué falta— y lo dice; no hay
+      // nada que marcar, así que no deja confirmar.
+      expect(screen.getByTestId('preliminar-nada-que-mandar')).toHaveTextContent(
+        'no hay nada que mandar',
+      );
+      expect(casillaPreliminar('CIE-02')).toBeDisabled();
+      expect(screen.getByTestId('preliminar-confirmar')).toBeDisabled();
+      fireEvent.click(
+        within(screen.getByTestId('preliminar-avios')).getByRole('button', { name: 'Cancelar' }),
+      );
+      expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
       // El renglón vacío del alta sigue ahí, sin avío: no se trajo ninguno.
       expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('');
     });
@@ -584,6 +667,531 @@ describe('DialogoEditarNota (F4-E5)', () => {
       // El avío SÍ quedó en el renglón: al soltar el campo, la etiqueta de la selección sigue ahí.
       fireEvent.blur(screen.getByTestId('selector-avio-nota-busqueda'));
       expect(screen.getByTestId('selector-avio-nota-busqueda')).toHaveValue('CIE-02');
+    });
+  });
+
+  /**
+   * ⭐⭐ FILA 0.220 — EL PRELIMINAR: «ver un preliminar y seleccionar qué avíos son los que se van a
+   * mandar (obviamente… que sólo te ofrezca los que ya se recibieron en almacén)» (Daniel, 07b).
+   */
+  describe('el PRELIMINAR de «Traer avíos» (fila 0.220)', () => {
+    /** BOT-01 (500) y ETQ-03 (12) hay; CIE-02 no. */
+    const EXISTENCIAS_DOS = {
+      data: {
+        filas: [
+          { idAvio: 3, idAlmacen: 2, existencia: 500, unidad: 'pza' },
+          { idAvio: 5, idAlmacen: 2, existencia: 12, unidad: 'pza' },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+    };
+
+    function abrirPreliminar(): void {
+      useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_DOS);
+      useHabilitacionOrdenMock.mockReturnValue({
+        data: {
+          idOrden: 50,
+          folioOrden: 1001,
+          idMaquilero: 9,
+          avios: [
+            {
+              idAvio: 3,
+              clave: 'BOT-01',
+              descripcion: 'Botón',
+              requerido: 180,
+              enviado: 0,
+              falta: 180,
+              unidad: 'pza',
+              esExtra: false,
+            },
+            {
+              idAvio: 4,
+              clave: 'CIE-02',
+              descripcion: 'Cierre',
+              requerido: 60,
+              enviado: 0,
+              falta: 60,
+              unidad: 'pza',
+              esExtra: false,
+            },
+            {
+              idAvio: 5,
+              clave: 'ETQ-03',
+              descripcion: 'Etiqueta',
+              requerido: 30,
+              enviado: 0,
+              falta: 30,
+              unidad: 'pza',
+              esExtra: false,
+            },
+          ],
+        },
+        isPending: false,
+      });
+      renderConProveedores(
+        <DialogoEditarNota
+          abierto
+          alCambiarAbierto={() => undefined}
+          alGuardada={() => undefined}
+        />,
+        { sesion: estadoSesionDePrueba(['notas.administrar']) },
+      );
+      fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+      fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
+      fireEvent.click(screen.getByTestId('nota-traer-boton'));
+    }
+
+    function avioDeRenglones(): string[] {
+      return screen
+        .getAllByTestId('selector-avio-nota-busqueda')
+        .map((e) => (e as HTMLInputElement).value);
+    }
+
+    it('⭐ no mete nada de golpe: enseña la lista y los que hay vienen MARCADOS', () => {
+      abrirPreliminar();
+      expect(screen.getAllByTestId('preliminar-fila')).toHaveLength(3);
+      expect(casillaPreliminar('BOT-01')).toBeChecked();
+      expect(casillaPreliminar('ETQ-03')).toBeChecked();
+      expect(casillaPreliminar('CIE-02')).not.toBeChecked();
+      expect(casillaPreliminar('CIE-02')).toBeDisabled();
+      // La nota sigue con su renglón vacío: nada entra hasta confirmar.
+      expect(avioDeRenglones()).toEqual(['']);
+    });
+
+    it('⭐ camino rápido: confirmar sin tocar nada mete los que hay', () => {
+      abrirPreliminar();
+      fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+      expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
+      expect(avioDeRenglones()).toEqual(['BOT-01', 'ETQ-03']);
+    });
+
+    it('⭐ DESMARCAR uno lo deja fuera de la nota (y no se avisa como faltante)', () => {
+      abrirPreliminar();
+      fireEvent.click(casillaPreliminar('ETQ-03'));
+      fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+      expect(avioDeRenglones()).toEqual(['BOT-01']);
+      // El aviso de faltantes habla de lo que NO HAY, no de lo que se desmarcó a propósito.
+      expect(toastWarning).toHaveBeenCalledTimes(1);
+      expect(toastWarning.mock.calls[0]?.[0]).toContain('CIE-02');
+      expect(toastWarning.mock.calls[0]?.[0]).not.toContain('ETQ-03');
+    });
+
+    it('cancelar el preliminar no mete nada', () => {
+      abrirPreliminar();
+      fireEvent.click(
+        within(screen.getByTestId('preliminar-avios')).getByRole('button', { name: 'Cancelar' }),
+      );
+      expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
+      expect(avioDeRenglones()).toEqual(['']);
+    });
+
+    /**
+     * ⭐ Si con el preliminar abierto la existencia deja de saberse (la consulta falla al refrescar),
+     * la regla de las 0.216/0.233 manda: no se inventa un cero, así que el que no había se puede
+     * marcar —y decide el servidor al confirmar la nota (A1)—.
+     */
+    it('⭐ si la existencia deja de saberse, el que no había SE PUEDE marcar y entra', () => {
+      abrirPreliminar();
+      expect(casillaPreliminar('CIE-02')).toBeDisabled();
+      useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO_EN_ERROR);
+      // Cualquier cambio de estado re-pinta el diálogo y vuelve a leer las existencias.
+      fireEvent.change(screen.getByTestId('nota-observaciones'), { target: { value: 'x' } });
+      expect(casillaPreliminar('CIE-02')).toBeEnabled();
+      expect(casillaPreliminar('CIE-02')).not.toBeChecked();
+      fireEvent.click(casillaPreliminar('CIE-02'));
+      fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+      expect(avioDeRenglones()).toEqual(['BOT-01', 'CIE-02', 'ETQ-03']);
+    });
+
+    /**
+     * ⭐⭐ FILA 0.220 (decisión del lead) — se propone lo que le FALTA a la orden, no el requerido:
+     * una OP surtida a medias volvía a pedir la receta entera y se podían mandar avíos de más. Lo ya
+     * surtido sale «Ya surtido» y no se puede marcar.
+     */
+    describe('lo que le FALTA a la orden', () => {
+      /**
+       * BOT-01 ya surtido (180 de 180) y CON existencia; CIE-02 a medias (60 pedidos, 20 enviados ⇒
+       * faltan 40); HIL-06 ya surtido y SIN existencia — el que mide que lo ya surtido no se avisa
+       * como faltante (con existencia, el aviso no lo nombraría de todos modos).
+       */
+      function abrirOpAMedias(): void {
+        useExistenciasAvioMock.mockReturnValue({
+          data: {
+            filas: [
+              { idAvio: 3, idAlmacen: 2, existencia: 500, unidad: 'pza' },
+              { idAvio: 4, idAlmacen: 2, existencia: 100, unidad: 'pza' },
+              { idAvio: 5, idAlmacen: 2, existencia: 12, unidad: 'pza' },
+            ],
+          },
+          isPending: false,
+          isError: false,
+          isPlaceholderData: false,
+        });
+        useHabilitacionOrdenMock.mockReturnValue({
+          data: {
+            idOrden: 50,
+            folioOrden: 1001,
+            idMaquilero: 9,
+            avios: [
+              {
+                idAvio: 3,
+                clave: 'BOT-01',
+                descripcion: 'Botón',
+                requerido: 180,
+                enviado: 180,
+                falta: 0,
+                unidad: 'pza',
+                esExtra: false,
+              },
+              {
+                idAvio: 4,
+                clave: 'CIE-02',
+                descripcion: 'Cierre',
+                requerido: 60,
+                enviado: 20,
+                falta: 40,
+                unidad: 'pza',
+                esExtra: false,
+              },
+              {
+                idAvio: 6,
+                clave: 'HIL-06',
+                descripcion: 'Hilo',
+                requerido: 90,
+                enviado: 90,
+                falta: 0,
+                unidad: 'pza',
+                esExtra: false,
+              },
+            ],
+          },
+          isPending: false,
+        });
+        renderConProveedores(
+          <DialogoEditarNota
+            abierto
+            alCambiarAbierto={() => undefined}
+            alGuardada={() => undefined}
+          />,
+          { sesion: estadoSesionDePrueba(['notas.administrar']) },
+        );
+        fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+        fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+      }
+
+      it('⭐ una OP surtida a medias propone la FALTA, no el requerido', () => {
+        abrirOpAMedias();
+        const filaCierre = screen
+          .getAllByTestId('preliminar-fila')
+          .find((f) => within(f).queryByText('CIE-02') !== null);
+        expect(
+          within(filaCierre as HTMLElement).getByTestId('preliminar-cantidad'),
+        ).toHaveTextContent('40 pza');
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(avioDeRenglones()).toEqual(['CIE-02']);
+        expect(screen.getByTestId('cantidad-nota')).toHaveValue(40);
+      });
+
+      it('⭐ un avío YA SURTIDO sale «Ya surtido», no se puede marcar y no entra (ni se avisa)', () => {
+        abrirOpAMedias();
+        const filaBoton = screen
+          .getAllByTestId('preliminar-fila')
+          .find((f) => within(f).queryByText('BOT-01') !== null);
+        expect(
+          within(filaBoton as HTMLElement).getByTestId('preliminar-cantidad'),
+        ).toHaveTextContent('Ya surtido');
+        // Aunque HAY 500 en el almacén: no le falta a la orden.
+        expect(casillaPreliminar('BOT-01')).toBeDisabled();
+        expect(casillaPreliminar('BOT-01')).not.toBeChecked();
+        fireEvent.click(screen.getByTestId('preliminar-marcar-todos'));
+        fireEvent.click(screen.getByTestId('preliminar-marcar-todos'));
+        expect(casillaPreliminar('BOT-01')).not.toBeChecked();
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(avioDeRenglones()).not.toContain('BOT-01');
+        // Lo ya surtido no es un faltante que haya que ir a comprar.
+        expect(toastWarning).not.toHaveBeenCalled();
+      });
+
+      /**
+       * El flag ✓/⚠ mide contra la receta COMPLETA de la orden, no contra lo que se trajo: un avío de
+       * la receta que no se trajo (aquí, por ya surtido) sigue siendo «de la receta» si alguien lo
+       * agrega a mano —p. ej. para reponer merma—, y uno de fuera sigue saliendo ⚠.
+       */
+      it('el flag ✓/⚠ de la receta sigue funcionando', () => {
+        abrirOpAMedias();
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(screen.getByTestId('flag-receta-nota')).toHaveTextContent('en la receta');
+
+        function agregarAMano(clave: string): void {
+          fireEvent.click(screen.getByTestId('agregar-renglon-nota'));
+          const ordenes = screen.getAllByTestId('selector-orden-nota');
+          fireEvent.change(ordenes[ordenes.length - 1] as HTMLElement, { target: { value: '50' } });
+          const buscadores = screen.getAllByTestId('selector-avio-nota-busqueda');
+          fireEvent.focus(buscadores[buscadores.length - 1] as HTMLElement);
+          const opcion = screen
+            .getAllByTestId('selector-avio-nota-opcion')
+            .find((o) => (o.textContent ?? '').includes(clave));
+          fireEvent.mouseDown(opcion as HTMLElement);
+        }
+        agregarAMano('BOT-01');
+        agregarAMano('ETQ-03');
+        const flags = screen.getAllByTestId('flag-receta-nota').map((f) => f.textContent);
+        expect(flags).toHaveLength(3);
+        expect(flags[0]).toContain('en la receta');
+        // BOT-01 no se trajo (ya surtido) pero ES de la receta.
+        expect(flags[1]).toContain('en la receta');
+        expect(flags[2]).toContain('fuera de la receta');
+      });
+    });
+
+    /**
+     * ⭐⭐ Revisión de la fila 0.220 — los datos de la habilitación tienen que ser los de AHORA, y lo
+     * que ESTA nota ya lleva se descuenta de lo que se propone.
+     */
+    describe('datos vivos y lo que la nota ya lleva', () => {
+      /** CIE-02: 60 pedidos; la existencia de las pruebas tiene 3, 4 y 5. */
+      const EXISTENCIAS_TRES = {
+        data: {
+          filas: [
+            { idAvio: 3, idAlmacen: 2, existencia: 500, unidad: 'pza' },
+            { idAvio: 4, idAlmacen: 2, existencia: 100, unidad: 'pza' },
+            { idAvio: 5, idAlmacen: 2, existencia: 12, unidad: 'pza' },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        isPlaceholderData: false,
+      };
+      function habilitacion(falta: number): Record<string, unknown> {
+        return {
+          idOrden: 50,
+          folioOrden: 1001,
+          idMaquilero: 9,
+          avios: [
+            {
+              idAvio: 3,
+              clave: 'BOT-01',
+              descripcion: 'Botón',
+              requerido: 180,
+              enviado: 0,
+              falta: 180,
+              unidad: 'pza',
+              esExtra: false,
+            },
+            {
+              idAvio: 4,
+              clave: 'CIE-02',
+              descripcion: 'Cierre',
+              requerido: 60,
+              enviado: 60 - falta,
+              falta,
+              unidad: 'pza',
+              esExtra: false,
+            },
+          ],
+        };
+      }
+      function render(prefill?: Parameters<typeof DialogoEditarNota>[0]['prefill']): void {
+        useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_TRES);
+        renderConProveedores(
+          <DialogoEditarNota
+            abierto
+            alCambiarAbierto={() => undefined}
+            alGuardada={() => undefined}
+            prefill={prefill}
+          />,
+          { sesion: estadoSesionDePrueba(['notas.administrar']) },
+        );
+        if (prefill === undefined) {
+          fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+        }
+        fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
+      }
+      function cantidadPreliminar(clave: string): string {
+        const fila = screen
+          .getAllByTestId('preliminar-fila')
+          .find((f) => within(f).queryByText(clave) !== null);
+        return within(fila as HTMLElement).getByTestId('preliminar-cantidad').textContent ?? '';
+      }
+      /** Re-pinta el diálogo (cualquier cambio de estado vuelve a leer las consultas). */
+      function repintar(): void {
+        fireEvent.change(screen.getByTestId('nota-observaciones'), {
+          target: { value: String(Math.random()) },
+        });
+      }
+
+      it('🔴 con la orden REFRESCÁNDOSE (datos viejos en mano) no abre el preliminar', () => {
+        useHabilitacionOrdenMock.mockReturnValue({
+          data: habilitacion(60),
+          isPending: false,
+          isFetching: true,
+          isError: false,
+        });
+        render();
+        expect(screen.getByTestId('nota-traer-boton')).toBeDisabled();
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
+      });
+
+      it('🔴 con la consulta de la orden EN ERROR no abre y dice que no se pudo leer la receta', () => {
+        useHabilitacionOrdenMock.mockReturnValue({
+          data: habilitacion(60),
+          isPending: false,
+          isFetching: false,
+          isError: true,
+          error: { message: 'Se cayó la red.' },
+        });
+        render();
+        expect(screen.getByTestId('nota-traer-boton')).toBeDisabled();
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
+        expect(screen.getByTestId('nota-traer-error')).toHaveTextContent(
+          'No se pudo leer la receta de la orden: Se cayó la red.',
+        );
+      });
+
+      it('⭐ si la orden se refresca con el preliminar ABIERTO, la falta se actualiza ahí mismo', () => {
+        useHabilitacionOrdenMock.mockReturnValue({ data: habilitacion(60), isPending: false });
+        render();
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        expect(cantidadPreliminar('CIE-02')).toBe('60 pza');
+
+        // Mientras se refresca: no se deja confirmar con la cifra vieja, y se dice por qué.
+        useHabilitacionOrdenMock.mockReturnValue({
+          data: habilitacion(60),
+          isPending: false,
+          isFetching: true,
+        });
+        repintar();
+        expect(screen.getByTestId('preliminar-confirmar')).toBeDisabled();
+        expect(screen.getByTestId('preliminar-aviso-datos')).toHaveTextContent('Actualizando');
+
+        // Llega el dato nuevo (otra nota confirmó 20 entretanto).
+        useHabilitacionOrdenMock.mockReturnValue({ data: habilitacion(40), isPending: false });
+        repintar();
+        expect(cantidadPreliminar('CIE-02')).toBe('40 pza');
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(
+          screen.getAllByTestId('cantidad-nota').map((e) => (e as HTMLInputElement).value),
+        ).toEqual(['180', '40']);
+      });
+
+      it('⭐ con el borrador llevando ya BOT-01 de la orden, propone sólo el RESTO', () => {
+        useHabilitacionOrdenMock.mockReturnValue({ data: habilitacion(60), isPending: false });
+        render({
+          idMaquilero: 9,
+          idAlmacen: 2,
+          renglones: [{ idOrden: 50, idAvio: 3, clave: 'BOT-01', cantidad: 100, unidad: 'pza' }],
+        });
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        expect(cantidadPreliminar('BOT-01')).toContain('80 pza');
+        expect(cantidadPreliminar('BOT-01')).toContain('100 pza ya en esta nota');
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(
+          screen.getAllByTestId('cantidad-nota').map((e) => (e as HTMLInputElement).value),
+        ).toEqual(['100', '80', '60']);
+      });
+
+      it('⭐ traer DOS veces la misma orden no duplica: la segunda dice «ya en esta nota»', () => {
+        useHabilitacionOrdenMock.mockReturnValue({ data: habilitacion(60), isPending: false });
+        render();
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(screen.getAllByTestId('renglon-nota')).toHaveLength(2);
+
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        expect(cantidadPreliminar('BOT-01')).toBe('Ya en esta nota');
+        expect(cantidadPreliminar('CIE-02')).toBe('Ya en esta nota');
+        expect(casillaPreliminar('BOT-01')).toBeDisabled();
+        expect(casillaPreliminar('BOT-01')).not.toBeChecked();
+        expect(screen.getByTestId('preliminar-nada-que-mandar')).toHaveTextContent(
+          'ya va en esta nota',
+        );
+        expect(screen.getByTestId('preliminar-confirmar')).toBeDisabled();
+        expect(screen.getAllByTestId('renglon-nota')).toHaveLength(2);
+      });
+
+      it('los toasts hablan en SINGULAR cuando es uno', () => {
+        useHabilitacionOrdenMock.mockReturnValue({
+          data: {
+            idOrden: 50,
+            folioOrden: 1001,
+            idMaquilero: 9,
+            avios: [
+              {
+                idAvio: 3,
+                clave: 'BOT-01',
+                descripcion: 'Botón',
+                requerido: 180,
+                enviado: 0,
+                falta: 180,
+                unidad: 'pza',
+                esExtra: false,
+              },
+              {
+                idAvio: 6,
+                clave: 'HIL-06',
+                descripcion: 'Hilo',
+                requerido: 90,
+                enviado: 0,
+                falta: 90,
+                unidad: 'pza',
+                esExtra: false,
+              },
+            ],
+          },
+          isPending: false,
+        });
+        render();
+        fireEvent.click(screen.getByTestId('nota-traer-boton'));
+        fireEvent.click(screen.getByTestId('preliminar-confirmar'));
+        expect(toastSuccess).toHaveBeenCalledWith(
+          '1 avío de la orden 1001 agregado desde su receta.',
+        );
+        expect(toastWarning).toHaveBeenCalledWith(
+          'No se trajo 1 avío de la receta porque no hay existencia en este almacén: HIL-06.',
+        );
+      });
+    });
+
+    it('con el almacén elegido pero su existencia EN VUELO no abre el preliminar (aún no se sabe)', () => {
+      useExistenciasAvioMock.mockReturnValue(EXISTENCIAS_AVIO_EN_VUELO);
+      useHabilitacionOrdenMock.mockReturnValue({
+        data: {
+          idOrden: 50,
+          folioOrden: 1001,
+          idMaquilero: 9,
+          avios: [
+            {
+              idAvio: 4,
+              clave: 'CIE-02',
+              descripcion: 'Cierre',
+              requerido: 60,
+              enviado: 0,
+              falta: 60,
+              unidad: 'pza',
+              esExtra: false,
+            },
+          ],
+        },
+        isPending: false,
+      });
+      renderConProveedores(
+        <DialogoEditarNota
+          abierto
+          alCambiarAbierto={() => undefined}
+          alGuardada={() => undefined}
+        />,
+        { sesion: estadoSesionDePrueba(['notas.administrar']) },
+      );
+      fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
+      fireEvent.change(screen.getByTestId('nota-traer-orden'), { target: { value: '50' } });
+      fireEvent.click(screen.getByTestId('nota-traer-boton'));
+      expect(screen.queryByTestId('preliminar-avios')).not.toBeInTheDocument();
+      expect(toastError.mock.calls[0]?.[0]).toContain('espera a que cargue su existencia');
     });
   });
 

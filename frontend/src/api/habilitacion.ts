@@ -9,7 +9,7 @@ import type { HabilitacionOrden } from './tipos';
  * el tablero "requerido vs. enviado" de una orden (`GET /api/ordenes/{id}/habilitacion`, permiso
  * `ordenes.habilitacion`). CERO lógica: el backend agrega y decide (A1). Lo consumen el PANEL de
  * habilitación (centro de Órdenes R2 / banner de notas) y el botón "Traer avíos de la orden" del
- * constructor de notas (usa el `requerido` de la receta como cantidad sugerida).
+ * constructor de notas (propone la `falta` de cada avío, menos lo que la nota ya lleva — fila 0.220).
  */
 
 /** Clave raíz de la cache de habilitación en TanStack Query (la invalidan las mutaciones de notas). */

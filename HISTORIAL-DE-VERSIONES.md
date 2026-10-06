@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.200 · 6-oct-2026 · **en prueba** — **Al traer los avíos de la orden, primero ves la lista y escoges qué se manda**
+
+> **La v0.200 cierra una fila del programa: la 0.220**, y abre dos más que salieron de medirla (0.253 y 0.254). Es tu
+> punto 07b del repaso de Inventarios: *«al traer los avíos de la OP, estaría bien ver un preliminar y seleccionar qué
+> avíos son los que se van a mandar (obviamente tendría que validar que sólo te ofrezca los que ya se recibieron en
+> almacén)»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**«Traer avíos de la orden» en la nota de salida ya no mete todo de golpe:** primero abre una lista con cada avío de la
+receta, cuánto **falta por surtir** de esa orden y cuánto hay en el almacén. Marcas los que se van y sólo ésos entran a
+la nota. Por omisión vienen marcados los que tienen existencia y falta, así que el camino rápido sigue siendo un clic.
+
+**Lo que no hay se ve, pero no se puede marcar** («Sin existencia»), y lo que ya se surtió completo sale como **«Ya
+surtido»** y tampoco se marca.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**La cantidad que se propone ahora es lo que FALTA por surtir, no la receta completa** —la misma falta que ya proponía
+el panel de habilitación—. Antes, en una orden surtida a medias, «traer avíos» volvía a proponer todo —y se podía mandar de
+más—. Y además descuenta lo que **esta misma nota** ya lleva de esa orden: si traes dos veces, la segunda dice «Ya en esta
+nota» en vez de duplicar renglones. Si necesitas mandar de más (por ejemplo, para reponer merma), agrega el avío a mano en
+la nota.
+
+### ⏳ Sigue pendiente o roto
+
+**Dos cosas que salieron de medir y quedan como filas aparte, con una pregunta para ti** (§Post-F9.270):
+- **0.253:** lo que falta por surtir sólo descuenta las notas **confirmadas**. Si hay una nota en borrador con avíos de
+  esa orden, otra nota nueva volvería a proponerlos. ¿Pasa seguido tener dos notas abiertas a la vez para la misma
+  orden?
+- **0.254:** «Pasar a nota de salida» desde el panel de habilitación no revisa existencia al pasar; la nota lo pinta en
+  rojo al elegir almacén y el sistema rechaza al confirmar.
+
 ## 0.199 · 6-oct-2026 · **en prueba** — **Cada avío tiene su botón de movimientos, y las existencias se agrupan por proveedor**
 
 > **La v0.199 cierra una fila del programa: la 0.221.** Es tu punto 06 del repaso de Inventarios: *«debería haber un
