@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  CopyIcon,
   Lock,
   PencilIcon,
   SaveIcon,
@@ -35,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { ArbolPermisos } from './ArbolPermisos';
 import { DialogoRol } from './DialogoRol';
 
 /**
@@ -43,6 +45,12 @@ import { DialogoRol } from './DialogoRol';
  * densa lista los roles (Rol · Usuarios · Sistema); al hacer clic en un renglón se abre un cajón ANCHO
  * con los datos del rol y el ÁRBOL DE PERMISOS agrupado por módulo (checkboxes = lo que queda,
  * semántica de REEMPLAZO) + botón Guardar. Alta/edición/eliminación en diálogos.
+ *
+ * ⭐ «Duplicar» (fila 0.248, Daniel 1-oct-2026: *«pon una opción de copiar un rol en otro que haga
+ * nuevo»*): abre el diálogo de ALTA —nunca el de edición— con el nombre «Copia de …» y el árbol ya
+ * palomeado con los permisos del rol origen; al guardar va al mismo `POST /api/roles` y el origen
+ * no se toca. Se puede duplicar también un rol de SISTEMA: la copia nace propia (`esSistema: false`,
+ * el backend no deja nacer otra cosa) y el seed ya no la pisa — que es justo para lo que sirve.
  *
  * Un rol de SISTEMA no se renombra ni se elimina (el backend es la autoridad, A1): la UI deshabilita
  * esas acciones con su razón, pero SÍ permite editar sus permisos — con un AVISO de que el seed se
@@ -61,9 +69,15 @@ export function RolesPagina(): React.JSX.Element {
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [enEdicion, setEnEdicion] = useState<Rol | undefined>(undefined);
+  // Rol del que se copia en el alta por duplicado (fila 0.248); `undefined` = alta en blanco.
+  const [aDuplicar, setADuplicar] = useState<Rol | undefined>(undefined);
   const [aEliminar, setAEliminar] = useState<Rol | null>(null);
   // El cajón guarda el ID; el rol mostrado se DERIVA de la lista viva.
   const [seleccionId, setSeleccionId] = useState<number | null>(null);
+  // El rol que acaba de devolver el POST de alta. Entre la creación y la recarga de la lista, el
+  // cajón ya apunta a su id pero la lista todavía no lo trae: sin este respaldo el cajón quedaba
+  // ABIERTO Y VACÍO unos instantes (fila 0.248). En cuanto la lista lo trae, manda la lista.
+  const [recienCreado, setRecienCreado] = useState<Rol | null>(null);
 
   // Los roles son pocos: se filtran en cliente por nombre/descripción (sin paginación).
   const registros = useMemo(() => {
@@ -79,11 +93,20 @@ export function RolesPagina(): React.JSX.Element {
 
   function abrirAlta(): void {
     setEnEdicion(undefined);
+    setADuplicar(undefined);
     setDialogoAbierto(true);
   }
 
   function abrirEdicion(rol: Rol): void {
     setEnEdicion(rol);
+    setADuplicar(undefined);
+    setDialogoAbierto(true);
+  }
+
+  /** Alta por duplicado: el diálogo de ALTA (no el de edición) precargado con el rol origen. */
+  function abrirDuplicado(rol: Rol): void {
+    setEnEdicion(undefined);
+    setADuplicar(rol);
     setDialogoAbierto(true);
   }
 
@@ -102,7 +125,13 @@ export function RolesPagina(): React.JSX.Element {
     });
   }
 
-  const seleccion = registros.find((r) => r.id === seleccionId) ?? null;
+  // Se busca en la lista VIVA SIN FILTRAR, no en `registros`: si la búsqueda ocultara el rol
+  // abierto, el cajón caería al respaldo `recienCreado` y se quedaría para siempre con la foto del
+  // POST («Editar» revertiría cambios, «Duplicar» copiaría permisos viejos). El respaldo es SÓLO
+  // para el instante en que la lista todavía no trae al recién creado.
+  const seleccion =
+    (consulta.data ?? []).find((r) => r.id === seleccionId) ??
+    (recienCreado !== null && recienCreado.id === seleccionId ? recienCreado : null);
   const total = registros.length;
 
   return (
@@ -244,7 +273,12 @@ export function RolesPagina(): React.JSX.Element {
         }
         acciones={
           seleccion !== null && puedeAdministrar ? (
-            <AccionesRol rol={seleccion} alEditar={abrirEdicion} alEliminar={setAEliminar} />
+            <AccionesRol
+              rol={seleccion}
+              alEditar={abrirEdicion}
+              alDuplicar={abrirDuplicado}
+              alEliminar={setAEliminar}
+            />
           ) : undefined
         }
       >
@@ -277,7 +311,16 @@ export function RolesPagina(): React.JSX.Element {
         ) : null}
       </CajonDetalle>
 
-      <DialogoRol abierto={dialogoAbierto} alCambiarAbierto={setDialogoAbierto} rol={enEdicion} />
+      <DialogoRol
+        abierto={dialogoAbierto}
+        alCambiarAbierto={setDialogoAbierto}
+        rol={enEdicion}
+        origen={aDuplicar}
+        alCrear={(creado) => {
+          setRecienCreado(creado);
+          setSeleccionId(creado.id);
+        }}
+      />
       <DialogoConfirmacion
         abierto={aEliminar !== null}
         alCambiarAbierto={(abierto) => {
@@ -303,17 +346,20 @@ export function RolesPagina(): React.JSX.Element {
 }
 
 /**
- * Acciones del hero de un rol: Editar y Eliminar. Un rol de SISTEMA no se
+ * Acciones del hero de un rol: Editar, Duplicar y Eliminar. Duplicar no tiene candado: cualquier
+ * rol —también uno de sistema— sirve de molde para uno propio nuevo. Un rol de SISTEMA no se
  * renombra ni se elimina; un rol con usuarios asignados tampoco se elimina — esos
  * botones se muestran deshabilitados con su razón (el backend es la autoridad, A1).
  */
 function AccionesRol({
   rol,
   alEditar,
+  alDuplicar,
   alEliminar,
 }: {
   rol: Rol;
   alEditar: (r: Rol) => void;
+  alDuplicar: (r: Rol) => void;
   alEliminar: (r: Rol) => void;
 }): React.JSX.Element {
   const tieneUsuarios = rol.totalUsuarios > 0;
@@ -338,6 +384,16 @@ function AccionesRol({
       >
         <PencilIcon aria-hidden />
         Editar
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => alDuplicar(rol)}
+        title="Crea un rol nuevo con los mismos permisos; este rol no cambia."
+        data-testid="duplicar-rol"
+      >
+        <CopyIcon aria-hidden />
+        Duplicar
       </Button>
       <Button
         variant="destructive"
@@ -469,55 +525,12 @@ function EditorPermisos({
             </p>
           ) : null}
 
-          {/* Rejilla FLUIDA al ancho del cajón (auto-fit): 1 columna en móvil, 2-3 en
-              amplio/máximo. `min(100%,…)` evita que la columna mínima desborde cuando el
-              cajón es más angosto que 15rem — así las secciones nunca se enciman. */}
-          <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
-            {catalogo.map((grupo) => {
-              const marcadosModulo = grupo.permisos.filter((p) => seleccion.has(p.clave)).length;
-              return (
-                <fieldset
-                  key={grupo.modulo}
-                  // `min-w-0`: un <fieldset> trae `min-inline-size: min-content` de fábrica y, sin
-                  // esto, se niega a encoger a su columna del grid y DESBORDA sobre la de al lado
-                  // (era el encimado de las secciones de Finanzas).
-                  className="min-w-0 rounded-xl ring-1 ring-foreground/10 p-3"
-                  data-testid="grupo-permisos"
-                >
-                  <legend className="flex items-center gap-2 px-1 text-sm font-medium">
-                    {grupo.etiqueta}
-                    <span className="text-xs text-muted-foreground">
-                      {marcadosModulo}/{grupo.permisos.length}
-                    </span>
-                  </legend>
-                  <ul className="mt-1 space-y-1.5">
-                    {grupo.permisos.map((permiso) => (
-                      <li key={permiso.clave}>
-                        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 hover:bg-muted">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 size-4 shrink-0 accent-primary"
-                            checked={seleccion.has(permiso.clave)}
-                            disabled={!puedeAdministrar || asignar.isPending}
-                            onChange={() => alternar(permiso.clave)}
-                            data-testid="permiso-checkbox"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm leading-tight">
-                              {permiso.descripcion}
-                            </span>
-                            <span className="block font-mono text-[11px] break-words text-muted-foreground">
-                              {permiso.clave}
-                            </span>
-                          </span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </fieldset>
-              );
-            })}
-          </div>
+          <ArbolPermisos
+            catalogo={catalogo}
+            seleccion={seleccion}
+            alAlternar={alternar}
+            deshabilitado={!puedeAdministrar || asignar.isPending}
+          />
 
           {puedeAdministrar ? (
             <div className="flex justify-end pt-1">
