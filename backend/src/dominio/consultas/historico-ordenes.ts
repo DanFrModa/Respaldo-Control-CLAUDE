@@ -35,6 +35,7 @@ import {
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -82,21 +83,47 @@ function aResumen(o: OrdenConModelo): HistoricoOrdenResumen {
   };
 }
 
+/**
+ * Los ids de las tres cajas de TEXTO del buscador (cliente, taller y búsqueda libre), resueltos SIN
+ * acentos ni mayúsculas con el pre-filtro de `comun/busqueda.ts` (fila 0.214) y acotados a la
+ * empresa activa (A9). `undefined` = esa caja vino vacía y no filtra.
+ */
+interface IdsTextoHistorico {
+  cliente: number[] | undefined;
+  taller: number[] | undefined;
+  busqueda: number[] | undefined;
+}
+
+/** Resuelve {@link IdsTextoHistorico}: hasta tres consultas, en paralelo, una vez por búsqueda. */
+async function idsTextoHistorico(
+  cliente: Parameters<typeof idsSiHayBusqueda>[0],
+  idEmpresa: number,
+  f: DatosHistoricoOrdenesQuery,
+): Promise<IdsTextoHistorico> {
+  const opciones = { idEmpresa };
+  const [porCliente, porTaller, porBusqueda] = await Promise.all([
+    idsSiHayBusqueda(cliente, 'historico-orden-cliente', f.cliente, opciones),
+    // El taller: la cabecera, los campos abiertos con TODOS los que la trabajaron (§Post-F9.27) o
+    // los procesos. El pre-filtro mira las cuatro columnas y los procesos de una vez.
+    idsSiHayBusqueda(cliente, 'historico-orden-taller', f.maquilero, opciones),
+    // La caja libre: número, cliente, código del viejo, la empresa del viejo (§Post-F9.29 — la única
+    // forma de volver a juntar las órdenes de una empresa que ya no existe: como se rescataron
+    // colgadas de la principal, su `idEmpresa` ya no las distingue) y el modelo ligado.
+    idsSiHayBusqueda(cliente, 'historico-orden', f.busqueda, opciones),
+  ]);
+  return { cliente: porCliente, taller: porTaller, busqueda: porBusqueda };
+}
+
 /** Arma el `where` de Prisma con los filtros del buscador. */
 function construirWhere(
   idEmpresa: number,
   f: DatosHistoricoOrdenesQuery,
+  idsTexto: IdsTextoHistorico,
 ): Prisma.HistoricoOrdenV1WhereInput {
-  const contiene = (valor: string): Prisma.StringFilter => ({
-    contains: valor,
-    mode: 'insensitive',
-  });
-
   const where: Prisma.HistoricoOrdenV1WhereInput = { idEmpresa };
 
   if (f.incluirCanceladas === 'false') where.cancelada = false;
   if (f.idModelo !== undefined) where.idModelo = f.idModelo;
-  if (f.cliente !== undefined && f.cliente !== '') where.cliente = contiene(f.cliente);
 
   // Tipo de prenda y género viven en el MODELO: se filtran a través de la relación, sin duplicar
   // esos campos en el archivo (y sin que una orden sin modelo ligado se cuele).
@@ -114,38 +141,13 @@ function construirWhere(
     };
   }
 
-  // El taller: la cabecera, los campos abiertos con TODOS los que la trabajaron (§Post-F9.27) o
-  // los procesos. Los campos abiertos van primero porque resuelven la mayoría sin subquery; el
-  // `some` sobre procesos se queda como red por si un nombre solo vive ahí.
-  if (f.maquilero !== undefined && f.maquilero !== '') {
-    where.OR = [
-      { maquilero: contiene(f.maquilero) },
-      { cortadores: contiene(f.maquilero) },
-      { maquileros: contiene(f.maquilero) },
-      { estampadores: contiene(f.maquilero) },
-      { procesos: { some: { tercero: contiene(f.maquilero) } } },
-    ];
+  // Las tres cajas de texto van en `AND`, cada una con sus ids: así ninguna se come a las otras
+  // (buscar "azul" con cliente="X" trae sólo órdenes de X).
+  const porTexto: Prisma.HistoricoOrdenV1WhereInput[] = [];
+  for (const ids of [idsTexto.cliente, idsTexto.taller, idsTexto.busqueda]) {
+    if (ids !== undefined) porTexto.push({ id: { in: ids } });
   }
-
-  // La caja de búsqueda libre. Va en `AND` para que no se coma los otros filtros (si fuera otro
-  // `OR` al mismo nivel, buscar "azul" con cliente="X" traería órdenes de cualquier cliente).
-  if (f.busqueda !== undefined && f.busqueda !== '') {
-    where.AND = [
-      {
-        OR: [
-          { numero: contiene(f.busqueda) },
-          { cliente: contiene(f.busqueda) },
-          { codigoModeloV1: contiene(f.busqueda) },
-          // §Post-F9.29 — la empresa del viejo. Es la única forma de volver a juntar las órdenes de
-          // una empresa que ya no existe: como se rescataron colgadas de la principal, su
-          // `idEmpresa` ya no las distingue; solo este texto sabe de quién eran.
-          { empresaV1: contiene(f.busqueda) },
-          { modelo: { codigo: contiene(f.busqueda) } },
-          { modelo: { descripcion: contiene(f.busqueda) } },
-        ],
-      },
-    ];
-  }
+  if (porTexto.length > 0) where.AND = porTexto;
 
   return where;
 }
@@ -181,7 +183,11 @@ export async function listarHistoricoOrdenes(
   verificarPermiso(sesion, 'ordenes.ver');
   const f = validarEntrada(esquemaHistoricoOrdenesQuery, filtros);
   const cliente = clienteLectura(bd);
-  const where = construirWhere(sesion.idEmpresaActiva, f);
+  const where = construirWhere(
+    sesion.idEmpresaActiva,
+    f,
+    await idsTextoHistorico(cliente, sesion.idEmpresaActiva, f),
+  );
 
   // Desempate por id: sin él, dos órdenes de la misma fecha pueden bailar entre páginas.
   const orderBy: Prisma.HistoricoOrdenV1OrderByWithRelationInput[] = [

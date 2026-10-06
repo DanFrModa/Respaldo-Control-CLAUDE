@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
+import type { Prisma } from '../../datos/index.js';
 
 import { sinonimosDeDepartamentos } from './cliente-departamentos-sinonimos.js';
 
@@ -56,13 +57,39 @@ function casa(fila: FilaDepartamento, where: WhereFalso): boolean {
   throw new Error(`where no soportado por la tabla falsa: ${JSON.stringify(where)}`);
 }
 
-/** Catálogo falso en memoria + el contador de viajes a la base (para el gate de rendimiento). */
+/** Sin acentos y en minúsculas: lo que hace `lower(unaccent())` en el pre-filtro real. */
+function comparable(texto: string): string {
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/**
+ * Catálogo falso en memoria + el contador de viajes a la base (para el gate de rendimiento).
+ *
+ * Fila 0.214: la SEMILLA ya no es un `findMany` con `contains` sino el pre-filtro sin acentos de
+ * `comun/busqueda.ts` (un `$queryRaw`). La tabla falsa lo emula: sólo acepta el SQL del catálogo
+ * de departamentos (cualquier otro revienta, igual que un `where` desconocido) y compara sin acentos
+ * el texto CRUDO que viaja como último parámetro.
+ */
 function catalogo(filas: FilaDepartamento[]) {
   const findMany = vi.fn((args: { where: WhereFalso }) =>
     Promise.resolve(filas.filter((f) => casa(f, args.where)).map((f) => ({ ...f }))),
   );
-  const bd: ContextoBd = { tx: { clienteDepartamento: { findMany } } as unknown as Tx };
-  return { bd, findMany };
+  const queryRaw = vi.fn((consulta: Prisma.Sql) => {
+    if (!consulta.text.includes('"cliente_departamento"')) {
+      throw new Error(`SQL no soportado por la tabla falsa: ${consulta.text}`);
+    }
+    // El texto viaja CRUDO (el escape de comodines lo hace el SQL, después de `unaccent`).
+    const texto = comparable(String(consulta.values[consulta.values.length - 1]));
+    return Promise.resolve(
+      filas.filter((f) => comparable(f.nombre).includes(texto)).map((f) => ({ id: f.id })),
+    );
+  });
+  const bd: ContextoBd = {
+    tx: { clienteDepartamento: { findMany }, $queryRaw: queryRaw } as unknown as Tx,
+  };
+  /** Viajes a la base: el pre-filtro de la semilla + cada `findMany`. */
+  const viajes = () => queryRaw.mock.calls.length + findMany.mock.calls.length;
+  return { bd, findMany, viajes };
 }
 
 /**
@@ -154,22 +181,22 @@ describe('sinónimos de departamento — cuando NO hay rastro (REGLA 0-B: funcio
   });
 
   it('un texto que no casa con ningún departamento se resuelve en UN solo viaje', async () => {
-    const { bd, findMany } = catalogo(caballerosConSuSinonimo);
+    const { bd, viajes } = catalogo(caballerosConSuSinonimo);
     expect(await sinonimosDeDepartamentos('MONARCH-778', bd)).toEqual([]);
-    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(viajes()).toBe(1);
   });
 
   it('búsqueda vacía o en blanco no toca la base', async () => {
-    const { bd, findMany } = catalogo(caballerosConSuSinonimo);
+    const { bd, viajes } = catalogo(caballerosConSuSinonimo);
     expect(await sinonimosDeDepartamentos('', bd)).toEqual([]);
     expect(await sinonimosDeDepartamentos('   ', bd)).toEqual([]);
     expect(await sinonimosDeDepartamentos(undefined, bd)).toEqual([]);
-    expect(findMany).not.toHaveBeenCalled();
+    expect(viajes()).toBe(0);
   });
 });
 
 describe('sinónimos de departamento — lo que NO devuelve', () => {
-  it('omite los nombres que el `contains` de siempre ya encuentra (no engorda el OR)', async () => {
+  it('omite los nombres que la búsqueda de texto ya encuentra (no engorda el OR)', async () => {
     // «HOMBRE» casa por texto con los dos, y además están fusionados: no hay nada que sumar.
     const { bd } = catalogo([
       { id: 1, nombre: 'HOMBRE', idFusionadoEn: null },
@@ -181,6 +208,16 @@ describe('sinónimos de departamento — lo que NO devuelve', () => {
   it('la semilla es insensible a mayúsculas (el usuario no teclea el catálogo al pie de la letra)', async () => {
     const { bd } = catalogo(caballerosConSuSinonimo);
     expect(await sinonimosDeDepartamentos('caBALLeros', bd)).toEqual(['2-HOMBRE']);
+  });
+
+  it('⭐ fila 0.214: la semilla es también SIN ACENTOS («ninos» siembra «NIÑOS»)', async () => {
+    const { bd } = catalogo([
+      { id: 1, nombre: 'NIÑOS', idFusionadoEn: null },
+      { id: 2, nombre: '3-KIDS', idFusionadoEn: 1 },
+    ]);
+    expect(await sinonimosDeDepartamentos('ninos', bd)).toEqual(['3-KIDS']);
+    // Y la semilla con acento NO se devuelve como sinónimo: la búsqueda de texto ya la encuentra.
+    expect(await sinonimosDeDepartamentos('3-kids', bd)).toEqual(['NIÑOS']);
   });
 
   it('recorta el nombre y no devuelve repetidos', async () => {
@@ -200,10 +237,11 @@ describe('sinónimos de departamento — rendimiento y paracaídas', () => {
     for (let i = 2; i <= 41; i++) {
       filas.push({ id: i, nombre: `SINONIMO-${String(i)}`, idFusionadoEn: 1 });
     }
-    const { bd, findMany } = catalogo(filas);
+    const { bd, viajes } = catalogo(filas);
     expect(await sinonimosDeDepartamentos('Caballeros', bd)).toHaveLength(40);
-    // 1 semilla + 1 nivel que baja a los 40 + 1 nivel que no encuentra nada nuevo.
-    expect(findMany.mock.calls.length).toBeLessThanOrEqual(3);
+    // Pre-filtro de la semilla + leer la semilla + 1 nivel que baja a los 40 + 1 nivel que no
+    // encuentra nada nuevo (la fila 0.214 sumó el primer viaje: la semilla ya no se lee por texto).
+    expect(viajes()).toBeLessThanOrEqual(4);
   });
 
   it('⭐ un ANILLO sembrado a mano no cuelga ni repite (el tope de niveles es el paracaídas)', async () => {

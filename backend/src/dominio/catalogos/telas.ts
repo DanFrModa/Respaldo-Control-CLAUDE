@@ -62,7 +62,7 @@ import type { ComposicionTela, Prisma, Tela, TelaCategoria } from '../../datos/i
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
+import { idsPorTextoSinAcentos, idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -321,11 +321,16 @@ export async function listarTelasCategorias(
   verificarPermiso(sesion, 'telas.ver');
   const filtros = validarEntrada(esquemaListarTelasCategorias, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(
+    clienteLectura(bd),
+    'tela-categoria',
+    filtros.busqueda,
+  );
   const where: Prisma.TelaCategoriaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);
@@ -579,11 +584,16 @@ export async function listarComposicionesTela(
   verificarPermiso(sesion, 'telas.ver');
   const filtros = validarEntrada(esquemaListarComposicionesTela, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(
+    clienteLectura(bd),
+    'composicion-tela',
+    filtros.busqueda,
+  );
   const where: Prisma.ComposicionTelaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);

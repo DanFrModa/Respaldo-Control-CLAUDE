@@ -22,6 +22,7 @@ import {
 import type { ConceptoCosto, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import {
@@ -270,16 +271,16 @@ export async function listarConceptosCosto(
   verificarPermiso(sesion, 'concepto-costo.ver');
   const filtros = validarEntrada(esquemaListarConceptosCosto, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(
+    clienteLectura(bd),
+    'concepto-costo',
+    filtros.busqueda,
+  );
   const where: Prisma.ConceptoCostoWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
-            { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);

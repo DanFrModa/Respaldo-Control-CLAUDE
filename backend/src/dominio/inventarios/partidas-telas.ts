@@ -57,6 +57,7 @@ import {
 import { DireccionMovimiento, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { condicionContieneSinAcentos, idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -1872,9 +1873,21 @@ export async function consultarExistenciasTelaColor(
   if (filtros.idProveedor !== undefined)
     condiciones.push(Prisma.sql`te."id_proveedor" = ${filtros.idProveedor}`);
   if (filtros.busqueda !== undefined && filtros.busqueda.length > 0) {
-    const patron = `%${filtros.busqueda}%`;
+    // SIN acentos ni mayúsculas, con los comodines del usuario escapados (fila 0.214) — las mismas
+    // cinco columnas que el catálogo `tela` de `comun/busqueda.ts` («negro», «alsatex»…).
+    const busqueda = filtros.busqueda;
+    const columnas = [
+      'te."nombre"',
+      'te."nombre_proveedor"',
+      'p."nombre"',
+      'c."nombre"',
+      'c."pantone"',
+    ];
     condiciones.push(
-      Prisma.sql`(te."nombre" ILIKE ${patron} OR te."nombre_proveedor" ILIKE ${patron} OR p."nombre" ILIKE ${patron} OR c."nombre" ILIKE ${patron} OR c."pantone" ILIKE ${patron})`,
+      Prisma.sql`(${Prisma.join(
+        columnas.map((columna) => condicionContieneSinAcentos(columna, busqueda)),
+        ' OR ',
+      )})`,
     );
   }
   if (!filtros.incluirCeros) {
@@ -2367,10 +2380,10 @@ export async function listarPartidasTela(
   const busqueda = filtros.busqueda;
   const filtrosBusqueda: Prisma.PartidaTelaWhereInput[] = [];
   if (busqueda !== undefined && busqueda.length > 0) {
-    const or: Prisma.PartidaTelaWhereInput[] = [
-      { loteProveedor: { contains: busqueda, mode: 'insensitive' } },
-      { factura: { contains: busqueda, mode: 'insensitive' } },
-    ];
+    // Lote del proveedor o factura SIN acentos ni mayúsculas (fila 0.214), acotado a la empresa
+    // activa (A9).
+    const ids = await idsPorTextoSinAcentos(cliente, 'partida-tela', busqueda, { idEmpresa });
+    const or: Prisma.PartidaTelaWhereInput[] = [{ id: { in: ids } }];
     // Si lo tecleado es un número, también casa por folio exacto.
     if (/^\d+$/.test(busqueda)) {
       or.push({ folio: BigInt(busqueda) });

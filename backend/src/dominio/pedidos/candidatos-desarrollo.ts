@@ -21,7 +21,7 @@ import { z } from 'zod';
 import type { CandidatoDesarrollo } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
-import { escaparLike } from '../../comun/busqueda.js';
+import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -55,26 +55,23 @@ export async function candidatosDesarrollo(
   const cliente = clienteLectura(bd);
   const verImportes = tienePermiso(sesion, 'pedidos.importes');
 
-  // Pre-filtro de ids por SQL crudo: `lower(unaccent())` en AMBOS lados, texto parametrizado y
-  // escapado. ⚠️ El ORDEN importa y no es estético — `unaccent(lower(x))` ata la búsqueda al
-  // `LC_CTYPE` del servidor y con locale `C` falla en todo valor acentuado en MAYÚSCULA. La
-  // medición y el porqué viven en la cabecera de `comun/busqueda.ts`, que hace lo mismo para los
-  // seis catálogos; esto es su gemelo a mano (aquí el pre-filtro cruza tres tablas y lleva sus
-  // propias condiciones, así que no cabe en la whitelist del ayudante).
+  // Pre-filtro de ids por SQL crudo (cruza tres tablas y lleva sus propias condiciones, así que no
+  // cabe en la whitelist de `comun/busqueda.ts`). La comparación de texto SÍ es la del ayudante
+  // (`condicionContieneSinAcentos`, fila 0.214): `lower(unaccent())` en los dos lados y en ese
+  // orden, y los comodines escapados DESPUÉS de `unaccent`. Antes era un gemelo escrito a mano que
+  // escapaba en JS, y un `％` tecleado se volvía `%` vivo dentro de `unaccent`.
   const condiciones = [Prisma.sql`d.apagado = false`, Prisma.sql`p.id_empresa = ${idEmpresa}`];
   if (filtros.idCliente !== undefined) {
     condiciones.push(Prisma.sql`p.id_cliente = ${filtros.idCliente}`);
   }
   if (filtros.busqueda !== undefined && filtros.busqueda !== '') {
-    const patron = `%${escaparLike(filtros.busqueda)}%`;
+    const busqueda = filtros.busqueda;
+    const columnas = ['m.codigo', 'm.descripcion', 'd.numero_cliente', 'p.nombre', 'c.nombre'];
     condiciones.push(
-      Prisma.sql`(
-        lower(unaccent(m.codigo)) LIKE lower(unaccent(${patron}))
-        OR lower(unaccent(COALESCE(m.descripcion, ''))) LIKE lower(unaccent(${patron}))
-        OR lower(unaccent(COALESCE(d.numero_cliente, ''))) LIKE lower(unaccent(${patron}))
-        OR lower(unaccent(p.nombre)) LIKE lower(unaccent(${patron}))
-        OR lower(unaccent(c.nombre)) LIKE lower(unaccent(${patron}))
-      )`,
+      Prisma.sql`(${Prisma.join(
+        columnas.map((columna) => condicionContieneSinAcentos(columna, busqueda)),
+        ' OR ',
+      )})`,
     );
   }
   const filas = await cliente.$queryRaw<{ id: number }[]>(

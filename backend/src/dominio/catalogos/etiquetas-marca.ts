@@ -20,6 +20,7 @@ import { esquemaEtiquetaMarcaCrear, esquemaEtiquetaMarcaEditar } from '../../con
 import type { EtiquetaMarca, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -294,11 +295,16 @@ export async function listarEtiquetasMarca(
   verificarPermiso(sesion, 'etiquetas-marca.ver');
   const filtros = validarEntrada(esquemaListarEtiquetasMarca, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(
+    clienteLectura(bd),
+    'etiqueta-marca',
+    filtros.busqueda,
+  );
   const where: Prisma.EtiquetaMarcaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);

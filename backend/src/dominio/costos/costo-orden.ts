@@ -541,7 +541,7 @@ export async function listarCostos(
     orden: {
       ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
       ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
-      ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
+      ...(await armarBusquedaConSinonimos(filtros.busqueda, sesion.idEmpresaActiva, bd)),
     },
   };
 

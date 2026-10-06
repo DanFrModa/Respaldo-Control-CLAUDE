@@ -226,7 +226,7 @@ export async function consultarOrdenes(
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
     ...filtroOrdenesCerradas(filtros.cerradas),
-    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, sesion.idEmpresaActiva, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -493,7 +493,7 @@ export async function buscarOrdenesGlobal(
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     estado: { not: 'cancelada' },
-    ...(await armarBusquedaConSinonimos(q, bd)),
+    ...(await armarBusquedaConSinonimos(q, sesion.idEmpresaActiva, bd)),
   };
 
   const cliente = clienteLectura(bd);

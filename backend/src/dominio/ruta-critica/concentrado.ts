@@ -33,6 +33,7 @@ import type {
 } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
+import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { armarPagina, rangoPrisma, type Paginacion } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -110,7 +111,8 @@ function condicionesOrden(idEmpresa: number, filtros: FiltrosConcentrado): Prism
     Prisma.sql`o."rc_activa" = TRUE`,
   ];
   if (filtros.busquedaCliente !== undefined && filtros.busquedaCliente !== '') {
-    cond.push(Prisma.sql`c."nombre" ILIKE ${'%' + filtros.busquedaCliente + '%'}`);
+    // SIN acentos ni mayúsculas, con los comodines del usuario escapados (fila 0.214).
+    cond.push(condicionContieneSinAcentos('c."nombre"', filtros.busquedaCliente));
   }
   if (filtros.idProcesoDef !== undefined) {
     cond.push(

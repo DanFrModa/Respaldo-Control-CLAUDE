@@ -21,7 +21,13 @@ import { dirname, join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { escaparLike, sqlIdsPorTextoSinAcentos, type CatalogoBuscable } from './busqueda.js';
+import {
+  catalogoConEmpresa,
+  condicionContieneSinAcentos,
+  idsSiHayBusqueda,
+  sqlIdsPorTextoSinAcentos,
+  type CatalogoBuscable,
+} from './busqueda.js';
 
 /** Sube desde el cwd hasta la carpeta `backend/` (la que tiene `src/dominio`). */
 function raizBackend(): string {
@@ -75,46 +81,127 @@ const COLUMNAS_ESPERADAS: Record<CatalogoBuscable, readonly string[]> = {
   avio: ['t.clave', 't.descripcion'],
   modelo: ['t.codigo', 't.codigo_desarrollo', 't.descripcion'],
   // Las tres últimas viven en tablas VECINAS (el proveedor dueño y el grid de colores) y se
-  // consultan con `EXISTS`, con alias `v`.
+  // consultan con una subconsulta `IN`, con alias `v`.
   tela: ['t.nombre', 't.nombre_proveedor', 'v.nombre', 'v.nombre', 'v.pantone'],
+
+  // ── Fila 0.214 ──
+  // Órdenes: TODO en vecinas (código del modelo, nombre del cliente, cualquier referencia).
+  orden: ['v.codigo', 'v.nombre', 'v.valor'],
+  // El Centro: SIN el nombre del cliente.
+  'orden-centro': ['v.codigo', 'v.valor'],
+  'historico-orden': [
+    't.numero',
+    't.cliente',
+    't.codigo_modelo_v1',
+    't.empresa_v1',
+    'v.codigo',
+    'v.descripcion',
+  ],
+  'historico-orden-cliente': ['t.cliente'],
+  'historico-orden-taller': [
+    't.maquilero',
+    't.cortadores',
+    't.maquileros',
+    't.estampadores',
+    'v.tercero',
+  ],
+  proyecto: ['t.nombre'],
+  'entrada-tela': ['t.numero_documento', 'v.nombre'],
+  'partida-tela': ['t.lote_proveedor', 't.factura'],
+  'modelo-arte': ['t.descripcion', 't.posicion', 'v.codigo', 'v.descripcion'],
+  'directorio-tercero': ['t.nombre', 't.corto', 't.razon_social', 't.contacto', 't.telefono'],
+  'directorio-tercero-servicio': ['t.servicios'],
+  'cliente-departamento': ['t.nombre'],
+  almacen: ['t.nombre'],
+  usuario: ['t.username', 't.nombre'],
+  auditor: ['t.nombre'],
+  defecto: ['t.clave', 't.descripcion'],
+  'plan-aql': ['t.nombre'],
+  'tipo-producto': ['t.nombre'],
+  'concepto-pago': ['t.nombre'],
+  'direccion-entrega': ['t.nombre', 't.direccion'],
+  'etiqueta-marca': ['t.nombre'],
+  talla: ['t.etiqueta'],
+  'curva-talla': ['t.nombre'],
+  'tela-categoria': ['t.nombre'],
+  'composicion-tela': ['t.nombre'],
+  temporada: ['t.nombre'],
+  'concepto-costo': ['t.codigo', 't.nombre'],
+  'estado-lista': ['t.codigo', 't.nombre'],
+  'personal-area': ['t.nombre'],
+  'actividad-productividad': ['t.nombre'],
+  'tipo-proceso': ['t.codigo', 't.nombre'],
+  'proceso-def': ['t.codigo', 't.nombre'],
 };
+
+/**
+ * Los catálogos que se acotan por EMPRESA dentro del propio pre-filtro (A9), escritos a mano por la
+ * misma razón que las columnas: quitarle la empresa a uno es un cambio de comportamiento que esta
+ * prueba tiene que ver.
+ */
+const CON_EMPRESA: readonly CatalogoBuscable[] = [
+  'orden',
+  'orden-centro',
+  'historico-orden',
+  'historico-orden-cliente',
+  'historico-orden-taller',
+  'proyecto',
+  'entrada-tela',
+  'partida-tela',
+];
+
+/** Empresa de mentira para armar el SQL de los catálogos que la exigen. */
+const ID_EMPRESA = 77;
+
+/** Las opciones con las que se arma el SQL de un catálogo (con empresa si la exige). */
+function opcionesDe(catalogo: CatalogoBuscable): { idEmpresa?: number } {
+  return catalogoConEmpresa(catalogo) ? { idEmpresa: ID_EMPRESA } : {};
+}
 
 const CATALOGOS = Object.keys(COLUMNAS_ESPERADAS) as CatalogoBuscable[];
 
 /** El SQL con los placeholders numerados (`$1`…), tal como lo recibe Postgres. */
 function textoSql(catalogo: CatalogoBuscable, busqueda: string): string {
-  return sqlIdsPorTextoSinAcentos(catalogo, busqueda).text;
+  return sqlIdsPorTextoSinAcentos(catalogo, busqueda, opcionesDe(catalogo)).text;
 }
 
-describe('escaparLike', () => {
-  it('escapa los comodines de LIKE del texto del usuario', () => {
-    expect(escaparLike('100%')).toBe('100\\%');
-    expect(escaparLike('a_b')).toBe('a\\_b');
-    expect(escaparLike('c\\d')).toBe('c\\\\d');
-    expect(escaparLike('ambar')).toBe('ambar');
-  });
-});
+/**
+ * El patrón de LIKE, tal como lo arma el SQL (fila 0.214, corrección del reviewer): `%` + el texto
+ * CRUDO del usuario sin acentos ni mayúsculas + `%`, con los comodines escapados DESPUÉS de
+ * `unaccent` y `ESCAPE` con la barra. Escrito entero a propósito: cualquier cambio en la forma —en
+ * particular volver a escapar en JavaScript ANTES de `unaccent`— tiene que verse aquí.
+ */
+const PATRON_ESPERADO = (n: number) =>
+  `LIKE ('%' || replace(replace(replace(lower(unaccent($${n})), '\\', '\\\\'), '%', '\\%'), '_', '\\_') || '%') ESCAPE '\\'`;
 
 describe('sqlIdsPorTextoSinAcentos — seguridad (el texto del usuario nunca es SQL)', () => {
   it.each(CATALOGOS)('en %s el texto viaja como VALOR, no dentro del SQL', (catalogo) => {
     // Un texto que sería catastrófico interpolado: comilla + comentario + punto y coma.
     const malicioso = "x'; DROP TABLE colores; --";
-    const consulta = sqlIdsPorTextoSinAcentos(catalogo, malicioso);
+    const consulta = sqlIdsPorTextoSinAcentos(catalogo, malicioso, opcionesDe(catalogo));
 
     // Las DOS formas del mismo SQL (`?` y `$1`): ninguna lleva el texto dentro.
     for (const sql of [consulta.sql, consulta.text]) {
       expect(sql).not.toContain('DROP TABLE');
       expect(sql).not.toContain(malicioso);
     }
-    // Un parámetro por comparación, y todos con el patrón escapado del usuario.
-    expect(consulta.values).toEqual(
-      COLUMNAS_ESPERADAS[catalogo].map(() => `%${escaparLike(malicioso)}%`),
-    );
+    // Un parámetro por comparación, y todos con el texto CRUDO del usuario (más la empresa,
+    // primero, en los catálogos que la exigen — también como VALOR).
+    expect(consulta.values).toEqual([
+      ...(catalogoConEmpresa(catalogo) ? [ID_EMPRESA] : []),
+      ...COLUMNAS_ESPERADAS[catalogo].map(() => malicioso),
+    ]);
   });
 
-  it('el patrón lleva los comodines del usuario ya escapados', () => {
-    const consulta = sqlIdsPorTextoSinAcentos('color', '50%_azul');
-    expect(consulta.values).toEqual(['%50\\%\\_azul%']);
+  /**
+   * 🔴 El texto viaja CRUDO y el SQL lo escapa DESPUÉS de `unaccent`. Si se escapara en JavaScript
+   * (como al principio), `unaccent` convertiría un `％` de ancho completo en un `%` vivo: medido,
+   * `100％` encontraba «ROJO 1000 CEREZA». El «sí/no encuentra» de verdad vive en la integración.
+   */
+  it('el texto viaja CRUDO (sin escapar en JS) y el SQL lo escapa después de unaccent', () => {
+    const consulta = sqlIdsPorTextoSinAcentos('color', '50%_azul＿100％');
+    expect(consulta.values).toEqual(['50%_azul＿100％']);
+    expect(consulta.text).toContain(PATRON_ESPERADO(1));
   });
 });
 
@@ -124,14 +211,17 @@ describe('sqlIdsPorTextoSinAcentos — lower(unaccent(...)) en AMBOS lados', () 
     const columnas = COLUMNAS_ESPERADAS[catalogo];
 
     for (const columna of columnas) {
-      // Lado IZQUIERDO: la columna, con COALESCE (simetría con `candidatos-desarrollo.ts`).
+      // Lado IZQUIERDO: la columna, con COALESCE (por simetría entre todas las comparaciones).
       expect(sql).toContain(`lower(unaccent(COALESCE(${columna}, '')))`);
     }
-    // Lado DERECHO: el parámetro, también envuelto — uno por columna.
-    const ladosDerechos = sql.match(/LIKE lower\(unaccent\(\$\d+\)\)/g) ?? [];
+    // Lado DERECHO: el parámetro, también envuelto y escapado DESPUÉS — uno por columna.
+    const ladosDerechos =
+      sql.match(/LIKE \('%' \|\| replace\(replace\(replace\(lower\(unaccent\(\$\d+\)\)/g) ?? [];
     expect(ladosDerechos).toHaveLength(columnas.length);
-    // Y ninguna comparación quedó a medias: tantos LIKE como columnas, ni uno más.
+    // Y ninguna comparación quedó a medias: tantos LIKE como columnas, ni uno más, y cada uno con su
+    // ESCAPE (sin él, la barra que añade el `replace` no escaparía nada).
     expect(sql.match(/LIKE/g) ?? []).toHaveLength(columnas.length);
+    expect(sql.match(/ESCAPE '\\'/g) ?? []).toHaveLength(columnas.length);
   });
 
   /**
@@ -154,8 +244,8 @@ describe('sqlIdsPorTextoSinAcentos — lower(unaccent(...)) en AMBOS lados', () 
   it('las columnas se unen con OR (cualquiera de ellas basta)', () => {
     expect(textoSql('avio', 'ambar').match(/ OR /g) ?? []).toHaveLength(1);
     expect(textoSql('modelo', 'ambar').match(/ OR /g) ?? []).toHaveLength(2);
-    // tela: 2 columnas propias + 2 `EXISTS` = 3 OR arriba, más 1 OR DENTRO del EXISTS del grid
-    // de colores (nombre O pantone) = 4 en total.
+    // tela: 2 columnas propias + 2 subconsultas = 3 OR arriba, más 1 OR DENTRO de la subconsulta
+    // del grid de colores (nombre O pantone) = 4 en total.
     expect(textoSql('tela', 'ambar').match(/ OR /g) ?? []).toHaveLength(4);
     // Una sola columna: no hay OR que unir.
     expect(textoSql('color', 'ambar')).not.toContain(' OR ');
@@ -170,19 +260,38 @@ describe('sqlIdsPorTextoSinAcentos — la tabla raíz y sus vecinas', () => {
     ['avio', '"avios" t'],
     ['modelo', '"modelos" t'],
     ['tela', '"telas" t'],
+    ['orden', '"ordenes" t'],
+    ['orden-centro', '"ordenes" t'],
+    ['historico-orden', '"historico_orden_v1" t'],
+    ['entrada-tela', '"entradas_tela" t'],
+    ['partida-tela', '"partidas_tela" t'],
+    ['usuario', '"usuarios" t'],
+    ['cliente-departamento', '"cliente_departamento" t'],
   ] as [CatalogoBuscable, string][])('%s lee de %s', (catalogo, tabla) => {
     expect(textoSql(catalogo, 'ambar')).toContain(`FROM ${tabla}`);
   });
 
-  it('tela alcanza su proveedor y su grid de colores por EXISTS (nunca por JOIN)', () => {
+  it('tela alcanza su proveedor y su grid de colores por IN (subconsulta), nunca por JOIN', () => {
     const sql = textoSql('tela', 'ambar');
-    expect(sql).toContain('EXISTS (SELECT 1 FROM "proveedores" v WHERE v.id = t.id_proveedor AND');
-    expect(sql).toContain('EXISTS (SELECT 1 FROM "telas_colores" v WHERE v.id_tela = t.id AND');
+    expect(sql).toContain('t.id_proveedor IN (SELECT v.id FROM "proveedores" v WHERE');
+    expect(sql).toContain('t.id IN (SELECT v.id_tela FROM "telas_colores" v WHERE');
     // 🔑 Por qué importa la forma: un JOIN devolvería el id de la tela una vez POR COLOR. El
     // resultado visible saldría igual (el `id IN (…)` de Prisma deduplica), pero la lista de ids
-    // crecería con el grid y la consulta cuesta ~3× más (medido: ~40 ms vs ~15 ms).
+    // crecería con el grid y la consulta cuesta ~3× más (medido en la 0.205: ~40 ms vs ~15 ms).
     expect(sql).not.toContain('JOIN');
     expect(sql).not.toContain('DISTINCT');
+  });
+
+  /**
+   * ⭐ Fila 0.214: y tampoco `EXISTS` CORRELACIONADO. Dentro de un `OR`, Postgres lo evalúa fila por
+   * fila de la raíz; el `IN` sin correlación se resuelve una vez y se consulta con un hash. Medido el
+   * 6-oct-2026, 7 corridas, en órdenes (20,000 de una empresa + 75,000 referencias): `EXISTS`
+   * 236-327 ms, `IN` 45-68 ms (en telas no hay diferencia; ver `VecinoBuscable` en `busqueda.ts`).
+   * Volver a `EXISTS` no rompe ningún resultado —por eso lo fija esta prueba y no una de
+   * integración—, sólo el tiempo.
+   */
+  it.each(CATALOGOS)('%s no usa EXISTS correlacionado para sus vecinas', (catalogo) => {
+    expect(textoSql(catalogo, 'ambar')).not.toContain('EXISTS');
   });
 
   it.each(CATALOGOS)('%s devuelve el id de la tabla RAÍZ (alias t), no del vecino', (catalogo) => {
@@ -194,14 +303,85 @@ describe('sqlIdsPorTextoSinAcentos — la tabla raíz y sus vecinas', () => {
   });
 });
 
+describe('sqlIdsPorTextoSinAcentos — la EMPRESA (A9) dentro del pre-filtro (fila 0.214)', () => {
+  it('la lista escrita a mano coincide con la whitelist (quitarle la empresa a uno se nota)', () => {
+    expect(CATALOGOS.filter((catalogo) => catalogoConEmpresa(catalogo)).sort()).toEqual(
+      [...CON_EMPRESA].sort(),
+    );
+  });
+
+  it.each(CON_EMPRESA)('%s filtra por empresa, como VALOR y ANTES del texto', (catalogo) => {
+    const consulta = sqlIdsPorTextoSinAcentos(catalogo, 'ambar', { idEmpresa: ID_EMPRESA });
+    // El `AND (…)` con paréntesis es lo que impide que un `OR` del texto se coma la empresa.
+    expect(consulta.text).toMatch(/WHERE t\.id_empresa = \$1 AND \(/);
+    expect(consulta.values[0]).toBe(ID_EMPRESA);
+    expect(consulta.text).not.toContain(String(ID_EMPRESA));
+  });
+
+  it.each(CON_EMPRESA)('%s TRUENA si le falta la empresa (no busca en todas)', (catalogo) => {
+    expect(() => sqlIdsPorTextoSinAcentos(catalogo, 'ambar')).toThrow(/exige idEmpresa/);
+  });
+
+  it('un catálogo SIN empresa truena si se la pasan (no finge un filtro que no hace)', () => {
+    expect(() => sqlIdsPorTextoSinAcentos('color', 'ambar', { idEmpresa: 1 })).toThrow(
+      /no se acota por empresa/,
+    );
+  });
+
+  it('órdenes: las tres vecinas por IN (subconsulta), y el Centro sin la del cliente', () => {
+    const orden = textoSql('orden', 'ambar');
+    expect(orden).toContain('t.id_modelo IN (SELECT v.id FROM "modelos" v WHERE');
+    expect(orden).toContain('t.id_cliente IN (SELECT v.id FROM "clientes" v WHERE');
+    expect(orden).toContain('t.id IN (SELECT v.id_orden FROM "orden_referencia" v WHERE');
+    const centro = textoSql('orden-centro', 'ambar');
+    expect(centro).toContain('"orden_referencia" v');
+    expect(centro).not.toContain('"clientes"');
+  });
+});
+
+describe('condicionContieneSinAcentos — la condición suelta del SQL crudo (fila 0.214)', () => {
+  it('el texto viaja CRUDO como VALOR, y el SQL lo pliega y lo escapa (la misma comparación)', () => {
+    const malicioso = "x'; DROP TABLE colores; --50％";
+    const condicion = condicionContieneSinAcentos('c."nombre"', malicioso);
+    expect(condicion.text).toBe(`lower(unaccent(COALESCE(c."nombre", ''))) ${PATRON_ESPERADO(1)}`);
+    expect(condicion.values).toEqual([malicioso]);
+    expect(condicion.text).not.toContain(ORDEN_PROHIBIDO);
+  });
+});
+
+describe('idsSiHayBusqueda — sin texto NO toca la base', () => {
+  it.each([undefined, ''])(
+    'con %j devuelve undefined («no filtres»), sin consulta',
+    async (texto) => {
+      let consultas = 0;
+      const cliente = {
+        $queryRaw: () => {
+          consultas += 1;
+          return Promise.resolve([]);
+        },
+      } as unknown as Parameters<typeof idsSiHayBusqueda>[0];
+      expect(await idsSiHayBusqueda(cliente, 'color', texto)).toBeUndefined();
+      expect(consultas).toBe(0);
+    },
+  );
+
+  it('con texto devuelve la lista (vacía = «filtra a cero», que NO es lo mismo)', async () => {
+    const cliente = {
+      $queryRaw: () => Promise.resolve([]),
+    } as unknown as Parameters<typeof idsSiHayBusqueda>[0];
+    expect(await idsSiHayBusqueda(cliente, 'color', 'zzz')).toEqual([]);
+  });
+});
+
 /**
  * ⭐⭐ **LA RED QUE IMPIDE QUE EL ORDEN MALO VUELVA A NACER — EN CUALQUIER SITIO, NO SÓLO AQUÍ.**
  *
- * El pre-filtro de este módulo no es el único SQL crudo con `unaccent` del backend: `dominio/
- * pedidos/candidatos-desarrollo.ts` hace lo mismo a mano (cruza tres tablas, así que no cabe en la
- * whitelist del ayudante). Los DOS nacieron con `unaccent(lower(x))` y los dos se invirtieron en la
- * fila 0.205. Una aserción sobre el SQL que genera ESTE archivo no dice nada del otro, ni del
- * tercero que alguien escriba el mes que viene copiando el que tenga más a mano.
+ * El pre-filtro de este módulo no fue el único SQL crudo con `unaccent` del backend:
+ * `dominio/pedidos/candidatos-desarrollo.ts` lo hacía a mano (cruza tres tablas, así que no cabe en
+ * la whitelist del ayudante). Los DOS nacieron con `unaccent(lower(x))` y los dos se invirtieron en
+ * la fila 0.205; desde la 0.214 el segundo usa `condicionContieneSinAcentos`. Una aserción sobre el
+ * SQL que genera ESTE archivo no dice nada del tercero que alguien escriba el mes que viene copiando
+ * el que tenga más a mano.
  *
  * 🔑 **Y esta es la razón de fondo de que haga falta una red y no baste con revisar:** las dos
  * formas dan el MISMO resultado en una base con locale UTF-8, que es la del CI y la de Railway.
@@ -312,18 +492,20 @@ describe('RED: el orden lower(unaccent(…)) está fijado en TODO el backend', (
     // (2) Cero sitios con el orden malo, ni en el código ni en las migraciones.
     expect(sitiosMalos(todos)).toEqual([]);
 
-    // (3) Canarios: que el escáner haya mirado de verdad. MEDIDO el 26-sep-2026 sobre este árbol:
-    // **1,096 archivos .ts**, **124 archivos .sql** (uno por migración) y **18 usos del orden bueno**
-    // en código — 2 en `busqueda.ts` (los dos lados de `comparacion()`), 10 en
-    // `candidatos-desarrollo.ts` (5 condiciones × 2 lados) y 6 en este archivo; en `.sql` hoy hay
-    // CERO (ninguna migración indexa todavía). Las cotas van muy por debajo de lo medido para no
-    // romperse al crecer el árbol, pero cazan que el glob deje de casar o que los pre-filtros
-    // desaparezcan sin que nadie mire.
+    // (3) Canarios: que el escáner haya mirado de verdad. MEDIDO el 26-sep-2026: **1,096 archivos
+    // .ts** y **124 .sql**. Los usos del orden bueno se cuentan SÓLO en código que no es prueba, y
+    // RE-MEDIDOS el 6-oct-2026 (fila 0.214): son **2**, los dos en `busqueda.ts` (el lado de la
+    // columna en `comparacion()` y el del texto en `patronSql()`). Eran 12 hasta que
+    // `candidatos-desarrollo.ts` dejó su gemelo escrito a mano y pasó a usar
+    // `condicionContieneSinAcentos`: hoy TODA comparación sin acentos sale de esas dos líneas. En
+    // `.sql` hay CERO (ninguna migración indexa todavía). La cota caza que el glob deje de casar o que
+    // el ayudante desaparezca sin que nadie mire.
     expect(archivosTs.length).toBeGreaterThan(300);
     expect(archivosSql.length).toBeGreaterThan(50);
     const usosBuenos = todos
+      .filter(({ ruta }) => !ruta.endsWith('.test.ts'))
       .flatMap(({ ruta, fuente }) => lineasDeCodigo(fuente, ruta))
       .flatMap((linea) => linea.match(/lower\(unaccent\(/g) ?? []).length;
-    expect(usosBuenos).toBeGreaterThanOrEqual(10);
+    expect(usosBuenos).toBeGreaterThanOrEqual(2);
   });
 });

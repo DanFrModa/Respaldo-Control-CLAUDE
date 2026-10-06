@@ -118,6 +118,7 @@ import type {
 import { esquemaRecetasPorRevisarDominio } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
+import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -179,10 +180,11 @@ export async function consultarRecetasPorRevisar(
   const condBusqueda =
     busqueda === ''
       ? Prisma.empty
-      : Prisma.sql`AND (
-            m."codigo" ILIKE ${`%${busqueda}%`}
-         OR padre."codigo" ILIKE ${`%${busqueda}%`}
-         OR neg."cliente" ILIKE ${`%${busqueda}%`}
+      : // SIN acentos ni mayúsculas, con los comodines del usuario escapados (fila 0.214).
+        Prisma.sql`AND (
+            ${condicionContieneSinAcentos('m."codigo"', busqueda)}
+         OR ${condicionContieneSinAcentos('padre."codigo"', busqueda)}
+         OR ${condicionContieneSinAcentos('neg."cliente"', busqueda)}
         )`;
   const condSoloConPedido = f.soloConPedido
     ? Prisma.sql`AND esp."piezas" IS NOT NULL`

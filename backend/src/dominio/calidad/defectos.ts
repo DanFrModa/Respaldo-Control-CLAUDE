@@ -17,6 +17,7 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -340,19 +341,15 @@ export async function listarDefectos(
   verificarPermiso(sesion, 'calidad.ver');
   const filtros = validarEntrada(esquemaListarDefectos, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'defecto', filtros.busqueda);
   const where: Prisma.DefectoCatalogoWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.severidad === undefined ? {} : { severidad: filtros.severidad }),
     ...(filtros.soloFavoritos ? { favorito: true } : {}),
     ...(filtros.nivelAQL === undefined ? {} : { nivelAQL: filtros.nivelAQL }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { clave: { contains: filtros.busqueda, mode: 'insensitive' } },
-            { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);
