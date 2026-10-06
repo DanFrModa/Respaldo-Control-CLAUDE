@@ -383,6 +383,10 @@ orden de **3.4 MB** en una sola respuesta). Con la ventana por omisión son **30
   materiales filtrado por avío y almacén (parámetros en `inventarios/kardex-enlace.ts`; el kardex lee pestaña, avío y
   almacén de la URL). `consultarExistenciasAvio` une el proveedor **habitual** y devuelve `porProveedor`
   (`subtotalesPorProveedor`, el grupo sin habitual al final).
+- ⭐ **«Traer avíos de la orden» pasa por una lista previa** (fila 0.220, nota de salida): `notas-salida/PreliminarAviosOrden.tsx`
+  + `preliminar-avios.ts`. Propone la **falta** por surtir (`aSurtirDefault`, la misma del panel de habilitación), no la
+  receta completa, menos lo que la propia nota ya lleva; lo ya surtido, lo que ya va en la nota y lo que no hay no se
+  marcan; entran sólo los marcados. No se abre ni confirma con la habilitación refrescándose o en error.
 
 ## Migración del histórico (F4-E6)
 

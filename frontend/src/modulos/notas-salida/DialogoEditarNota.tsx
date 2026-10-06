@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useAlmacenes } from '@/api/almacenes';
 import { useHabilitacionOrden } from '@/api/habilitacion';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
-import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
+import type { HabilitacionOrden, NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
 import { hoy } from '@/lib/fecha-negocio';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,7 +24,6 @@ import { useStockAvioEnAlmacen } from '@/modulos/inventarios/useStockAvioEnAlmac
 
 import {
   capturaDesdeNota,
-  hayStockDeAvio,
   nuevaClaveRenglon,
   renglonApi,
   renglonCompleto,
@@ -41,6 +40,8 @@ import {
   type OrdenElegible,
 } from '@/modulos/produccion/ordenes-de-captura';
 import { EditorRenglonesNota } from './EditorRenglonesNota';
+import { cantidadEnNotaPorAvio, type FilaPreliminarAvio } from './preliminar-avios';
+import { PreliminarAviosOrden } from './PreliminarAviosOrden';
 
 /** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
 export interface PrefillRenglonNota {
@@ -70,7 +71,7 @@ export interface PrefillNota {
  * Diálogo de CAPTURA / EDICIÓN de una nota de salida (F4-E5; rediseño R6 §4.6). Si recibe `nota`,
  * edita; si recibe `prefill`, da de alta PRE-CARGADO (desde "Pasar a nota de salida" de la
  * habilitación); si no, alta vacía. Encabezado (maquilero, almacén origen [decisión g], fechas,
- * observaciones) + **"Traer avíos de la orden"** (carga la receta con su cantidad sugerida, PROPONE
+ * observaciones) + **"Traer avíos de la orden"** (preliminar de la receta con lo que le falta a la orden, PROPONE
  * no LIMITA) + renglones de AVÍO (con flag de receta ✓/⚠ y existencia; la tela ya no se captura
  * aquí — §Post-F9.38: la salida de tela a una orden NO lleva nota). Una nota
  * confirmada/cancelada va en `soloLectura`. Acciones gobernadas por `notas.administrar`; el backend
@@ -128,11 +129,41 @@ export function DialogoEditarNota({
   const [recetas, setRecetas] = useState<Record<number, number[]>>({});
   // Orden elegida en el selector "Traer avíos de la orden".
   const [ordenTraer, setOrdenTraer] = useState<number | null>(null);
+  // ⭐ Fila 0.220: la orden cuyo PRELIMINAR está abierto (null = cerrado).
+  const [idOrdenPreliminar, setIdOrdenPreliminar] = useState<number | null>(null);
 
-  // Habilitación de la orden elegida para "Traer avíos" (trae la receta + cantidad sugerida).
+  // Habilitación de la orden elegida para "Traer avíos" (trae la receta + lo que le falta).
   const habTraer = useHabilitacionOrden(ordenTraer ?? undefined);
   const habLista =
     habTraer.data !== undefined && ordenTraer !== null && habTraer.data.idOrden === ordenTraer;
+  /**
+   * ⭐ Fila 0.220 (reviewer): ¿se puede CREER lo que trae la habilitación? No mientras se refresca
+   * en segundo plano —tras confirmar una nota la caché se invalida y TanStack entrega los datos
+   * VIEJOS con `isPending=false`— ni si ese refresco falló (se quedan los viejos). Abrir el
+   * preliminar ahí propondría una falta que ya no es.
+   */
+  const habCreible = habLista && !habTraer.isFetching && !habTraer.isError;
+  const errorReceta =
+    ordenTraer !== null && habTraer.isError
+      ? `No se pudo leer la receta de la orden: ${habTraer.error.message}`
+      : null;
+  /**
+   * La habilitación que ve el preliminar: la de la consulta, EN VIVO, mientras sea de su orden — no
+   * una foto tomada al abrir (si la consulta se refresca con el preliminar abierto, la falta se
+   * actualiza ahí mismo).
+   */
+  const habPreliminar: HabilitacionOrden | undefined =
+    idOrdenPreliminar !== null && habTraer.data?.idOrden === idOrdenPreliminar
+      ? habTraer.data
+      : undefined;
+  /** Lo que ESTA nota ya lleva de cada avío para la orden del preliminar (se le descuenta). */
+  const enNotaPreliminar = useMemo(
+    () =>
+      idOrdenPreliminar === null
+        ? new Map<number, number>()
+        : cantidadEnNotaPorAvio(renglones, idOrdenPreliminar),
+    [renglones, idOrdenPreliminar],
+  );
 
   /**
    * Existencia por avío en el almacén origen — o `undefined` cuando **no se sabe** (sin almacén, en
@@ -160,6 +191,7 @@ export function DialogoEditarNota({
       return;
     }
     setOrdenTraer(null);
+    setIdOrdenPreliminar(null);
     setMostrarCerradas(false);
     if (nota !== undefined) {
       setIdMaquilero(nota.idMaquilero);
@@ -217,42 +249,69 @@ export function DialogoEditarNota({
   }, [abierto, nota, prefill]);
 
   /**
-   * Carga los avíos de la receta de la orden elegida (cantidad = requerido); PROPONE, no LIMITA.
+   * «Traer avíos de la orden»: abre el PRELIMINAR con la receta de la orden elegida (fila 0.220).
    *
-   * ⭐⭐ FILA 0.216 — **pero sólo los que HAY en el almacén origen.** Daniel: *«como me jala avíos que
-   * no hay stock, no me deja… que no deje meter los avíos que no hay stock, ANTES de meterlos»*
-   * (§Post-F9.243, punto 07c). Los que no tienen existencia **no se traen** y se dicen por su clave:
-   * callarlos sería peor que traerlos, porque la receta los pide y alguien tiene que ir a comprarlos.
+   * ⭐⭐ FILA 0.216 — **sólo se puede mandar lo que HAY en el almacén origen.** Daniel: *«como me jala
+   * avíos que no hay stock, no me deja… que no deje meter los avíos que no hay stock, ANTES de
+   * meterlos»* (§Post-F9.243, punto 07c).
    *
-   * 🔒 Y por eso el ALMACÉN es requisito de este botón: el stock es *de un almacén*, así que sin él
-   * no hay nada contra lo que filtrar (`hayStockDeAvio` dejaría pasar todo) y volvería el defecto.
+   * ⭐⭐ FILA 0.220 — **y antes de meterlos, se escogen.** Daniel (punto 07b): *«estaría bien ver un
+   * preliminar y seleccionar qué avíos son los que se van a mandar (obviamente tendría que validar
+   * que sólo te ofrezca los que ya se recibieron en almacén)»*. Ya no se meten de golpe: se abre
+   * {@link PreliminarAviosOrden} con TODA la receta, los que no hay se ven deshabilitados y entran
+   * sólo los marcados ({@link agregarDesdePreliminar}).
+   *
+   * 🔒 Y por eso el ALMACÉN —con su existencia ya leída— es requisito de este botón: el stock es *de
+   * un almacén*, así que sin él no hay nada contra lo que comparar (`hayStockDeAvio` dejaría marcar
+   * todo) y volvería el defecto de la 0.216.
    */
   function traerAvios(): void {
-    if (!habLista || habTraer.data === undefined) {
+    if (errorReceta !== null) {
+      toast.error(errorReceta);
+      return;
+    }
+    if (!habCreible || habTraer.data === undefined) {
       toast.error('Elige una orden y espera a que cargue su receta.');
       return;
     }
-    if (!stockConocido) {
+    if (idAlmacen === null) {
       toast.error('Elige primero el almacén origen: de ahí se sabe qué avíos hay para mandar.');
       return;
     }
-    const data = habTraer.data;
-    const deReceta = data.avios.filter((a) => !a.esExtra);
-    if (deReceta.length === 0) {
-      toast.error('La orden no tiene avíos en su receta.');
-      return;
-    }
-    // 🔴 EL FILTRO DE LA FILA 0.216. Si se quitara, la nota volvería a nacer con renglones que el
-    // servidor rechaza al confirmar — el callejón sin salida que Daniel reportó.
-    const conStock = deReceta.filter((a) => hayStockDeAvio(existenciaPorAvio, a.idAvio));
-    const sinStock = deReceta.filter((a) => !hayStockDeAvio(existenciaPorAvio, a.idAvio));
-    if (conStock.length === 0) {
+    if (!stockConocido) {
       toast.error(
-        `Ninguno de los ${String(deReceta.length)} avíos de la receta tiene existencia en este almacén: no hay nada que mandar.`,
+        'Todavía no se sabe qué hay en el almacén origen: espera a que cargue su existencia.',
       );
       return;
     }
-    const nuevos: RenglonNotaCaptura[] = conStock.map((a) => ({
+    const data = habTraer.data;
+    if (!data.avios.some((a) => !a.esExtra)) {
+      toast.error('La orden no tiene avíos en su receta.');
+      return;
+    }
+    setIdOrdenPreliminar(data.idOrden);
+  }
+
+  /**
+   * Mete a la nota los avíos MARCADOS en el preliminar (cantidad = lo que le FALTA a la orden, fila
+   * 0.220; PROPONE, no LIMITA: el renglón la deja editar).
+   *
+   * 🔴 EL FILTRO DE LAS FILAS 0.216 Y 0.220 vive en `aviosAEnviar` (lo aplica el preliminar antes de
+   * llamar aquí): sólo los marcados y que tienen existencia. Si se quitara, la nota volvería a nacer
+   * con renglones que el servidor rechaza al confirmar — el callejón sin salida que Daniel reportó.
+   *
+   * `sinExistencia` viene de las MISMAS filas del preliminar (`faltantesSinExistencia`): una sola
+   * fuente para lo que se avisa como faltante.
+   */
+  function agregarDesdePreliminar(
+    seleccionados: FilaPreliminarAvio[],
+    sinExistencia: FilaPreliminarAvio[],
+  ): void {
+    if (habPreliminar === undefined) return;
+    const data = habPreliminar;
+    setIdOrdenPreliminar(null);
+    const deReceta = data.avios.filter((a) => !a.esExtra);
+    const nuevos: RenglonNotaCaptura[] = seleccionados.map((a) => ({
       clave: nuevaClaveRenglon(),
       tipo: 'avio',
       idOrden: data.idOrden,
@@ -263,7 +322,7 @@ export function DialogoEditarNota({
       idLote: null,
       loteClave: null,
       idMovimientoSalidaTela: null,
-      cantidad: String(a.requerido),
+      cantidad: String(a.cantidad),
       unidad: a.unidad ?? '',
       descripcionLegacy: null,
     }));
@@ -275,19 +334,24 @@ export function DialogoEditarNota({
       return [...conContenido, ...nuevos];
     });
     // La RECETA completa (no sólo lo traído): el flag ✓/⚠ dice si el avío pertenece a la receta de
-    // la orden, y eso no cambia porque hoy no haya existencia de él.
+    // la orden, y eso no cambia porque hoy no haya existencia de él ni porque no se haya marcado.
     setRecetas((prev) => ({ ...prev, [data.idOrden]: deReceta.map((a) => a.idAvio) }));
     if (idMaquilero === null && data.idMaquilero !== null) setIdMaquilero(data.idMaquilero);
     toast.success(
-      `${String(nuevos.length)} avíos de la orden ${String(data.folioOrden)} agregados desde su receta.`,
+      nuevos.length === 1
+        ? `1 avío de la orden ${String(data.folioOrden)} agregado desde su receta.`
+        : `${String(nuevos.length)} avíos de la orden ${String(data.folioOrden)} agregados desde su receta.`,
     );
-    if (sinStock.length > 0) {
-      // Un aviso APARTE del éxito, y con las claves: si no, quien captura no se enteraría de que la
-      // receta pide más de lo que se llevó.
+    // Un aviso APARTE del éxito, y con las claves: los que la receta pide y no hay en el almacén.
+    // El preliminar ya los enseñaba; se repite aquí porque al cerrarlo se pierde de vista y alguien
+    // tiene que ir a comprarlos. Los que se DESMARCARON a propósito no se avisan (fue una decisión),
+    // ni lo ya surtido o lo que ya va en esta nota (no falta comprarlos).
+    if (sinExistencia.length > 0) {
+      const claves = sinExistencia.map((a) => a.clave).join(', ');
       toast.warning(
-        `No se trajeron ${String(sinStock.length)} avíos de la receta porque no hay existencia en este almacén: ${sinStock
-          .map((a) => a.clave ?? String(a.idAvio))
-          .join(', ')}.`,
+        sinExistencia.length === 1
+          ? `No se trajo 1 avío de la receta porque no hay existencia en este almacén: ${claves}.`
+          : `No se trajeron ${String(sinExistencia.length)} avíos de la receta porque no hay existencia en este almacén: ${claves}.`,
       );
     }
   }
@@ -529,9 +593,9 @@ export function DialogoEditarNota({
                   confirmar, que es justo lo que Daniel pidió. */}
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground sm:flex-1">
                 <InfoIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                La receta del modelo ya dice qué avíos lleva la orden. Tráelos ya cargados con su
-                cantidad sugerida. Elige antes el almacén origen: sólo se traen los avíos que hay
-                ahí.
+                La receta del modelo ya dice qué avíos lleva la orden. Tráelos con lo que le falta
+                por surtir y escoge cuáles mandar. Elige antes el almacén origen: sólo se pueden
+                mandar los avíos que hay ahí.
               </p>
               <div className="flex items-end gap-2">
                 <label className="text-xs text-muted-foreground">
@@ -562,7 +626,10 @@ export function DialogoEditarNota({
                   disabled={
                     ordenTraer === null ||
                     ordenTraerCerrada ||
-                    (ordenTraer !== null && habTraer.isPending)
+                    habTraer.isPending ||
+                    // ⭐ 0.220 (reviewer): ni con un refresco en vuelo ni con la consulta en error.
+                    habTraer.isFetching ||
+                    habTraer.isError
                   }
                   data-testid="nota-traer-boton"
                 >
@@ -579,6 +646,18 @@ export function DialogoEditarNota({
                 />
               </div>
             </div>
+          ) : null}
+
+          {/* ⭐ 0.220: si la receta de la orden no se pudo leer, el botón se apaga y aquí se dice por
+              qué (no «espera a que cargue»: no va a cargar sola). */}
+          {!soloLectura && errorReceta !== null ? (
+            <p
+              className="rounded-md bg-crit-soft px-2.5 py-1.5 text-xs text-crit"
+              role="note"
+              data-testid="nota-traer-error"
+            >
+              {errorReceta}
+            </p>
           ) : null}
 
           {!soloLectura && foliosCerrados.length > 0 ? (
@@ -629,6 +708,25 @@ export function DialogoEditarNota({
             </Button>
           ) : null}
         </DialogFooter>
+        {/* ⭐ Fila 0.220: el preliminar (diálogo anidado) se monta sólo cuando se pide, así su
+            selección inicial sale de la existencia de ESE momento. */}
+        {habPreliminar !== undefined ? (
+          <PreliminarAviosOrden
+            folioOrden={habPreliminar.folioOrden}
+            avios={habPreliminar.avios}
+            stock={existenciaPorAvio}
+            enNota={enNotaPreliminar}
+            avisoDatos={
+              habTraer.isError
+                ? 'No se pudo volver a leer la orden: lo que falta puede haber cambiado. Cierra y vuelve a intentarlo.'
+                : habTraer.isFetching
+                  ? 'Actualizando lo que le falta a la orden…'
+                  : null
+            }
+            alConfirmar={agregarDesdePreliminar}
+            alCancelar={() => setIdOrdenPreliminar(null)}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
