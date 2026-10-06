@@ -53956,8 +53956,22 @@ export interface paths {
                 existencia: number;
                 /** @description Dónde está guardado el material en ESE almacén (texto libre); null = no anotada. */
                 ubicacion: string | null;
+                /** @description Proveedor HABITUAL del avío (el que surte normalmente). null = sin habitual. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor habitual. null = sin habitual. */
+                proveedor: string | null;
               }[];
               totalExistencia: number;
+              /** @description Subtotales por proveedor HABITUAL de las MISMAS filas (fila 0.221): alfabético, con el grupo sin proveedor (idProveedor null) al final. Suman `totalExistencia`. */
+              porProveedor: {
+                /** @description null = el grupo «Sin proveedor habitual». */
+                idProveedor: number | null;
+                proveedor: string | null;
+                /** @description Σ de la existencia de los renglones del grupo. */
+                existencia: number;
+                /** @description Cuántos renglones avío×almacén caen en el grupo. */
+                renglones: number;
+              }[];
             };
           };
         };

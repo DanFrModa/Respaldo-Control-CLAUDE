@@ -141057,6 +141057,30 @@
                               }
                             ],
                             "description": "Dónde está guardado el material en ESE almacén (texto libre); null = no anotada."
+                          },
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor HABITUAL del avío (el que surte normalmente). null = sin habitual."
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor habitual. null = sin habitual."
                           }
                         },
                         "required": [
@@ -141068,18 +141092,70 @@
                           "idAlmacen",
                           "almacen",
                           "existencia",
-                          "ubicacion"
+                          "ubicacion",
+                          "idProveedor",
+                          "proveedor"
                         ],
                         "additionalProperties": false
                       }
                     },
                     "totalExistencia": {
                       "type": "number"
+                    },
+                    "porProveedor": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "null = el grupo «Sin proveedor habitual»."
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "existencia": {
+                            "type": "number",
+                            "description": "Σ de la existencia de los renglones del grupo."
+                          },
+                          "renglones": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos renglones avío×almacén caen en el grupo."
+                          }
+                        },
+                        "required": [
+                          "idProveedor",
+                          "proveedor",
+                          "existencia",
+                          "renglones"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Subtotales por proveedor HABITUAL de las MISMAS filas (fila 0.221): alfabético, con el grupo sin proveedor (idProveedor null) al final. Suman `totalExistencia`."
                     }
                   },
                   "required": [
                     "filas",
-                    "totalExistencia"
+                    "totalExistencia",
+                    "porProveedor"
                   ],
                   "additionalProperties": false,
                   "description": "Existencias de avío (consulta de solo lectura, D3)."

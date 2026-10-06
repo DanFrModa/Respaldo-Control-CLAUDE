@@ -1,8 +1,9 @@
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { useAlmacenes } from '@/api/almacenes';
 import type { Avio } from '@/api/avios';
 import {
   useCancelarAvio,
@@ -22,9 +23,11 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCancelarMaterial } from './DialogoCancelarMaterial';
+import { idDeParametro, PARAM_KARDEX } from './kardex-enlace';
 import { FiltroPeriodoKardex, LineaPeriodoKardex } from './PeriodoKardex';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorAvio } from './SelectorAvio';
@@ -57,9 +60,19 @@ type Dimension = 'tela' | 'avio';
  * lote (legado)», la última captura que todavía escribía con esa forma. Retirarlo no
  * habría movido a nadie a otra pantalla: habría borrado la única. El criterio completo está escrito
  * una sola vez, en `TraspasoMaterialesPagina.tsx`. Lo que aquí se arregló es que MINTIERA.
+ *
+ * ⭐ FILA 0.221 — la pestaña de AVÍOS se puede ABRIR YA FILTRADA desde la URL
+ * (`?material=avio&idAvio=…&idAlmacen=…`, ver `kardex-enlace.ts`): es el destino del botón
+ * «Movimientos» de cada renglón de «Inventario de avíos». Pestaña, avío y almacén VIVEN en la URL
+ * (no en estado local), así que el enlace se recarga, se guarda o se manda tal cual.
  */
 export function KardexMaterialesPagina(): React.JSX.Element {
-  const [dimension, setDimension] = useState<Dimension>('tela');
+  const [params, setParams] = useSearchParams();
+  const dimension: Dimension = params.get(PARAM_KARDEX.material) === 'avio' ? 'avio' : 'tela';
+  const setDimension = (d: Dimension): void => {
+    // Cambiar de pestaña SUELTA el avío y el almacén: son filtros de la pestaña de avíos.
+    setParams(d === 'avio' ? { [PARAM_KARDEX.material]: 'avio' } : {}, { replace: true });
+  };
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 md:p-5">
@@ -383,18 +396,32 @@ function KardexTela(): React.JSX.Element {
   );
 }
 
-/** Kardex por AVÍO (card estándar: toolbar con combobox + tabla densa). */
+/** Valor del filtro de almacén que significa "todos". */
+const TODOS_ALMACENES = '';
+
+/**
+ * Kardex por AVÍO (card estándar: toolbar con combobox + tabla densa).
+ *
+ * ⭐ Fila 0.221 — el avío y el almacén salen de la URL (los fija el botón «Movimientos» de
+ * existencias, o el propio combobox/select de aquí). El almacén es un filtro VISIBLE: un filtro que
+ * llega por la URL y no se ve en pantalla haría pasar el kardex de UN almacén por el de todos.
+ */
 function KardexAvio(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeMover = tienePermiso('inventario-avios.mover');
-  const [avio, setAvio] = useState<Avio | undefined>(undefined);
+  const [params, setParams] = useSearchParams();
+  const idAvio = idDeParametro(params.get(PARAM_KARDEX.idAvio));
+  const idAlmacen = idDeParametro(params.get(PARAM_KARDEX.idAlmacen));
+  /** El avío elegido en el combobox (trae su clave/descripción antes de que llegue el kardex). */
+  const [avioElegido, setAvioElegido] = useState<Avio | undefined>(undefined);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [aCancelar, setACancelar] = useState<KardexAvioRenglon | null>(null);
   const consulta = useKardexAvio(
-    avio !== undefined
+    idAvio !== undefined
       ? {
-          idAvio: avio.id,
+          idAvio,
+          ...(idAlmacen !== undefined ? { idAlmacen } : {}),
           ...(desde !== '' ? { desde } : {}),
           ...(hasta !== '' ? { hasta } : {}),
         }
@@ -404,23 +431,96 @@ function KardexAvio(): React.JSX.Element {
   const renglones = kardex?.renglones ?? [];
   const saldosIniciales = kardex?.saldosIniciales ?? [];
   const cancelar = useCancelarAvio();
+  const almacenes = useAlmacenes({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    tipo: 'AVIO',
+  });
+
+  /**
+   * Identidad del avío consultado. Si llegó por la URL no hubo combobox: la da el propio kardex
+   * (sólo si es del MISMO avío — con `keepPreviousData` podría ser todavía el anterior).
+   */
+  const identidad: { clave: string; descripcion: string } | undefined =
+    avioElegido !== undefined && avioElegido.id === idAvio
+      ? { clave: avioElegido.clave, descripcion: avioElegido.descripcion }
+      : kardex !== undefined && kardex.idAvio === idAvio
+        ? { clave: kardex.avio, descripcion: kardex.descripcion }
+        : undefined;
+
+  /** Opciones del almacén. Si el de la URL no está en la lista (p. ej. sin `almacenes.ver`), se
+   * agrega con el nombre que trae el kardex: el select nunca debe mostrar «Todos» filtrando uno. */
+  const opcionesAlmacen = (almacenes.data?.datos ?? []).map((a) => ({
+    id: a.id,
+    nombre: a.nombre,
+  }));
+  if (idAlmacen !== undefined && !opcionesAlmacen.some((a) => a.id === idAlmacen)) {
+    const nombre =
+      renglones.find((r) => r.idAlmacen === idAlmacen)?.almacen ??
+      saldosIniciales.find((si) => si.idAlmacen === idAlmacen)?.almacen ??
+      `Almacén ${String(idAlmacen)}`;
+    opcionesAlmacen.push({ id: idAlmacen, nombre });
+  }
+
+  /** Escribe el filtro en la URL conservando la pestaña (y el resto de los filtros). */
+  const fijarParam = (clave: string, valor: number | undefined): void => {
+    setParams(
+      (actuales) => {
+        const nuevos = new URLSearchParams(actuales);
+        nuevos.set(PARAM_KARDEX.material, 'avio');
+        if (valor === undefined) nuevos.delete(clave);
+        else nuevos.set(clave, String(valor));
+        return nuevos;
+      },
+      { replace: true },
+    );
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
         <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
           <SelectorAvio
-            idSeleccionado={avio?.id}
-            alSeleccionar={setAvio}
-            alLimpiar={() => setAvio(undefined)}
+            idSeleccionado={idAvio}
+            etiquetaSeleccion={identidad?.clave}
+            alSeleccionar={(a) => {
+              setAvioElegido(a);
+              fijarParam(PARAM_KARDEX.idAvio, a.id);
+            }}
+            alLimpiar={() => {
+              setAvioElegido(undefined);
+              fijarParam(PARAM_KARDEX.idAvio, undefined);
+            }}
           />
         </div>
+        {/* Fila 0.221 — el ALMACÉN, visible y cambiable (viene preseleccionado desde existencias). */}
+        <SelectNativo
+          className="h-8 w-44 text-sm"
+          aria-label="Filtrar por almacén"
+          value={idAlmacen === undefined ? TODOS_ALMACENES : String(idAlmacen)}
+          onChange={(e) =>
+            fijarParam(
+              PARAM_KARDEX.idAlmacen,
+              e.target.value === TODOS_ALMACENES ? undefined : Number(e.target.value),
+            )
+          }
+          data-testid="kardex-avio-almacen"
+        >
+          <option value={TODOS_ALMACENES}>Todos los almacenes</option>
+          {opcionesAlmacen.map((a) => (
+            <option key={a.id} value={String(a.id)}>
+              {a.nombre}
+            </option>
+          ))}
+        </SelectNativo>
         {/* Identidad VISIBLE del avío consultado: clave + descripción (el value del input no
             es un nodo de texto; el kardex debe decir de QUÉ avío es). */}
-        {avio !== undefined ? (
+        {identidad !== undefined ? (
           <span className="truncate text-xs text-muted-foreground" data-testid="kardex-avio-sel">
-            <span className="num font-medium text-foreground">{avio.clave}</span> —{' '}
-            {avio.descripcion}
+            <span className="num font-medium text-foreground">{identidad.clave}</span> —{' '}
+            {identidad.descripcion}
           </span>
         ) : null}
         {/* El PERIODO (fila 0.173, mecanismo de la 0.138). Vacío = el servidor pone su ventana por
@@ -432,7 +532,7 @@ function KardexAvio(): React.JSX.Element {
           alCambiarDesde={setDesde}
           alCambiarHasta={setHasta}
         />
-        {avio !== undefined ? (
+        {idAvio !== undefined ? (
           <span className="ml-auto text-xs text-faint">
             {renglones.length.toLocaleString('es-MX')} renglones
           </span>
@@ -441,11 +541,11 @@ function KardexAvio(): React.JSX.Element {
 
       {/* Qué periodo se está viendo REALMENTE — y si la lista vino cortada. Sin esta línea, una
           ventana por omisión se leería como «este avío no tiene más movimientos». */}
-      {avio !== undefined && kardex !== undefined ? (
+      {idAvio !== undefined && kardex !== undefined ? (
         <LineaPeriodoKardex idBase="kardex-avio" periodo={kardex} />
       ) : null}
 
-      {avio === undefined ? (
+      {idAvio === undefined ? (
         <p className="p-6 text-sm text-muted-foreground">
           Busca un avío para ver su kardex (movimientos en orden, con el saldo por almacén).
         </p>
@@ -457,7 +557,9 @@ function KardexAvio(): React.JSX.Element {
         <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
       ) : renglones.length === 0 ? (
         <p className="p-6 text-sm text-muted-foreground" data-testid="kardex-avio-vacio">
-          Este avío no tiene movimientos en el periodo (amplía las fechas para ver más atrás).
+          Este avío no tiene movimientos en el periodo
+          {idAlmacen !== undefined ? ' en el almacén elegido' : ''} (amplía las fechas para ver más
+          atrás{idAlmacen !== undefined ? ', o elige «Todos los almacenes»' : ''}).
         </p>
       ) : (
         <>

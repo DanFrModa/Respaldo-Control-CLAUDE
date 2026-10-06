@@ -1594,7 +1594,28 @@ const esquemaExistenciaAvioFila = z.object({
   almacen: z.string(),
   existencia: z.number().describe('Existencia actual (Σ de movimientos, D3).'),
   ubicacion: UBICACION_MATERIAL_SALIDA,
+  // ⭐ Fila 0.221 — el proveedor por el que se AGRUPA. El avío puede tener VARIOS proveedores en su
+  // catálogo; el que aquí viaja es el HABITUAL (a lo más uno por avío: índice único parcial
+  // `avio_proveedor_habitual_unico`), así cada avío cae en UN solo grupo y los subtotales suman el
+  // total sin contar dos veces. `null` = el avío no tiene habitual marcado.
+  idProveedor: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Proveedor HABITUAL del avío (el que surte normalmente). null = sin habitual.'),
+  proveedor: z.string().nullable().describe('Nombre del proveedor habitual. null = sin habitual.'),
 });
+
+/** Un subtotal de existencia por proveedor habitual (fila 0.221). */
+const esquemaSubtotalAvioProveedor = z.object({
+  idProveedor: z.number().int().nullable().describe('null = el grupo «Sin proveedor habitual».'),
+  proveedor: z.string().nullable(),
+  existencia: z.number().describe('Σ de la existencia de los renglones del grupo.'),
+  renglones: z.number().int().describe('Cuántos renglones avío×almacén caen en el grupo.'),
+});
+
+/** Un subtotal por proveedor tal como lo devuelve la API. */
+export type SubtotalAvioProveedor = z.infer<typeof esquemaSubtotalAvioProveedor>;
 
 /** Una fila de existencia de avío tal como la devuelve la API. */
 export type ExistenciaAvioFila = z.infer<typeof esquemaExistenciaAvioFila>;
@@ -1604,6 +1625,12 @@ export const esquemaExistenciasAvioLista = z
   .object({
     filas: z.array(esquemaExistenciaAvioFila),
     totalExistencia: z.number(),
+    porProveedor: z
+      .array(esquemaSubtotalAvioProveedor)
+      .describe(
+        'Subtotales por proveedor HABITUAL de las MISMAS filas (fila 0.221): alfabético, con el ' +
+          'grupo sin proveedor (idProveedor null) al final. Suman `totalExistencia`.',
+      ),
   })
   .describe('Existencias de avío (consulta de solo lectura, D3).');
 

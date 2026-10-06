@@ -26,6 +26,7 @@ import {
   type TraspasoAvioSalida,
   type ExistenciasAvioLista,
   type ExistenciaAvioFila,
+  type SubtotalAvioProveedor,
   type KardexAvioLista,
   type KardexAvioRenglon,
 } from '../../contrato/index.js';
@@ -553,7 +554,8 @@ export type ParametrosExistenciasAvio = z.input<typeof esquemaConsultaExistencia
  * Consulta las EXISTENCIAS de AVÍO por avío×almacén, leyendo la vista `existencia_avio` (CONSULTA,
  * ADR-0010 §3) filtrada por la empresa activa (A9). JOIN para nombres del avío + bandera
  * `esGenerico` (R4: para distinguir en la UI). Por defecto OMITE las filas con existencia 0.
- * Permiso `inventario-avios.ver`.
+ * Desde la fila 0.221 cada renglón trae su proveedor HABITUAL y la respuesta, los subtotales por
+ * proveedor ({@link subtotalesPorProveedor}). Permiso `inventario-avios.ver`.
  */
 export async function consultarExistenciasAvio(
   sesion: SesionUsuario,
@@ -585,6 +587,9 @@ export async function consultarExistenciasAvio(
       existencia: Prisma.Decimal;
       /** Fila 0.103 — dónde está guardado ESE avío en ESE almacén; null = no anotada. */
       ubicacion: string | null;
+      /** Fila 0.221 — proveedor HABITUAL del avío; null = no tiene uno marcado. */
+      idProveedor: number | null;
+      proveedor: string | null;
     }[]
   >(Prisma.sql`
     SELECT
@@ -596,7 +601,9 @@ export async function consultarExistenciasAvio(
       e."id_almacen"  AS "idAlmacen",
       a."nombre"      AS "almacen",
       e."existencia"  AS "existencia",
-      u."ubicacion"   AS "ubicacion"
+      u."ubicacion"   AS "ubicacion",
+      pr."id"         AS "idProveedor",
+      pr."nombre"     AS "proveedor"
     FROM "existencia_avio" e
     JOIN "avios"     av ON av."id" = e."id_avio"
     JOIN "almacenes" a  ON a."id" = e."id_almacen"
@@ -608,6 +615,13 @@ export async function consultarExistenciasAvio(
            ON u."id_avio"     = e."id_avio"
           AND u."id_almacen"  = e."id_almacen"
           AND u."id_empresa"  = e."id_empresa"
+    -- ⭐ Fila 0.221: el proveedor HABITUAL, para AGRUPAR. LEFT: un avío sin habitual NO se esconde,
+    -- cae en el grupo «Sin proveedor habitual». A lo más UN renglón por avío (índice único parcial
+    -- avio_proveedor_habitual_unico), así que el JOIN no multiplica filas ni existencias.
+    LEFT JOIN "avio_proveedor" ap
+           ON ap."id_avio"  = e."id_avio"
+          AND ap."habitual" = true
+    LEFT JOIN "proveedores" pr ON pr."id" = ap."id_proveedor"
     WHERE ${where}
     ORDER BY av."clave" ASC, a."nombre" ASC
   `);
@@ -626,10 +640,48 @@ export async function consultarExistenciasAvio(
       almacen: f.almacen,
       existencia,
       ubicacion: f.ubicacion,
+      idProveedor: f.idProveedor,
+      proveedor: f.proveedor,
     };
   });
 
-  return { filas: filasSalida, totalExistencia };
+  return {
+    filas: filasSalida,
+    totalExistencia,
+    porProveedor: subtotalesPorProveedor(filasSalida),
+  };
+}
+
+/**
+ * ⭐ FILA 0.221 — SUBTOTALES de existencia por PROVEEDOR HABITUAL (Daniel: *«Falta agrupar por
+ * proveedor»*). Pura (sin BD), para probarla sola. Agrupa las MISMAS filas que se devuelven, así que
+ * los subtotales cuadran con `totalExistencia` por construcción: cada avío trae a lo más UN habitual
+ * y cae en un solo grupo (nunca se cuenta dos veces).
+ *
+ * Orden: alfabético por nombre de proveedor (es-MX), y el grupo **«Sin proveedor habitual»**
+ * (`idProveedor: null`) SIEMPRE al final — y SIEMPRE presente cuando hay filas sin habitual: es lo
+ * normal en lo que ya existía (REGLA 0-B), y esconderlo haría que los subtotales no sumaran el total.
+ */
+export function subtotalesPorProveedor(
+  filas: readonly Pick<ExistenciaAvioFila, 'idProveedor' | 'proveedor' | 'existencia'>[],
+): SubtotalAvioProveedor[] {
+  const grupos = new Map<number | null, SubtotalAvioProveedor>();
+  for (const f of filas) {
+    const grupo = grupos.get(f.idProveedor) ?? {
+      idProveedor: f.idProveedor,
+      proveedor: f.idProveedor === null ? null : f.proveedor,
+      existencia: 0,
+      renglones: 0,
+    };
+    grupo.existencia += f.existencia;
+    grupo.renglones += 1;
+    grupos.set(f.idProveedor, grupo);
+  }
+  return [...grupos.values()].sort((a, b) => {
+    if (a.idProveedor === null) return b.idProveedor === null ? 0 : 1;
+    if (b.idProveedor === null) return -1;
+    return (a.proveedor ?? '').localeCompare(b.proveedor ?? '', 'es-MX');
+  });
 }
 
 export type ParametrosKardexAvio = z.input<typeof esquemaConsultaKardexAvio>;

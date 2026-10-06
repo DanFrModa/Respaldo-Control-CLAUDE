@@ -1,11 +1,12 @@
-import { Warehouse } from 'lucide-react';
+import { History, Warehouse } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
 import type { Avio } from '@/api/avios';
 import { useExistenciasAvio, useFijarUbicacionAvio } from '@/api/inventario-materiales';
-import type { ExistenciaAvioFila } from '@/api/tipos';
+import type { ExistenciaAvioFila, ExistenciasAvio } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -22,10 +23,44 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { BotonUbicacion, DialogoUbicacionMaterial } from './DialogoUbicacionMaterial';
+import { rutaKardexAvio } from './kardex-enlace';
 import { SelectorAvio } from './SelectorAvio';
 
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
+
+/** Cómo se agrupan los renglones (fila 0.221). */
+type Agrupar = 'ninguno' | 'proveedor';
+
+/** Título del grupo de los avíos que no tienen proveedor habitual marcado (fila 0.221). */
+const SIN_PROVEEDOR_HABITUAL = 'Sin proveedor habitual';
+
+/** Un bloque de renglones: la lista entera (sin agrupar) o un proveedor con su subtotal. */
+interface Seccion {
+  clave: string;
+  /** null = sin encabezado (vista sin agrupar). */
+  grupo: { titulo: string; existencia: number; renglones: number } | null;
+  filas: ExistenciaAvioFila[];
+}
+
+/**
+ * ⭐ Fila 0.221 — parte los renglones en secciones. Los SUBTOTALES no se calculan aquí: vienen del
+ * servidor (`porProveedor`, dominio), que agrupa las MISMAS filas; la pantalla sólo reparte cada
+ * renglón bajo su encabezado. El grupo sin proveedor habitual va al final, como lo manda el servidor.
+ */
+function seccionesDe(datos: ExistenciasAvio | undefined, agrupar: Agrupar): Seccion[] {
+  const filas = datos?.filas ?? [];
+  if (agrupar === 'ninguno') return [{ clave: 'todos', grupo: null, filas }];
+  return (datos?.porProveedor ?? []).map((g) => ({
+    clave: g.idProveedor === null ? 'sin-proveedor' : `prov-${String(g.idProveedor)}`,
+    grupo: {
+      titulo: g.proveedor ?? SIN_PROVEEDOR_HABITUAL,
+      existencia: g.existencia,
+      renglones: g.renglones,
+    },
+    filas: filas.filter((f) => f.idProveedor === g.idProveedor),
+  }));
+}
 
 /**
  * EXISTENCIAS de AVÍOS (F4-E1, proto `vAvios` — re-vestido R9; R4). Inventario MULTI-ALMACÉN: existencia
@@ -45,11 +80,24 @@ const TODOS = 'TODOS';
  * trabaja, con `inventario-avios.mover`; quien sólo puede ver la lee y ya. «—» = todavía no
  * anotada, que es lo normal en lo que ya existía (REGLA 0-B: nada se rellena hacia atrás).
  *
+ * ⭐ FILA 0.221 (Daniel: *«Debería haber un botón para ver los movimientos de cada avío. Falta
+ * agrupar por proveedor.»*):
+ *  - cada renglón lleva **«Movimientos»**, que abre el kardex de materiales YA filtrado a ese avío y
+ *    ese almacén (no es otra pantalla de movimientos: es la misma, preseleccionada). Sólo aparece si
+ *    la sesión puede leer el kardex de avíos (`inventario-avios.ver`, el permiso de su endpoint);
+ *  - **«Agrupar por proveedor»** reparte los renglones bajo su proveedor HABITUAL con su subtotal.
+ *    El habitual porque el avío puede tener VARIOS proveedores en el catálogo y sólo uno habitual:
+ *    así cada avío cae en un grupo y los subtotales suman el total. Los que no tienen habitual van
+ *    al grupo «Sin proveedor habitual», al final. Esta pantalla no enseña importes.
+ *
  * `inventario-avios.ver` gobierna el acceso.
  */
 export function ExistenciasAviosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeUbicar = tienePermiso('inventario-avios.mover');
+  /** Fila 0.221 — el kardex de avíos pide este permiso; sin él, el botón no se ofrece. */
+  const puedeVerKardex = tienePermiso('inventario-avios.ver');
+  const [agrupar, setAgrupar] = useState<Agrupar>('ninguno');
   /** Renglón cuyo «dónde está guardado» se está editando (fila 0.103). */
   const [ubicando, setUbicando] = useState<ExistenciaAvioFila | null>(null);
   const fijarUbicacion = useFijarUbicacionAvio();
@@ -73,6 +121,9 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
   });
   const filas = consulta.data?.filas ?? [];
   const totalExistencia = consulta.data?.totalExistencia ?? 0;
+  const secciones = seccionesDe(consulta.data, agrupar);
+  /** Columnas ANTES de «Existencia» (para que el encabezado de grupo cuadre con la tabla). */
+  const columnasAntesDeExistencia = 6;
 
   const kpis: Kpi[] = [
     {
@@ -154,6 +205,17 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
             />
             Incluir ceros
           </label>
+          {/* Fila 0.221 — agrupar por proveedor habitual, con subtotal por grupo. */}
+          <SelectNativo
+            className="w-48 h-8 text-sm"
+            aria-label="Agrupar por"
+            value={agrupar}
+            onChange={(e) => setAgrupar(e.target.value === 'proveedor' ? 'proveedor' : 'ninguno')}
+            data-testid="avios-agrupar"
+          >
+            <option value="ninguno">Sin agrupar</option>
+            <option value="proveedor">Agrupar por proveedor</option>
+          </SelectNativo>
           {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
           <span className="ml-auto text-xs text-faint">
             {filas.length.toLocaleString('es-MX')} renglones
@@ -181,47 +243,73 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
             <>
               {/* Móvil: tarjetas apiladas. */}
               <div className="space-y-3 p-3 md:hidden" data-testid="avios-tarjetas">
-                {filas.map((f) => (
-                  <div
-                    key={`${f.idAvio}-${f.idAlmacen}`}
-                    className="flex items-start justify-between gap-3 rounded-lg border bg-card p-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-1.5 font-medium">
-                        {f.avio}
-                        <ChipEstado
-                          tono={f.esGenerico ? 'info' : 'neutro'}
-                          title={
-                            f.esGenerico
-                              ? 'Genérico de stock · se netea en el MRP'
-                              : 'Se compra contra la orden'
-                          }
-                        >
-                          {f.esGenerico ? 'Genérico · stock' : 'Por orden'}
-                        </ChipEstado>
-                      </p>
-                      <p className="text-xs text-muted-foreground">{f.descripcion}</p>
-                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Warehouse className="size-3.5" aria-hidden />
-                        {f.almacen}
-                      </p>
-                      {/* Fila 0.103 — dónde está guardado, tocable para capturar/corregir. */}
-                      <BotonUbicacion
-                        ubicacion={f.ubicacion}
-                        editable={puedeUbicar}
-                        alEditar={() => setUbicando(f)}
-                        etiqueta={`${f.avio} en ${f.almacen}`}
-                        idPrueba={`avios-ubicacion-movil-${String(f.idAvio)}-${String(f.idAlmacen)}`}
-                      />
-                    </div>
-                    <span className="num text-lg font-semibold">
-                      {f.existencia.toLocaleString('es-MX')}
-                      {f.unidad !== null ? (
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          {f.unidad}
+                {secciones.map((sec) => (
+                  <div key={sec.clave} className="space-y-3">
+                    {sec.grupo !== null ? (
+                      <div
+                        className="flex items-baseline justify-between gap-3 rounded-lg bg-primary-soft px-3 py-2 text-sm text-primary-soft-foreground"
+                        data-testid="avios-grupo-movil"
+                      >
+                        <span className="font-semibold">{sec.grupo.titulo}</span>
+                        <span className="num font-semibold">
+                          {sec.grupo.existencia.toLocaleString('es-MX')}
                         </span>
-                      ) : null}
-                    </span>
+                      </div>
+                    ) : null}
+                    {sec.filas.map((f) => (
+                      <div
+                        key={`${f.idAvio}-${f.idAlmacen}`}
+                        className="flex items-start justify-between gap-3 rounded-lg border bg-card p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-1.5 font-medium">
+                            {f.avio}
+                            <ChipEstado
+                              tono={f.esGenerico ? 'info' : 'neutro'}
+                              title={
+                                f.esGenerico
+                                  ? 'Genérico de stock · se netea en el MRP'
+                                  : 'Se compra contra la orden'
+                              }
+                            >
+                              {f.esGenerico ? 'Genérico · stock' : 'Por orden'}
+                            </ChipEstado>
+                          </p>
+                          <p className="text-xs text-muted-foreground">{f.descripcion}</p>
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Warehouse className="size-3.5" aria-hidden />
+                            {f.almacen}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Proveedor: {f.proveedor ?? '—'}
+                          </p>
+                          {/* Fila 0.103 — dónde está guardado, tocable para capturar/corregir. */}
+                          <BotonUbicacion
+                            ubicacion={f.ubicacion}
+                            editable={puedeUbicar}
+                            alEditar={() => setUbicando(f)}
+                            etiqueta={`${f.avio} en ${f.almacen}`}
+                            idPrueba={`avios-ubicacion-movil-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                          />
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="num text-lg font-semibold">
+                            {f.existencia.toLocaleString('es-MX')}
+                            {f.unidad !== null ? (
+                              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                {f.unidad}
+                              </span>
+                            ) : null}
+                          </span>
+                          {puedeVerKardex ? (
+                            <BotonMovimientos
+                              fila={f}
+                              idPrueba={`avios-movimientos-movil-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -234,56 +322,97 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
                       <TablaDensaHead>Avío</TablaDensaHead>
                       <TablaDensaHead>Descripción</TablaDensaHead>
                       <TablaDensaHead>Tipo</TablaDensaHead>
+                      <TablaDensaHead>Proveedor</TablaDensaHead>
                       <TablaDensaHead>Almacén</TablaDensaHead>
                       <TablaDensaHead>Ubicación</TablaDensaHead>
                       <TablaDensaHead numerica>Existencia</TablaDensaHead>
+                      {puedeVerKardex ? (
+                        <TablaDensaHead>
+                          <span className="sr-only">Movimientos</span>
+                        </TablaDensaHead>
+                      ) : null}
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
                   <TablaDensaCuerpo>
-                    {filas.map((f) => (
-                      <TablaDensaFila key={`${f.idAvio}-${f.idAlmacen}`}>
-                        <TablaDensaCelda>
-                          <div className="flex items-center gap-2">
-                            {/* Proto `vAvios`: thumb con la sigla FIJA "AV" (cian de avíos). */}
-                            <Avatar nombre={f.avio} tono="avios" tamano="sm">
-                              AV
-                            </Avatar>
-                            <span className="font-medium">{f.avio}</span>
-                          </div>
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>{f.descripcion}</TablaDensaCelda>
-                        <TablaDensaCelda>
-                          <ChipEstado
-                            tono={f.esGenerico ? 'info' : 'neutro'}
-                            title={
-                              f.esGenerico
-                                ? 'Genérico de stock · se netea en el MRP'
-                                : 'Se compra contra la orden'
-                            }
-                          >
-                            {f.esGenerico ? 'Genérico · stock' : 'Por orden'}
-                          </ChipEstado>
-                        </TablaDensaCelda>
-                        <TablaDensaCelda>{f.almacen}</TablaDensaCelda>
-                        <TablaDensaCelda>
-                          <BotonUbicacion
-                            ubicacion={f.ubicacion}
-                            editable={puedeUbicar}
-                            alEditar={() => setUbicando(f)}
-                            etiqueta={`${f.avio} en ${f.almacen}`}
-                            idPrueba={`avios-ubicacion-${String(f.idAvio)}-${String(f.idAlmacen)}`}
-                          />
-                        </TablaDensaCelda>
-                        <TablaDensaCelda numerica className="font-semibold">
-                          {f.existencia.toLocaleString('es-MX')}
-                          {f.unidad !== null ? (
-                            <span className="ml-1 text-xs font-normal text-muted-foreground">
-                              {f.unidad}
-                            </span>
+                    {secciones.flatMap((sec) => [
+                      ...(sec.grupo !== null
+                        ? [
+                            <TablaDensaFila
+                              key={`grupo-${sec.clave}`}
+                              className="bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft"
+                              data-testid="avios-grupo"
+                            >
+                              <TablaDensaCelda colSpan={columnasAntesDeExistencia}>
+                                <span className="font-semibold">{sec.grupo.titulo}</span>
+                                <span className="ml-2 text-xs opacity-80">
+                                  {sec.grupo.renglones.toLocaleString('es-MX')} renglones
+                                </span>
+                              </TablaDensaCelda>
+                              <TablaDensaCelda
+                                numerica
+                                className="font-semibold"
+                                data-testid="avios-grupo-subtotal"
+                              >
+                                {sec.grupo.existencia.toLocaleString('es-MX')}
+                              </TablaDensaCelda>
+                              {puedeVerKardex ? <TablaDensaCelda /> : null}
+                            </TablaDensaFila>,
+                          ]
+                        : []),
+                      ...sec.filas.map((f) => (
+                        <TablaDensaFila key={`${f.idAvio}-${f.idAlmacen}`}>
+                          <TablaDensaCelda>
+                            <div className="flex items-center gap-2">
+                              {/* Proto `vAvios`: thumb con la sigla FIJA "AV" (cian de avíos). */}
+                              <Avatar nombre={f.avio} tono="avios" tamano="sm">
+                                AV
+                              </Avatar>
+                              <span className="font-medium">{f.avio}</span>
+                            </div>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>{f.descripcion}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <ChipEstado
+                              tono={f.esGenerico ? 'info' : 'neutro'}
+                              title={
+                                f.esGenerico
+                                  ? 'Genérico de stock · se netea en el MRP'
+                                  : 'Se compra contra la orden'
+                              }
+                            >
+                              {f.esGenerico ? 'Genérico · stock' : 'Por orden'}
+                            </ChipEstado>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>{f.proveedor ?? '—'}</TablaDensaCelda>
+                          <TablaDensaCelda>{f.almacen}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <BotonUbicacion
+                              ubicacion={f.ubicacion}
+                              editable={puedeUbicar}
+                              alEditar={() => setUbicando(f)}
+                              etiqueta={`${f.avio} en ${f.almacen}`}
+                              idPrueba={`avios-ubicacion-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                            />
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica className="font-semibold">
+                            {f.existencia.toLocaleString('es-MX')}
+                            {f.unidad !== null ? (
+                              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                {f.unidad}
+                              </span>
+                            ) : null}
+                          </TablaDensaCelda>
+                          {puedeVerKardex ? (
+                            <TablaDensaCelda className="text-right">
+                              <BotonMovimientos
+                                fila={f}
+                                idPrueba={`avios-movimientos-${String(f.idAvio)}-${String(f.idAlmacen)}`}
+                              />
+                            </TablaDensaCelda>
                           ) : null}
-                        </TablaDensaCelda>
-                      </TablaDensaFila>
-                    ))}
+                        </TablaDensaFila>
+                      )),
+                    ])}
                   </TablaDensaCuerpo>
                 </TablaDensa>
               </div>
@@ -331,5 +460,32 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * ⭐ Fila 0.221 — «Movimientos» de UN renglón: abre el kardex de materiales en la pestaña de avíos,
+ * con ESTE avío y ESTE almacén ya elegidos. Es un enlace (no un botón con `navigate`): se puede
+ * abrir en otra pestaña y conserva la existencia a la vista.
+ */
+function BotonMovimientos({
+  fila,
+  idPrueba,
+}: {
+  fila: ExistenciaAvioFila;
+  idPrueba: string;
+}): React.JSX.Element {
+  return (
+    <Button asChild variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
+      <Link
+        to={rutaKardexAvio(fila.idAvio, fila.idAlmacen)}
+        aria-label={`Movimientos de ${fila.avio} en ${fila.almacen}`}
+        title="Ver sus movimientos (kardex)"
+        data-testid={idPrueba}
+      >
+        <History className="size-3.5" aria-hidden />
+        Movimientos
+      </Link>
+    </Button>
   );
 }
