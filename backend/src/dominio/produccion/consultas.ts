@@ -36,7 +36,7 @@ import type {
   TableroPedidosMes,
   TableroPedidosMesFila,
 } from '../../contrato/esquemas/orden-consulta.js';
-import { esquemaEstadoOrden } from '../../contrato/esquemas/orden.js';
+import { esquemaEstadoOrden, esquemaFiltroCerradas } from '../../contrato/esquemas/orden.js';
 import type { EstadoOrden, Prisma } from '../../datos/index.js';
 
 import {
@@ -50,6 +50,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { filtroOrdenesCerradas } from './filtro-cerradas.js';
 import { armarBusquedaConSinonimos, rangoAnio } from './ordenes.js';
 
 // ── Constantes del semáforo de antigüedad (regla `EsUrgente` del viejo) ──────────────
@@ -192,6 +193,8 @@ export const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
   anio: z.number().int().min(2000).max(2100).optional(),
   estado: esquemaEstadoOrden.optional(),
   incluirCanceladas: z.boolean().default(false),
+  // ⭐ 0.227: default `incluir` (la consulta no cambia); `ocultar`/`solo` para captura y su aviso.
+  cerradas: esquemaFiltroCerradas.default('incluir'),
   ordenarPor: z.enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn']).default('folio'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
 });
@@ -222,6 +225,7 @@ export async function consultarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
+    ...filtroOrdenesCerradas(filtros.cerradas),
     ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 

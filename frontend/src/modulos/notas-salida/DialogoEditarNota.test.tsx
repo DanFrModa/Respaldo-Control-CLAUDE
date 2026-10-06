@@ -74,18 +74,31 @@ vi.mock('@/api/telas', () => ({
   useTelas: () => ({ data: { datos: [{ id: 7, nombre: 'Felpa francesa' }] } }),
 }));
 /**
- * Las órdenes del selector. ⭐ 0.226b: la 51 está CERRADA (`estado: 'cerrada'`): se OFRECE (el
- * selector no filtra, sólo la marca) pero la nota no se guarda con un renglón suyo.
+ * Las órdenes del selector. ⭐ 0.226b: la 51 está CERRADA (`estado: 'cerrada'`): la nota no se
+ * guarda con un renglón suyo. ⭐ 0.227: el mock respeta `cerradas` como el SERVIDOR —con `ocultar`
+ * (el default de la pantalla) la 51 no viene; sólo con «Mostrar cerradas» (`incluir`)—.
  */
+const ORDEN_ABIERTA = {
+  id: 50,
+  folio: 1001,
+  codigoModelo: 'MOD-1',
+  cliente: 'Cliente A',
+  estado: 'completa',
+};
+const ORDEN_CERRADA = {
+  id: 51,
+  folio: 1002,
+  codigoModelo: 'MOD-2',
+  cliente: 'Cliente A',
+  estado: 'cerrada',
+};
+const SOLO_ABIERTAS = { data: { datos: [ORDEN_ABIERTA] } };
+const CON_CERRADAS = { data: { datos: [ORDEN_ABIERTA, ORDEN_CERRADA] } };
+const useConsultaOrdenesMock = vi.fn((query: { cerradas?: string }) =>
+  query.cerradas === 'ocultar' ? SOLO_ABIERTAS : CON_CERRADAS,
+);
 vi.mock('@/api/ordenes-consulta', () => ({
-  useConsultaOrdenes: () => ({
-    data: {
-      datos: [
-        { id: 50, folio: 1001, codigoModelo: 'MOD-1', cliente: 'Cliente A', estado: 'completa' },
-        { id: 51, folio: 1002, codigoModelo: 'MOD-2', cliente: 'Cliente A', estado: 'cerrada' },
-      ],
-    },
-  }),
+  useConsultaOrdenes: (query: { cerradas?: string }) => useConsultaOrdenesMock(query),
 }));
 /**
  * El editor de renglones usa el kardex de tela (para listar las salidas-a-orden) y las existencias de
@@ -226,7 +239,20 @@ describe('DialogoEditarNota (F4-E5)', () => {
     );
     await elegirEnCombobox('nota-maquilero', 'bajío', 'Costuras del Bajío');
     fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
-    // La cerrada se ofrece, MARCADA (informativo, nunca un filtro).
+    // ⭐ 0.227: por omisión la cerrada NO se ofrece (ni en el renglón ni en «Traer avíos»)…
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'ocultar' }),
+    );
+    for (const testid of ['selector-orden-nota', 'nota-traer-orden']) {
+      expect(
+        within(screen.getByTestId(testid)).queryByRole('option', { name: /Orden 1002/ }),
+      ).not.toBeInTheDocument();
+    }
+    // …y con «Mostrar cerradas» vuelve, MARCADA.
+    fireEvent.click(screen.getByTestId('nota-mostrar-cerradas'));
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'incluir' }),
+    );
     expect(
       within(screen.getByTestId('selector-orden-nota')).getByRole('option', {
         name: /Orden 1002 · MOD-2 · Cerrada/,
@@ -236,6 +262,23 @@ describe('DialogoEditarNota (F4-E5)', () => {
     elegirAvioBoton();
     fireEvent.change(screen.getByTestId('cantidad-nota'), { target: { value: '5' } });
 
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 1002 está cerrada/,
+    );
+    expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
+
+    // ⭐ 0.227: APAGAR el interruptor NO hace olvidar la cerrada ya elegida: el renglón la sigue
+    // mostrando (marcada) y el aviso y el guardar apagado siguen ahí.
+    fireEvent.click(screen.getByTestId('nota-mostrar-cerradas'));
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'ocultar' }),
+    );
+    expect(screen.getByTestId('selector-orden-nota')).toHaveValue('51');
+    expect(
+      within(screen.getByTestId('selector-orden-nota')).getByRole('option', {
+        name: /Orden 1002 · MOD-2 · Cerrada/,
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(
       /La orden 1002 está cerrada/,
     );
@@ -265,6 +308,14 @@ describe('DialogoEditarNota (F4-E5)', () => {
     );
     expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 4321/);
     expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
+    // ⭐ 0.227: la orden del renglón NO viene en la lista (está cerrada) y aun así se ve ligada y
+    // marcada — un `<select>` sin su opción se leería «Elige una orden…».
+    expect(screen.getByTestId('selector-orden-nota')).toHaveValue('77');
+    expect(
+      within(screen.getByTestId('selector-orden-nota')).getByRole('option', {
+        name: 'Orden 4321 · Cerrada',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('⭐ 0.226b: el PREFILL dice qué orden está cerrada aunque no venga en la lista de órdenes', () => {

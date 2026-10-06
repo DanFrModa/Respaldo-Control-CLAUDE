@@ -39,6 +39,9 @@
        - `src/aviso-orden-cerrada-guardian.test.ts` (0.226b) recorre los .tsx de `src/modulos` para
          exigir que toda pantalla que elige la orden con `SelectorOrden`/`SelectorOrdenPt` use el
          aviso unico `AvisoOrdenCerrada` (una orden cerrada no admite movimientos);
+       - `src/selectores-orden-cerradas-guardian.test.ts` (0.227) recorre los .ts/.tsx de
+         `src/modulos` para exigir que toda lista de ordenes declare su politica de cerradas: las
+         capturas las ocultan con interruptor y aviso; las consultas no las ocultan;
        - `src/tope-existencias-pt.test.ts` lee `frontend/openapi.json` para exigir que el `limite`
          que piden las pantallas de captura de PT (fila 0.143) sea el techo REAL que el backend
          publica: si se separan, cada carga de Movimientos y Traspasos seria un 400;
@@ -55,6 +58,7 @@
     "src/abreviatura-e2e.test.ts",
     "src/selector-proveedor-unico.test.ts",
     "src/aviso-orden-cerrada-guardian.test.ts",
+    "src/selectores-orden-cerradas-guardian.test.ts",
     "src/ventana-fecha-pt.test.ts",
     "src/tope-existencias-pt.test.ts"
   ]

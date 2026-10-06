@@ -80,3 +80,42 @@ export function foliosDeOrdenesCerradas(
   }
   return [...new Set(folios)];
 }
+
+// ── 0.227 (§Post-F9.244, etapa 2): las listas de CAPTURA ocultan las cerradas ──────────────────
+
+/**
+ * ⭐ 0.227 — la etiqueta ÚNICA del interruptor que vuelve a mostrar las órdenes cerradas en un
+ * selector de captura. Una sola, porque el aviso la cita entre comillas: si una pantalla la
+ * rotulara distinto, el aviso mandaría a buscar un botón que no existe.
+ */
+export const ETIQUETA_MOSTRAR_CERRADAS = 'Mostrar cerradas';
+
+/**
+ * ⭐ 0.227 — EL AVISO de que lo buscado existe pero está CERRADO (y por eso no aparece). Nunca un
+ * «no hay coincidencias» mudo: ése es el precedente del 26-jul-2026 (`SelectorOrden.tsx`), cuando
+ * filtrar el selector por estado dejó órdenes inoperables sin explicación. Dice las dos salidas:
+ * consultarla (el interruptor) y moverla (reabrirla, que es de quien tiene ese permiso).
+ *
+ * `total` es cuántas cerradas coinciden en total; `folios`, las que se nombran (las primeras). Si
+ * hay más de las nombradas, se dice cuántas más — nunca se callan.
+ */
+export function textoAvisoCerradasOcultas(
+  folios: readonly (number | string)[],
+  total: number = folios.length,
+): string {
+  const lista = [...new Set(folios.map(String))];
+  const resto = Math.max(total - lista.length, 0);
+  const interruptor = `“${ETIQUETA_MOSTRAR_CERRADAS}”`;
+  if (lista.length === 0) return '';
+  if (lista.length === 1 && resto === 0) {
+    return (
+      `La orden ${lista[0] ?? ''} está cerrada: actívala con ${interruptor} para consultarla; ` +
+      'para moverla hay que reabrirla.'
+    );
+  }
+  const nombradas = resto > 0 ? `${lista.join(', ')} y ${resto} más` : listaDeFolios(lista);
+  return (
+    `Las órdenes ${nombradas} están cerradas: actívalas con ${interruptor} para consultarlas; ` +
+    'para moverlas hay que reabrirlas.'
+  );
+}

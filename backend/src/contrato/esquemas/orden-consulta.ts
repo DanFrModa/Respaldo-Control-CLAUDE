@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { esquemaEstadoOrden } from './orden.js';
+import { esquemaEstadoOrden, esquemaFiltroCerradas } from './orden.js';
 
 /**
  * Contrato Zod de las CONSULTAS/TABLEROS/BÚSQUEDA de Órdenes (F2-E4 — doc
@@ -102,6 +102,7 @@ export const esquemaConsultaOrdenes = z
       .stringbool()
       .default(false)
       .describe('Incluye las órdenes canceladas (cancelación suave).'),
+    cerradas: esquemaFiltroCerradas.default('incluir'),
     ordenarPor: z
       .enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn'])
       .default('folio')

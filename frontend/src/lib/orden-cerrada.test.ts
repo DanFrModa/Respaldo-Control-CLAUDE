@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { estaCerrada, foliosDeOrdenesCerradas, textoAvisoOrdenCerrada } from './orden-cerrada';
+import {
+  ETIQUETA_MOSTRAR_CERRADAS,
+  estaCerrada,
+  foliosDeOrdenesCerradas,
+  textoAvisoCerradasOcultas,
+  textoAvisoOrdenCerrada,
+} from './orden-cerrada';
 
 describe('estaCerrada (0.226b)', () => {
   it('lee las tres formas del dato: cerradaEn, estado y el booleano aditivo', () => {
@@ -62,5 +68,34 @@ describe('foliosDeOrdenesCerradas (0.226b)', () => {
         { ordenCerrada: undefined, folioOrden: 9, idOrden: 3 },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('textoAvisoCerradasOcultas (0.227)', () => {
+  it('una orden: la nombra, cita el interruptor tal cual y dice cómo moverla', () => {
+    expect(textoAvisoCerradasOcultas([5424])).toBe(
+      'La orden 5424 está cerrada: actívala con “Mostrar cerradas” para consultarla; para ' +
+        'moverla hay que reabrirla.',
+    );
+  });
+
+  it('varias: las une en español y habla en plural', () => {
+    expect(textoAvisoCerradasOcultas([1, 2, 3])).toBe(
+      'Las órdenes 1, 2 y 3 están cerradas: actívalas con “Mostrar cerradas” para ' +
+        'consultarlas; para moverlas hay que reabrirlas.',
+    );
+  });
+
+  it('si hay más de las nombradas, dice cuántas más (nunca las calla)', () => {
+    expect(textoAvisoCerradasOcultas([10, 11], 7)).toContain('Las órdenes 10, 11 y 5 más');
+    expect(textoAvisoCerradasOcultas([10], 2)).toContain('Las órdenes 10 y 1 más');
+  });
+
+  it('cita la MISMA etiqueta que lleva el interruptor', () => {
+    expect(textoAvisoCerradasOcultas([1])).toContain(`“${ETIQUETA_MOSTRAR_CERRADAS}”`);
+  });
+
+  it('sin folios no dice nada', () => {
+    expect(textoAvisoCerradasOcultas([])).toBe('');
   });
 });

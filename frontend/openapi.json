@@ -61187,6 +61187,21 @@
           },
           {
             "schema": {
+              "default": "incluir",
+              "type": "string",
+              "enum": [
+                "incluir",
+                "ocultar",
+                "solo"
+              ]
+            },
+            "in": "query",
+            "name": "cerradas",
+            "required": false,
+            "description": "Órdenes cerradas: incluir (default, como siempre), ocultar (sólo abiertas, para las pantallas de captura) o solo (sólo cerradas, para avisar por qué no aparece una orden)."
+          },
+          {
+            "schema": {
               "default": "folio",
               "type": "string",
               "enum": [
@@ -94555,6 +94570,21 @@
             "name": "incluirCanceladas",
             "required": false,
             "description": "Incluye las órdenes canceladas (cancelación suave)."
+          },
+          {
+            "schema": {
+              "default": "incluir",
+              "type": "string",
+              "enum": [
+                "incluir",
+                "ocultar",
+                "solo"
+              ]
+            },
+            "in": "query",
+            "name": "cerradas",
+            "required": false,
+            "description": "Órdenes cerradas: incluir (default, como siempre), ocultar (sólo abiertas, para las pantallas de captura) o solo (sólo cerradas, para avisar por qué no aparece una orden)."
           },
           {
             "schema": {

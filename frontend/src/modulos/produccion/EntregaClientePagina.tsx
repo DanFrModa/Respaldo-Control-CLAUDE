@@ -272,6 +272,11 @@ export function EntregaClientePagina(): React.JSX.Element {
             <SelectorOrden
               idSeleccionada={idOrden}
               alSeleccionar={alElegirOrden}
+              // 0.227: la orden de un deep-link (p. ej. una cerrada desde el tablero WIP) puede no
+              // venir en la lista, que oculta las cerradas por omisión: se rotula igual.
+              etiquetaSeleccion={
+                orden.data === undefined ? undefined : `Orden #${orden.data.folio}`
+              }
               testid="entrega-selector-orden"
             />
           </CardContent>

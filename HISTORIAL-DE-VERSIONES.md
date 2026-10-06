@@ -71,6 +71,37 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.194 · 6-oct-2026 · **en prueba** — **Las órdenes cerradas ya no estorban donde se captura**
+
+> **La v0.194 cierra una fila del programa: la 0.227.** Es la última parte de tu regla de las órdenes cerradas:
+> *«en las pantallas donde se mete información ya no deberían aparecer»*, sin volverlas invisibles.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Al capturar, sólo ves las órdenes abiertas.** En la entrega a cliente, la salida de tela, el alta de auditoría,
+los movimientos y traspasos de producto terminado y los diálogos de orden de compra y de nota de salida, las órdenes
+cerradas ya no aparecen en la lista.
+
+**Pero nunca desaparecen.** Cada una de esas listas tiene un interruptor **«Mostrar cerradas»**. Y si buscas una orden
+que está cerrada, el sistema te lo dice —*«La orden N está cerrada: actívala con “Mostrar cerradas” para consultarla;
+para moverla hay que reabrirla»*— en lugar de decirte que no encontró nada.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Las pantallas de consulta no cambiaron:** el Centro de Órdenes, las consultas, el buscador, el costeo, la explosión
+de materiales y la ruta crítica siguen mostrando todas las órdenes.
+
+**En la entrega a cliente**, para ver el historial de una orden cerrada hay que encender «Mostrar cerradas» (o entrar
+desde el tablero de avance, que la sigue abriendo directo).
+
+**En movimientos y traspasos de producto terminado**, las piezas de órdenes cerradas no salen por omisión; el aviso
+te dice cuántas hay.
+
+### ⏳ Sigue pendiente o roto
+
+**Los desplegables de órdenes en la orden de compra y en la nota de salida traen las primeras 100 órdenes, sin
+buscador.** Ya era así; al quitar las cerradas, caben más de las que sí se usan.
+
 ## 0.193 · 5-oct-2026 · **en prueba** — **La factura del maquilero ya no se cuenta dos veces**
 
 > **La v0.193 cierra una fila del programa: la 0.252**, que bloqueaba el arranque. Se hizo como lo decidiste: lo

@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useAvios } from '@/api/avios';
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
-import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTelas } from '@/api/telas';
@@ -25,7 +24,13 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { InterruptorCerradas } from '@/components/dominio/InterruptorCerradas';
 import { estaCerrada } from '@/lib/orden-cerrada';
+import {
+  ordenesConElegidas,
+  useOrdenesDeCaptura,
+  type OrdenElegible,
+} from '@/modulos/produccion/ordenes-de-captura';
 import { capturaDesdeOc, renglonApi, renglonVacio, type RenglonOcCaptura } from './captura';
 import { EditorLineasOc } from './EditorLineasOc';
 
@@ -92,8 +97,11 @@ export function DialogoEditarOc({
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
   const avios = useAvios({ pagina: 1, porPagina: 100 });
   const tallas = useTallasActivas();
-  // Órdenes de producción no canceladas para ligar por línea (R7).
-  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
+  // Órdenes de producción no canceladas para ligar por línea (R7). ⭐ 0.227: sólo las ABIERTAS
+  // salvo «Mostrar cerradas» (filtro en el servidor) — ligar una OC a una cerrada es comprarle
+  // material a una orden que ya no admite movimientos.
+  const [mostrarCerradas, setMostrarCerradas] = useState(false);
+  const ordenes = useOrdenesDeCaptura(mostrarCerradas);
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idProveedor, setIdProveedor] = useState<number | null>(null);
@@ -175,6 +183,7 @@ export function DialogoEditarOc({
     if (!abierto) {
       return;
     }
+    setMostrarCerradas(false);
     if (oc !== undefined) {
       setIdProveedor(oc.idProveedor);
       setNombreProveedor(oc.proveedor);
@@ -202,8 +211,10 @@ export function DialogoEditarOc({
    */
   const foliosCerrados = useMemo(() => {
     const cerradas = new Map<number, number | string>();
-    for (const o of ordenes.data?.datos ?? []) {
-      if (estaCerrada(o)) cerradas.set(o.id, Number(o.folio));
+    // ⭐ 0.227: TODAS las órdenes vistas en el diálogo, no sólo la página actual — si alguien elige
+    // una cerrada con «Mostrar cerradas» y luego lo apaga, la pantalla sigue sabiendo que lo está.
+    for (const o of ordenes.vistas.values()) {
+      if (estaCerrada(o)) cerradas.set(o.id, o.folio ?? o.id);
     }
     for (const l of oc?.lineas ?? []) {
       if (l.ordenCerrada && l.idOrden !== null) cerradas.set(l.idOrden, l.folioOrden ?? l.idOrden);
@@ -214,7 +225,30 @@ export function DialogoEditarOc({
       if (folio !== undefined) folios.push(folio);
     }
     return [...new Set(folios)];
-  }, [renglones, ordenes.data, oc]);
+  }, [renglones, ordenes.vistas, oc]);
+
+  /**
+   * ⭐ 0.227: el desplegable de cada renglón = las abiertas (o todas, con el interruptor) + las YA
+   * elegidas que la página no trae — un renglón de una OC vieja ligado a una cerrada se sigue viendo
+   * ligado (y marcado), en vez de leerse «Sin ligar».
+   */
+  const ordenesDelEditor = useMemo(() => {
+    const conocidas = new Map<number, OrdenElegible>(ordenes.vistas);
+    for (const l of oc?.lineas ?? []) {
+      if (l.idOrden !== null && !conocidas.has(l.idOrden)) {
+        conocidas.set(l.idOrden, {
+          id: l.idOrden,
+          folio: l.folioOrden ?? l.idOrden,
+          ordenCerrada: l.ordenCerrada,
+        });
+      }
+    }
+    return ordenesConElegidas(
+      ordenes.lista,
+      renglones.map((r) => r.idOrden),
+      conocidas,
+    );
+  }, [ordenes.lista, ordenes.vistas, oc, renglones]);
 
   function confirmar(): void {
     if (idProveedor === null) {
@@ -406,7 +440,17 @@ export function DialogoEditarOc({
 
           {/* Renglones */}
           <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">Renglones</h3>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Renglones</h3>
+              {/* ⭐ 0.227: el desplegable «Orden ligada» oculta las cerradas por omisión. */}
+              {!soloLectura ? (
+                <InterruptorCerradas
+                  activo={mostrarCerradas}
+                  alCambiar={setMostrarCerradas}
+                  testid="oc-mostrar-cerradas"
+                />
+              ) : null}
+            </div>
             <EditorLineasOc
               renglones={renglones}
               alCambiar={setRenglones}
@@ -417,7 +461,7 @@ export function DialogoEditarOc({
                   : 'Este proveedor no tiene telas dadas de alta'
               }
               avios={avios.data?.datos ?? []}
-              ordenes={ordenes.data?.datos ?? []}
+              ordenes={ordenesDelEditor}
               tallas={tallas.data?.datos ?? []}
               soloLectura={soloLectura}
             />

@@ -409,6 +409,28 @@ export const esquemaEstadoOrden = z
   );
 
 /**
+ * ⭐ 0.227 (§Post-F9.244, etapa 2) — QUÉ HACER CON LAS ÓRDENES CERRADAS en un listado. Parámetro
+ * ADITIVO de consulta de `GET /api/ordenes` y `GET /api/ordenes/consulta`:
+ *  • `incluir` (DEFAULT): como siempre — quien no lo pasa ve lo mismo que antes. Así ninguna pantalla
+ *    de CONSULTA (Centro de Órdenes, tableros, reportes) cambia: la regla de Daniel es que una orden
+ *    cerrada **no se vuelve invisible**.
+ *  • `ocultar`: sólo las ABIERTAS. Lo piden los selectores desde donde se CAPTURA (entrega, salida de
+ *    tela, alta de auditoría, OC, nota de salida), con su interruptor «Mostrar cerradas».
+ *  • `solo`: sólo las CERRADAS. Lo usa el selector para AVISAR que lo buscado existe pero está
+ *    cerrado, en vez de un «no hay coincidencias» mudo (el precedente del 26-jul-2026).
+ * El criterio es `cerradaEn` (la verdad autoritativa del cierre), no el `estado`, que es su espejo.
+ */
+export const esquemaFiltroCerradas = z
+  .enum(['incluir', 'ocultar', 'solo'])
+  .describe(
+    'Órdenes cerradas: incluir (default, como siempre), ocultar (sólo abiertas, para las ' +
+      'pantallas de captura) o solo (sólo cerradas, para avisar por qué no aparece una orden).',
+  );
+
+/** Forma del filtro de cerradas en la API. */
+export type FiltroCerradas = z.infer<typeof esquemaFiltroCerradas>;
+
+/**
  * REQUISITOS que sostienen el estado `completa` (Daniel 26-jul-2026): la orden dice POR QUÉ está
  * como está. Regla: **tallas + receta liberada, y arte si aplica**. `arte: "no-aplica"` = el modelo
  * no lleva arte (no bloquea). `faltantes` es lo que la UI muestra como "Falta: …".
@@ -650,6 +672,7 @@ export const esquemaListarOrdenes = z
       .stringbool()
       .default(false)
       .describe('Incluye las órdenes canceladas (cancelación suave).'),
+    cerradas: esquemaFiltroCerradas.default('incluir'),
     ordenarPor: z
       .enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn'])
       .default('folio')

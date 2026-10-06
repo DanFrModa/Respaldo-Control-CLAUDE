@@ -18429,3 +18429,26 @@ contaría dos veces. Es consecuencia de no desarrollar el caso (decisión 3 de a
 
 **(d) Prioridad: bloquea el arranque** (confirmado por Daniel).
 
+
+#### (Post-F9.263) — EL ANTICIPO A UN MAQUILERO NO SE LIGA A LA ORDEN (6-oct-2026, decisión de Daniel)
+
+Al confirmar que en EsMa los saldos pueden quedar en negativo —*«es muy común que nos pidan anticipos sobre alguna OP
+que estén cosiendo»*—, se le preguntó si el anticipo debía quedar amarrado a la orden. Textual: *«No necesito que el
+anticipo vaya ligado a una orden.»* ⇒ el anticipo sigue siendo un **pago a cuenta** en EsMa (`crearPagoACuentaMaquilero`,
+§Post-F9.186(h)) que deja el saldo en negativo a propósito; la orden, si se quiere, se anota en las observaciones. **No
+nace fila.**
+
+#### (Post-F9.264) — LAS ÓRDENES CERRADAS DEJAN DE APARECER DONDE SE CAPTURA (fila 0.227, v0.194) — cuatro criterios con su default
+
+Aplica §Post-F9.244 (etapa 2). El corte es **por acción**: el selector que alimenta una captura oculta las cerradas
+por omisión, con interruptor «Mostrar cerradas» y aviso; las consultas no cambian. Cuatro criterios que el lead dejó
+con default y que Daniel puede corregir:
+1. **Entrega a cliente** es pantalla mixta con un solo selector: oculta las cerradas por omisión; para consultar una
+   hay que usar el interruptor (el enlace directo desde el tablero WIP sigue abriéndola).
+2. **Costeo** se trata como consulta: la orden cerrada es justo la que se consulta (costo congelado), y su edición ya
+   se apaga desde la 0.061.
+3. **El aviso sale siempre que haya cerradas que coincidan con la búsqueda**, no sólo cuando no hay abiertas: así se
+   encuentra el folio exacto de una cerrada aunque otras abiertas coincidan por modelo o referencia.
+4. **Movimientos y traspasos de PT** ocultan por omisión las piezas de órdenes cerradas (se cuentan en el aviso),
+   coherente con que una cerrada no admite movimientos.
+

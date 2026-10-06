@@ -6,7 +6,6 @@ import { useAlmacenes } from '@/api/almacenes';
 import { useHabilitacionOrden } from '@/api/habilitacion';
 import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
-import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
 import { hoy } from '@/lib/fecha-negocio';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,14 @@ import {
   type RenglonNotaCaptura,
 } from './captura';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
+import { InterruptorCerradas } from '@/components/dominio/InterruptorCerradas';
 import { estaCerrada } from '@/lib/orden-cerrada';
+import {
+  ordenesConElegidas,
+  rotuloOrdenElegible,
+  useOrdenesDeCaptura,
+  type OrdenElegible,
+} from '@/modulos/produccion/ordenes-de-captura';
 import { EditorRenglonesNota, type ExistenciaAvioNota } from './EditorRenglonesNota';
 
 /** Un renglón para pre-cargar el constructor (viene del panel de habilitación, §4.6). */
@@ -103,7 +109,10 @@ export function DialogoEditarNota({
     ordenarPor: 'nombre',
     tipo: 'AVIO',
   });
-  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
+  // ⭐ 0.227: los desplegables de orden (renglón y «Traer avíos») ofrecen sólo las ABIERTAS salvo
+  // «Mostrar cerradas» (filtro en el servidor): a una orden cerrada no se le surten avíos.
+  const [mostrarCerradas, setMostrarCerradas] = useState(false);
+  const ordenes = useOrdenesDeCaptura(mostrarCerradas);
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);
@@ -177,6 +186,7 @@ export function DialogoEditarNota({
       return;
     }
     setOrdenTraer(null);
+    setMostrarCerradas(false);
     if (nota !== undefined) {
       setIdMaquilero(nota.idMaquilero);
       setNombreMaquilero(nota.maquilero);
@@ -317,14 +327,16 @@ export function DialogoEditarNota({
    */
   const idsOrdenCerradas = useMemo(() => {
     const ids = new Set<number>();
-    for (const o of ordenes.data?.datos ?? []) if (estaCerrada(o)) ids.add(o.id);
+    // 0.227: TODAS las vistas en el diálogo (no sólo la página actual): apagar «Mostrar cerradas»
+    // no hace olvidar que la orden elegida está cerrada.
+    for (const o of ordenes.vistas.values()) if (estaCerrada(o)) ids.add(o.id);
     for (const l of nota?.lineas ?? []) if (l.ordenCerrada) ids.add(l.idOrden);
     for (const o of prefill?.ordenesCerradas ?? []) ids.add(o.idOrden);
     return ids;
-  }, [ordenes.data, nota, prefill]);
+  }, [ordenes.vistas, nota, prefill]);
   const foliosCerrados = useMemo(() => {
     const folioPorId = new Map<number, number>();
-    for (const o of ordenes.data?.datos ?? []) folioPorId.set(o.id, Number(o.folio));
+    for (const o of ordenes.vistas.values()) folioPorId.set(o.id, o.folio ?? o.id);
     for (const l of nota?.lineas ?? []) {
       if (l.folioOrden !== null) folioPorId.set(l.idOrden, l.folioOrden);
     }
@@ -336,7 +348,43 @@ export function DialogoEditarNota({
       }
     }
     return [...new Set(folios)];
-  }, [renglones, idsOrdenCerradas, ordenes.data, nota, prefill]);
+  }, [renglones, idsOrdenCerradas, ordenes.vistas, nota, prefill]);
+
+  /**
+   * ⭐ 0.227: lo que se sabe de cada orden que el diálogo puede tener elegida aunque la página no la
+   * traiga (una cerrada de una nota vieja o del prefill): así su renglón se sigue viendo ligado —y
+   * marcado— en vez de «Elige una orden…».
+   */
+  const conocidas = useMemo(() => {
+    const mapa = new Map<number, OrdenElegible>(ordenes.vistas);
+    for (const l of nota?.lineas ?? []) {
+      if (!mapa.has(l.idOrden)) {
+        mapa.set(l.idOrden, {
+          id: l.idOrden,
+          folio: l.folioOrden ?? l.idOrden,
+          ordenCerrada: l.ordenCerrada,
+        });
+      }
+    }
+    for (const o of prefill?.ordenesCerradas ?? []) {
+      if (!mapa.has(o.idOrden))
+        mapa.set(o.idOrden, { id: o.idOrden, folio: o.folio, ordenCerrada: true });
+    }
+    return mapa;
+  }, [ordenes.vistas, nota, prefill]);
+  const ordenesDeRenglones = useMemo(
+    () =>
+      ordenesConElegidas(
+        ordenes.lista,
+        renglones.map((r) => r.idOrden),
+        conocidas,
+      ),
+    [ordenes.lista, renglones, conocidas],
+  );
+  const ordenesDeTraer = useMemo(
+    () => ordenesConElegidas(ordenes.lista, [ordenTraer], conocidas),
+    [ordenes.lista, ordenTraer, conocidas],
+  );
   const ordenTraerCerrada = ordenTraer !== null && idsOrdenCerradas.has(ordenTraer);
 
   const renglonesValidos = renglones.length > 0 && renglones.every(renglonCompleto);
@@ -524,11 +572,10 @@ export function DialogoEditarNota({
                     data-testid="nota-traer-orden"
                   >
                     <option value="">Elige una orden…</option>
-                    {(ordenes.data?.datos ?? []).map((o) => (
+                    {ordenesDeTraer.map((o) => (
                       <option key={o.id} value={String(o.id)}>
-                        Orden {o.folio} · {o.codigoModelo}
-                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
-                        {estaCerrada(o) ? ' · Cerrada' : ''}
+                        {/* « · Cerrada» sólo con «Mostrar cerradas» o si ya estaba elegida (0.227). */}
+                        {rotuloOrdenElegible(o)}
                       </option>
                     ))}
                   </SelectNativo>
@@ -548,6 +595,14 @@ export function DialogoEditarNota({
                   <DownloadIcon aria-hidden />
                   Traer avíos de la orden
                 </Button>
+                {/* ⭐ 0.227: UN interruptor para los dos desplegables de orden (éste y el de cada
+                    renglón): por omisión sólo ofrecen órdenes ABIERTAS. */}
+                <InterruptorCerradas
+                  activo={mostrarCerradas}
+                  alCambiar={setMostrarCerradas}
+                  className="pb-2"
+                  testid="nota-mostrar-cerradas"
+                />
               </div>
             </div>
           ) : null}
@@ -571,7 +626,7 @@ export function DialogoEditarNota({
             <EditorRenglonesNota
               renglones={renglones}
               alCambiar={setRenglones}
-              ordenes={ordenes.data?.datos ?? []}
+              ordenes={ordenesDeRenglones}
               recetaPorOrden={recetaPorOrden}
               existenciaPorAvio={existenciaPorAvio}
               soloLectura={soloLectura}

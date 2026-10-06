@@ -2,7 +2,7 @@ import { Grid3x3, Trash2Icon } from 'lucide-react';
 
 import type { Avio } from '@/api/avios';
 import { etiquetaUnidadTela, type Tela } from '@/api/telas';
-import type { OrdenLigera, Talla } from '@/api/tipos';
+import type { Talla } from '@/api/tipos';
 import {
   MatrizColorTalla,
   type MatrizLinea,
@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { rotuloOrdenElegible, type OrdenElegible } from '@/modulos/produccion/ordenes-de-captura';
 import { SelectorColor } from '@/components/dominio/SelectorColor';
 import { formatearMoneda } from '@/lib/formato';
 
@@ -22,7 +23,6 @@ import {
   type RenglonOcCaptura,
   type TipoMaterialOc,
 } from './captura';
-import { estaCerrada } from '@/lib/orden-cerrada';
 
 /**
  * EDITOR DE RENGLONES de una OC (F4-E2): cada renglón elige el tipo de material (tela del catálogo /
@@ -52,7 +52,11 @@ export function EditorLineasOc({
   /** Qué decir cuando no hay telas que ofrecer (sin proveedor / proveedor sin telas). */
   mensajeSinTelas: string;
   avios: readonly Avio[];
-  ordenes: readonly OrdenLigera[];
+  /**
+   * Órdenes del desplegable (0.227: sólo abiertas salvo «Mostrar cerradas», más las ya ELEGIDAS que
+   * la página no trae — ver `ordenesConElegidas`).
+   */
+  ordenes: readonly OrdenElegible[];
   tallas: readonly Talla[];
   soloLectura?: boolean;
 }): React.JSX.Element {
@@ -502,9 +506,9 @@ export function EditorLineasOc({
                     <option value="">Sin ligar</option>
                     {ordenes.map((o) => (
                       <option key={o.id} value={String(o.id)}>
-                        Orden {o.folio} · {o.codigoModelo}
-                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
-                        {estaCerrada(o) ? ' · Cerrada' : ''}
+                        {/* Marca « · Cerrada» (0.226b); sólo aparecen con «Mostrar cerradas» o si
+                            ya estaban elegidas (0.227). */}
+                        {rotuloOrdenElegible(o)}
                       </option>
                     ))}
                   </SelectNativo>

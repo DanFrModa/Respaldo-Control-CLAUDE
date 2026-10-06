@@ -58,9 +58,16 @@ const SEGUIMIENTO = {
 const crearEntrega = vi.fn();
 const useEntregasOrden = vi.fn<() => unknown>();
 const useSeguimientoEntrega = vi.fn<() => unknown>();
-const useOrden = vi.fn<() => unknown>();
+const respuestaOrden = vi.fn<(id?: number) => unknown>();
+/** Lo que devuelve react-query para un id que no es el de la orden (o `undefined`: consulta apagada). */
+const SIN_ORDEN = { data: undefined, isError: false, isPending: false };
 
-vi.mock('@/api/ordenes', () => ({ useOrden: () => useOrden() }));
+// 0.227: el mock DEPENDE DEL ID, como el hook real. Si devolviera la orden con `useOrden(undefined)`,
+// la pantalla la «tendría» sin que nadie la eligiera y una prueba de enlace directo pasaría aunque
+// el enlace no hiciera nada.
+vi.mock('@/api/ordenes', () => ({
+  useOrden: (id?: number) => (id === ORDEN.id ? respuestaOrden(id) : SIN_ORDEN),
+}));
 vi.mock('@/api/entregas-cliente', () => ({
   CLAVE_ENTREGAS: ['entregas'],
   useEntregasOrden: () => useEntregasOrden(),
@@ -80,10 +87,20 @@ vi.mock('@/api/almacenes', () => ({
 }));
 /** El selector de orden se reduce a un botón: elegir la orden es el paso previo, no lo que se mide. */
 vi.mock('./SelectorOrden', () => ({
-  SelectorOrden: ({ alSeleccionar }: { alSeleccionar: (o: Orden) => void }) => (
-    <button type="button" data-testid="elegir-orden" onClick={() => alSeleccionar(ORDEN)}>
-      Elegir orden
-    </button>
+  SelectorOrden: ({
+    alSeleccionar,
+    etiquetaSeleccion,
+  }: {
+    alSeleccionar: (o: Orden) => void;
+    etiquetaSeleccion?: string;
+  }) => (
+    <>
+      <button type="button" data-testid="elegir-orden" onClick={() => alSeleccionar(ORDEN)}>
+        Elegir orden
+      </button>
+      {/* 0.227: cómo rotula el buscador la orden elegida que no viene en su lista. */}
+      <span data-testid="selector-etiqueta">{etiquetaSeleccion ?? ''}</span>
+    </>
   ),
 }));
 
@@ -112,7 +129,7 @@ async function capturarUnaEntrega(usuario: ReturnType<typeof userEvent.setup>): 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useOrden.mockReturnValue({ data: ORDEN, isError: false, isPending: false });
+  respuestaOrden.mockReturnValue({ data: ORDEN, isError: false, isPending: false });
   useSeguimientoEntrega.mockReturnValue({
     data: SEGUIMIENTO,
     isError: false,
@@ -242,7 +259,7 @@ describe('⭐ 0.226b — la orden CERRADA apaga la entrega (§Post-F9.244)', () 
   const PERMISOS = ['produccion.entrega', 'produccion.wip-ver', 'produccion.cancelar'];
 
   it('cerrada: avisa y apaga almacén, matriz y «Guardar»; el historial ya no ofrece cancelar', async () => {
-    useOrden.mockReturnValue({
+    respuestaOrden.mockReturnValue({
       data: { ...ORDEN, cerradaEn: '2026-10-01T10:00:00.000Z', estado: 'cerrada' },
       isError: false,
       isPending: false,
@@ -297,7 +314,7 @@ describe('⭐ 0.226b — la orden CERRADA apaga la entrega (§Post-F9.244)', () 
     expect(screen.getByTestId('entrega-cancelar')).toBeInTheDocument();
 
     // La orden se CIERRA (llega en el siguiente render, p. ej. tras un refetch): el botón se va.
-    useOrden.mockReturnValue({
+    respuestaOrden.mockReturnValue({
       data: { ...ORDEN, cerradaEn: '2026-10-01T10:00:00.000Z', estado: 'cerrada' },
       isError: false,
       isPending: false,
@@ -307,5 +324,35 @@ describe('⭐ 0.226b — la orden CERRADA apaga la entrega (§Post-F9.244)', () 
     expect(screen.queryByTestId('entrega-cancelar')).not.toBeInTheDocument();
     // El comprobante de la última entrega sigue (consultar es libre).
     expect(screen.getByTestId('entrega-pdf')).toBeInTheDocument();
+  });
+
+  it('⭐ 0.227: con ENLACE DIRECTO la orden queda ELEGIDA (matriz) y el buscador la rotula', async () => {
+    // El tablero WIP abre la entrega de una orden por su id; el buscador oculta las cerradas y
+    // sólo trae 8, así que la pantalla tiene que elegirla ella y pasarle el rótulo.
+    renderConProveedores(<EntregaClientePagina />, {
+      sesion: estadoSesionDePrueba(['produccion.entrega', 'produccion.wip-ver']),
+      rutaInicial: { pathname: '/produccion/entregas', state: { idOrden: ORDEN.id } },
+    });
+    // Elegida de verdad: se pinta su matriz de captura (sin tocar `elegir-orden`).
+    expect(await screen.findByTestId('entrega-matriz-celda')).toBeInTheDocument();
+    expect(screen.getByTestId('selector-etiqueta')).toHaveTextContent('Orden #5424');
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+  });
+
+  it('⭐ 0.227: ENLACE DIRECTO a una orden CERRADA también la elige, y avisa (consultar es libre)', async () => {
+    respuestaOrden.mockReturnValue({
+      data: { ...ORDEN, cerradaEn: '2026-10-01T10:00:00.000Z', estado: 'cerrada' },
+      isError: false,
+      isPending: false,
+    });
+    renderConProveedores(<EntregaClientePagina />, {
+      sesion: estadoSesionDePrueba(['produccion.entrega', 'produccion.wip-ver']),
+      rutaInicial: { pathname: '/produccion/entregas', state: { idOrden: ORDEN.id } },
+    });
+    expect(await screen.findByTestId('aviso-orden-cerrada')).toHaveTextContent(
+      /La orden 5424 está cerrada/,
+    );
+    expect(screen.getByTestId('selector-etiqueta')).toHaveTextContent('Orden #5424');
+    expect(screen.getByTestId('entrega-guardar')).toBeDisabled();
   });
 });

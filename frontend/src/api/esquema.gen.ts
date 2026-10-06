@@ -25269,6 +25269,8 @@ export interface paths {
           estado?: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
           /** @description Incluye las órdenes canceladas (cancelación suave). */
           incluirCanceladas?: string;
+          /** @description Órdenes cerradas: incluir (default, como siempre), ocultar (sólo abiertas, para las pantallas de captura) o solo (sólo cerradas, para avisar por qué no aparece una orden). */
+          cerradas?: 'incluir' | 'ocultar' | 'solo';
           /** @description Columna de orden. */
           ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega' | 'creadoEn';
           /** @description Dirección del orden. */
@@ -36292,6 +36294,8 @@ export interface paths {
           estado?: 'capturada' | 'completa' | 'cancelada' | 'cerrada';
           /** @description Incluye las órdenes canceladas (cancelación suave). */
           incluirCanceladas?: string;
+          /** @description Órdenes cerradas: incluir (default, como siempre), ocultar (sólo abiertas, para las pantallas de captura) o solo (sólo cerradas, para avisar por qué no aparece una orden). */
+          cerradas?: 'incluir' | 'ocultar' | 'solo';
           /** @description Columna de orden. */
           ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega' | 'creadoEn';
           /** @description Dirección del orden. */
