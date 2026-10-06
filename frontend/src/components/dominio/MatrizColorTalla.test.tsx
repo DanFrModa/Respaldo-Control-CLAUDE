@@ -193,3 +193,26 @@ describe('<MatrizColorTalla> (candado)', () => {
     expect(screen.getAllByTestId('mc-total-fila')[1]).toHaveTextContent('0');
   });
 });
+
+describe('⭐ Fila 0.219 — `pistaCelda` reemplaza el «de N» de la referencia', () => {
+  it('con la prop pinta SU pista por celda (color, talla, pack, cantidad) y no el «de N»', () => {
+    render(
+      <MatrizColorTalla
+        tallas={TALLAS.slice(0, 2)}
+        colores={COLORES_SIN_PACK.slice(0, 1)}
+        valores={{ [claveCelda(10, 2, '')]: 3 }}
+        onCambiar={() => undefined}
+        referencia={new Map([[claveCelda(10, 1, ''), 40]])}
+        pistaCelda={(idColor, idTalla, pack, cantidad) => (
+          <span data-testid="pista">{`${String(idColor)}·${String(idTalla)}·${pack}·${String(cantidad)}`}</span>
+        )}
+        testid="mc"
+      />,
+    );
+    expect(screen.getAllByTestId('pista').map((p) => p.textContent)).toEqual([
+      '10·1··0',
+      '10·2··3',
+    ]);
+    expect(screen.queryByTestId('mc-hint')).not.toBeInTheDocument();
+  });
+});

@@ -23,6 +23,7 @@ El componente es **controlado en dos ejes independientes**: el padre es dueño d
 | `slotAgregarColor?`  | `ReactNode`                                                         | Reemplaza el `<select>` de "agregar color" (p. ej. el combobox con alta al vuelo de la OP). Los demás flujos, sin la prop, conservan el select. |
 | `onPantoneChange?`   | `(indice, pantone) => void`                                         | Callback del pantone por fila. **El 1er argumento es la POSICIÓN de la fila**, no el `idColor`.                                                 |
 | `onPackChange?`      | `(indice, pack) => void`                                            | Si se pasa, aparece la columna **Pack** (§Post-F9.10). Sin ella, la matriz es la de siempre.                                                    |
+| `pistaCelda?`        | `(idColor, idTalla, cantidad) => ReactNode`                         | **Fila 0.219**: lo que devuelva se pinta bajo cada celda (p. ej. la existencia en la entrega a cliente). Pásala memoizada. Sin ella, nada cambia. |
 
 ### Comportamiento
 

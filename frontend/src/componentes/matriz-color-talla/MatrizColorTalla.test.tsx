@@ -283,3 +283,49 @@ describe('<MatrizColorTalla>', () => {
     expect(pantone).toHaveTextContent('PANTONE 19-3920 TCX');
   });
 });
+
+describe('⭐ Fila 0.219 — pista bajo cada celda (`pistaCelda`)', () => {
+  const LINEAS: MatrizLinea[] = [{ idColor: 10, color: 'Rojo', cantidades: { 1: 2 } }];
+
+  it('pinta lo que devuelve para CADA celda, con su color, talla y cantidad', () => {
+    render(
+      <MatrizColorTalla
+        tallas={TALLAS.slice(0, 2)}
+        lineas={LINEAS}
+        tallasDisponibles={TALLAS}
+        onLineasChange={() => undefined}
+        onTallasChange={() => undefined}
+        pistaCelda={(idColor, idTalla, cantidad) => (
+          <span data-testid="pista">{`${String(idColor)}·${String(idTalla)}·${String(cantidad)}`}</span>
+        )}
+      />,
+    );
+    expect(screen.getAllByTestId('pista').map((p) => p.textContent)).toEqual(['10·1·2', '10·2·0']);
+  });
+
+  it('también en solo lectura; y sin la prop no pinta nada', () => {
+    const { unmount } = render(
+      <MatrizColorTalla
+        tallas={TALLAS.slice(0, 1)}
+        lineas={LINEAS}
+        tallasDisponibles={TALLAS}
+        onLineasChange={() => undefined}
+        onTallasChange={() => undefined}
+        soloLectura
+        pistaCelda={() => <span data-testid="pista">x</span>}
+      />,
+    );
+    expect(screen.getAllByTestId('pista')).toHaveLength(1);
+    unmount();
+    render(
+      <MatrizColorTalla
+        tallas={TALLAS.slice(0, 1)}
+        lineas={LINEAS}
+        tallasDisponibles={TALLAS}
+        onLineasChange={() => undefined}
+        onTallasChange={() => undefined}
+      />,
+    );
+    expect(screen.queryAllByTestId('pista')).toHaveLength(0);
+  });
+});

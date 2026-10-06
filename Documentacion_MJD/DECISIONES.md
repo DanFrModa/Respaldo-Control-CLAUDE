@@ -18515,3 +18515,20 @@ Dos criterios que el lead dejó con default y que Daniel puede corregir:
 1. **«Guardar» no se bloquea** cuando un renglón ya capturado queda «Sin existencia» o «Excede» (por ejemplo, al cambiar
    de almacén): se pinta en rojo y el servidor decide al guardar, igual que en la nota de salida.
 2. **En el traspaso no hay un aviso aparte por la suma de los renglones:** cada renglón ya dice «Excede · hay N».
+
+#### (Post-F9.268) — LA ENTREGA A CLIENTE ENSEÑA LA EXISTENCIA POR TALLA (fila 0.219, v0.198) — dos criterios con su default
+
+Aplica el punto 10b de §Post-F9.243. Bajo cada celda color×talla de la entrega se pinta lo que hay **de esa orden** en
+el almacén elegido, en las dos pantallas donde se captura. Si no se sabe cuánto hay, no se pinta y se deja capturar: el
+servidor decide al guardar. «Guardar» sigue apagado cuando se sabe que algo se pasa, como ya era antes de esta fila.
+Medirla corrigió dos defectos de ese bloqueo previo: un usuario sin permiso de ver el avance nunca podía guardar, y al
+cambiar de almacén se usaban un momento los números del anterior. El rechazo del servidor ahora nombra el color y la
+talla.
+
+Dos criterios que el lead dejó con default y que Daniel puede corregir:
+1. **«Sin existencia» se pinta en rojo aunque la celda esté vacía.** En órdenes con muchas tallas sin producir puede verse
+   cargado; la alternativa es rojo sólo si se tecleó algo y gris si no.
+2. **Sólo cuenta la existencia de esa orden.** Lo que vive en el almacén sin orden (migrado, inventario de arranque) no se
+   muestra porque tampoco se puede entregar contra la orden. ⚠️ Esto no lo eligió esta fila: es la regla del inventario
+   de PT por orden desde F6-E2 (ADR-0014), y la pantalla sólo la enseña. Si Daniel quiere entregar también lo que no
+   tiene orden, el cambio no es de pantalla sino de esa regla (ficha aparte).

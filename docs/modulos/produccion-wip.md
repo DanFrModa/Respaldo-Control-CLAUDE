@@ -71,6 +71,8 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   salida" del recibo de costura. Deriva la etapa `entrega_cliente`, la validación **no-negativo estricta**
   (no entregar lo que no existe, suma directa bajo lock), y la **SALIDA del kardex PT**. El seguimiento
   del pedido (entregado/faltante) es DERIVADO de las entregas vivas (D3). Evento `entrega-registrado`.
+  ⭐ Fila 0.219: la captura pinta por celda color×talla la existencia **de esa orden** en el almacén (el `disponible`
+  de `seguimiento-entrega`, mismo tope que la guarda); *no se sabe* ⇒ deja pasar, y el rechazo nombra color y talla.
 - `produccion/wip.ts` (F3-E5) — **tablero WIP** + existencias en poder del maquilero (`MaqExis`): CONSULTAS
   de solo lectura, todo derivado por suma de `EtapaMovimientoDet` (excluyendo canceladas).
 - `esma/cargos.ts` (F3-E4) — **cola de validación EsMa**: el cargo nace `propuesto` del recibo **o de un

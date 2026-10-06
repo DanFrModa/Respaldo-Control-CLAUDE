@@ -236,9 +236,17 @@ async function validarNoNegativo(
       idOrden,
     );
     if (existencia - c.cantidad < 0) {
+      // ⭐ Fila 0.219: el rechazo NOMBRA el color y la talla. Antes decía «de un artículo con N» y,
+      // en una matriz de varias tallas, quien capturaba no sabía cuál ajustar. Sólo se consulta al
+      // fallar (la operación ya no sigue), sin lock: es redacción, no validación.
+      const [color, talla] = await Promise.all([
+        tx.color.findUnique({ where: { id: c.idColor }, select: { nombre: true } }),
+        tx.talla.findUnique({ where: { id: c.idTalla }, select: { etiqueta: true } }),
+      ]);
+      const celda = `${color?.nombre ?? `color ${String(c.idColor)}`} · talla ${talla?.etiqueta ?? String(c.idTalla)}`;
       throw new ErrorConflicto(
-        `No hay existencia suficiente para entregar: se intenta sacar ${c.cantidad} pza(s) de un ` +
-          `artículo con ${existencia} en existencia de esta orden en el almacén (no se permite dejar negativo).`,
+        `No hay existencia suficiente para entregar ${celda}: se intenta sacar ${String(c.cantidad)} ` +
+          `pza(s) y hay ${String(existencia)} de esta orden en el almacén (no se permite dejar negativo).`,
       );
     }
   }

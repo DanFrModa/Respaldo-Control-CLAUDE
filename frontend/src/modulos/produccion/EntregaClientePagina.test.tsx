@@ -55,9 +55,12 @@ const SEGUIMIENTO = {
   celdas: [{ idColor: 7, idTalla: 11, pedido: 10, entregado: 0, faltante: 10, disponible: 10 }],
 };
 
+/** La orden que «elige» el selector simulado (las pruebas de la 0.219 usan una de tres celdas). */
+let ordenDelSelector: Orden = ORDEN;
+
 const crearEntrega = vi.fn();
 const useEntregasOrden = vi.fn<() => unknown>();
-const useSeguimientoEntrega = vi.fn<() => unknown>();
+const useSeguimientoEntrega = vi.fn<(...args: unknown[]) => unknown>();
 const respuestaOrden = vi.fn<(id?: number) => unknown>();
 /** Lo que devuelve react-query para un id que no es el de la orden (o `undefined`: consulta apagada). */
 const SIN_ORDEN = { data: undefined, isError: false, isPending: false };
@@ -71,7 +74,8 @@ vi.mock('@/api/ordenes', () => ({
 vi.mock('@/api/entregas-cliente', () => ({
   CLAVE_ENTREGAS: ['entregas'],
   useEntregasOrden: () => useEntregasOrden(),
-  useSeguimientoEntrega: () => useSeguimientoEntrega(),
+  // Se le pasan los argumentos (orden, query, habilitado) para poder medir CUÁNDO se pide (0.219).
+  useSeguimientoEntrega: (...args: unknown[]) => useSeguimientoEntrega(...args),
   useCrearEntrega: () => ({ mutate: crearEntrega, isPending: false }),
   useCancelarEntrega: () => ({ mutate: vi.fn(), isPending: false }),
   urlComprobanteEntrega: (id: number) => `/api/produccion/entregas-cliente/${id}/comprobante`,
@@ -95,7 +99,11 @@ vi.mock('./SelectorOrden', () => ({
     etiquetaSeleccion?: string;
   }) => (
     <>
-      <button type="button" data-testid="elegir-orden" onClick={() => alSeleccionar(ORDEN)}>
+      <button
+        type="button"
+        data-testid="elegir-orden"
+        onClick={() => alSeleccionar(ordenDelSelector)}
+      >
         Elegir orden
       </button>
       {/* 0.227: cómo rotula el buscador la orden elegida que no viene en su lista. */}
@@ -129,6 +137,7 @@ async function capturarUnaEntrega(usuario: ReturnType<typeof userEvent.setup>): 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ordenDelSelector = ORDEN;
   respuestaOrden.mockReturnValue({ data: ORDEN, isError: false, isPending: false });
   useSeguimientoEntrega.mockReturnValue({
     data: SEGUIMIENTO,
@@ -157,10 +166,9 @@ describe('Comprobante PDF de la barra del «recién guardado» (fila 0.200)', ()
     // que nada más la protege.
     //
     // ⚠️ HONESTIDAD SOBRE EL MONTAJE: al `useSeguimientoEntrega` se le da su respuesta aunque esta
-    // sesión NO lleve `wip-ver` (en el servidor sería un 403). Es DELIBERADO y es lo único que
-    // permite llegar a la barra, porque sin ese dato el botón de guardar se deshabilita — lo mide el
-    // tercer bloque de este archivo. O sea: lo que se fija aquí es la REGLA del gate, no que el
-    // agujero sea alcanzable por la UI de hoy.
+    // sesión NO lleve `wip-ver` (la pantalla ya ni la pide). Da igual para lo que se mide: desde la
+    // fila 0.219 la barra es alcanzable de verdad SIN el seguimiento —lo mide el tercer bloque de
+    // este archivo—, así que este gate es el único freno.
     const usuario = userEvent.setup();
     pintar(['produccion.entrega']);
     await capturarUnaEntrega(usuario);
@@ -228,30 +236,226 @@ describe('Comprobante PDF del historial de la orden (fila 0.200)', () => {
 });
 
 describe('⚠️ Medición: qué tan alcanzable es la barra sin `produccion.wip-ver`', () => {
-  it('sin el seguimiento (que pide `wip-ver`) «Guardar entrega» queda DESHABILITADO', async () => {
-    // Éste es el estado REAL de un capturista sin `wip-ver`: el seguimiento le devuelve 403, así que
-    // el mapa de `disponible` llega vacío, todo lo que teclee cuenta como exceso y el botón no se
-    // habilita. ⇒ por la UI de HOY la barra del recién guardado no se alcanza, y el gate de arriba es
-    // una red, no un parche a un agujero abierto.
-    //
-    // 🔑 La prueba se queda porque fija esa dependencia: si alguien «arregla» el exceso para que no
-    // bloquee cuando no hay disponible, la barra pasa a ser alcanzable de verdad — y el gate, lo
-    // único que evitaría el 403.
+  it('🔴 0.219: sin el seguimiento (que pide `wip-ver`) «Guardar entrega» SÍ se habilita y guarda', async () => {
+    // Hasta la v0.196 esta prueba fijaba lo CONTRARIO: sin `wip-ver` el mapa de existencia llegaba
+    // vacío, todo contaba como exceso y el botón nunca se habilitaba. Era un ACCIDENTE que la fila
+    // 0.219 corrige a propósito: una existencia que NO se sabe no bloquea (bloquear sería inventar un
+    // cero) y decide el servidor. ⇒ la barra del recién guardado es alcanzable de verdad sin
+    // `wip-ver`, y el gate del comprobante (primer bloque) pasa a ser el único freno.
+    const refetch = vi.fn();
     useSeguimientoEntrega.mockReturnValue({
       data: undefined,
-      isError: true,
+      isError: false,
       isPending: false,
-      refetch: vi.fn(),
+      refetch,
     });
     const usuario = userEvent.setup();
     pintar(['produccion.entrega']);
+    await capturarUnaEntrega(usuario);
+    // Tampoco se re-pide al guardar: `refetch` ignora `enabled: false` y sería un 403 seguro.
+    expect(refetch).not.toHaveBeenCalled();
+
+    // La consulta ni se pide (sería un 403 seguro): el tercer argumento es `habilitado`.
+    expect(useSeguimientoEntrega).toHaveBeenCalled();
+    for (const llamada of useSeguimientoEntrega.mock.calls) {
+      expect(llamada[2]).toBe(false);
+    }
+    expect(screen.queryByTestId('entrega-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByText(/Última entrega guardada: #3/)).toBeInTheDocument();
+    expect(screen.queryByTestId('entrega-pdf')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐⭐ FILA 0.219 — LA ENTREGA ENSEÑA LA EXISTENCIA POR TALLA (punto 10b del repaso de Daniel):
+ * *«Debería de decir la existencia que hay por talla para saber lo que se va a capturar no exceda la
+ * cantidad por talla.»*
+ *
+ * La orden de estas pruebas tiene TRES celdas con existencias DISTINTAS a propósito —Rojo CH 5,
+ * Rojo M 0, Azul CH 8—: si la pantalla mirara otra talla u otro color, el número pintado cambiaría
+ * y la prueba lo vería.
+ */
+describe('⭐ 0.219 — la existencia por talla se pinta bajo cada celda', () => {
+  const PERMISOS = ['produccion.entrega', 'produccion.wip-ver'];
+
+  const ORDEN_TRES = {
+    ...ORDEN,
+    lineas: [
+      {
+        idColor: 7,
+        color: 'Rojo',
+        pack: '',
+        tallas: [
+          { idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+          { idTalla: 12, etiquetaTalla: 'M', cantidad: 10 },
+        ],
+      },
+      {
+        idColor: 8,
+        color: 'Azul',
+        pack: '',
+        tallas: [{ idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+      },
+    ],
+    totalPiezas: 30,
+  } as unknown as Orden;
+
+  const celda = (idColor: number, idTalla: number, disponible: number) => ({
+    idColor,
+    idTalla,
+    pedido: 10,
+    entregado: 0,
+    faltante: 10,
+    disponible,
+  });
+  const SEGUIMIENTO_TRES = {
+    ...SEGUIMIENTO,
+    totalPedido: 30,
+    totalFaltante: 30,
+    celdas: [celda(7, 11, 5), celda(7, 12, 0), celda(8, 11, 8)],
+  };
+
+  /** El input de una celda por su etiqueta accesible, y lo que la pantalla pinta debajo. */
+  const input = (etiqueta: string): HTMLElement => screen.getByLabelText(etiqueta);
+  function leyendaDe(etiqueta: string): HTMLElement | null {
+    const td = input(etiqueta).closest('td');
+    return td?.querySelector('[data-testid="entrega-existencia"]') ?? null;
+  }
+
+  async function prepararCaptura(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
     await usuario.click(screen.getByTestId('elegir-orden'));
     await usuario.selectOptions(screen.getByTestId('entrega-almacen'), '1');
-    await usuario.type(screen.getByTestId('entrega-matriz-celda'), '1');
+  }
 
+  beforeEach(() => {
+    ordenDelSelector = ORDEN_TRES;
+    respuestaOrden.mockReturnValue({ data: ORDEN_TRES, isError: false, isPending: false });
+    useSeguimientoEntrega.mockReturnValue({
+      data: SEGUIMIENTO_TRES,
+      isError: false,
+      isPending: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('pinta «Hay N» por color×talla y dice el cero con su nombre («Sin existencia»)', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await prepararCaptura(usuario);
+
+    expect(leyendaDe('Rojo, talla CH')).toHaveTextContent(/^Hay 5$/);
+    expect(leyendaDe('Rojo, talla M')).toHaveTextContent(/^Sin existencia$/);
+    expect(leyendaDe('Azul, talla CH')).toHaveTextContent(/^Hay 8$/);
+    // El cero se pinta en rojo aunque no se haya tecleado nada: ahí no hay qué entregar.
+    expect(leyendaDe('Rojo, talla M')).toHaveAttribute('data-tono', 'crit');
+    expect(leyendaDe('Rojo, talla CH')).toHaveAttribute('data-tono', 'normal');
+  });
+
+  it('lo que EXCEDE la existencia de ESA talla se pinta «Excede · hay N» y no deja guardar', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await prepararCaptura(usuario);
+
+    // 6 cabe en Azul CH (hay 8) pero NO en Rojo CH (hay 5): distingue color y talla.
+    await usuario.type(input('Azul, talla CH'), '6');
+    expect(leyendaDe('Azul, talla CH')).toHaveTextContent(/^Hay 8$/);
+    expect(screen.getByTestId('entrega-guardar')).toBeEnabled();
+
+    await usuario.type(input('Rojo, talla CH'), '6');
+    expect(leyendaDe('Rojo, talla CH')).toHaveTextContent(/^Excede · hay 5$/);
+    expect(leyendaDe('Rojo, talla CH')).toHaveAttribute('data-tono', 'crit');
+    expect(screen.getByTestId('entrega-aviso-exceso')).toHaveTextContent(/1 pieza\(s\)/);
     expect(screen.getByTestId('entrega-guardar')).toBeDisabled();
-    expect(screen.getByTestId('entrega-aviso-exceso')).toBeInTheDocument();
-    expect(crearEntrega).not.toHaveBeenCalled();
+
+    // Al bajarlo a lo que hay, vuelve a «Hay 5» y se puede guardar.
+    await usuario.clear(input('Rojo, talla CH'));
+    await usuario.type(input('Rojo, talla CH'), '5');
+    expect(leyendaDe('Rojo, talla CH')).toHaveTextContent(/^Hay 5$/);
+    expect(screen.getByTestId('entrega-guardar')).toBeEnabled();
+  });
+
+  it('teclear en la talla SIN existencia la sigue diciendo «Sin existencia» y no deja guardar', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await prepararCaptura(usuario);
+
+    await usuario.type(input('Rojo, talla M'), '1');
+    expect(leyendaDe('Rojo, talla M')).toHaveTextContent(/^Sin existencia$/);
+    expect(screen.getByTestId('entrega-guardar')).toBeDisabled();
+  });
+
+  it('sin almacén elegido no pinta nada (no hay a qué preguntarle)', async () => {
+    const usuario = userEvent.setup();
+    pintar(PERMISOS);
+    await usuario.click(screen.getByTestId('elegir-orden'));
+
+    expect(screen.queryAllByTestId('entrega-existencia')).toHaveLength(0);
+  });
+
+  describe('«no se sabe» NO se pinta como cero y deja pasar (decide el servidor)', () => {
+    /** Teclea MUCHO más de lo que hay y comprueba que la pantalla no frena ni inventa un número. */
+    async function teclearDeMas(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+      await prepararCaptura(usuario);
+      await usuario.type(input('Rojo, talla M'), '99');
+      expect(screen.queryAllByTestId('entrega-existencia')).toHaveLength(0);
+      expect(screen.queryByTestId('entrega-aviso-exceso')).not.toBeInTheDocument();
+      expect(screen.getByTestId('entrega-guardar')).toBeEnabled();
+    }
+
+    it('la consulta FALLÓ: lo dice y deja capturar', async () => {
+      useSeguimientoEntrega.mockReturnValue({
+        data: undefined,
+        isError: true,
+        isPending: false,
+        refetch: vi.fn(),
+      });
+      const usuario = userEvent.setup();
+      pintar(PERMISOS);
+      await teclearDeMas(usuario);
+      expect(screen.getByTestId('entrega-existencia-desconocida')).toBeInTheDocument();
+    });
+
+    it('sin `produccion.wip-ver`: ni la pide, lo dice y deja capturar', async () => {
+      useSeguimientoEntrega.mockReturnValue({
+        data: undefined,
+        isError: false,
+        isPending: false,
+        refetch: vi.fn(),
+      });
+      const usuario = userEvent.setup();
+      pintar(['produccion.entrega']);
+      await teclearDeMas(usuario);
+      expect(screen.getByTestId('entrega-existencia-desconocida')).toBeInTheDocument();
+    });
+
+    it('CARGANDO: no pinta ni bloquea (y tampoco dice que falló)', async () => {
+      useSeguimientoEntrega.mockReturnValue({
+        data: undefined,
+        isError: false,
+        isPending: true,
+        refetch: vi.fn(),
+      });
+      const usuario = userEvent.setup();
+      pintar(PERMISOS);
+      await teclearDeMas(usuario);
+      expect(screen.queryByTestId('entrega-existencia-desconocida')).not.toBeInTheDocument();
+    });
+
+    it('dato del almacén ANTERIOR (`keepPreviousData`): no se pinta como si fuera de éste', async () => {
+      // La consulta trae el disponible del almacén de antes mientras vuelve el nuevo: pintarlo sería
+      // decir lo que hay en OTRO almacén, y bloquear con él, frenar por un número ajeno.
+      useSeguimientoEntrega.mockReturnValue({
+        data: SEGUIMIENTO_TRES,
+        isError: false,
+        isPending: false,
+        isPlaceholderData: true,
+        refetch: vi.fn(),
+      });
+      const usuario = userEvent.setup();
+      pintar(PERMISOS);
+      await teclearDeMas(usuario);
+    });
   });
 });
 

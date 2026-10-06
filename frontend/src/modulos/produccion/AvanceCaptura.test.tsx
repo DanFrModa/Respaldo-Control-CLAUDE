@@ -1024,6 +1024,94 @@ describe('Captura del avance · ENTREGA A CLIENTE (el cierre del ciclo)', () => 
     expect(crearEntrega).not.toHaveBeenCalled();
   });
 
+  /** Seguimiento con UNA celda (Rojo CH) y el `disponible` dado, más las banderas de la consulta. */
+  function seguimientoCon(disponible: number, banderas: Record<string, unknown> = {}): unknown {
+    return {
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      ...banderas,
+      data: {
+        idOrden: 1,
+        folioOrden: 5424,
+        idCliente: 4,
+        cliente: 'C&A',
+        idModelo: 3,
+        modelo: '62182',
+        celdas: [
+          {
+            idColor: 7,
+            color: 'Rojo',
+            idTalla: 11,
+            etiquetaTalla: 'CH',
+            pedido: 10,
+            entregado: 0,
+            faltante: 10,
+            disponible,
+          },
+        ],
+        totalPedido: 10,
+        totalEntregado: 0,
+        totalFaltante: 10,
+      },
+    };
+  }
+
+  it('⭐ 0.219: pinta la existencia bajo la celda («Hay N» → «Excede · hay N»)', async () => {
+    useSeguimientoEntrega.mockReturnValue(seguimientoCon(3));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+    // Sin almacén no se sabe nada: no se pinta.
+    expect(screen.queryByTestId('avance-entrega-existencia')).not.toBeInTheDocument();
+
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+    expect(screen.getByTestId('avance-entrega-existencia')).toHaveTextContent(/^Hay 3$/);
+    // La pista PROPIA reemplaza el «de N» genérico de la matriz con candado.
+    expect(screen.queryByTestId('avance-entrega-matriz-hint')).not.toBeInTheDocument();
+
+    await usuario.type(screen.getByTestId('avance-entrega-matriz-celda'), '4');
+    expect(screen.getByTestId('avance-entrega-existencia')).toHaveTextContent(/^Excede · hay 3$/);
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('⭐ 0.219: el cero se dice «Sin existencia»', async () => {
+    useSeguimientoEntrega.mockReturnValue(seguimientoCon(0));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+
+    expect(screen.getByTestId('avance-entrega-existencia')).toHaveTextContent(/^Sin existencia$/);
+  });
+
+  it('⭐ 0.219: con el dato del almacén ANTERIOR (`keepPreviousData`) ni pinta ni bloquea', async () => {
+    // Antes de la 0.219 el panel usaba ese dato viejo como tope: pintaba y bloqueaba con lo que hay
+    // en OTRO almacén mientras volvía la consulta del nuevo.
+    useSeguimientoEntrega.mockReturnValue(seguimientoCon(3, { isPlaceholderData: true }));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+    await usuario.type(screen.getByTestId('avance-entrega-matriz-celda'), '9');
+
+    expect(screen.queryByTestId('avance-entrega-existencia')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('avance-entrega-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
+  it('⭐ 0.219: si la consulta FALLÓ ni pinta ni bloquea (decide el servidor)', async () => {
+    useSeguimientoEntrega.mockReturnValue(seguimientoCon(3, { isError: true }));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-cliente');
+    await usuario.selectOptions(screen.getByTestId('avance-entrega-almacen'), '1');
+    await usuario.type(screen.getByTestId('avance-entrega-matriz-celda'), '9');
+
+    expect(screen.queryByTestId('avance-entrega-existencia')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
   it('sin `produccion.entrega` la etapa se ve pero no ofrece capturar (A4)', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {

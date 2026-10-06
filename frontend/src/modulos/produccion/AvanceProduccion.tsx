@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Ban, FileText, Loader2, Plus, Printer, Route, Scissors, Wand2, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -66,6 +66,8 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { type ClaveEtapaAvance } from './etapas-avance';
 import { ejesDeOrden, ejesDeOrdenPlegados, piezasRecibibles } from './matriz-orden';
+import { existenciaDeCelda, existenciaDeSeguimiento } from './existencia-entrega';
+import { LeyendaExistenciaEntrega } from './LeyendaExistenciaEntrega';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { estaCerrada } from '@/lib/orden-cerrada';
 import { cn } from '@/lib/utils';
@@ -2518,20 +2520,53 @@ function CapturaEntregaCliente({
   }
 
   /**
+   * ⭐⭐ Fila 0.219 — existencia por celda de ESTA orden en el almacén elegido, o `undefined` cuando
+   * NO se sabe (sin almacén, cargando, dato del almacén ANTERIOR por `keepPreviousData`, o error).
+   * Es la misma regla que la pantalla del menú (`existenciaDeSeguimiento`): las dos puertas al mismo
+   * acto dicen lo mismo.
+   */
+  const almacenElegido = idAlmacen !== '';
+  const seguimientoData = seguimiento.data;
+  const seguimientoError = seguimiento.isError;
+  const seguimientoPrevio = seguimiento.isPlaceholderData;
+  const existencia = useMemo(
+    () =>
+      existenciaDeSeguimiento(
+        { data: seguimientoData, isError: seguimientoError, isPlaceholderData: seguimientoPrevio },
+        almacenElegido,
+      ),
+    [seguimientoData, seguimientoError, seguimientoPrevio, almacenElegido],
+  );
+
+  /**
    * Referencia por celda = lo DISPONIBLE en el almacén elegido (que es el tope real de la salida).
-   * Sin almacén no hay referencia: la matriz queda en estado NEUTRO en vez de fingir un tope de 0.
+   * Sin existencia CONOCIDA no hay referencia: la matriz queda en estado NEUTRO en vez de fingir un
+   * tope de 0 (ni pinta, ni bloquea: decide el servidor).
    */
   const referencia = useMemo<Map<string, number> | null>(() => {
-    if (idAlmacen === '' || seguimiento.data === undefined) {
+    if (existencia === undefined || seguimientoData === undefined) {
       return null;
     }
     const mapa = new Map<string, number>();
-    for (const c of seguimiento.data.celdas) {
+    for (const c of seguimientoData.celdas) {
       // Pack vacío: la entrega a cliente no lo maneja y sus filas van plegadas por color.
       mapa.set(claveCelda(c.idColor, c.idTalla, ''), c.disponible);
     }
     return mapa;
-  }, [idAlmacen, seguimiento.data]);
+  }, [existencia, seguimientoData]);
+
+  /** «Hay N» · «Excede · hay N» · «Sin existencia» bajo cada celda (nada si no se sabe). */
+  const pistaExistencia = useCallback(
+    (idColor: number, idTalla: number, _pack: string, cantidad: number): React.ReactNode =>
+      existencia === undefined ? null : (
+        <LeyendaExistenciaEntrega
+          cantidad={cantidad}
+          existencia={existenciaDeCelda(existencia, idColor, idTalla)}
+          testid="avance-entrega-existencia"
+        />
+      ),
+    [existencia],
+  );
   const totalReferencia =
     referencia === null
       ? undefined
@@ -2658,6 +2693,7 @@ function CapturaEntregaCliente({
         {...(referencia === null ? {} : { referencia })}
         {...(totalReferencia === undefined ? {} : { totalReferencia })}
         etiquetaReferencia="disponible en el almacén"
+        pistaCelda={pistaExistencia}
         deshabilitada={idAlmacen === ''}
         testid="avance-entrega-matriz"
       />

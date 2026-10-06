@@ -1,5 +1,5 @@
 import { Ban, Loader2Icon, Printer, Truck } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -36,6 +36,8 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { estaCerrada } from '@/lib/orden-cerrada';
+import { existenciaDeCelda, existenciaDeSeguimiento, piezasExcedidas } from './existencia-entrega';
+import { LeyendaExistenciaEntrega } from './LeyendaExistenciaEntrega';
 import { SelectorOrden } from './SelectorOrden';
 import { coloresDeOrden, lineasVaciasDeOrden, tallasDeOrden, totalMatriz } from './matriz-orden';
 
@@ -56,9 +58,10 @@ function leerIdDeepLink(state: unknown, clave: string): number | null {
 /**
  * ENTREGA A CLIENTE (F3-E5, doc 03-Produccion "Entrega"): CIERRE del ciclo de la orden. Saca el
  * producto terminado del almacén PT elegido hacia el cliente (salida de kardex) y deja el
- * seguimiento del pedido (entregado/faltante) DERIVADO. La matriz se acota a lo DISPONIBLE en el
- * almacén (existencia) y a lo FALTANTE del pedido; el servidor es la verdad: no deja entregar más
- * de la existencia (no-negativo estricto) ni de lo no producido.
+ * seguimiento del pedido (entregado/faltante) DERIVADO. Bajo cada celda de la matriz se PINTA la
+ * existencia de la orden en el almacén elegido (⭐ fila 0.219: «Hay N» · «Excede · hay N» · «Sin
+ * existencia»); el servidor es la verdad: no deja entregar más de la existencia (no-negativo
+ * estricto, bajo bloqueo) ni de lo no producido.
  *
  * Acepta el DEEP-LINK `state.idOrden` (V1-E3a): el tablero WIP —que es donde se ve el KPI «Por
  * entregar»— y la bandeja de la Ruta Crítica llegan con la orden ya puesta, para no volver a
@@ -77,17 +80,13 @@ export function EntregaClientePagina(): React.JSX.Element {
    * `produccion.entrega` — es una reimpresión, o sea una consulta, igual que los impresos de envío y
    * de recibo.
    *
-   * ⚠️ **Y lo que este gate NO es: hoy nadie cosecha ese 403.** Se escribió primero que un capturista
-   * con `produccion.entrega` y sin `wip-ver` «capturaba, veía el botón y se llevaba un 403», y **es
-   * falso** — lo desmiente una prueba de este módulo. La barra sale de `ultimaEntrega`, que es estado
-   * LOCAL puesto con la respuesta de la propia captura, **pero esa captura no llega a ocurrir**:
-   * `puedeGuardar` exige `excede === 0`, `excede` se calcula contra `disponible`, y `disponible` sale
-   * de `useSeguimientoEntrega`, que pide `wip-ver`. Sin él el mapa queda vacío, toda cantidad cuenta
-   * como exceso y **«Guardar entrega» nunca se habilita**.
-   * ⇒ El gate vale por dos razones REALES, no por un 403 en vivo: (1) las dos puertas al mismo PDF
-   * dicen lo mismo, y (2) deja de depender de un ACCIDENTE del cálculo del exceso — el día que
-   * alguien arregle ese cálculo para no bloquear cuando no hay disponible (arreglo razonable de
-   * pedir), la barra se vuelve alcanzable de verdad y este gate pasa a ser el único freno.
+   * 🔴 **Y desde la fila 0.219 este gate es el ÚNICO freno, tal como se anunció aquí.** Hasta la
+   * v0.196 nadie cosechaba ese 403 por un ACCIDENTE: sin `wip-ver` el seguimiento (que da la
+   * existencia) llegaba vacío, toda cantidad contaba como exceso y «Guardar entrega» nunca se
+   * habilitaba. La 0.219 arregló justo eso —una existencia que NO se sabe ya no bloquea: bloquear
+   * sería inventar un cero, y decide el servidor—, así que un capturista con `produccion.entrega` y
+   * sin `wip-ver` YA guarda, y la barra del recién guardado le aparece. Sin este gate vería un
+   * «Comprobante PDF» que el servidor le niega.
    */
   const puedeImprimirComprobante = tienePermiso('produccion.wip-ver');
 
@@ -127,11 +126,17 @@ export function EntregaClientePagina(): React.JSX.Element {
     (a) => a.tipo === 'PT' && a.activo && !a.esTransitoProceso,
   );
 
+  /**
+   * El seguimiento (pedido − entregado, y la existencia del almacén elegido) es una CONSULTA que el
+   * servidor sirve con `produccion.wip-ver`. Sin ese permiso no se pide —sería un 403 seguro— y la
+   * existencia queda «no se sabe»: la captura sigue y decide el servidor (fila 0.219).
+   */
+  const puedeVerSeguimiento = tienePermiso('produccion.wip-ver');
   // Seguimiento del pedido (pedido − entregado) con el disponible del almacén elegido (si hay).
   const seguimiento = useSeguimientoEntrega(
     idOrden,
     idAlmacen !== '' ? { idAlmacen: Number(idAlmacen) } : {},
-    idOrden !== undefined,
+    idOrden !== undefined && puedeVerSeguimiento,
   );
 
   function alElegirOrden(o: Orden): void {
@@ -171,31 +176,57 @@ export function EntregaClientePagina(): React.JSX.Element {
     // El candado real de "una sola vez" es `deepLinkAtendido` (ref), no las dependencias.
   }, [idDeepLink, ordenDeepLinkData, ordenDeepLink.isError, location.pathname, navigate, idOrden]);
 
-  // Disponible por celda (color:talla → existencia en el almacén elegido) para acotar la captura en UI.
-  const disponible = useMemo(() => {
-    const mapa = new Map<string, number>();
-    for (const c of seguimiento.data?.celdas ?? []) {
-      mapa.set(`${c.idColor}:${c.idTalla}`, c.disponible);
-    }
-    return mapa;
-  }, [seguimiento.data]);
+  /**
+   * ⭐⭐ Fila 0.219 — existencia por celda (color:talla) de ESTA orden en el almacén elegido, o
+   * `undefined` cuando NO se sabe (sin almacén, cargando, dato del almacén ANTERIOR, error o sin
+   * permiso). Ver `existenciaDeSeguimiento`: con `undefined` ni se pinta ni se bloquea.
+   */
+  const almacenElegido = idAlmacen !== '';
+  const seguimientoData = seguimiento.data;
+  const seguimientoError = seguimiento.isError;
+  const seguimientoPrevio = seguimiento.isPlaceholderData;
+  const existencia = useMemo(
+    () =>
+      existenciaDeSeguimiento(
+        {
+          data: seguimientoData,
+          isError: seguimientoError,
+          isPlaceholderData: seguimientoPrevio,
+        },
+        almacenElegido,
+      ),
+    [seguimientoData, seguimientoError, seguimientoPrevio, almacenElegido],
+  );
 
-  // Aviso de exceso en UI (el server bloquea; aquí solo informamos en vivo): por encima del disponible.
-  const excede = useMemo(() => {
-    if (idAlmacen === '') {
-      return 0;
-    }
-    let total = 0;
-    for (const linea of lineas) {
-      for (const [idTalla, cantidad] of Object.entries(linea.cantidades)) {
-        const disp = disponible.get(`${linea.idColor}:${Number(idTalla)}`) ?? 0;
-        if (cantidad > disp) {
-          total += cantidad - Math.max(disp, 0);
-        }
-      }
-    }
-    return total;
-  }, [lineas, disponible, idAlmacen]);
+  // Aviso de exceso en UI (el server bloquea; aquí se informa en vivo): por encima de la existencia
+  // CONOCIDA. Con la existencia desconocida es 0 a propósito (no se inventa un cero).
+  const excede = useMemo(
+    () =>
+      piezasExcedidas(
+        lineas.flatMap((linea) =>
+          Object.entries(linea.cantidades).map(([idTalla, cantidad]) => ({
+            idColor: linea.idColor,
+            idTalla: Number(idTalla),
+            cantidad,
+          })),
+        ),
+        existencia,
+      ),
+    [lineas, existencia],
+  );
+
+  /** La existencia pintada bajo cada celda (nada cuando no se sabe). Memoizada: la matriz va en `memo`. */
+  const pistaExistencia = useCallback(
+    (idColor: number, idTalla: number, cantidad: number): React.ReactNode =>
+      existencia === undefined ? null : (
+        <LeyendaExistenciaEntrega
+          cantidad={cantidad}
+          existencia={existenciaDeCelda(existencia, idColor, idTalla)}
+          testid="entrega-existencia"
+        />
+      ),
+    [existencia],
+  );
 
   const total = totalMatriz(lineas);
   const puedeGuardar =
@@ -242,7 +273,8 @@ export function EntregaClientePagina(): React.JSX.Element {
           if (orden.data) {
             setLineas(lineasVaciasDeOrden(orden.data));
           }
-          void seguimiento.refetch();
+          // `refetch` IGNORA `enabled: false`: sin `wip-ver` dispararía un 403 seguro (fila 0.219).
+          if (puedeVerSeguimiento) void seguimiento.refetch();
         },
         onError: (error) => toast.error(error.message),
       },
@@ -365,7 +397,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                 <div>
                   <h3 className="mb-2 text-sm font-medium">
                     Cantidades a entregar (color × talla)
-                    {idAlmacen !== '' ? ' · acotado a la existencia del almacén' : ''}
+                    {existencia !== undefined ? ' · bajo cada talla, lo que hay en el almacén' : ''}
                   </h3>
                   <MatrizColorTalla
                     testid="entrega-matriz"
@@ -376,6 +408,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                     onLineasChange={setLineas}
                     onTallasChange={setTallas}
                     soloLectura={!puedeCapturar || idAlmacen === ''}
+                    pistaCelda={pistaExistencia}
                   />
                 </div>
 
@@ -383,6 +416,20 @@ export function EntregaClientePagina(): React.JSX.Element {
                   <p className="text-sm text-muted-foreground">
                     Elige un almacén de salida para ver la existencia disponible y capturar la
                     entrega.
+                  </p>
+                ) : null}
+
+                {almacenElegido &&
+                existencia === undefined &&
+                (!puedeVerSeguimiento || seguimiento.isError) ? (
+                  // Fila 0.219: la existencia NO se sabe (sin permiso de consultarla, o la consulta
+                  // falló). Se dice, y la captura sigue: el servidor la valida al guardar.
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid="entrega-existencia-desconocida"
+                  >
+                    No se pudo consultar la existencia de este almacén. Puedes capturar: al guardar,
+                    el sistema rechaza lo que no haya.
                   </p>
                 ) : null}
 
@@ -428,7 +475,7 @@ export function EntregaClientePagina(): React.JSX.Element {
                         entrega={ultimaEntrega}
                         alCancelar={() => {
                           setUltimaEntrega(null);
-                          void seguimiento.refetch();
+                          if (puedeVerSeguimiento) void seguimiento.refetch();
                         }}
                       />
                     )}
