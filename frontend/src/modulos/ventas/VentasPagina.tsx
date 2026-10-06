@@ -49,7 +49,8 @@ function mesCorto(mes: number): string {
  * EDR (F7-E2; D2 #5), vista como lista operativa por período. page-head + 4 KPIs de vistazo (ventas,
  * unidades, ticket promedio, # de líneas — TODOS Σ del SERVIDOR, A1) + tabla densa (folio de la OP,
  * cliente, modelo, cantidad, precio, importe, mes), con selector de período (mes + año) + búsqueda +
- * export a Excel. Solo lectura; se protege con `edr.ver` (es data del EDR). v2 no tiene folio de
+ * export a Excel. Solo lectura; se abre con `ventas.ver` o con `edr.ver` (fila 0.251: la facturación
+ * tiene llave propia para poder darse sin el estado de resultados). v2 no tiene folio de
  * factura en el EDR → la columna identificadora es el FOLIO DE LA OP (o "—" en líneas manuales).
  */
 export function VentasPagina(): React.JSX.Element {

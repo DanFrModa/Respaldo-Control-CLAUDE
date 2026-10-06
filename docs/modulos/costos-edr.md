@@ -16,6 +16,10 @@ Construido en F7 (etapas E1 = costo por orden, E2 = EDR mensual, E6 = ETL de cie
   GUARDADO (lo que el usuario confirma o ajusta).
 - **EDR** (F7-E2): el estado de resultados mensual, **consolidado** y **generado** desde las ventas
   reales del mes, valuado siempre a costo actual (D1).
+- **Ventas** (`/ventas`, `dominio/edr/ventas.ts::listarVentas`): la facturación por modelo sobre las líneas del EDR —
+  cantidad, precio de venta e importe, **sin costo ni margen**—. Desde la fila 0.251 tiene **llave propia,
+  `ventas.ver`** (también la abre `edr.ver`), para poder darse sin abrir el estado de resultados (§Post-F9.271). La
+  «Conciliación de ventas» sí trae costos y se queda en `edr.ver`.
 
 ## Capas (A1 — lógica solo en dominio)
 

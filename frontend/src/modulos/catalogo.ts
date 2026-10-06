@@ -924,7 +924,10 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             descripcion: 'Facturación por modelo del cliente (base del EDR)',
             ruta: '/ventas',
             icono: 'grafica',
-            permisos: ['edr.ver'],
+            // ⭐ 0.251 (§Post-F9.260(b)): llave PROPIA, partida de `edr.ver` para poder darse sin el
+            // estado de resultados (Ventas sólo enseña lo facturado, sin costo ni utilidad).
+            // `edr.ver` la sigue abriendo: basta UNA (`.some()`), igual que en el backend.
+            permisos: ['ventas.ver', 'edr.ver'],
           },
         ],
       },

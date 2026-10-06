@@ -9,7 +9,8 @@ import { z } from 'zod';
  *
  * Fuente = `EdrLinea` (cantVendida × precioVenta FACTURADO, D2 #5); el mes sale del encabezado `Edr`.
  * v2 NO tiene folio de factura en el EDR → la columna identificadora del proto ("Factura") se sustituye
- * por el FOLIO DE LA OP (o null en líneas manuales sin orden). Se protege con `edr.ver` (es data del EDR).
+ * por el FOLIO DE LA OP (o null en líneas manuales sin orden). Se protege con `ventas.ver` o `edr.ver`
+ * (fila 0.251): sólo lo facturado, sin costo ni utilidad.
  */
 
 /** Filtros de la consulta de ventas por período (año + mes opcional + búsqueda + paginación). */

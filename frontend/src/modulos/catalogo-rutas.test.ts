@@ -108,6 +108,20 @@ describe('rutaPermitida', () => {
     ).toBe(true);
   });
 
+  it('⭐ 0.251: `ventas.ver` abre Ventas y NINGUNA pantalla del EDR; `edr.ver` abre las dos', () => {
+    // §Post-F9.260(b): Daniel negó `edr.ver` a Administración (abre el estado de resultados) y esa
+    // misma llave era la única puerta de la facturación. Ventas tiene la suya desde la 0.251.
+    const soloVentas = permisosDe('ventas.ver');
+    expect(rutaPermitida('/ventas', soloVentas)).toBe(true);
+    for (const ruta of ['/edr', '/edr/por-mes', '/edr/por-anio', '/edr/conciliacion']) {
+      expect(rutaPermitida(ruta, soloVentas), ruta).toBe(false);
+    }
+    const soloEdr = permisosDe('edr.ver');
+    expect(rutaPermitida('/ventas', soloEdr), 'quien tenía `edr.ver` no pierde Ventas').toBe(true);
+    expect(rutaPermitida('/edr/por-mes', soloEdr)).toBe(true);
+    expect(rutaPermitida('/ventas', permisosDe('edr.capturar'))).toBe(false);
+  });
+
   it('una ruta sin declaración NO se cierra (la capa es de presentación, A4)', () => {
     expect(rutaPermitida('/ruta-inventada-que-no-existe', permisosDe())).toBe(true);
   });

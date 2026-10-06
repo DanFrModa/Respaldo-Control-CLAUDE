@@ -2,7 +2,13 @@
  * VENTAS — la vista COMERCIAL de la facturación por modelo (proto `vVentas`; F7-E2; doc
  * `06-Costos-y-EDR.md` §4; D2 #5). No es un módulo nuevo: reusa la misma fuente que el EDR (`EdrLinea`
  * × `Edr`), presentada como lista operativa por período. Toda la lógica vive AQUÍ (A1); la ruta solo
- * valida permiso + Zod y delega. Se protege con `edr.ver` (es data del EDR; sin permisos nuevos).
+ * valida permiso + Zod y delega.
+ *
+ * 🔑 PUERTA (fila 0.251, §Post-F9.260(b)): se abre con `ventas.ver` **o** con `edr.ver`. Hasta la
+ * 0.251 la abría SÓLO `edr.ver`, y por eso negar el estado de resultados (costo actual, utilidad bruta)
+ * dejaba también sin la facturación. Lo que esta vista enseña es SÓLO lo facturado —cantidad, precio
+ * de venta, importe, por OP/cliente/modelo—: ni costo, ni margen, ni resultado. Por eso basta su llave
+ * propia. Quien tiene `edr.ver` la sigue viendo (ve más que esto, no menos). Ver {@link exigirVerVentas}.
  *
  * Ventas = Σ(cantVendida × precioVenta FACTURADO) (D2 #5); las unidades = Σ cantVendida; el mes sale
  * del encabezado `Edr`. v2 NO tiene folio de factura en el EDR → la columna identificadora del proto
@@ -24,11 +30,27 @@ import type { z } from 'zod';
 
 import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { armarPagina, rangoPrisma, type Paginacion } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { redondear2 } from '../costos/decimales.js';
+
+/**
+ * Exige poder VER las ventas (fila 0.251). Pasa con `ventas.ver` —la llave de la facturación, que
+ * puede darse sin el estado de resultados— **o** con `edr.ver`, que abre el EDR entero y por tanto
+ * también esto (nadie que la tenía pierde la pantalla). Sigue siendo deny-by-default (A4): sin
+ * ninguna de las dos, 403 nombrando `ventas.ver`, que es la llave que hay que dar.
+ *
+ * ⚠️ La inversa NO vale y es la razón de la fila: `ventas.ver` no abre NADA del EDR (`calcularEdr`,
+ * `edrPorMes`, `edrPorAnio`, `listarLineasEdr` siguen exigiendo `edr.ver` a secas).
+ */
+export function exigirVerVentas(sesion: SesionUsuario): void {
+  if (tienePermiso(sesion, 'edr.ver')) {
+    return;
+  }
+  verificarPermiso(sesion, 'ventas.ver');
+}
 
 /** Filtros ya validados. */
 type FiltrosVentas = z.output<typeof esquemaVentasQuery>;
@@ -105,7 +127,7 @@ function aVentaLinea(f: FilaCruda): VentaLinea {
 }
 
 /**
- * VENTAS de un período (A4 `edr.ver`): resumen agregado (sobre TODO el filtro) + la página de líneas.
+ * VENTAS de un período (A4 `ventas.ver` o `edr.ver`, {@link exigirVerVentas}): resumen agregado (sobre TODO el filtro) + la página de líneas.
  * `mes` omitido = todo el año. Orden determinista: período reciente primero, luego folio de OP (las
  * líneas manuales sin folio al final) y por id. El resumen se calcula en SQL (importe = Σ cant×precio).
  */
@@ -114,7 +136,7 @@ export async function listarVentas(
   parametros: z.input<typeof esquemaVentasQuery> = { anio: new Date().getFullYear() },
   bd?: ContextoBd,
 ): Promise<VentasSalida> {
-  verificarPermiso(sesion, 'edr.ver');
+  exigirVerVentas(sesion);
   const filtros = validarEntrada(esquemaVentasQuery, parametros);
   const cliente = clienteLectura(bd);
 

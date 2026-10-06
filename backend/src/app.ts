@@ -404,7 +404,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // EDR (Módulo 6, F7-E2): Estado de Resultados mensual CONSOLIDADO (todas las empresas paraEdr),
   // valuado a COSTO ACTUAL (D1). Genera/reconcilia las líneas desde las entregas a cliente del mes
   // (D2 #5), concilia el precio facturado, encabezado de gastos global (D2 #6) y cortes por empresa/
-  // cliente. RBAC edr.ver/edr.capturar (mismos roles que costos). Impresos R9 (PDF mensual/anual, Excel).
+  // cliente. RBAC edr.ver/edr.capturar (mismos roles que costos); Ventas también abre con ventas.ver
+  // (fila 0.251). Impresos R9 (PDF mensual/anual, Excel).
   await app.register(rutasEdr, { prefix: '/api' });
   // INDICADORES (Módulo Indicadores, F7-E3): tableros directivos calculados en SEGUNDO PLANO sobre
   // vistas materializadas (KPIs de Ruta Crítica/D11, calidad por maquilero/F6, WIP analítico/F3). La

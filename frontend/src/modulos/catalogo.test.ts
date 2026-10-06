@@ -111,7 +111,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
 
   it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
     // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta. (Ventas ya es una
-    // pantalla real gateada por `edr.ver`, F9; Documental sigue "Próximamente".)
+    // pantalla real gateada por `ventas.ver` o `edr.ver`, F9 + 0.251; Documental sigue "Próximamente".)
     for (const [clave, nota] of [['documental', 'Llega en una fase posterior del plan']] as const) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
       expect(hoja, clave).toBeDefined();
@@ -126,7 +126,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // el gate del hub Catálogos (telas, avíos, clientes, proveedores, colores,
     // tallas, temporadas, almacenes, etiquetas de marca) y la «Próximamente» Documental.
     // (CxC ya NO: es pantalla real gateada por `cxc.ver`, F9-E4. Auditores tampoco: `calidad.ver`, R9.
-    // Ventas tampoco: es pantalla real gateada por `edr.ver`, F9.)
+    // Ventas tampoco: es pantalla real gateada por `ventas.ver` o `edr.ver`, F9 + 0.251.)
     // Los 10 catálogos de uso general siguen "autenticado" aunque el backend exija su
     // `<catálogo>.ver`: el desajuste es de la FAMILIA COMPLETA y se arregla parejo o no se arregla
     // (pedido de Daniel en A2: que siempre se vean). Deuda anotada en `HOJA-DE-RUTA.md` §4.
@@ -170,8 +170,8 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       ['inventario-existencias', ['inventario-pt.ver']],
       ['inventario-movimientos', ['inventario-pt.mover']],
       ['edr-por-mes', ['edr.ver']],
-      // Ventas comparte el gate del EDR (es su misma data, F9).
-      ['ventas', ['edr.ver']],
+      // Ventas: llave PROPIA desde la 0.251 (§Post-F9.260(b)), y `edr.ver` la sigue abriendo.
+      ['ventas', ['ventas.ver', 'edr.ver']],
       // Los catálogos que vivían bajo el hub Catálogos conservan su gate "autenticado" — TODA la
       // familia, incluidos telas y avíos ya dentro del riel (pedido de Daniel en A2: que se vean
       // siempre, «como los demás catálogos de uso general»). Que el backend exija su

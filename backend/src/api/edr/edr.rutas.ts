@@ -17,6 +17,9 @@
  *  • `DELETE /edr/lineas/:idLinea`  (`edr.capturar`) → elimina una línea manual.
  *  • `GET  /edr/:id/impreso`        (`edr.ver`)      → EDR mensual en PDF (R9).
  *  • `GET  /edr/:id/excel`          (`edr.ver`)      → EDR mensual en Excel (.xlsx).
+ *  • `GET  /edr/ventas`             (`ventas.ver` o `edr.ver`) → ventas facturadas por período.
+ *  • `GET  /edr/ventas/excel`       (`ventas.ver` o `edr.ver`) → las mismas ventas en Excel.
+ *    (Fila 0.251: Ventas tiene llave propia para poder darse SIN el estado de resultados.)
  */
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
@@ -168,11 +171,13 @@ export const rutasEdr: FastifyPluginCallbackZod = (app, _opciones, done) => {
   });
 
   // ── Ventas: la vista comercial de la facturación por modelo (proto vVentas). Estática ANTES de
-  //    `/edr/:id` (find-my-way prioriza el estático). Reusa `edr.ver` (es data del EDR). ──
+  //    `/edr/:id` (find-my-way prioriza el estático). Se abre con `ventas.ver` O con `edr.ver` (fila
+  //    0.251): enseña SÓLO lo facturado, sin costo ni utilidad, y su llave propia se puede dar sin el
+  //    EDR. El dominio (`exigirVerVentas`) exige lo mismo (A1). ──
   app.route({
     method: 'GET',
     url: '/edr/ventas',
-    preHandler: app.conPermiso('edr.ver'),
+    preHandler: app.conAlgunPermiso('ventas.ver', 'edr.ver'),
     schema: {
       tags: ['edr'],
       summary: 'Ventas por período (facturación por modelo): resumen + líneas paginadas',
@@ -189,7 +194,7 @@ export const rutasEdr: FastifyPluginCallbackZod = (app, _opciones, done) => {
   app.route({
     method: 'GET',
     url: '/edr/ventas/excel',
-    preHandler: app.conPermiso('edr.ver'),
+    preHandler: app.conAlgunPermiso('ventas.ver', 'edr.ver'),
     schema: {
       tags: ['edr'],
       summary: 'Ventas del período en Excel (.xlsx) — todo el filtro, no solo la página',

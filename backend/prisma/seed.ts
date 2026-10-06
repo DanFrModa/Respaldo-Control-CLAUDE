@@ -492,6 +492,10 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'temporadas.ver',
   'terceros.ver',
   'tipos-proceso.ver',
+  // ⭐ 0.251 (§Post-F9.260(b)): la llave de Ventas, partida de `edr.ver`. `Directivo` ya veía Ventas
+  // por `edr.ver`; la lleva también para que quitarle el EDR desde la pantalla no le quite la
+  // facturación. Nadie la gana ni la pierde: la tienen exactamente los que tenían `edr.ver`.
+  'ventas.ver',
 ];
 
 /**
@@ -976,9 +980,11 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **318 asignaciones**: las 135 del catálogo para `Director General` y 183 repartidas entre los
+ * **319 asignaciones**: las 136 del catálogo para `Director General` y 183 repartidas entre los
  * otros 15 (eran 317 = 134 + 183 hasta la fila 0.228, que estrenó `ordenes.reabrir` en el catálogo:
- * el dueño la recibe por derivación y ninguno de los otros 15). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
+ * el dueño la recibe por derivación y ninguno de los otros 15; y 318 hasta la fila 0.251, que estrenó
+ * `ventas.ver` del mismo modo —ningún puesto la recibe, ni siquiera Administración y Finanzas: darla
+ * es decisión de Daniel). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
  * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
  *
  * *(Eran 306 = 134 + 172 en su primera revisión. Las **11 llaves de más** las agregó él mismo al
@@ -1060,7 +1066,7 @@ export type PerfilDePuesto = {
  *
  * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
  * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
- * llegarle solo. Una lista literal de 135 claves quedaría obsoleta en el siguiente `clave:` que
+ * llegarle solo. Una lista literal de 136 claves quedaría obsoleta en el siguiente `clave:` que
  * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
  *
  * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
@@ -1384,8 +1390,9 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 318 asignaciones de los 16 puestos (las 317 que él
- * revisó, más `ordenes.reabrir`, que la fila 0.228 le sumó al dueño por derivación).
+ * un puesto**, y meterlo aquí falsearía las 319 asignaciones de los 16 puestos (las 317 que él
+ * revisó, más `ordenes.reabrir` y `ventas.ver`, que las filas 0.228 y 0.251 le sumaron al dueño por
+ * derivación).
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1397,7 +1404,7 @@ export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * ⭐⭐ **LAS 16 LLAVES QUE SON DINERO.** La raya que puso el dueño, textual:
+ * ⭐⭐ **LAS 17 LLAVES QUE SON DINERO.** La raya que puso el dueño, textual:
  *
  * > *«lo que sea dinero no debe estar en el piso»*
  *
@@ -1421,6 +1428,9 @@ export const PERMISOS_DE_DINERO: readonly ClavePermiso[] = [
   'costos.ver',
   'precostos.consultar',
   'edr.ver',
+  // ⭐ 0.251: la facturación por modelo, partida de `edr.ver`. Sin costo ni utilidad, pero enseña lo
+  // que se le cobró a cada cliente (precio e importe) ⇒ es dinero y no va al piso.
+  'ventas.ver',
   'desarrollo.ver',
   'listas.ver',
   'terceros.ver',
@@ -1512,7 +1522,8 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * Nació de una medición, **re-hecha con el escáner de rutas arreglado** (el que resuelve también
  * `conAlgunPermiso` y los guards declarados en variable) y con el criterio dicho, porque sin criterio
  * no se reproduce *(medido ANTES de la fila 0.228; esa fila sumó `ordenes.reabrir`, que guarda un
- * `POST` ⇒ hoy son 135 claves y una más que ESCRIBE; las de pura lectura no cambian)*: de las
+ * `POST` ⇒ eran 135 claves y una más que ESCRIBE; y la fila 0.251 sumó `ventas.ver`, de pura
+ * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ hoy son 136)*: de las
  * **134** claves que tenía entonces el catálogo, **sólo 34 son de PURA LECTURA** —todas sus
  * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
  * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no

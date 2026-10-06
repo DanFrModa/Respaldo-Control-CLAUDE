@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.203 · 6-oct-2026 · **en prueba** — **La pantalla de Ventas ya tiene su propia llave, separada del estado de resultados**
+
+> **La v0.203 cierra una fila del programa: la 0.251.** Le negaste a Administración y Finanzas la llave del estado de
+> resultados, porque enseña costo y utilidad. Pero esa misma llave era la única que abría la pantalla **Ventas**
+> (facturación por modelo), así que tampoco podían ver lo facturado.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Existe la llave «Ventas (facturación por modelo)»** (`ventas.ver`). Abre la pantalla Ventas y su Excel, y **nada del
+estado de resultados**. Ventas sólo enseña cantidad, precio e importe facturado por orden, cliente y modelo: ni costo, ni
+margen, ni utilidad.
+
+**Ya se la puedes dar a quien quieras** desde Administración › Roles, sin abrirle el estado de resultados.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Nadie perdió nada:** todo rol que ya tenía la llave del estado de resultados recibió también la nueva (queda anotado
+en la bitácora), y esa llave sigue abriendo Ventas igual que antes.
+
+**No se la di a Administración y Finanzas.** Es tu decisión; con esta versión ya se puede.
+
+**La «Conciliación de ventas» sigue del lado del estado de resultados**, porque enseña costos.
+
+### ⏳ Sigue pendiente o roto
+
+**¿Le doy la llave de Ventas a Administración y Finanzas?** (§Post-F9.271) Propuesta: sí, si Lupita va a revisar lo
+facturado. Ojo: Ventas enseña lo que ya se registró en el estado de resultados; **timbrar facturas todavía no existe**.
+
 ## 0.202 · 6-oct-2026 · **en prueba** — **Ya puedes duplicar un rol para crear uno nuevo con los mismos permisos**
 
 > **La v0.202 cierra una fila del programa: la 0.248.** Lo pediste el 1-oct: *«pon una opción de copiar un rol en otro
