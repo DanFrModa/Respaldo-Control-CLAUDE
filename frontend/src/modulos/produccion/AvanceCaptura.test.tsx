@@ -1180,7 +1180,7 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     // `ordenes.ver-precio-real-maquila` llega hasta Ventas y `produccion.envio` lo lleva todo perfil
     // menos `Basico` (o sea: Logística, Asistente y Secretarial capturan sin poder ver el precio).
     // Si el campo se escondiera, estos roles capturarían la maquila diaria sin precio y el cargo
-    // EsMa nacería sin precio (`esma/cargos.ts` cae al `precioPactado` del recibo).
+    // EsMa nacería sin precio (el recibo HEREDA el precio del envío desde la fila 0.218).
     renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
       sesion: estadoSesionDePrueba(['produccion.wip-ver', 'produccion.envio']),
     });
@@ -1197,20 +1197,36 @@ describe('Captura del avance · el precio pactado y la fecha compromiso (migrado
     });
   });
 
-  it('el recibo manda el precio y NO ofrece fecha compromiso (es del envío)', async () => {
+  it('⭐ el RECIBO no pide precio ni lo manda: lo hereda el servidor del envío (fila 0.218)', async () => {
+    // Daniel: *«no me debe de preguntar el precio del recibo. Eso está en la salida de maquila»*.
     const usuario = userEvent.setup();
     pintar();
     await abrirCaptura(usuario, 'recibo-maquila');
-    expect(screen.getByTestId('avance-precio')).toBeInTheDocument();
+    expect(screen.queryByTestId('avance-precio')).not.toBeInTheDocument();
     expect(screen.queryByTestId('avance-fecha-compromiso')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('avance-proveedor-input'));
     await usuario.click(await screen.findByText('Maquila del Norte'));
     await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
-    await usuario.type(screen.getByTestId('avance-precio'), '3');
     await usuario.type(screen.getByTestId('avance-matriz-celda'), '2');
     await usuario.click(screen.getByTestId('avance-guardar'));
-    expect(crearRecibo.mock.calls[0]?.[0]).toMatchObject({ precioPactado: 3 });
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo).toMatchObject({ idMaquilero: 77 });
+    expect(cuerpo).not.toHaveProperty('precioPactado');
+  });
+
+  it('el recibo de ARTE tampoco pide precio (fila 0.218)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-aplicacion');
+    expect(screen.queryByTestId('avance-precio')).not.toBeInTheDocument();
+  });
+
+  it('el ENVÍO sí sigue pidiendo el precio: de ahí lo hereda el recibo', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+    expect(screen.getByTestId('avance-precio')).toBeInTheDocument();
   });
 });
 

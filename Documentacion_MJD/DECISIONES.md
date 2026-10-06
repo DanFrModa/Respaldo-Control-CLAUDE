@@ -18473,3 +18473,32 @@ Tres criterios que el lead dejó con default y que Daniel puede corregir:
    recepción cancelada sigue existiendo como rastro, D3).
 3. **Una OC que quedó en una entrada de tela cancelada desde captura queda con renglones fijos.** Default: sí, OC
    nueva. Soltar ese amarre sería borrar el renglón de una entrada, y la cancelación nunca borra (D3).
+
+#### (Post-F9.266) — EL RECIBO DE MAQUILA HEREDA EL PRECIO DE LA SALIDA Y LA ENTRADA DE TELA EL DE LA OC (filas 0.218 y 0.217, v0.196) — una pregunta de dinero y tres criterios con su default
+
+Aplica §Post-F9.243, puntos 08 y 02. 📐 **En los dos casos esconder el campo habría roto dinero**, así que el precio
+lo pone el servidor desde donde ya está:
+- **Recibo de maquila (0.218):** hereda el precio de la **salida a maquila** (la ligada, o la viva más reciente con
+  precio de la misma orden, proceso y maquilero; una cancelada no presta). Lo siguen leyendo el cargo EsMa propuesto,
+  los recibos semanales, el pago semanal y el impreso. Si el recibo viene ligado a una salida **sin** precio, queda sin
+  precio: no se busca otra salida (la liga manda). Y como ese precio ya no lo teclea quien recibe, **quien no tiene la
+  llave de ver el precio real de maquila no lo ve** ni en la respuesta del recibo ni en su impreso (R2 §4.4.3: se puede
+  teclear el precio, no ver el que capturó otro).
+- **Entrada de tela (0.217):** al confirmar toma el precio del **renglón de la OC** (el complemento, su precio propio o
+  el de la tela). De ahí sale la deuda del proveedor que no factura, el costo del kardex y el de la recepción. Con
+  factura, la deuda sigue naciendo por el total del CFDI.
+
+❓ **La pregunta que toca dinero, abierta a Daniel:** para el **cargo en EsMa** el sistema usa primero el precio de
+maquila de la **orden de producción** (`maquilaOrd`/`aplicacionOrd`) y sólo si falta el del recibo; los **recibos
+semanales** y el **pago semanal** usan el del recibo (ahora, el de la salida). Si la orden y la salida no coinciden, el
+mismo recibo aparece con dos importes según la pantalla. **Default propuesto: manda el de la orden de producción**,
+que es el que Producción captura y el que la fila 0.242 va a topar contra lo negociado con el cliente. Esta versión
+**no** cambia esa regla: espera su respuesta.
+
+Tres criterios ya construidos con su default, que Daniel puede corregir:
+1. **Dos salidas al mismo maquilero con precios distintos:** el recibo toma la **más reciente** (mismo criterio que ya
+   usaba el cierre de maquila).
+2. **A un proveedor de tela sin factura se le pagó un precio distinto al de la OC:** se corrige en Finanzas con la
+   corrección de movimientos sin factura (fila 0.145), o ajustando la OC antes de recibir.
+3. **Los avíos sí dejan corregir el precio al recibir (decisión de la 0.129) y la tela ya no:** se deja así; si quiere
+   que los avíos también tomen siempre el precio de la OC, es otra ficha.

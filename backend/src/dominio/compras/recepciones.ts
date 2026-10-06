@@ -881,7 +881,7 @@ export async function recibirCompra(
           : datos.factura,
       etiqueta: 'Recepción de compra',
       cfdi: null,
-      importeCapturado: importeACobrar,
+      importeRecibido: importeACobrar,
     });
     const idMovimientoTercero =
       cargo === null ? null : (await registrarMovimientoTerceroInterno(sesion, cargo, { tx })).id;

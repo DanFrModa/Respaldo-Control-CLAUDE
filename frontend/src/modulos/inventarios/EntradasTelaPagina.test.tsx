@@ -124,6 +124,20 @@ describe('EntradasTelaPagina (B1)', () => {
     expect(confirmarMutate.mock.calls[0]?.[0]).toBe(5);
   });
 
+  it('⭐ 0.217 · el cajón ya NO enseña importe (ni por renglón ni total), aunque el API lo traiga', async () => {
+    // Daniel: *«para cuestión de inventarios no es necesario saber el importe»*. La fixture trae
+    // `importe`/`totalImporte` y la sesión SÍ tiene `telas.ver-totales`: si se pintara, saldría.
+    const usuario = userEvent.setup();
+    renderConProveedores(<EntradasTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'telas.ver-totales']),
+    });
+    await usuario.click(screen.getByTestId('fila-entrada-5'));
+    expect(screen.getByText('Felpa Suiza')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Importe' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importe:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('32,400')).not.toBeInTheDocument();
+  });
+
   it('una CONFIRMADA ya no se edita ni se re-confirma; sólo se cancela (con motivo)', async () => {
     const usuario = userEvent.setup();
     useEntradasTelaMock.mockReturnValue(

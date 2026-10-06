@@ -78,6 +78,7 @@ import { resolverConFactura } from '../esma/facturacion.js';
 
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { celdasSaldables, saldadosPorCelda } from './faltantes-saldados.js';
+import { precioDelEnvio } from './precio-envio.js';
 import { pendientePorCelda } from './incompletas.js';
 import { claveCeldaPack, normalizarPack } from './packs.js';
 import { bloquearEtapasDeOrden, sumarCeldas } from './recibos.js';
@@ -380,32 +381,6 @@ async function derivarFaltantes(
   return celdas;
 }
 
-/**
- * El PRECIO con el que se propone el cobro: el `precioPactado` del ENVÍO vivo más reciente de ese
- * maquilero a ese proceso. Es el precio de maquila que se le pactó por esa prenda, que es lo que
- * Daniel descuenta. `null` cuando ningún envío lo trae — el caso del histórico migrado (1,309
- * envíos sin precio): entonces el cierre SALDA igual y NO propone el cobro, y lo dice con nombre.
- * **No se inventa un precio** (REGLA 0-B: lo viejo se tolera, no se compensa).
- */
-async function precioDelEnvio(
-  tx: Tx,
-  filtros: { idOrden: number; idTipoProceso: number; idMaquilero: number },
-): Promise<number | null> {
-  const envio = await tx.etapaMovimiento.findFirst({
-    where: {
-      idOrden: filtros.idOrden,
-      idTipoProceso: filtros.idTipoProceso,
-      idTercero: filtros.idMaquilero,
-      tipo: TipoEtapaMovimiento.envio_maquila,
-      canceladoEn: null,
-      precioPactado: { not: null },
-    },
-    orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
-    select: { precioPactado: true },
-  });
-  return envio?.precioPactado == null ? null : envio.precioPactado.toNumber();
-}
-
 // ── Operaciones ──────────────────────────────────────────────────────────────────────────────────
 
 /** Alta de un cierre: campos del esquema compartido. */
@@ -497,6 +472,9 @@ export async function cerrarOrdenMaquila(
       );
     }
 
+    // El PRECIO con el que se propone el cobro: el del ENVÍO (regla compartida con el recibo,
+    // `precio-envio.ts`). `null` cuando ningún envío lo trae — el histórico migrado: entonces el
+    // cierre SALDA igual y NO propone el cobro, y lo dice con nombre.
     const precio = datos.desenlace === 'cobrado' ? await precioDelEnvio(tx, filtros) : null;
     // El `conFactura` se resuelve ANTES de escribir nada: si el proveedor no tiene modalidad
     // definida (fila 0.110) el descuento no se puede capturar, y saldar el faltante sin poder

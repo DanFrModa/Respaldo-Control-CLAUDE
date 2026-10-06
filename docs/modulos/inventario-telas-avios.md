@@ -167,7 +167,9 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   a la tela" en la OC → `state: { idOrdenCompra, idProveedor }` a la captura, que fija el proveedor
   (deshabilitado) y pinta el panel "Pendiente de la orden de compra" (`GET
   /api/compras/lineas-tela-pendientes?idProveedor&idOrdenCompra`); cada renglón precarga tela +
-  pendiente + precio + la liga con un clic. **Se retiró** el selector "Renglón de OC". Y el buscador
+  pendiente + la liga con un clic (⭐ **desde la v0.196, fila 0.217, la entrada YA NO lleva precio ni importe**: al
+  confirmar, `valuarConLaOc` sella en cada renglón el precio de su renglón de OC —complemento: `precioComplemento ??
+  precio`— y de ahí salen el kardex, el `costoUnit` de la recepción y el cargo CxP del proveedor `solo_sin`). **Se retiró** el selector "Renglón de OC". Y el buscador
   de telas se acota al **proveedor DUEÑO** (`listarTelas` gana el filtro `idProveedor`, ESTRICTO: las
   migradas sin dueño no aparecen). La contabilidad de §Post-F9.14 NO cambió: esto es el punto de
   entrada, no el mecanismo.

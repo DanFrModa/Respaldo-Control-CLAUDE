@@ -153,7 +153,11 @@ export const esquemaReciboCrear = z
       .number({ error: 'El precio pactado debe ser un número' })
       .min(0, { error: 'El precio pactado no puede ser negativo' })
       .nullish()
-      .describe('Precio de maquila (base del cargo EsMa). Opcional; suele heredarse del envío.'),
+      .describe(
+        'Precio de maquila (base del cargo EsMa). OPCIONAL: si se omite, se hereda del envío ' +
+          '(el ligado en `idEtapaEnvio`, o si no, el envío vivo más reciente de esta orden, ' +
+          'proceso y maquilero que traiga precio). La pantalla ya no lo pide (fila 0.218).',
+      ),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaReciboMatriz,
   })

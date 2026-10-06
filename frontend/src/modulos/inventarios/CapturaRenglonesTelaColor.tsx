@@ -38,10 +38,6 @@ export interface RenglonTelaColor {
   idPartida?: number;
   /** Cómo se llama ese lote en pantalla ("Folio 12 · L-880"). Sólo para enseñarlo en la tabla. */
   loteEtiqueta?: string;
-  /** Precio por unidad del CUERPO (solo con `conPrecios`; viaja al kardex como costo, D1). */
-  precioUnit?: number;
-  /** Precio por unidad del COMPLEMENTO (solo con `conPrecios`; vive en el documento). */
-  precioUnitComplemento?: number;
   /** Renglón de OC que SURTE este renglón (§Post-F9.14; solo la entrada por factura). */
   idOrdenCompraLinea?: number;
 }
@@ -58,7 +54,6 @@ export interface LineaOcPendiente {
   pantoneTelaColor: string | null;
   unidad: string | null;
   pendiente: number;
-  precio: number;
   /** Cómo se llama el complemento de esa tela ("Cardigan"), o null si no lleva (§Post-F9.19). */
   nombreComplemento: string | null;
   /** Complemento que pidió la OC, y lo que falta por recibir de él. */
@@ -169,13 +164,13 @@ function etiquetaLote(l: { folio: number; loteProveedor: string | null }): strin
  * cantidades — cuerpo y complemento — que viajan JUNTAS en el mismo renglón (Daniel: el
  * complemento es parte de la misma tela; comprar solo cardigan = cuerpo en 0). Con
  * `conLoteProveedor` (ajustes de ENTRADA) se captura además el número de lote del proveedor de la
- * partida, y con `conPrecios` (documento de entrada por factura/remisión, B1) los DOS precios
- * unitarios — prellenados con los del catálogo del color como SUGERENCIA (la fuente de verdad del
- * costo es lo que se captura aquí, D1). Presentación pura (A1): el backend valida.
+ * partida. **Sin precios** (fila 0.217, Daniel: *«podemos quitarle el importe y el precio en la
+ * entrada. Para cuestión de inventarios no es necesario saber el importe»*): el servidor toma el
+ * precio del renglón de OC al confirmar. Presentación pura (A1): el backend valida.
  *
  * Con `lineasOc` (entrada por factura, §Post-F9.14) cada renglón se AMARRA a su renglón de orden
  * de compra pulsando **Capturar** en el panel "Pendiente de la orden de compra": la tela, el color,
- * la cantidad y el precio salen de la orden. (Aquí decía que además "deja elegir «sin orden de
+ * la cantidad salen de la orden. (Aquí decía que además "deja elegir «sin orden de
  * compra» para la tela suelta" — eso **nunca fue cierto en este componente**, que ya sólo amarra
  * por ese botón, y desde §Post-F9.159(a) además está PROHIBIDO.)
  *
@@ -189,7 +184,6 @@ export function CapturaRenglonesTelaColor({
   onChange,
   soloLectura = false,
   conLoteProveedor = false,
-  conPrecios = false,
   idAlmacenLotesOrigen,
   lineasOc,
   idProveedorTelas,
@@ -200,8 +194,6 @@ export function CapturaRenglonesTelaColor({
   onChange: (renglones: RenglonTelaColor[]) => void;
   soloLectura?: boolean;
   conLoteProveedor?: boolean;
-  /** Muestra y captura los precios unitarios de cuerpo y complemento (B1). */
-  conPrecios?: boolean;
   /**
    * ⭐⭐ Fila 0.146 — almacén de ORIGEN del TRASPASO. Con él, la captura ofrece los LOTES que ese
    * almacén tiene de ese color (con su saldo) para escoger de cuál sale la tela; `undefined` = esta
@@ -216,7 +208,7 @@ export function CapturaRenglonesTelaColor({
    * Renglones de OC PENDIENTES de recibir (§Post-F9.14, replanteado en §Post-F9.15). `undefined` =
    * esta pantalla no liga a órdenes de compra (ajuste, traspaso, salida). Con un arreglo se pinta el
    * panel "Pendiente de la orden de compra": cada renglón trae su botón **Capturar**, que precarga
-   * la tela, la cantidad que falta y el precio de la OC — así la liga NO se teclea ni se busca en un
+   * la tela y la cantidad que falta — así la liga NO se teclea ni se busca en un
    * combo, sale de la orden. 🔴 Con `exigirOrdenCompra` (§Post-F9.159(a)) ése es el ÚNICO camino:
    * el renglón "a mano", sin orden, dejó de poder agregarse.
    */
@@ -242,8 +234,6 @@ export function CapturaRenglonesTelaColor({
   const [cantidad, setCantidad] = useState<string>('');
   const [cantidadComplemento, setCantidadComplemento] = useState<string>('');
   const [loteProveedor, setLoteProveedor] = useState<string>('');
-  const [precioUnit, setPrecioUnit] = useState<string>('');
-  const [precioComplemento, setPrecioComplemento] = useState<string>('');
   const [idLineaOc, setIdLineaOc] = useState<string>('');
   /** ⭐ Fila 0.146 — lote del ORIGEN escogido a mano; `''` = que lo decida el sistema (FIFO). */
   const [idPartida, setIdPartida] = useState<string>('');
@@ -300,28 +290,19 @@ export function CapturaRenglonesTelaColor({
     setIdPartida('');
     setAvisoCaptura('');
     setCantidadComplemento('');
-    setPrecioUnit('');
-    setPrecioComplemento('');
   }
 
-  /**
-   * Al elegir el color, PRE-LLENA los precios con los del catálogo (sugerencia editable): el precio
-   * real de la factura manda y es el que se guarda (el catálogo no es la fuente de verdad, D1).
-   */
+  /** Elige el color del renglón (y suelta un lote escogido de otro color). */
   function elegirColor(valor: string): void {
     setIdTelaColor(valor);
     // Un lote pertenece al color que lo trajo: al cambiar de color se vuelve a «lo decide el
     // sistema» en vez de arrastrar una elección que ya no existe en la lista nueva.
     setIdPartida('');
     setAvisoCaptura('');
-    if (!conPrecios) return;
-    const color = tela?.colores.find((c) => String(c.id) === valor);
-    setPrecioUnit(color?.precio == null ? '' : String(color.precio));
-    setPrecioComplemento(color?.precioComplemento == null ? '' : String(color.precioComplemento));
   }
 
-  // Aplica la precarga en cuanto llega la tela: cantidad = lo que FALTA de la OC y precio = el de la
-  // orden (los dos editables — lo que llegó puede no ser lo pedido).
+  // Aplica la precarga en cuanto llega la tela: cantidad = lo que FALTA de la OC (editable — lo que
+  // llegó puede no ser lo pedido). El precio ya no se precarga: no se captura (fila 0.217).
   //
   // ⭐⭐ V1-E3u (§Post-F9.89) — **EL COLOR TAMBIÉN SE PRECARGA, porque desde esta etapa la OC SÍ lo
   // dice.** Aquí decía *"el color NO se adivina: la OC no lo define"*, y eso dejó de ser cierto en
@@ -351,7 +332,6 @@ export function CapturaRenglonesTelaColor({
     setCantidadComplemento(
       pendiente.pendienteComplemento > 0 ? String(pendiente.pendienteComplemento) : '',
     );
-    setPrecioUnit(String(pendiente.precio));
     setIdLineaOc(String(pendiente.idOrdenCompraLinea));
     setPendientePrecargando(null);
   }, [pendientePrecargando, telaPrecargada.data]);
@@ -362,8 +342,6 @@ export function CapturaRenglonesTelaColor({
     // Enter o un cambio futuro del `disabled` no cuele un renglón que el servidor va a rechazar.
     if (renglonSinOrdenDeCompra) return;
     const loteElegido = lotes.find((l) => String(l.idPartida) === idPartida);
-    const precioCuerpoNum = precioUnit === '' ? undefined : Number(precioUnit);
-    const precioComplNum = precioComplemento === '' ? undefined : Number(precioComplemento);
     const nuevo: RenglonTelaColor = {
       idTelaColor: colorElegido.id,
       tela: tela.nombre,
@@ -373,15 +351,6 @@ export function CapturaRenglonesTelaColor({
       cantidadComplemento: llevaComplemento ? complementoNum : 0,
       ...(conLoteProveedor && loteProveedor.trim().length > 0
         ? { loteProveedor: loteProveedor.trim() }
-        : {}),
-      ...(conPrecios && precioCuerpoNum !== undefined && Number.isFinite(precioCuerpoNum)
-        ? { precioUnit: precioCuerpoNum }
-        : {}),
-      ...(conPrecios &&
-      llevaComplemento &&
-      precioComplNum !== undefined &&
-      Number.isFinite(precioComplNum)
-        ? { precioUnitComplemento: precioComplNum }
         : {}),
       ...(idLineaOc === '' ? {} : { idOrdenCompraLinea: Number(idLineaOc) }),
       ...(loteElegido === undefined
@@ -425,8 +394,6 @@ export function CapturaRenglonesTelaColor({
     setCantidad('');
     setCantidadComplemento('');
     setLoteProveedor('');
-    setPrecioUnit('');
-    setPrecioComplemento('');
     setIdLineaOc('');
     setIdPartida('');
     setAvisoCaptura('');
@@ -509,7 +476,7 @@ export function CapturaRenglonesTelaColor({
           </ul>
           <p className="text-xs text-muted-foreground">
             Al capturar, la tela y la cantidad salen de la orden. Solo elige el color que llegó (y
-            el lote, si lo traes); las cantidades y el precio se pueden ajustar.
+            el lote, si lo traes); las cantidades se pueden ajustar. El precio es el de la orden.
           </p>
         </div>
       ) : null}
@@ -681,42 +648,6 @@ export function CapturaRenglonesTelaColor({
                 />
               </Field>
             ) : null}
-            {conPrecios ? (
-              <Field>
-                <FieldLabel htmlFor="captura-color-precio">
-                  Precio {(tela.nombreCuerpo ?? 'cuerpo').toLowerCase()}
-                </FieldLabel>
-                <Input
-                  id="captura-color-precio"
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={precioUnit}
-                  onChange={(e) => setPrecioUnit(e.target.value)}
-                  placeholder="Del catálogo"
-                  disabled={soloLectura}
-                  data-testid="captura-color-precio"
-                />
-              </Field>
-            ) : null}
-            {conPrecios && llevaComplemento ? (
-              <Field>
-                <FieldLabel htmlFor="captura-color-precio-compl">
-                  Precio {(tela.nombreComplemento ?? '').toLowerCase()}
-                </FieldLabel>
-                <Input
-                  id="captura-color-precio-compl"
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={precioComplemento}
-                  onChange={(e) => setPrecioComplemento(e.target.value)}
-                  placeholder="Del catálogo"
-                  disabled={soloLectura}
-                  data-testid="captura-color-precio-compl"
-                />
-              </Field>
-            ) : null}
           </div>
         ) : null}
         {tela !== undefined && llevaComplemento ? (
@@ -782,7 +713,6 @@ export function CapturaRenglonesTelaColor({
                 {lineasOc !== undefined || exigirOrdenCompra ? (
                   <TableHead>Orden de compra</TableHead>
                 ) : null}
-                {conPrecios ? <TableHead className="text-right">Precio</TableHead> : null}
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -823,14 +753,6 @@ export function CapturaRenglonesTelaColor({
                             lineasOc?.find((l) => l.idOrdenCompraLinea === r.idOrdenCompraLinea)
                               ?.numCompra ?? '',
                           )}`}
-                    </TableCell>
-                  ) : null}
-                  {conPrecios ? (
-                    <TableCell className="text-right text-xs tabular-nums">
-                      {r.precioUnit === undefined ? '—' : r.precioUnit.toLocaleString('es-MX')}
-                      {r.precioUnitComplemento === undefined
-                        ? ''
-                        : ` / ${r.precioUnitComplemento.toLocaleString('es-MX')}`}
                     </TableCell>
                   ) : null}
                   <TableCell className="text-right">
