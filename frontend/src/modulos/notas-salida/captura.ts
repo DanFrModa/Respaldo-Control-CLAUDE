@@ -132,40 +132,11 @@ export function renglonApi(renglon: RenglonNotaCaptura): NotaSalidaLineaEntrada 
 }
 
 /**
- * Lo que la pantalla sabe del stock del almacén ORIGEN: existencia por avío.
- *
- * `undefined` significa **«no se sabe»** —no hay almacén elegido, o su consulta no ha vuelto— y es
- * una tercera posibilidad que importa: no es lo mismo que «hay cero». Ver {@link hayStockDeAvio}.
+ * ⭐ Fila 0.216 — `hayStockDeAvio` y `StockDeAvios` nacieron aquí; desde la fila 0.233 viven en
+ * `inventarios/stock-avios.ts`, porque las otras tres pantallas que sacan avíos (salida sin orden,
+ * ajuste y traspaso) aplican la MISMA regla. Se re-exportan para no mover a quien ya los importa.
  */
-export type StockDeAvios = ReadonlyMap<number, { existencia: number }> | undefined;
-
-/**
- * ⭐⭐ FILA 0.216 — ¿SE PUEDE ENVIAR ESTE AVÍO DESDE EL ALMACÉN ORIGEN?
- *
- * Nace del repaso de Inventarios de DANIEL (§Post-F9.243, punto 07c), sobre la nota de salida:
- *
- * > *«Al traer los avíos de la OP… **como me jala avíos que no hay stock, no me deja**. Estaría bien
- * > que no deje meter los avíos que no hay stock, ANTES de meterlos. Porque ahorita valida DESPUÉS
- * > de haberlos metido en la nota de salida.»*
- *
- * ⚠️ **Esto NO sustituye la guarda del servidor** (A1): el no-negativo del avío lo sigue validando el
- * dominio al confirmar la nota, bajo bloqueo. Lo único que hace esta función es que la captura **no
- * llegue hasta ahí**: ni el «Traer avíos de la orden» ofrece lo que no hay, ni el selector del
- * renglón deja elegirlo.
- *
- * 🔑 **Sin stock CONOCIDO devuelve `true`, y es deliberado.** Un avío que NO aparece en el mapa
- * cuenta como cero —la vista de existencias sólo tiene renglón donde hubo movimientos, y la pantalla
- * pide `incluirCeros`, así que «no está» es «nunca entró aquí»—, pero si el mapa entero es
- * `undefined` no se sabe nada y bloquear sería inventar un cero: se deja pasar y decide el servidor.
- *
- * Función PURA (A1).
- */
-export function hayStockDeAvio(stock: StockDeAvios, idAvio: number): boolean {
-  if (stock === undefined) {
-    return true;
-  }
-  return (stock.get(idAvio)?.existencia ?? 0) > 0;
-}
+export { hayStockDeAvio, type StockDeAvios } from '../inventarios/stock-avios';
 
 /** Reconstruye los renglones de captura desde una nota existente (para editar). */
 export function capturaDesdeNota(nota: NotaSalida): RenglonNotaCaptura[] {

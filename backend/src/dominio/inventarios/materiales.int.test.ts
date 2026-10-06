@@ -626,6 +626,66 @@ describe('Avíos — multi-almacén (R4)', () => {
 });
 
 /**
+ * ⭐ FILA 0.233 — LA GUARDA DEL SERVIDOR EN LAS PUERTAS QUE SACAN AVÍOS, CON EL CASO QUE LA PANTALLA
+ * AHORA FRENA ANTES: un avío que NUNCA entró al almacén (sin un solo movimiento ahí, o sea sin
+ * renglón en la vista). La pantalla deja de ofrecerlo (presentación), pero la regla vive aquí (A1):
+ * estas pruebas fijan que, si alguien llega por fuera de la pantalla, el dominio lo sigue rechazando
+ * por Σ directa bajo bloqueo (D3) y no escribe nada.
+ */
+describe('Avíos — sacar lo que NUNCA entró se rechaza en el servidor (fila 0.233)', () => {
+  it('ajuste de SALIDA de un avío sin movimientos en el almacén → 409 y nada escrito', async () => {
+    const antes = await cliente.movimiento.count();
+    await expect(
+      ajustarInventarioAvio(
+        sesion(PERM_AVIOS),
+        {
+          idTipoMov: idTipoAjusteSalida,
+          idAlmacen: almAvioA.id,
+          fecha: '2026-06-21',
+          motivo: 'merma',
+          lineas: [{ idAvio: avioCierre.id, cantidad: 1 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.movimiento.count()).toBe(antes);
+  });
+
+  /**
+   * La existencia que manda es la del ORIGEN: aquí el avío SÍ hay en el destino (B) y no en el
+   * origen (A). El traspaso se rechaza y no deja ninguna de sus dos patas (A2).
+   */
+  it('traspaso desde un ORIGEN sin el avío (aunque el DESTINO sí tenga) → 409 y ninguna pata', async () => {
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioB.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 300 }],
+      },
+      bd(),
+    );
+    const antes = await cliente.movimiento.count();
+    await expect(
+      traspasarAvio(
+        sesion(PERM_AVIOS),
+        {
+          idAlmacenOrigen: almAvioA.id,
+          idAlmacenDestino: almAvioB.id,
+          fecha: '2026-06-21',
+          motivo: 'Surtido al taller',
+          lineas: [{ idAvio: avioCierre.id, cantidad: 1 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(await cliente.movimiento.count()).toBe(antes);
+  });
+});
+
+/**
  * ⭐ FILA 0.172 — el MOTIVO del traspaso de AVÍO queda en LAS DOS patas.
  *
  * 🔴 Sólo se puede medir contra Postgres: el motor (`comun/kardex.ts` → `registrarTraspasoAvio`,

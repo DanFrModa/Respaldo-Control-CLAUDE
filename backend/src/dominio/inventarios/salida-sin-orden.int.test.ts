@@ -390,6 +390,30 @@ describe('(c) NO se deja el inventario en negativo (D3, bajo lock)', () => {
     expect(await saldoTela()).toEqual({ cuerpo: 100, complemento: 5 });
   });
 
+  /**
+   * ⭐ Fila 0.233 — el caso que la pantalla ahora frena ANTES: el avío NUNCA entró a ese almacén (sin
+   * un solo movimiento ahí). El dominio lo sigue rechazando por su cuenta (A1).
+   */
+  it('⭐ AVÍO: sacar uno que NUNCA entró al almacén se rechaza y no escribe nada (fila 0.233)', async () => {
+    const antes = await cuantosMovimientos();
+
+    await expect(
+      registrarSalidaAvioSinOrden(
+        sesionDueno(),
+        {
+          concepto: 'devolucion-proveedor',
+          idAlmacen: almAvio.id,
+          fecha: '2026-09-05',
+          motivo: 'Devolución de cierres',
+          lineas: [{ idAvio: avioCierre.id, cantidad: 1 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    expect(await cuantosMovimientos()).toBe(antes);
+  });
+
   it('⭐ AVÍO: sacar más de lo que hay se rechaza y no escribe nada', async () => {
     await entrarAvio(500);
     const antes = await cuantosMovimientos();

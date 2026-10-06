@@ -375,6 +375,10 @@ orden de **3.4 MB** en una sola respuesta). Con la ventana por omisión son **30
 - 6 pantallas teal: Existencias de telas (componentes del lote expandibles), Kardex de materiales,
   Existencias de avíos (distingue `esGenerico`), Salida de tela a orden, Traspaso, Ajuste/inventario
   físico. Las **3 consultas** funcionan en móvil (regla 10). Impreso PDF de inventario de telas (R9).
+- ⭐ **Las capturas que SACAN avíos no dejan elegir lo que no hay** (nota de salida desde la 0.216; Salida sin orden,
+  Ajuste de salida y Traspaso —almacén origen— desde la 0.233): `CapturaRenglonesAvio` recibe `stockOrigen` del hook
+  compartido `inventarios/useStockAvioEnAlmacen.ts` (`undefined` = no se sabe ⇒ deja pasar) y pinta la existencia.
+  El ajuste de ENTRADA queda libre. La guarda que manda sigue en el servidor (`validarNoNegativoAvio`).
 
 ## Migración del histórico (F4-E6)
 

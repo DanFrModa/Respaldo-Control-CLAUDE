@@ -18502,3 +18502,16 @@ Tres criterios ya construidos con su default, que Daniel puede corregir:
    corrección de movimientos sin factura (fila 0.145), o ajustando la OC antes de recibir.
 3. **Los avíos sí dejan corregir el precio al recibir (decisión de la 0.129) y la tela ya no:** se deja así; si quiere
    que los avíos también tomen siempre el precio de la OC, es otra ficha.
+
+#### (Post-F9.267) — TAMPOCO LAS OTRAS TRES PANTALLAS QUE SACAN AVÍOS DEJAN ELEGIR LO QUE NO HAY (fila 0.233, v0.197) — dos criterios con su default
+
+Aplica el punto 07c de §Post-F9.243 —*«que no deje meter los avíos que no hay stock, ANTES de meterlos»*— a Salida sin
+orden, Ajuste de materiales y Traspaso de materiales, con el mismo molde que la nota de salida (fila 0.216): elegir a
+mano un avío sin existencia no entra al renglón, la existencia se pinta, y si no se sabe cuánto hay se deja pasar
+(bloquear sería inventar un cero). El **ajuste de entrada** queda libre —es como entra al almacén un avío que no
+estaba— y el **traspaso** mira el almacén de origen. El servidor ya rechazaba en las tres; la pantalla sólo avisa antes.
+
+Dos criterios que el lead dejó con default y que Daniel puede corregir:
+1. **«Guardar» no se bloquea** cuando un renglón ya capturado queda «Sin existencia» o «Excede» (por ejemplo, al cambiar
+   de almacén): se pinta en rojo y el servidor decide al guardar, igual que en la nota de salida.
+2. **En el traspaso no hay un aviso aparte por la suma de los renglones:** cada renglón ya dice «Excede · hay N».
