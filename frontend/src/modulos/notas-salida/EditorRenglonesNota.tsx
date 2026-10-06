@@ -2,12 +2,11 @@ import { Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import type { OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
-import { estaCerrada } from '@/lib/orden-cerrada';
+import { rotuloOrdenElegible, type OrdenElegible } from '@/modulos/produccion/ordenes-de-captura';
 import { SelectorAvio } from '../inventarios/SelectorAvio';
 
 import { aNumero, hayStockDeAvio, renglonVacio, type RenglonNotaCaptura } from './captura';
@@ -55,7 +54,11 @@ export function EditorRenglonesNota({
 }: {
   renglones: RenglonNotaCaptura[];
   alCambiar: (renglones: RenglonNotaCaptura[]) => void;
-  ordenes: readonly OrdenLigera[];
+  /**
+   * Órdenes del desplegable (0.227: sólo abiertas salvo «Mostrar cerradas», más las ya ELEGIDAS que
+   * la página no trae — ver `ordenesConElegidas`).
+   */
+  ordenes: readonly OrdenElegible[];
   /** Recetas conocidas por orden (idOrden → ids de avío de su receta) para el flag ✓/⚠. */
   recetaPorOrden?: Map<number, Set<number>> | undefined;
   /** Existencia por avío en el almacén origen elegido (para el aviso "excede"). */
@@ -125,9 +128,9 @@ export function EditorRenglonesNota({
                     <option value="">Elige una orden…</option>
                     {ordenes.map((o) => (
                       <option key={o.id} value={String(o.id)}>
-                        Orden {o.folio} · {o.codigoModelo}
-                        {/* 0.226b: informativo, NUNCA un filtro (ver `SelectorOrden`). */}
-                        {estaCerrada(o) ? ' · Cerrada' : ''}
+                        {/* Marca « · Cerrada» (0.226b); sólo aparecen con «Mostrar cerradas» o si
+                            ya estaban elegidas (0.227). */}
+                        {rotuloOrdenElegible(o)}
                       </option>
                     ))}
                   </SelectNativo>

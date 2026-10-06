@@ -81,8 +81,9 @@ export interface OpcionOrdenExistencia {
   existencia: number;
   /**
    * ⭐ 0.226b (§Post-F9.244): la orden de ese bucket está CERRADA — sus piezas se consultan pero no
-   * se mueven ni se traspasan. Se OFRECE igual (marcada), nunca se esconde: el estado es
-   * informativo, no una llave (ver `SelectorOrden`). Ausente = abierta o «sin orden».
+   * se mueven ni se traspasan. Desde 0.227 el selector la OCULTA por omisión y la vuelve a mostrar
+   * (marcada) con «Mostrar cerradas» — siempre contándola en su aviso, nunca en silencio (ver
+   * `SelectorOrdenPt`). Ausente = abierta o «sin orden».
    */
   ordenCerrada?: boolean;
 }

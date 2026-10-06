@@ -243,7 +243,7 @@ describe('TraspasosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
   });
 
-  it('⭐ 0.226b: el bucket de una orden CERRADA se ofrece marcado; elegirlo avisa y apaga guardar', async () => {
+  it('⭐ 0.226b + 0.227: la CERRADA se oculta por omisión (y se dice); con el interruptor se ofrece marcada; elegirla avisa y apaga guardar', async () => {
     const usuario = userEvent.setup();
     useExistenciasPtMock.mockReturnValue({
       ...EXISTENCIAS_CON_ORDEN,
@@ -260,6 +260,14 @@ describe('TraspasosPtPagina (F3-E3)', () => {
 
     await usuario.selectOptions(screen.getByTestId('traspaso-origen'), '3');
     await usuario.selectOptions(screen.getByTestId('traspaso-destino'), '4');
+    // ⭐ 0.227: oculta por omisión, pero DICHA.
+    expect(
+      [...screen.getByTestId('traspaso-orden').querySelectorAll('option')].map((o) => o.value),
+    ).toEqual(['sin']);
+    expect(screen.getByTestId('traspaso-orden-aviso-cerradas')).toHaveTextContent(
+      /La orden 9001 está cerrada: actívala con “Mostrar cerradas”/,
+    );
+    await usuario.click(screen.getByTestId('traspaso-orden-mostrar-cerradas'));
     const opciones = [...screen.getByTestId('traspaso-orden').querySelectorAll('option')];
     expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
     expect(opciones[1]?.textContent).toContain('Cerrada');
@@ -274,6 +282,14 @@ describe('TraspasosPtPagina (F3-E3)', () => {
       /La orden 9001 está cerrada/,
     );
     expect(screen.getByTestId('traspaso-guardar')).toBeDisabled();
+    // ⭐ 0.227 (gemela de Movimientos): apagar el interruptor con la cerrada ELEGIDA la devuelve a
+    // «sin orden» — nunca se manda una orden que el desplegable ya no muestra.
+    await usuario.click(screen.getByTestId('traspaso-orden-mostrar-cerradas'));
+    expect(screen.getByTestId('traspaso-orden')).toHaveValue('sin');
+    expect(
+      [...screen.getByTestId('traspaso-orden').querySelectorAll('option')].map((o) => o.value),
+    ).toEqual(['sin']);
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
   });
 
   /**

@@ -241,7 +241,12 @@ export function SalidaTelaColorOrdenPagina(): React.JSX.Element {
             <CardDescription>Elige la orden que consume la tela.</CardDescription>
           </CardHeader>
           <CardContent>
-            <SelectorOrden idSeleccionada={orden?.id} alSeleccionar={setOrden} />
+            <SelectorOrden
+              idSeleccionada={orden?.id}
+              alSeleccionar={setOrden}
+              // 0.227: la del deep-link puede no venir en la lista (oculta las cerradas): se rotula.
+              etiquetaSeleccion={orden === undefined ? undefined : `Orden #${orden.folio}`}
+            />
           </CardContent>
         </Card>
 

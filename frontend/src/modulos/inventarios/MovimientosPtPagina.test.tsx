@@ -483,7 +483,7 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     expect(cuerpo.lineas[0]?.idOrden).toBe(55);
   });
 
-  it('⭐ 0.226b: el bucket de una orden CERRADA se ofrece MARCADO; elegirlo avisa y apaga guardar', async () => {
+  it('⭐ 0.226b + 0.227: la CERRADA se oculta por omisión (y se dice); con el interruptor se ofrece MARCADA; elegirla avisa y apaga guardar', async () => {
     useExistenciasPtMock.mockImplementation((_query: Record<string, unknown>, hab?: boolean) => {
       if (hab === false) return SIN_DATOS;
       return {
@@ -500,10 +500,20 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
     await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
 
-    // Informativo, NUNCA un filtro: la orden cerrada sigue en la lista, rotulada.
+    // ⭐ 0.227: por omisión la cerrada NO se ofrece… pero se DICE (nunca un filtro mudo).
+    const valores = (): string[] =>
+      [...screen.getByTestId('mov-orden').querySelectorAll('option')].map((o) => o.value);
+    expect(valores()).toEqual(['sin']);
+    expect(screen.getByTestId('mov-orden-aviso-cerradas')).toHaveTextContent(
+      'La orden 9001 está cerrada: actívala con “Mostrar cerradas” para consultarla; para moverla hay que reabrirla.',
+    );
+
+    // Con «Mostrar cerradas» vuelve, rotulada, y el aviso de ocultas se va.
+    await usuario.click(screen.getByTestId('mov-orden-mostrar-cerradas'));
     const opciones = [...screen.getByTestId('mov-orden').querySelectorAll('option')];
     expect(opciones.map((o) => o.value)).toEqual(['sin', '55']);
     expect(opciones[1]?.textContent).toContain('Cerrada');
+    expect(screen.queryByTestId('mov-orden-aviso-cerradas')).not.toBeInTheDocument();
 
     await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
     const celda = screen.getByTestId('mov-matriz-celda');
@@ -518,6 +528,39 @@ describe('MovimientosPtPagina (F3-E3)', () => {
     // El bucket «sin orden» (abierto): el aviso se va y se puede guardar.
     await usuario.selectOptions(screen.getByTestId('mov-orden'), 'sin');
     expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+
+    // Apagar el interruptor con la cerrada ELEGIDA la devuelve a «sin orden»: nunca se manda una
+    // orden que el desplegable ya no muestra.
+    await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
+    expect(screen.getByTestId('aviso-orden-cerrada')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('mov-orden-mostrar-cerradas'));
+    expect(screen.getByTestId('mov-orden')).toHaveValue('sin');
+    expect(valores()).toEqual(['sin']);
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+  });
+
+  it('⭐ 0.227: con una orden ABIERTA elegida, encender y apagar «Mostrar cerradas» la CONSERVA (sólo se resetea la cerrada)', async () => {
+    useExistenciasPtMock.mockImplementation((_query: Record<string, unknown>, hab?: boolean) => {
+      if (hab === false) return SIN_DATOS;
+      return {
+        ...EXISTENCIAS_SALIDA,
+        data: {
+          filas: [fila(55, 9001, 20), { ...fila(56, 9002, 5), ordenCerrada: true }],
+          totalExistencia: 25,
+        },
+      };
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+    await elegirModelo(usuario);
+    await usuario.selectOptions(screen.getByTestId('mov-tipo'), '5'); // salida
+    await usuario.selectOptions(screen.getByTestId('mov-almacen'), '3');
+
+    await usuario.selectOptions(screen.getByTestId('mov-orden'), '55');
+    await usuario.click(screen.getByTestId('mov-orden-mostrar-cerradas'));
+    expect(screen.getByTestId('mov-orden')).toHaveValue('55');
+    await usuario.click(screen.getByTestId('mov-orden-mostrar-cerradas'));
+    expect(screen.getByTestId('mov-orden')).toHaveValue('55');
   });
 
   it('por default el movimiento sale del bucket «sin orden» (no manda idOrden)', async () => {

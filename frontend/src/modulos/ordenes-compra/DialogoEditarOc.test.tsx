@@ -132,8 +132,21 @@ vi.mock('@/api/direcciones-entrega', () => ({
 vi.mock('@/api/avios', () => ({ useAvios: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/tallas', () => ({ useTallasActivas: () => ({ data: { datos: [] } }) }));
+/**
+ * ⭐ 0.227: el mock respeta `cerradas` como el SERVIDOR: con `ocultar` (el default de la pantalla) la
+ * cerrada 51 no viene; con «Mostrar cerradas» (`incluir`), sí.
+ */
+const ORDENES_OC = {
+  abierta: { id: 50, folio: 800, codigoModelo: 'MOD-1', estado: 'completa' },
+  cerrada: { id: 51, folio: 801, codigoModelo: 'MOD-2', estado: 'cerrada' },
+};
+const SIN_CERRADAS = { data: { datos: [ORDENES_OC.abierta] } };
+const CON_CERRADAS = { data: { datos: [ORDENES_OC.abierta, ORDENES_OC.cerrada] } };
+const useConsultaOrdenesMock = vi.fn((query: { cerradas?: string }) =>
+  query.cerradas === 'ocultar' ? SIN_CERRADAS : CON_CERRADAS,
+);
 vi.mock('@/api/ordenes-consulta', () => ({
-  useConsultaOrdenes: () => ({ data: { datos: [] } }),
+  useConsultaOrdenes: (query: { cerradas?: string }) => useConsultaOrdenesMock(query),
 }));
 
 /** Renderiza el diálogo abierto (alta si no se pasa `oc`). */
@@ -356,7 +369,7 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
     if (renglon === undefined) throw new Error('fixture sin renglones');
     const conOrden = (ordenCerrada: boolean): ReturnType<typeof ocDePrueba> => ({
       ...base,
-      lineas: [{ ...renglon, idOrden: 50, folioOrden: 900, ordenCerrada }],
+      lineas: [{ ...renglon, idOrden: 77, folioOrden: 900, ordenCerrada }],
     });
 
     montar(conOrden(true));
@@ -364,11 +377,46 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
       /La orden 900 está cerrada/,
     );
     expect(screen.getByTestId('confirmar-oc')).toBeDisabled();
+    // ⭐ 0.227: su orden NO viene en la lista (oculta las cerradas) y aun así el renglón se ve
+    // LIGADO y marcado — un `<select>` sin su opción se leería «Sin ligar».
+    expect(screen.getByTestId('selector-orden-oc')).toHaveValue('77');
+    expect(
+      within(screen.getByTestId('selector-orden-oc')).getByRole('option', {
+        name: 'Orden 900 · Cerrada',
+      }),
+    ).toBeInTheDocument();
     cleanup();
 
     montar(conOrden(false));
     expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
     expect(screen.getByTestId('confirmar-oc')).toBeEnabled();
+  });
+
+  it('⭐ 0.227: «Orden ligada» oculta las cerradas por omisión; el interruptor las trae, y apagarlo no olvida la elegida', () => {
+    montar();
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'ocultar', incluirCanceladas: 'false' }),
+    );
+    const selector = (): HTMLElement => screen.getByTestId('selector-orden-oc');
+    expect(within(selector()).queryByRole('option', { name: /Orden 801/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('oc-mostrar-cerradas'));
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'incluir' }),
+    );
+    expect(
+      within(selector()).getByRole('option', { name: 'Orden 801 · MOD-2 · Cerrada' }),
+    ).toBeInTheDocument();
+    fireEvent.change(selector(), { target: { value: '51' } });
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 801/);
+
+    // Apagarlo NO la borra del renglón ni del aviso (la pantalla sigue sabiendo que está cerrada).
+    fireEvent.click(screen.getByTestId('oc-mostrar-cerradas'));
+    expect(useConsultaOrdenesMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cerradas: 'ocultar' }),
+    );
+    expect(selector()).toHaveValue('51');
+    expect(screen.getByTestId('aviso-orden-cerrada')).toHaveTextContent(/La orden 801/);
   });
 
   it('dice que cada renglón se liga a su propia OP (una OC puede surtir varias)', () => {

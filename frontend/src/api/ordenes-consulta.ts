@@ -59,14 +59,20 @@ async function buscarOrdenes(q: string): Promise<OrdenesBuscar> {
 
 // ── Hooks de lectura ────────────────────────────────────────────────────────────────
 
-/** Consulta ligera de órdenes (mantiene la página previa al paginar/filtrar). */
+/**
+ * Consulta ligera de órdenes (mantiene la página previa al paginar/filtrar). `habilitado` (0.227)
+ * apaga la petición cuando no hay nada que preguntar — p. ej. el aviso de cerradas de un selector,
+ * que sólo consulta cuando hay una búsqueda escrita.
+ */
 export function useConsultaOrdenes(
   query: OrdenesConsultaQuery,
+  opciones: { habilitado?: boolean } = {},
 ): UseQueryResult<OrdenesConsultaPagina, ErrorDeApi> {
   return useQuery({
     queryKey: [...CLAVE_ORDENES_CONSULTA, 'consulta', query],
     queryFn: () => consultarOrdenes(query),
     placeholderData: keepPreviousData,
+    enabled: opciones.habilitado ?? true,
   });
 }
 

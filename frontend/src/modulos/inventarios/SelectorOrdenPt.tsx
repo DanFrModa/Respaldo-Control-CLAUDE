@@ -1,3 +1,9 @@
+import { useState } from 'react';
+
+import {
+  AvisoCerradasOcultas,
+  InterruptorCerradas,
+} from '@/components/dominio/InterruptorCerradas';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -23,6 +29,16 @@ import { SIN_ORDEN, type OpcionOrdenExistencia } from './matriz-inventario';
  * Si las existencias NO se pudieron leer, se DICE y se ofrece reintentar; el selector queda
  * únicamente con «sin orden» (una opción explícita del usuario, no un relleno): un dato vacío se
  * nota, uno equivocado no.
+ *
+ * ⭐⭐ 0.227 (§Post-F9.244, etapa 2) — **las órdenes CERRADAS se ocultan por omisión**: mover o traspasar
+ * PT es CAPTURA, y una cerrada no admite movimientos (el servidor lo rechaza, etapa 1). Aquí el filtro
+ * va en el CLIENTE a propósito: la lista NO es una página de resultados de una búsqueda, son TODOS
+ * los buckets del artículo que ya llegaron (con su propio aviso de tope, fila 0.143) ⇒ ocultar no
+ * esconde nada que el servidor no haya mandado, y lo oculto se CUENTA y se nombra en el aviso. Con
+ * el interruptor «Mostrar cerradas» vuelven (marcadas «· Cerrada») y elegir una sigue avisando y
+ * apagando el guardar como en la etapa 1. Lo ya elegido nunca desaparece del desplegable: si al
+ * apagar el interruptor la orden elegida era cerrada, se vuelve a «sin orden» (nunca se manda una
+ * orden que la pantalla no muestra).
  */
 export function SelectorOrdenPt({
   id,
@@ -51,14 +67,29 @@ export function SelectorOrdenPt({
   ayuda?: string | undefined;
   testid?: string;
 }): React.JSX.Element {
+  const [mostrarCerradas, setMostrarCerradas] = useState(false);
   // El bucket «sin orden» siempre se ofrece: existe aunque hoy esté en cero (es donde entra lo que
   // se captura a mano). Las órdenes vienen de los movimientos reales del modelo.
-  const conOrden = opciones.filter((o) => o.idOrden !== null);
+  const todasConOrden = opciones.filter((o) => o.idOrden !== null);
   const sinOrden = opciones.find((o) => o.idOrden === null);
+  // 0.227: las CERRADAS fuera por omisión (se cuentan y se nombran en el aviso de abajo).
+  const cerradas = todasConOrden.filter((o) => o.ordenCerrada === true);
+  const ocultas = mostrarCerradas ? [] : cerradas;
+  const conOrden = mostrarCerradas
+    ? todasConOrden
+    : todasConOrden.filter((o) => o.ordenCerrada !== true);
   const esEntrada = modo === 'entrada';
   /** Sufijo " · N pzas" — solo en la SALIDA, donde ese saldo es de verdad el tope. */
   const piezas = (existencia: number): string =>
     esEntrada ? '' : ` · ${existencia.toLocaleString('es-MX')} pzas`;
+
+  function cambiarMostrarCerradas(activo: boolean): void {
+    setMostrarCerradas(activo);
+    // Lo elegido nunca queda fuera del desplegable: si era una cerrada, vuelve a «sin orden».
+    if (!activo && cerradas.some((o) => String(o.idOrden) === valor)) {
+      alCambiar(SIN_ORDEN);
+    }
+  }
 
   return (
     <Field>
@@ -78,12 +109,24 @@ export function SelectorOrdenPt({
           <option key={o.idOrden ?? 0} value={String(o.idOrden)}>
             Orden {o.folioOrden ?? o.idOrden}
             {piezas(o.existencia)}
-            {/* 0.226b: informativo, NUNCA un filtro — la orden cerrada se ve, pero la pantalla
-                avisa y apaga el guardar si se elige. */}
+            {/* Sólo con «Mostrar cerradas» encendido (0.227): la cerrada se ve marcada, y si se
+                elige la pantalla avisa y apaga el guardar (0.226b). */}
             {o.ordenCerrada === true ? ' · Cerrada' : ''}
           </option>
         ))}
       </SelectNativo>
+      <InterruptorCerradas
+        activo={mostrarCerradas}
+        alCambiar={cambiarMostrarCerradas}
+        deshabilitado={deshabilitado}
+        testid={`${testid}-mostrar-cerradas`}
+      />
+      {/* 0.227: lo oculto se DICE (nunca un «no hay órdenes» mudo cuando sí las hay, cerradas). */}
+      <AvisoCerradasOcultas
+        folios={ocultas.map((o) => o.folioOrden ?? o.idOrden ?? '—')}
+        total={ocultas.length}
+        testid={`${testid}-aviso-cerradas`}
+      />
       {hayError ? (
         <p className="text-xs text-destructive" role="alert" data-testid={`${testid}-error`}>
           No se pudieron leer las existencias: no se puede saber de qué órdenes hay piezas.{' '}
@@ -95,7 +138,7 @@ export function SelectorOrdenPt({
         </p>
       ) : cargando ? (
         <FieldDescription>Buscando de qué órdenes hay piezas…</FieldDescription>
-      ) : conOrden.length === 0 ? (
+      ) : conOrden.length === 0 && ocultas.length > 0 ? null : conOrden.length === 0 ? (
         <FieldDescription>
           {ayuda ??
             (esEntrada

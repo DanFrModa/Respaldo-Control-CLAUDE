@@ -128,7 +128,9 @@ let cerradaEnEmitida: string | null = null;
 vi.mock('@/modulos/produccion/SelectorOrden', () => ({
   SelectorOrden: ({
     alSeleccionar,
+    etiquetaSeleccion,
   }: {
+    etiquetaSeleccion?: string;
     alSeleccionar: (o: {
       id: number;
       folio: number;
@@ -151,6 +153,8 @@ vi.mock('@/modulos/produccion/SelectorOrden', () => ({
       }
     >
       elegir orden
+      {/* 0.227: cómo rotula el buscador la orden elegida que no viene en su lista. */}
+      <span data-testid="selector-etiqueta">{etiquetaSeleccion ?? ''}</span>
     </button>
   ),
 }));
@@ -552,6 +556,9 @@ describe('SalidaTelaColorOrdenPagina (A2 — salida por color)', () => {
     });
     expect(screen.getByTestId('salida-color-almacen')).toBeInTheDocument();
     expect(useOrden).toHaveBeenCalledWith(42);
+    // ⭐ 0.227: la orden del enlace puede no venir en la lista del buscador (oculta las cerradas,
+    // trae 8): la pantalla le pasa su rótulo para que no se vea vacío.
+    expect(screen.getByTestId('selector-etiqueta')).toHaveTextContent('Orden #5424');
   });
   it('solo ofrece almacenes de TELA (no bodegas de PT ni de avíos)', () => {
     renderConProveedores(<SalidaTelaColorOrdenPagina />, {

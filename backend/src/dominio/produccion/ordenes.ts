@@ -99,6 +99,7 @@ import {
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenComentarioCuerpo,
   esquemaEstadoOrden,
+  esquemaFiltroCerradas,
 } from '../../contrato/esquemas/orden.js';
 import type {
   DatosOrdenLineaEntrada,
@@ -144,6 +145,7 @@ import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sin
 
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
+import { filtroOrdenesCerradas } from './filtro-cerradas.js';
 import {
   SIN_PACK,
   coloresReempacados,
@@ -181,6 +183,8 @@ const esquemaListarOrdenesDominio = esquemaPaginacion.extend({
   // habría dejado la ruta sin poder filtrar por él.
   estado: esquemaEstadoOrden.optional(),
   incluirCanceladas: z.boolean().default(false),
+  // ⭐ 0.227: el MISMO enum del contrato (no una copia), default `incluir` = como siempre.
+  cerradas: esquemaFiltroCerradas.default('incluir'),
   ordenarPor: z.enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn']).default('folio'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
 });
@@ -1550,6 +1554,8 @@ export async function proyectarOrden(
  *  • `busqueda`: folio interno (si es número), código de modelo, nombre de cliente, o CUALQUIER
  *    valor de `OrdenReferencia` (usando su índice dedicado, D7).
  *  • filtros por modelo, cliente, año (de `fecha`) y estado.
+ *  • `cerradas` (0.227): `incluir` por defecto; `ocultar` lo piden los selectores de CAPTURA y
+ *    `solo` su aviso — ver `filtro-cerradas.ts`.
  * Por defecto NO incluye las canceladas. Cada orden trae su detalle embebido (matriz, referencias,
  * comentarios) con el total derivado.
  */
@@ -1570,6 +1576,7 @@ export async function listarOrdenes(
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
+    ...filtroOrdenesCerradas(filtros.cerradas),
     ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
   };
 
