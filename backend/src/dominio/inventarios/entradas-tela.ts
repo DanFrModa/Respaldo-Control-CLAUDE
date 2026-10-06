@@ -195,10 +195,12 @@ const incluirEntradaTela = {
       // llame al API a mano puede guardar un borrador apuntando a la OC de OTRA empresa y la
       // lectura le devolverá su `numCompra`. No es sólo "falta una validación": **se filtra un dato
       // de otra empresa**, que es justo lo que A9 prohíbe.
+      // ⭐ Fila 0.225: la mitad «empresa» de CAPTURAR ya se valida (`exigirRenglonesOcVigentes`, al
+      // crear y al editar el borrador). Lo que sigue abierto es la mitad «proveedor» (que la OC sea
+      // del proveedor del documento) y que este `include` sigue sin filtrar por empresa.
       // Lo que SÍ está cerrado: CONFIRMAR lo rechaza (`registrarRecepcionesDesdeEntradaTela` exige
       // `ordenCompra.idEmpresa === cabecera.idEmpresa`, `compras/recepciones.ts:831-834`), así que
-      // no puede convertirse en inventario ni en recepción. El arreglo es validar la OC (empresa +
-      // proveedor) al capturar; no se hizo en esta etapa para no ampliar su alcance.
+      // no puede convertirse en inventario ni en recepción.
       //
       // 0.226b: también la ORDEN DE PRODUCCIÓN del renglón de OC (folio + si está cerrada), para que
       // la pantalla avise antes de confirmar o cancelar. Se trae su `idEmpresa` para NO ensanchar la
@@ -341,6 +343,40 @@ async function exigirOrdenesAbiertasDeRenglonesOC(
     idEmpresa,
     lineasOC.map((l) => l.idOrden),
     queSeIntenta,
+  );
+}
+
+/**
+ * ⭐ Fila 0.225 — los renglones de OC que se van a AMARRAR existen y son de la empresa activa. Se
+ * llama BAJO el candado de sus OC (`bloquearOrdenesDeRenglones`), justo antes de escribir
+ * `entrada_tela_linea`.
+ *
+ * Por qué hace falta aunque ya haya candado: la edición de una OC REEMPLAZA sus renglones (borra y
+ * recrea). Si gana la carrera, el renglón que esta captura nombraba ya no existe cuando el candado
+ * se suelta, y el INSERT reventaba contra la FK con un P2003 (un 500 «error interno»). Con esta
+ * lectura después del candado, quien captura recibe un rechazo en lenguaje de negocio.
+ *
+ * Y de paso cierra la mitad «empresa» de la fuga A9 anotada en `incluirEntradaTela`: un borrador ya
+ * no puede apuntar al renglón de OC de OTRA empresa (el mensaje es el mismo que el de «no existe»,
+ * para no confirmarle a nadie que ese id existe en otra empresa). La mitad «proveedor» sigue abierta.
+ */
+async function exigirRenglonesOcVigentes(
+  tx: Tx,
+  idEmpresa: number,
+  idsOrdenCompraLinea: readonly (number | null | undefined)[],
+): Promise<void> {
+  const ids = [
+    ...new Set(idsOrdenCompraLinea.filter((idLinea): idLinea is number => idLinea != null)),
+  ];
+  if (ids.length === 0) return;
+  const vigentes = await tx.ordenCompraLinea.findMany({
+    where: { id: { in: ids }, ordenCompra: { idEmpresa } },
+    select: { id: true },
+  });
+  if (vigentes.length === ids.length) return;
+  throw new ErrorConflicto(
+    'La orden de compra de esta tela cambió mientras capturabas: alguno de sus renglones ya no ' +
+      'existe. Vuelve a elegir la tela desde lo que está pendiente de su orden de compra.',
   );
 }
 
@@ -679,7 +715,24 @@ export async function crearEntradaTela(
   }
 
   const id = await enTransaccion(async (tx) => {
-    // ⭐ 0.226a: no se le recibe tela a una orden CERRADA. Guarda ÚNICA en lote, PRIMERA instrucción.
+    // ⭐ Fila 0.225 — los candados de las OC que nombran los renglones, ANTES de escribir
+    // `entrada_tela_linea` (que la base amarra al renglón de OC con una FK RESTRICT). Sin ellos, una
+    // edición de la OC en paralelo podía borrar el renglón entre la validación y el INSERT, y esta
+    // captura reventaba con un P2003 (500). Mismo orden global que `recibirCompra`, `confirmar`,
+    // `cancelar` y `actualizarOC`: primero la OC (ascendente), luego la orden de producción.
+    await bloquearOrdenesDeRenglones(
+      tx,
+      datos.lineas
+        .map((l) => l.idOrdenCompraLinea)
+        .filter((idLinea): idLinea is number => idLinea != null),
+    );
+    await exigirRenglonesOcVigentes(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => l.idOrdenCompraLinea),
+    );
+    // ⭐ 0.226a: no se le recibe tela a una orden CERRADA. Guarda ÚNICA en lote (tras el candado
+    // de la OC, antes de escribir nada).
     await exigirOrdenesAbiertasDeRenglonesOC(
       tx,
       idEmpresa,
@@ -794,8 +847,29 @@ export async function actualizarEntradaTela(
   );
 
   await enTransaccion(async (tx) => {
-    // ⭐ 0.226a: los renglones que se ESCRIBEN no pueden surtir a una orden CERRADA. PRIMERA
-    // instrucción (antes de borrar y recrear los renglones).
+    // ⭐ Fila 0.225 — los candados de las OC de los renglones VIEJOS y de los NUEVOS (la unión, en
+    // orden ascendente: `bloquearOrdenesDeRenglones` deduplica y ordena), ANTES de borrar y recrear
+    // `entrada_tela_linea`. Los nuevos, por lo mismo que en el alta (el INSERT contra un renglón de
+    // OC que una edición en paralelo borra → P2003); los viejos, para que la guarda de
+    // `actualizarOC` («¿la OC aparece en una entrada de tela?») no lea un amarre que esta
+    // transacción está quitando a medias. Mismo orden global: OC → orden → inventario.
+    const renglonesViejos = await tx.entradaTelaLinea.findMany({
+      where: { idEntradaTela: id, entradaTela: { idEmpresa } },
+      select: { idOrdenCompraLinea: true },
+    });
+    await bloquearOrdenesDeRenglones(
+      tx,
+      [...renglonesViejos, ...datos.lineas]
+        .map((l) => l.idOrdenCompraLinea)
+        .filter((idLinea): idLinea is number => idLinea != null),
+    );
+    await exigirRenglonesOcVigentes(
+      tx,
+      idEmpresa,
+      datos.lineas.map((l) => l.idOrdenCompraLinea),
+    );
+    // ⭐ 0.226a: los renglones que se ESCRIBEN no pueden surtir a una orden CERRADA (tras el
+    // candado de la OC, antes de borrar y recrear los renglones).
     await exigirOrdenesAbiertasDeRenglonesOC(
       tx,
       idEmpresa,

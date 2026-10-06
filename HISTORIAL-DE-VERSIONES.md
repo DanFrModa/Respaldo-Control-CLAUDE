@@ -71,6 +71,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.195 · 6-oct-2026 · **en prueba** — **La orden de compra que ya recibió material no se cambia: para más, se hace otra**
+
+> **La v0.195 cierra una fila del programa: la 0.225.** Es tu regla del 30-sep: *«las OC que ya están recibidas
+> ya se quedan con esa cantidad recibida y se cierra. Si se quiere recibir más, se tendría que hacer una nueva OC»*
+> —para que el sobrecosto se vea—.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Ya puedes guardar notas, «corresponde a», fecha y dirección de entrega en una orden de compra recibida.** Antes, al
+guardar cualquier cambio en una OC que ya tenía material recibido —aunque fuera sólo una nota— el sistema contestaba
+«error interno». Ahora esos datos se guardan normalmente.
+
+**Y si intentas cambiarle cantidades, renglones o proveedor, el sistema te dice qué hacer en lugar de tronar:**
+*«La orden de compra N ya se recibió completa: se queda cerrada con lo que se recibió y sus renglones ya no se
+cambian. Si hace falta más material, haz una orden de compra nueva (la puedes ligar a la misma orden de producción):
+así el sobrecosto queda a la vista.»* La OC nueva ligada a la misma orden de producción ya funcionaba, y la explosión
+de materiales la cuenta.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**La regla alcanza también a la OC recibida a medias.** En cuanto una OC tiene una recepción (completa o parcial, y aunque
+la recepción se haya cancelado) o aparece en una entrada de tela, sus renglones y su proveedor quedan fijos. En la
+pantalla de edición esos campos aparecen apagados con el aviso. De hecho, antes tampoco se podía: daba error.
+
+**Una OC autorizada sin nada recibido se sigue editando igual que antes**, proveedor incluido, con la llave de editar
+OC autorizadas.
+
+**Tres choques raros entre dos personas trabajando a la vez ya no dejan nada mal:** cancelar o desautorizar una OC justo
+mientras otra persona registra su recepción (podía quedar cancelada con material recibido), y capturar una entrada de
+tela mientras alguien edita su OC (daba «error interno»). Ahora una espera a la otra y el sistema contesta con un
+mensaje claro.
+
+### ⏳ Sigue pendiente o roto
+
+**Tres preguntas para ti, ya construidas con su respuesta propuesta** (§Post-F9.265): si la OC recibida a medias se
+cierra igual que la completa (propuesto: sí); si una OC cuya recepción se canceló por error debe poder editarse otra vez
+(propuesto: no, se hace OC nueva); y si una OC que quedó en una entrada de tela cancelada debe poder soltarse (propuesto:
+no, OC nueva).
+
+**Reabrir una OC (fila 0.229) sigue pendiente**, y con ella la devolución al proveedor ligada a la OC.
+
 ## 0.194 · 6-oct-2026 · **en prueba** — **Las órdenes cerradas ya no estorban donde se captura**
 
 > **La v0.194 cierra una fila del programa: la 0.227.** Es la última parte de tu regla de las órdenes cerradas:

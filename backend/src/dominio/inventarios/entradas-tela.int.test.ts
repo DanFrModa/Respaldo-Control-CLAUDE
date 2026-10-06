@@ -27,8 +27,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorDominio,
+  ErrorNoEncontrado,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { existenciaTelaColorBloqueada } from '../../comun/kardex.js';
+import type { Tx } from '../../comun/transaccion.js';
 import type {
   Almacen,
   Empresa,
@@ -40,8 +46,8 @@ import type {
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { crearOC, autorizarOC } from '../compras/ordenes-compra.js';
-import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
+import { actualizarOC, crearOC, autorizarOC } from '../compras/ordenes-compra.js';
+import { bloquearOrdenCompra, lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
 import { registrarMovimientoCxp } from '../terceros/cxp/cxp.js';
 import { kardexTelaColor } from './partidas-telas.js';
 import {
@@ -1613,5 +1619,249 @@ describe('⭐ Facturación del proveedor: las dos puertas clasifican igual (fila
       bd(),
     );
     expect(pago.esFiscal).toBe(true);
+  });
+});
+
+/**
+ * ⭐ Fila 0.225 — la captura de una entrada de tela y la edición de su OC se SERIALIZAN por el
+ * candado de la OC. Las dos escriben sobre la misma FK RESTRICT (`entrada_tela_linea →
+ * orden_compra_linea`): sin candado, la que perdía la carrera reventaba con P2003 (un 500). Con él,
+ * la segunda espera y contesta en lenguaje de negocio — o pasa — pero nunca P2003.
+ */
+describe('⭐ Fila 0.225 — entrada de tela en captura vs. edición de su OC (sin P2003)', () => {
+  /** La OC a la que pertenece el renglón de la felpa del fixture. */
+  async function idOcDeLaFelpa(): Promise<number> {
+    const linea = await cliente.ordenCompraLinea.findUniqueOrThrow({
+      where: { id: lineaOcFelpa },
+      select: { idOrdenCompra: true },
+    });
+    return linea.idOrdenCompra;
+  }
+
+  /**
+   * Abre una transacción que toma el candado de la OC y ejecuta `trabajo` dentro; avisa cuando ya lo
+   * tiene y tarda en confirmar. Va envuelta en un objeto: una función `async` que devolviera la
+   * promesa la ADOPTARÍA y el llamador esperaría al commit — la prueba no mediría nada.
+   */
+  async function conCandadoDeLaOc(
+    idOc: number,
+    trabajo: (tx: Tx) => Promise<void>,
+  ): Promise<{ tx: Promise<unknown> }> {
+    let avisar!: () => void;
+    const tomado = new Promise<void>((r) => {
+      avisar = r;
+    });
+    const tx = cliente.$transaction(
+      async (t) => {
+        await bloquearOrdenCompra(t, idOc);
+        await trabajo(t);
+        avisar();
+        await new Promise((r) => setTimeout(r, 1500));
+      },
+      { timeout: 20_000 },
+    );
+    await tomado;
+    return { tx };
+  }
+
+  it('la OC se está editando (renglones reemplazados): la captura ESPERA y contesta de negocio, no P2003', async () => {
+    const idOc = await idOcDeLaFelpa();
+    // Lo que hace `actualizarOC` con los renglones, bajo su candado: borra y recrea.
+    const { tx: edicion } = await conCandadoDeLaOc(idOc, async (t) => {
+      await t.ordenCompraLinea.deleteMany({ where: { idOrdenCompra: idOc } });
+      await t.ordenCompraLinea.create({
+        data: { idOrdenCompra: idOc, idTela: telaLisa.id, cantidad: 10, precio: 8, unidad: 'm' },
+      });
+    });
+    const captura = capturarSimple();
+    const [rEdicion, rCaptura] = await Promise.allSettled([edicion, captura]);
+    expect(rEdicion.status).toBe('fulfilled');
+    expect(rCaptura.status).toBe('rejected');
+    const motivo = rCaptura.status === 'rejected' ? (rCaptura.reason as unknown) : null;
+    expect(motivo).toBeInstanceOf(ErrorDominio);
+    expect(motivo).toBeInstanceOf(ErrorConflicto);
+    expect(String((motivo as Error).message)).toMatch(/cambió mientras capturabas/);
+    expect(await cliente.entradaTelaLinea.count()).toBe(0);
+  });
+
+  it('EDITAR el borrador hacia una OC que se está editando: espera y contesta de negocio, no P2003', async () => {
+    // El borrador nace sobre la OC del fixture y se reapunta a OTRA OC, cuyo renglón se reemplaza
+    // en paralelo. Toca las DOS OC (la vieja y la nueva): el candado es de la unión.
+    const borrador = await capturarSimple();
+    const otraOc = await ocDeTelasAutorizada();
+    const idOtraOc = (
+      await cliente.ordenCompraLinea.findUniqueOrThrow({
+        where: { id: otraOc.felpa },
+        select: { idOrdenCompra: true },
+      })
+    ).idOrdenCompra;
+    const { tx: edicionOc } = await conCandadoDeLaOc(idOtraOc, async (t) => {
+      await t.ordenCompraLinea.deleteMany({ where: { idOrdenCompra: idOtraOc } });
+      await t.ordenCompraLinea.create({
+        data: {
+          idOrdenCompra: idOtraOc,
+          idTela: telaLisa.id,
+          cantidad: 10,
+          precio: 8,
+          unidad: 'm',
+        },
+      });
+    });
+    const reapunte = actualizarEntradaTela(
+      sesion(),
+      borrador.id,
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A-1001',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5, idOrdenCompraLinea: otraOc.felpa }],
+      },
+      bd(),
+    );
+    const [rOc, rReapunte] = await Promise.allSettled([edicionOc, reapunte]);
+    expect(rOc.status).toBe('fulfilled');
+    const motivo = rReapunte.status === 'rejected' ? (rReapunte.reason as unknown) : 'pasó';
+    expect(motivo).toBeInstanceOf(ErrorConflicto);
+    // Y el borrador sigue apuntando a donde estaba (la edición no escribió nada).
+    const lineas = await cliente.entradaTelaLinea.findMany({
+      where: { idEntradaTela: borrador.id },
+    });
+    expect(lineas.map((l) => l.idOrdenCompraLinea)).toEqual([lineaOcFelpa]);
+  });
+
+  it('REAPUNTAR el borrador de la OC A a la B sostiene también el candado de A: la edición de A espera y PASA', async () => {
+    // El borrador amarra un renglón de A (la OC del fixture) y se reapunta a B. Para que el reapunte
+    // quede A MEDIAS con los candados en la mano, otra transacción sostiene el de B: como el reapunte
+    // los toma en orden ascendente (A < B), se queda con A tomado y esperando a B.
+    const borrador = await capturarSimple();
+    const idOcA = await idOcDeLaFelpa();
+    const ocB = await ocDeTelasAutorizada();
+    const idOcB = (
+      await cliente.ordenCompraLinea.findUniqueOrThrow({
+        where: { id: ocB.felpa },
+        select: { idOrdenCompra: true },
+      })
+    ).idOrdenCompra;
+    expect(idOcA).toBeLessThan(idOcB);
+
+    const { tx: sostieneB } = await conCandadoDeLaOc(idOcB, async () => {});
+    const reapunte = actualizarEntradaTela(
+      sesion(),
+      borrador.id,
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'A-1001',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-06',
+        idAlmacen: almacen.id,
+        lineas: [{ idTelaColor: colorMarino.id, cantidad: 5, idOrdenCompraLinea: ocB.felpa }],
+      },
+      bd(),
+    );
+    // Determinista, sin adivinar tiempos: se espera a que el reapunte esté BLOQUEADO esperando un
+    // candado (el de B), o sea, ya con el de A en la mano.
+    for (let i = 0; i < 200; i++) {
+      const [fila] = await cliente.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*)::bigint AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`;
+      if (Number(fila?.n ?? 0) > 0) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+
+    // Mientras tanto, se editan los renglones de A. Con el candado sobre A, espera a que el reapunte
+    // termine y ve el estado FINAL: el borrador ya no amarra a A ⇒ la edición pasa. Sin él, leería
+    // el amarre viejo y se rechazaría por una entrada que, al terminar, ya no la nombra.
+    const edicionA = actualizarOC(
+      sesion([...PERM_COMPRAS, 'compras.editar-autorizada']),
+      idOcA,
+      {
+        lineas: [
+          {
+            idTela: telaFelpa.id,
+            cantidad: 100_000,
+            precio: 12,
+            unidad: 'kg',
+            cantidadComplemento: 5_000,
+          },
+          { idTela: telaLisa.id, cantidad: 120_000, precio: 8, unidad: 'm' },
+        ],
+      },
+      bd(),
+    );
+    const [rB, rReapunte, rEdicionA] = await Promise.allSettled([sostieneB, reapunte, edicionA]);
+    expect(rB.status).toBe('fulfilled');
+    expect(rReapunte.status === 'rejected' ? rReapunte.reason : 'ok').toBe('ok');
+    expect(rEdicionA.status === 'rejected' ? rEdicionA.reason : 'ok').toBe('ok');
+    const lineas = await cliente.entradaTelaLinea.findMany({
+      where: { idEntradaTela: borrador.id },
+    });
+    expect(lineas.map((l) => l.idOrdenCompraLinea)).toEqual([ocB.felpa]);
+  });
+
+  it('A9: capturar contra el renglón de OC de OTRA empresa se rechaza (mismo texto que «no existe»)', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    const ocDeOtra = await ocDeTelasAutorizada(otra.id);
+    await expect(
+      crearEntradaTela(
+        sesion(),
+        {
+          tipoDocumento: 'factura',
+          numeroDocumento: 'A-9',
+          idProveedor: proveedor.id,
+          fecha: '2026-08-06',
+          idAlmacen: almacen.id,
+          lineas: [
+            { idTelaColor: colorMarino.id, cantidad: 5, idOrdenCompraLinea: ocDeOtra.felpa },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/alguno de sus renglones ya no existe/);
+    expect(await cliente.entradaTela.count()).toBe(0);
+  });
+
+  it('una edición SIN tocar renglones: la captura espera y PASA', async () => {
+    const idOc = await idOcDeLaFelpa();
+    const { tx: edicion } = await conCandadoDeLaOc(idOc, async (t) => {
+      await t.ordenCompra.update({ where: { id: idOc }, data: { observaciones: 'nota' } });
+    });
+    const [rEdicion, rCaptura] = await Promise.allSettled([edicion, capturarSimple()]);
+    expect(rEdicion.status).toBe('fulfilled');
+    expect(rCaptura.status).toBe('fulfilled');
+  });
+
+  it('sentido inverso: con la captura en vuelo, editar los renglones de la OC da 409, no P2003', async () => {
+    const idOc = await idOcDeLaFelpa();
+    // Lo que hace `crearEntradaTela` bajo el candado: escribe la entrada y su renglón amarrado.
+    const { tx: captura } = await conCandadoDeLaOc(idOc, async (t) => {
+      await t.entradaTela.create({
+        data: {
+          folio: BigInt(99),
+          idEmpresa: empresa.id,
+          tipoDocumento: 'factura',
+          numeroDocumento: 'F-99',
+          idProveedor: proveedor.id,
+          fecha: new Date('2026-08-06'),
+          idAlmacen: almacen.id,
+          lineas: {
+            create: [
+              { idTelaColor: colorMarino.id, cantidad: 10, idOrdenCompraLinea: lineaOcFelpa },
+            ],
+          },
+        },
+      });
+    });
+    const edicion = actualizarOC(
+      sesion([...PERM_COMPRAS, 'compras.editar-autorizada']),
+      idOc,
+      { lineas: [{ idTela: telaLisa.id, cantidad: 10, precio: 8, unidad: 'm' }] },
+      bd(),
+    );
+    const [rCaptura, rEdicion] = await Promise.allSettled([captura, edicion]);
+    expect(rCaptura.status).toBe('fulfilled');
+    const motivo = rEdicion.status === 'rejected' ? (rEdicion.reason as unknown) : 'no se rechazó';
+    expect(motivo).toBeInstanceOf(ErrorConflicto);
+    expect(String((motivo as Error).message)).toMatch(/ya aparece en una entrada de tela/);
   });
 });

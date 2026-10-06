@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { cancelarOC, crearOC, listarOC } from './ordenes-compra.js';
+import { cancelarOC, crearOC, listarOC, motivoRenglonesOcFijos } from './ordenes-compra.js';
 
 /**
  * Unit del dominio de Órdenes de COMPRA (F4-E2) — SIN Postgres. Cubre lo que NO necesita la base: el
@@ -117,5 +117,70 @@ describe('⭐⭐ V1-E8z (H1) — el candado va FUERA del bucle exento por `agreg
     );
     expect(puertaFirma).toBeGreaterThan(-1);
     expect(candado).toBeLessThan(puertaFirma);
+  });
+});
+
+/**
+ * ⭐ Fila 0.225 (§Post-F9.245(a)) — la regla PURA de «la OC con material recibido ya no cambia
+ * renglones ni proveedor». El dominio la aplica bajo el candado de la OC (`recepciones.int.test.ts`
+ * la mide contra la base, con recepciones reales); aquí se fija QUÉ se rechaza y qué no.
+ */
+describe('⭐ 0.225 — motivoRenglonesOcFijos', () => {
+  const oc = (estatus: string) => ({ estatus, numCompra: 7n, idProveedor: 3 });
+  const renglon = [{ idAvio: 1, cantidad: 10, precio: 1 }];
+
+  it('recibida_total: CUALQUIER set de renglones se rechaza, y el texto manda a una OC nueva', () => {
+    const motivo = motivoRenglonesOcFijos(oc('recibida_total'), 'recibido', { lineas: renglon });
+    expect(motivo).toContain('La orden de compra 7 ya se recibió completa');
+    expect(motivo).toContain('haz una orden de compra nueva');
+    expect(motivo).toContain('misma orden de producción');
+    // Un set VACÍO también es tocar los renglones (los borraría todos).
+    expect(motivoRenglonesOcFijos(oc('recibida_total'), 'recibido', { lineas: [] })).not.toBeNull();
+    // Y el estatus basta aunque el amarre viniera vacío (defensa: la total no se reabre).
+    expect(motivoRenglonesOcFijos(oc('recibida_total'), 'ninguno', { lineas: renglon })).toContain(
+      'ya se recibió completa',
+    );
+  });
+
+  it('recibida_parcial: la variante «material recibido»', () => {
+    for (const amarre of ['recibido', 'ninguno'] as const) {
+      const motivo = motivoRenglonesOcFijos(oc('recibida_parcial'), amarre, { lineas: renglon });
+      expect(motivo).toContain('La orden de compra 7 ya tiene material recibido');
+      expect(motivo).toContain('haz una orden de compra nueva');
+      expect(motivoRenglonesOcFijos(oc('recibida_parcial'), amarre, { idProveedor: 4 })).toBe(
+        motivo,
+      );
+    }
+  });
+
+  it('autorizada con recepciones (todas reversadas): NO dice «material recibido», dice que YA TUVO una', () => {
+    const motivo = motivoRenglonesOcFijos(oc('autorizada'), 'recibido', { lineas: renglon });
+    expect(motivo).toContain('La orden de compra 7 ya tuvo una recepción (aunque se reversó)');
+    expect(motivo).toContain('quedan fijos');
+    expect(motivo).toContain('haz una orden de compra nueva');
+    expect(motivo).not.toContain('ya tiene material recibido');
+    expect(motivoRenglonesOcFijos(oc('autorizada'), 'recibido', { idProveedor: 4 })).toBe(motivo);
+  });
+
+  it('una OC nombrada por una ENTRADA DE TELA (sin recepción) tampoco cambia renglones', () => {
+    expect(
+      motivoRenglonesOcFijos(oc('autorizada'), 'entrada-de-tela', { lineas: renglon }),
+    ).toContain('ya aparece en una entrada de tela');
+  });
+
+  it('cambiar el proveedor se rechaza; mandar EL MISMO no es cambio; las anotaciones pasan', () => {
+    expect(motivoRenglonesOcFijos(oc('recibida_total'), 'recibido', { idProveedor: 4 })).toContain(
+      'ya no se le puede cambiar el proveedor',
+    );
+    expect(motivoRenglonesOcFijos(oc('recibida_total'), 'recibido', { idProveedor: 3 })).toBeNull();
+    expect(motivoRenglonesOcFijos(oc('recibida_total'), 'recibido', {})).toBeNull();
+  });
+
+  it('SIN nada amarrado, ningún estatus no recibido se toca aquí (la firma la gobierna otra llave)', () => {
+    for (const estatus of ['borrador', 'pendiente_autorizacion', 'autorizada', 'cancelada']) {
+      expect(
+        motivoRenglonesOcFijos(oc(estatus), 'ninguno', { lineas: renglon, idProveedor: 4 }),
+      ).toBeNull();
+    }
   });
 });

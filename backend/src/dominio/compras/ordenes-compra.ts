@@ -80,12 +80,14 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
+  type ClienteLectura,
   enTransaccion,
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
+import { bloquearOrdenCompra } from './recepciones.js';
 import {
   exigirComprasNoCongeladas,
   exigirMaterialesLiberados,
@@ -287,6 +289,122 @@ async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void>
  */
 function puedeEditarOcAutorizada(sesion: SesionUsuario): boolean {
   return tienePermiso(sesion, 'compras.editar-autorizada');
+}
+
+/**
+ * ¿Qué tiene amarrado a los renglones de una OC, de lo que la base NO deja borrar? Hay DOS FK
+ * `ON DELETE RESTRICT` hacia `orden_compra_linea` y ninguna mira estatus: `recepcion_compra_linea`
+ * (aunque la recepción esté REVERSADA, D3: el renglón no se borra) y `entrada_tela_linea` (aunque
+ * la entrada esté en borrador o cancelada).
+ *  • `'recibido'`: hay al menos una línea de recepción (activa o reversada). Una entrada de tela
+ *    CONFIRMADA también cae aquí, porque al confirmarse escribe su `RecepcionCompra`.
+ *  • `'entrada-de-tela'`: no hay recepción, pero sí una entrada de tela que nombra sus renglones
+ *    (en captura, o cancelada desde captura).
+ *  • `'ninguno'`: los renglones se pueden reemplazar.
+ */
+export type AmarreRenglonesOc = 'ninguno' | 'recibido' | 'entrada-de-tela';
+
+/**
+ * ⭐ Fila 0.225 (§Post-F9.245(a), DANIEL, 30-sep-2026): **LA OC CON MATERIAL RECIBIDO YA NO CAMBIA
+ * RENGLONES NI PROVEEDOR.** *«Las OC que ya están recibidas, ya se quedan con esa cantidad recibida
+ * y se cierra. Si se quiere recibir más, se tendría que hacer una nueva OC […] justo para saber que
+ * fue un sobre precio.»* Una OC aparte deja el sobrecosto A LA VISTA; si se editara la original, el
+ * material extra se escondería dentro del costo planeado.
+ *
+ * Devuelve el motivo del rechazo (texto de negocio) o `null` si la edición pasa. Cuando la OC está
+ * `recibida_*` o tiene sus renglones amarrados ({@link AmarreRenglonesOc} ≠ `'ninguno'`) se rechaza:
+ *  • **CUALQUIER `lineas`** (no sólo «al alza»): el editor manda el SET completo y el dominio lo
+ *    reemplaza borrando y recreando (`actualizarOC`), así que no hay forma honesta de distinguir un
+ *    renglón «igual» de uno cambiado sin adivinar — y el borrado choca de todos modos con las FK
+ *    RESTRICT de arriba. Antes de esta guarda, eso salía como un **500 «error interno»** (P2003).
+ *  • **cambiar el proveedor**: lo recibido ya le generó su cargo a ESE proveedor, y la entrada de
+ *    tela va sellada con él. (Mandar el mismo id no es cambio.)
+ * Las anotaciones del encabezado (observaciones, «corresponde a», fecha y dirección de entrega)
+ * siguen editables: no mueven cantidades ni dinero. Una OC firmada SIN nada amarrado se sigue
+ * editando entera con `compras.editar-autorizada` (decisión (a)).
+ *
+ * Pura a propósito: la prueban los unit y el dominio la aplica BAJO el candado de la OC.
+ */
+export function motivoRenglonesOcFijos(
+  actual: { estatus: string; numCompra: bigint | number; idProveedor: number },
+  amarre: AmarreRenglonesOc,
+  datos: { lineas?: unknown[] | undefined; idProveedor?: number | undefined },
+): string | null {
+  const cambiaRenglones = datos.lineas !== undefined;
+  const cambiaProveedor =
+    datos.idProveedor !== undefined && datos.idProveedor !== actual.idProveedor;
+  if (!cambiaRenglones && !cambiaProveedor) return null;
+
+  const folio = String(actual.numCompra);
+  const ocNueva =
+    'Si hace falta más material, haz una orden de compra nueva (la puedes ligar a la misma ' +
+    'orden de producción)';
+  if (actual.estatus === 'recibida_total') {
+    return cambiaRenglones
+      ? `La orden de compra ${folio} ya se recibió completa: se queda cerrada con lo que se ` +
+          `recibió y sus renglones ya no se cambian. ${ocNueva}: así el sobrecosto queda a la vista.`
+      : `La orden de compra ${folio} ya se recibió completa: ya no se le puede cambiar el ` +
+          `proveedor. ${ocNueva}: así el sobrecosto queda a la vista.`;
+  }
+  if (actual.estatus === 'recibida_parcial') {
+    return (
+      `La orden de compra ${folio} ya tiene material recibido: sus renglones y su proveedor ya no ` +
+      `se cambian. ${ocNueva}.`
+    );
+  }
+  if (amarre === 'recibido') {
+    // Recepciones, pero el estatus ya no es `recibida_*`: se reversaron todas. Decir «ya tiene
+    // material recibido» sería FALSO (no hay nada dentro); lo verdadero es que YA TUVO una, y su
+    // renglón la base no lo deja borrar (D3: la recepción reversada se queda).
+    return (
+      `La orden de compra ${folio} ya tuvo una recepción (aunque se reversó): sus renglones y su ` +
+      `proveedor quedan fijos. ${ocNueva}.`
+    );
+  }
+  if (amarre === 'entrada-de-tela') {
+    return (
+      `La orden de compra ${folio} ya aparece en una entrada de tela: sus renglones y su ` +
+      `proveedor ya no se cambian. ${ocNueva}.`
+    );
+  }
+  return null;
+}
+
+/**
+ * Lee el {@link AmarreRenglonesOc} de una OC. Se llama DENTRO de la transacción y BAJO el candado de
+ * la OC (`bloquearOrdenCompra`), el mismo que toman la recepción, la confirmación de la entrada de
+ * tela y el reverso.
+ */
+async function amarreRenglonesOc(tx: Tx, idOrdenCompra: number): Promise<AmarreRenglonesOc> {
+  return (await amarresRenglonesOc(tx, [idOrdenCompra])).get(idOrdenCompra) ?? 'ninguno';
+}
+
+/**
+ * El {@link AmarreRenglonesOc} de VARIAS OC en DOS consultas fijas (un `EXISTS` por tabla amarrada),
+ * sin importar cuántas OC traiga la página: es lo que usa `listarOC` para que la salida diga
+ * `renglonesFijos` sin un N+1. Las OC sin nada amarrado no aparecen en el mapa (= `'ninguno'`).
+ */
+async function amarresRenglonesOc(
+  cliente: ClienteLectura,
+  idsOrdenCompra: readonly number[],
+): Promise<Map<number, AmarreRenglonesOc>> {
+  const amarres = new Map<number, AmarreRenglonesOc>();
+  if (idsOrdenCompra.length === 0) return amarres;
+  const ids = [...new Set(idsOrdenCompra)];
+  const [conRecepcion, conEntrada] = await Promise.all([
+    cliente.ordenCompra.findMany({
+      where: { id: { in: ids }, lineas: { some: { recepcionLineas: { some: {} } } } },
+      select: { id: true },
+    }),
+    cliente.ordenCompra.findMany({
+      where: { id: { in: ids }, lineas: { some: { entradaTelaLineas: { some: {} } } } },
+      select: { id: true },
+    }),
+  ]);
+  for (const { id } of conEntrada) amarres.set(id, 'entrada-de-tela');
+  // La recepción manda sobre la entrada: una entrada CONFIRMADA ya escribió su recepción.
+  for (const { id } of conRecepcion) amarres.set(id, 'recibido');
+  return amarres;
 }
 
 /**
@@ -793,7 +911,8 @@ async function sincronizarOrdenesLigadas(
 /** Proyecta una OC (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
 function aCompraSalida(
   oc: OCConDetalle,
-  pctDesvio: number = PCT_DESVIO_COMPRA_DEFECTO,
+  pctDesvio: number,
+  amarre: AmarreRenglonesOc,
 ): CompraSalida {
   let total = 0;
   const lineas: CompraLineaSalida[] = oc.lineas.map((l) => {
@@ -889,6 +1008,11 @@ function aCompraSalida(
     canceladaEn: oc.canceladaEn === null ? null : oc.canceladaEn.toISOString(),
     canceladaPorId: oc.canceladaPorId,
     motivoCancelacion: oc.motivoCancelacion,
+    // ⭐ Fila 0.225 — por qué sus renglones y su proveedor ya no se cambian (o null). Es el MISMO
+    // motivo con el que `actualizarOC` rechazaría tocarlos: la pantalla lo lee de aquí en vez de
+    // adivinarlo por el estatus (una OC `autorizada` con su tela capturada en borrador también queda
+    // fija, y su estatus no lo dice).
+    renglonesFijos: motivoRenglonesOcFijos(oc, amarre, { lineas: [] }),
     lineas,
     ordenesLigadas: oc.ordenesLigadas.map((o) => ({
       idOrden: o.idOrden,
@@ -1073,6 +1197,11 @@ export async function crearOC(
  * `borrador`/`pendiente_autorizacion` cualquiera con `compras.administrar` edita. La OC cancelada
  * no se edita. Si `lineas` viene, REEMPLAZA todo el set (borra y recrea) y re-deriva las ligas
  * N:N. Bitácora MODIFICAR. Permiso `compras.administrar`.
+ *
+ * ⭐ Fila 0.225: una OC con material recibido (o amarrada a una entrada de tela) ya no cambia
+ * renglones ni proveedor (§Post-F9.245(a)); para más material, OC nueva
+ * ({@link motivoRenglonesOcFijos}). Estatus y amarre se leen bajo el candado de la OC
+ * (`bloquearOrdenCompra`), el mismo de la recepción.
  */
 export async function actualizarOC(
   sesion: SesionUsuario,
@@ -1084,8 +1213,15 @@ export async function actualizarOC(
   const datos = validarEntrada(esquemaCompraEditarCuerpo, entrada);
 
   await enTransaccion(async (tx) => {
+    // ⭐ Fila 0.225 — el candado de la OC (B2, el MISMO que toman la recepción, la entrada de tela y
+    // el reverso), ANTES de leer su estatus: así la guarda de «recibida completa» de abajo lee el
+    // estatus que va a valer al escribir. Sin él, una recepción que completara la OC en paralelo
+    // dejaba pasar la edición con el estatus viejo. Va antes que los candados de orden de la 0.226a
+    // por el mismo orden en que los toma `recibirCompra` (primero la OC, luego la orden): así las dos
+    // operaciones no pueden esperarse en cruz.
+    await bloquearOrdenCompra(tx, id);
     // ⭐ 0.226a: las líneas que se ESCRIBEN no pueden comprarle a una orden CERRADA. Guarda ÚNICA
-    // en lote, PRIMERA instrucción (antes de tocar el encabezado). Quitarle TODAS sus líneas a una
+    // en lote, antes de leer ni tocar el encabezado. Quitarle TODAS sus líneas a una
     // orden cerrada sí pasa (su id ya no está entre las entrantes): es la misma vía de escape que
     // ya tiene el candado de compra, y no compra nada (duda C2, default LIBRE).
     await exigirOrdenesAbiertas(
@@ -1103,6 +1239,16 @@ export async function actualizarOC(
       throw new ErrorConflicto(
         'La orden de compra ya está autorizada; no tienes permiso para modificarla.',
       );
+    }
+    // ⭐ Fila 0.225 (§Post-F9.245(a)): la OC con material recibido (o amarrada a una entrada de
+    // tela) ya no cambia renglones ni proveedor. `actual` y el amarre se leen BAJO el candado de
+    // arriba, y se rechaza antes de escribir nada. Sólo se consulta el amarre si la edición toca
+    // algo que la guarda mira.
+    if (datos.lineas !== undefined || datos.idProveedor !== undefined) {
+      const motivoFijos = motivoRenglonesOcFijos(actual, await amarreRenglonesOc(tx, id), datos);
+      if (motivoFijos !== null) {
+        throw new ErrorConflicto(motivoFijos);
+      }
     }
 
     const cambios: Prisma.OrdenCompraUncheckedUpdateInput = { ...datosModificacion(sesion) };
@@ -1311,6 +1457,11 @@ export async function desautorizarOC(
   const datos = validarEntrada(esquemaCompraDesautorizarCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ Fila 0.225 — el candado de la OC (B2) ANTES de leer su estatus y de contar recepciones. Sin
+    // él, una recepción en vuelo no se veía (aún sin confirmar), la guarda de «tiene material
+    // recibido» pasaba con el estatus viejo y el UPDATE de abajo —que espera a la recepción— pisaba
+    // su `recibida_*` con este estatus: una OC con material dentro quedaba des-autorizada.
+    await bloquearOrdenCompra(tx, id);
     const actual = await exigirOC(tx, id, sesion.idEmpresaActiva);
     if (actual.estatus === 'recibida_parcial' || actual.estatus === 'recibida_total') {
       throw new ErrorConflicto(
@@ -1395,6 +1546,11 @@ export async function cancelarOC(
   const datos = validarEntrada(esquemaCompraCancelarCuerpo, cuerpo);
 
   await enTransaccion(async (tx) => {
+    // ⭐ Fila 0.225 — el candado de la OC (B2) ANTES de leer su estatus y de contar recepciones. Sin
+    // él, una recepción en vuelo no se veía (aún sin confirmar), la guarda de «tiene material
+    // recibido» pasaba con el estatus viejo y el UPDATE de abajo —que espera a la recepción— pisaba
+    // su `recibida_*` con este estatus: una OC con material dentro quedaba cancelada.
+    await bloquearOrdenCompra(tx, id);
     const actual = await exigirOC(tx, id, sesion.idEmpresaActiva);
     if (actual.estatus === 'cancelada') {
       throw new ErrorConflicto(`La orden de compra ${Number(actual.numCompra)} ya está cancelada.`);
@@ -1490,7 +1646,12 @@ export async function proyectarOC(
   if (oc === null) {
     throw new ErrorNoEncontrado('OrdenCompra', id);
   }
-  return aCompraSalida(oc, await pctDesvioDeEmpresa(clienteLectura(bd), sesion.idEmpresaActiva));
+  const cliente = clienteLectura(bd);
+  return aCompraSalida(
+    oc,
+    await pctDesvioDeEmpresa(cliente, sesion.idEmpresaActiva),
+    (await amarresRenglonesOc(cliente, [oc.id])).get(oc.id) ?? 'ninguno',
+  );
 }
 
 /**
@@ -1537,7 +1698,13 @@ export async function listarOC(
     }),
   ]);
 
-  const salida = datos.map((o) => aCompraSalida(o as OCConDetalle, pctDesvio));
+  const amarres = await amarresRenglonesOc(
+    cliente,
+    datos.map((o) => o.id),
+  );
+  const salida = datos.map((o) =>
+    aCompraSalida(o as OCConDetalle, pctDesvio, amarres.get(o.id) ?? 'ninguno'),
+  );
   return armarPagina(salida, total, filtros);
 }
 
