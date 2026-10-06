@@ -147,6 +147,7 @@ export interface paths {
                 | 'precostos.consultar'
                 | 'edr.ver'
                 | 'edr.capturar'
+                | 'ventas.ver'
                 | 'usuarios.administrar'
                 | 'roles.administrar'
                 | 'admin.ver-bitacora'

@@ -3,10 +3,11 @@
  * y que el del dueño siga DERIVÁNDOSE del catálogo.
  *
  * Esto es la decisión de Daniel transcrita a código, y lo que se mide aquí es la transcripción, no
- * si la decisión es buena: **318 asignaciones** —las 135 del catálogo para `Director General` y 183
+ * si la decisión es buena: **319 asignaciones** —las 136 del catálogo para `Director General` y 183
  * repartidas entre los otros 15—, con sus nombres y su orden. *(Eran 306 = 134 + 172; las 11 de más
  * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final. Y 317 = 134 + 183
- * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño.)*
+ * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño; y 318 hasta la
+ * fila 0.251, que sumó `ventas.ver` del mismo modo.)*
  *
  * ## ⚠️ POR QUÉ ESTE ARCHIVO EXISTE APARTE (hay otros tres que hablan de roles)
  *
@@ -382,18 +383,19 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     }
   });
 
-  it('⭐ y en total son 318 asignaciones: 135 del dueño + 183 de los otros 15', () => {
+  it('⭐ y en total son 319 asignaciones: 136 del dueño + 183 de los otros 15', () => {
     // El número que Daniel revisó. Partido en dos porque las dos mitades se rompen distinto: la
     // primera si alguien deja de derivar el catálogo, la segunda si alguien recorta un perfil.
     // ⭐ 0.228: el dueño pasó de 134 a 135 —`ordenes.reabrir` le llega SOLO, por derivación— y los
-    // otros 15 se quedan en 183: ningún puesto la recibe.
+    // otros 15 se quedan en 183: ningún puesto la recibe. ⭐ 0.251: y de 135 a 136 con `ventas.ver`,
+    // por el mismo camino; tampoco la recibe ningún otro puesto (darla a Administración es de Daniel).
     const delDueno = PERFIL_DIRECTOR_GENERAL.permisos.length;
     const deLosQuince = PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0);
-    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(135);
+    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(136);
     expect(deLosQuince, 'los otros 15 suman 183 asignaciones (172 + las 11 de §Post-F9.260)').toBe(
       183,
     );
-    expect(delDueno + deLosQuince).toBe(318);
+    expect(delDueno + deLosQuince).toBe(319);
   });
 
   it('ningún perfil repite una llave, y ningún slug ni nombre está duplicado', () => {
@@ -831,7 +833,7 @@ describe('⭐⭐ «Consulta general»: el piso de lectura', () => {
       PERFILES_DE_PUESTO.some((p) => (p.permisos as string[]).includes(clave)),
     );
     expect(enAlgunPuesto).toHaveLength(12);
-    // Y el total de los puestos sigue intacto: el piso NO entra en sus 318 asignaciones.
+    // Y el total de los puestos sigue intacto: el piso NO entra en sus 319 asignaciones.
     expect(PERFILES_DE_PUESTO_TODOS.map((p) => p.nombre)).not.toContain('Consulta general');
     expect(
       PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0),
@@ -871,7 +873,8 @@ describe('🔴 el PISO y el DINERO son conjuntos disjuntos (regla del dueño)', 
       `PERMISOS_DE_DINERO nombra claves que ya no existen: ${fantasmas.join(', ')}`,
     ).toEqual([]);
     expect(new Set(PERMISOS_DE_DINERO).size).toBe(PERMISOS_DE_DINERO.length);
-    expect(PERMISOS_DE_DINERO).toHaveLength(16);
+    // ⭐ 0.251: 17 con `ventas.ver` (la facturación, partida de `edr.ver`: enseña importes de venta).
+    expect(PERMISOS_DE_DINERO).toHaveLength(17);
   });
 
   it('⭐ y el dinero sigue teniendo dueño: lo reparten los puestos que deben, no el piso', () => {
@@ -1318,8 +1321,9 @@ const RECHAZADAS_EN_POST_F9_260: readonly { puesto: string; clave: string }[] = 
   { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-productividad' },
   { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-confiabilidad' },
   { puesto: 'Desarrollo de Producto', clave: 'indicadores.ip-muestrarios' },
-  // Su regla del dinero. ⚠️ El efecto colateral de `edr.ver` (Administración se queda sin la
-  // pantalla de facturación) es la fila 0.251, no un motivo para dársela aquí.
+  // Su regla del dinero. ⚠️ El efecto colateral de `edr.ver` (Administración se quedaba sin la
+  // pantalla de facturación) lo resolvió la fila 0.251 partiendo la llave en `ventas.ver` — que
+  // tampoco se le da aquí: la fila sólo la hace POSIBLE, darla es de Daniel (ver la prueba de abajo).
   { puesto: 'Administración y Finanzas', clave: 'costos.ver' },
   { puesto: 'Administración y Finanzas', clave: 'edr.ver' },
   // Producción captura la RC sólo dentro de la ventana (§Post-F9.260(d)).
@@ -1373,6 +1377,26 @@ describe('⭐⭐ las 17 decisiones de Daniel sobre el reparto (§Post-F9.260)', 
     // batería 1 (`DECISION_DE_DANIEL`), llave por llave.
     expect(perfilDe('Gerente de Ventas')).toContain('clientes.modificar');
     expect(perfilDe('Compras')).toContain('proveedores.modificar');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ⭐ FILA 0.251 — la llave de Ventas se HACE POSIBLE, pero no se reparte sola
+// ─────────────────────────────────────────────────────────────────────────────
+describe('🔀 0.251: `ventas.ver` existe para poder darse sin el EDR, pero el seed no la da (§Post-F9.260(b))', () => {
+  it('⭐ ningún puesto editable ni el piso la lleva —Administración y Finanzas tampoco—; el dueño sí', () => {
+    // La fila nació porque Daniel negó `edr.ver` a Administración y eso le quitaba la facturación.
+    // Partir la llave lo hace POSIBLE; dársela a Administración (o a Lupita) es decisión de Daniel y
+    // se hace desde Administración › Roles, no aquí. Si un día él lo decide, esta prueba se ajusta
+    // con su cita, igual que las 11 de §Post-F9.260.
+    const conVentas = PERFILES_EDITABLES.filter((perfil) =>
+      (perfil.permisos as string[]).includes('ventas.ver'),
+    ).map((perfil) => perfil.nombre);
+    expect(
+      conVentas,
+      'un perfil editable reparte `ventas.ver` sin que Daniel lo decidiera',
+    ).toEqual([]);
+    expect(PERFIL_DIRECTOR_GENERAL.permisos as string[]).toContain('ventas.ver');
   });
 });
 

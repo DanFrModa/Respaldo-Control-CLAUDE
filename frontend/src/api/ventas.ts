@@ -7,7 +7,7 @@ import type { Ventas, VentasQuery } from './tipos';
 /**
  * Capa de datos de VENTAS (vista comercial de la facturación por modelo sobre el EDR, proto vVentas).
  * Cliente TIPADO del OpenAPI; CERO lógica de negocio (A1): el backend agrega el resumen (importe,
- * unidades, ticket, # líneas) y pagina las líneas. Se protege con `edr.ver` (es data del EDR).
+ * unidades, ticket, # líneas) y pagina las líneas. Se abre con `ventas.ver` o con `edr.ver` (fila 0.251).
  */
 
 /** Clave raíz de la caché de ventas. */

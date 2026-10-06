@@ -58,7 +58,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { definirRoles, PERFILES_ACCESO_TOTAL, SOLO_ADMINISTRADOR } from '../../prisma/seed.js';
+import {
+  definirRoles,
+  PERFILES_ACCESO_TOTAL,
+  PERFILES_DE_PUESTO,
+  SOLO_ADMINISTRADOR,
+} from '../../prisma/seed.js';
 import { CLAVES_PERMISO, type ClavePermiso } from '../contrato/index.js';
 
 /** Los perfiles de SISTEMA que declaran permisos uno por uno (todos menos los de acceso total). */
@@ -646,6 +651,18 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'PERFIL que lleve la llave (Daniel crea o edita uno en Administración › Roles y se lo ' +
       'asigna a esa persona): el permiso suelto por persona no existe todavía (fila 0.234).',
   },
+  // ── ⭐⭐ La facturación por modelo, partida de `edr.ver` (fila 0.251), §Post-F9.260(b) ───────
+  {
+    clave: 'ventas.ver',
+    razon:
+      'EXACTAMENTE los perfiles que llevan `edr.ver` (los tres de acceso total y Directivo): ' +
+      'nadie la gana ni la pierde. Hasta la 0.251 la pantalla Ventas se abría SÓLO con ' +
+      '`edr.ver`, así que negarle a Administración el estado de resultados (costo actual, ' +
+      'utilidad bruta) la dejaba también sin la facturación. Ventas enseña sólo lo facturado, sin ' +
+      'costo ni margen; con su llave propia se puede dar sin el EDR. `edr.ver` la sigue abriendo. ' +
+      'NO se le da a «Administración y Finanzas»: darla es decisión de Daniel, la fila sólo la ' +
+      'hace posible. Es DINERO (va en PERMISOS_DE_DINERO): nunca al piso.',
+  },
 ];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {
@@ -753,6 +770,31 @@ describe('🔌 fila 0.120: los cinco interruptores que colgaban de `roles.admini
       expect(catalogo.has(clave), `${clave} no está en el catálogo de src/contrato`).toBe(true);
     }
     expect(new Set(LLAVES_DE_LA_0120).size).toBe(4);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4-bis. LA FILA 0.251 — Ventas deja de colgar sólo de `edr.ver`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ §Post-F9.260(b): `edr.ver` hacía dos cosas que no debían ir juntas —abrir el estado de
+ * resultados y abrir la facturación—. La 0.251 partió la segunda en `ventas.ver`. El compromiso, como
+ * en la 0.120, es **no mover a nadie de sitio**: la llave nueva la llevan exactamente los perfiles que
+ * llevaban `edr.ver`, ni uno más (Administración y Finanzas incluida: no la gana) ni uno menos.
+ */
+describe('🔀 fila 0.251: `ventas.ver` la llevan exactamente quienes llevan `edr.ver`', () => {
+  it('⭐ mismo reparto que `edr.ver`, perfil por perfil', () => {
+    const referencia = perfilesQueOtorgan('edr.ver');
+    expect(referencia, 'la referencia no puede estar vacía').not.toEqual([]);
+    expect(perfilesQueOtorgan('ventas.ver')).toEqual(referencia);
+  });
+
+  it('y ningún perfil de puesto la recibe salvo el del dueño (Administración tampoco: es de Daniel)', () => {
+    const conLaLlave = PERFILES_DE_PUESTO.filter((p) =>
+      (p.permisos as string[]).includes('ventas.ver'),
+    ).map((p) => p.nombre);
+    expect(conLaLlave).toEqual([]);
   });
 });
 

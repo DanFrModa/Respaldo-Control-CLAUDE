@@ -45,6 +45,10 @@ export const MODULOS_PERMISO = {
   // propio (ex nivel ≤30, menú 6.2), separado de `costos` porque tiene su propio flujo (generar mes
   // + conciliar ventas). Se reparte a los MISMOS roles que `costos` (directivo/dirección/admin).
   edr: 'Estado de resultados',
+  // Ventas — la facturación por modelo (fila 0.251, §Post-F9.260(b)). Módulo PROPIO, partido de `edr`:
+  // la pantalla Ventas sólo enseña lo FACTURADO (cantidad × precio de venta), nunca costo ni utilidad,
+  // y tiene que poder darse sin abrir el estado de resultados. `edr.ver` la sigue abriendo también.
+  ventas: 'Ventas (facturación por modelo)',
   // Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1) — el motor único de CxC/CxP que
   // generaliza EsMa (D12/D15/R10). `ver` (estados de cuenta/saldos, roles directivos que ya ven
   // EsMa), `administrar` (capturar/cancelar movimientos) y `fiscal` (la vista/reporte fiscal para el
@@ -877,6 +881,21 @@ export const CATALOGO_PERMISOS = [
     modulo: 'edr',
     descripcion:
       'Capturar el encabezado, generar y conciliar las líneas del estado de resultados (nivel ≤30)',
+  },
+
+  // ── Ventas — la facturación por modelo, PARTIDA de `edr.ver` (fila 0.251, §Post-F9.260(b)) ──
+  // Daniel le negó `edr.ver` a Administración y Finanzas por su regla del dinero: esa llave abre el
+  // estado de resultados ENTERO (costo actual, utilidad bruta). Pero era también la ÚNICA puerta de la
+  // pantalla Ventas, que sólo enseña lo facturado por modelo y cliente (cantidad, precio de venta,
+  // importe) — nada de costo ni de margen (medido: `dominio/edr/ventas.ts`). Esta llave abre SÓLO
+  // eso, para poder darla sin el estado de resultados. `edr.ver` la sigue abriendo (quien la tenía no
+  // pierde nada) y la migración `20261006120000_la_llave_de_ventas` se la dio a todo rol que ya
+  // llevaba `edr.ver`. Sigue siendo DINERO (`PERMISOS_DE_DINERO`): enseña importes de venta.
+  {
+    clave: 'ventas.ver',
+    modulo: 'ventas',
+    descripcion:
+      'Consultar las ventas facturadas por modelo y cliente (cantidad, precio e importe; sin costo ni utilidad)',
   },
 
   // ── Administración (nuevos en v2, sin equivalente granular en el viejo) ──────

@@ -18566,3 +18566,18 @@ Dos criterios que el lead dejó con default y que Daniel puede corregir:
 Y de medir nacen dos filas, las dos 🟢 por recomendación del lead: la **0.253** (lo que falta por surtir no descuenta las
 notas en borrador — ❓ *¿qué tan seguido hay dos notas abiertas a la vez para la misma orden?*) y la **0.254** («Pasar a
 nota de salida» desde el panel de habilitación no revisa existencia).
+
+#### (Post-F9.271) — LA PANTALLA DE VENTAS TIENE SU PROPIA LLAVE, SEPARADA DEL ESTADO DE RESULTADOS (fila 0.251, v0.203) — una pregunta para Daniel
+
+Aplica la consecuencia de §Post-F9.260(b): Daniel negó `edr.ver` a Administración y Finanzas porque abre el estado de
+resultados completo (costo y utilidad), pero esa llave era también la única que abría la pantalla **Ventas**. 📐 Medido:
+Ventas sólo enseña cantidad, precio e importe facturado por orden, cliente y modelo —ni costo ni margen—, así que nace
+la llave **`ventas.ver`** («Ventas (facturación por modelo)»), que abre Ventas y su Excel y nada del estado de
+resultados. Todo rol que ya tenía `edr.ver` recibe también la nueva, para que nadie pierda nada. Es una llave de
+**dinero** (enseña lo que se le cobró a cada cliente): nunca va al piso de lectura.
+
+❓ **La pregunta para Daniel:** ¿se le da `ventas.ver` a **Administración y Finanzas**? Default propuesto: **sí**, si Lupita
+va a revisar lo facturado — él dijo que *«eventualmente generará las facturas»*. Esta versión **no** la asigna: es su
+decisión, y la puede dar él mismo desde Administración › Roles. Nota: Ventas enseña lo que ya se registró en el estado
+de resultados; **timbrar facturas (R14) todavía no existe**, e importar los CFDI de ventas ya cuelga de
+`cxc.administrar`, que ese puesto ya tiene.

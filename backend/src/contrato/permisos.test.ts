@@ -201,6 +201,9 @@ describe('catálogo de permisos', () => {
       'tipos-proceso.marcar-entrada-pt',
       'tipos-proceso.ver',
       'usuarios.administrar',
+      // ⭐ Fila 0.251 (§Post-F9.260(b)): la facturación por modelo, partida de `edr.ver` para
+      // poder darse sin el estado de resultados.
+      'ventas.ver',
     ]);
   });
 
