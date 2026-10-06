@@ -71,6 +71,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.198 · 6-oct-2026 · **en prueba** — **La entrega a cliente te dice cuánto hay por talla antes de capturar**
+
+> **La v0.198 cierra una fila del programa: la 0.219.** Es tu punto 10b del repaso de Inventarios: *«debería de decir
+> la existencia que hay por talla para saber lo que se va a capturar no exceda la cantidad por talla»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Bajo cada color y talla de la entrega ves lo que hay de esa orden en el almacén elegido:** «Hay N», «Excede · hay N» o
+«Sin existencia». Funciona igual en la pantalla de Entrega a cliente y en la etapa «Entrega a cliente» del avance de
+producción. Si te pasas, lo ves en la celda exacta antes de guardar.
+
+**Y si el sistema rechaza una entrega, ahora te dice en qué color y talla:** *«No hay existencia suficiente para
+entregar Rojo · talla M: se intenta sacar 1 pza(s) y hay 0 de esta orden en el almacén…»*. Antes no decía cuál.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**La existencia que se muestra es la de ESA orden.** Lo que vive en el almacén sin orden (lo migrado y el inventario de
+arranque) no cuenta, porque tampoco se puede entregar contra la orden. Si ves piezas en el almacén y la entrega dice
+«Sin existencia», es por eso.
+
+**Si el sistema no sabe cuánto hay** (todavía no eliges almacén, se está cargando, falló la consulta o tu usuario no
+tiene permiso de ver el avance), no pinta nada y te deja capturar; al guardar, el sistema comprueba y rechaza lo que no
+alcance. Antes, un usuario sin ese permiso **nunca** podía guardar la entrega, y al cambiar de almacén se usaban por un
+momento los números del almacén anterior: las dos cosas quedaron corregidas.
+
+**«Guardar» sigue apagado si algo se pasa**, como ya era antes; ahora se ve en qué celda.
+
+### ⏳ Sigue pendiente o roto
+
+**Dos criterios con su respuesta propuesta** (§Post-F9.268): que «Sin existencia» se pinte en rojo aunque la celda esté
+vacía (alternativa: rojo sólo si tecleaste algo), y que sólo cuente la existencia de esa orden.
+
 ## 0.197 · 6-oct-2026 · **en prueba** — **Tampoco en la salida sin orden, el ajuste y el traspaso de avíos te deja elegir lo que no hay**
 
 > **La v0.197 cierra una fila del programa: la 0.233.** Es tu punto 07c del repaso de Inventarios —*«que no deje meter

@@ -105,6 +105,16 @@ export interface PropsMatrizColorTalla {
    * Los flujos que no lo pasan conservan el select de siempre.
    */
   slotAgregarColor?: React.ReactNode;
+  /**
+   * ⭐ Fila 0.219 — PISTA bajo cada celda (p. ej. la existencia del almacén en la entrega a cliente:
+   * «Hay N» · «Excede · hay N» · «Sin existencia»). Recibe la celda y lo capturado en ella; lo que
+   * devuelva se pinta debajo del input (o del número, en solo lectura). `null` = nada. Si NO se pasa,
+   * la matriz es idéntica a la de antes. Presentación: la regla de qué decir la pone el flujo.
+   *
+   * ⚠️ Pásala MEMOIZADA (`useCallback`): la matriz va en `memo` y una función nueva en cada render la
+   * re-pinta entera.
+   */
+  pistaCelda?: (idColor: number, idTalla: number, cantidad: number) => React.ReactNode;
   /** Solo lectura (orden cancelada / sin permiso): oculta toda edición y deja la matriz visible. */
   soloLectura?: boolean;
   /** Base de los `data-testid` (por defecto "matriz"). */
@@ -156,6 +166,7 @@ function MatrizColorTallaBase({
   onPantoneChange,
   onPackChange,
   slotAgregarColor,
+  pistaCelda,
   soloLectura = false,
   testid = 'matriz',
 }: PropsMatrizColorTalla): React.JSX.Element {
@@ -500,6 +511,7 @@ function MatrizColorTallaBase({
                             onFocus={(e) => seleccionarTodo(e.target)}
                           />
                         )}
+                        {pistaCelda?.(linea.idColor, talla.idTalla, cantidad)}
                       </td>
                     );
                   })}

@@ -125,6 +125,17 @@ export interface PropsMatrizCandado {
    * referencia y el pendiente son dos números distintos (ver {@link estadoCaptura}).
    */
   sustantivoReferencia?: string;
+  /**
+   * ⭐ Fila 0.219 — PISTA PROPIA bajo cada celda, que REEMPLAZA el «de N» de la referencia (p. ej.
+   * la existencia en la entrega a cliente: «Hay N» · «Excede · hay N» · «Sin existencia»). `null` =
+   * nada bajo esa celda. Si NO se pasa, la matriz pinta el «de N» de siempre.
+   */
+  pistaCelda?: (
+    idColor: number,
+    idTalla: number,
+    pack: string,
+    cantidad: number,
+  ) => React.ReactNode;
   deshabilitada?: boolean;
   /** Base de los `data-testid` (default "matriz-candado"). */
   testid?: string;
@@ -152,6 +163,7 @@ export function MatrizColorTalla({
   totalReferencia,
   etiquetaReferencia = 'pendiente',
   sustantivoReferencia = 'el pendiente',
+  pistaCelda,
   deshabilitada = false,
   testid = 'matriz-candado',
 }: PropsMatrizCandado): React.JSX.Element {
@@ -280,7 +292,9 @@ export function MatrizColorTalla({
                         }
                         onKeyDown={(e) => navegar(e, indiceFila, indiceColumna)}
                       />
-                      {pendiente !== undefined ? (
+                      {pistaCelda !== undefined ? (
+                        pistaCelda(color.idColor, t.idTalla, color.pack, cantidad)
+                      ) : pendiente !== undefined ? (
                         <span
                           className={cn(
                             'mt-0.5 block text-[10.5px] tabular-nums',

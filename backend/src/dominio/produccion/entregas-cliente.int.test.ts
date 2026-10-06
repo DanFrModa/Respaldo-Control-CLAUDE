@@ -348,6 +348,126 @@ describe('Entrega a cliente — salida de PT (F3-E5)', () => {
   });
 });
 
+/**
+ * ⭐⭐ FILA 0.219 — la pantalla pinta la existencia por talla con el `disponible` del seguimiento, y
+ * el servidor decide con la suma directa bajo lock. Estas pruebas fijan que (1) los dos números son
+ * EL MISMO, (2) el servidor sigue rechazando el exceso aunque la pantalla no lo frene (cuando no
+ * sabe la existencia, deja pasar), y (3) el rechazo nombra la celda que no alcanza.
+ */
+describe('⭐ 0.219 — existencia por talla: lo que se pinta es con lo que el servidor decide', () => {
+  it('el `disponible` del seguimiento es el tope exacto del servidor (uno más, rechazo; justo, pasa)', async () => {
+    await meterAInventario(10);
+    await entregar(4);
+
+    const antes = await seguimientoEntregaOrden(sesion(), idOrden, { idAlmacen: almacen.id }, bd());
+    const ch = antes.celdas.find((c) => c.idTalla === tallaCH.id);
+    expect(ch?.disponible).toBe(6);
+
+    // Uno más de lo pintado: el servidor lo rechaza, y dice el MISMO número que se pintó.
+    await expect(entregar(7)).rejects.toThrow(/hay 6 de esta orden/);
+    // Justo lo pintado: pasa, y el disponible queda en cero.
+    await entregar(6);
+    const despues = await seguimientoEntregaOrden(
+      sesion(),
+      idOrden,
+      { idAlmacen: almacen.id },
+      bd(),
+    );
+    expect(despues.celdas.find((c) => c.idTalla === tallaCH.id)?.disponible).toBe(0);
+  });
+
+  it('una talla que excede tumba la entrega ENTERA aunque otra quepa, y el rechazo NOMBRA esa celda', async () => {
+    await meterAInventario(10); // sólo Rojo/CH; Rojo/M queda en cero
+
+    const intento = registrarEntregaCliente(
+      sesion(),
+      {
+        idOrden,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 5 },
+              { idTalla: tallaM.id, cantidad: 1 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+    await expect(intento).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(intento).rejects.toThrow(
+      'No hay existencia suficiente para entregar Rojo · talla M: se intenta sacar 1 pza(s) y hay 0',
+    );
+
+    // Nada se escribió: ni la entrega ni la salida de la talla que sí cabía (A2).
+    expect(
+      await cliente.etapaMovimiento.count({ where: { idOrden, tipo: 'entrega_cliente' } }),
+    ).toBe(0);
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(10);
+  });
+
+  it('el `disponible` es de ESTA orden y ESTE almacén: no suma el stock de otra orden ni de otro almacén', async () => {
+    await meterAInventario(10); // 10 de Rojo/CH de la orden 1 en `almacen`
+    const idOrden2 = await crearOrdenConMatriz(2n);
+    const otroAlmacen = await cliente.almacen.create({ data: { nombre: 'PT Norte', tipo: 'PT' } });
+
+    const segOrden2 = await seguimientoEntregaOrden(
+      sesion(),
+      idOrden2,
+      { idAlmacen: almacen.id },
+      bd(),
+    );
+    expect(segOrden2.celdas.find((c) => c.idTalla === tallaCH.id)?.disponible).toBe(0);
+
+    const segOtroAlmacen = await seguimientoEntregaOrden(
+      sesion(),
+      idOrden,
+      { idAlmacen: otroAlmacen.id },
+      bd(),
+    );
+    expect(segOtroAlmacen.celdas.find((c) => c.idTalla === tallaCH.id)?.disponible).toBe(0);
+  });
+
+  it('A9: el seguimiento de una orden de OTRA empresa "no existe" (no filtra su existencia)', async () => {
+    await meterAInventario(10);
+    const ajena = await crearEmpresaPrueba(cliente, 'Empresa ajena');
+    const sesionAjena = sesionDePrueba({ idEmpresaActiva: ajena.id, permisos: PERM_TODOS });
+
+    await expect(
+      seguimientoEntregaOrden(sesionAjena, idOrden, { idAlmacen: almacen.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('sin `produccion.wip-ver` el seguimiento (y su existencia) se niega: la pantalla queda en «no se sabe»', async () => {
+    await meterAInventario(10);
+    await expect(
+      seguimientoEntregaOrden(
+        sesion(['produccion.entrega']),
+        idOrden,
+        { idAlmacen: almacen.id },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    // …y aun así ENTREGA (su permiso es `produccion.entrega`), con la guarda del servidor puesta.
+    await expect(
+      registrarEntregaCliente(
+        sesion(['produccion.entrega']),
+        {
+          idOrden,
+          idAlmacen: almacen.id,
+          fecha: '2026-06-21',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 11 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Rojo · talla CH: se intenta sacar 11 pza\(s\) y hay 10/);
+  });
+});
+
 describe('Cancelación de entregas (F3-E5)', () => {
   it('(d) cancelar entrega = inverso que devuelve la existencia y el pendiente del pedido', async () => {
     await meterAInventario(10);
