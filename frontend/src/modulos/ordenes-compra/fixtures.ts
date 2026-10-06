@@ -28,6 +28,7 @@ export function ocDePrueba(sobrescribir: Partial<OrdenCompra> = {}): OrdenCompra
     canceladaEn: null,
     canceladaPorId: null,
     motivoCancelacion: null,
+    renglonesFijos: null,
     lineas: [
       {
         id: 10,

@@ -37306,6 +37306,8 @@ export interface paths {
                 canceladaPorId: string | null;
                 /** @description Motivo de la cancelación, o null. */
                 motivoCancelacion: string | null;
+                /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+                renglonesFijos: string | null;
                 /** @description Renglones de la OC. */
                 lineas: {
                   /** @description Id del renglón. */
@@ -37642,6 +37644,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */
@@ -38044,6 +38048,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */
@@ -38248,7 +38254,7 @@ export interface paths {
       requestBody: {
         content: {
           'application/json': {
-            /** @description Proveedor (solo editable en borrador/pendiente). */
+            /** @description Proveedor. En una OC firmada sólo lo cambia quien tiene compras.editar-autorizada; no se cambia si la OC ya tiene material recibido (o aparece en una entrada de tela). */
             idProveedor?: number;
             /**
              * Format: date
@@ -38375,6 +38381,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */
@@ -38753,6 +38761,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */
@@ -39032,6 +39042,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */
@@ -39311,6 +39323,8 @@ export interface paths {
               canceladaPorId: string | null;
               /** @description Motivo de la cancelación, o null. */
               motivoCancelacion: string | null;
+              /** @description Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar. */
+              renglonesFijos: string | null;
               /** @description Renglones de la OC. */
               lineas: {
                 /** @description Id del renglón. */

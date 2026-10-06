@@ -13,9 +13,10 @@ import { ocDePrueba } from './fixtures';
  */
 
 // Espía del código de rol con el que el diálogo pide los proveedores + catálogo simulado por rol.
-const { espiaRolProveedor, toastError } = vi.hoisted(() => ({
+const { espiaRolProveedor, toastError, actualizarMutate } = vi.hoisted(() => ({
   espiaRolProveedor: vi.fn(),
   toastError: vi.fn(),
+  actualizarMutate: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -65,7 +66,7 @@ vi.mock('@/api/proveedores', () => ({
 
 vi.mock('@/api/ordenes-compra', () => ({
   useCrearOc: () => ({ mutate: vi.fn(), isPending: false }),
-  useActualizarOc: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarOc: () => ({ mutate: actualizarMutate, isPending: false }),
 }));
 const espiaTelasQuery = vi.fn<(query: { idProveedor?: number }, opciones?: unknown) => void>();
 /**
@@ -422,5 +423,108 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
   it('dice que cada renglón se liga a su propia OP (una OC puede surtir varias)', () => {
     montar();
     expect(screen.getByTestId('ayuda-varias-ordenes-oc')).toHaveTextContent('varias OP');
+  });
+});
+
+/**
+ * ⭐ Fila 0.225 (§Post-F9.245(a), Daniel): la OC con material RECIBIDO (completa o a medias) ya no
+ * cambia renglones ni proveedor. El servidor lo rechaza; la pantalla los apaga, dice por qué y manda
+ * a una OC nueva. Las anotaciones (notas, entrega) sí se siguen guardando.
+ */
+describe('DialogoEditarOc · ⭐ 0.225 la OC con renglones fijos (lo dice el servidor) no los cambia', () => {
+  type Opciones = { onError?: (error: Error) => void };
+  /** El cuerpo con el que se llamó la última vez a guardar la edición. */
+  function ultimoCuerpo(): Record<string, unknown> {
+    const llamada = actualizarMutate.mock.calls.at(-1) as
+      | [{ id: number; cuerpo: Record<string, unknown> }, Opciones]
+      | undefined;
+    if (llamada === undefined) throw new Error('no se guardó nada');
+    return llamada[0].cuerpo;
+  }
+
+  /** Motivos tal como los arma el dominio (`motivoRenglonesOcFijos`): la pantalla sólo los pinta. */
+  const OC_NUEVA =
+    'Si hace falta más material, haz una orden de compra nueva (la puedes ligar a la misma orden ' +
+    'de producción)';
+  it.each([
+    [
+      'recibida_total',
+      `La orden de compra 1 ya se recibió completa: se queda cerrada con lo que se recibió y sus renglones ya no se cambian. ${OC_NUEVA}: así el sobrecosto queda a la vista.`,
+    ],
+    [
+      'recibida_parcial',
+      `La orden de compra 1 ya tiene material recibido: sus renglones y su proveedor ya no se cambian. ${OC_NUEVA}.`,
+    ],
+    // ⭐ El caso que el estatus NO delata: la tela de esta OC ya se capturó en borrador.
+    [
+      'autorizada',
+      `La orden de compra 1 ya aparece en una entrada de tela: sus renglones y su proveedor ya no se cambian. ${OC_NUEVA}.`,
+    ],
+    [
+      'autorizada',
+      `La orden de compra 1 ya tuvo una recepción (aunque se reversó): sus renglones y su proveedor quedan fijos. ${OC_NUEVA}.`,
+    ],
+  ] as const)(
+    '%s con renglonesFijos: apaga renglones y proveedor, pinta EL motivo y sólo manda las anotaciones',
+    (estatus, motivo) => {
+      actualizarMutate.mockClear();
+      montar({ ...ocDePrueba(), estatus, renglonesFijos: motivo });
+
+      expect(screen.getByTestId('aviso-oc-renglones-fijos')).toHaveTextContent(motivo);
+      expect(screen.getByTestId('oc-proveedor-busqueda')).toBeDisabled();
+      expect(screen.queryByTestId('agregar-renglon-oc')).not.toBeInTheDocument();
+      // Las anotaciones siguen vivas.
+      expect(screen.getByTestId('oc-observaciones')).toBeEnabled();
+
+      fireEvent.change(screen.getByTestId('oc-observaciones'), {
+        target: { value: 'la factura llega el lunes' },
+      });
+      fireEvent.click(screen.getByTestId('confirmar-oc'));
+      const cuerpo = ultimoCuerpo();
+      expect(cuerpo).not.toHaveProperty('lineas');
+      expect(cuerpo).not.toHaveProperty('idProveedor');
+      expect(cuerpo).toMatchObject({ observaciones: 'la factura llega el lunes' });
+    },
+  );
+
+  it('control: una OC AUTORIZADA con renglonesFijos = null se sigue editando entera, sin el aviso', () => {
+    actualizarMutate.mockClear();
+    montar({ ...ocDePrueba(), estatus: 'autorizada', renglonesFijos: null });
+    expect(screen.queryByTestId('aviso-oc-renglones-fijos')).not.toBeInTheDocument();
+    expect(screen.getByTestId('oc-proveedor-busqueda')).toBeEnabled();
+    expect(screen.getByTestId('agregar-renglon-oc')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirmar-oc'));
+    expect(ultimoCuerpo()).toHaveProperty('lineas');
+    expect(ultimoCuerpo()).toHaveProperty('idProveedor', 5);
+  });
+
+  it('el 409 del servidor se muestra con SU texto (amarre que nació con el diálogo abierto)', () => {
+    // Si el amarre nació DESPUÉS de abrir el diálogo (la lista traía null), manda el 409.
+    const mensaje =
+      'La orden de compra 7 ya tuvo una recepción (aunque se reversó): sus renglones y su ' +
+      'proveedor quedan fijos. Si hace falta más material, haz una orden de compra nueva (la ' +
+      'puedes ligar a la misma orden de producción).';
+    actualizarMutate.mockClear();
+    actualizarMutate.mockImplementationOnce((_args: unknown, opciones: Opciones) => {
+      opciones.onError?.(new Error(mensaje));
+    });
+    toastError.mockClear();
+    montar({ ...ocDePrueba(), estatus: 'autorizada' });
+    fireEvent.click(screen.getByTestId('confirmar-oc'));
+    expect(toastError).toHaveBeenCalledWith(mensaje);
+  });
+
+  it('una orden CERRADA en sus renglones no le impide guardar notas (los renglones no viajan)', () => {
+    const base = ocDePrueba();
+    const renglon = base.lineas[0];
+    if (renglon === undefined) throw new Error('fixture sin renglones');
+    montar({
+      ...base,
+      estatus: 'recibida_total',
+      renglonesFijos: 'La orden de compra 1 ya se recibió completa.',
+      lineas: [{ ...renglon, idOrden: 50, folioOrden: 900, ordenCerrada: true }],
+    });
+    expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('confirmar-oc')).toBeEnabled();
   });
 });

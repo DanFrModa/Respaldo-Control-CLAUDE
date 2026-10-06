@@ -293,7 +293,10 @@ export const esquemaCompraEditarCuerpo = z.object({
     .int()
     .positive()
     .optional()
-    .describe('Proveedor (solo editable en borrador/pendiente).'),
+    .describe(
+      'Proveedor. En una OC firmada sólo lo cambia quien tiene compras.editar-autorizada; no se ' +
+        'cambia si la OC ya tiene material recibido (o aparece en una entrada de tela).',
+    ),
   // Opcional (no tocar si se omite) pero NO nullable: una vez capturada no se vacía.
   fechaEntrega: campoFechaEntrega().fechaEntrega.optional(),
   // La dirección se puede cambiar, pero no quitar (mismo criterio que la fecha de entrega).
@@ -543,6 +546,14 @@ export const esquemaCompraSalida = z
     canceladaEn: z.iso.datetime().nullable().describe('Fecha de cancelación (ISO), o null.'),
     canceladaPorId: z.string().nullable().describe('Usuario que canceló, o null.'),
     motivoCancelacion: z.string().nullable().describe('Motivo de la cancelación, o null.'),
+    renglonesFijos: z
+      .string()
+      .nullable()
+      .describe(
+        'Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material ' +
+          'recibido, una recepción reversada o una entrada de tela que la nombra), en texto de ' +
+          'negocio; null si se pueden editar.',
+      ),
     lineas: z.array(esquemaCompraLineaSalida).describe('Renglones de la OC.'),
     ordenesLigadas: z
       .array(esquemaCompraOrdenLigadaSalida)

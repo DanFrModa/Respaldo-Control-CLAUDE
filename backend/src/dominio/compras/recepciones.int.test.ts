@@ -21,8 +21,20 @@ import type {
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { autorizarOC, cancelarOC, crearOC, resumenOC } from './ordenes-compra.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
+import { comprometidoEnOc } from './comprometido-en-oc.js';
 import {
+  actualizarOC,
+  autorizarOC,
+  cancelarOC,
+  crearOC,
+  desautorizarOC,
+  listarOC,
+  obtenerOC,
+  resumenOC,
+} from './ordenes-compra.js';
+import {
+  bloquearOrdenCompra,
   lineasPendientesDeOC,
   listarRecepcionesDeOC,
   ocsRecibibles,
@@ -1525,5 +1537,416 @@ describe('Recepción — fila 0.129: reverso y no-duplicación del cargo', () =>
     expect((await cliente.ordenCompra.findUniqueOrThrow({ where: { id: oc.id } })).estatus).toBe(
       'autorizada',
     );
+  });
+});
+
+/**
+ * ⭐ Fila 0.225 (§Post-F9.245(a), DANIEL, 30-sep-2026): *«las OC que ya están recibidas, ya se quedan
+ * con esa cantidad recibida y se cierra. Si se quiere recibir más, se tendría que hacer una nueva
+ * OC»* — para que el sobrecosto se VEA. Aquí vive porque la prueba necesita recibir DE VERDAD (no
+ * forzar el estatus): el rechazo tiene que valer con las recepciones reales encima.
+ */
+describe('⭐ Fila 0.225 — la OC con material recibido ya no cambia renglones ni proveedor', () => {
+  /** Quien edita una OC ya firmada (decisión (a)) y además recibe. */
+  const PERM_EDITA_FIRMADA: ClavePermiso[] = [...PERM, 'compras.editar-autorizada'];
+
+  async function recibirAvio(idOc: number, idLineaOC: number, cantidad: number) {
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: idOc,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-20',
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad }],
+      },
+      bd(),
+    );
+  }
+
+  /** Lo que tiene la OC en la base: estatus, renglones y cantidades (para "no se escribió nada"). */
+  async function fotoOc(id: number) {
+    const oc = await cliente.ordenCompra.findUniqueOrThrow({
+      where: { id },
+      include: { lineas: { orderBy: { id: 'asc' } } },
+    });
+    return {
+      estatus: oc.estatus,
+      idProveedor: oc.idProveedor,
+      observaciones: oc.observaciones,
+      lineas: oc.lineas.map((l) => ({ id: l.id, cantidad: Number(l.cantidad) })),
+    };
+  }
+
+  async function ocRecibidaTotal() {
+    const oc = await ocAvioAutorizada(100, 5);
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 100);
+    expect((await fotoOc(oc.id)).estatus).toBe('recibida_total');
+    return oc;
+  }
+
+  it('SUBIR la cantidad de una OC recibida completa se rechaza, con el texto de la OC nueva, y no escribe nada', async () => {
+    const oc = await ocRecibidaTotal();
+    const antes = await fotoOc(oc.id);
+    const bitacoraAntes = await cliente.bitacora.count({
+      where: { entidad: 'OrdenCompra', idEntidad: String(oc.id), accion: 'MODIFICAR' },
+    });
+
+    const intento = actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      {
+        observaciones: 'ojo: esto NO debe quedar',
+        lineas: [{ idAvio: avioBoton.id, cantidad: 150, precio: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+    await expect(intento).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(intento).rejects.toThrow(/ya se recibió completa.*haz una orden de compra nueva/s);
+
+    // Ni el encabezado (que en la misma llamada se intentó cambiar) ni los renglones se movieron.
+    expect(await fotoOc(oc.id)).toEqual(antes);
+    expect(
+      await cliente.bitacora.count({
+        where: { entidad: 'OrdenCompra', idEntidad: String(oc.id), accion: 'MODIFICAR' },
+      }),
+    ).toBe(bitacoraAntes);
+    // Y no quedó nada «pendiente de recibir» colgando: lo comprado sigue siendo lo recibido.
+    const lineas = await lineasPendientesDeOC(sesion(PERM), oc.id, bd());
+    expect(lineas.every((l) => l.pendiente === 0)).toBe(true);
+  });
+
+  it('AGREGAR un renglón (aun conservando el recibido) también se rechaza', async () => {
+    const oc = await ocRecibidaTotal();
+    const antes = await fotoOc(oc.id);
+    await expect(
+      actualizarOC(
+        sesion(PERM_EDITA_FIRMADA),
+        oc.id,
+        {
+          lineas: [
+            { idAvio: avioBoton.id, cantidad: 100, precio: 5, unidad: 'pza' },
+            { idAvio: avioBoton.id, cantidad: 20, precio: 5, unidad: 'pza' },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/ya se recibió completa/);
+    expect(await fotoOc(oc.id)).toEqual(antes);
+  });
+
+  it('cambiarle el PROVEEDOR se rechaza; las anotaciones del encabezado sí se guardan', async () => {
+    const oc = await ocRecibidaTotal();
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro proveedor' } });
+    await expect(
+      actualizarOC(sesion(PERM_EDITA_FIRMADA), oc.id, { idProveedor: otro.id }, bd()),
+    ).rejects.toThrow(/ya no se le puede cambiar el proveedor/);
+    expect((await fotoOc(oc.id)).idProveedor).toBe(proveedor.id);
+
+    // Mandar el MISMO proveedor + una nota pasa: no mueve cantidades ni dinero.
+    const editada = await actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      { idProveedor: proveedor.id, observaciones: 'llegó con caja golpeada' },
+      bd(),
+    );
+    expect(editada.observaciones).toBe('llegó con caja golpeada');
+    expect((await fotoOc(oc.id)).estatus).toBe('recibida_total');
+  });
+
+  it('control: una OC AUTORIZADA sin recibir se sigue editando al alza y cambiando de proveedor', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro proveedor' } });
+    await actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      {
+        idProveedor: otro.id,
+        lineas: [{ idAvio: avioBoton.id, cantidad: 150, precio: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+    const despues = await fotoOc(oc.id);
+    expect(despues.estatus).toBe('autorizada');
+    expect(despues.idProveedor).toBe(otro.id);
+    expect(despues.lineas.map((l) => l.cantidad)).toEqual([150]);
+  });
+
+  it('una OC RECIBIDA A MEDIAS: subirla da 409 con su texto (antes, un 500) y no escribe nada', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 40);
+    const antes = await fotoOc(oc.id);
+    expect(antes.estatus).toBe('recibida_parcial');
+    const intento = actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      {
+        observaciones: 'esto NO debe quedar',
+        lineas: [{ idAvio: avioBoton.id, cantidad: 150, precio: 5, unidad: 'pza' }],
+      },
+      bd(),
+    );
+    await expect(intento).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(intento).rejects.toThrow(
+      /ya tiene material recibido: sus renglones y su proveedor ya no se cambian.*haz una orden de compra nueva/s,
+    );
+    expect(await fotoOc(oc.id)).toEqual(antes);
+    // Bajarla a exactamente lo recibido tampoco: también es reemplazar renglones.
+    await expect(
+      actualizarOC(
+        sesion(PERM_EDITA_FIRMADA),
+        oc.id,
+        { lineas: [{ idAvio: avioBoton.id, cantidad: 40, precio: 5, unidad: 'pza' }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('una OC AUTORIZADA con su recepción REVERSADA tampoco cambia renglones: 409, no 500', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 100);
+    const [rec] = (await listarRecepcionesDeOC(sesion(PERM), oc.id, bd())).recepciones;
+    await reversarRecepcion(sesion(PERM), rec!.id, { motivo: 'era de otra OC' }, bd());
+    const antes = await fotoOc(oc.id);
+    expect(antes.estatus).toBe('autorizada');
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro proveedor' } });
+    for (const cuerpo of [
+      { lineas: [{ idAvio: avioBoton.id, cantidad: 150, precio: 5, unidad: 'pza' as const }] },
+      { idProveedor: otro.id },
+    ]) {
+      const intento = actualizarOC(sesion(PERM_EDITA_FIRMADA), oc.id, cuerpo, bd());
+      await expect(intento).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(intento).rejects.toThrow(/ya tuvo una recepción \(aunque se reversó\)/);
+    }
+    expect(await fotoOc(oc.id)).toEqual(antes);
+    // H2: NO dice «material recibido» — no hay nada dentro. Y la salida trae el mismo motivo.
+    const salida = await obtenerOC(sesion(PERM), oc.id, bd());
+    expect(salida.renglonesFijos).toMatch(/ya tuvo una recepción \(aunque se reversó\)/);
+    expect(salida.renglonesFijos).not.toMatch(/ya tiene material recibido/);
+  });
+
+  it('una OC nombrada por una ENTRADA DE TELA en captura tampoco cambia renglones: 409, no 500', async () => {
+    const oc = await ocTelaAutorizada(100, 5);
+    const almacenTela = await cliente.almacen.create({ data: { nombre: 'Telas', tipo: 'TELA' } });
+    await cliente.entradaTela.create({
+      data: {
+        folio: BigInt(1),
+        idEmpresa: empresa.id,
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-1',
+        idProveedor: proveedor.id,
+        fecha: new Date('2026-06-20'),
+        idAlmacen: almacenTela.id,
+        lineas: {
+          create: [
+            {
+              idTelaColor: colorFelpaRojo.id,
+              cantidad: 10,
+              idOrdenCompraLinea: oc.lineas[0]!.id,
+            },
+          ],
+        },
+      },
+    });
+    const antes = await fotoOc(oc.id);
+    const intento = actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      {
+        lineas: [
+          { idTela: telaFelpa.id, cantidad: 150, precio: 5, unidad: 'm', cantidadComplemento: 10 },
+        ],
+      },
+      bd(),
+    );
+    await expect(intento).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(intento).rejects.toThrow(/ya aparece en una entrada de tela/);
+    expect(await fotoOc(oc.id)).toEqual(antes);
+
+    // ⭐ La SALIDA lo dice de antemano (su estatus sigue `autorizada`), en el detalle y en la lista
+    // —que es la que alimenta el diálogo—, y una NOTA sí se guarda.
+    const detalle = await obtenerOC(sesion(PERM), oc.id, bd());
+    expect(detalle.estatus).toBe('autorizada');
+    expect(detalle.renglonesFijos).toMatch(/ya aparece en una entrada de tela/);
+    const enLista = (await listarOC(sesion(PERM), {}, bd())).datos.find((o) => o.id === oc.id);
+    expect(enLista?.renglonesFijos).toBe(detalle.renglonesFijos);
+    const conNota = await actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      { observaciones: 'la factura llega el lunes' },
+      bd(),
+    );
+    expect(conNota.observaciones).toBe('la factura llega el lunes');
+    expect(conNota.renglonesFijos).toBe(detalle.renglonesFijos);
+  });
+
+  it('una OC AUTORIZADA sin nada amarrado trae renglonesFijos = null (en el detalle y en la lista)', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    expect((await obtenerOC(sesion(PERM), oc.id, bd())).renglonesFijos).toBeNull();
+    const enLista = (await listarOC(sesion(PERM), {}, bd())).datos.find((o) => o.id === oc.id);
+    expect(enLista?.renglonesFijos).toBeNull();
+    // Y una recibida completa trae el suyo.
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 100);
+    expect((await obtenerOC(sesion(PERM), oc.id, bd())).renglonesFijos).toMatch(
+      /ya se recibió completa/,
+    );
+  });
+
+  it('control: una OC RECIBIDA A MEDIAS sigue aceptando notas de encabezado', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    await recibirAvio(oc.id, oc.lineas[0]!.id, 40);
+    const editada = await actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      { observaciones: 'falta el resto', idProveedor: proveedor.id },
+      bd(),
+    );
+    expect(editada.observaciones).toBe('falta el resto');
+    expect((await fotoOc(oc.id)).estatus).toBe('recibida_parcial');
+  });
+
+  it('⭐ el camino de Daniel: OC NUEVA ligada a la MISMA orden se crea, se recibe y el MRP la suma', async () => {
+    const modelo = await cliente.modelo.create({ data: { codigo: 'M-0225' } });
+    // La orden necesita receta congelada (V1-E3d): basta un BOM mínimo del modelo.
+    await cliente.modeloTela.create({
+      data: { idModelo: modelo.id, idTela: telaFelpa.id, consumoPorPrenda: 1 },
+    });
+    const clienteNeg = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: BigInt(225),
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNeg.id,
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+
+    const crearLigada = async (cantidad: number) => {
+      const oc = await crearOC(
+        sesion(PERM),
+        {
+          ...encabezadoOc(),
+          idProveedor: proveedor.id,
+          lineas: [{ idAvio: avioBoton.id, cantidad, precio: 5, unidad: 'pza', idOrden: orden.id }],
+        },
+        bd(),
+      );
+      await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+      return oc;
+    };
+
+    const original = await crearLigada(100);
+    await recibirAvio(original.id, original.lineas[0]!.id, 100);
+    // La original ya no crece…
+    await expect(
+      actualizarOC(
+        sesion(PERM_EDITA_FIRMADA),
+        original.id,
+        {
+          lineas: [
+            { idAvio: avioBoton.id, cantidad: 130, precio: 5, unidad: 'pza', idOrden: orden.id },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/haz una orden de compra nueva/);
+
+    // …el extra va en una OC aparte, ligada a la misma orden, que SÍ se recibe.
+    const extra = await crearLigada(30);
+    await recibirAvio(extra.id, extra.lineas[0]!.id, 30);
+    expect((await fotoOc(extra.id)).estatus).toBe('recibida_total');
+
+    // El MRP cuenta las DOS: 130 en OC y 130 recibidos para esa orden y ese avío.
+    const comprometido = await comprometidoEnOc(empresa.id, [orden.id], bd());
+    const delAvio = [...(comprometido.get(orden.id)?.values() ?? [])].find(
+      (m) => m.idAvio === avioBoton.id,
+    );
+    expect(delAvio?.enOc).toBe(130);
+    expect(delAvio?.recibido).toBe(130);
+  });
+
+  it('⭐ el estatus se lee BAJO el candado de la OC: una recepción en vuelo que la completa gana', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    // Una "recepción" en vuelo: toma el candado de la OC (como `recibirCompra`), la deja recibida
+    // completa y tarda en confirmar. La edición que llega mientras tanto tiene que ESPERAR y ver el
+    // estatus nuevo; sin el candado leería `autorizada` y colaría el alza.
+    let avisarCandado!: () => void;
+    const candadoTomado = new Promise<void>((r) => {
+      avisarCandado = r;
+    });
+    const recepcionEnVuelo = cliente.$transaction(
+      async (tx) => {
+        await bloquearOrdenCompra(tx, oc.id);
+        await tx.ordenCompra.update({ where: { id: oc.id }, data: { estatus: 'recibida_total' } });
+        avisarCandado();
+        await new Promise((r) => setTimeout(r, 1500));
+      },
+      { timeout: 20_000 },
+    );
+    await candadoTomado;
+    const edicion = actualizarOC(
+      sesion(PERM_EDITA_FIRMADA),
+      oc.id,
+      { lineas: [{ idAvio: avioBoton.id, cantidad: 150, precio: 5, unidad: 'pza' }] },
+      bd(),
+    );
+    const [rRecepcion, rEdicion] = await Promise.allSettled([recepcionEnVuelo, edicion]);
+    expect(rRecepcion.status).toBe('fulfilled');
+    expect(rEdicion.status).toBe('rejected');
+    expect(rEdicion.status === 'rejected' ? rEdicion.reason : null).toBeInstanceOf(ErrorConflicto);
+    expect((await fotoOc(oc.id)).lineas.map((l) => l.cantidad)).toEqual([100]);
+  });
+  /**
+   * Una «recepción en vuelo»: toma el candado de la OC (como `recibirCompra`), deja la OC recibida y
+   * tarda en confirmar. Devuelve la promesa de esa transacción una vez que el candado ya está tomado.
+   * ⚠️ Envuelta en un objeto A PROPÓSITO: una función `async` que devuelve una promesa la ADOPTA, y
+   * el `await` del llamador esperaría a que la recepción confirmara — la prueba ya no mediría nada.
+   */
+  async function recepcionEnVueloQueLaCompleta(idOc: number): Promise<{ tx: Promise<unknown> }> {
+    let avisar!: () => void;
+    const tomado = new Promise<void>((r) => {
+      avisar = r;
+    });
+    const tx = cliente.$transaction(
+      async (t) => {
+        await bloquearOrdenCompra(t, idOc);
+        await t.ordenCompra.update({ where: { id: idOc }, data: { estatus: 'recibida_total' } });
+        avisar();
+        await new Promise((r) => setTimeout(r, 1500));
+      },
+      { timeout: 20_000 },
+    );
+    await tomado;
+    return { tx };
+  }
+
+  it('⭐ CANCELAR espera al candado: con una recepción en vuelo que la completa, se rechaza', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    const { tx: enVuelo } = await recepcionEnVueloQueLaCompleta(oc.id);
+    const cancelacion = cancelarOC(sesion(PERM_CANCELAR), oc.id, { motivo: 'ya no va' }, bd());
+    const [rVuelo, rCancel] = await Promise.allSettled([enVuelo, cancelacion]);
+    expect(rVuelo.status).toBe('fulfilled');
+    expect(rCancel.status === 'rejected' ? rCancel.reason : 'no se rechazó').toBeInstanceOf(
+      ErrorConflicto,
+    );
+    // Sin el candado, el UPDATE de cancelar esperaba a la recepción y pisaba su estatus.
+    expect((await fotoOc(oc.id)).estatus).toBe('recibida_total');
+  });
+
+  it('⭐ DES-AUTORIZAR espera al candado: con una recepción en vuelo que la completa, se rechaza', async () => {
+    const oc = await ocAvioAutorizada(100, 5);
+    const { tx: enVuelo } = await recepcionEnVueloQueLaCompleta(oc.id);
+    const desautorizacion = desautorizarOC(
+      sesion(['compras.ver', 'compras.desautorizar']),
+      oc.id,
+      { motivo: 'me equivoqué' },
+      bd(),
+    );
+    const [rVuelo, rDesaut] = await Promise.allSettled([enVuelo, desautorizacion]);
+    expect(rVuelo.status).toBe('fulfilled');
+    expect(rDesaut.status === 'rejected' ? rDesaut.reason : 'no se rechazó').toBeInstanceOf(
+      ErrorConflicto,
+    );
+    expect((await fotoOc(oc.id)).estatus).toBe('recibida_total');
   });
 });

@@ -17038,7 +17038,7 @@ dentro del costo original y se pierde la señal de que se gastó más de lo plan
 
 📐 **MEDIDO: el sistema ya lo permite entero, no hay nada que construir para esto.** Se puede crear una OC a
 mano y **ligarla a la misma OP** aunque no venga de la explosión (`idOrden` opcional por renglón,
-`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa — la regla está **enunciada** en `compras/ordenes-compra.ts:298` y la que la **cumple** es `:612`, el `throw new ErrorNoEncontrado('Orden', idOrden)`). Y lo que
+`contrato/esquemas/compra.ts:198-204` y `schema.prisma:5951-5954`; el dominio valida que la orden exista y sea de la empresa activa — la regla está **enunciada** en `compras/ordenes-compra.ts`, en el comentario del `idOrden` del renglón, y la que la **cumple** es el `throw new ErrorNoEncontrado('Orden', idOrden)` del mismo archivo — citas por nombre desde la v0.195, que desplazó sus números de línea). Y lo que
 importa: **el MRP la cuenta** — `comprometido-en-oc.ts` es *«LA VERDAD DE "CUÁNTO DE ESTO YA ESTÁ EN UNA
 ORDEN DE COMPRA" — UN SOLO LUGAR»* y mira **todas** las OC de esa OP ⇒ la explosión no vuelve a pedir ese
 material.
@@ -18452,3 +18452,24 @@ con default y que Daniel puede corregir:
 4. **Movimientos y traspasos de PT** ocultan por omisión las piezas de órdenes cerradas (se cuentan en el aviso),
    coherente con que una cerrada no admite movimientos.
 
+
+#### (Post-F9.265) — LA OC QUE YA TIENE MATERIAL RECIBIDO NO SE CAMBIA EN RENGLONES NI PROVEEDOR (fila 0.225, v0.195) — tres criterios con su default
+
+Aplica §Post-F9.245(a). 📐 **Medirla corrigió la ficha:** la edición al alza no dejaba un renglón inalcanzable; **no
+llegaba a escribirse**. `actualizarOC` reemplaza los renglones borrándolos, y las recepciones y las entradas de tela
+los referencian con una llave que impide borrarlos ⇒ cualquier edición de renglones de una OC con recepciones (completa,
+parcial o reversada) terminaba en «error interno», y desde la pantalla —que siempre manda los renglones— **hasta
+guardar una nota**. ⇒ La regla se aplica **por amarre, no sólo por estatus**: si la OC tiene una recepción (aunque esté
+reversada) o aparece en una entrada de tela, sus renglones y su proveedor quedan fijos y el sistema manda a hacer una OC
+nueva, ligable a la misma orden de producción. Notas, «corresponde a», fecha y dirección de entrega siguen editables.
+Una OC autorizada sin amarre se edita como antes, con `compras.editar-autorizada` (decisión (a) de las «Decisiones de diseño
+F4»: *Edición de una OC autorizada*).
+
+Tres criterios que el lead dejó con default y que Daniel puede corregir:
+1. **La OC recibida a medias se cierra igual que la completa** (renglones y proveedor). Default: sí — su regla habla de
+   «las OC que ya están recibidas», y para más material la OC nueva hace visible el sobrecosto. Si quiere poder subirle
+   cantidad a una parcial, hay que rediseñar la edición para no borrar renglones (ficha aparte).
+2. **Una OC cuya recepción se canceló por error queda con renglones fijos.** Default: sí, se hace OC nueva (la
+   recepción cancelada sigue existiendo como rastro, D3).
+3. **Una OC que quedó en una entrada de tela cancelada desde captura queda con renglones fijos.** Default: sí, OC
+   nueva. Soltar ese amarre sería borrar el renglón de una entrada, y la cancelación nunca borra (D3).

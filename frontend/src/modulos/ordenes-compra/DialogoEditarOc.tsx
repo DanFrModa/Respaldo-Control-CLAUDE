@@ -93,6 +93,18 @@ export function DialogoEditarOc({
   const actualizar = useActualizarOc();
   const guardando = crear.isPending || actualizar.isPending;
   const esEdicion = oc !== undefined;
+  /**
+   * ⭐ Fila 0.225 (§Post-F9.245(a), Daniel): una OC con material recibido —o con una recepción
+   * reversada, o nombrada por una entrada de tela— ya no cambia renglones ni proveedor: el servidor
+   * lo rechaza (A1). La pantalla NO lo deduce del estatus —una OC `autorizada` con su tela capturada
+   * en borrador también queda fija y su estatus no lo dice—: lo lee de `renglonesFijos`, que el
+   * dominio arma con la MISMA regla con la que rechazaría. Si viene, se apagan renglones y
+   * proveedor, se muestra ese motivo, y se guardan sólo las anotaciones (notas, entrega).
+   */
+  const motivoRenglonesFijos = oc?.renglonesFijos ?? null;
+  const conRenglonesFijos = motivoRenglonesFijos !== null;
+  /** Renglones y proveedor congelados: por solo lectura o porque el servidor ya no los deja cambiar. */
+  const renglonesFijos = soloLectura || conRenglonesFijos;
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
   const avios = useAvios({ pagina: 1, porPagina: 100 });
@@ -265,18 +277,19 @@ export function DialogoEditarOc({
       toast.error('Elige la dirección de entrega del catálogo.');
       return;
     }
-    const encabezado = {
-      idProveedor,
+    const anotaciones = {
       // La fecha de EMISIÓN no se manda: la pone el servidor con el día de la captura.
       fechaEntrega,
       idDireccionEntrega,
       observaciones: observaciones.trim() || null,
       correspondeA: correspondeA.trim() || null,
-      lineas: renglones.map(renglonApi),
     };
+    const encabezado = { ...anotaciones, idProveedor, lineas: renglones.map(renglonApi) };
 
     if (esEdicion && oc !== undefined) {
-      const cuerpo: OrdenCompraEditar = encabezado;
+      // ⭐ 0.225: a la OC con renglones fijos sólo se le mandan las anotaciones. Mandar los renglones
+      // (aunque fueran los mismos) es pedir reemplazarlos, y el servidor lo rechaza.
+      const cuerpo: OrdenCompraEditar = conRenglonesFijos ? anotaciones : encabezado;
       actualizar.mutate(
         { id: oc.id, cuerpo },
         {
@@ -315,7 +328,9 @@ export function DialogoEditarOc({
           <DialogDescription>
             {soloLectura
               ? 'Esta orden está autorizada: se muestra en solo lectura.'
-              : 'Captura el encabezado y los renglones. El folio y el total los asigna el sistema.'}
+              : conRenglonesFijos
+                ? 'Sus renglones y su proveedor ya no se cambian: sólo se corrigen sus notas y su entrega.'
+                : 'Captura el encabezado y los renglones. El folio y el total los asigna el sistema.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -337,7 +352,7 @@ export function DialogoEditarOc({
                 alLimpiar={() => {
                   cambiarProveedor(null, '');
                 }}
-                deshabilitado={soloLectura}
+                deshabilitado={renglonesFijos}
                 idInput="oc-proveedor"
                 testid="oc-proveedor"
               />
@@ -431,7 +446,17 @@ export function DialogoEditarOc({
             </Field>
           </div>
 
-          {!soloLectura && foliosCerrados.length > 0 ? (
+          {!soloLectura && motivoRenglonesFijos !== null ? (
+            <p
+              className="rounded-md border border-border bg-muted/50 p-3 text-sm"
+              role="status"
+              data-testid="aviso-oc-renglones-fijos"
+            >
+              {motivoRenglonesFijos}
+            </p>
+          ) : null}
+
+          {!renglonesFijos && foliosCerrados.length > 0 ? (
             <AvisoOrdenCerrada
               folios={foliosCerrados}
               detalle="Quita sus renglones para poder guardar la orden de compra."
@@ -463,7 +488,7 @@ export function DialogoEditarOc({
               avios={avios.data?.datos ?? []}
               ordenes={ordenesDelEditor}
               tallas={tallas.data?.datos ?? []}
-              soloLectura={soloLectura}
+              soloLectura={renglonesFijos}
             />
           </div>
         </div>
@@ -481,7 +506,11 @@ export function DialogoEditarOc({
             <Button
               type="button"
               onClick={confirmar}
-              disabled={guardando || idProveedor === null || foliosCerrados.length > 0}
+              disabled={
+                guardando ||
+                idProveedor === null ||
+                (!conRenglonesFijos && foliosCerrados.length > 0)
+              }
               data-testid="confirmar-oc"
             >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}

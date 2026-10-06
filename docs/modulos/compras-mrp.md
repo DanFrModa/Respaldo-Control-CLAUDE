@@ -23,7 +23,7 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
     `compras.autorizar` (ex-acceso #8) y registra usuario+fecha en `Bitacora` (A7). OC autorizada
     **bloqueada** salvo con el permiso **`compras.editar-autorizada`** (decisión **(a)**; hasta la
     fila 0.120 esto se resolvía preguntando por `roles.administrar`, o sea que administrar roles
-    regalaba la capacidad de tocar una compra ya firmada). ⛔ **«Duplicar a nueva OC» se RETIRÓ** (v0.179, fila 0.212: la copia arrastraba la liga a la OP y el borrador volvía a contar como «ya comprado»). El `Totales` viejo NO se
+    regalaba la capacidad de tocar una compra ya firmada). **Una OC con algo amarrado —una recepción, aunque se haya reversado, o una entrada de tela, aunque esté en captura— ya no cambia renglones ni proveedor** (fila 0.225, §Post-F9.245(a)/§Post-F9.265): `actualizarOC` toma `bloquearOrdenCompra` primero y contesta 409 mandando a una OC nueva; la salida de la OC trae `renglonesFijos` (el motivo, o null), calculado con la misma regla —en lote en `listarOC`—, y la pantalla de edición decide con ese campo; `cancelarOC`/`desautorizarOC` también toman ese candado antes de leer el estatus. ⛔ **«Duplicar a nueva OC» se RETIRÓ** (v0.179, fila 0.212: la copia arrastraba la liga a la OP y el borrador volvía a contar como «ya comprado»). El `Totales` viejo NO se
     almacena: es derivado de las líneas.
   - `recepciones.ts` — `recibirCompra` / `reversarRecepcion`.
     - ⚠️ **Desde §Post-F9.14 (7-ago-2026) la TELA no se recibe por aquí:** `recibirCompra` rechaza

@@ -97030,6 +97030,17 @@
                             ],
                             "description": "Motivo de la cancelación, o null."
                           },
+                          "renglonesFijos": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                          },
                           "lineas": {
                             "type": "array",
                             "items": {
@@ -97500,6 +97511,7 @@
                           "canceladaEn",
                           "canceladaPorId",
                           "motivoCancelacion",
+                          "renglonesFijos",
                           "lineas",
                           "ordenesLigadas",
                           "total",
@@ -98226,6 +98238,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -98696,6 +98719,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
@@ -99336,6 +99360,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -99806,6 +99841,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
@@ -99980,7 +100016,7 @@
                 "type": "object",
                 "properties": {
                   "idProveedor": {
-                    "description": "Proveedor (solo editable en borrador/pendiente).",
+                    "description": "Proveedor. En una OC firmada sólo lo cambia quien tiene compras.editar-autorizada; no se cambia si la OC ya tiene material recibido (o aparece en una entrada de tela).",
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -100502,6 +100538,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -100972,6 +101019,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
@@ -101541,6 +101589,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -102011,6 +102070,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
@@ -102428,6 +102488,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -102898,6 +102969,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
@@ -103315,6 +103387,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "renglonesFijos": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Por qué los renglones y el proveedor de esta OC ya no se pueden cambiar (material recibido, una recepción reversada o una entrada de tela que la nombra), en texto de negocio; null si se pueden editar."
+                    },
                     "lineas": {
                       "type": "array",
                       "items": {
@@ -103785,6 +103868,7 @@
                     "canceladaEn",
                     "canceladaPorId",
                     "motivoCancelacion",
+                    "renglonesFijos",
                     "lineas",
                     "ordenesLigadas",
                     "total",
