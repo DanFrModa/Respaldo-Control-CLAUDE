@@ -71,6 +71,33 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.199 · 6-oct-2026 · **en prueba** — **Cada avío tiene su botón de movimientos, y las existencias se agrupan por proveedor**
+
+> **La v0.199 cierra una fila del programa: la 0.221.** Es tu punto 06 del repaso de Inventarios: *«debería haber un
+> botón para ver los movimientos de cada avío. Falta agrupar por proveedor»*.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**En Existencias de avíos, cada renglón tiene un botón «Movimientos»** que abre el kardex de materiales ya filtrado por
+ese avío y ese almacén. El enlace se puede recargar o compartir: abre lo mismo.
+
+**Las existencias se pueden agrupar por proveedor**, con subtotal por grupo. Y hay una columna nueva, «Proveedor».
+
+**En el kardex de avíos ahora puedes elegir el almacén** (antes sólo el avío).
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El proveedor que se muestra es el HABITUAL del avío.** Un avío puede tener varios proveedores en el catálogo, pero a
+lo más uno marcado como habitual; ése es su grupo. Los que no tienen habitual van al grupo **«Sin proveedor
+habitual»**, al final.
+
+**El subtotal suma unidades distintas** (piezas, conos, metros), igual que el total que la pantalla ya mostraba.
+
+### ⏳ Sigue pendiente o roto
+
+**Tres criterios con su respuesta propuesta** (§Post-F9.269): agrupar por el proveedor habitual (no bajo cada uno de sus
+proveedores), dejar el subtotal en unidades mezcladas, y no agregar un filtro por proveedor mientras no lo pidas.
+
 ## 0.198 · 6-oct-2026 · **en prueba** — **La entrega a cliente te dice cuánto hay por talla antes de capturar**
 
 > **La v0.198 cierra una fila del programa: la 0.219.** Es tu punto 10b del repaso de Inventarios: *«debería de decir

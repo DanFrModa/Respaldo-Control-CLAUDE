@@ -113,6 +113,12 @@ vi.mock('@/api/inventario-materiales', () => ({
   useCancelarTela: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarAvio: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+// Fila 0.221 — la pestaña de avíos filtra por almacén. La lista viene VACÍA a propósito: así se
+// mide también el caso de quien no puede leer el catálogo de almacenes (el nombre sale del kardex).
+const almacenesCatalogo = vi.fn<() => { id: number; nombre: string }[]>(() => []);
+vi.mock('@/api/almacenes', () => ({
+  useAlmacenes: () => ({ data: { datos: almacenesCatalogo() } }),
+}));
 // El selector emite la tela al hacer click en su opción.
 vi.mock('./SelectorTela', () => ({
   SelectorTela: ({
@@ -152,6 +158,7 @@ beforeEach(() => {
   datosKardexAvio.mockReturnValue(kardexAvio);
   consultaKardexTela.mockClear();
   consultaKardexAvio.mockClear();
+  almacenesCatalogo.mockReturnValue([]);
 });
 
 /** Abre la pestaña de avíos y elige uno (las dos pestañas son excluyentes: sólo una se pinta). */
@@ -592,5 +599,91 @@ describe('KardexMaterialesPagina (F4-E1)', () => {
         within(screen.getByTestId('kardex-avio-tarjetas')).queryByTestId('kardex-avio-obs'),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('⭐ 0.221 · el kardex de avíos se abre YA filtrado desde la URL (botón «Movimientos»)', () => {
+  it('abre la pestaña de avíos y consulta ESE avío en ESE almacén', () => {
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=3&idAlmacen=9',
+    });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3, idAlmacen: 9 });
+    expect(consultaKardexTela).not.toHaveBeenCalledWith(expect.objectContaining({ idTela: 1 }));
+    // Sin combobox de por medio, la identidad la da el propio kardex.
+    expect(screen.getByTestId('kardex-avio-sel')).toHaveTextContent('CIERRE-1 — Cierre metálico');
+    // El almacén es un filtro VISIBLE, con el nombre que trae el kardex (catálogo vacío).
+    const almacen = screen.getByTestId('kardex-avio-almacen');
+    expect(almacen).toHaveValue('9');
+    expect(within(almacen).getByRole('option', { name: 'Avíos A' })).toBeInTheDocument();
+    expect(screen.getByTestId('kardex-avio-tabla')).toBeInTheDocument();
+  });
+
+  it('el almacén se puede soltar («Todos») y cambiar, y la consulta lo sigue', () => {
+    almacenesCatalogo.mockReturnValue([
+      { id: 9, nombre: 'Avíos A' },
+      { id: 11, nombre: 'Avíos B' },
+    ]);
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=3&idAlmacen=9',
+    });
+    const almacen = screen.getByTestId('kardex-avio-almacen');
+    // Con el catálogo cargado no se duplica la opción del almacén de la URL.
+    expect(within(almacen).getAllByRole('option', { name: 'Avíos A' })).toHaveLength(1);
+    fireEvent.change(almacen, { target: { value: '' } });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3 });
+    fireEvent.change(almacen, { target: { value: '11' } });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3, idAlmacen: 11 });
+  });
+
+  it('un id que no es número válido en la URL no consulta nada', () => {
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=abc&idAlmacen=-2',
+    });
+    expect(screen.getByTestId('kardex-avio-almacen')).toHaveValue('');
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('un 0 en la URL cuenta como «sin filtro» (el comentario de `idDeParametro`: 0 = sin filtro)', () => {
+    // idAvio=0 → no hay avío: no se consulta nada.
+    const { unmount } = renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=0&idAlmacen=9',
+    });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith(undefined);
+    unmount();
+    consultaKardexAvio.mockClear();
+
+    // idAlmacen=0 con un avío válido → se consulta el avío SIN almacén, y el select dice «Todos».
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=3&idAlmacen=0',
+    });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3 });
+    expect(screen.getByTestId('kardex-avio-almacen')).toHaveValue('');
+  });
+
+  it('cambiar de pestaña SUELTA el avío y el almacén (volver a Avíos no los conserva)', () => {
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex?material=avio&idAvio=3&idAlmacen=9',
+    });
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith({ idAvio: 3, idAlmacen: 9 });
+    fireEvent.click(screen.getByTestId('kardex-mat-dim-tela'));
+    expect(screen.getByTestId('kardex-tela-nota-legado')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kardex-mat-dim-avio'));
+    expect(consultaKardexAvio).toHaveBeenLastCalledWith(undefined);
+    expect(screen.getByTestId('kardex-avio-almacen')).toHaveValue('');
+  });
+
+  it('sin parámetros sigue abriendo en telas, como siempre', () => {
+    renderConProveedores(<KardexMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-avios.ver']),
+      rutaInicial: '/inventarios/materiales/kardex',
+    });
+    expect(screen.getByTestId('kardex-tela-nota-legado')).toBeInTheDocument();
+    expect(screen.queryByTestId('kardex-avio-almacen')).not.toBeInTheDocument();
   });
 });

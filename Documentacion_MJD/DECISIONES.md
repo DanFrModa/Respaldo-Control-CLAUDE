@@ -18532,3 +18532,17 @@ Dos criterios que el lead dejó con default y que Daniel puede corregir:
    muestra porque tampoco se puede entregar contra la orden. ⚠️ Esto no lo eligió esta fila: es la regla del inventario
    de PT por orden desde F6-E2 (ADR-0014), y la pantalla sólo la enseña. Si Daniel quiere entregar también lo que no
    tiene orden, el cambio no es de pantalla sino de esa regla (ficha aparte).
+
+#### (Post-F9.269) — CADA AVÍO TIENE SU BOTÓN DE MOVIMIENTOS Y LAS EXISTENCIAS SE AGRUPAN POR PROVEEDOR (fila 0.221, v0.199) — tres criterios con su default
+
+Aplica el punto 06 de §Post-F9.243. El botón «Movimientos» de cada renglón de Existencias de avíos abre el kardex de
+materiales que ya existía, filtrado por ese avío y ese almacén (el kardex gana el selector de almacén). Las existencias
+se pueden agrupar por proveedor con subtotal por grupo, calculado en el servidor.
+
+Tres criterios que el lead dejó con default y que Daniel puede corregir:
+1. **Se agrupa por el proveedor HABITUAL.** Un avío puede tener varios proveedores en el catálogo pero a lo más uno
+   habitual; así cada avío cae en un solo grupo y los subtotales suman el total. Los que no tienen habitual van a «Sin
+   proveedor habitual». La alternativa —que el avío aparezca bajo cada uno de sus proveedores— rompería esa suma.
+2. **El subtotal suma unidades distintas** (piezas, conos, metros), como el total que la pantalla ya tenía. Alternativa:
+   mostrar sólo cuántos renglones hay por grupo.
+3. **No se agrega un filtro por proveedor**, sólo el agrupado que se pidió, mientras Daniel no lo pida.

@@ -7,6 +7,7 @@ import {
   cancelarMovimientoAvio,
   consultarExistenciasAvio,
   kardexAvio,
+  subtotalesPorProveedor,
   traspasarAvio,
 } from './avios.js';
 
@@ -145,5 +146,62 @@ describe('Motivo OBLIGATORIO al traspasar avíos (fila 0.172)', () => {
     await expect(
       traspasarAvio(sesionMover(), { ...traspaso, motivo: '     ' }),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('⭐ Fila 0.221 · subtotales de existencia por PROVEEDOR HABITUAL', () => {
+  const fila = (idProveedor: number | null, proveedor: string | null, existencia: number) => ({
+    idProveedor,
+    proveedor,
+    existencia,
+  });
+
+  it('suma por proveedor, ordena alfabético y deja «Sin proveedor habitual» AL FINAL', () => {
+    const grupos = subtotalesPorProveedor([
+      fila(null, null, 7),
+      fila(2, 'Zíper SA', 100),
+      fila(1, 'Avíos del Norte', 40),
+      fila(2, 'Zíper SA', 60),
+      fila(null, null, 3),
+    ]);
+    expect(grupos).toEqual([
+      { idProveedor: 1, proveedor: 'Avíos del Norte', existencia: 40, renglones: 1 },
+      { idProveedor: 2, proveedor: 'Zíper SA', existencia: 160, renglones: 2 },
+      { idProveedor: null, proveedor: null, existencia: 10, renglones: 2 },
+    ]);
+  });
+
+  it('«Sin proveedor habitual» queda al final VENGA DONDE VENGA en la entrada', () => {
+    // Una sola posición de entrada no basta: el ordenamiento compara en un orden que depende de
+    // dónde cae cada elemento, y un comparador que sólo acierta «cuando el null es el segundo»
+    // pasaría con una fixtura y fallaría con otra (mutación sobreviviente del coder, 0.221).
+    const conProveedor = [fila(2, 'Botones', 1), fila(1, 'Avíos', 1), fila(3, 'Cierres', 1)];
+    for (let i = 0; i <= conProveedor.length; i += 1) {
+      const entrada = [...conProveedor.slice(0, i), fila(null, null, 1), ...conProveedor.slice(i)];
+      expect(subtotalesPorProveedor(entrada).map((g) => g.proveedor)).toEqual([
+        'Avíos',
+        'Botones',
+        'Cierres',
+        null,
+      ]);
+    }
+  });
+
+  it('los subtotales CUADRAN con el total (nada se cuenta dos veces ni se pierde)', () => {
+    const filas = [fila(1, 'A', 5), fila(null, null, 2), fila(3, 'C', 11), fila(1, 'A', 1)];
+    const total = filas.reduce((s, f) => s + f.existencia, 0);
+    const grupos = subtotalesPorProveedor(filas);
+    expect(grupos.reduce((s, g) => s + g.existencia, 0)).toBe(total);
+    expect(grupos.reduce((s, g) => s + g.renglones, 0)).toBe(filas.length);
+  });
+
+  it('el grupo sin proveedor aparece aunque sea el ÚNICO, y no aparece si no hay filas sin él', () => {
+    expect(subtotalesPorProveedor([fila(null, null, 4)])).toEqual([
+      { idProveedor: null, proveedor: null, existencia: 4, renglones: 1 },
+    ]);
+    expect(subtotalesPorProveedor([fila(1, 'A', 4)]).some((g) => g.idProveedor === null)).toBe(
+      false,
+    );
+    expect(subtotalesPorProveedor([])).toEqual([]);
   });
 });

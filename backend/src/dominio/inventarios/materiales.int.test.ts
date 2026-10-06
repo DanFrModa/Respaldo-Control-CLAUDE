@@ -464,6 +464,61 @@ describe('Avíos — multi-almacén (R4)', () => {
     expect(soloGen.filas[0]?.idAvio).toBe(avioGenerico.id);
   });
 
+  it('⭐ 0.221 · cada renglón trae su proveedor HABITUAL y los subtotales por proveedor cuadran', async () => {
+    // El cierre tiene DOS proveedores en el catálogo: sólo el habitual decide su grupo. El hilo
+    // no tiene ninguno → «Sin proveedor habitual». Si el JOIN multiplicara filas (por tomar a los
+    // dos proveedores), la existencia del cierre saldría DOBLE y el total no cuadraría.
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Avíos del Norte' } });
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: avioCierre.id, idProveedor: otro.id, habitual: false },
+        { idAvio: avioCierre.id, idProveedor: proveedor.id, habitual: true },
+      ],
+    });
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioA.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo físico',
+        lineas: [
+          { idAvio: avioCierre.id, cantidad: 500 },
+          { idAvio: avioGenerico.id, cantidad: 1000 },
+        ],
+      },
+      bd(),
+    );
+    await ajustarInventarioAvio(
+      sesion(PERM_AVIOS),
+      {
+        idTipoMov: idTipoAjusteEntrada,
+        idAlmacen: almAvioB.id,
+        fecha: '2026-06-20',
+        motivo: 'conteo físico',
+        lineas: [{ idAvio: avioCierre.id, cantidad: 30 }],
+      },
+      bd(),
+    );
+
+    const exis = await consultarExistenciasAvio(sesion(PERM_AVIOS), {}, bd());
+    expect(exis.filas).toHaveLength(3);
+    expect(exis.totalExistencia).toBe(1530);
+    const cierre = exis.filas.filter((f) => f.idAvio === avioCierre.id);
+    expect(cierre.map((f) => [f.idProveedor, f.proveedor])).toEqual([
+      [proveedor.id, 'Textiles SA'],
+      [proveedor.id, 'Textiles SA'],
+    ]);
+    const hilo = exis.filas.find((f) => f.idAvio === avioGenerico.id);
+    expect(hilo?.idProveedor).toBeNull();
+    expect(hilo?.proveedor).toBeNull();
+
+    expect(exis.porProveedor).toEqual([
+      { idProveedor: proveedor.id, proveedor: 'Textiles SA', existencia: 530, renglones: 2 },
+      { idProveedor: null, proveedor: null, existencia: 1000, renglones: 1 },
+    ]);
+  });
+
   it('traspaso de avío mueve entre almacenes; no-negativo bloquea', async () => {
     await ajustarInventarioAvio(
       sesion(PERM_AVIOS),

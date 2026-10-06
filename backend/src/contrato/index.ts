@@ -1452,6 +1452,7 @@ export {
   type ExistenciasAvioQuery,
   type ExistenciaAvioFila,
   type ExistenciasAvioLista,
+  type SubtotalAvioProveedor,
   type KardexAvioQuery,
   type KardexAvioRenglon,
   type KardexAvioSaldoInicial,

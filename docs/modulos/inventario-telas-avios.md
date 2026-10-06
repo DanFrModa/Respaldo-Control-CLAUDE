@@ -379,6 +379,10 @@ orden de **3.4 MB** en una sola respuesta). Con la ventana por omisión son **30
   Ajuste de salida y Traspaso —almacén origen— desde la 0.233): `CapturaRenglonesAvio` recibe `stockOrigen` del hook
   compartido `inventarios/useStockAvioEnAlmacen.ts` (`undefined` = no se sabe ⇒ deja pasar) y pinta la existencia.
   El ajuste de ENTRADA queda libre. La guarda que manda sigue en el servidor (`validarNoNegativoAvio`).
+- ⭐ **Existencias de avíos → kardex, y agrupado por proveedor** (fila 0.221): cada renglón enlaza al kardex de
+  materiales filtrado por avío y almacén (parámetros en `inventarios/kardex-enlace.ts`; el kardex lee pestaña, avío y
+  almacén de la URL). `consultarExistenciasAvio` une el proveedor **habitual** y devuelve `porProveedor`
+  (`subtotalesPorProveedor`, el grupo sin habitual al final).
 
 ## Migración del histórico (F4-E6)
 
