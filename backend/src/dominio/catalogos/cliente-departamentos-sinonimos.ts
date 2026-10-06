@@ -35,6 +35,7 @@
  */
 import type { ContextoBd } from '../../comun/transaccion.js';
 
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { clienteLectura } from '../../comun/transaccion.js';
 
 /**
@@ -60,7 +61,8 @@ interface NodoFusion {
  * fusión que alguno de los que ya casan con `texto`.
  *
  * Devuelve los nombres **ya recortados** y **sin los que el propio `texto` ya encontraría** (ésos
- * los cubre el `contains` de siempre; repetirlos sólo engordaría el `OR`). Sin coincidencias, sin
+ * los cubre la búsqueda de texto, sin acentos desde la fila 0.214; repetirlos sólo engordaría el
+ * `OR`). Sin coincidencias, sin
  * fusiones o con `texto` vacío devuelve `[]` — y entonces la búsqueda se comporta EXACTAMENTE como
  * antes de esta etapa, que es lo que la hace segura cuando el rastro no está (REGLA 0-B).
  *
@@ -78,15 +80,18 @@ export async function sinonimosDeDepartamentos(
   const cliente = clienteLectura(bd);
   const seleccion = { id: true, nombre: true, idFusionadoEn: true } as const;
 
-  // Semilla: los departamentos que el texto ya encuentra por nombre. Si ninguno casa, no hay
-  // sinónimo que resolver y se acabó en UNA consulta.
-  const semilla: NodoFusion[] = await cliente.clienteDepartamento.findMany({
-    where: { nombre: { contains: buscado, mode: 'insensitive' } },
-    select: seleccion,
-  });
-  if (semilla.length === 0) {
+  // Semilla: los departamentos que el texto ya encuentra por nombre, SIN ACENTOS (fila 0.214:
+  // «nino» tiene que sembrar «Niño Infantil»; con el `contains` de antes la semilla salía vacía y la
+  // pata de sinónimos se perdía entera). Si ninguno casa, no hay sinónimo que resolver y se acabó en
+  // UNA consulta.
+  const idsSemilla = await idsPorTextoSinAcentos(cliente, 'cliente-departamento', buscado);
+  if (idsSemilla.length === 0) {
     return [];
   }
+  const semilla: NodoFusion[] = await cliente.clienteDepartamento.findMany({
+    where: { id: { in: idsSemilla } },
+    select: seleccion,
+  });
 
   const vistos = new Map<number, NodoFusion>(semilla.map((d) => [d.id, d]));
   let frontera = semilla;
@@ -118,11 +123,15 @@ export async function sinonimosDeDepartamentos(
     }
   }
 
-  // Fuera los que el `contains` de siempre ya trae: sólo interesan los nombres que la búsqueda NO
-  // alcanzaría sola.
-  const enMinusculas = buscado.toLocaleLowerCase();
+  // Fuera los que la búsqueda de texto ya trae: sólo interesan los nombres que NO alcanzaría sola.
+  // Ésos son exactamente la SEMILLA, porque la semilla salió del MISMO pre-filtro sin acentos que
+  // busca en las referencias de la orden (fila 0.214). Se descartan por id y no re-comparando el
+  // texto en JavaScript: una segunda normalización hecha a mano podría no coincidir con `unaccent`
+  // en algún carácter raro, y entonces se tiraría un sinónimo que la búsqueda NO encuentra.
+  const enSemilla = new Set(idsSemilla);
   const sinonimos = [...vistos.values()]
+    .filter((d) => !enSemilla.has(d.id))
     .map((d) => d.nombre.trim())
-    .filter((nombre) => nombre !== '' && !nombre.toLocaleLowerCase().includes(enMinusculas));
+    .filter((nombre) => nombre !== '');
   return [...new Set(sinonimos)];
 }

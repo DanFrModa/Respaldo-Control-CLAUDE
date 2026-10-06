@@ -67,6 +67,7 @@ import {
 import { EstatusNotaSalida, type Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
@@ -1059,7 +1060,7 @@ export async function listarNotasSalida(
   const filtros = validarEntrada(esquemaListarNotasDominio, parametros);
 
   const where: Prisma.NotaSalidaWhereInput = {
-    ...armarWhereNotas(sesion.idEmpresaActiva, filtros),
+    ...(await armarWhereNotas(sesion.idEmpresaActiva, filtros, bd)),
     ...(filtros.estatus === undefined ? {} : { estatus: filtros.estatus }),
     ...(filtros.estatus === undefined && !filtros.incluirCanceladas
       ? { estatus: { not: EstatusNotaSalida.cancelada } }
@@ -1082,14 +1083,21 @@ export async function listarNotasSalida(
   return pagina;
 }
 
-/** Arma el `OR` de búsqueda: folio (si es entero) o nombre de maquilero. Vacío → sin OR. */
-function armarBusqueda(busqueda: string | undefined): Prisma.NotaSalidaWhereInput {
+/**
+ * Arma el `OR` de búsqueda: folio (si es entero) o nombre de maquilero. Vacío → sin OR.
+ *
+ * El maquilero es un PROVEEDOR: su nombre se compara SIN acentos ni mayúsculas (fila 0.214) con el
+ * pre-filtro del catálogo de proveedores, compuesto por `idMaquilero`.
+ */
+async function armarBusqueda(
+  busqueda: string | undefined,
+  bd?: ContextoBd,
+): Promise<Prisma.NotaSalidaWhereInput> {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
-  const or: Prisma.NotaSalidaWhereInput[] = [
-    { maquilero: { nombre: { contains: busqueda, mode: 'insensitive' } } },
-  ];
+  const idsMaquilero = await idsPorTextoSinAcentos(clienteLectura(bd), 'proveedor', busqueda);
+  const or: Prisma.NotaSalidaWhereInput[] = [{ idMaquilero: { in: idsMaquilero } }];
   if (/^\d+$/.test(busqueda.trim())) {
     try {
       or.push({ numNota: BigInt(busqueda.trim()) });
@@ -1106,20 +1114,21 @@ function armarBusqueda(busqueda: string | undefined): Prisma.NotaSalidaWhereInpu
  * el mismo universo de dos maneras distintas (mismo patrón que `armarWhereAuditorias`). El
  * ESTATUS no entra aquí: el listado lo agrega encima y el resumen desglosa por estatus él mismo.
  */
-function armarWhereNotas(
+async function armarWhereNotas(
   idEmpresa: number,
   filtros: {
     busqueda?: string | undefined;
     idMaquilero?: number | undefined;
     idOrden?: number | undefined;
   },
-): Prisma.NotaSalidaWhereInput {
+  bd?: ContextoBd,
+): Promise<Prisma.NotaSalidaWhereInput> {
   return {
     idEmpresa,
     ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
     // Notas ligadas a una orden de PRODUCCIÓN (consulta "Notas por orden"): vía sus renglones.
     ...(filtros.idOrden === undefined ? {} : { lineas: { some: { idOrden: filtros.idOrden } } }),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusqueda(filtros.busqueda, bd)),
   };
 }
 
@@ -1155,7 +1164,7 @@ export async function resumenNotasSalida(
   verificarPermiso(sesion, 'notas.ver');
   const filtros = validarEntrada(esquemaResumenNotasDominio, parametros);
   const cliente = clienteLectura(bd);
-  const whereNotas = armarWhereNotas(sesion.idEmpresaActiva, filtros);
+  const whereNotas = await armarWhereNotas(sesion.idEmpresaActiva, filtros, bd);
 
   const [porEstatus, ordenesDistintas] = await Promise.all([
     cliente.notaSalida.groupBy({

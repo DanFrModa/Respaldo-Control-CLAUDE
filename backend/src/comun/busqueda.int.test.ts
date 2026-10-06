@@ -195,7 +195,7 @@ describe('Búsqueda sin acentos — TELAS (5 columnas, tres en tablas vecinas)',
 
   it('una tela cuyos DOS colores casan sale UNA vez en la página', async () => {
     // "TCX" está en los dos pantones de la MISMA tela. Esto fija lo que VE el usuario; la forma
-    // del SQL (vecinos por `EXISTS`, sin ids repetidos) la fija `busqueda.test.ts`, porque el
+    // del SQL (vecinos por subconsulta `IN`, sin ids repetidos) la fija `busqueda.test.ts`, porque el
     // `id IN (…)` de Prisma deduplicaría la lista y aquí no se notaría la diferencia.
     const pagina = await listarTelas(sesion(), { busqueda: 'tcx' }, bd());
     expect(pagina.total).toBe(1);

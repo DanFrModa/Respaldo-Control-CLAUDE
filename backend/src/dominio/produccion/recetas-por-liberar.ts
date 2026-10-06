@@ -41,6 +41,7 @@ import type {
 import { esquemaRecetasPorLiberarDominio } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
+import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 // ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — la MISMA lectura de "qué ya está comprado en firme" que usan la
 // receta y la guarda de §Post-F9.79. La bandeja NO la vuelve a escribir: el criterio de comprometido
@@ -124,10 +125,11 @@ export async function consultarRecetasPorLiberar(
   const condBusqueda =
     busqueda === ''
       ? Prisma.empty
-      : Prisma.sql`AND (
-            m."codigo" ILIKE ${`%${busqueda}%`}
-         OR c."nombre" ILIKE ${`%${busqueda}%`}
-         OR CAST(o."folio" AS TEXT) LIKE ${`%${busqueda}%`}
+      : // SIN acentos ni mayúsculas, con los comodines del usuario escapados (fila 0.214).
+        Prisma.sql`AND (
+            ${condicionContieneSinAcentos('m."codigo"', busqueda)}
+         OR ${condicionContieneSinAcentos('c."nombre"', busqueda)}
+         OR ${condicionContieneSinAcentos('CAST(o."folio" AS TEXT)', busqueda)}
         )`;
   // "Ya está frenando dinero": OC NO cancelada ligada a la orden por cualquier renglón.
   const conOc = Prisma.sql`EXISTS (

@@ -35,6 +35,7 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -116,12 +117,13 @@ export async function listarConceptosPago(
   const filtros = validarEntrada(esquemaConceptosPagoQuery, parametros);
   const cliente = clienteLectura(bd);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'concepto-pago', filtros.busqueda);
   const where: Prisma.ConceptoPagoWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.rubro === undefined ? {} : { rubro: filtros.rubro }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const [total, filas] = await Promise.all([

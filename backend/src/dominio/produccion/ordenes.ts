@@ -117,6 +117,7 @@ import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   EVENTOS_OUTBOX,
@@ -1577,7 +1578,7 @@ export async function listarOrdenes(
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(filtros.anio === undefined ? {} : { fecha: rangoAnio(filtros.anio) }),
     ...filtroOrdenesCerradas(filtros.cerradas),
-    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, sesion.idEmpresaActiva, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -1606,7 +1607,15 @@ export const buscarOrdenes = listarOrdenes;
 
 /**
  * Arma el `OR` de búsqueda combinada: folio (si la búsqueda es entero), código de modelo, nombre
- * de cliente y valor de referencia (D7, vía el índice de `OrdenReferencia.valor`). Vacío → sin OR.
+ * de cliente y valor de referencia (D7). Vacío → sin OR.
+ *
+ * ⭐ **Fila 0.214 — los TEXTOS ya no se comparan aquí.** El código de modelo, el nombre del cliente y
+ * las referencias se buscaban con `contains mode: 'insensitive'` (ILIKE), que ignora mayúsculas pero
+ * NO acentos: teclear «nino» en `SelectorOrden` no encontraba las órdenes de «Niño Infantil», ni
+ * «oscar» las de «Almacenes Óscar». Ahora llegan como `idsPorTexto`: los ids de las órdenes que
+ * casan SIN acentos, resueltos UNA vez por consulta con el pre-filtro de `comun/busqueda.ts`
+ * (catálogo `orden`, acotado a la empresa). Lo que se queda aquí son las IGUALDADES —el folio y los
+ * sinónimos de departamento—, que no son texto difuso.
  *
  * Exportado para reusarse en las CONSULTAS ligeras (F2-E4, `consultas.ts`): la consulta y el
  * buscador global comparten EXACTAMENTE esta lógica de búsqueda combinada (folio + modelo + cliente
@@ -1620,21 +1629,18 @@ export const buscarOrdenes = listarOrdenes;
  * usuario tecleó sino nombres EXACTOS del catálogo —los mismos que el importador copió al valor de
  * la referencia—, y un `contains` con un nombre de una o dos letras arrastraría media base.
  *
- * 🔑 Esta función sigue siendo **pura**: quien la llama resuelve el conjunto de sinónimos UNA vez
- * (`armarBusquedaConSinonimos`) y se lo pasa. Nunca se recorre la cadena de fusiones por fila.
+ * 🔑 Esta función sigue siendo **pura**: quien la llama resuelve los ids y el conjunto de sinónimos
+ * UNA vez (`armarBusquedaConSinonimos`) y se los pasa. Nunca se recorre nada por fila.
  */
 export function armarBusqueda(
   busqueda: string | undefined,
+  idsPorTexto: readonly number[],
   sinonimosDepartamento: readonly string[] = [],
 ): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
-  const or: Prisma.OrdenWhereInput[] = [
-    { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
-    { cliente: { nombre: { contains: busqueda, mode: 'insensitive' } } },
-    { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
-  ];
+  const or: Prisma.OrdenWhereInput[] = [{ id: { in: [...idsPorTexto] } }];
   const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
   if (porSinonimo !== null) {
     or.push(porSinonimo);
@@ -1667,21 +1673,28 @@ export function condicionSinonimosDepartamento(
 
 /**
  * ⭐⭐ La búsqueda de órdenes CON los sinónimos ya resueltos (§Post-F9.172(a)): el embudo que usan el
- * listado, las consultas ligeras, el buscador global, el tablero WIP y la lista de costos.
+ * listado (y con él `SelectorOrden`), las consultas ligeras, el buscador global, el tablero WIP y la
+ * lista de costos.
  *
  * Es {@link armarBusqueda} + **una** resolución de sinónimos por consulta
- * ({@link sinonimosDeDepartamentos}, 1 viaje si el texto no casa con ningún departamento). Se hizo
- * async por esto: el rastro de la fusión vive en el catálogo y hay que leerlo, pero **una sola vez**
- * — jamás por fila.
+ * ({@link sinonimosDeDepartamentos}, 1 viaje si el texto no casa con ningún departamento) + **un**
+ * pre-filtro de ids sin acentos (fila 0.214). Las dos lecturas van en paralelo y ninguna es por
+ * fila. `idEmpresa` acota el pre-filtro a la empresa activa (A9): el `where` del llamador también
+ * la lleva, pero así la lista de ids es del tamaño de una empresa y no de la base.
  */
 export async function armarBusquedaConSinonimos(
   busqueda: string | undefined,
+  idEmpresa: number,
   bd?: ContextoBd,
 ): Promise<Prisma.OrdenWhereInput> {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
-  return armarBusqueda(busqueda, await sinonimosDeDepartamentos(busqueda, bd));
+  const [idsPorTexto, sinonimos] = await Promise.all([
+    idsPorTextoSinAcentos(clienteLectura(bd), 'orden', busqueda, { idEmpresa }),
+    sinonimosDeDepartamentos(busqueda, bd),
+  ]);
+  return armarBusqueda(busqueda, idsPorTexto, sinonimos);
 }
 
 /** Si la búsqueda es un entero, devuelve el `bigint` para filtrar por folio; si no, `null`. */

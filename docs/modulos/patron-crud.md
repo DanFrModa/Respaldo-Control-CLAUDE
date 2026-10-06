@@ -189,6 +189,16 @@ async function reactivar<Entidad>(id: number) {
 
 ---
 
+## Búsqueda de texto: SIEMPRE sin acentos (fila 0.214)
+
+Toda búsqueda que teclea el usuario pasa por `backend/src/comun/busqueda.ts` (pre-filtro de ids con
+`lower(unaccent(x))`, la tabla y sus columnas declaradas en su lista blanca, con `columnaEmpresa` si la
+tabla es por empresa). **Nunca** `contains` + `mode: 'insensitive'` ni `ILIKE` a mano: ignoran mayúsculas
+pero no acentos, y `busqueda-guardian.test.ts` pone el CI en rojo si aparece uno nuevo. Los `equals` de
+«ya existe uno con ese nombre» no son búsqueda y quedan fuera.
+
+---
+
 ## Accesibilidad y forma (todo lo menor es mayor)
 
 - **Español** en toda la UI; identificadores en código sin acentos ni ñ.

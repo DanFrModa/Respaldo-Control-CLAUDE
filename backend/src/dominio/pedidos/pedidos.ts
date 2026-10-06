@@ -34,6 +34,7 @@ import type {
 import type { Pedido, PedidoLinea, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -1034,15 +1035,18 @@ export async function listarPedidos(
   const puedeVerImportes = tienePermiso(sesion, 'pedidos.importes');
 
   const busquedaFolio = aFolioBusqueda(filtros.busqueda);
+  // Nombre del cliente SIN acentos ni mayúsculas (fila 0.214): el pre-filtro va contra el CATÁLOGO
+  // de clientes (chico), no contra los pedidos, y se compone por `idCliente`.
+  const idsClienteBuscado = await idsSiHayBusqueda(clienteLectura(bd), 'cliente', filtros.busqueda);
   const where: Prisma.PedidoWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     ...(filtros.incluirCancelados ? {} : { pedCancelado: false }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
+    ...(idsClienteBuscado === undefined
       ? {}
       : {
           OR: [
-            { cliente: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } },
+            { idCliente: { in: idsClienteBuscado } },
             ...(busquedaFolio === null ? [] : [{ folio: busquedaFolio }]),
           ],
         }),

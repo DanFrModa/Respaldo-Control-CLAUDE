@@ -642,7 +642,7 @@ export async function consultarWip(
       : { estado: filtros.estado }),
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
-    ...(await armarBusquedaConSinonimos(filtros.busqueda, bd)),
+    ...(await armarBusquedaConSinonimos(filtros.busqueda, sesion.idEmpresaActiva, bd)),
   };
 
   const paginacion: Paginacion = { pagina: filtros.pagina, porPagina: filtros.porPagina };

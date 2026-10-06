@@ -35,6 +35,7 @@ import { z } from 'zod';
 import type { OrdenCentroFila, OrdenesCentroPagina } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import {
   armarPagina,
   esquemaPaginacion,
@@ -95,18 +96,21 @@ const CONDICION_OC_TELA = {
  * que se arregla vive en `OrdenReferencia.valor`, y esta función lee esa misma columna. Cubrir un
  * embudo y no el otro habría dejado el Centro de Órdenes —la pantalla que más se usa— sin el
  * arreglo. Los sinónimos llegan YA resueltos (una vez por consulta, nunca por fila).
+ *
+ * ⭐ **Fila 0.214 — y por la misma razón, también SIN ACENTOS.** El código de modelo y las
+ * referencias llegan como `idsPorTexto` (pre-filtro `orden-centro` de `comun/busqueda.ts`, resuelto
+ * una vez por consulta): teclear «nino» trae las órdenes de «Niño Infantil», que con el
+ * `contains` de antes daba CERO (§Post-F9.238(b)).
  */
 function busquedaCentro(
   busqueda: string | undefined,
+  idsPorTexto: readonly number[],
   sinonimosDepartamento: readonly string[],
 ): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
-  const or: Prisma.OrdenWhereInput[] = [
-    { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
-    { referencias: { some: { valor: { contains: busqueda, mode: 'insensitive' } } } },
-  ];
+  const or: Prisma.OrdenWhereInput[] = [{ id: { in: [...idsPorTexto] } }];
   const porSinonimo = condicionSinonimosDepartamento(sinonimosDepartamento);
   if (porSinonimo !== null) {
     or.push(porSinonimo);
@@ -198,10 +202,18 @@ export async function centroComandoOrdenes(
   if (filtros.ocTela !== undefined) {
     condiciones.push(filtros.ocTela === 'con' ? CONDICION_OC_TELA : { NOT: CONDICION_OC_TELA });
   }
-  const busqueda = busquedaCentro(
-    filtros.busqueda,
-    await sinonimosDeDepartamentos(filtros.busqueda, bd),
-  );
+  // Los ids sin acentos y los sinónimos se resuelven UNA vez, en paralelo (nunca por fila).
+  const texto = filtros.busqueda;
+  const [idsPorTexto, sinonimos] =
+    texto === undefined || texto === ''
+      ? [[], []]
+      : await Promise.all([
+          idsPorTextoSinAcentos(cliente, 'orden-centro', texto, {
+            idEmpresa: sesion.idEmpresaActiva,
+          }),
+          sinonimosDeDepartamentos(texto, bd),
+        ]);
+  const busqueda = busquedaCentro(texto, idsPorTexto, sinonimos);
   if (busqueda.OR !== undefined) {
     condiciones.push(busqueda);
   }

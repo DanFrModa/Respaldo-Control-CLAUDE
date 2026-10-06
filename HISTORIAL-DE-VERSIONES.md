@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.201 · 6-oct-2026 · **en prueba** — **Buscas sin acentos en todo el sistema: «nino» encuentra «NIÑO»**
+
+> **La v0.201 cierra una fila del programa: la 0.214.** Desde R2 y la 0.205, proveedores, clientes, colores, telas, avíos
+> y modelos ya se encontraban sin teclear acentos. Faltaban **39 buscadores más**, y ya están todos.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El buscador de órdenes de las pantallas de captura** (entrega a cliente, salida de tela a orden, alta de auditoría)
+encuentra la orden aunque no teclees el acento: «nino» encuentra una referencia «NIÑO INFANTIL», «oscar» encuentra al
+cliente «Almacenes Óscar», «cana» encuentra el modelo «CAÑA-01». Antes la lista salía vacía y parecía que la orden no
+existía.
+
+**Lo mismo en el resto de los buscadores:** almacenes, usuarios, auditores, defectos, tallas, curvas, temporadas,
+personal, pedidos, el Centro de Órdenes, el histórico de órdenes, la bandeja de Ruta Crítica, órdenes de compra, notas de
+salida, entradas y partidas de tela, la galería de arte, los proyectos de desarrollo, el concentrado de Ruta Crítica,
+ventas y las recetas por revisar y por liberar, entre otros.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El `%` y el `_` que teclees ahora se buscan tal cual** (también sus versiones anchas, `％` y `＿`). Antes funcionaban como comodín sin querer: buscar «100%» traía
+todo lo que tuviera «100» en cualquier parte.
+
+### ⏳ Sigue pendiente o roto
+
+**Los chequeos de «ya existe uno con ese nombre» siguen distinguiendo acentos** (p. ej. al dar de alta una composición
+de tela o un código de modelo): no son búsquedas del usuario y cambiarlos cambiaría qué cuenta como repetido; si algún día
+se quiere, es otra decisión.
+
 ## 0.200 · 6-oct-2026 · **en prueba** — **Al traer los avíos de la orden, primero ves la lista y escoges qué se manda**
 
 > **La v0.200 cierra una fila del programa: la 0.220**, y abre dos más que salieron de medirla (0.253 y 0.254). Es tu

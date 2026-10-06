@@ -32,6 +32,7 @@ import type { Prisma } from '../../datos/index.js';
 import { hashPassword } from 'better-auth/crypto';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -575,17 +576,13 @@ export async function listarUsuarios(
   verificarPermiso(sesion, 'usuarios.administrar');
   const filtros = validarEntrada(esquemaListarUsuarios, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'usuario', filtros.busqueda);
   const where: Prisma.UsuarioWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.soloBloqueados ? { bloqueado: true } : {}),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { username: { contains: filtros.busqueda, mode: 'insensitive' } },
-            { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);

@@ -52,6 +52,7 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import {
   eliminarObjetosBestEffort,
   servicioArchivos,
@@ -747,20 +748,13 @@ export async function galeriaArte(
   verificarPermiso(sesion, 'modelos.ver');
   const filtros = validarEntrada(esquemaParametrosGaleria, parametros);
 
-  const busqueda = filtros.busqueda ?? '';
+  // Descripción/posición del arte O clave/descripción de su modelo, SIN acentos ni mayúsculas
+  // (fila 0.214): un solo pre-filtro de ids que alcanza al modelo por subconsulta.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'modelo-arte', filtros.busqueda);
   const where: Prisma.ModeloArteWhereInput = {
     ...(filtros.idTipoArte === undefined ? {} : { idTipoArte: filtros.idTipoArte }),
     ...(filtros.soloConFoto ? { fotos: { some: {} } } : {}),
-    ...(busqueda === ''
-      ? {}
-      : {
-          OR: [
-            { descripcion: { contains: busqueda, mode: 'insensitive' } },
-            { posicion: { contains: busqueda, mode: 'insensitive' } },
-            { modelo: { codigo: { contains: busqueda, mode: 'insensitive' } } },
-            { modelo: { descripcion: { contains: busqueda, mode: 'insensitive' } } },
-          ],
-        }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const orden: Prisma.ModeloArteOrderByWithRelationInput =

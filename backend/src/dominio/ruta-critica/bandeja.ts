@@ -31,6 +31,7 @@ import type {
 } from '../../contrato/esquemas/ruta-critica-bandeja.js';
 import type { Prisma } from '../../datos/index.js';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import {
   armarPagina,
   esquemaPaginacion,
@@ -232,21 +233,20 @@ async function procesosResponsablesDeUsuario(
 /**
  * Arma el `where` de las tareas ACTIVAS de la empresa activa (A9): renglones 'activo' de órdenes con
  * la RC viva. Si `idsProcesoResponsable` no es null, además restringe a esos procesos (las tareas del
- * usuario); si es `[]`, no devuelve nada (usuario sin procesos responsables). `filtroCliente` añade,
- * cuando viene, un `contains` insensible sobre el nombre del cliente DENTRO del mismo `orden` (para no
- * perder el scope de empresa/rcActiva).
+ * usuario); si es `[]`, no devuelve nada (usuario sin procesos responsables). `idsClienteBuscado`
+ * añade, cuando viene, el filtro por cliente DENTRO del mismo `orden` (para no perder el scope de
+ * empresa/rcActiva): son los clientes cuyo nombre casa con lo tecleado SIN acentos (fila 0.214),
+ * resueltos por quien llama con el pre-filtro de `comun/busqueda.ts` — así esta función sigue pura.
  */
 function whereTareasActivas(
   sesion: SesionUsuario,
   idsProcesoResponsable: number[] | null,
-  filtroCliente?: string,
+  idsClienteBuscado?: readonly number[],
 ): Prisma.RutaOrdenWhereInput {
   const orden: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     rcActiva: true,
-    ...(filtroCliente === undefined || filtroCliente === ''
-      ? {}
-      : { cliente: { nombre: { contains: filtroCliente, mode: 'insensitive' } } }),
+    ...(idsClienteBuscado === undefined ? {} : { idCliente: { in: [...idsClienteBuscado] } }),
   };
   return {
     estado: 'activo',
@@ -323,8 +323,10 @@ export async function consultarBandeja(
     }
   }
 
+  // Cliente SIN acentos ni mayúsculas (fila 0.214): pre-filtro contra el catálogo de clientes.
+  const idsClienteBuscado = await idsSiHayBusqueda(cliente, 'cliente', filtros.busquedaCliente);
   const where: Prisma.RutaOrdenWhereInput = {
-    ...whereTareasActivas(sesion, idsProcesoEfectivos, filtros.busquedaCliente),
+    ...whereTareasActivas(sesion, idsProcesoEfectivos, idsClienteBuscado),
     ...(filtros.idOrden === undefined ? {} : { idOrden: filtros.idOrden }),
   };
 

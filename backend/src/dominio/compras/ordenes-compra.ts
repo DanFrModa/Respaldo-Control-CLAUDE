@@ -60,6 +60,7 @@ import type {
 import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import {
@@ -1683,7 +1684,7 @@ export async function listarOC(
       ? {}
       : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
     ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusqueda(filtros.busqueda, bd)),
   };
 
   const cliente = clienteLectura(bd);
@@ -1755,7 +1756,7 @@ export async function resumenOC(
       ? {}
       : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
     ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
-    ...armarBusqueda(filtros.busqueda),
+    ...(await armarBusqueda(filtros.busqueda, bd)),
   };
 
   const abiertas = await cliente.ordenCompra.findMany({
@@ -1822,14 +1823,21 @@ export async function resumenOC(
   return { ocAbiertas, porRecibir: redondear2(porRecibir) };
 }
 
-/** Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR. */
-function armarBusqueda(busqueda: string | undefined): Prisma.OrdenCompraWhereInput {
+/**
+ * Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR.
+ *
+ * El nombre del proveedor se compara SIN acentos ni mayúsculas (fila 0.214): el pre-filtro corre
+ * contra el CATÁLOGO de proveedores (chico) y se compone por `idProveedor`.
+ */
+async function armarBusqueda(
+  busqueda: string | undefined,
+  bd?: ContextoBd,
+): Promise<Prisma.OrdenCompraWhereInput> {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
-  const or: Prisma.OrdenCompraWhereInput[] = [
-    { proveedor: { nombre: { contains: busqueda, mode: 'insensitive' } } },
-  ];
+  const idsProveedor = await idsPorTextoSinAcentos(clienteLectura(bd), 'proveedor', busqueda);
+  const or: Prisma.OrdenCompraWhereInput[] = [{ idProveedor: { in: idsProveedor } }];
   if (/^\d+$/.test(busqueda.trim())) {
     try {
       or.push({ numCompra: BigInt(busqueda.trim()) });

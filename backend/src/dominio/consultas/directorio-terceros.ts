@@ -28,6 +28,7 @@ import {
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -63,21 +64,19 @@ export async function listarDirectorioTerceros(
   const f: DatosDirectorioTercerosQuery = validarEntrada(esquemaDirectorioTercerosQuery, filtros);
   const cliente = clienteLectura(bd);
 
-  const contiene = (v: string): Prisma.StringFilter => ({ contains: v, mode: 'insensitive' });
-  const where: Prisma.DirectorioTerceroV1WhereInput = {};
-
-  if (f.busqueda !== undefined && f.busqueda !== '') {
-    // Se busca también por TELÉFONO: la pregunta de Daniel era literalmente "encontrar algún
-    // teléfono", y a veces se llega al revés (tengo el número, ¿de quién es?).
-    where.OR = [
-      { nombre: contiene(f.busqueda) },
-      { corto: contiene(f.busqueda) },
-      { razonSocial: contiene(f.busqueda) },
-      { contacto: contiene(f.busqueda) },
-      { telefono: contiene(f.busqueda) },
-    ];
-  }
-  if (f.servicio !== undefined && f.servicio !== '') where.servicios = contiene(f.servicio);
+  // Las dos cajas de texto, SIN acentos ni mayúsculas (fila 0.214): cada una es un pre-filtro de
+  // ids de `comun/busqueda.ts`, y se cruzan con `AND` (las dos tienen que casar).
+  // Se busca también por TELÉFONO: la pregunta de Daniel era literalmente "encontrar algún
+  // teléfono", y a veces se llega al revés (tengo el número, ¿de quién es?).
+  const [idsBusqueda, idsServicio] = await Promise.all([
+    idsSiHayBusqueda(cliente, 'directorio-tercero', f.busqueda),
+    idsSiHayBusqueda(cliente, 'directorio-tercero-servicio', f.servicio),
+  ]);
+  const porTexto: Prisma.DirectorioTerceroV1WhereInput[] = [];
+  if (idsBusqueda !== undefined) porTexto.push({ id: { in: idsBusqueda } });
+  if (idsServicio !== undefined) porTexto.push({ id: { in: idsServicio } });
+  const where: Prisma.DirectorioTerceroV1WhereInput =
+    porTexto.length === 0 ? {} : { AND: porTexto };
   if (f.enCatalogo === 'solo-catalogo') where.enCatalogo = true;
   if (f.enCatalogo === 'solo-fuera') where.enCatalogo = false;
 

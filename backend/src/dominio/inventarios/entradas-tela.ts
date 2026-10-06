@@ -87,6 +87,7 @@ import {
 } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { exigirAlmacenDelTipo } from '../../comun/almacenes.js';
 import { type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -1523,10 +1524,10 @@ export async function listarEntradasTela(
     condiciones.push({ fecha: { lte: aDateColumna(filtros.fechaHasta) } });
   const busqueda = filtros.busqueda;
   if (busqueda !== undefined && busqueda.length > 0) {
-    const or: Prisma.EntradaTelaWhereInput[] = [
-      { numeroDocumento: { contains: busqueda, mode: 'insensitive' } },
-      { proveedor: { nombre: { contains: busqueda, mode: 'insensitive' } } },
-    ];
+    // Número de documento o nombre del proveedor SIN acentos ni mayúsculas (fila 0.214), acotado a
+    // la empresa activa (A9). El folio es igualdad y se queda en Prisma.
+    const ids = await idsPorTextoSinAcentos(cliente, 'entrada-tela', busqueda, { idEmpresa });
+    const or: Prisma.EntradaTelaWhereInput[] = [{ id: { in: ids } }];
     if (/^\d+$/.test(busqueda)) or.push({ folio: BigInt(busqueda) });
     condiciones.push({ OR: or });
   }

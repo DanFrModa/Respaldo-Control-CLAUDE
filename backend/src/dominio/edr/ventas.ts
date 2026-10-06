@@ -22,6 +22,7 @@ import {
 import { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
 import { armarPagina, rangoPrisma, type Paginacion } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -43,9 +44,10 @@ function condicionesVenta(filtros: FiltrosVentas): Prisma.Sql {
     cond.push(Prisma.sql`e."mes" = ${filtros.mes}`);
   }
   if (filtros.busqueda !== undefined && filtros.busqueda !== '') {
-    const patron = `%${filtros.busqueda}%`;
+    // SIN acentos ni mayúsculas, con los comodines del usuario escapados (fila 0.214).
+    const busqueda = filtros.busqueda;
     cond.push(
-      Prisma.sql`(c."nombre" ILIKE ${patron} OR m."codigo" ILIKE ${patron} OR o."folio"::text ILIKE ${patron})`,
+      Prisma.sql`(${condicionContieneSinAcentos('c."nombre"', busqueda)} OR ${condicionContieneSinAcentos('m."codigo"', busqueda)} OR ${condicionContieneSinAcentos('o."folio"::text', busqueda)})`,
     );
   }
   return Prisma.join(cond, ' AND ');

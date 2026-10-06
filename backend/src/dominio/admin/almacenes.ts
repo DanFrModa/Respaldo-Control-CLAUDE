@@ -30,6 +30,7 @@ import { esquemaAlmacenCrear, esquemaAlmacenEditar, TIPOS_ALMACEN } from '../../
 import type { Almacen, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -504,13 +505,14 @@ export async function listarAlmacenes(
   verificarPermiso(sesion, 'almacenes.ver');
   const filtros = validarEntrada(esquemaListarAlmacenes, parametros);
 
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'almacen', filtros.busqueda);
   const where: Prisma.AlmacenWhereInput = {
     ...(filtros.todasLasEmpresas ? {} : filtroEmpresaActiva(sesion)),
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
   const cliente = clienteLectura(bd);

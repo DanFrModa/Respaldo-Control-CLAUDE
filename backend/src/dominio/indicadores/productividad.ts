@@ -72,6 +72,7 @@ import type {
 } from '../../datos/index.js';
 import { Prisma as PrismaNS } from '../../datos/index.js';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import {
   ErrorConflicto,
@@ -298,12 +299,13 @@ export async function listarPersonal(
 ): Promise<PersonalPagina> {
   verificarLectura(sesion);
   const filtros: PersonalQuery = validarEntrada(esquemaPersonalQueryDominio, parametros);
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'personal-area', filtros.busqueda);
   const where: Prisma.PersonalAreaWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.area === undefined ? {} : { area: filtros.area }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
   const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
@@ -469,12 +471,17 @@ export async function listarActividades(
 ): Promise<ActividadPagina> {
   verificarLectura(sesion);
   const filtros: ActividadQuery = validarEntrada(esquemaActividadQueryDominio, parametros);
+  // Búsqueda SIN acentos ni mayúsculas (fila 0.214: «ambar» encuentra «ÁMBAR»): pre-filtro de
+  // ids de `comun/busqueda.ts`, compuesto con el resto del where.
+  const idsBusqueda = await idsSiHayBusqueda(
+    clienteLectura(bd),
+    'actividad-productividad',
+    filtros.busqueda,
+  );
   const where: Prisma.ActividadProductividadWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.area === undefined ? {} : { area: filtros.area }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
   const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([

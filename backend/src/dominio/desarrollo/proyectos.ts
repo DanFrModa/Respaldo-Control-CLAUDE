@@ -42,6 +42,7 @@ import {
 import type { Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -721,6 +722,10 @@ export async function listarProyectos(
   const filtros = validarEntrada(esquemaListarProyectosDominio, parametros);
 
   const busquedaFolio = aFolioBusqueda(filtros.busqueda);
+  // Nombre SIN acentos ni mayúsculas (fila 0.214), acotado a la empresa activa (A9).
+  const idsBusqueda = await idsSiHayBusqueda(clienteLectura(bd), 'proyecto', filtros.busqueda, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   const where: Prisma.ProyectoWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
     ...(filtros.incluirArchivados ? {} : { archivado: false }),
@@ -729,11 +734,11 @@ export async function listarProyectos(
       ? {}
       : { idClienteDepartamento: filtros.idClienteDepartamento }),
     ...(filtros.idTemporada === undefined ? {} : { idTemporada: filtros.idTemporada }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
+    ...(idsBusqueda === undefined
       ? {}
       : {
           OR: [
-            { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
+            { id: { in: idsBusqueda } },
             ...(busquedaFolio === null ? [] : [{ folio: busquedaFolio }]),
           ],
         }),

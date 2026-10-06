@@ -71,6 +71,28 @@ function casaCatalogo(fila: FilaCatalogo, where: WhereCatalogo): boolean {
   throw new Error(`where de catálogo no soportado: ${JSON.stringify(where)}`);
 }
 
+/** Sin acentos y en minúsculas: lo que hace `lower(unaccent())` en el pre-filtro real. */
+function comparable(texto: string): string {
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/**
+ * Emula el PRE-FILTRO sin acentos (fila 0.214) sobre el catálogo de departamentos: la semilla de los
+ * sinónimos ya no es un `findMany` con `contains`, es un `$queryRaw` de `comun/busqueda.ts`. El
+ * texto llega CRUDO como el último parámetro (los comodines los escapa el SQL). Cualquier otro
+ * pre-filtro (el de órdenes) devuelve CERO ids: aquí no hay órdenes, se mide el `where`.
+ */
+function preFiltroStub(catalogo: FilaCatalogo[]) {
+  return vi.fn((consulta: Prisma.Sql) => {
+    if (!consulta.text.includes('"cliente_departamento"')) return Promise.resolve([]);
+    // El texto viaja CRUDO (el escape de comodines lo hace el SQL, después de `unaccent`).
+    const texto = comparable(String(consulta.values[consulta.values.length - 1]));
+    return Promise.resolve(
+      catalogo.filter((f) => comparable(f.nombre).includes(texto)).map((f) => ({ id: f.id })),
+    );
+  });
+}
+
 /**
  * Stub de lectura: catálogo de departamentos vivo (para que el resolver camine de verdad) y CERO
  * órdenes — lo que se mide aquí es el `where` que se emite, no la proyección.
@@ -104,11 +126,11 @@ function bdStub(catalogo: FilaCatalogo[] = CATALOGO_FUSIONADO) {
       count: vi.fn(() => Promise.resolve(0)),
       findMany: vi.fn(() => Promise.resolve([])),
     },
-    $queryRaw: vi.fn(() => Promise.resolve([])),
+    $queryRaw: preFiltroStub(catalogo),
   };
   tx.costoOrden.count = contarCostos;
   const bd: ContextoBd = { tx: tx as unknown as Tx };
-  return { bd, count, findMany, departamentos, contarCostos };
+  return { bd, count, findMany, departamentos, contarCostos, queryRaw: tx.$queryRaw };
 }
 
 /** El `where` con el que se pidió el CONTEO (el mismo del `findMany`, por construcción). */
@@ -139,26 +161,34 @@ function buscaReferenciaIgualA(where: Prisma.OrdenWhereInput, nombre: string): b
 
 // ── La función pura ────────────────────────────────────────────────────────────────
 
-describe('armarBusqueda — la forma de siempre no cambia', () => {
-  it('sin sinónimos emite exactamente las 3 cláusulas de texto de siempre', () => {
-    const where = armarBusqueda('Caballeros');
-    expect(where.OR).toHaveLength(3);
+describe('armarBusqueda — la forma (fila 0.214: el texto llega como ids sin acentos)', () => {
+  it('sin sinónimos emite UNA cláusula: los ids que el pre-filtro sin acentos encontró', () => {
+    const where = armarBusqueda('Caballeros', [7, 9]);
+    expect(where.OR).toEqual([{ id: { in: [7, 9] } }]);
     expect(buscaReferenciaIgualA(where, '2-HOMBRE')).toBe(false);
   });
 
-  it('búsqueda vacía sigue siendo un where vacío, aunque le pasen sinónimos', () => {
-    expect(armarBusqueda('', ['2-HOMBRE'])).toEqual({});
-    expect(armarBusqueda(undefined, ['2-HOMBRE'])).toEqual({});
+  it('⭐ ya NO compara texto con `contains` (ILIKE no dobla acentos: «nino» ≠ «Niño»)', () => {
+    expect(JSON.stringify(armarBusqueda('nino', [], ['2-HOMBRE']))).not.toContain('contains');
   });
 
-  it('con sinónimos agrega UNA cláusula más, sin tocar las tres originales', () => {
-    const where = armarBusqueda('Caballeros', ['2-HOMBRE']);
-    expect(where.OR).toHaveLength(4);
+  it('búsqueda vacía sigue siendo un where vacío, aunque le pasen ids y sinónimos', () => {
+    expect(armarBusqueda('', [1], ['2-HOMBRE'])).toEqual({});
+    expect(armarBusqueda(undefined, [1], ['2-HOMBRE'])).toEqual({});
+  });
+
+  it('con sinónimos agrega UNA cláusula más, sin tocar la de los ids', () => {
+    const where = armarBusqueda('Caballeros', [], ['2-HOMBRE']);
+    expect(where.OR).toHaveLength(2);
     expect(buscaReferenciaIgualA(where, '2-HOMBRE')).toBe(true);
   });
 
+  it('el folio (búsqueda entera) sigue entrando como IGUALDAD', () => {
+    expect(armarBusqueda('104', []).OR).toContainEqual({ folio: 104n });
+  });
+
   it('⭐ el sinónimo se compara por IGUALDAD, nunca por `contains` (es un nombre exacto del catálogo)', () => {
-    const where = armarBusqueda('Caballeros', ['2-HOMBRE']);
+    const where = armarBusqueda('Caballeros', [], ['2-HOMBRE']);
     const clausula = clausulas(where).find((c) => c.referencias?.some?.OR !== undefined);
     const or = clausula?.referencias?.some?.OR;
     const lista = or === undefined ? [] : Array.isArray(or) ? or : [or];
@@ -177,28 +207,49 @@ describe('armarBusquedaConSinonimos — resuelve contra el catálogo', () => {
   it('DESTINO → ORIGEN: buscar «Caballeros» agrega la referencia «2-HOMBRE»', async () => {
     const { bd } = bdStub();
     expect(
-      buscaReferenciaIgualA(await armarBusquedaConSinonimos('Caballeros', bd), '2-HOMBRE'),
+      buscaReferenciaIgualA(await armarBusquedaConSinonimos('Caballeros', 1, bd), '2-HOMBRE'),
     ).toBe(true);
   });
 
   it('ORIGEN → DESTINO: buscar «2-HOMBRE» agrega la referencia «Caballeros»', async () => {
     const { bd } = bdStub();
     expect(
-      buscaReferenciaIgualA(await armarBusquedaConSinonimos('2-HOMBRE', bd), 'Caballeros'),
+      buscaReferenciaIgualA(await armarBusquedaConSinonimos('2-HOMBRE', 1, bd), 'Caballeros'),
     ).toBe(true);
   });
 
   it('⭐ SIN fusión no agrega nada (mismos nombres, mismo texto: cambia sólo el rastro)', async () => {
     const { bd } = bdStub(CATALOGO_SIN_FUSION);
-    const where = await armarBusquedaConSinonimos('Caballeros', bd);
-    expect(where.OR).toHaveLength(3);
+    const where = await armarBusquedaConSinonimos('Caballeros', 1, bd);
+    expect(where.OR).toHaveLength(1);
     expect(buscaReferenciaIgualA(where, '2-HOMBRE')).toBe(false);
   });
 
-  it('búsqueda vacía no consulta el catálogo', async () => {
-    const { bd, departamentos } = bdStub();
-    expect(await armarBusquedaConSinonimos('', bd)).toEqual({});
+  it('búsqueda vacía no consulta el catálogo ni corre el pre-filtro', async () => {
+    const { bd, departamentos, queryRaw } = bdStub();
+    expect(await armarBusquedaConSinonimos('', 1, bd)).toEqual({});
     expect(departamentos).not.toHaveBeenCalled();
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('⭐ fila 0.214: la SEMILLA es sin acentos — «nino» encuentra «Niño Infantil» y su fusión', async () => {
+    const { bd } = bdStub([
+      { id: 1, nombre: 'Niño Infantil', idFusionadoEn: null },
+      { id: 2, nombre: '4-KIDS', idFusionadoEn: 1 },
+    ]);
+    expect(buscaReferenciaIgualA(await armarBusquedaConSinonimos('nino', 1, bd), '4-KIDS')).toBe(
+      true,
+    );
+  });
+
+  it('el pre-filtro de órdenes se acota a la EMPRESA que se le pasa (A9)', async () => {
+    const { bd, queryRaw } = bdStub();
+    await armarBusquedaConSinonimos('Caballeros', 42, bd);
+    const deOrdenes = queryRaw.mock.calls
+      .map(([consulta]) => consulta)
+      .find((consulta) => consulta.text.includes('"ordenes" t'));
+    expect(deOrdenes?.text).toContain('t.id_empresa = $1');
+    expect(deOrdenes?.values[0]).toBe(42);
   });
 });
 
@@ -220,7 +271,7 @@ describe('el sinónimo LLEGA al where — listado de órdenes', () => {
   it('⭐ sin fusión, el where queda EXACTAMENTE como antes de esta etapa', async () => {
     const { bd, count } = bdStub(CATALOGO_SIN_FUSION);
     await listarOrdenes(sesionVer(), { busqueda: 'Caballeros' }, bd);
-    expect(whereDelConteo(count).OR).toHaveLength(3);
+    expect(whereDelConteo(count).OR).toHaveLength(1);
   });
 
   it('la consulta LIGERA comparte el arreglo (mismo embudo)', async () => {
@@ -253,15 +304,21 @@ describe('el sinónimo LLEGA al where — Centro de Órdenes (el OTRO embudo)', 
   });
 
   it('sigue SIN buscar por nombre de cliente (el sinónimo no le cambió el criterio)', async () => {
-    const { bd, count } = bdStub();
+    const { bd, count, queryRaw } = bdStub();
     await centroComandoOrdenes(sesionVer(), { busqueda: 'Caballeros' }, bd);
     expect(clausulas(whereDelConteo(count)).some((c) => c.cliente !== undefined)).toBe(false);
+    // Y su pre-filtro sin acentos (fila 0.214) es el del CENTRO: modelo + referencias, sin clientes.
+    const deOrdenes = queryRaw.mock.calls
+      .map(([consulta]) => consulta)
+      .find((consulta) => consulta.text.includes('"ordenes" t'));
+    expect(deOrdenes?.text).toContain('"orden_referencia"');
+    expect(deOrdenes?.text).not.toContain('"clientes"');
   });
 
   it('⭐ sin fusión, el Centro queda EXACTAMENTE como antes de esta etapa', async () => {
     const { bd, count } = bdStub(CATALOGO_SIN_FUSION);
     await centroComandoOrdenes(sesionVer(), { busqueda: 'Caballeros' }, bd);
-    expect(clausulas(whereDelConteo(count))).toHaveLength(2); // modelo + referencia, nada más
+    expect(clausulas(whereDelConteo(count))).toHaveLength(1); // los ids de modelo + referencia
   });
 });
 
