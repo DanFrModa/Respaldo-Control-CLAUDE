@@ -14370,9 +14370,9 @@ export interface paths {
                 revisionNota: string | null;
                 /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
                 metaResultado: ('lograda' | 'no_lograda') | null;
-                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
                 metaCostoPrometido: number | null;
-                /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+                /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
                 metaCostoConseguido: number | null;
                 /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
                 metaNota: string | null;
@@ -14615,9 +14615,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -14843,9 +14843,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -15230,9 +15230,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -15471,9 +15471,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -16129,9 +16129,9 @@ export interface paths {
                 revisionNota: string | null;
                 /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
                 metaResultado: ('lograda' | 'no_lograda') | null;
-                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+                /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
                 metaCostoPrometido: number | null;
-                /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+                /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
                 metaCostoConseguido: number | null;
                 /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
                 metaNota: string | null;
@@ -16377,9 +16377,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -16608,9 +16608,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -16761,9 +16761,9 @@ export interface paths {
               revisionNota: string | null;
               /** @description Desenlace de la promesa de la mesa, o null = NADIE lo declaró (no significa que se haya cumplido). */
               metaResultado: ('lograda' | 'no_lograda') | null;
-              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada. */
+              /** @description La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor). */
               metaCostoPrometido: number | null;
-              /** @description Lo que SÍ se consiguió (costo por prenda), o null. */
+              /** @description Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor). */
               metaCostoConseguido: number | null;
               /** @description Por qué no se consiguió, u observación de lo que sí se logró. Null si no se escribió. */
               metaNota: string | null;
@@ -118503,8 +118503,10 @@ export interface paths {
                  * @enum {string}
                  */
                 accion: 'CREAR' | 'MODIFICAR' | 'DESACTIVAR' | 'CANCELAR' | 'OTRO';
-                /** @description Detalle del cambio en JSON (o null). */
+                /** @description Detalle del cambio en JSON (o null). Cada importe que tu usuario no tiene llave para ver viaja sustituido por `{ "oculto": true }` (lo guardado queda completo). Un valor null no se tapa. */
                 datos: unknown | null;
+                /** @description Cuántos valores de dinero se taparon para TU usuario en `datos`; 0 = ves el registro completo. */
+                datosOcultos: number;
                 /** @description Id del usuario que hizo el cambio (o null). */
                 idUsuario: string | null;
                 /** @description Nombre del usuario (resuelto), o null si es de sistema/borrado. */

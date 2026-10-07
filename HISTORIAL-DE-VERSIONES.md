@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.207 · 7-oct-2026 · **en prueba** — **La bitácora ya no enseña importes a quien no puede verlos en su pantalla**
+
+> **La v0.207 cierra dos filas: la 0.249** (su cuarta y última parte) **y la 0.255.** La bitácora guardaba los cambios
+> con sus cifras, y cualquiera con permiso de leerla veía precios, costos, márgenes, factores y a quién se le paga —
+> aunque en las pantallas de esos datos no tuviera acceso.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**La bitácora tapa cada importe según quién la consulta**, con la misma llave que la pantalla de ese dato: si no puedes
+ver el costo de una orden en su pantalla, tampoco lo ves en la bitácora. Donde hay algo tapado, la fila lo dice
+(**«N importes ocultos»**) y el cajón lo explica. **Lo guardado no se toca**: el registro sigue completo y quien tiene
+las llaves lo ve todo, también en los cambios de antes de esta versión.
+
+**La corrida de pagos (fila 0.255):** a quién se le paga sólo lo ve quien ve la corrida; cuánto, quien además ve
+importes.
+
+**La meta de costo del modelo** se partió: el costo **prometido** sólo lo ve quien ve importes; el **conseguido**,
+también quien firma la revisión (lo escribe él).
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Gerencial deja de ver por la bitácora** el estado de resultados, el costo de la orden y los factores de las listas
+y de los clientes — lo mismo que ya no veía en esas pantallas. **Ventas, Logística, Asistente y Secretarial** dejan de
+ver ahí costos, el estado de resultados, EsMa, cuentas por pagar y cobrar, la corrida, listas, cotizaciones, precostos, el corte y arte del modelo,
+la meta de costo y el margen sugerido de la empresa; Logística, Asistente y Secretarial, además, la maquila y la receta
+de la orden. **Dirección y Administración no pierden nada.**
+
+### ⏳ Sigue pendiente o roto
+
+**Una cifra escrita a mano en una nota, un motivo o un acuerdo no se tapa**: la bitácora no puede saber que ese texto
+es un importe. **Desarrollo de Producto firma la revisión del modelo sin ver el costo prometido** (la pantalla no se
+rompe: sólo omite la frase); si debe verlo es pregunta para Daniel (§Post-F9.275). Y **entrar modelos, órdenes y
+proveedores al piso de lectura** —lo que esta fila hacía posible— sigue siendo decisión de Daniel (§Post-F9.272 y
+§Post-F9.275).
+
 ## 0.206 · 7-oct-2026 · **en prueba** — **Los precios de modelos y órdenes ya sólo le llegan a quien tiene llave de dinero**
 
 > **La v0.206 no cierra ninguna fila del programa**: entrega la tercera parte de la 0.249. Quien consultaba modelos u

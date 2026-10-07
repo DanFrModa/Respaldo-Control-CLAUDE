@@ -33578,7 +33578,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                            "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                           },
                           "metaCostoConseguido": {
                             "anyOf": [
@@ -33589,7 +33589,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                            "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                           },
                           "metaNota": {
                             "anyOf": [
@@ -34426,7 +34426,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -34437,7 +34437,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -35171,7 +35171,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -35182,7 +35182,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -36678,7 +36678,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -36689,7 +36689,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -37421,7 +37421,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -37432,7 +37432,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -38991,7 +38991,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                          "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                         },
                         "metaCostoConseguido": {
                           "anyOf": [
@@ -39002,7 +39002,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                          "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                         },
                         "metaNota": {
                           "anyOf": [
@@ -39783,7 +39783,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -39794,7 +39794,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -40479,7 +40479,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -40490,7 +40490,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -40823,7 +40823,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada."
+                      "description": "La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor)."
                     },
                     "metaCostoConseguido": {
                       "anyOf": [
@@ -40834,7 +40834,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Lo que SÍ se consiguió (costo por prenda), o null."
+                      "description": "Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor)."
                     },
                     "metaNota": {
                       "anyOf": [
@@ -292008,7 +292008,13 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Detalle del cambio en JSON (o null)."
+                            "description": "Detalle del cambio en JSON (o null). Cada importe que tu usuario no tiene llave para ver viaja sustituido por `{ \"oculto\": true }` (lo guardado queda completo). Un valor null no se tapa."
+                          },
+                          "datosOcultos": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos valores de dinero se taparon para TU usuario en `datos`; 0 = ves el registro completo."
                           },
                           "idUsuario": {
                             "anyOf": [
@@ -292045,6 +292051,7 @@
                           "idEntidad",
                           "accion",
                           "datos",
+                          "datosOcultos",
                           "idUsuario",
                           "nombreUsuario",
                           "fecha"

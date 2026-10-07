@@ -37,6 +37,8 @@ import {
   LLAVES_PRECIO_MODELO,
   ocultarPreciosDeModeloSiNoPuede,
   puedeVerMaquilaDeReferencia,
+  puedeVerMetaConseguida,
+  puedeVerMetaPrometida,
   puedeVerPreciosDeModelo,
   puedeVerPreciosDeOrden,
 } from './precios-de-modelo.js';
@@ -238,6 +240,8 @@ describe('ocultarPreciosDeModeloSiNoPuede', () => {
     descripcion: 'Sudadera',
     maquilaBase: new Prisma.Decimal('23.5'),
     corteBase: new Prisma.Decimal('4.25'),
+    metaCostoPrometido: new Prisma.Decimal('81.5'),
+    metaCostoConseguido: new Prisma.Decimal('79.25'),
   };
 
   it('con sólo modelos.ver: maquila y corte en null, con sus dos marcas; la ficha intacta', () => {
@@ -257,12 +261,41 @@ describe('ocultarPreciosDeModeloSiNoPuede', () => {
     expect(r.preciosOcultos).toBe(true);
   });
 
-  it('con modelos.administrar: todo completo', () => {
+  it('con modelos.administrar: maquila y corte completos; la META de costo NO (no es su llave)', () => {
     const r = ocultarPreciosDeModeloSiNoPuede(sesion(['modelos.administrar']), modelo);
     expect(r.maquilaBase?.toString()).toBe('23.5');
     expect(r.corteBase?.toString()).toBe('4.25');
     expect(r.maquilaOculta).toBe(false);
     expect(r.preciosOcultos).toBe(false);
+    expect(r.metaCostoPrometido).toBeNull();
+    expect(r.metaCostoConseguido).toBeNull();
+  });
+
+  // ⭐ 0.249 parte D: la meta de costo, partida (ver `puedeVerMetaPrometida`).
+  it('meta: con sólo modelos.ver, las dos en null', () => {
+    const r = ocultarPreciosDeModeloSiNoPuede(sesion(['modelos.ver']), modelo);
+    expect(r.metaCostoPrometido).toBeNull();
+    expect(r.metaCostoConseguido).toBeNull();
+  });
+
+  it('meta: quien FIRMA sin ver importes ve lo conseguido (lo teclea) y NO lo prometido', () => {
+    const r = ocultarPreciosDeModeloSiNoPuede(sesion(['modelos.aprobar-receta']), modelo);
+    expect(r.metaCostoConseguido?.toString()).toBe('79.25');
+    expect(r.metaCostoPrometido).toBeNull();
+  });
+
+  it('meta: con consultas.ver-importes, las dos completas', () => {
+    const r = ocultarPreciosDeModeloSiNoPuede(sesion(['consultas.ver-importes']), modelo);
+    expect(r.metaCostoPrometido?.toString()).toBe('81.5');
+    expect(r.metaCostoConseguido?.toString()).toBe('79.25');
+  });
+
+  it('las reglas de la meta: prometida = ver-importes; conseguida = ver-importes ∨ aprobar-receta', () => {
+    expect(puedeVerMetaPrometida(sesion(['consultas.ver-importes']))).toBe(true);
+    expect(puedeVerMetaPrometida(sesion(['modelos.aprobar-receta']))).toBe(false);
+    expect(puedeVerMetaConseguida(sesion(['consultas.ver-importes']))).toBe(true);
+    expect(puedeVerMetaConseguida(sesion(['modelos.aprobar-receta']))).toBe(true);
+    expect(puedeVerMetaConseguida(sesion(['modelos.ver', 'modelos.administrar']))).toBe(false);
   });
 });
 

@@ -29,6 +29,15 @@ export function exigirVerCorrida(sesion: SesionUsuario): void {
   verificarPermiso(sesion, 'pagos.corrida-ver');
 }
 
+/**
+ * La MISMA reja que {@link exigirVerCorrida}, en booleano: ¿la sesión puede ver una corrida? La usa
+ * la lectura de la bitácora (fila 0.255) para tapar a quién se le paga en cada renglón con la llave
+ * de la propia corrida. Una sola regla: si una cambia, cambian las dos.
+ */
+export function puedeVerCorrida(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'pagos.corrida-armar') || tienePermiso(sesion, 'pagos.corrida-ver');
+}
+
 /** `include` de una corrida con sus renglones (orden estable: por rubro y luego por id). */
 export const incluirRenglones = {
   renglones: { orderBy: [{ rubro: 'asc' }, { id: 'asc' }] },

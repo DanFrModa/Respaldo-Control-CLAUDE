@@ -85,10 +85,36 @@ export function puedeVerPreciosDeOrden(sesion: SesionUsuario): boolean {
   return LLAVES_PRECIO_DE_ORDEN.some((clave) => tienePermiso(sesion, clave));
 }
 
+/**
+ * ⭐ LA META DE COSTO DEL MODELO (fila 0.249 parte D) — lo que el modelo congela al firmar su revisión:
+ * lo PROMETIDO en la mesa (`metaCostoPrometido`) y lo que SÍ se consiguió (`metaCostoConseguido`).
+ * Son costos por prenda, o sea dinero, y van partidas:
+ *
+ *  • **Lo prometido** sólo con `consultas.ver-importes`: es la misma regla con que las otras tres
+ *    puertas que lo enseñan lo cierran (`GET /modelos/:id/meta-prometida`, el `costoPrometido` de la
+ *    bandeja «Recetas por revisar» y «Promesas incumplidas», en `meta-negociada.ts`). Quien firma NO
+ *    lo teclea —lo resuelve el servidor—, así que no hay «quien escribe» que dejar a ciegas.
+ *  • **Lo conseguido** con `consultas.ver-importes` **o** `modelos.aprobar-receta`: es lo que el
+ *    firmante TECLEA al aprobar. Quien escribe, lee — si no, el eco de su propia firma le llegaría en
+ *    blanco.
+ */
+export function puedeVerMetaPrometida(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'consultas.ver-importes');
+}
+
+/** ¿La sesión recibe lo CONSEGUIDO de la meta de costo? Ver {@link puedeVerMetaPrometida}. */
+export function puedeVerMetaConseguida(sesion: SesionUsuario): boolean {
+  return (
+    tienePermiso(sesion, 'consultas.ver-importes') || tienePermiso(sesion, 'modelos.aprobar-receta')
+  );
+}
+
 /** Lo mínimo de un modelo que trae dinero propio (lo cumple `ModeloConRelaciones`). */
 interface ConDineroDeModelo {
   maquilaBase: { toNumber(): number } | null;
   corteBase: { toNumber(): number } | null;
+  metaCostoPrometido: { toNumber(): number } | null;
+  metaCostoConseguido: { toNumber(): number } | null;
 }
 
 /** Las marcas de lo que el servidor TAPÓ de un modelo para esta sesión. */
@@ -104,9 +130,9 @@ export interface MarcasPreciosModelo {
  * nunca escribe. Lo que NO se tapa: la ficha, el linaje, la revisión, el conteo de fotos — dicen QUÉ
  * es la prenda, no cuánto cuesta. (`costoActual` ya lo tapa `puedeVerCostoRealDeModelo`.)
  *
- * ⚠️ `metaCostoPrometido`/`metaCostoConseguido` (la meta que el modelo congela al firmar su
- * revisión) NO se tapan aquí: ninguna pantalla los lee de esta salida, y su regla choca con quien
- * los escribe (`modelos.aprobar-receta` sin `consultas.ver-importes`). Queda reportado aparte.
+ * La meta de costo (`metaCostoPrometido`/`metaCostoConseguido`) se tapa con
+ * {@link puedeVerMetaPrometida}/{@link puedeVerMetaConseguida} y va en `null` SIN marca: ninguna
+ * pantalla la lee de esta salida (la firma pide la meta en vivo a `GET /modelos/:id/meta-prometida`).
  */
 export function ocultarPreciosDeModeloSiNoPuede<T extends ConDineroDeModelo>(
   sesion: SesionUsuario,
@@ -118,6 +144,8 @@ export function ocultarPreciosDeModeloSiNoPuede<T extends ConDineroDeModelo>(
     ...modelo,
     maquilaBase: verMaquila ? modelo.maquilaBase : null,
     corteBase: verModelo ? modelo.corteBase : null,
+    metaCostoPrometido: puedeVerMetaPrometida(sesion) ? modelo.metaCostoPrometido : null,
+    metaCostoConseguido: puedeVerMetaConseguida(sesion) ? modelo.metaCostoConseguido : null,
     preciosOcultos: !verModelo,
     maquilaOculta: !verMaquila,
   };

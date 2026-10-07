@@ -29,7 +29,21 @@ export const esquemaBitacoraSalida = z
     entidad: z.string().describe('Entidad afectada (ej. "Almacen").'),
     idEntidad: z.string().describe('Id del registro afectado (texto).'),
     accion: z.enum(ACCIONES_BITACORA).describe('Qué se hizo.'),
-    datos: z.unknown().nullable().describe('Detalle del cambio en JSON (o null).'),
+    datos: z
+      .unknown()
+      .nullable()
+      .describe(
+        'Detalle del cambio en JSON (o null). Cada importe que tu usuario no tiene llave para ver ' +
+          'viaja sustituido por `{ "oculto": true }` (lo guardado queda completo). Un valor null ' +
+          'no se tapa.',
+      ),
+    datosOcultos: z
+      .number()
+      .int()
+      .min(0)
+      .describe(
+        'Cuántos valores de dinero se taparon para TU usuario en `datos`; 0 = ves el registro completo.',
+      ),
     idUsuario: z.string().nullable().describe('Id del usuario que hizo el cambio (o null).'),
     nombreUsuario: z
       .string()
