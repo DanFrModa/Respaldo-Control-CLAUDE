@@ -71,6 +71,30 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.208 · 7-oct-2026 · **en prueba** — **El costo de la orden ya no cuenta dos veces el estampado**
+
+> **La v0.208 cierra la fila 0.256**, que nació y cerró el mismo día.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El costo teórico de los procesos de la orden cuenta el estampado UNA sola vez.** Si la orden tiene capturado el
+precio real de estampado/aplicación, manda ése; si no, se usa la referencia de cada arte de la receta de la orden —igual
+que ya pasaba con la costura (el precio real de maquila manda sobre el de referencia del modelo).
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Los costeos nuevos de órdenes con estampado salen más bajos**, porque antes se sumaban el precio real y la referencia
+del mismo estampado. Ejemplo: 1,000 prendas con estampado de $8 salían a $86 por prenda y lo correcto es $78 (se costeaba un
+10 % de más). Lo arrastran el costeo de la orden, el estado de resultados, los márgenes y el costo que se congela al cerrar.
+**Lo ya guardado o cerrado no se recalcula.**
+
+### ⏳ Sigue pendiente o roto
+
+**Una orden con estampado Y bordado tiene un solo campo de precio real para los dos**: si se captura, sustituye a la suma
+de las referencias de los dos procesos. Si ese precio era sólo del estampado, el bordado no se cuenta. Es pregunta para
+Daniel (§Post-F9.276) y lo resuelve de raíz la fila 0.242 (precio por proceso). **En la pantalla de costeo «Procesos»
+sigue siendo una sola cifra**, sin desglose costura/estampado.
+
 ## 0.207 · 7-oct-2026 · **en prueba** — **La bitácora ya no enseña importes a quien no puede verlos en su pantalla**
 
 > **La v0.207 cierra dos filas: la 0.249** (su cuarta y última parte) **y la 0.255.** La bitácora guardaba los cambios

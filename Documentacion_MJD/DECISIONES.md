@@ -18707,3 +18707,29 @@ veía el estado de resultados, el costo de la orden y los factores, que sus pant
 
 📌 **Límites declarados** (HOJA §4): una cifra escrita en una nota, un motivo o un acuerdo no se tapa; ni un importe que
 se pueda deducir de otros datos visibles.
+
+#### (Post-F9.276) — EL COSTO DE LA ORDEN YA NO CUENTA DOS VECES EL ESTAMPADO (fila 0.256, v0.208) — dos preguntas para Daniel
+
+📐 El costo teórico de procesos de la orden sumaba el precio **real** del estampado capturado en la orden **y** la
+**referencia** de cada arte de su receta — el mismo dinero dos veces (§Post-F9.35: el precio que viaja a la OP es de
+referencia; el real se define en la OP). Ejemplo: estampado de $8 en 1,000 prendas → $86 por prenda en vez de $78. Se
+arrastraba al costeo, al estado de resultados, a los márgenes y al costo congelado al cerrar, sin verse en pantalla.
+
+**Construido con el default del lead:** igual que la costura, **el precio real manda; si no hay, se usa la referencia**
+(la suma de los artes de la receta de la orden que no estén excluidos). Un real capturado en 0 también manda. Lo ya
+guardado no se recalcula.
+
+❓ **Preguntas:**
+1. **¿Qué tan seguido captura Producción el precio real del estampado en la orden?** Define la clasificación: si es
+   habitual, el defecto **bloqueaba** (🔴); si casi nunca, **dolía** (🔶).
+2. **Una orden con estampado Y bordado** tiene un solo campo de precio real para todo el arte. Con el default, si se
+   captura, sustituye a la suma de las referencias de los dos procesos. *Default: así, como el sistema viejo; el precio
+   por proceso llega con la fila 0.242.* Alternativa: que el real sólo sustituya cuando la orden tiene un único proceso de
+   arte.
+   📐 **Dato para decidir** (medido por el reviewer en el sistema viejo): 281 de ~2,053 modelos con arte llevan dos o más
+   artes, pero **sólo 11 de 5,451 órdenes (0.2 %)** tenían además precio real de estampado capturado. ⚠️ Y EsMa hoy
+   propone pagar **cada** recibo que no es costura a ese mismo precio real, así que una orden con estampado y bordado
+   propondría pagar dos veces el real mientras el costo lo cuenta una — herencia de v1, la resuelve también la 0.242.
+
+📌 **Recomendación (no construida):** desglosar en la pantalla de costeo «Procesos» en costura y estampado, para que un
+error así se vea al revisar.

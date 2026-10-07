@@ -89353,7 +89353,7 @@ export interface paths {
                 telaPorPrenda: number | null;
                 /** @description Costo de avíos por prenda (receta paraCosto). */
                 aviosPorPrenda: number | null;
-                /** @description Costo de procesos por prenda (maquila + estampado + arte). */
+                /** @description Costo de procesos por prenda = costura (maquila real ?? base del modelo) + estampado (precio real de aplicación ?? Σ referencias de arte). El real sustituye a la referencia. */
                 procesosPorPrenda: number | null;
                 /** @description Tela teórica total = por prenda × cortado. */
                 tela: number | null;
@@ -89607,7 +89607,7 @@ export interface paths {
                 telaPorPrenda: number | null;
                 /** @description Costo de avíos por prenda (receta paraCosto). */
                 aviosPorPrenda: number | null;
-                /** @description Costo de procesos por prenda (maquila + estampado + arte). */
+                /** @description Costo de procesos por prenda = costura (maquila real ?? base del modelo) + estampado (precio real de aplicación ?? Σ referencias de arte). El real sustituye a la referencia. */
                 procesosPorPrenda: number | null;
                 /** @description Tela teórica total = por prenda × cortado. */
                 tela: number | null;
