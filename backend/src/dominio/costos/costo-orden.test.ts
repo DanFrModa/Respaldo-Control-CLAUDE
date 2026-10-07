@@ -1,6 +1,7 @@
 /**
  * Tests UNITARIOS de las fórmulas PURAS del costo de orden (F7-E1; D1/D2):
  *  • `teoricoPorPrenda` — receta paraCosto × precios vigentes + procesos (arte UNA vez, nulos→0).
+ *  • `procesosPorPrenda` — costura + estampado, cada uno «real ?? referencia» (0.256: UNA vez).
  *  • `cantidadDeBase`   — elige la cantidad de la base de prorrateo (cortado/recibido/vendido).
  *  • `unitarioODeuda`   — el unitario, o el MOTIVO y la FRASE de por qué no lo hay (0.061).
  * El flujo con BD (guardar, rechazo de noCostear, unitario, lista) vive en `costo-orden.int.test.ts`.
@@ -16,7 +17,7 @@ import {
   divisorCongelado,
   unitarioODeuda,
 } from './cantidades.js';
-import { teoricoPorPrenda } from './costo-orden.js';
+import { procesosPorPrenda, teoricoPorPrenda } from './costo-orden.js';
 
 const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
 type OrdenArg = Parameters<typeof teoricoPorPrenda>[0];
@@ -73,7 +74,7 @@ function ordenFake(over: {
 }
 
 describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
-  it('suma tela/avíos y arma procesos = maquilaOrd + aplicacionOrd + arte', () => {
+  it('suma tela/avíos y arma procesos = maquilaOrd + (aplicacionOrd ?? Σ artes)', () => {
     const orden = ordenFake({
       maquilaOrd: D(10),
       aplicacionOrd: D(2),
@@ -88,7 +89,8 @@ describe('teoricoPorPrenda (receta paraCosto × precios + procesos)', () => {
     const t = teoricoPorPrenda(orden);
     expect(t.tela).toBeCloseTo(30, 6); // 1.5×20 + 0.5×0
     expect(t.avios).toBeCloseTo(6, 6); // 2×3
-    expect(t.procesos).toBeCloseTo(24, 6); // 10 + 2 + (5 + 7)
+    // 🔴 0.256: 10 + 2 (el real de estampado SUSTITUYE a las referencias 5 + 7). Antes daba 24.
+    expect(t.procesos).toBeCloseTo(12, 6);
   });
 
   it('el arte entra UNA vez por modelo, SIN cantidad', () => {
@@ -235,12 +237,15 @@ describe('V1-E3d — el costeo NO se mueve al sacar el arte del catálogo', () =
 
   for (const caso of casos) {
     it(`da el mismo importe que la fórmula vieja: ${caso.titulo}`, () => {
+      // 🔴 0.256: sin real de estampado (`aplicacionOrd` null), que es cuando la referencia del
+      // arte cuenta. Con real capturado las referencias ya no entran (ver el bloque de abajo), así
+      // que medir esta invariante con real presente no mediría nada del arte.
       const orden = ordenFake({
         maquilaOrd: D(10),
-        aplicacionOrd: D(2),
+        aplicacionOrd: null,
         artes: caso.artes.map(migrado),
       });
-      const esperadoViejo = 10 + 2 + arteViejo(caso.artes);
+      const esperadoViejo = 10 + arteViejo(caso.artes);
       expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(esperadoViejo, 6);
     });
   }
@@ -255,6 +260,92 @@ describe('V1-E3d — el costeo NO se mueve al sacar el arte del catálogo', () =
     const orden = ordenFake({ artes: artes.map(migrado) });
     expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(arteViejo(artes), 6);
     expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(12, 6);
+  });
+});
+
+/**
+ * 🔴 FILA 0.256 — EL ESTAMPADO SE CUENTA UNA VEZ: `aplicacionOrd ?? Σ artes`.
+ *
+ * `OrdenArte.precio` es la REFERENCIA de cada proceso de arte (viaja del modelo) y
+ * `Orden.aplicacionOrd` es el precio REAL negociado del mismo estampado (§Post-F9.35/§254). Antes
+ * se sumaban los dos. La regla es la MISMA de la costura (`maquilaOrd ?? maquilaBase`): el real
+ * manda; si no hay real, la referencia. La costura no cambia.
+ */
+describe('0.256 — estampado = real ?? Σ referencias de arte (una sola vez)', () => {
+  it('real presente + artes ⇒ SÓLO el real (el ejemplo del analista: 1,000 prendas, 78 y no 86)', () => {
+    const orden = ordenFake({
+      maquilaOrd: D(20),
+      aplicacionOrd: D(8),
+      artes: [{ precio: D(8) }],
+      telas: [{ consumoPorPrenda: D(1), precioSugerido: D(40) }],
+      avios: [{ consumoPorPrenda: D(1), precioReferencia: D(10) }],
+    });
+    const t = teoricoPorPrenda(orden);
+    expect(t.procesos).toBeCloseTo(28, 6); // 20 + 8, NO 20 + 8 + 8
+    expect(t.tela + t.avios + t.procesos).toBeCloseTo(78, 6);
+  });
+
+  it('el real manda aunque sea MENOR que la referencia (negociado abajo)', () => {
+    const orden = ordenFake({ maquilaOrd: D(20), aplicacionOrd: D(7), artes: [{ precio: D(8) }] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(27, 6);
+  });
+
+  it('real null + artes ⇒ la suma de las referencias de arte', () => {
+    const orden = ordenFake({ maquilaOrd: D(20), aplicacionOrd: null, artes: [{ precio: D(8) }] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(28, 6);
+  });
+
+  it('real null + DOS artes ⇒ suma las dos referencias', () => {
+    const orden = ordenFake({
+      maquilaOrd: D(20),
+      aplicacionOrd: null,
+      artes: [{ precio: D(8) }, { precio: D(5) }],
+    });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(33, 6); // 20 + (8 + 5)
+  });
+
+  it('real presente + DOS artes ⇒ el real sustituye a la suma de las dos (como v1)', () => {
+    const orden = ordenFake({
+      maquilaOrd: D(20),
+      aplicacionOrd: D(11),
+      artes: [{ precio: D(8) }, { precio: D(5) }],
+    });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(31, 6); // 20 + 11, NO 20 + 11 + 13
+  });
+
+  it('real presente SIN artes ⇒ el real', () => {
+    const orden = ordenFake({ maquilaOrd: D(20), aplicacionOrd: D(6), artes: [] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(26, 6);
+  });
+
+  it('real y artes ausentes ⇒ estampado 0 (sólo la costura)', () => {
+    const orden = ordenFake({ maquilaOrd: D(20), aplicacionOrd: null, artes: [] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(20, 6);
+    expect(teoricoPorPrenda(ordenFake({})).procesos).toBe(0);
+  });
+
+  it('un real de 0 CAPTURADO manda: no cae a las referencias (igual que la costura)', () => {
+    // La ausencia es `null`; un 0 es un precio (el taller no cobró el estampado).
+    const orden = ordenFake({ maquilaOrd: D(20), aplicacionOrd: D(0), artes: [{ precio: D(8) }] });
+    expect(teoricoPorPrenda(orden).procesos).toBeCloseTo(20, 6);
+  });
+
+  it('la costura NO cambia: maquilaOrd manda (también en 0) y sin ella cae a maquilaBase', () => {
+    const conReal = ordenFake({ maquilaOrd: D(0), maquilaBase: D(9), aplicacionOrd: D(4) });
+    expect(teoricoPorPrenda(conReal).procesos).toBeCloseTo(4, 6); // 0 + 4
+    const sinReal = ordenFake({ maquilaOrd: null, maquilaBase: D(9), aplicacionOrd: D(4) });
+    expect(teoricoPorPrenda(sinReal).procesos).toBeCloseTo(13, 6); // 9 + 4
+  });
+
+  it('`procesosPorPrenda` es la MISMA regla que usa el teórico (un solo sitio)', () => {
+    const orden = ordenFake({
+      maquilaOrd: null,
+      maquilaBase: D(9),
+      aplicacionOrd: D(3),
+      artes: [{ precio: D(8) }],
+    });
+    expect(procesosPorPrenda(orden)).toBeCloseTo(12, 6);
+    expect(teoricoPorPrenda(orden).procesos).toBe(procesosPorPrenda(orden));
   });
 });
 

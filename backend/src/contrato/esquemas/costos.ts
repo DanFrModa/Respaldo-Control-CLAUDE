@@ -196,7 +196,10 @@ const esquemaCostoTeorico = z.object({
   procesosPorPrenda: z
     .number()
     .nullable()
-    .describe('Costo de procesos por prenda (maquila + estampado + arte).'),
+    .describe(
+      'Costo de procesos por prenda = costura (maquila real ?? base del modelo) + estampado ' +
+        '(precio real de aplicación ?? Σ referencias de arte). El real sustituye a la referencia.',
+    ),
   tela: z.number().nullable().describe('Tela teórica total = por prenda × cortado.'),
   avios: z.number().nullable().describe('Avíos teóricos totales = por prenda × cortado.'),
   procesos: z.number().nullable().describe('Procesos teóricos totales = por prenda × cortado.'),

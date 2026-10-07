@@ -123,7 +123,11 @@ beforeEach(async () => {
       estado: 'completa',
       fecha: new Date('2026-06-01T00:00:00.000Z'),
       maquilaOrd: 10,
-      aplicacionOrd: 2,
+      // 🔴 0.256: el precio REAL de estampado (7) SUSTITUYE a la referencia del arte del modelo (5):
+      // procesos = 10 + 7 = 17. Con la fórmula vieja (que sumaba los dos) daría 22 — por eso el 7
+      // y no otro número: las cifras de abajo (17, 1590, 63.6…) siguen siendo las de siempre y a
+      // la vez sólo se cumplen si el estampado se cuenta UNA vez.
+      aplicacionOrd: 7,
       lineas: {
         create: [
           {
@@ -235,7 +239,8 @@ describe('obtenerCostoOrden (teórico + unitario)', () => {
     expect(c.cantidades.vendido).toBe(20);
     // El TEÓRICO sigue refiriéndose a las CORTADAS (es "lo que costó producir lo que se cortó"):
     // eso NO lo cambió 0.061, que sólo movió el DIVISOR del unitario.
-    // por prenda: tela 30, avíos 6, procesos = maquilaOrd 10 + aplicación 2 + bordado 5 = 17.
+    // por prenda: tela 30, avíos 6, procesos = maquilaOrd 10 + estampado REAL 7 = 17 (la
+    // referencia del arte, 5, NO se suma encima del real — 0.256).
     expect(c.teorico.telaPorPrenda).toBe(30);
     expect(c.teorico.procesosPorPrenda).toBe(17);
     expect(c.teorico.total).toBe(1590); // (30 + 6 + 17) × 30
@@ -246,6 +251,34 @@ describe('obtenerCostoOrden (teórico + unitario)', () => {
     expect(c.unitario.costoUnitario).toBe(63.6); // 1590 / 25
     expect(c.unitario.motivoSinUnitario).toBeNull();
     expect(c.ordenCerrada).toBe(false);
+  });
+
+  it('🔴 0.256: sin precio real de estampado, cuenta la REFERENCIA del arte (y el guardado la hereda)', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { aplicacionOrd: null } });
+    const c = await obtenerCostoOrden(sesion(), idOrden, bd());
+    expect(c.teorico.procesosPorPrenda).toBe(15); // 10 + 5 (el arte del modelo, copiado a la OP)
+    expect(c.teorico.procesos).toBe(450); // 15 × 30 cortadas
+    // El primer guardado sin cuerpo cae al teórico: el default de `procesosCost` lleva la regla.
+    const g = await guardarCostoOrden(sesion(), idOrden, { baseProrrateo: 'cortado' }, bd());
+    expect(g.guardado?.procesosCalc).toBe(450);
+    expect(g.guardado?.procesosCost).toBe(450);
+  });
+
+  it('🔴 0.256: sin real, un arte EXCLUIDO de la OP NO suma a la referencia (sólo los vivos)', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { aplicacionOrd: null } });
+    // Un segundo arte en la receta de la OP, EXCLUIDO (la orden no lo lleva): no cuesta.
+    await cliente.ordenArte.create({
+      data: { idOrden, descripcion: 'Bordado manga', idTipoArte, precio: 9, excluido: true },
+    });
+    const c = await obtenerCostoOrden(sesion(), idOrden, bd());
+    expect(c.teorico.procesosPorPrenda).toBe(15); // 10 + 5; con el excluido daría 24
+    expect(c.teorico.procesos).toBe(450);
+  });
+
+  it('🔴 0.256: un real de estampado CAPTURADO EN 0 manda (no cae a la referencia del arte)', async () => {
+    await cliente.orden.update({ where: { id: idOrden }, data: { aplicacionOrd: 0 } });
+    const c = await obtenerCostoOrden(sesion(), idOrden, bd());
+    expect(c.teorico.procesosPorPrenda).toBe(10); // sólo la costura: el 0 es un precio
   });
 
   it('⭐ 0.061: SIN piezas recibidas no hay unitario, y la salida DICE por qué', async () => {

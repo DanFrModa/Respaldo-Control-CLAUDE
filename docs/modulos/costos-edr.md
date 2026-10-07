@@ -68,7 +68,7 @@ Construido en F7 (etapas E1 = costo por orden, E2 = EDR mensual, E6 = ETL de cie
 
 - **Teórico por prenda** = Σ (`ModeloTela.consumoPorPrenda` × `Tela.precioSugerido` de la receta
   `paraCosto`) para tela; Σ (`ModeloAvio.consumoPorPrenda` × `Avio.precioReferencia`) para avíos;
-  `(maquilaOrd ?? modelo.maquilaBase) + aplicacionOrd + Σ bordados` para procesos. Todo a **costo
+  `(maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? Σ artes de la OP no excluidos)` para procesos (`procesosPorPrenda`; **antes sumaba `aplicacionOrd` Y los artes**, el mismo dinero dos veces — fila 0.256, §Post-F9.276). Todo a **costo
   ACTUAL** (D1). Los totales teóricos = por-prenda × piezas **cortadas**.
 - **`costoTotal`** (el dinero REAL) = `telaCost + procesosCost + aviosCost + otros`. La **regalía NO
   entra** (D2).

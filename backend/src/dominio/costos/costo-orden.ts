@@ -13,7 +13,9 @@
  *                        congela precio de complemento, así que se valúa con el ESTIMADO del
  *                        catálogo — el número que Daniel mandó crear justo para esto.
  *      aviosPorPrenda  = Σ ( OrdenAvio.consumoPorPrenda × (OrdenAvio.precio ?? Avio.precioReferencia) )
- *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes de la OP
+ *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? Σ artes de la OP)
+ *                        🔴 0.256: el real de estampado SUSTITUYE a la referencia del arte; antes
+ *                        se sumaban los dos (el mismo dinero dos veces). Ver `procesosPorPrenda`.
  *      tela/avios/procesos (TOTALES) = por-prenda × cortado
  *    La REGALÍA NO entra (D2): va sobre la venta (lista de precios).
  *  • REAL DE COMPRAS (`*Real`) — lo REALMENTE comprado: Σ de las líneas de OC autorizada+ ligadas a
@@ -197,16 +199,52 @@ export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
         (a.precio === null ? num(a.avio.precioReferencia) : a.precio.toNumber()),
     0,
   );
-  // ARTE: desde V1-E3d el arte vive congelado en la ORDEN, con SU precio (§Post-F9.35: "el precio
-  // del modelo es referencia; el real se define en la OP"). ⚠️ Entra UNA vez, SIN multiplicar por
-  // cantidad — invariante heredada de la pieza A y cubierta por `costo-orden.test.ts`.
-  const arte = orden.recetaArtes.reduce((s, a) => s + num(a.precio), 0);
-  // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + arte.
-  const maquila =
-    orden.maquilaOrd == null ? num(orden.modelo.maquilaBase) : orden.maquilaOrd.toNumber();
-  const aplicacion = num(orden.aplicacionOrd);
-  const procesos = maquila + aplicacion + arte;
+  // Procesos = COSTURA + ESTAMPADO, cada uno «real ?? referencia» (ver `procesosPorPrenda`).
+  const procesos = procesosPorPrenda(orden);
   return { tela, avios, procesos };
+}
+
+/** Lo que `procesosPorPrenda` necesita de la orden (la forma mínima, para probarla sin BD). */
+export interface OrdenParaProcesos {
+  maquilaOrd: Prisma.Decimal | null;
+  aplicacionOrd: Prisma.Decimal | null;
+  modelo: { maquilaBase: Prisma.Decimal | null };
+  recetaArtes: { precio: Prisma.Decimal | null }[];
+}
+
+/**
+ * Costo de PROCESOS por prenda de una orden: **costura + estampado, cada uno contado UNA vez**.
+ *
+ * Los dos siguen la MISMA regla —**el precio REAL de la orden manda; si no se capturó, la
+ * REFERENCIA**— (§Post-F9.35, Daniel: *«el precio que viaja a la OP es un precio de referencia. El
+ * precio real se define en la OP»*):
+ *  • COSTURA   = `Orden.maquilaOrd`    ?? `Modelo.maquilaBase`
+ *  • ESTAMPADO = `Orden.aplicacionOrd` ?? Σ `OrdenArte.precio` (los no excluidos)
+ *
+ * 🔴 **Fila 0.256 — el estampado se contaba DOS veces.** Hasta aquí era
+ * `maquila + aplicacionOrd + Σ artes`: sumaba el precio REAL negociado (`aplicacionOrd`) **y** la
+ * REFERENCIA de ese mismo proceso (`OrdenArte.precio`, que viaja del modelo, §Post-F9.254(2)) — el
+ * mismo dinero dos veces. En v1 había UN solo término de estampado (`CostoOrdSub.txt`:
+ * `[maquilacalc]+[bordcalc]`, y `BordCost == AplicacionOrd` al centavo en el 61 % de los costeos).
+ *
+ * ⚠️ **Un real de 0 capturado MANDA** (no cae a la referencia), igual que en costura: la ausencia
+ * es `null`, no `0` — un taller que no cobra el estampado es un precio, no un hueco. Por eso es
+ * `== null` y no un `||`.
+ *
+ * ⚠️ `aplicacionOrd` es UN solo número para TODO lo que no es costura (así lo paga EsMa también);
+ * cuando la orden lleva dos procesos de arte (estampado + bordado) y hay real capturado, ese real
+ * sustituye a la suma de los dos — como en v1. El precio real POR proceso es la fila 0.242.
+ *
+ * El arte entra UNA vez, SIN multiplicar por cantidad (invariante de V1-E3d pieza A).
+ */
+export function procesosPorPrenda(orden: OrdenParaProcesos): number {
+  const costura =
+    orden.maquilaOrd == null ? num(orden.modelo.maquilaBase) : orden.maquilaOrd.toNumber();
+  const estampado =
+    orden.aplicacionOrd == null
+      ? orden.recetaArtes.reduce((s, a) => s + num(a.precio), 0)
+      : orden.aplicacionOrd.toNumber();
+  return costura + estampado;
 }
 
 /** Proyecta una orden + sus cantidades + su costo a la forma del contrato (ocultando importes). */
