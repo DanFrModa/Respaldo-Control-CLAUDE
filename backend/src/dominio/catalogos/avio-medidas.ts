@@ -28,6 +28,7 @@ import type { Prisma } from '../../datos/index.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeAvio } from './precios-de-catalogo.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -45,7 +46,8 @@ export interface MedidaAvioSalida {
   medida: string;
   valor: number | null;
   requiereRevision: boolean;
-  precio: number;
+  /** `null` SÓLO si {@link MedidasDeAvio.preciosOcultos} (fila 0.249): toda medida lleva precio. */
+  precio: number | null;
   orden: number;
   activo: boolean;
 }
@@ -56,7 +58,16 @@ export interface MedidasDeAvio {
   unidadMedida: string | null;
   promedioPreCosto: number | null;
   avisos: string[];
+  /**
+   * ⭐ Fila 0.249 parte B: `true` = la sesión no lleva ninguna llave de `puedeVerPreciosDeAvio` y el
+   * precio de cada medida y el promedio del precosto van `null`. Las medidas, su orden y los avisos
+   * (que hablan de medidas, no de precios) viajan completos.
+   */
+  preciosOcultos: boolean;
 }
+
+/** Una medida con su precio a la vista: la forma interna, antes de decidir si se tapa. */
+type MedidaConPrecio = Omit<MedidaAvioSalida, 'precio'> & { precio: number };
 
 /** Forma mínima de una fila de `AvioMedida` para proyectarla (evita atarse al `select`). */
 interface FilaMedida {
@@ -86,8 +97,12 @@ async function exigirAvio(tx: Tx, idAvio: number): Promise<{ unidadMedida: strin
  * AVISOS que no bloquean. Los avisos sólo miran las medidas ACTIVAS: una desactivada ya no se
  * compra ni se costea, y gritar por ella sería ruido.
  */
-function proyectarMedidas(filas: FilaMedida[], unidadMedida: string | null): MedidasDeAvio {
-  const datos: MedidaAvioSalida[] = filas.map((f) => ({
+function proyectarMedidas(
+  sesion: SesionUsuario,
+  filas: FilaMedida[],
+  unidadMedida: string | null,
+): MedidasDeAvio {
+  const datos: MedidaConPrecio[] = filas.map((f) => ({
     id: f.id,
     medida: f.medida,
     valor: f.valor === null ? null : f.valor.toNumber(),
@@ -107,7 +122,7 @@ function proyectarMedidas(filas: FilaMedida[], unidadMedida: string | null): Med
   // MISMA medida escrita de tres formas. La migración las marca; aquí se DICE qué son, porque
   // "necesita revisión" a secas dejaba al usuario adivinando cuál sobra. Se agrupan por valor para
   // nombrar el conjunto completo, no una fila suelta.
-  const porValor = new Map<number, MedidaAvioSalida[]>();
+  const porValor = new Map<number, MedidaConPrecio[]>();
   for (const d of activas) {
     if (d.valor === null) continue;
     const grupo = porValor.get(d.valor);
@@ -147,7 +162,24 @@ function proyectarMedidas(filas: FilaMedida[], unidadMedida: string | null): Med
     if (aviso !== null) avisos.push(aviso);
   }
 
-  return { datos, unidadMedida: normalizarUnidad(unidadMedida), promedioPreCosto, avisos };
+  // ⭐ Fila 0.249 parte B: el precio de cada medida y su promedio son DINERO. Se tapan al final,
+  // después de armar los avisos, porque los avisos sólo hablan de medidas (nunca de precios).
+  if (!puedeVerPreciosDeAvio(sesion)) {
+    return {
+      datos: datos.map((d) => ({ ...d, precio: null })),
+      unidadMedida: normalizarUnidad(unidadMedida),
+      promedioPreCosto: null,
+      avisos,
+      preciosOcultos: true,
+    };
+  }
+  return {
+    datos,
+    unidadMedida: normalizarUnidad(unidadMedida),
+    promedioPreCosto,
+    avisos,
+    preciosOcultos: false,
+  };
 }
 
 /** `select` de las medidas (una sola definición para la lectura y para la respuesta del PUT). */
@@ -179,7 +211,7 @@ export async function listarMedidasDeAvio(
     select: SELECT_MEDIDA,
     orderBy: [{ orden: 'asc' }, { medida: 'asc' }],
   });
-  return proyectarMedidas(filas, unidadMedida);
+  return proyectarMedidas(sesion, filas, unidadMedida);
 }
 
 /**
@@ -414,6 +446,6 @@ export async function reemplazarMedidasAvio(
       select: SELECT_MEDIDA,
       orderBy: [{ orden: 'asc' }, { medida: 'asc' }],
     });
-    return proyectarMedidas(filas, unidadMedida);
+    return proyectarMedidas(sesion, filas, unidadMedida);
   }, bd);
 }

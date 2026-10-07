@@ -40,11 +40,16 @@ export interface ColorTela {
 const FORMATO_MONEDA = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
 /**
- * Presenta un precio (o "—" si es null / no se puede ver importes). Los importes se ocultan sin
- * `consultas.ver-importes` (el backend ya los puede nular; aquí además se respeta el permiso).
+ * Presenta un precio: «—» si el servidor lo TAPÓ para esta sesión, «Sin precio» si no lo tiene.
+ *
+ * ⭐ Fila 0.249 parte B: antes esta pantalla decidía por su cuenta con `consultas.ver-importes` y el
+ * API mandaba el precio entero a cualquiera con `telas.ver` — maquillaje, no reja. Ahora lo tapa el
+ * servidor (`dominio/catalogos/precios-de-catalogo.ts`) y aquí sólo se lee su marca
+ * `preciosOcultos`. Y de paso deja de pintar «—» a quien TECLEA esos precios sin llevar la llave de
+ * importes (Desarrollo de Producto administra telas): la regla del servidor sí lo deja verlos.
  */
-function precioTexto(precio: number | null, puedeVerImportes: boolean): string {
-  if (!puedeVerImportes) {
+function precioTexto(precio: number | null, preciosOcultos: boolean): string {
+  if (preciosOcultos) {
     return '—';
   }
   return precio === null ? 'Sin precio' : FORMATO_MONEDA.format(precio);
@@ -57,20 +62,18 @@ function precioTexto(precio: number | null, puedeVerImportes: boolean): string {
  * reactivar renglones, cada uno con su precio base, condiciones y, opcional, un grid de precio
  * POR COLOR (`manejaPrecioPorColor`).
  *
- * `deshabilitado` (sin `telas.administrar` o tela inactiva) deja el listado en solo lectura.
- * `puedeVerImportes` oculta los precios cuando la sesión no tiene `consultas.ver-importes`.
+ * `deshabilitado` (sin `telas.administrar` o tela inactiva) deja el listado en solo lectura. Los
+ * precios los tapa el SERVIDOR (fila 0.249): cada renglón trae su `preciosOcultos`.
  */
 export function EditorProveedoresTela({
   idTela,
   colores,
   deshabilitado = false,
-  puedeVerImportes,
 }: {
   idTela: number;
   /** Colores de la tela (base del grid de precio por color). */
   colores: readonly ColorTela[];
   deshabilitado?: boolean;
-  puedeVerImportes: boolean;
 }): React.JSX.Element {
   const consulta = useTelaProveedores(idTela);
   const desactivar = useDesactivarTelaProveedor();
@@ -178,7 +181,7 @@ export function EditorProveedoresTela({
                   <span className="block text-xs text-muted-foreground">
                     {proveedor.manejaPrecioPorColor
                       ? 'Precio por color'
-                      : precioTexto(proveedor.precio, puedeVerImportes)}
+                      : precioTexto(proveedor.precio, proveedor.preciosOcultos)}
                     {proveedor.condiciones ? ` · ${proveedor.condiciones}` : ''}
                   </span>
                 </div>
@@ -234,7 +237,7 @@ export function EditorProveedoresTela({
                     >
                       <span className="truncate">{color.nombre}</span>
                       <span className="text-muted-foreground">
-                        {precioTexto(color.precio, puedeVerImportes)}
+                        {precioTexto(color.precio, proveedor.preciosOcultos)}
                       </span>
                     </li>
                   ))}
@@ -330,6 +333,12 @@ function DialogoProveedorTela({
   idsAsignados: ReadonlySet<number>;
 }): React.JSX.Element {
   const esEdicion = proveedor !== undefined;
+  /**
+   * 🔒 Fila 0.249 parte B: ¿el servidor TAPÓ los precios de este renglón? Hoy no pasa —editar pide
+   * `telas.administrar`, que los ve—, pero si un día se separan, el diálogo no debe mandar el precio
+   * base vacío (`null` lo borra) ni el grid de colores (es SET-COMPLETO: los vaciaría).
+   */
+  const preciosOcultos = esEdicion && proveedor.preciosOcultos;
   const crear = useCrearTelaProveedor();
   const actualizar = useActualizarTelaProveedor();
   const guardando = crear.isPending || actualizar.isPending;
@@ -391,10 +400,10 @@ function DialogoProveedorTela({
 
     if (esEdicion) {
       const cuerpo: TelaProveedorEditar = {
-        precio: precioNum ?? null,
         condiciones: condicionesLimpio.length > 0 ? condicionesLimpio : null,
         manejaPrecioPorColor,
-        colores: coloresBody,
+        // Lo que no se vio no se manda (= "no tocar").
+        ...(preciosOcultos ? {} : { precio: precioNum ?? null, colores: coloresBody }),
       };
       actualizar.mutate(
         { idTela, id: proveedor.id, cuerpo },
@@ -489,14 +498,18 @@ function DialogoProveedorTela({
                     step="0.01"
                     min="0"
                     inputMode="decimal"
-                    placeholder="0.00"
-                    disabled={guardando || manejaPrecioPorColor}
-                    value={precio}
+                    disabled={guardando || manejaPrecioPorColor || preciosOcultos}
+                    value={preciosOcultos ? '' : precio}
+                    placeholder={preciosOcultos ? '—' : '0.00'}
                     onChange={(e) => setPrecio(e.target.value)}
                     data-testid="precio-proveedor-tela"
                   />
                   <FieldDescription>
-                    {manejaPrecioPorColor ? 'Se usa el precio por color de abajo.' : 'Opcional.'}
+                    {preciosOcultos
+                      ? 'Los precios no están a tu alcance: se conservan al guardar.'
+                      : manejaPrecioPorColor
+                        ? 'Se usa el precio por color de abajo.'
+                        : 'Opcional.'}
                   </FieldDescription>
                 </Field>
 
@@ -550,7 +563,7 @@ function DialogoProveedorTela({
               ) : null}
 
               {/* Grid color × precio (solo si maneja precio por color). */}
-              {manejaPrecioPorColor ? (
+              {manejaPrecioPorColor && !preciosOcultos ? (
                 grid.length === 0 ? (
                   <p
                     className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground"

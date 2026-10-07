@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Contrato Zod de Tela + TelaCategoria + ComposicionTela + TelaColor (F1-E3, PIEZA A —
  * Telas unificadas, D5 — ADR-0009; reestructura A1 §Post-F9.11).
@@ -326,6 +328,7 @@ export const esquemaTelaColorSalida = z
       .describe(
         'LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas.',
       ),
+    preciosOcultos: esquemaPreciosOcultos,
   })
   .describe('Renglón de color de una tela (con sus precios y pantone).');
 
@@ -641,7 +644,12 @@ export const esquemaTelaSalida = z
       .enum(TIPOS_COMPONENTE_TELA)
       .describe('Rol típico de la tela en el lote (D5).'),
     favorito: z.boolean().describe('¿Tela de uso frecuente?'),
-    precioSugerido: z.number().nullable().describe('Precio de referencia por unidad, o null.'),
+    precioSugerido: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249).',
+      ),
     precioSugeridoComplemento: z
       .number()
       .nullable()
@@ -655,6 +663,7 @@ export const esquemaTelaSalida = z
     colores: z
       .array(esquemaTelaColorSalida)
       .describe('Colores HIJOS de la tela (nombre libre + pantone + precios).'),
+    preciosOcultos: esquemaPreciosOcultos,
     activo: z.boolean().describe('Falso si está desactivada (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),

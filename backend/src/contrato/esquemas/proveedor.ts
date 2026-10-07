@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { MODALIDADES_FACTURACION } from './esma.js';
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
 import { esClabeValida, esRfcValido, METODOS_PAGO, MONEDAS } from './fiscal.js';
 
 /** Tipos de adjunto de un proveedor (R15 §4). Alineado con el enum `TipoArchivoProveedor`. */
@@ -990,6 +991,7 @@ export const esquemaProveedorAvioSalida = z
     descripcion: z.string().describe('Descripción del avío (para la UI).'),
     precio: z.number().nullable().describe('Precio al que este proveedor lo surte, o null.'),
     condiciones: z.string().nullable().describe('Condiciones comerciales, o null.'),
+    preciosOcultos: esquemaPreciosOcultos,
   })
   .describe('Avío que surte un proveedor con su precio y condiciones (R1/B17).');
 

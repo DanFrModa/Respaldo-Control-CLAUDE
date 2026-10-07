@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Contrato de Avíos + AvioProveedor (F1-E3, PIEZA B — R1). Una sola definición de las
  * reglas de captura para UI y servidor (fuente del OpenAPI). Calca el patrón N:N de
@@ -257,6 +259,7 @@ export const esquemaAvioProveedorSalida = z
         '⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba ' +
           'del "más barato" de F4). Uno por avío.',
       ),
+    preciosOcultos: esquemaPreciosOcultos,
   })
   .describe('Proveedor de un avío con su precio y condiciones (R1).');
 
@@ -288,6 +291,7 @@ export const esquemaAvioSalida = z
     proveedores: z
       .array(esquemaAvioProveedorSalida)
       .describe('Proveedores del avío con su precio y condiciones (R1).'),
+    preciosOcultos: esquemaPreciosOcultos,
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

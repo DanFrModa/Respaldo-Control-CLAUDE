@@ -241,6 +241,14 @@ export function DialogoTela({
   tela: Tela | undefined;
 }): React.JSX.Element {
   const esEdicion = tela !== undefined;
+  /**
+   * 🔒 Fila 0.249 parte B: ¿el servidor TAPÓ los precios de esta tela para esta sesión? Hoy no pasa
+   * en edición —editar pide `telas.administrar`, que ve los precios—, pero si un día se separan, el
+   * formulario no debe pintar vacío lo que no vio, ni mandarlo al guardar: el precio sugerido y el
+   * del complemento viajarían como `null` (los BORRA) y el grid de colores es SET-COMPLETO con dos
+   * precios por color (los vaciaría todos).
+   */
+  const preciosOcultos = esEdicion && tela.preciosOcultos;
   const crear = useCrearTela();
   const actualizar = useActualizarTela();
   const guardando = crear.isPending || actualizar.isPending;
@@ -429,11 +437,16 @@ export function DialogoTela({
         idCategoria: categoria,
         idComposicion: composicion,
         ...(idProveedor === null ? {} : { idProveedor }),
-        precioSugerido: precio ?? null,
-        precioSugeridoComplemento: precioComplemento ?? null,
         peso: peso ?? null,
         ancho: ancho ?? null,
-        colores: coloresCuerpo,
+        // Lo que no se vio no se manda (= "no tocar"). Ver `preciosOcultos`.
+        ...(preciosOcultos
+          ? {}
+          : {
+              precioSugerido: precio ?? null,
+              precioSugeridoComplemento: precioComplemento ?? null,
+              colores: coloresCuerpo,
+            }),
       };
       actualizar.mutate(
         { id: tela.id, cuerpo },
@@ -803,48 +816,57 @@ export function DialogoTela({
                     {/* ⭐⭐ 0.163 — el COMPLEMENTO TAMBIÉN CUESTA. Daniel: «El complemento de la
                         tela debe de llevar un costo estimado». Es el último escalón con el que el
                         costeo valúa el cárdigan cuando no hay compras ni precio por color. */}
-                    <Field data-invalid={Boolean(errors.precioSugeridoComplemento)}>
-                      <FieldLabel htmlFor="tela-precio-complemento">
-                        Costo estimado del complemento
-                      </FieldLabel>
-                      <Input
-                        id="tela-precio-complemento"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        inputMode="decimal"
-                        placeholder="Ej. 62.00"
-                        aria-invalid={Boolean(errors.precioSugeridoComplemento)}
-                        disabled={guardando}
-                        data-testid="tela-precio-complemento"
-                        {...registrar('precioSugeridoComplemento')}
-                      />
-                      <FieldDescription>
-                        Por unidad. Se usa al costear cuando el complemento no se ha comprado ni
-                        tiene precio por color (vacío = sin estimado).
-                      </FieldDescription>
-                      <FieldError errors={[errors.precioSugeridoComplemento]} />
-                    </Field>
+                    {preciosOcultos ? null : (
+                      <Field data-invalid={Boolean(errors.precioSugeridoComplemento)}>
+                        <FieldLabel htmlFor="tela-precio-complemento">
+                          Costo estimado del complemento
+                        </FieldLabel>
+                        <Input
+                          id="tela-precio-complemento"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          placeholder="Ej. 62.00"
+                          aria-invalid={Boolean(errors.precioSugeridoComplemento)}
+                          disabled={guardando}
+                          data-testid="tela-precio-complemento"
+                          {...registrar('precioSugeridoComplemento')}
+                        />
+                        <FieldDescription>
+                          Por unidad. Se usa al costear cuando el complemento no se ha comprado ni
+                          tiene precio por color (vacío = sin estimado).
+                        </FieldDescription>
+                        <FieldError errors={[errors.precioSugeridoComplemento]} />
+                      </Field>
+                    )}
                   </>
                 ) : null}
 
                 {/* Precio sugerido */}
-                <Field data-invalid={Boolean(errors.precioSugerido)}>
-                  <FieldLabel htmlFor="tela-precio">Precio sugerido</FieldLabel>
-                  <Input
-                    id="tela-precio"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
-                    placeholder="Ej. 78.00"
-                    aria-invalid={Boolean(errors.precioSugerido)}
-                    disabled={guardando}
-                    {...registrar('precioSugerido')}
-                  />
-                  <FieldDescription>Referencia por unidad (vacío = sin precio).</FieldDescription>
-                  <FieldError errors={[errors.precioSugerido]} />
-                </Field>
+                {preciosOcultos ? (
+                  <p className="text-xs text-muted-foreground" data-testid="precios-tela-tapados">
+                    Los precios de esta tela (el sugerido y los de cada color) no están a tu
+                    alcance: se conservan tal cual al guardar.
+                  </p>
+                ) : (
+                  <Field data-invalid={Boolean(errors.precioSugerido)}>
+                    <FieldLabel htmlFor="tela-precio">Precio sugerido</FieldLabel>
+                    <Input
+                      id="tela-precio"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Ej. 78.00"
+                      aria-invalid={Boolean(errors.precioSugerido)}
+                      disabled={guardando}
+                      {...registrar('precioSugerido')}
+                    />
+                    <FieldDescription>Referencia por unidad (vacío = sin precio).</FieldDescription>
+                    <FieldError errors={[errors.precioSugerido]} />
+                  </Field>
+                )}
 
                 {/* Bandera de favorita (en el ALTA arranca MARCADA, A1.1 punto 2). La casilla
                     "¿Es tela de producción?" se OCULTÓ (A1.1 punto 4): el dato queda en el
@@ -864,13 +886,15 @@ export function DialogoTela({
                 </Field>
 
                 {/* Grid de colores con pantone y precios (inline, puede ir vacío) */}
-                <EditorColoresTela
-                  colores={colores}
-                  alCambiar={setColores}
-                  deshabilitado={guardando}
-                  llevaComplemento={llevaComplemento}
-                  nombreComplemento={nombreComplementoVivo}
-                />
+                {preciosOcultos ? null : (
+                  <EditorColoresTela
+                    colores={colores}
+                    alCambiar={setColores}
+                    deshabilitado={guardando}
+                    llevaComplemento={llevaComplemento}
+                    nombreComplemento={nombreComplementoVivo}
+                  />
+                )}
               </FieldGroup>
 
               {!esEdicion ? (

@@ -1443,6 +1443,12 @@ export const PERMISOS_DE_DINERO: readonly ClavePermiso[] = [
   // para ver y registrar pagos»* es dinero de cabo a rabo. No había brecha —nunca estuvo en el piso—
   // pero la lista decía que cubría los pagos y no los cubría todos.
   'esma.ver-pagos',
+  // ⭐ 0.249 parte B: `compras.ver` es la llave de leer las ÓRDENES DE COMPRA (con precio e importe
+  // de cada renglón), de la EXPLOSIÓN (precio sugerido de cada material) y de
+  // `GET /ordenes/:id/colores-tela` (precio por color de la tela). Nunca estuvo en el piso —no hay
+  // brecha—, pero no estaba en esta lista y una prueba de la parte B afirmaba en falso que «no abre
+  // precios». Va aquí para que el piso no pueda recibirla por un copiar-y-pegar.
+  'compras.ver',
 ];
 
 /**

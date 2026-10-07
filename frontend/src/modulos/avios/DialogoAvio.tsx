@@ -129,7 +129,11 @@ function aCuerpoCrear(datos: DatosAvioFormulario, renglones: RenglonProveedorAvi
  * un campo omitido no se tocaría, así que omitirlo nunca permitiría vaciar un valor ya
  * capturado). Los proveedores SIEMPRE viajan (reemplazan el set; puede quedar en []).
  */
-function aCuerpoEditar(datos: DatosAvioFormulario, renglones: RenglonProveedorAvio[]): AvioEditar {
+function aCuerpoEditar(
+  datos: DatosAvioFormulario,
+  renglones: RenglonProveedorAvio[],
+  { preciosOcultos }: { preciosOcultos: boolean },
+): AvioEditar {
   return {
     clave: datos.clave,
     descripcion: datos.descripcion,
@@ -139,8 +143,16 @@ function aCuerpoEditar(datos: DatosAvioFormulario, renglones: RenglonProveedorAv
     esGenerico: datos.esGenerico,
     seCompraSinColor: datos.seCompraSinColor,
     cantFav: numeroOpcionalACuerpo(datos.cantFav) ?? null,
-    precioReferencia: numeroOpcionalACuerpo(datos.precioReferencia) ?? null,
-    proveedores: aProveedoresCuerpo(renglones),
+    // 🔒 Fila 0.249 parte B: si el servidor TAPÓ los precios, el formulario nunca los vio y están
+    // vacíos por eso, no porque alguien los borrara. El precio de referencia viajaría como `null`
+    // (lo BORRA) y el grid de proveedores es SET-COMPLETO (cada precio omitido se guarda `null`).
+    // Se omiten los dos = "no tocar".
+    ...(preciosOcultos
+      ? {}
+      : {
+          precioReferencia: numeroOpcionalACuerpo(datos.precioReferencia) ?? null,
+          proveedores: aProveedoresCuerpo(renglones),
+        }),
   };
 }
 
@@ -170,6 +182,12 @@ export function DialogoAvio({
   avio: Avio | undefined;
 }): React.JSX.Element {
   const esEdicion = avio !== undefined;
+  /**
+   * 🔒 Fila 0.249 parte B: ¿el servidor TAPÓ los precios de este avío para esta sesión? Hoy no pasa
+   * en edición —editar pide `avios.administrar`, que ve los precios—, pero si un día se separan, el
+   * formulario no debe pintar vacío lo que no vio, ni mandarlo al guardar (lo borraría).
+   */
+  const preciosOcultos = esEdicion && avio.preciosOcultos;
   const crear = useCrearAvio();
   const actualizar = useActualizarAvio();
   const guardando = crear.isPending || actualizar.isPending;
@@ -218,7 +236,7 @@ export function DialogoAvio({
 
   const enviar = formulario.handleSubmit((datos) => {
     if (esEdicion) {
-      const cuerpo = aCuerpoEditar(datos, renglones);
+      const cuerpo = aCuerpoEditar(datos, renglones, { preciosOcultos });
       actualizar.mutate(
         { id: avio.id, cuerpo },
         {
@@ -403,31 +421,41 @@ export function DialogoAvio({
                 Sin marcar, cada color va en su propio renglón, como los cierres.
               </p>
 
-              <Field data-invalid={Boolean(errors.precioReferencia)}>
-                <FieldLabel htmlFor="avio-precio-ref">Precio de referencia</FieldLabel>
-                <Input
-                  id="avio-precio-ref"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  inputMode="decimal"
-                  placeholder="Opcional (fallback de precio)"
-                  aria-invalid={Boolean(errors.precioReferencia)}
-                  disabled={guardando}
-                  {...registrar('precioReferencia')}
-                />
-                <FieldError errors={[errors.precioReferencia]} />
-              </Field>
+              {/* 🔒 Fila 0.249: sin precios a la vista no se pide ni el de referencia ni el grid
+                  de proveedores (es set-completo con precio): guardar los pisaría. */}
+              {preciosOcultos ? (
+                <p className="text-xs text-muted-foreground" data-testid="precios-avio-tapados">
+                  Los precios de este avío no están a tu alcance: se conservan tal cual al guardar.
+                </p>
+              ) : (
+                <>
+                  <Field data-invalid={Boolean(errors.precioReferencia)}>
+                    <FieldLabel htmlFor="avio-precio-ref">Precio de referencia</FieldLabel>
+                    <Input
+                      id="avio-precio-ref"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      inputMode="decimal"
+                      placeholder="Opcional (fallback de precio)"
+                      aria-invalid={Boolean(errors.precioReferencia)}
+                      disabled={guardando}
+                      {...registrar('precioReferencia')}
+                    />
+                    <FieldError errors={[errors.precioReferencia]} />
+                  </Field>
 
-              {/* Proveedores y precios (inline, ≥0). */}
-              <SelectorProveedoresAvio
-                proveedores={proveedores}
-                cargando={proveedoresCatalogo.isPending}
-                error={proveedoresCatalogo.isError ? proveedoresCatalogo.error.message : null}
-                renglones={renglones}
-                alCambiar={setRenglones}
-                deshabilitado={guardando}
-              />
+                  {/* Proveedores y precios (inline, ≥0). */}
+                  <SelectorProveedoresAvio
+                    proveedores={proveedores}
+                    cargando={proveedoresCatalogo.isPending}
+                    error={proveedoresCatalogo.isError ? proveedoresCatalogo.error.message : null}
+                    renglones={renglones}
+                    alCambiar={setRenglones}
+                    deshabilitado={guardando}
+                  />
+                </>
+              )}
             </FieldGroup>
           </div>
 

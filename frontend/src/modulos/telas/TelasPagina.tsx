@@ -100,7 +100,6 @@ function identidadTela(tela: Tela): string {
 export function TelasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('telas.administrar');
-  const puedeVerImportes = tienePermiso('consultas.ver-importes');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -356,7 +355,6 @@ export function TelasPagina(): React.JSX.Element {
                         tela={tela}
                         abierta={expandidas.has(tela.id)}
                         puedeAdministrar={puedeAdministrar}
-                        puedeVerImportes={puedeVerImportes}
                         onToggle={() => alternarExpandida(tela.id)}
                         onExpandir={() => expandir(tela.id)}
                         onEditar={() => abrirEdicion(tela)}
@@ -441,7 +439,6 @@ function RenglonTela({
   tela,
   abierta,
   puedeAdministrar,
-  puedeVerImportes,
   onToggle,
   onExpandir,
   onEditar,
@@ -451,7 +448,6 @@ function RenglonTela({
   tela: Tela;
   abierta: boolean;
   puedeAdministrar: boolean;
-  puedeVerImportes: boolean;
   onToggle: () => void;
   onExpandir: () => void;
   onEditar: () => void;
@@ -618,7 +614,12 @@ function RenglonTela({
                         </span>
                         <span className="num flex shrink-0 flex-col items-end text-sm text-muted-foreground">
                           <span>
-                            {color.precio === null ? 'Sin precio' : formatearPrecio(color.precio)}
+                            {/* 🔒 Fila 0.249: tapado por el servidor ≠ «Sin precio». */}
+                            {tela.preciosOcultos
+                              ? '—'
+                              : color.precio === null
+                                ? 'Sin precio'
+                                : formatearPrecio(color.precio)}
                           </span>
                           {/* El precio del COMPLEMENTO solo existe si la tela lo lleva
                               (§Post-F9.11), con su nombre: "Precio Cardigan". */}
@@ -658,7 +659,6 @@ function RenglonTela({
                       : [{ idColor: color.idColor, nombre: color.nombre }],
                   )}
                   deshabilitado={!puedeAdministrar || !tela.activo}
-                  puedeVerImportes={puedeVerImportes}
                 />
               </section>
 

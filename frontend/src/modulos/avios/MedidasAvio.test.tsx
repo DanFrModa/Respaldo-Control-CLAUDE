@@ -55,6 +55,7 @@ function medidas(over: Partial<TipoMedidas> = {}): TipoMedidas {
     unidadMedida: 'cm',
     promedioPreCosto: 6,
     avisos: [],
+    preciosOcultos: false,
     ...over,
   };
 }
@@ -222,5 +223,46 @@ describe('<MedidasAvio> (V1-E3g)', () => {
     expect(screen.getByTestId('avisos-medidas-avio')).toHaveTextContent('fuera de lo normal');
     await usuario.click(screen.getByTestId('guardar-medidas'));
     await waitFor(() => expect(guardarMutate).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('<MedidasAvio> con los precios TAPADOS por el servidor (fila 0.249 parte B)', () => {
+  beforeEach(() => {
+    guardarMutate.mockReset();
+    useMedidas.mockReturnValue({
+      data: medidas({
+        datos: [
+          {
+            id: 1,
+            medida: '53 cm',
+            valor: 53,
+            requiereRevision: false,
+            precio: null,
+            orden: 0,
+            activo: true,
+          },
+        ],
+        promedioPreCosto: null,
+        preciosOcultos: true,
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  it('no abre el editor (guardar es set-completo y PISARÍA el precio) aunque pueda administrar', () => {
+    render();
+    expect(screen.queryByTestId('guardar-medidas')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Precio de la medida 1')).not.toBeInTheDocument();
+    expect(guardarMutate).not.toHaveBeenCalled();
+  });
+
+  it('enseña la medida con «—» y NO dice que el avío no maneja medidas', () => {
+    render();
+    expect(screen.getByTestId('lista-medidas-avio')).toHaveTextContent('53 cm');
+    expect(screen.getByTestId('lista-medidas-avio')).toHaveTextContent('—');
+    expect(screen.getByTestId('promedio-precosteo')).toHaveTextContent('Promedio (precosteo): —');
+    expect(screen.queryByText(/no maneja medidas/)).not.toBeInTheDocument();
   });
 });

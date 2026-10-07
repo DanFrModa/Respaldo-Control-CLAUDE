@@ -46,6 +46,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeAvio } from './precios-de-catalogo.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -93,6 +94,40 @@ const incluirProveedores = {
     orderBy: { proveedor: { nombre: 'asc' } },
   },
 } satisfies Prisma.AvioInclude;
+
+/**
+ * Avío TAL COMO SALE hacia quien lo consulta (fila 0.249 parte B): `preciosOcultos: true` = el
+ * `precioReferencia` y el `precio` de cada proveedor van `null` porque la sesión no lleva ninguna
+ * llave de `puedeVerPreciosDeAvio` (no porque no los tenga capturados).
+ */
+export type AvioVisible = AvioConProveedores & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR los precios de un avío para quien no puede verlos (fila 0.249 parte B,
+ * §Post-F9.257(c)). Mismo patrón que `ocultarDatosBancariosSiNoPuede` (parte A).
+ *
+ * Lo que se tapa: el precio de referencia y el de cada proveedor. Lo que NO: clave, descripción,
+ * unidad, genérico, favorito, quién lo surte, quién es el habitual y sus condiciones — dicen QUÉ es
+ * y A QUIÉN se compra, no a cuánto.
+ *
+ * Proyección pura: nunca escribe. Quien edita el avío lleva `avios.administrar`, que está en la
+ * regla, así que el formulario siempre parte de los precios completos (el grid de proveedores es
+ * SET-COMPLETO: un precio omitido se guardaría como `null`).
+ */
+export function ocultarPreciosDeAvioSiNoPuede(
+  sesion: SesionUsuario,
+  avio: AvioConProveedores,
+): AvioVisible {
+  if (puedeVerPreciosDeAvio(sesion)) {
+    return { ...avio, preciosOcultos: false };
+  }
+  return {
+    ...avio,
+    precioReferencia: null,
+    proveedores: avio.proveedores.map((p) => ({ ...p, precio: null })),
+    preciosOcultos: true,
+  };
+}
 
 /**
  * Parámetros del listado a nivel DOMINIO. A diferencia del esquema de querystring del
@@ -424,13 +459,13 @@ export async function crearAvio(
   sesion: SesionUsuario,
   entrada: EntradaCrearAvio,
   bd?: ContextoBd,
-): Promise<AvioConProveedores> {
+): Promise<AvioVisible> {
   verificarPermiso(sesion, 'avios.administrar');
   const datos = validarEntrada(esquemaAvioCrear, entrada);
   validarFavorito(datos.favorito, datos.cantFav ?? null);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const avio = await enTransaccion(async (tx) => {
       await exigirClaveLibre(tx, datos.clave);
 
       const avio = await tx.avio.create({
@@ -460,6 +495,7 @@ export async function crearAvio(
         include: incluirProveedores,
       });
     }, bd);
+    return ocultarPreciosDeAvioSiNoPuede(sesion, avio);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto(`Ya existe un avío con la clave "${datos.clave}".`, {
@@ -484,12 +520,12 @@ export async function actualizarAvio(
   sesion: SesionUsuario,
   entrada: EntradaActualizarAvio,
   bd?: ContextoBd,
-): Promise<AvioConProveedores> {
+): Promise<AvioVisible> {
   verificarPermiso(sesion, 'avios.administrar');
   const datos = validarEntrada(esquemaAvioEditar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const avio = await enTransaccion(async (tx) => {
       const actual = await exigirAvio(tx, datos.id);
 
       const cambiaClave = datos.clave !== undefined && datos.clave !== actual.clave;
@@ -596,6 +632,7 @@ export async function actualizarAvio(
         include: incluirProveedores,
       });
     }, bd);
+    return ocultarPreciosDeAvioSiNoPuede(sesion, avio);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto('Ya existe un avío con esa clave.', { causa: error });
@@ -613,7 +650,7 @@ export async function desactivarAvio(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<AvioConProveedores> {
+): Promise<AvioVisible> {
   verificarPermiso(sesion, 'avios.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirAvio(tx, id);
@@ -629,7 +666,7 @@ export async function reactivarAvio(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<AvioConProveedores> {
+): Promise<AvioVisible> {
   verificarPermiso(sesion, 'avios.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirAvio(tx, id);
@@ -645,7 +682,7 @@ export async function obtenerAvio(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<AvioConProveedores> {
+): Promise<AvioVisible> {
   verificarPermiso(sesion, 'avios.ver');
   const avio = await clienteLectura(bd).avio.findUnique({
     where: { id },
@@ -654,7 +691,7 @@ export async function obtenerAvio(
   if (avio === null) {
     throw new ErrorNoEncontrado('Avio', id);
   }
-  return avio;
+  return ocultarPreciosDeAvioSiNoPuede(sesion, avio);
 }
 
 /**
@@ -670,7 +707,7 @@ export async function listarAvios(
   sesion: SesionUsuario,
   parametros: ParametrosListarAvios = {},
   bd?: ContextoBd,
-): Promise<Pagina<AvioConProveedores>> {
+): Promise<Pagina<AvioVisible>> {
   verificarPermiso(sesion, 'avios.ver');
   const filtros = validarEntrada(esquemaListarAviosDominio, parametros);
   const cliente = clienteLectura(bd);
@@ -699,7 +736,11 @@ export async function listarAvios(
     }),
   ]);
 
-  return armarPagina(datos, total, filtros);
+  return armarPagina(
+    datos.map((avio) => ocultarPreciosDeAvioSiNoPuede(sesion, avio)),
+    total,
+    filtros,
+  );
 }
 
 /**
@@ -708,7 +749,10 @@ export async function listarAvios(
  * el BOM. Hasta V1-E8a viajaba junto un `precioUnidadConsumo` = `precio` ÷ factor de conversión;
  * se retiró con el factor, porque ya no hay dos unidades que traducir.
  */
-export type ProveedorDeAvio = AvioConProveedores['proveedores'][number];
+export type ProveedorDeAvio = AvioConProveedores['proveedores'][number] & {
+  /** Fila 0.249 parte B: `true` = su `precio` va `null` porque a esta sesión no le toca verlo. */
+  preciosOcultos: boolean;
+};
 
 /**
  * Lista los proveedores de un avío con su precio/condiciones. El precio por proveedor vive aquí.
@@ -725,7 +769,7 @@ export async function listarProveedoresDeAvio(
   if (avio === null) {
     throw new ErrorNoEncontrado('Avio', idAvio);
   }
-  return cliente.avioProveedor.findMany({
+  const filas = await cliente.avioProveedor.findMany({
     where: { idAvio },
     select: {
       idProveedor: true,
@@ -736,4 +780,11 @@ export async function listarProveedoresDeAvio(
     },
     orderBy: { proveedor: { nombre: 'asc' } },
   });
+  // Fila 0.249 parte B: el precio por proveedor es lo que se tapa; quién surte el avío, no.
+  const preciosOcultos = !puedeVerPreciosDeAvio(sesion);
+  return filas.map((fila) => ({
+    ...fila,
+    ...(preciosOcultos ? { precio: null } : {}),
+    preciosOcultos,
+  }));
 }

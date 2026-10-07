@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Contrato Zod de las MEDIDAS de un avío "por medida" (rediseño R5, B11) — cierres, elástico… El avío
  * se COSTEA con un solo precio en el precosto (el PROMEDIO SIMPLE de los precios de sus medidas
@@ -132,7 +134,13 @@ export const esquemaAvioMedidaSalida = z
         '¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y ' +
           'NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando.',
       ),
-    precio: z.number().describe('Precio real de compra de esta medida.'),
+    precio: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio real de compra de esta medida. null SÓLO si la sesión no ve precios ' +
+          '(`preciosOcultos` de la lista, fila 0.249).',
+      ),
     orden: z.number().int().describe('Orden de despliegue.'),
     activo: z.boolean().describe('Falso si está desactivada (borrado suave).'),
   })
@@ -165,6 +173,7 @@ export const esquemaAvioMedidasLista = z
       .describe(
         'Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo).',
       ),
+    preciosOcultos: esquemaPreciosOcultos,
   })
   .describe('Medidas de un avío con el promedio del precosteo.');
 

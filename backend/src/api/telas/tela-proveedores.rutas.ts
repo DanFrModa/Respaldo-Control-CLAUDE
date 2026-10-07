@@ -33,6 +33,7 @@ import {
   listarProveedoresDeTela,
   obtenerTelaProveedor,
   type TelaProveedorConColores,
+  type TelaProveedorVisible,
 } from '../../dominio/catalogos/tela-proveedores.js';
 
 /** Proyecta un renglón de precio por color a la forma JSON del contrato (decimales → number). */
@@ -48,7 +49,7 @@ function aColorSalida(
 
 /** Proyecta el modelo Prisma `TelaProveedor` (con proveedor y colores) a la forma JSON del contrato. */
 function aTelaProveedorSalida(
-  tp: TelaProveedorConColores,
+  tp: TelaProveedorVisible,
 ): z.infer<typeof esquemaTelaProveedorSalida> {
   return {
     id: tp.id,
@@ -60,6 +61,8 @@ function aTelaProveedorSalida(
     condiciones: tp.condiciones,
     activo: tp.activo,
     colores: tp.colores.map(aColorSalida),
+    // Fila 0.249 parte B: el DOMINIO decide si esta sesión ve los precios (aquí sólo se copia).
+    preciosOcultos: tp.preciosOcultos,
     creadoEn: tp.creadoEn.toISOString(),
     creadoPorId: tp.creadoPorId,
     modificadoEn: tp.modificadoEn.toISOString(),
