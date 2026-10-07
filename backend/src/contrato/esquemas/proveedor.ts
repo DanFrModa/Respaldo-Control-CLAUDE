@@ -764,15 +764,29 @@ export const esquemaProveedorSalida = z
       .nullable()
       .describe('Efectivo o transferencia por omisión en la corrida semanal, o null.'),
     metodoPago: z.string().nullable().describe('Método de pago CFDI (PUE/PPD), o null.'),
-    banco: z.string().nullable().describe('Banco, o null.'),
-    clabe: z.string().nullable().describe('CLABE interbancaria, o null.'),
+    banco: z
+      .string()
+      .nullable()
+      .describe('Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249).'),
+    clabe: z
+      .string()
+      .nullable()
+      .describe(
+        'CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249).',
+      ),
     limiteCredito: z.number().nullable().describe('Límite de crédito, o null.'),
     // ── Operativo (E1B) ─────────────────────────────────────────────────────────
     leadTimeDias: z.number().int().nullable().describe('Lead time en días, o null.'),
     notas: z.string().nullable().describe('Notas, o null.'),
     // ── Maquila/corte (fusión de terceros D12/R15) ───────────────────────────────
     asegurado: z.boolean().nullable().describe('¿Está asegurado? (talleres), o null.'),
-    obsPago: z.string().nullable().describe('Observaciones de pago (talleres), o null.'),
+    obsPago: z
+      .string()
+      .nullable()
+      .describe(
+        'Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la ' +
+          'sesión no ve datos bancarios (fila 0.249).',
+      ),
     modalidadFacturacion: z
       .enum(MODALIDADES_FACTURACION)
       .nullable()
@@ -782,10 +796,16 @@ export const esquemaProveedorSalida = z
     contactos: z
       .array(esquemaProveedorContactoSalida)
       .describe('Contactos ACTIVOS del proveedor (V1-E3f pieza B).'),
+    /**
+     * ⭐ Fila 0.249: **`null` ≠ `[]`**. `null` = la sesión no lleva la llave de los datos bancarios
+     * (`proveedores.administrar`) y el servidor NO los manda; `[]` = el proveedor no tiene cuentas.
+     */
     cuentasPago: z
       .array(esquemaProveedorCuentaPagoSalida)
+      .nullable()
       .describe(
-        'Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte.',
+        'Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden ' +
+          'aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas.',
       ),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),

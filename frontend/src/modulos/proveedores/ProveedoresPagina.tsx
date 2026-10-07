@@ -564,7 +564,8 @@ function DetalleProveedor({
     hayTexto(p.moneda) ||
     p.formaPagoPreferida !== null ||
     hayTexto(p.metodoPago) ||
-    p.cuentasPago.length > 0 ||
+    // `null` = el servidor no las manda a esta sesión (fila 0.249): no hay nada que pintar.
+    (p.cuentasPago !== null && p.cuentasPago.length > 0) ||
     hayTexto(p.condiciones);
 
   const hayOperativo = p.leadTimeDias !== null || hayTexto(p.notas) || p.cantidadAdjuntos > 0;
@@ -671,8 +672,10 @@ function DetalleProveedor({
             ) : null}
             {/* ⭐ Las CUENTAS reemplazan al par `banco`/`clabe` viejo (0.112): un proveedor tiene
                 varias, cada una a nombre de SU beneficiario —que casi nunca es él— y una queda por
-                omisión. Los campos viejos siguen en la base pero ya nadie los lee (REGLA 0-B). */}
-            {p.cuentasPago.length > 0 ? (
+                omisión. Los campos viejos siguen en la base pero ya nadie los lee (REGLA 0-B).
+                🔒 Fila 0.249: sin `proveedores.administrar` el SERVIDOR manda `cuentasPago: null`
+                y aquí no se pinta nada — la pantalla no esconde, simplemente no le llegó. */}
+            {p.cuentasPago !== null && p.cuentasPago.length > 0 ? (
               <CampoDetalle icono={Landmark} etiqueta="Cuentas de pago" anchoCompleto>
                 <span className="flex flex-col gap-1" data-testid="cuentas-pago-detalle">
                   {p.cuentasPago.map((c) => (

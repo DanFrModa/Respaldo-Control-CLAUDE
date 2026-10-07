@@ -158,7 +158,10 @@ export function ConceptosPagoPagina(): React.JSX.Element {
                           ? '—'
                           : (ETIQUETA_FORMA[c.formaPagoPreferida] ?? c.formaPagoPreferida)}
                       </TablaDensaCelda>
-                      <TablaDensaCelda>{String(c.cuentas.length)}</TablaDensaCelda>
+                      {/* 🔒 Fila 0.249: `null` = el servidor no manda las cuentas a esta sesión. */}
+                      <TablaDensaCelda data-testid="conceptos-num-cuentas">
+                        {c.cuentas === null ? '—' : String(c.cuentas.length)}
+                      </TablaDensaCelda>
                       <TablaDensaCelda>
                         <ChipEstado tono={c.activo ? 'ok' : 'neutro'}>
                           {c.activo ? 'Activo' : 'Retirado'}
@@ -347,6 +350,9 @@ function CuentasDelConcepto({
   if (concepto === null) {
     return null;
   }
+  // Este panel sólo se abre con `conceptos-pago.administrar`, y a esa llave el servidor siempre le
+  // manda las cuentas (fila 0.249). El `?? []` sólo satisface al tipo, que admite `null`.
+  const cuentas = concepto.cuentas ?? [];
 
   return (
     <div className="mt-4 rounded-md border p-3" data-testid="concepto-cuentas">
@@ -357,13 +363,13 @@ function CuentasDelConcepto({
         </Button>
       </div>
 
-      {concepto.cuentas.length === 0 ? (
+      {cuentas.length === 0 ? (
         <p className="mb-3 text-sm text-muted-foreground">
           Todavía no tiene cuentas: se le paga en efectivo.
         </p>
       ) : (
         <ul className="mb-3 space-y-1 text-sm">
-          {concepto.cuentas.map((c) => (
+          {cuentas.map((c) => (
             <li key={c.id} className="flex items-center gap-2">
               <span className="font-medium">{c.beneficiario}</span>
               <span className="text-muted-foreground">

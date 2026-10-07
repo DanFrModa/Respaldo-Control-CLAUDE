@@ -232,7 +232,10 @@ function textoONull(valor: string): string | null {
  * (retenciones/asegurado) viajan como boolean; los numericos/enum opcionales vacios van
  * como `null`. Los `roles` los inyecta el `enviar` (estado local, nunca `[]`).
  */
-function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
+function aCuerpoEditar(
+  datos: DatosProveedorFormulario,
+  { datosBancariosTapados }: { datosBancariosTapados: boolean },
+): ProveedorEditar {
   const cuerpo: ProveedorEditar = {
     nombre: datos.nombre,
     // Textos opcionales: vacio -> null (borrar).
@@ -252,7 +255,10 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     condiciones: textoONull(datos.condiciones),
     notas: textoONull(datos.notas),
     // Datos de taller (fusión de terceros, D12/R15): texto opcional vacio -> null (borrar).
-    obsPago: textoONull(datos.obsPago),
+    // 🔒 Fila 0.249: si el servidor NO mandó los datos bancarios a esta sesión, el formulario
+    // nunca vio `obsPago` (trae números de cuenta) y está vacío por eso, no porque alguien lo
+    // borrara: mandar `null` lo PISARÍA. Se omite = "no tocar".
+    ...(datosBancariosTapados ? {} : { obsPago: textoONull(datos.obsPago) }),
     // Banderas: siempre viajan como boolean. `factura` NO está (fila 0.124): la columna vieja se
     // queda como histórico y ninguna edición la toca (REGLA 0-B).
     retieneIva: datos.retieneIva,
@@ -302,6 +308,13 @@ export function DialogoProveedor({
   proveedor: Proveedor | undefined;
 }): React.JSX.Element {
   const esEdicion = proveedor !== undefined;
+  /**
+   * 🔒 Fila 0.249: ¿el servidor TAPÓ los datos bancarios de este proveedor para esta sesión?
+   * `cuentasPago: null` es la marca (`[]` sería «no tiene»). Hoy no pasa en edición —editar y ver
+   * los bancarios piden la misma llave, `proveedores.administrar`—, pero si un día se separan, el
+   * formulario no debe pintar vacío lo que no vio, ni mandarlo como `null` al guardar.
+   */
+  const datosBancariosTapados = esEdicion && proveedor.cuentasPago === null;
   const crear = useCrearProveedor();
   const actualizar = useActualizarProveedor();
   const subirAdjunto = useSubirAdjuntoProveedor();
@@ -426,7 +439,10 @@ export function DialogoProveedor({
       // Edicion: los campos opcionales vacios viajan como `null` para BORRARLOS (M1).
       // Los roles SIEMPRE viajan (el usuario eligio ≥1; si no los toco, son los que se
       // poblaron al abrir). Nunca `[]`.
-      const cuerpo: ProveedorEditar = { ...aCuerpoEditar(datos), roles: idsRoles };
+      const cuerpo: ProveedorEditar = {
+        ...aCuerpoEditar(datos, { datosBancariosTapados }),
+        roles: idsRoles,
+      };
       actualizar.mutate(
         { id: proveedor.id, cuerpo },
         {
@@ -945,18 +961,23 @@ export function DialogoProveedor({
                         deshabilitado={guardando}
                       />
 
-                      <Field data-invalid={Boolean(errors.obsPago)}>
-                        <FieldLabel htmlFor="proveedor-obs-pago">Observaciones de pago</FieldLabel>
-                        <textarea
-                          id="proveedor-obs-pago"
-                          rows={3}
-                          aria-invalid={Boolean(errors.obsPago)}
-                          disabled={guardando}
-                          className="w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
-                          {...registrar('obsPago')}
-                        />
-                        <FieldError errors={[errors.obsPago]} />
-                      </Field>
+                      {/* 🔒 Fila 0.249: `obsPago` trae números de cuenta; si no llegó, no se pide. */}
+                      {datosBancariosTapados ? null : (
+                        <Field data-invalid={Boolean(errors.obsPago)}>
+                          <FieldLabel htmlFor="proveedor-obs-pago">
+                            Observaciones de pago
+                          </FieldLabel>
+                          <textarea
+                            id="proveedor-obs-pago"
+                            rows={3}
+                            aria-invalid={Boolean(errors.obsPago)}
+                            disabled={guardando}
+                            className="w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
+                            {...registrar('obsPago')}
+                          />
+                          <FieldError errors={[errors.obsPago]} />
+                        </Field>
+                      )}
                     </FieldGroup>
                   </AccordionContent>
                 </AccordionItem>
@@ -967,11 +988,18 @@ export function DialogoProveedor({
                 <AccordionTrigger>Cuentas de pago</AccordionTrigger>
                 <AccordionContent>
                   {esEdicion ? (
-                    <EditorCuentasPagoProveedor
-                      idProveedor={proveedor.id}
-                      cuentas={proveedor.cuentasPago}
-                      nombreProveedor={proveedor.nombre}
-                    />
+                    proveedor.cuentasPago === null ? (
+                      <FieldDescription data-testid="cuentas-pago-tapadas">
+                        Las cuentas de pago son datos bancarios: sólo las ve quien administra
+                        proveedores.
+                      </FieldDescription>
+                    ) : (
+                      <EditorCuentasPagoProveedor
+                        idProveedor={proveedor.id}
+                        cuentas={proveedor.cuentasPago}
+                        nombreProveedor={proveedor.nombre}
+                      />
+                    )
                   ) : (
                     <FieldDescription data-testid="cuentas-pago-requiere-guardar">
                       Guarda el proveedor primero y luego captura a nombre de quién se le deposita

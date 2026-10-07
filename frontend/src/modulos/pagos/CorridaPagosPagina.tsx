@@ -584,7 +584,10 @@ function AgregarConcepto({
         onClick={() => {
           const concepto = conceptos.find((c) => String(c.id) === id);
           if (concepto === undefined) return;
-          const cuenta = concepto.cuentas.find((c) => c.esDefault) ?? concepto.cuentas[0] ?? null;
+          // `cuentas: null` (fila 0.249) sólo le llega a quien no puede armar la corrida; quien la
+          // arma (`pagos.corrida-armar`) siempre las recibe. Se trata como «sin cuenta» por si acaso.
+          const cuentas = concepto.cuentas ?? [];
+          const cuenta = cuentas.find((c) => c.esDefault) ?? cuentas[0] ?? null;
           // Sin cuenta viva sólo cabe el efectivo (lo repite el servidor y un CHECK de la base).
           if (concepto.formaPagoPreferida === 'transferencia' && cuenta !== null) {
             onAgregar(concepto.id, 'transferencia', cuenta.id);

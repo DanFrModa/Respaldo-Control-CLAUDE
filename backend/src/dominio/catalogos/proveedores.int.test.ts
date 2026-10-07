@@ -144,6 +144,106 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     });
   });
 
+  // ── ⭐ DATOS BANCARIOS TAPADOS EN EL SERVIDOR (fila 0.249, §Post-F9.257(c)) ─────────────────
+  // `proveedores.ver` abre el DIRECTORIO; banco, CLABE, cuentas de pago y `obsPago` (que en Access
+  // traía números de cuenta) sólo los ve quien lleva `proveedores.administrar`.
+  describe('datos bancarios (fila 0.249)', () => {
+    const CLABE = '002010077777777771';
+    const soloVer = () => sesionDePrueba({ permisos: ['proveedores.ver'] });
+
+    /** Un proveedor con TODO el dato bancario lleno, escrito directo en la base. */
+    async function proveedorConBanco(): Promise<number> {
+      const p = await cliente.proveedor.create({
+        data: {
+          nombre: 'Taller con cuenta',
+          rfc: 'TCC010101AB1',
+          telefono: '555-0000',
+          banco: 'BBVA',
+          clabe: CLABE,
+          obsPago: `Depositar a ${CLABE}`,
+          notas: 'Entrega los lunes',
+          roles: { create: { idRolProveedor: rolMaquila } },
+          cuentasPago: {
+            create: { beneficiario: 'Fulana de Tal', tipoCuenta: 'clabe', cuenta: CLABE },
+          },
+        },
+      });
+      return p.id;
+    }
+
+    it('con SÓLO `proveedores.ver`, la FICHA llega sin banco, CLABE, obsPago ni cuentas (null)', async () => {
+      const id = await proveedorConBanco();
+      const ficha = await obtenerProveedor(soloVer(), id, bd());
+      expect(ficha.banco).toBeNull();
+      expect(ficha.clabe).toBeNull();
+      expect(ficha.obsPago).toBeNull();
+      expect(ficha.cuentasPago).toBeNull();
+      // El DIRECTORIO sí llega entero: esto es lo que Daniel pidió que viera todo el mundo.
+      expect(ficha).toMatchObject({
+        nombre: 'Taller con cuenta',
+        rfc: 'TCC010101AB1',
+        telefono: '555-0000',
+        notas: 'Entrega los lunes',
+      });
+      expect(ficha.roles.map((r) => r.rol.codigo)).toEqual(['maquila-costura']);
+      expect(JSON.stringify(ficha)).not.toContain(CLABE);
+    });
+
+    it('con SÓLO `proveedores.ver`, el LISTADO tampoco los trae', async () => {
+      await proveedorConBanco();
+      const pagina = await listarProveedores(soloVer(), {}, bd());
+      expect(pagina.datos).toHaveLength(1);
+      expect(pagina.datos[0]).toMatchObject({
+        banco: null,
+        clabe: null,
+        obsPago: null,
+        cuentasPago: null,
+      });
+      expect(JSON.stringify(pagina.datos)).not.toContain(CLABE);
+    });
+
+    it('quien administra proveedores los ve COMPLETOS, en ficha y listado', async () => {
+      const id = await proveedorConBanco();
+      const ficha = await obtenerProveedor(sesionAdmin(), id, bd());
+      expect(ficha).toMatchObject({ banco: 'BBVA', clabe: CLABE, obsPago: `Depositar a ${CLABE}` });
+      expect(ficha.cuentasPago?.map((c) => c.cuenta)).toEqual([CLABE]);
+      const pagina = await listarProveedores(sesionAdmin(), {}, bd());
+      expect(pagina.datos[0]?.clabe).toBe(CLABE);
+      expect(pagina.datos[0]?.cuentasPago?.[0]?.beneficiario).toBe('Fulana de Tal');
+    });
+
+    it('`null` (tapado) NO es `[]` (sin cuentas): un proveedor sin cuentas le llega `[]` a quien sí ve', async () => {
+      const p = await cliente.proveedor.create({ data: { nombre: 'Sin cuentas' } });
+      expect((await obtenerProveedor(sesionAdmin(), p.id, bd())).cuentasPago).toEqual([]);
+      expect((await obtenerProveedor(soloVer(), p.id, bd())).cuentasPago).toBeNull();
+    });
+
+    it('tapar es PROYECCIÓN: leer sin la llave no borra nada de la base', async () => {
+      const id = await proveedorConBanco();
+      await obtenerProveedor(soloVer(), id, bd());
+      await listarProveedores(soloVer(), {}, bd());
+      const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id } });
+      expect(enBd).toMatchObject({ banco: 'BBVA', clabe: CLABE, obsPago: `Depositar a ${CLABE}` });
+      expect(await cliente.proveedorCuentaPago.count({ where: { idProveedor: id } })).toBe(1);
+    });
+
+    it('editar OTROS campos del proveedor no pisa los datos bancarios (omitir = no tocar)', async () => {
+      const id = await proveedorConBanco();
+      const editado = await actualizarProveedor(
+        sesionAdmin(),
+        { id, telefono: '555-9999', notas: 'Otra nota' },
+        bd(),
+      );
+      expect(editado).toMatchObject({
+        banco: 'BBVA',
+        clabe: CLABE,
+        obsPago: `Depositar a ${CLABE}`,
+      });
+      const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id } });
+      expect(enBd).toMatchObject({ banco: 'BBVA', clabe: CLABE, obsPago: `Depositar a ${CLABE}` });
+    });
+  });
+
   describe('crear (con roles y campos enriquecidos, transacción A2)', () => {
     it('crea con roles, campos fiscales/comerciales, auditoría y bitácora (A7)', async () => {
       const sesion = sesionAdmin();
@@ -785,7 +885,10 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(bitacora.datos).toMatchObject({
         nombreCorto: { de: 'OLD', a: 'NEW' },
         asegurado: { de: false, a: true },
+        // 🔒 Fila 0.249: `obsPago` trae números de cuenta; la bitácora sólo anota que cambió.
+        obsPago: { cambio: true },
       });
+      expect(JSON.stringify(bitacora.datos)).not.toContain('Transferencia');
     });
 
     it('vaciar corto/obsPago en edición (null) los BORRA; "" se normaliza a null', async () => {

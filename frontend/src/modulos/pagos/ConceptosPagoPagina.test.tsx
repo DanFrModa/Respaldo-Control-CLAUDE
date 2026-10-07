@@ -225,6 +225,24 @@ describe('⭐ la reja del permiso', () => {
     expect(screen.queryByTestId('conceptos-cuentas')).not.toBeInTheDocument();
   });
 
+  // 🔒 Fila 0.249: sin la llave de las cuentas el SERVIDOR manda `cuentas: null` (no `[]`).
+  it('🔒 con `cuentas: null` (tapadas por el servidor) la columna dice «—», no «0»', () => {
+    estado.lista = {
+      data: { ...CATALOGO, datos: CATALOGO.datos.map((c) => ({ ...c, cuentas: null })) },
+      isPending: false,
+      isError: false,
+    };
+    pintar(['conceptos-pago.ver']);
+    for (const nombre of ['Caja chica', 'Agua']) {
+      expect(within(filaDe(nombre)).getByTestId('conceptos-num-cuentas')).toHaveTextContent('—');
+    }
+  });
+
+  it('🔒 con cuentas que sí llegaron, la columna cuenta cuántas hay', () => {
+    pintar(['conceptos-pago.ver']);
+    expect(within(filaDe('Agua')).getByTestId('conceptos-num-cuentas')).toHaveTextContent('0');
+  });
+
   it('con `administrar` sí aparece todo', () => {
     pintar();
     expect(screen.getByTestId('concepto-guardar')).toBeInTheDocument();
