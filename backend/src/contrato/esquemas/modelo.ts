@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { esquemaArteSalida } from './arte.js';
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
 
 /**
  * Contrato Zod del Módulo 2 — Modelos (F1-E4): el modelo (ex `Modelos`), su receta/BOM
@@ -614,6 +615,11 @@ export const esquemaModeloTelaSalida = z
       .number()
       .nullable()
       .describe('Último escalón: precio de catálogo de la tela (precioSugerido).'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios ' +
+        'de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van ' +
+        'null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio».',
+    ),
   })
   .describe('Renglón de tela del BOM del modelo.');
 
@@ -661,6 +667,11 @@ export const esquemaModeloAvioSalida = z
       .number()
       .nullable()
       .describe('Último escalón: precio de referencia del avío (catálogo).'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios ' +
+        'de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van ' +
+        'null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio».',
+    ),
   })
   .describe('Renglón de avío del BOM del modelo.');
 
@@ -775,7 +786,17 @@ export const esquemaModeloSalida = z
       .string()
       .nullable()
       .describe('Composición textil del modelo (la heredan sus órdenes), o null.'),
-    maquilaBase: z.number().nullable().describe('Costo de maquila base, o null.'),
+    maquilaBase: z
+      .number()
+      .nullable()
+      .describe('Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`).'),
+    maquilaOculta: z
+      .boolean()
+      .describe(
+        '¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null ' +
+          'porque no te toca verla; false = un null es «sin captura». Con true el formulario NO ' +
+          'manda `maquilaBase`.',
+      ),
     idTemporada: z.number().int().nullable().describe('Id de la temporada, o null.'),
     temporada: z.string().nullable().describe('Nombre de la temporada, o null.'),
     idCurvaTalla: z.number().int().nullable().describe('Id de la curva de tallas, o null.'),
@@ -793,7 +814,16 @@ export const esquemaModeloSalida = z
       .int()
       .nullable()
       .describe('# de operaciones de costura (R5/B7), o null si no se capturó.'),
-    corteBase: z.number().nullable().describe('Costo de corte por prenda (R5/B8), o null.'),
+    corteBase: z
+      .number()
+      .nullable()
+      .describe('Costo de corte por prenda (R5/B8), o null (sin captura, o tapado).'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true ' +
+        '= `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, ' +
+        '`maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda ' +
+        '`corteBase`.',
+    ),
     idMaquileroCotizado: z
       .number()
       .int()

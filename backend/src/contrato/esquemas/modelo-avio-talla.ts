@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Contrato Zod del sub-recurso MEDIDAS POR TALLA de un avío del BOM (F8-E1, R18).
  *
@@ -182,6 +184,10 @@ export const esquemaModeloAvioMedidasSalida = z
       .array(z.string())
       .describe('Advertencias que NO bloquean (números absurdos para la unidad, unidad faltante).'),
     tallas: z.array(esquemaModeloAvioTallaSalida).describe('Medidas por talla del avío.'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ el `precioMedida` de las tallas para esta sesión? (fila 0.249 parte C). ' +
+        'true = va null porque no te toca ver precios de avío; false = un null es «sin amarre».',
+    ),
   })
   .describe('Medidas por talla de un avío del BOM de un modelo.');
 

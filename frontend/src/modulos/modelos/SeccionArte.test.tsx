@@ -47,7 +47,13 @@ vi.mock('@/api/tipos-proceso', () => ({
 }));
 
 /** Un arte del modelo con lo mínimo que la sección pinta. */
-function arte(over: { id: number; nombre: string; precio?: number; proveedor?: string }): Arte {
+function arte(over: {
+  id: number;
+  nombre: string;
+  precio?: number;
+  proveedor?: string;
+  preciosOcultos?: boolean;
+}): Arte {
   return {
     id: over.id,
     idModelo: 1,
@@ -55,6 +61,7 @@ function arte(over: { id: number; nombre: string; precio?: number; proveedor?: s
     posicion: null,
     puntadas: null,
     precio: over.precio ?? null,
+    preciosOcultos: over.preciosOcultos ?? false,
     idTipoArte: 9,
     tipoArte: 'Bordado',
     codigoTipoArte: 'bordado',
@@ -105,6 +112,24 @@ describe('<SeccionArte>', () => {
     expect(screen.getByTestId('renglon-arte-5')).toHaveTextContent('$30.00');
     expect(screen.getByTestId('renglon-arte-5')).toHaveTextContent('Eurobordados');
     expect(screen.getByTestId('renglon-arte-6')).toHaveTextContent('$12.00');
+  });
+
+  // 🔒 Fila 0.249 parte C: tapado por el servidor ⇒ «—», nunca «sin precio» (eso sería mentir).
+  it('con el precio TAPADO pinta «—» y no «sin precio»; sin la marca, un null sí es «sin precio»', () => {
+    renderConProveedores(
+      <SeccionArte
+        idModelo={1}
+        artes={[
+          arte({ id: 7, nombre: 'Tapado', preciosOcultos: true }),
+          arte({ id: 8, nombre: 'Sin precio' }),
+        ]}
+        puedeAdministrar={false}
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver']) },
+    );
+    expect(screen.getByTestId('renglon-arte-7')).toHaveTextContent('· —');
+    expect(screen.getByTestId('renglon-arte-7')).not.toHaveTextContent('sin precio');
+    expect(screen.getByTestId('renglon-arte-8')).toHaveTextContent('sin precio');
   });
 
   it('quitar un arte llama al backend con el modelo y el arte', async () => {

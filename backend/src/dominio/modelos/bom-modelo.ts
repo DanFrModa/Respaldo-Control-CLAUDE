@@ -51,6 +51,7 @@ import {
 } from '../costos/ultimo-precio-compra.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeAvio, puedeVerPreciosDeTela } from '../catalogos/precios-de-catalogo.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -71,16 +72,19 @@ import {
   borrarArchivoSiQuedoHuerfano,
   datosArteParaBitacora,
   leerArtesModelo,
+  ocultarPrecioDeArteSiNoPuede,
   type ModeloArteDetalle,
+  type ModeloArteVisible,
 } from './arte-modelo.js';
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import {
   exigirModelo,
   incluirRelacionesModelo,
   leerTallasCurvaModelo,
-  type ModeloConRelaciones,
   type TallaCurvaModelo,
+  type ModeloVisible,
 } from './modelos.js';
+import { ocultarPreciosDeModeloSiNoPuede } from './precios-de-modelo.js';
 
 // ── Tipos de entrada (lo que recibe el dominio ANTES de validar: defaults opcionales) ──
 // El dominio re-valida con `validarEntrada` (mismo patrón que `EntradaCrear*`): por eso los
@@ -241,6 +245,79 @@ export type ModeloAvioDetalle = {
   /** `Avio.precioReferencia`: último escalón de la cascada. */
   precioReferencia: number | null;
 };
+
+/**
+ * Renglón de tela del BOM TAL COMO SALE hacia quien lo consulta (fila 0.249 parte C):
+ * `preciosOcultos: true` = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque la
+ * sesión no ve precios de tela (no porque no los haya).
+ */
+export type ModeloTelaVisible = ModeloTelaDetalle & { preciosOcultos: boolean };
+
+/** Renglón de avío del BOM tal como sale (ver {@link ModeloTelaVisible}). */
+export type ModeloAvioVisible = ModeloAvioDetalle & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR los precios de un renglón de TELA del BOM (fila 0.249 parte C,
+ * §Post-F9.257(c)). ⚠️ Con la regla de la PARTE B (`puedeVerPreciosDeTela`), no con la del modelo: el
+ * precio que costea la receta ES el precio de catálogo de esa tela (el amarre, el más barato, el
+ * sugerido) o su última compra. Quien lo ve en el catálogo lo ve aquí, y quien no, tampoco aquí — si
+ * no, la receta sería la puerta lateral del catálogo que la parte B cerró.
+ *
+ * Se tapa también `proveedorPrecio` (DE QUIÉN sale ese precio): con «el más barato» dice quién cobra
+ * menos. NO se tapan el amarre (`idTelaProveedor`/`proveedorAmarrado`: a quién se le compra, que la
+ * parte B tampoco tapó), `origenPrecio` ni `amarreIgnorado` (de qué escalón sale, no cuánto).
+ *
+ * Proyección pura: nunca escribe. El PUT del BOM no lleva precios (sólo amarres), así que no hay
+ * formulario que pueda pisarlos.
+ */
+export function ocultarPreciosDeTelaBomSiNoPuede(
+  sesion: SesionUsuario,
+  tela: ModeloTelaDetalle,
+): ModeloTelaVisible {
+  if (puedeVerPreciosDeTela(sesion)) return { ...tela, preciosOcultos: false };
+  return {
+    ...tela,
+    precioCosteo: null,
+    proveedorPrecio: null,
+    precioReferencia: null,
+    preciosOcultos: true,
+  };
+}
+
+/** Lo mismo para un renglón de AVÍO del BOM, con la regla de avíos de la parte B. */
+export function ocultarPreciosDeAvioBomSiNoPuede(
+  sesion: SesionUsuario,
+  avio: ModeloAvioDetalle,
+): ModeloAvioVisible {
+  if (puedeVerPreciosDeAvio(sesion)) return { ...avio, preciosOcultos: false };
+  return {
+    ...avio,
+    precioCosteo: null,
+    proveedorPrecio: null,
+    precioReferencia: null,
+    preciosOcultos: true,
+  };
+}
+
+/**
+ * BOM TAL COMO SALE hacia quien lo consulta (fila 0.249 parte C): cada renglón ya tapado según la
+ * sesión, con su marca. Lo devuelven `obtenerFichaModelo` y `copiarBom`; `leerBom` sigue dando el
+ * BOM completo para los usos INTERNOS (impreso, receta de la orden), que no salen por una ruta.
+ */
+export interface BomVisible {
+  telas: ModeloTelaVisible[];
+  avios: ModeloAvioVisible[];
+  artes: ModeloArteVisible[];
+}
+
+/** Tapa un BOM entero con las reglas de cada sección (tela, avío y arte). */
+export function ocultarPreciosDeBomSiNoPuede(sesion: SesionUsuario, bom: BomModelo): BomVisible {
+  return {
+    telas: bom.telas.map((t) => ocultarPreciosDeTelaBomSiNoPuede(sesion, t)),
+    avios: bom.avios.map((a) => ocultarPreciosDeAvioBomSiNoPuede(sesion, a)),
+    artes: bom.artes.map((a) => ocultarPrecioDeArteSiNoPuede(sesion, a)),
+  };
+}
 
 /** BOM completo de un modelo (telas + avíos + su ARTE), para embeber en la ficha. */
 export interface BomModelo {
@@ -562,8 +639,8 @@ export async function leerBom(tx: Tx, idModelo: number, idEmpresa: number): Prom
  * FICHA). Las tallas viajan solo aquí (el listado no las paga): son la lista con la que la receta
  * arma el consumo por talla de un avío (R18).
  */
-export type ModeloFicha = ModeloConRelaciones &
-  BomModelo & {
+export type ModeloFicha = ModeloVisible &
+  BomVisible & {
     tallasCurva: TallaCurvaModelo[];
     /**
      * ⭐ V1-E3r (§Post-F9.81): avisos —YA REDACTADOS por el servidor— de que la curva del modelo no
@@ -614,7 +691,15 @@ export async function obtenerFichaModelo(
     // producción» (ver `receta-compartida.ts`). Sin `take`: la ficha los enseña todos.
     listarHijosDeDesarrollo(cliente, idModelo),
   ]);
-  return { ...modelo, ...bom, tallasCurva, avisosCurva, modelosDeProduccion };
+  // ⭐ Fila 0.249 parte C: la ficha sale TAPADA desde aquí (el modelo con su regla, cada renglón del
+  // BOM con la de su sección); la ruta sólo traduce.
+  return {
+    ...ocultarPreciosDeModeloSiNoPuede(sesion, modelo),
+    ...ocultarPreciosDeBomSiNoPuede(sesion, bom),
+    tallasCurva,
+    avisosCurva,
+    modelosDeProduccion,
+  };
 }
 
 // ── Validación de componentes (existen y están activos) ────────────────────────
@@ -928,10 +1013,10 @@ export async function reemplazarTelasBom(
   idModelo: number,
   telas: EntradaTelaBom[],
   bd?: ContextoBd,
-): Promise<ModeloTelaDetalle[]> {
+): Promise<ModeloTelaVisible[]> {
   verificarPermiso(sesion, 'modelos.administrar');
   const deseados = validarEntrada(esquemaModeloTelas, telas);
-  return enTransaccion(async (tx) => {
+  const resultado = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
     // ⭐ V1-E9b pieza B — la receta de un HIJO del linaje 1:N no se edita desde el hijo: guardar
     // aquí reescribiría la del desarrollo y la de sus hermanos de color, en silencio.
@@ -948,6 +1033,8 @@ export async function reemplazarTelasBom(
     }
     return leerTelasBom(tx, idModelo, sesion.idEmpresaActiva);
   }, bd);
+  // Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return resultado.map((t) => ocultarPreciosDeTelaBomSiNoPuede(sesion, t));
 }
 
 /** Reemplaza el set COMPLETO de AVÍOS del BOM (igual que telas). */
@@ -956,10 +1043,10 @@ export async function reemplazarAviosBom(
   idModelo: number,
   avios: EntradaAvioBom[],
   bd?: ContextoBd,
-): Promise<ModeloAvioDetalle[]> {
+): Promise<ModeloAvioVisible[]> {
   verificarPermiso(sesion, 'modelos.administrar');
   const deseados = validarEntrada(esquemaModeloAvios, avios);
-  return enTransaccion(async (tx) => {
+  const resultado = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
     // ⭐ V1-E9b pieza B — misma razón que en las telas: la receta del hijo es de solo lectura.
     await exigirRecetaPropia(tx, idModelo);
@@ -980,6 +1067,8 @@ export async function reemplazarAviosBom(
     }
     return leerAviosBom(tx, idModelo, sesion.idEmpresaActiva);
   }, bd);
+  // Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return resultado.map((a) => ocultarPreciosDeAvioBomSiNoPuede(sesion, a));
 }
 
 // ── Lecturas sueltas de cada sección (para los GET) ───────────────────────────
@@ -989,14 +1078,17 @@ export async function listarTelasBom(
   sesion: SesionUsuario,
   idModelo: number,
   bd?: ContextoBd,
-): Promise<ModeloTelaDetalle[]> {
+): Promise<ModeloTelaVisible[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const existe = await cliente.modelo.findUnique({ where: { id: idModelo }, select: { id: true } });
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  return leerTelasBom(cliente, idModelo, sesion.idEmpresaActiva);
+  // Fila 0.249 parte C: precios con la regla de TELA de la parte B.
+  return (await leerTelasBom(cliente, idModelo, sesion.idEmpresaActiva)).map((t) =>
+    ocultarPreciosDeTelaBomSiNoPuede(sesion, t),
+  );
 }
 
 /** Lista los avíos del BOM de un modelo. */
@@ -1004,14 +1096,17 @@ export async function listarAviosBom(
   sesion: SesionUsuario,
   idModelo: number,
   bd?: ContextoBd,
-): Promise<ModeloAvioDetalle[]> {
+): Promise<ModeloAvioVisible[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const existe = await cliente.modelo.findUnique({ where: { id: idModelo }, select: { id: true } });
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  return leerAviosBom(cliente, idModelo, sesion.idEmpresaActiva);
+  // Fila 0.249 parte C: precios con la regla de AVÍO de la parte B.
+  return (await leerAviosBom(cliente, idModelo, sesion.idEmpresaActiva)).map((a) =>
+    ocultarPreciosDeAvioBomSiNoPuede(sesion, a),
+  );
 }
 
 // ── Copiar BOM de otro modelo (atómico) ───────────────────────────────────────
@@ -1063,7 +1158,7 @@ export async function copiarBom(
   entrada: EntradaCopiarBom,
   bd?: ContextoBd,
   archivos?: ServicioArchivos,
-): Promise<BomModelo> {
+): Promise<BomVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCopiarBomCuerpo, entrada);
 
@@ -1307,5 +1402,6 @@ export async function copiarBom(
     `las fotos de arte que reemplazó la copia de receta al modelo ${String(idDestino)}`,
   );
 
-  return bom;
+  // Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return ocultarPreciosDeBomSiNoPuede(sesion, bom);
 }

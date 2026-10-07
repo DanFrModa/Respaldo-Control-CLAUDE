@@ -44,7 +44,11 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import { clienteLectura, enTransaccion } from '../../comun/transaccion.js';
 
-import { leerAviosBom, type ModeloAvioDetalle } from './bom-modelo.js';
+import {
+  leerAviosBom,
+  ocultarPreciosDeAvioBomSiNoPuede,
+  type ModeloAvioVisible,
+} from './bom-modelo.js';
 import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { exigirModelo } from './modelos.js';
 import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
@@ -188,8 +192,8 @@ export interface ResultadoAceptarFavoritos {
   agregados: number;
   /** Claves de los avíos agregados, para poder nombrarlos en el aviso. */
   clavesAgregadas: string[];
-  /** La receta de avíos completa tras aceptar (misma forma que el PUT del BOM). */
-  avios: ModeloAvioDetalle[];
+  /** La receta de avíos completa tras aceptar (misma forma que el PUT del BOM), ya TAPADA. */
+  avios: ModeloAvioVisible[];
 }
 
 /**
@@ -265,7 +269,10 @@ export async function aceptarAviosFavoritos(
     return {
       agregados: sugeridos.length,
       clavesAgregadas: sugeridos.map((f) => f.clave),
-      avios: await leerAviosBom(tx, idModelo, sesion.idEmpresaActiva),
+      // Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura del BOM.
+      avios: (await leerAviosBom(tx, idModelo, sesion.idEmpresaActiva)).map((a) =>
+        ocultarPreciosDeAvioBomSiNoPuede(sesion, a),
+      ),
     };
   }, bd);
 }

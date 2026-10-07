@@ -137,13 +137,18 @@ function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
  * quedan VACÍOS viajan como `null` para BORRAR el dato (M1) — en un PATCH parcial un campo
  * omitido no se tocaría. `codigo` siempre va.
  */
-function aCuerpoEditar(datos: DatosModeloFormulario): ModeloEditar {
+function aCuerpoEditar(
+  datos: DatosModeloFormulario,
+  ocultos: { maquila: boolean; corte: boolean } = { maquila: false, corte: false },
+): ModeloEditar {
   return {
     codigo: datos.codigo,
     descripcion: datos.descripcion.length > 0 ? datos.descripcion : null,
     composicion: datos.composicion.length > 0 ? datos.composicion : null,
-    maquilaBase: numeroOpcionalACuerpo(datos.maquilaBase) ?? null,
-    corteBase: numeroOpcionalACuerpo(datos.corteBase) ?? null,
+    // 🔒 Fila 0.249 parte C: un precio que el servidor TAPÓ no se manda. Aquí un vacío viaja como
+    // `null` = BORRAR, así que mandar lo que no se vio borraría la maquila o el corte de verdad.
+    ...(ocultos.maquila ? {} : { maquilaBase: numeroOpcionalACuerpo(datos.maquilaBase) ?? null }),
+    ...(ocultos.corte ? {} : { corteBase: numeroOpcionalACuerpo(datos.corteBase) ?? null }),
     numOperaciones: numeroOpcionalACuerpo(datos.numOperaciones) ?? null,
     secuenciaEstampado: datos.secuenciaEstampado,
     llevaArte: datos.llevaArte,
@@ -249,7 +254,13 @@ export function DialogoModelo({
   const enviar = formulario.handleSubmit((datos) => {
     if (esEdicion) {
       actualizar.mutate(
-        { id: modelo.id, cuerpo: aCuerpoEditar(datos) },
+        {
+          id: modelo.id,
+          cuerpo: aCuerpoEditar(datos, {
+            maquila: modelo.maquilaOculta,
+            corte: modelo.preciosOcultos,
+          }),
+        },
         {
           onSuccess: (resultado) => {
             toast.success(`Modelo "${resultado.codigo}" actualizado.`);
@@ -373,9 +384,10 @@ export function DialogoModelo({
                         inputMode="decimal"
                         min={0}
                         step="0.01"
-                        placeholder="Ej. 45.00"
+                        placeholder={modelo?.maquilaOculta === true ? '—' : 'Ej. 45.00'}
                         aria-invalid={Boolean(errors.maquilaBase)}
-                        disabled={guardando}
+                        // 🔒 0.249 C: tapada por el servidor ⇒ no se edita (ni se manda).
+                        disabled={guardando || modelo?.maquilaOculta === true}
                         {...registrar('maquilaBase')}
                       />
                       <FieldDescription>
@@ -392,9 +404,9 @@ export function DialogoModelo({
                         inputMode="decimal"
                         min={0}
                         step="0.01"
-                        placeholder="Ej. 8.50"
+                        placeholder={modelo?.preciosOcultos === true ? '—' : 'Ej. 8.50'}
                         aria-invalid={Boolean(errors.corteBase)}
-                        disabled={guardando}
+                        disabled={guardando || modelo?.preciosOcultos === true}
                         {...registrar('corteBase')}
                       />
                       <FieldDescription>

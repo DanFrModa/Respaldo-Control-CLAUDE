@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Esquemas del ARCHIVO HISTÓRICO DE ÓRDENES del sistema viejo (§Post-F9.26).
  *
@@ -145,6 +147,10 @@ export const esquemaHistoricoOrdenDetalle = esquemaHistoricoOrdenResumen.extend(
   procesos: z.array(esquemaHistoricoProceso),
   /** La habilitación (avíos) que la orden llevó de verdad, con su cantidad y su precio (V1-E3d). */
   habilitacion: z.array(esquemaHistoricoHab),
+  preciosOcultos: esquemaPreciosOcultos.describe(
+    '¿El servidor TAPÓ el precio de la habilitación para esta sesión? (fila 0.249 parte C). ' +
+      'true = cada `precio` va null porque no te toca verlo; false = un null es «el viejo no lo traía».',
+  ),
 });
 
 export type HistoricoOrdenResumen = z.infer<typeof esquemaHistoricoOrdenResumen>;

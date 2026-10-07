@@ -154,7 +154,8 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
     amarreIgnorado: t.amarreIgnorado,
     precioReferencia: t.precioReferencia,
     pendienteRecalculo: false,
-    precioTapado: false,
+    // 🔒 0.249 parte C: el servidor tapa también los precios del BOM (regla de catálogo de la B).
+    precioTapado: t.preciosOcultos,
   };
 }
 
@@ -181,7 +182,8 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     amarreIgnorado: a.amarreIgnorado,
     precioReferencia: a.precioReferencia,
     pendienteRecalculo: false,
-    precioTapado: false,
+    // 🔒 0.249 parte C: el servidor tapa también los precios del BOM (regla de catálogo de la B).
+    precioTapado: a.preciosOcultos,
   };
 }
 

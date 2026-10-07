@@ -1225,6 +1225,11 @@ function DetalleModelo({
             <CampoDetalle icono={Tag} etiqueta="Maquila base">
               {formatearPrecio(modelo.maquilaBase)}
             </CampoDetalle>
+          ) : modelo.maquilaOculta ? (
+            // 🔒 Fila 0.249 parte C: el servidor la TAPÓ — se dice «—», no se calla como si no hubiera.
+            <CampoDetalle icono={Tag} etiqueta="Maquila base">
+              <span data-testid="maquila-base-oculta">—</span>
+            </CampoDetalle>
           ) : null}
           {puedeVerInventario && existencias.data !== undefined ? (
             <CampoDetalle icono={Package} etiqueta="Existencia PT">

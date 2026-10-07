@@ -64,6 +64,7 @@ function arte(over: Partial<Arte> = {}): Arte {
     posicion: 'frente',
     puntadas: null,
     precio: null,
+    preciosOcultos: false,
     idTipoArte: 9,
     tipoArte: 'Bordado',
     codigoTipoArte: 'bordado',
@@ -86,10 +87,12 @@ let artesDelModelo: Arte[] = [];
 /** V1-E9b: con qué `idModelo` se piden y se suben las FOTOS del arte (ver la prueba del final). */
 const fotosArteArgs = vi.fn();
 const subirFotoMutate = vi.fn();
+/** Espía del PATCH del arte (fila 0.249 parte C: qué manda la edición con el precio tapado). */
+const actualizarArteMutate = vi.fn();
 
 vi.mock('@/api/artes', () => ({
   useCrearArte: () => ({ mutate: crearMutate, isPending: false }),
-  useActualizarArte: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarArte: () => ({ mutate: actualizarArteMutate, isPending: false }),
   useArtesModelo: () => ({ data: { datos: artesDelModelo }, isPending: false, isError: false }),
   useFotosArte: (idModelo: number | undefined, idArte: number | undefined) => {
     fotosArteArgs(idModelo, idArte);
@@ -285,5 +288,43 @@ describe('<DialogoArte> — la captura del arte (V1-E3f)', () => {
       expect(subirFotoMutate).toHaveBeenCalledTimes(1);
       expect(subirFotoMutate.mock.calls[0]?.[0]).toMatchObject({ idModelo: 3, idArte: 77 });
     });
+  });
+});
+
+/**
+ * 🔒 Fila 0.249 parte C — EL FORMULARIO NO PISA EL PRECIO QUE NO VIO. En la edición del arte un vacío
+ * viaja como `null` = BORRAR: con el precio TAPADO por el servidor, mandarlo borraría el precio real.
+ */
+describe('<DialogoArte> — edición con el precio TAPADO (0.249 parte C)', () => {
+  beforeEach(() => {
+    actualizarArteMutate.mockReset();
+    artesDelModelo = [];
+  });
+
+  async function guardarEdicion(conArte: Arte): Promise<Record<string, unknown>> {
+    const usuario = userEvent.setup();
+    pintar(conArte);
+    await usuario.click(screen.getByTestId('guardar-arte'));
+    expect(actualizarArteMutate).toHaveBeenCalledTimes(1);
+    const [{ cuerpo }] = actualizarArteMutate.mock.calls[0] as [
+      { cuerpo: Record<string, unknown> },
+    ];
+    return cuerpo;
+  }
+
+  it('tapado: el campo no se edita y el PATCH NO lleva `precio`', async () => {
+    const tapado = arte({ precio: null, preciosOcultos: true });
+    const cuerpo = await guardarEdicion(tapado);
+    expect(cuerpo).not.toHaveProperty('precio');
+  });
+
+  it('tapado: el campo de precio está deshabilitado', () => {
+    pintar(arte({ precio: null, preciosOcultos: true }));
+    expect(screen.getByTestId('arte-precio')).toBeDisabled();
+  });
+
+  it('control: visible, el PATCH sí manda su precio', async () => {
+    const cuerpo = await guardarEdicion(arte({ precio: 30, preciosOcultos: false }));
+    expect(cuerpo.precio).toBe(30);
   });
 });

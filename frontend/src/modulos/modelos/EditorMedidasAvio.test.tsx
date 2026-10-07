@@ -58,6 +58,7 @@ function medidas(consumoPorTalla: boolean, extra: Partial<MedidasAvio> = {}): Me
     unidadMedida: null,
     avisos: [],
     tallas: [talla(10, 'CH'), talla(11, 'M'), talla(12, 'G')],
+    preciosOcultos: false,
     ...extra,
   };
 }

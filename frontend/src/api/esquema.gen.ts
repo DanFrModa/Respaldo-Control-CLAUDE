@@ -585,6 +585,8 @@ export interface paths {
                 /** @description `PrecioHabOrd`: el precio de ESA orden. */
                 precio: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ el precio de la habilitación para esta sesión? (fila 0.249 parte C). true = cada `precio` va null porque no te toca verlo; false = un null es «el viejo no lo traía». */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -14378,8 +14380,10 @@ export interface paths {
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
                 composicion: string | null;
-                /** @description Costo de maquila base, o null. */
+                /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
                 maquilaBase: number | null;
+                /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+                maquilaOculta: boolean;
                 /** @description Id de la temporada, o null. */
                 idTemporada: number | null;
                 /** @description Nombre de la temporada, o null. */
@@ -14398,8 +14402,10 @@ export interface paths {
                 tipoProducto: string | null;
                 /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
                 numOperaciones: number | null;
-                /** @description Costo de corte por prenda (R5/B8), o null. */
+                /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
                 corteBase: number | null;
+                /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+                preciosOcultos: boolean;
                 /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
                 idMaquileroCotizado: number | null;
                 /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -14619,8 +14625,10 @@ export interface paths {
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
               composicion: string | null;
-              /** @description Costo de maquila base, o null. */
+              /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
               maquilaBase: number | null;
+              /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+              maquilaOculta: boolean;
               /** @description Id de la temporada, o null. */
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
@@ -14639,8 +14647,10 @@ export interface paths {
               tipoProducto: string | null;
               /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
               numOperaciones: number | null;
-              /** @description Costo de corte por prenda (R5/B8), o null. */
+              /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
               corteBase: number | null;
+              /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+              preciosOcultos: boolean;
               /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
               idMaquileroCotizado: number | null;
               /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -14843,8 +14853,10 @@ export interface paths {
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
               composicion: string | null;
-              /** @description Costo de maquila base, o null. */
+              /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
               maquilaBase: number | null;
+              /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+              maquilaOculta: boolean;
               /** @description Id de la temporada, o null. */
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
@@ -14863,8 +14875,10 @@ export interface paths {
               tipoProducto: string | null;
               /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
               numOperaciones: number | null;
-              /** @description Costo de corte por prenda (R5/B8), o null. */
+              /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
               corteBase: number | null;
+              /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+              preciosOcultos: boolean;
               /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
               idMaquileroCotizado: number | null;
               /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -14947,6 +14961,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
               /** @description Avíos del BOM. */
               avios: {
@@ -14989,6 +15005,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
               /** @description Arte (bordados/estampados) del modelo. */
               artes: {
@@ -15004,6 +15022,8 @@ export interface paths {
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
+                /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+                preciosOcultos: boolean;
                 /** @description Id del tipo de arte (catálogo TipoProceso). */
                 idTipoArte: number;
                 /** @description Nombre del tipo de arte, resuelto. */
@@ -15220,8 +15240,10 @@ export interface paths {
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
               composicion: string | null;
-              /** @description Costo de maquila base, o null. */
+              /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
               maquilaBase: number | null;
+              /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+              maquilaOculta: boolean;
               /** @description Id de la temporada, o null. */
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
@@ -15240,8 +15262,10 @@ export interface paths {
               tipoProducto: string | null;
               /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
               numOperaciones: number | null;
-              /** @description Costo de corte por prenda (R5/B8), o null. */
+              /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
               corteBase: number | null;
+              /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+              preciosOcultos: boolean;
               /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
               idMaquileroCotizado: number | null;
               /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -15457,8 +15481,10 @@ export interface paths {
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
               composicion: string | null;
-              /** @description Costo de maquila base, o null. */
+              /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
               maquilaBase: number | null;
+              /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+              maquilaOculta: boolean;
               /** @description Id de la temporada, o null. */
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
@@ -15477,8 +15503,10 @@ export interface paths {
               tipoProducto: string | null;
               /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
               numOperaciones: number | null;
-              /** @description Costo de corte por prenda (R5/B8), o null. */
+              /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
               corteBase: number | null;
+              /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+              preciosOcultos: boolean;
               /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
               idMaquileroCotizado: number | null;
               /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -16111,8 +16139,10 @@ export interface paths {
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
                 composicion: string | null;
-                /** @description Costo de maquila base, o null. */
+                /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
                 maquilaBase: number | null;
+                /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+                maquilaOculta: boolean;
                 /** @description Id de la temporada, o null. */
                 idTemporada: number | null;
                 /** @description Nombre de la temporada, o null. */
@@ -16131,8 +16161,10 @@ export interface paths {
                 tipoProducto: string | null;
                 /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
                 numOperaciones: number | null;
-                /** @description Costo de corte por prenda (R5/B8), o null. */
+                /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
                 corteBase: number | null;
+                /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+                preciosOcultos: boolean;
                 /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
                 idMaquileroCotizado: number | null;
                 /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -16355,8 +16387,10 @@ export interface paths {
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
               composicion: string | null;
-              /** @description Costo de maquila base, o null. */
+              /** @description Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`). */
               maquilaBase: number | null;
+              /** @description ¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`. */
+              maquilaOculta: boolean;
               /** @description Id de la temporada, o null. */
               idTemporada: number | null;
               /** @description Nombre de la temporada, o null. */
@@ -16375,8 +16409,10 @@ export interface paths {
               tipoProducto: string | null;
               /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
               numOperaciones: number | null;
-              /** @description Costo de corte por prenda (R5/B8), o null. */
+              /** @description Costo de corte por prenda (R5/B8), o null (sin captura, o tapado). */
               corteBase: number | null;
+              /** @description ¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`. */
+              preciosOcultos: boolean;
               /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
               idMaquileroCotizado: number | null;
               /** @description Nombre del maquilero cotizado (R5/B9), o null. */
@@ -17348,6 +17384,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -17517,6 +17555,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -17678,6 +17718,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -17843,6 +17885,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -18149,6 +18193,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -18282,6 +18328,8 @@ export interface paths {
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
+                /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+                preciosOcultos: boolean;
                 /** @description Id del tipo de arte (catálogo TipoProceso). */
                 idTipoArte: number;
                 /** @description Nombre del tipo de arte, resuelto. */
@@ -18449,6 +18497,8 @@ export interface paths {
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
+              /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
               /** @description Id del tipo de arte (catálogo TipoProceso). */
               idTipoArte: number;
               /** @description Nombre del tipo de arte, resuelto. */
@@ -18738,6 +18788,8 @@ export interface paths {
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
+              /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
               /** @description Id del tipo de arte (catálogo TipoProceso). */
               idTipoArte: number;
               /** @description Nombre del tipo de arte, resuelto. */
@@ -18907,6 +18959,8 @@ export interface paths {
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
+                /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+                preciosOcultos: boolean;
                 /** @description Id del tipo de arte (catálogo TipoProceso). */
                 idTipoArte: number;
                 /** @description Nombre del tipo de arte, resuelto. */
@@ -19085,6 +19139,8 @@ export interface paths {
               puntadas: number | null;
               /** @description Precio del arte (el que viaja a la OP), o null. */
               precio: number | null;
+              /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
               /** @description Id del tipo de arte (catálogo TipoProceso). */
               idTipoArte: number;
               /** @description Nombre del tipo de arte, resuelto. */
@@ -19654,6 +19710,8 @@ export interface paths {
                 tipoArte: string;
                 /** @description Precio del arte, o null. */
                 precio: number | null;
+                /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). */
+                preciosOcultos: boolean;
                 /** @description Id del Archivo de la PRIMERA foto del arte, o null si no tiene. */
                 idArchivoFoto: string | null;
                 /** @description Id del modelo dueño del arte. */
@@ -19845,6 +19903,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de catálogo de la tela (precioSugerido). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
               /** @description Avíos del BOM. */
               avios: {
@@ -19887,6 +19947,8 @@ export interface paths {
                 amarreIgnorado: boolean;
                 /** @description Último escalón: precio de referencia del avío (catálogo). */
                 precioReferencia: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio». */
+                preciosOcultos: boolean;
               }[];
               /** @description Artes del modelo, ya ordenados. */
               artes: {
@@ -19902,6 +19964,8 @@ export interface paths {
                 puntadas: number | null;
                 /** @description Precio del arte (el que viaja a la OP), o null. */
                 precio: number | null;
+                /** @description ¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`. */
+                preciosOcultos: boolean;
                 /** @description Id del tipo de arte (catálogo TipoProceso). */
                 idTipoArte: number;
                 /** @description Nombre del tipo de arte, resuelto. */
@@ -28387,8 +28451,10 @@ export interface paths {
               folioOrden: number;
               /** @description Precio de venta por prenda (del renglón del pedido), o null si no ve importes. */
               precioVenta: number | null;
-              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null. */
+              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null (sin captura, o tapado: ver `maquilaReferenciaOculta`). */
               maquilaReferencia: number | null;
+              /** @description ¿El servidor TAPÓ la maquila de referencia para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «el modelo no la tiene». */
+              maquilaReferenciaOculta: boolean;
               /** @description Precio REAL de maquila de la orden, o null (sin captura o sin permiso). */
               maquilaReal: number | null;
               /** @description Precio REAL de aplicación de la orden, o null (sin captura o sin permiso). */
@@ -28560,8 +28626,10 @@ export interface paths {
               folioOrden: number;
               /** @description Precio de venta por prenda (del renglón del pedido), o null si no ve importes. */
               precioVenta: number | null;
-              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null. */
+              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null (sin captura, o tapado: ver `maquilaReferenciaOculta`). */
               maquilaReferencia: number | null;
+              /** @description ¿El servidor TAPÓ la maquila de referencia para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «el modelo no la tiene». */
+              maquilaReferenciaOculta: boolean;
               /** @description Precio REAL de maquila de la orden, o null (sin captura o sin permiso). */
               maquilaReal: number | null;
               /** @description Precio REAL de aplicación de la orden, o null (sin captura o sin permiso). */
@@ -29432,6 +29500,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -29511,6 +29581,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -29613,6 +29685,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -29695,6 +29769,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -29958,6 +30034,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -30037,6 +30115,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -30139,6 +30219,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -30221,6 +30303,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -30448,6 +30532,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -30527,6 +30613,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -30629,6 +30717,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -30711,6 +30801,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -30943,6 +31035,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -31022,6 +31116,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -31124,6 +31220,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -31206,6 +31304,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -31421,6 +31521,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -31500,6 +31602,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -31602,6 +31706,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -31684,6 +31790,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -31904,6 +32012,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -31983,6 +32093,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -32085,6 +32197,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -32167,6 +32281,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -32382,6 +32498,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -32461,6 +32579,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -32563,6 +32683,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -32645,6 +32767,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -32875,6 +32999,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -32954,6 +33080,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -33056,6 +33184,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -33138,6 +33268,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -33361,6 +33493,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -33440,6 +33574,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -33542,6 +33678,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -33624,6 +33762,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -33839,6 +33979,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id de la tela. */
                 idTela: number;
                 /** @description Nombre de la tela. */
@@ -33918,6 +34060,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Id del avío. */
                 idAvio: number;
                 /** @description Clave del avío. */
@@ -34020,6 +34164,8 @@ export interface paths {
                 liberadoEn: string | null;
                 /** @description Quién firmó este renglón, o null. */
                 liberadoPor: string | null;
+                /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                precioModeloOculto: boolean;
                 /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                 idModeloArte: number | null;
                 /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -34102,6 +34248,8 @@ export interface paths {
                 /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                 notaFueraDeLaComparacion: string | null;
               };
+              /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -34342,6 +34490,8 @@ export interface paths {
                   liberadoEn: string | null;
                   /** @description Quién firmó este renglón, o null. */
                   liberadoPor: string | null;
+                  /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                  precioModeloOculto: boolean;
                   /** @description Id de la tela. */
                   idTela: number;
                   /** @description Nombre de la tela. */
@@ -34421,6 +34571,8 @@ export interface paths {
                   liberadoEn: string | null;
                   /** @description Quién firmó este renglón, o null. */
                   liberadoPor: string | null;
+                  /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                  precioModeloOculto: boolean;
                   /** @description Id del avío. */
                   idAvio: number;
                   /** @description Clave del avío. */
@@ -34523,6 +34675,8 @@ export interface paths {
                   liberadoEn: string | null;
                   /** @description Quién firmó este renglón, o null. */
                   liberadoPor: string | null;
+                  /** @description ¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay». */
+                  precioModeloOculto: boolean;
                   /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
                   idModeloArte: number | null;
                   /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
@@ -34605,6 +34759,8 @@ export interface paths {
                   /** @description ⭐ La frase, YA REDACTADA por el servidor (singular/plural incluido), que explica cuántas OP del modelo quedaron fuera y por qué. `null` = ninguna quedó fuera. 🔴 Es INDEPENDIENTE de `aviso`: se enseña **también cuando `aviso` es null**, que es justo el caso silencioso que vino a destapar — y con el histórico real ése es el caso común, no la esquina. */
                   notaFueraDeLaComparacion: string | null;
                 };
+                /** @description ¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`. */
+                preciosOcultos: boolean;
               };
               /** @description Lo que sí entró a la receta (SIN LIBERAR: pasa por la misma firma). */
               traidos: {
@@ -102011,6 +102167,8 @@ export interface paths {
                 /** @description Precio de la medida amarrada, o null. */
                 precioMedida: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ el `precioMedida` de las tallas para esta sesión? (fila 0.249 parte C). true = va null porque no te toca ver precios de avío; false = un null es «sin amarre». */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -102167,6 +102325,8 @@ export interface paths {
                 /** @description Precio de la medida amarrada, o null. */
                 precioMedida: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ el `precioMedida` de las tallas para esta sesión? (fila 0.249 parte C). true = va null porque no te toca ver precios de avío; false = un null es «sin amarre». */
+              preciosOcultos: boolean;
             };
           };
         };

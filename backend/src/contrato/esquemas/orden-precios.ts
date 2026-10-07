@@ -77,7 +77,16 @@ export const esquemaOrdenPreciosSalida = z
     maquilaReferencia: z
       .number()
       .nullable()
-      .describe('Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null.'),
+      .describe(
+        'Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null (sin captura, ' +
+          'o tapado: ver `maquilaReferenciaOculta`).',
+      ),
+    maquilaReferenciaOculta: z
+      .boolean()
+      .describe(
+        '¿El servidor TAPÓ la maquila de referencia para esta sesión? (fila 0.249 parte C). true = ' +
+          'va null porque no te toca verla; false = un null es «el modelo no la tiene».',
+      ),
     maquilaReal: z
       .number()
       .nullable()

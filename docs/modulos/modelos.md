@@ -140,6 +140,10 @@ nada.
 
 ## Decisiones de diseño
 
+### 🔒 Precios tapados (fila 0.249 parte C, §Post-F9.274)
+
+El dinero del modelo se redacta **en el dominio** con la regla única de `dominio/modelos/precios-de-modelo.ts`: corte base y precio del arte ⇐ `consultas.ver-importes` | `modelos.administrar`; `maquilaBase` ⇐ lo anterior + `ordenes.precio-maquila` + `ordenes.ver-precio-real-maquila`; BOM y medidas ⇐ las reglas de telas y avíos de `catalogos/precios-de-catalogo.ts`. Las funciones de lectura y los ecos de las mutaciones devuelven tipos `ModeloVisible`/`BomVisible`/`ModeloTelaVisible`/`ModeloAvioVisible`/`ModeloArteVisible`, y los mapeadores de `modelos.rutas.ts` sólo aceptan ésos ⇒ **una ruta nueva que olvide tapar no compila**. `leerBom` se queda completo a propósito: lo usan la ficha y `copiarBom` (que lo tapan al salir) y el impreso de la orden, que sólo casa la foto de cada arte y no lleva precios. ⚠️ La garantía de compilación vale para las rutas que usan esos mapeadores: una ruta que devolviera `leerBom` con un mapeador propio sí compilaría. Contrato: `preciosOcultos` y `maquilaOculta`; el frontend pinta «—» y `DialogoModelo`/`DialogoArte` no mandan el precio que no vieron. ⏳ La bitácora y `metaCosto*` quedan para la parte D (guardián `bitacora-precios-guardian.test.ts`).
+
 ### Temporadas — modelos sin temporada
 
 El CSV viejo `Temporadas.csv` estaba **vacío** (E6 lo verificó). Todos los registros de `Modelos.csv` tienen `IdTemporadas=0`. Decisión del dueño: **los modelos se cargan SIN temporada**. Se reporta como incidencia en el reporte de cuadre (no null silencioso, §7). Las temporadas podrán asignarse manualmente desde la UI una vez que se definan.

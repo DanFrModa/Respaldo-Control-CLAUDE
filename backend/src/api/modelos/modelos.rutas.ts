@@ -88,7 +88,7 @@ import {
   listarGeneros,
   listarModelos,
   pasarModeloAProduccion,
-  type ModeloConRelaciones,
+  type ModeloVisible,
 } from '../../dominio/modelos/modelos.js';
 import {
   asignarCurvaDesdeOrdenes,
@@ -108,7 +108,7 @@ import {
   listarFotosArte,
   type FotoArteConUrl,
   type GaleriaArteItem,
-  type ModeloArteDetalle,
+  type ModeloArteVisible,
   type SubidaFotoArte,
 } from '../../dominio/modelos/arte-modelo.js';
 import {
@@ -118,9 +118,9 @@ import {
   obtenerFichaModelo,
   reemplazarAviosBom,
   reemplazarTelasBom,
-  type ModeloAvioDetalle,
+  type ModeloAvioVisible,
   type ModeloFicha,
-  type ModeloTelaDetalle,
+  type ModeloTelaVisible,
 } from '../../dominio/modelos/bom-modelo.js';
 import {
   aceptarAviosFavoritos,
@@ -147,7 +147,9 @@ import {
 } from '../../dominio/modelos/fotos-modelo.js';
 
 /** Proyecta los campos comunes del modelo (datos generales + relaciones + conteo) a JSON. */
-function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloSalida> {
+function aModeloBase(modelo: ModeloVisible): z.infer<typeof esquemaModeloSalida> {
+  // ⭐ Fila 0.249 parte C: el modelo llega YA TAPADO del dominio (`ModeloVisible`): aquí sólo se
+  // traduce. Un modelo sin tapar (`ModeloConRelaciones`) no compila en este mapeador.
   return {
     id: modelo.id,
     codigo: modelo.codigo,
@@ -183,6 +185,7 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
+    maquilaOculta: modelo.maquilaOculta,
     idTemporada: modelo.idTemporada,
     temporada: modelo.temporada?.nombre ?? null,
     idCurvaTalla: modelo.idCurvaTalla,
@@ -193,6 +196,7 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     tipoProducto: modelo.tipoProducto?.nombre ?? null,
     numOperaciones: modelo.numOperaciones,
     corteBase: modelo.corteBase === null ? null : modelo.corteBase.toNumber(),
+    preciosOcultos: modelo.preciosOcultos,
     idMaquileroCotizado: modelo.idMaquileroCotizado,
     maquileroCotizado: modelo.maquileroCotizado?.nombre ?? null,
     secuenciaEstampado: modelo.secuenciaEstampado,
@@ -218,8 +222,9 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
 
 /** Proyecta un renglón de tela del BOM a JSON. */
 function aTelaBomSalida(
-  t: ModeloTelaDetalle,
+  t: ModeloTelaVisible,
 ): z.infer<typeof esquemaModeloBomTelasLista>['datos'][number] {
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla de TELA de la parte B).
   return {
     idTela: t.idTela,
     nombre: t.nombre,
@@ -237,13 +242,15 @@ function aTelaBomSalida(
     proveedorPrecio: t.proveedorPrecio,
     amarreIgnorado: t.amarreIgnorado,
     precioReferencia: t.precioReferencia,
+    preciosOcultos: t.preciosOcultos,
   };
 }
 
 /** Proyecta un renglón de avío del BOM a JSON. */
 function aAvioBomSalida(
-  a: ModeloAvioDetalle,
+  a: ModeloAvioVisible,
 ): z.infer<typeof esquemaModeloBomAviosLista>['datos'][number] {
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla de AVÍO de la parte B).
   return {
     idAvio: a.idAvio,
     clave: a.clave,
@@ -260,11 +267,13 @@ function aAvioBomSalida(
     proveedorPrecio: a.proveedorPrecio,
     amarreIgnorado: a.amarreIgnorado,
     precioReferencia: a.precioReferencia,
+    preciosOcultos: a.preciosOcultos,
   };
 }
 
 /** Proyecta un ARTE del modelo a JSON (la `key` de cada foto es interna: NUNCA sale). */
-function aArteSalida(a: ModeloArteDetalle): z.infer<typeof esquemaArteSalida> {
+function aArteSalida(a: ModeloArteVisible): z.infer<typeof esquemaArteSalida> {
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla del MODELO).
   return {
     id: a.id,
     idModelo: a.idModelo,
@@ -272,6 +281,7 @@ function aArteSalida(a: ModeloArteDetalle): z.infer<typeof esquemaArteSalida> {
     posicion: a.posicion,
     puntadas: a.puntadas,
     precio: a.precio,
+    preciosOcultos: a.preciosOcultos,
     idTipoArte: a.idTipoArte,
     tipoArte: a.tipoArte,
     codigoTipoArte: a.codigoTipoArte,
@@ -289,8 +299,9 @@ function aArteSalida(a: ModeloArteDetalle): z.infer<typeof esquemaArteSalida> {
 
 /** Proyecta una celda de la galería de arte a JSON. */
 function aGaleriaArteSalida(
-  a: GaleriaArteItem,
+  a: GaleriaArteItem & { preciosOcultos: boolean },
 ): z.infer<typeof esquemaGaleriaArtePagina>['datos'][number] {
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla del MODELO).
   return {
     id: a.id,
     descripcion: a.descripcion,
@@ -298,6 +309,7 @@ function aGaleriaArteSalida(
     idTipoArte: a.idTipoArte,
     tipoArte: a.tipoArte,
     precio: a.precio,
+    preciosOcultos: a.preciosOcultos,
     idArchivoFoto: a.idArchivoFoto,
     idModelo: a.idModelo,
     claveModelo: a.claveModelo,

@@ -109,6 +109,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
     idModelo: 9,
     codigoModelo: 'A-100',
     cliente: 'C&A',
+    preciosOcultos: false,
     fechaEntrega: '2026-09-30',
     estado: 'capturada',
     totalPiezas: 1200,
@@ -143,6 +144,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         notas: null,
         liberadoEn: null,
         liberadoPor: null,
+        precioModeloOculto: false,
         enElModelo: true,
         cambios: [],
         idTela: 10,
@@ -176,6 +178,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         notas: null,
         liberadoEn: null,
         liberadoPor: null,
+        precioModeloOculto: false,
         enElModelo: true,
         cambios: [],
         idAvio: 20,
@@ -211,6 +214,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         notas: null,
         liberadoEn: null,
         liberadoPor: null,
+        precioModeloOculto: false,
         enElModelo: true,
         cambios: [],
         idAvio: 21,
@@ -2068,6 +2072,7 @@ describe('PanelRecetaOrden · el cableado de las fotos del arte (§Post-F9.177)'
       notas: null,
       liberadoEn: null,
       liberadoPor: null,
+      precioModeloOculto: false,
       enElModelo: true,
       cambios: [],
       idModeloArte: 500,
@@ -2365,5 +2370,115 @@ describe('<PanelRecetaOrden> — esta OP no va igual que sus hermanas', () => {
     expect(screen.getByTestId('receta-aviso-hermanas')).toHaveTextContent(
       '2 OP del modelo quedaron fuera de la comparación',
     );
+  });
+});
+
+/**
+ * 🔒 Fila 0.249 parte C — la receta llega con los precios TAPADOS (`preciosOcultos`). El campo de
+ * precio no se ofrece para editar —guardar desde un precio que no se vio sería teclear a ciegas— y
+ * el renglón pinta «—». Con la regla de hoy quien edita la receta siempre ve precios; esto protege el
+ * día que eso cambie.
+ */
+describe('<PanelRecetaOrden> con los precios TAPADOS (0.249 parte C)', () => {
+  /** Un arte vivo de la receta (mismo molde que el de la sección de fotos del arte). */
+  const ARTE: RecetaOrdenArte = {
+    id: 40,
+    tipo: 'arte',
+    estado: 'sin_revisar',
+    agregadoAMano: false,
+    excluido: false,
+    notas: null,
+    liberadoEn: null,
+    liberadoPor: null,
+    precioModeloOculto: false,
+    enElModelo: true,
+    cambios: [],
+    idModeloArte: 600,
+    descripcion: 'Logo tapado',
+    posicion: null,
+    puntadas: null,
+    idTipoArte: 1,
+    tipoArte: 'Bordado',
+    codigoTipoArte: 'bordado',
+    usaPuntadas: true,
+    precio: 12,
+    idProveedor: null,
+    proveedor: null,
+    precioModelo: 12,
+    precioModeloDeCompra: false,
+  };
+
+  /** La receta base MÁS un arte vivo, con o sin la marca de precios tapados. */
+  function conArte(tapada: boolean): RecetaOrden {
+    const r = recetaDePrueba({ artes: [ARTE] });
+    if (!tapada) return r;
+    return {
+      ...r,
+      preciosOcultos: true,
+      telas: r.telas.map((t) => ({ ...t, precio: null, precioModelo: null })),
+      avios: r.avios.map((a) => ({ ...a, precio: null, precioModelo: null })),
+      artes: r.artes.map((a) => ({ ...a, precio: null, precioModelo: null })),
+    };
+  }
+
+  it('tapada: el precio NO es un campo editable (ni de tela, ni de avío, ni de arte)', () => {
+    const receta = conArte(true);
+    render(receta);
+    expect(screen.queryByTestId('precio-receta-tela-1')).not.toBeInTheDocument();
+    for (const a of receta.avios) {
+      expect(screen.queryByTestId(`precio-receta-avio-${String(a.id)}`)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId('precio-receta-arte-40')).not.toBeInTheDocument();
+  });
+
+  /** Receta con el complemento sin estimado, variando las DOS marcas por separado. */
+  function conComplemento(marcas: {
+    congelados: boolean;
+    origenTela: boolean;
+    estimado?: number | null;
+  }): RecetaOrden {
+    const r = recetaDePrueba();
+    return {
+      ...r,
+      preciosOcultos: marcas.congelados,
+      telas: r.telas.map((t) => ({
+        ...t,
+        nombreComplemento: 'Cardigan',
+        precioComplemento: marcas.estimado ?? null,
+        precioModeloOculto: marcas.origenTela,
+      })),
+    };
+  }
+
+  it('el estimado del COMPLEMENTO TAPADO por su origen dice «—», no «sin costo estimado»', () => {
+    // El perfil de Ventas: ve los congelados de la orden pero no el catálogo de la tela.
+    render(conComplemento({ congelados: false, origenTela: true }));
+    const estimado = screen.getByTestId('precio-complemento-receta-tela-1');
+    expect(estimado).toHaveTextContent('— estimado');
+    expect(estimado).not.toHaveTextContent('sin costo estimado');
+  });
+
+  it('control: sin la marca del origen, un complemento sin estimado SÍ dice «sin costo estimado»', () => {
+    render(conComplemento({ congelados: false, origenTela: false }));
+    expect(screen.getByTestId('precio-complemento-receta-tela-1')).toHaveTextContent(
+      'sin costo estimado',
+    );
+  });
+
+  it('inverso: con los CONGELADOS tapados pero el origen visible, el estimado SÍ se pinta', () => {
+    render(conComplemento({ congelados: true, origenTela: false, estimado: 50 }));
+    expect(screen.getByTestId('precio-complemento-receta-tela-1')).toHaveTextContent(
+      '$50.00 estimado',
+    );
+  });
+
+  it('control: sin la marca, los MISMOS renglones sí ofrecen el campo de precio', () => {
+    const receta = conArte(false);
+    render(receta);
+    expect(screen.getByTestId('precio-receta-tela-1')).toBeInTheDocument();
+    for (const a of receta.avios) {
+      expect(screen.getByTestId(`precio-receta-avio-${String(a.id)}`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId('precio-receta-arte-40')).toBeInTheDocument();
   });
 });

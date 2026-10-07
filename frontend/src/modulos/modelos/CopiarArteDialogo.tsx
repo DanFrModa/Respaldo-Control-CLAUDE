@@ -132,7 +132,11 @@ export function CopiarArteDialogo({
                     </span>
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {item.precio === null ? 'sin precio' : `$${item.precio.toFixed(2)}`}
+                    {item.preciosOcultos
+                      ? '—'
+                      : item.precio === null
+                        ? 'sin precio'
+                        : `$${item.precio.toFixed(2)}`}
                   </span>
                 </button>
               </li>

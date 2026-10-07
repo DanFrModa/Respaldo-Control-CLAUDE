@@ -2033,7 +2033,9 @@ function SeccionTelas({
               <TablaDensaCelda numerica>
                 <CeldaNumero
                   valor={t.precio}
-                  editable={editable && !t.excluido}
+                  // 🔒 Fila 0.249 parte C: con los precios TAPADOS el campo no se ofrece (se pinta
+                  // «—»): guardar desde un precio que no se vio sería teclear a ciegas.
+                  editable={editable && !t.excluido && !receta.preciosOcultos}
                   ocupado={ocupado || editar.isPending}
                   testid={`precio-receta-tela-${t.id}`}
                   alGuardar={(n) =>
@@ -2052,14 +2054,20 @@ function SeccionTelas({
                     className="mt-1 text-xs text-muted-foreground"
                     data-testid={`precio-complemento-receta-tela-${t.id}`}
                     title={
-                      t.precioComplemento === null
-                        ? `Nadie capturó el costo estimado de ${t.nombreComplemento}: se captura en el catálogo de telas.`
-                        : `Estimado del catálogo de telas para ${t.nombreComplemento}.`
+                      t.precioModeloOculto
+                        ? `El costo estimado de ${t.nombreComplemento} no está disponible con tus permisos.`
+                        : t.precioComplemento === null
+                          ? `Nadie capturó el costo estimado de ${t.nombreComplemento}: se captura en el catálogo de telas.`
+                          : `Estimado del catálogo de telas para ${t.nombreComplemento}.`
                     }
                   >
-                    {t.precioComplemento === null
-                      ? 'sin costo estimado'
-                      : `${formatearMoneda(t.precioComplemento)} estimado`}
+                    {/* 🔒 0.249 C: el estimado REPITE el catálogo de telas ⇒ se tapa con SU regla
+                        (la marca del renglón), no con la de los precios congelados de la orden. */}
+                    {t.precioModeloOculto
+                      ? '— estimado'
+                      : t.precioComplemento === null
+                        ? 'sin costo estimado'
+                        : `${formatearMoneda(t.precioComplemento)} estimado`}
                   </div>
                 )}
               </TablaDensaCelda>
@@ -2229,7 +2237,9 @@ function SeccionAvios({
               <TablaDensaCelda numerica>
                 <CeldaNumero
                   valor={a.precio}
-                  editable={editable && !a.excluido}
+                  // 🔒 Fila 0.249 parte C: con los precios TAPADOS el campo no se ofrece (se pinta
+                  // «—»): guardar desde un precio que no se vio sería teclear a ciegas.
+                  editable={editable && !a.excluido && !receta.preciosOcultos}
                   ocupado={ocupado || editar.isPending}
                   testid={`precio-receta-avio-${a.id}`}
                   alGuardar={(n) =>
@@ -2346,7 +2356,9 @@ function SeccionArtes({
               <TablaDensaCelda numerica>
                 <CeldaNumero
                   valor={a.precio}
-                  editable={editable && !a.excluido}
+                  // 🔒 Fila 0.249 parte C: con los precios TAPADOS el campo no se ofrece (se pinta
+                  // «—»): guardar desde un precio que no se vio sería teclear a ciegas.
+                  editable={editable && !a.excluido && !receta.preciosOcultos}
                   ocupado={ocupado || editar.isPending}
                   testid={`precio-receta-arte-${a.id}`}
                   alGuardar={(n) =>

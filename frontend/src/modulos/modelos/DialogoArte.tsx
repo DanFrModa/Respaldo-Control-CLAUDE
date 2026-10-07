@@ -78,13 +78,15 @@ function aCuerpoCrear(datos: DatosArteFormulario): ArteCrear {
  * quedan VACÍOS viajan como `null` para BORRAR el dato (M1) — en un PATCH parcial un campo
  * omitido no se tocaría.
  */
-function aCuerpoEditar(datos: DatosArteFormulario): ArteEditar {
+function aCuerpoEditar(datos: DatosArteFormulario, precioOculto: boolean): ArteEditar {
   return {
     descripcion: datos.descripcion,
     idTipoArte: Number(datos.idTipoArte),
     posicion: datos.posicion.length > 0 ? datos.posicion : null,
     puntadas: numeroOpcionalACuerpo(datos.puntadas) ?? null,
-    precio: numeroOpcionalACuerpo(datos.precio) ?? null,
+    // 🔒 Fila 0.249 parte C: un precio que el servidor TAPÓ no se manda — aquí un vacío viaja como
+    // `null` = BORRAR, así que mandarlo sin haberlo visto borraría el precio del arte.
+    ...(precioOculto ? {} : { precio: numeroOpcionalACuerpo(datos.precio) ?? null }),
     idProveedor: datos.idProveedor.trim() === '' ? null : Number(datos.idProveedor),
   };
 }
@@ -220,7 +222,7 @@ export function DialogoArte({
       return;
     }
     actualizar.mutate(
-      { idModelo, idArte: arte.id, cuerpo: aCuerpoEditar(datos) },
+      { idModelo, idArte: arte.id, cuerpo: aCuerpoEditar(datos, arte.preciosOcultos) },
       {
         onSuccess: () => {
           toast.success('Arte actualizado.');
@@ -317,6 +319,9 @@ export function DialogoArte({
                 step="0.01"
                 inputMode="decimal"
                 {...formulario.register('precio')}
+                // 🔒 0.249 C: tapado por el servidor ⇒ no se edita (ni se manda).
+                disabled={arte?.preciosOcultos === true}
+                {...(arte?.preciosOcultos === true ? { placeholder: '—' } : {})}
                 aria-invalid={errores.precio !== undefined}
                 data-testid="arte-precio"
               />

@@ -52,8 +52,9 @@ import {
   CAMPOS_FICHA_HEREDADOS,
   exigirDigitosDeNomenclatura,
   incluirRelacionesModelo,
-  type ModeloConRelaciones,
+  type ModeloVisible,
 } from './modelos.js';
+import { ocultarPreciosDeModeloSiNoPuede } from './precios-de-modelo.js';
 import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /**
@@ -597,13 +598,17 @@ export async function crearVersionDeModelo(
   idModeloPadre: number,
   datos: DatosVersionModelo = {},
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.aprobar-receta');
-  return enTransaccion(async (tx) => {
+  const version = await enTransaccion(async (tx) => {
     const idHija = await mintearVersionDeModelo(tx, sesion, idModeloPadre, datos);
     return tx.modelo.findUniqueOrThrow({
       where: { id: idHija },
       include: incluirRelacionesModelo,
     });
   }, bd);
+  // ⭐ Fila 0.249 parte C: `modelos.aprobar-receta` NO está en la regla de precios del modelo
+  // (Desarrollo de Producto la tiene, y lleva `modelos.administrar` aparte): la versión nueva sale
+  // con la MISMA tapa que cualquier lectura del modelo.
+  return ocultarPreciosDeModeloSiNoPuede(sesion, version);
 }
