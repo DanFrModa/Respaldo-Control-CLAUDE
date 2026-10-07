@@ -4159,7 +4159,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Banco, o null."
+                            "description": "Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                           },
                           "clabe": {
                             "anyOf": [
@@ -4170,7 +4170,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "CLABE interbancaria, o null."
+                            "description": "CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                           },
                           "limiteCredito": {
                             "anyOf": [
@@ -4227,7 +4227,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Observaciones de pago (talleres), o null."
+                            "description": "Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249)."
                           },
                           "modalidadFacturacion": {
                             "anyOf": [
@@ -4361,101 +4361,108 @@
                             "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                           },
                           "cuentasPago": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991,
-                                  "description": "Id de la cuenta."
-                                },
-                                "idProveedor": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991,
-                                  "description": "Id del proveedor dueño de la cuenta."
-                                },
-                                "beneficiario": {
-                                  "type": "string",
-                                  "description": "A nombre de quién está la cuenta (el del depósito)."
-                                },
-                                "banco": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id de la cuenta."
                                     },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "description": "Banco, o null."
-                                },
-                                "tipoCuenta": {
-                                  "type": "string",
-                                  "enum": [
-                                    "clabe",
-                                    "tarjeta"
-                                  ],
-                                  "description": "CLABE o tarjeta."
-                                },
-                                "cuenta": {
-                                  "type": "string",
-                                  "description": "El número, sólo dígitos."
-                                },
-                                "alias": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                                    "idProveedor": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id del proveedor dueño de la cuenta."
                                     },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
-                                },
-                                "esFiscal": {
-                                  "type": "boolean",
-                                  "description": "Verdadero si a ella puede salir un pago CON factura."
-                                },
-                                "esDefault": {
-                                  "type": "boolean",
-                                  "description": "Verdadero si es LA cuenta por omisión del proveedor."
-                                },
-                                "notas": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                                    "beneficiario": {
+                                      "type": "string",
+                                      "description": "A nombre de quién está la cuenta (el del depósito)."
                                     },
-                                    {
-                                      "type": "null"
+                                    "banco": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Banco, o null."
+                                    },
+                                    "tipoCuenta": {
+                                      "type": "string",
+                                      "enum": [
+                                        "clabe",
+                                        "tarjeta"
+                                      ],
+                                      "description": "CLABE o tarjeta."
+                                    },
+                                    "cuenta": {
+                                      "type": "string",
+                                      "description": "El número, sólo dígitos."
+                                    },
+                                    "alias": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                                    },
+                                    "esFiscal": {
+                                      "type": "boolean",
+                                      "description": "Verdadero si a ella puede salir un pago CON factura."
+                                    },
+                                    "esDefault": {
+                                      "type": "boolean",
+                                      "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                                    },
+                                    "notas": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Notas, o null."
+                                    },
+                                    "activo": {
+                                      "type": "boolean",
+                                      "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                                     }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "idProveedor",
+                                    "beneficiario",
+                                    "banco",
+                                    "tipoCuenta",
+                                    "cuenta",
+                                    "alias",
+                                    "esFiscal",
+                                    "esDefault",
+                                    "notas",
+                                    "activo"
                                   ],
-                                  "description": "Notas, o null."
-                                },
-                                "activo": {
-                                  "type": "boolean",
-                                  "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                                  "additionalProperties": false,
+                                  "description": "Cuenta/destino de pago de un proveedor."
                                 }
                               },
-                              "required": [
-                                "id",
-                                "idProveedor",
-                                "beneficiario",
-                                "banco",
-                                "tipoCuenta",
-                                "cuenta",
-                                "alias",
-                                "esFiscal",
-                                "esDefault",
-                                "notas",
-                                "activo"
-                              ],
-                              "additionalProperties": false,
-                              "description": "Cuenta/destino de pago de un proveedor."
-                            },
-                            "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas."
                           },
                           "cantidadAdjuntos": {
                             "type": "integer",
@@ -5122,7 +5129,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Banco, o null."
+                      "description": "Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "clabe": {
                       "anyOf": [
@@ -5133,7 +5140,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "CLABE interbancaria, o null."
+                      "description": "CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "limiteCredito": {
                       "anyOf": [
@@ -5190,7 +5197,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones de pago (talleres), o null."
+                      "description": "Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249)."
                     },
                     "modalidadFacturacion": {
                       "anyOf": [
@@ -5324,101 +5331,108 @@
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
                     "cuentasPago": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idProveedor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del proveedor dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idProveedor": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del proveedor dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idProveedor",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un proveedor."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idProveedor",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un proveedor."
-                      },
-                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas."
                     },
                     "cantidadAdjuntos": {
                       "type": "integer",
@@ -5913,7 +5927,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Banco, o null."
+                      "description": "Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "clabe": {
                       "anyOf": [
@@ -5924,7 +5938,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "CLABE interbancaria, o null."
+                      "description": "CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "limiteCredito": {
                       "anyOf": [
@@ -5981,7 +5995,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones de pago (talleres), o null."
+                      "description": "Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249)."
                     },
                     "modalidadFacturacion": {
                       "anyOf": [
@@ -6115,101 +6129,108 @@
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
                     "cuentasPago": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idProveedor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del proveedor dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idProveedor": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del proveedor dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idProveedor",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un proveedor."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idProveedor",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un proveedor."
-                      },
-                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas."
                     },
                     "cantidadAdjuntos": {
                       "type": "integer",
@@ -6991,7 +7012,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Banco, o null."
+                      "description": "Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "clabe": {
                       "anyOf": [
@@ -7002,7 +7023,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "CLABE interbancaria, o null."
+                      "description": "CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "limiteCredito": {
                       "anyOf": [
@@ -7059,7 +7080,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones de pago (talleres), o null."
+                      "description": "Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249)."
                     },
                     "modalidadFacturacion": {
                       "anyOf": [
@@ -7193,101 +7214,108 @@
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
                     "cuentasPago": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idProveedor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del proveedor dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idProveedor": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del proveedor dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idProveedor",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un proveedor."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idProveedor",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un proveedor."
-                      },
-                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas."
                     },
                     "cantidadAdjuntos": {
                       "type": "integer",
@@ -7780,7 +7808,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Banco, o null."
+                      "description": "Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "clabe": {
                       "anyOf": [
@@ -7791,7 +7819,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "CLABE interbancaria, o null."
+                      "description": "CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249)."
                     },
                     "limiteCredito": {
                       "anyOf": [
@@ -7848,7 +7876,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Observaciones de pago (talleres), o null."
+                      "description": "Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249)."
                     },
                     "modalidadFacturacion": {
                       "anyOf": [
@@ -7982,101 +8010,108 @@
                       "description": "Contactos ACTIVOS del proveedor (V1-E3f pieza B)."
                     },
                     "cuentasPago": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idProveedor": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del proveedor dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idProveedor": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del proveedor dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del proveedor."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago (\"1\", \"2\"…)."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del proveedor."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idProveedor",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un proveedor."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idProveedor",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un proveedor."
-                      },
-                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas."
                     },
                     "cantidadAdjuntos": {
                       "type": "integer",
@@ -10708,7 +10743,7 @@
     },
     "/api/proveedores/{id}/cuentas-pago": {
       "get": {
-        "summary": "Listar las cuentas de pago del proveedor (la default primero)",
+        "summary": "Listar las cuentas de pago del proveedor (la default primero). Son datos bancarios: exige además proveedores.administrar (fila 0.249)",
         "tags": [
           "proveedores"
         ],
@@ -169661,101 +169696,108 @@
                             "description": "Falso si está retirado del catálogo."
                           },
                           "cuentas": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991,
-                                  "description": "Id de la cuenta."
-                                },
-                                "idConcepto": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991,
-                                  "description": "Id del concepto dueño de la cuenta."
-                                },
-                                "beneficiario": {
-                                  "type": "string",
-                                  "description": "A nombre de quién está la cuenta (el del depósito)."
-                                },
-                                "banco": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id de la cuenta."
                                     },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "description": "Banco, o null."
-                                },
-                                "tipoCuenta": {
-                                  "type": "string",
-                                  "enum": [
-                                    "clabe",
-                                    "tarjeta"
-                                  ],
-                                  "description": "CLABE o tarjeta."
-                                },
-                                "cuenta": {
-                                  "type": "string",
-                                  "description": "El número, sólo dígitos."
-                                },
-                                "alias": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                                    "idConcepto": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id del concepto dueño de la cuenta."
                                     },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "description": "Cómo se le llama en la relación de pago."
-                                },
-                                "esFiscal": {
-                                  "type": "boolean",
-                                  "description": "Verdadero si a ella puede salir un pago CON factura."
-                                },
-                                "esDefault": {
-                                  "type": "boolean",
-                                  "description": "Verdadero si es LA cuenta por omisión del concepto."
-                                },
-                                "notas": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
+                                    "beneficiario": {
+                                      "type": "string",
+                                      "description": "A nombre de quién está la cuenta (el del depósito)."
                                     },
-                                    {
-                                      "type": "null"
+                                    "banco": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Banco, o null."
+                                    },
+                                    "tipoCuenta": {
+                                      "type": "string",
+                                      "enum": [
+                                        "clabe",
+                                        "tarjeta"
+                                      ],
+                                      "description": "CLABE o tarjeta."
+                                    },
+                                    "cuenta": {
+                                      "type": "string",
+                                      "description": "El número, sólo dígitos."
+                                    },
+                                    "alias": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Cómo se le llama en la relación de pago."
+                                    },
+                                    "esFiscal": {
+                                      "type": "boolean",
+                                      "description": "Verdadero si a ella puede salir un pago CON factura."
+                                    },
+                                    "esDefault": {
+                                      "type": "boolean",
+                                      "description": "Verdadero si es LA cuenta por omisión del concepto."
+                                    },
+                                    "notas": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Notas, o null."
+                                    },
+                                    "activo": {
+                                      "type": "boolean",
+                                      "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                                     }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "idConcepto",
+                                    "beneficiario",
+                                    "banco",
+                                    "tipoCuenta",
+                                    "cuenta",
+                                    "alias",
+                                    "esFiscal",
+                                    "esDefault",
+                                    "notas",
+                                    "activo"
                                   ],
-                                  "description": "Notas, o null."
-                                },
-                                "activo": {
-                                  "type": "boolean",
-                                  "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                                  "additionalProperties": false,
+                                  "description": "Cuenta/destino de pago de un concepto."
                                 }
                               },
-                              "required": [
-                                "id",
-                                "idConcepto",
-                                "beneficiario",
-                                "banco",
-                                "tipoCuenta",
-                                "cuenta",
-                                "alias",
-                                "esFiscal",
-                                "esDefault",
-                                "notas",
-                                "activo"
-                              ],
-                              "additionalProperties": false,
-                              "description": "Cuenta/destino de pago de un concepto."
-                            },
-                            "description": "Cuentas/destinos de pago."
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene."
                           }
                         },
                         "required": [
@@ -170081,101 +170123,108 @@
                       "description": "Falso si está retirado del catálogo."
                     },
                     "cuentas": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idConcepto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del concepto dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idConcepto": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del concepto dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del concepto."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del concepto."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idConcepto",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un concepto."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idConcepto",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un concepto."
-                      },
-                      "description": "Cuentas/destinos de pago."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene."
                     }
                   },
                   "required": [
@@ -170431,101 +170480,108 @@
                       "description": "Falso si está retirado del catálogo."
                     },
                     "cuentas": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idConcepto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del concepto dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idConcepto": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del concepto dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del concepto."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del concepto."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idConcepto",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un concepto."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idConcepto",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un concepto."
-                      },
-                      "description": "Cuentas/destinos de pago."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene."
                     }
                   },
                   "required": [
@@ -170838,101 +170894,108 @@
                       "description": "Falso si está retirado del catálogo."
                     },
                     "cuentas": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id de la cuenta."
-                          },
-                          "idConcepto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Id del concepto dueño de la cuenta."
-                          },
-                          "beneficiario": {
-                            "type": "string",
-                            "description": "A nombre de quién está la cuenta (el del depósito)."
-                          },
-                          "banco": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Banco, o null."
-                          },
-                          "tipoCuenta": {
-                            "type": "string",
-                            "enum": [
-                              "clabe",
-                              "tarjeta"
-                            ],
-                            "description": "CLABE o tarjeta."
-                          },
-                          "cuenta": {
-                            "type": "string",
-                            "description": "El número, sólo dígitos."
-                          },
-                          "alias": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "idConcepto": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del concepto dueño de la cuenta."
                               },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Cómo se le llama en la relación de pago."
-                          },
-                          "esFiscal": {
-                            "type": "boolean",
-                            "description": "Verdadero si a ella puede salir un pago CON factura."
-                          },
-                          "esDefault": {
-                            "type": "boolean",
-                            "description": "Verdadero si es LA cuenta por omisión del concepto."
-                          },
-                          "notas": {
-                            "anyOf": [
-                              {
-                                "type": "string"
+                              "beneficiario": {
+                                "type": "string",
+                                "description": "A nombre de quién está la cuenta (el del depósito)."
                               },
-                              {
-                                "type": "null"
+                              "banco": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Banco, o null."
+                              },
+                              "tipoCuenta": {
+                                "type": "string",
+                                "enum": [
+                                  "clabe",
+                                  "tarjeta"
+                                ],
+                                "description": "CLABE o tarjeta."
+                              },
+                              "cuenta": {
+                                "type": "string",
+                                "description": "El número, sólo dígitos."
+                              },
+                              "alias": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Cómo se le llama en la relación de pago."
+                              },
+                              "esFiscal": {
+                                "type": "boolean",
+                                "description": "Verdadero si a ella puede salir un pago CON factura."
+                              },
+                              "esDefault": {
+                                "type": "boolean",
+                                "description": "Verdadero si es LA cuenta por omisión del concepto."
+                              },
+                              "notas": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Notas, o null."
+                              },
+                              "activo": {
+                                "type": "boolean",
+                                "description": "Falso si está retirada (sigue siendo historial reutilizable)."
                               }
+                            },
+                            "required": [
+                              "id",
+                              "idConcepto",
+                              "beneficiario",
+                              "banco",
+                              "tipoCuenta",
+                              "cuenta",
+                              "alias",
+                              "esFiscal",
+                              "esDefault",
+                              "notas",
+                              "activo"
                             ],
-                            "description": "Notas, o null."
-                          },
-                          "activo": {
-                            "type": "boolean",
-                            "description": "Falso si está retirada (sigue siendo historial reutilizable)."
+                            "additionalProperties": false,
+                            "description": "Cuenta/destino de pago de un concepto."
                           }
                         },
-                        "required": [
-                          "id",
-                          "idConcepto",
-                          "beneficiario",
-                          "banco",
-                          "tipoCuenta",
-                          "cuenta",
-                          "alias",
-                          "esFiscal",
-                          "esDefault",
-                          "notas",
-                          "activo"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Cuenta/destino de pago de un concepto."
-                      },
-                      "description": "Cuentas/destinos de pago."
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene."
                     }
                   },
                   "required": [
@@ -171101,7 +171164,7 @@
     },
     "/api/conceptos-pago/{id}/cuentas": {
       "get": {
-        "summary": "Cuentas/destinos de pago de un concepto",
+        "summary": "Cuentas/destinos de pago de un concepto. Son datos bancarios: exige además conceptos-pago.administrar o pagos.corrida-armar (fila 0.249)",
         "tags": [
           "conceptos-pago"
         ],

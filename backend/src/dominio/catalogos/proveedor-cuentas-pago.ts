@@ -36,8 +36,9 @@
  *    (REGLA 0-B: `banco`/`clabe` viejos NO se convierten en cuentas; Daniel las captura en el
  *    arranque).
  *
- * SIN permisos nuevos: se gobierna con `proveedores.ver` / `proveedores.administrar`, que ya
- * existen. Todo cambio va en UNA transacción con su bitácora (A2/A7).
+ * SIN permisos nuevos: se gobierna con `proveedores.administrar`, que ya existía. ⚠️ Desde la fila
+ * 0.249, **leerlas también la exige** (`proveedores.ver` sólo abre el directorio): ver
+ * `LLAVE_DATOS_BANCARIOS_PROVEEDOR` en `proveedores.ts`. Todo cambio va en UNA transacción con su bitácora (A2/A7).
  */
 import {
   esquemaProveedorCuentaPagoCrear,
@@ -64,7 +65,7 @@ import {
   promoverExigeReactivar,
   resolverJuegoDeDefault,
 } from './cuentas-pago-reglas.js';
-import { exigirProveedor } from './proveedores.js';
+import { exigirProveedor, exigirVerDatosBancariosDeProveedor } from './proveedores.js';
 
 /**
  * Namespace del `pg_advisory_xact_lock` que serializa el juego de LA DEFAULT de UN proveedor.
@@ -198,7 +199,10 @@ function traducirChoque(error: unknown): never {
 /**
  * Lista las cuentas de pago de un proveedor. Por omisión sólo las ACTIVAS; con `incluirInactivas`
  * salen también las retiradas, que es como se consulta el **historial reutilizable**.
- * Permiso `proveedores.ver`.
+ *
+ * Permiso: `proveedores.ver` (la puerta) **y** la llave de los datos bancarios
+ * ({@link exigirVerDatosBancariosDeProveedor}, fila 0.249). Esta lista ES el dato bancario completo
+ * —beneficiario, banco y número entero—: con sólo el directorio (`proveedores.ver`) contesta 403.
  */
 export async function listarCuentasPagoProveedor(
   sesion: SesionUsuario,
@@ -207,6 +211,7 @@ export async function listarCuentasPagoProveedor(
   bd?: ContextoBd,
 ): Promise<CuentaPagoProveedor[]> {
   verificarPermiso(sesion, 'proveedores.ver');
+  exigirVerDatosBancariosDeProveedor(sesion);
   const cliente = clienteLectura(bd);
   const proveedor = await cliente.proveedor.findUnique({
     where: { id: idProveedor },
@@ -280,7 +285,7 @@ export async function crearCuentaPagoProveedor(
       accion: 'CREAR',
       datos: {
         idProveedor,
-        beneficiario: cuenta.beneficiario,
+        // 🔒 Fila 0.249: sin el beneficiario (dato bancario: a nombre de quién va el depósito).
         tipoCuenta: cuenta.tipoCuenta,
         esFiscal: cuenta.esFiscal,
         esDefault: cuenta.esDefault === true,
@@ -337,7 +342,10 @@ export async function actualizarCuentaPagoProveedor(
       const anterior = actual[campo];
       if (nuevo !== anterior) {
         (cambios as Record<string, unknown>)[campo] = nuevo;
-        detalle[campo] = { de: anterior, a: nuevo };
+        // 🔒 Fila 0.249: como el número, NINGÚN texto de la cuenta se copia a la bitácora
+        // (beneficiario y banco son el dato bancario; alias y notas se teclean libres y pueden
+        // llevarlo). La bitácora la lee quien no ve las cuentas (`admin.ver-bitacora`).
+        detalle[campo] = { cambio: true };
       }
     }
 
@@ -399,7 +407,7 @@ export async function actualizarCuentaPagoProveedor(
       datos: {
         idProveedor,
         ...detalle,
-        ...(retira ? { operacion: 'retirar', beneficiario: actual.beneficiario } : {}),
+        ...(retira ? { operacion: 'retirar' } : {}),
         ...(revive ? { operacion: 'reactivar' } : {}),
         ...(promueve ? { operacion: 'default' } : {}),
         ...(degrada ? { operacion: 'quitar-default' } : {}),

@@ -419,6 +419,72 @@ describe('<DialogoProveedor>', () => {
     expect(args.cuerpo.telefono).toBeNull();
   });
 
+  // ── 🔒 Fila 0.249: los datos bancarios TAPADOS por el servidor ──────────────────────────────
+  // Hoy no ocurre en edición (editar y ver piden `proveedores.administrar`), pero si un día se
+  // separan las llaves el formulario no puede pintar vacío lo que no vio NI mandarlo como null.
+  describe('🔒 datos bancarios tapados por el servidor (cuentasPago: null)', () => {
+    const TALLER = [{ id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' }];
+
+    it('NO manda `obsPago` al guardar (mandarlo en null lo PISARÍA) y no pide el campo', async () => {
+      const usuario = userEvent.setup();
+      actualizarMutate.mockImplementation(
+        (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo());
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ roles: TALLER, cuentasPago: null, obsPago: null })}
+        />,
+      );
+
+      await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
+      expect(await screen.findByLabelText('¿Está asegurado?')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Observaciones de pago')).not.toBeInTheDocument();
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      expect(await screen.findByTestId('cuentas-pago-tapadas')).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-cuentas-pago')).not.toBeInTheDocument();
+
+      await elegirModalidad(usuario);
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+      const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
+      expect(args.cuerpo).not.toHaveProperty('obsPago');
+      expect(args.cuerpo).not.toHaveProperty('banco');
+      expect(args.cuerpo).not.toHaveProperty('clabe');
+    });
+
+    it('con los datos a la vista, vaciar `obsPago` SÍ manda null (el borrado sigue funcionando)', async () => {
+      const usuario = userEvent.setup();
+      actualizarMutate.mockImplementation(
+        (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo());
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({ roles: TALLER, cuentasPago: [], obsPago: 'paga viernes' })}
+        />,
+      );
+
+      await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
+      await usuario.clear(await screen.findByLabelText('Observaciones de pago'));
+      await usuario.click(screen.getByRole('button', { name: 'Cuentas de pago' }));
+      expect(screen.queryByTestId('cuentas-pago-tapadas')).not.toBeInTheDocument();
+      await elegirModalidad(usuario);
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+      const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
+      expect(args.cuerpo).toHaveProperty('obsPago', null);
+    });
+  });
+
   it('en edición, los enum y numéricos opcionales vacíos viajan como null', async () => {
     const usuario = userEvent.setup();
     actualizarMutate.mockImplementation(
@@ -1044,7 +1110,7 @@ describe('<DialogoProveedor>', () => {
   // ── 0.112: las CUENTAS de pago, N por proveedor, con su beneficiario ────────
   describe('cuentas de pago del proveedor', () => {
     /** Una cuenta como la devuelve el API. */
-    function cuenta(sobre: Partial<Proveedor['cuentasPago'][number]> = {}) {
+    function cuenta(sobre: Partial<NonNullable<Proveedor['cuentasPago']>[number]> = {}) {
       return {
         id: 3,
         idProveedor: 10,

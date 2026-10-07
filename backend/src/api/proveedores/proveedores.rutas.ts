@@ -119,7 +119,9 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
       nombre: r.rol.nombre,
     })),
     contactos: proveedor.contactos.map(aContactoSalida),
-    cuentasPago: proveedor.cuentasPago.map(aCuentaPagoSalida),
+    // `null` = la sesión no lleva la llave de datos bancarios (fila 0.249; lo decide el dominio).
+    cuentasPago:
+      proveedor.cuentasPago === null ? null : proveedor.cuentasPago.map(aCuentaPagoSalida),
     cantidadAdjuntos: proveedor._count.archivos,
     activo: proveedor.activo,
     creadoEn: proveedor.creadoEn.toISOString(),
@@ -634,7 +636,9 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
   });
 
   // ── Cuentas / destinos de pago del proveedor (0.112) ────────────────────────
-  // SIN permisos nuevos: se gobiernan con `proveedores.ver`/`.administrar`.
+  // SIN permisos nuevos: se gobiernan con `proveedores.ver`/`.administrar`. ⚠️ Fila 0.249: LEERLAS
+  // exige además la llave de datos bancarios (`proveedores.administrar`); la puerta deja pasar con
+  // `proveedores.ver` y el DOMINIO (`listarCuentasPagoProveedor`) contesta 403 sin ella (A1).
   // El BENEFICIARIO casi nunca es el proveedor, y un proveedor tiene VARIAS cuentas: una default y
   // las demás como historial reutilizable (Daniel, leyendo su relación de pago semanal).
 
@@ -644,7 +648,9 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
     preHandler: app.conPermiso('proveedores.ver'),
     schema: {
       tags: ['proveedores'],
-      summary: 'Listar las cuentas de pago del proveedor (la default primero)',
+      summary:
+        'Listar las cuentas de pago del proveedor (la default primero). Son datos bancarios: exige ' +
+        'además proveedores.administrar (fila 0.249)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       querystring: esquemaCuentasPagoQuery,

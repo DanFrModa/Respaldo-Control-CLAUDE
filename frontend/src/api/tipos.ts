@@ -86,8 +86,11 @@ export type ProveedorContactoCrear =
 /** Cuerpo de edicion de un contacto (`PATCH /api/proveedores/{id}/contactos/{idContacto}`). */
 export type ProveedorContactoEditar =
   paths['/api/proveedores/{id}/contactos/{idContacto}']['patch']['requestBody']['content']['application/json'];
-/** Una CUENTA / destino de pago del proveedor (0.112). */
-export type ProveedorCuentaPago = Proveedor['cuentasPago'][number];
+/**
+ * Una CUENTA / destino de pago del proveedor (0.112). ⚠️ En la ficha `cuentasPago` puede venir
+ * `null` (fila 0.249: la sesión no ve datos bancarios); el tipo de UNA cuenta lo saca de ahí.
+ */
+export type ProveedorCuentaPago = NonNullable<Proveedor['cuentasPago']>[number];
 /** Cuerpo de alta de una cuenta de pago (`POST /api/proveedores/{id}/cuentas-pago`). */
 export type ProveedorCuentaPagoCrear =
   paths['/api/proveedores/{id}/cuentas-pago']['post']['requestBody']['content']['application/json'];
@@ -2282,7 +2285,7 @@ export type ConceptosPagoPagina =
 /** Un concepto de pago con sus cuentas. */
 export type ConceptoPago = ConceptosPagoPagina['datos'][number];
 /** Una cuenta de un concepto de pago. */
-export type ConceptoPagoCuenta = ConceptoPago['cuentas'][number];
+export type ConceptoPagoCuenta = NonNullable<ConceptoPago['cuentas']>[number];
 /** Filtros del catálogo (querystring). */
 export type ConceptosPagoQuery = NonNullable<
   paths['/api/conceptos-pago']['get']['parameters']['query']

@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.204 · 7-oct-2026 · **en prueba** — **Los datos bancarios de proveedores y conceptos de pago ya sólo le llegan a quien los administra**
+
+> **La v0.204 no cierra ninguna fila del programa**: entrega la primera parte de la 0.249, la que la ficha pedía hacer
+> primero. Tú pediste que el catálogo de proveedores lo viera todo el mundo; antes de poder abrirlo había que tapar
+> sus datos bancarios, que la pantalla ocultaba pero **el sistema entregaba completos** a cualquiera con la llave.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Quien sólo consulta proveedores ve el directorio** (nombre, contacto, RFC, giro, condiciones) **pero ya no recibe el
+banco, la CLABE, las cuentas de pago ni las observaciones de pago.** Esas observaciones también se tapan porque, en el
+sistema viejo, ahí se escribían números de cuenta. Quien da de alta y edita proveedores los sigue viendo igual.
+
+**Lo mismo con el catálogo de conceptos de pago:** sus cuentas sólo las ve quien administra el catálogo o arma la corrida
+de pagos (la corrida necesita la cuenta del concepto para pagarlo por transferencia).
+
+**Editar un proveedor sin ver sus datos bancarios no los borra**, y **la bitácora ya no los copia**: anota que cambiaron, sin el
+valor (antes la leían seis puestos que no administran proveedores, y podían ver la CLABE o lo escrito en las
+observaciones de pago).
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Directivo y Gerencial dejan de ver las cuentas en el catálogo** de proveedores y de conceptos; las siguen viendo donde
+se pagan, en la relación de la corrida.
+
+**Compras sí ve las CLABE**, porque le diste la llave de administrar proveedores.
+
+### ⏳ Sigue pendiente o roto
+
+**El catálogo de proveedores todavía NO está abierto a todos.** Antes falta decidir quién descarga los **adjuntos** del
+proveedor (un adjunto «Otro» puede ser una carátula bancaria). Y la otra parte de la 0.249 —tapar los precios de telas,
+avíos, modelos y órdenes— sigue pendiente. Y de revisar esta versión salió la **0.255**: la bitácora de la corrida de
+pagos guarda **a quién se le paga y cuánto**, y por ahí lo ven Ventas, Logística, Asistente y Secretarial, que no tienen
+acceso a la corrida. Cuatro preguntas para ti en
+§Post-F9.272.
+
 ## 0.203 · 6-oct-2026 · **en prueba** — **La pantalla de Ventas ya tiene su propia llave, separada del estado de resultados**
 
 > **La v0.203 cierra una fila del programa: la 0.251.** Le negaste a Administración y Finanzas la llave del estado de

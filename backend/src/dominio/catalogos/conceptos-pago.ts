@@ -48,7 +48,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { proyectarCuentaConcepto } from './conceptos-pago-cuentas.js';
+import { proyectarCuentaConcepto, puedeVerCuentasDeConcepto } from './conceptos-pago-cuentas.js';
 
 /** `include` para traer el concepto con sus cuentas (la default primero). */
 export const incluirConcepto = {
@@ -64,8 +64,12 @@ export const incluirConcepto = {
 /** Concepto con sus cuentas, tal como lo devuelve Prisma. */
 type ConceptoConCuentas = Prisma.ConceptoPagoGetPayload<{ include: typeof incluirConcepto }>;
 
-/** Proyecta un concepto al contrato. */
-export function proyectarConcepto(c: ConceptoConCuentas): ConceptoPagoSalida {
+/**
+ * Proyecta un concepto al contrato. `cuentas: null` cuando la sesión no puede ver los datos
+ * bancarios ({@link puedeVerCuentasDeConcepto}, fila 0.249). `null` significa «no te toca verlas»;
+ * `[]` significa «no tiene».
+ */
+export function proyectarConcepto(c: ConceptoConCuentas, verCuentas: boolean): ConceptoPagoSalida {
   return {
     id: c.id,
     nombre: c.nombre,
@@ -74,7 +78,7 @@ export function proyectarConcepto(c: ConceptoConCuentas): ConceptoPagoSalida {
     predeterminado: c.predeterminado,
     notas: c.notas,
     activo: c.activo,
-    cuentas: c.cuentas.map(proyectarCuentaConcepto),
+    cuentas: verCuentas ? c.cuentas.map(proyectarCuentaConcepto) : null,
   };
 }
 
@@ -140,7 +144,7 @@ export async function listarConceptosPago(
   ]);
 
   return {
-    datos: filas.map(proyectarConcepto),
+    datos: filas.map((fila) => proyectarConcepto(fila, puedeVerCuentasDeConcepto(sesion))),
     total,
     pagina: filtros.pagina,
     porPagina: filtros.porPagina,
@@ -178,12 +182,12 @@ export async function obtenerConceptoPago(
  * ⚠️ **NO usar para consultar**: toda lectura que NO sea el eco de una escritura propia va por
  * {@link obtenerConceptoPago}, que sí exige `conceptos-pago.ver`.
  *
- * La `sesion` NO se usa en el cuerpo —el catálogo es global, no hay filtro por empresa que aplicar—
- * pero se conserva en la firma para que sea la MISMA que la de `obtenerConceptoPago` (`_sesion`, la
- * convención de la casa para un parámetro que sólo está por uniformidad; ver `admin/empresas.ts`).
+ * La `sesion` no filtra por empresa (el catálogo es global). Sí decide si las CUENTAS viajan
+ * ({@link puedeVerCuentasDeConcepto}, fila 0.249). El eco de una escritura siempre las lleva,
+ * porque escribir exige `conceptos-pago.administrar`.
  */
 export async function proyectarConceptoPago(
-  _sesion: SesionUsuario,
+  sesion: SesionUsuario,
   idConcepto: number,
   bd?: ContextoBd,
 ): Promise<ConceptoPagoSalida> {
@@ -194,7 +198,7 @@ export async function proyectarConceptoPago(
   if (concepto === null) {
     throw new ErrorNoEncontrado('ConceptoPago', idConcepto);
   }
-  return proyectarConcepto(concepto);
+  return proyectarConcepto(concepto, puedeVerCuentasDeConcepto(sesion));
 }
 
 /**

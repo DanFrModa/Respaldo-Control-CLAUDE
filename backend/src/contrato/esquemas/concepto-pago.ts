@@ -173,7 +173,13 @@ export const esquemaConceptoPagoSalida = z
       .describe('Verdadero si se carga solo, EN CERO, en cada corrida nueva.'),
     notas: z.string().nullable().describe('Notas, o null.'),
     activo: z.boolean().describe('Falso si está retirado del catálogo.'),
-    cuentas: z.array(esquemaConceptoPagoCuentaSalida).describe('Cuentas/destinos de pago.'),
+    /** ⭐ Fila 0.249: `null` ≠ `[]`. `null` = la sesión no ve datos bancarios; `[]` = no tiene. */
+    cuentas: z
+      .array(esquemaConceptoPagoCuentaSalida)
+      .nullable()
+      .describe(
+        'Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene.',
+      ),
   })
   .describe('Concepto de pago que no es proveedor.');
 

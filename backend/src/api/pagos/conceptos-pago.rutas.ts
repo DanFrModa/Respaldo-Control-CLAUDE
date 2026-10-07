@@ -147,7 +147,9 @@ export const rutasConceptosPago: FastifyPluginCallbackZod = (app, _opciones, don
     preHandler: app.conPermiso('conceptos-pago.ver'),
     schema: {
       tags: ['conceptos-pago'],
-      summary: 'Cuentas/destinos de pago de un concepto',
+      summary:
+        'Cuentas/destinos de pago de un concepto. Son datos bancarios: exige además ' +
+        'conceptos-pago.administrar o pagos.corrida-armar (fila 0.249)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       querystring: z.object({

@@ -18581,3 +18581,28 @@ va a revisar lo facturado — él dijo que *«eventualmente generará las factur
 decisión, y la puede dar él mismo desde Administración › Roles. Nota: Ventas enseña lo que ya se registró en el estado
 de resultados; **timbrar facturas (R14) todavía no existe**, e importar los CFDI de ventas ya cuelga de
 `cxc.administrar`, que ese puesto ya tiene.
+
+#### (Post-F9.272) — LOS DATOS BANCARIOS DE PROVEEDORES Y CONCEPTOS DE PAGO SÓLO LE LLEGAN A QUIEN LOS ADMINISTRA (fila 0.249 parte A, v0.204) — cuatro preguntas para Daniel
+
+Primera parte de la 0.249 (§Post-F9.257(c)). 📐 El API entregaba **completos** el banco, la CLABE, las cuentas de pago y
+las observaciones de pago del proveedor a cualquiera con `proveedores.ver` (la pantalla sólo los enmascaraba), y las
+cuentas de los conceptos de pago a cualquiera con `conceptos-pago.ver`. Ahora se tapan en el servidor: los del proveedor
+sólo los recibe quien tiene **`proveedores.administrar`** (la llave que ya hacía falta para teclearlos), y los de los
+conceptos quien los administra o **arma la corrida** (que necesita la cuenta del concepto para pagar por transferencia).
+Las observaciones de pago se tapan también porque en el sistema viejo guardaban números de cuenta. Editar sin verlos no
+los borra. Sin llaves nuevas. Y la **bitácora** ya no los copia: banco, CLABE y observaciones de pago del proveedor, y
+beneficiario, banco, alias y notas de las cuentas, se anotan sólo como «cambió», porque la bitácora la leen
+puestos que no administran proveedores.
+
+❓ **Cuatro preguntas; las tres primeras con el default que ya quedó construido:**
+1. **Compras ve las CLABE** porque Daniel le dio `proveedores.administrar` (§Post-F9.260). ¿Está bien? *Default: sí.*
+2. **Directivo y Gerencial dejan de ver las cuentas en los catálogos**; las siguen viendo en la relación de la corrida,
+   donde se pagan. *Default: así se queda, del lado restringido.*
+3. **Los adjuntos del proveedor** (constancia, contrato, «otro») se descargan hoy con `proveedores.ver`. Un «otro» puede
+   ser una carátula bancaria y un contrato trae condiciones comerciales. **Hay que decidirlo antes de meter
+   `proveedores.ver` al piso de lectura.** *Default propuesto: que la constancia fiscal la descargue cualquiera con la
+   llave de ver, y contrato y «otro» sólo quien administra proveedores.*
+4. **(Fila 0.255) La bitácora de la corrida de pagos guarda a quién se le paga y cuánto** cada semana. Directivo y
+   Gerencial ya ven la corrida completa; pero Ventas, Logística, Asistente y Secretarial no tienen acceso a la corrida
+   y por la bitácora sí lo ven. ¿Deben verlo? *Propuesta: ocultar el beneficiario y dejar el monto, que es lo
+   auditable.*

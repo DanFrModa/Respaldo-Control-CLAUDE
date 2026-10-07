@@ -1713,9 +1713,9 @@ export interface paths {
                 formaPagoPreferida: ('efectivo' | 'transferencia') | null;
                 /** @description Método de pago CFDI (PUE/PPD), o null. */
                 metodoPago: string | null;
-                /** @description Banco, o null. */
+                /** @description Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
                 banco: string | null;
-                /** @description CLABE interbancaria, o null. */
+                /** @description CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
                 clabe: string | null;
                 /** @description Límite de crédito, o null. */
                 limiteCredito: number | null;
@@ -1725,7 +1725,7 @@ export interface paths {
                 notas: string | null;
                 /** @description ¿Está asegurado? (talleres), o null. */
                 asegurado: boolean | null;
-                /** @description Observaciones de pago (talleres), o null. */
+                /** @description Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249). */
                 obsPago: string | null;
                 /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
                 modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -1757,34 +1757,36 @@ export interface paths {
                   /** @description Falso si está archivado (borrado suave). */
                   activo: boolean;
                 }[];
-                /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
-                cuentasPago: {
-                  /** @description Id de la cuenta. */
-                  id: number;
-                  /** @description Id del proveedor dueño de la cuenta. */
-                  idProveedor: number;
-                  /** @description A nombre de quién está la cuenta (el del depósito). */
-                  beneficiario: string;
-                  /** @description Banco, o null. */
-                  banco: string | null;
-                  /**
-                   * @description CLABE o tarjeta.
-                   * @enum {string}
-                   */
-                  tipoCuenta: 'clabe' | 'tarjeta';
-                  /** @description El número, sólo dígitos. */
-                  cuenta: string;
-                  /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
-                  alias: string | null;
-                  /** @description Verdadero si a ella puede salir un pago CON factura. */
-                  esFiscal: boolean;
-                  /** @description Verdadero si es LA cuenta por omisión del proveedor. */
-                  esDefault: boolean;
-                  /** @description Notas, o null. */
-                  notas: string | null;
-                  /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                  activo: boolean;
-                }[];
+                /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas. */
+                cuentasPago:
+                  | {
+                      /** @description Id de la cuenta. */
+                      id: number;
+                      /** @description Id del proveedor dueño de la cuenta. */
+                      idProveedor: number;
+                      /** @description A nombre de quién está la cuenta (el del depósito). */
+                      beneficiario: string;
+                      /** @description Banco, o null. */
+                      banco: string | null;
+                      /**
+                       * @description CLABE o tarjeta.
+                       * @enum {string}
+                       */
+                      tipoCuenta: 'clabe' | 'tarjeta';
+                      /** @description El número, sólo dígitos. */
+                      cuenta: string;
+                      /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                      alias: string | null;
+                      /** @description Verdadero si a ella puede salir un pago CON factura. */
+                      esFiscal: boolean;
+                      /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                      esDefault: boolean;
+                      /** @description Notas, o null. */
+                      notas: string | null;
+                      /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                      activo: boolean;
+                    }[]
+                  | null;
                 /** @description Cantidad de adjuntos del proveedor. */
                 cantidadAdjuntos: number;
                 /** @description Falso si está desactivado (borrado suave). */
@@ -1991,9 +1993,9 @@ export interface paths {
               formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
-              /** @description Banco, o null. */
+              /** @description Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               banco: string | null;
-              /** @description CLABE interbancaria, o null. */
+              /** @description CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               clabe: string | null;
               /** @description Límite de crédito, o null. */
               limiteCredito: number | null;
@@ -2003,7 +2005,7 @@ export interface paths {
               notas: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
-              /** @description Observaciones de pago (talleres), o null. */
+              /** @description Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249). */
               obsPago: string | null;
               /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
               modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -2035,34 +2037,36 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
-              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
-              cuentasPago: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del proveedor dueño de la cuenta. */
-                idProveedor: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas. */
+              cuentasPago:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del proveedor dueño de la cuenta. */
+                    idProveedor: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -2239,9 +2243,9 @@ export interface paths {
               formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
-              /** @description Banco, o null. */
+              /** @description Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               banco: string | null;
-              /** @description CLABE interbancaria, o null. */
+              /** @description CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               clabe: string | null;
               /** @description Límite de crédito, o null. */
               limiteCredito: number | null;
@@ -2251,7 +2255,7 @@ export interface paths {
               notas: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
-              /** @description Observaciones de pago (talleres), o null. */
+              /** @description Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249). */
               obsPago: string | null;
               /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
               modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -2283,34 +2287,36 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
-              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
-              cuentasPago: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del proveedor dueño de la cuenta. */
-                idProveedor: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas. */
+              cuentasPago:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del proveedor dueño de la cuenta. */
+                    idProveedor: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -2476,9 +2482,9 @@ export interface paths {
               formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
-              /** @description Banco, o null. */
+              /** @description Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               banco: string | null;
-              /** @description CLABE interbancaria, o null. */
+              /** @description CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               clabe: string | null;
               /** @description Límite de crédito, o null. */
               limiteCredito: number | null;
@@ -2488,7 +2494,7 @@ export interface paths {
               notas: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
-              /** @description Observaciones de pago (talleres), o null. */
+              /** @description Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249). */
               obsPago: string | null;
               /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
               modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -2520,34 +2526,36 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
-              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
-              cuentasPago: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del proveedor dueño de la cuenta. */
-                idProveedor: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas. */
+              cuentasPago:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del proveedor dueño de la cuenta. */
+                    idProveedor: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -2747,9 +2755,9 @@ export interface paths {
               formaPagoPreferida: ('efectivo' | 'transferencia') | null;
               /** @description Método de pago CFDI (PUE/PPD), o null. */
               metodoPago: string | null;
-              /** @description Banco, o null. */
+              /** @description Banco, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               banco: string | null;
-              /** @description CLABE interbancaria, o null. */
+              /** @description CLABE interbancaria, o null (también null si la sesión no ve datos bancarios, fila 0.249). */
               clabe: string | null;
               /** @description Límite de crédito, o null. */
               limiteCredito: number | null;
@@ -2759,7 +2767,7 @@ export interface paths {
               notas: string | null;
               /** @description ¿Está asegurado? (talleres), o null. */
               asegurado: boolean | null;
-              /** @description Observaciones de pago (talleres), o null. */
+              /** @description Observaciones de pago (talleres), o null. Traen números de cuenta: también null si la sesión no ve datos bancarios (fila 0.249). */
               obsPago: string | null;
               /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
               modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
@@ -2791,34 +2799,36 @@ export interface paths {
                 /** @description Falso si está archivado (borrado suave). */
                 activo: boolean;
               }[];
-              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. */
-              cuentasPago: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del proveedor dueño de la cuenta. */
-                idProveedor: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del proveedor. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas de pago ACTIVAS del proveedor, la default primero (0.112). Las retiradas se piden aparte. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene cuentas. */
+              cuentasPago:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del proveedor dueño de la cuenta. */
+                    idProveedor: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago ("1", "2"…). */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del proveedor. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
               /** @description Cantidad de adjuntos del proveedor. */
               cantidadAdjuntos: number;
               /** @description Falso si está desactivado (borrado suave). */
@@ -4145,7 +4155,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Listar las cuentas de pago del proveedor (la default primero) */
+    /** Listar las cuentas de pago del proveedor (la default primero). Son datos bancarios: exige además proveedores.administrar (fila 0.249) */
     get: {
       parameters: {
         query?: {
@@ -66031,34 +66041,36 @@ export interface paths {
                 notas: string | null;
                 /** @description Falso si está retirado del catálogo. */
                 activo: boolean;
-                /** @description Cuentas/destinos de pago. */
-                cuentas: {
-                  /** @description Id de la cuenta. */
-                  id: number;
-                  /** @description Id del concepto dueño de la cuenta. */
-                  idConcepto: number;
-                  /** @description A nombre de quién está la cuenta (el del depósito). */
-                  beneficiario: string;
-                  /** @description Banco, o null. */
-                  banco: string | null;
-                  /**
-                   * @description CLABE o tarjeta.
-                   * @enum {string}
-                   */
-                  tipoCuenta: 'clabe' | 'tarjeta';
-                  /** @description El número, sólo dígitos. */
-                  cuenta: string;
-                  /** @description Cómo se le llama en la relación de pago. */
-                  alias: string | null;
-                  /** @description Verdadero si a ella puede salir un pago CON factura. */
-                  esFiscal: boolean;
-                  /** @description Verdadero si es LA cuenta por omisión del concepto. */
-                  esDefault: boolean;
-                  /** @description Notas, o null. */
-                  notas: string | null;
-                  /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                  activo: boolean;
-                }[];
+                /** @description Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene. */
+                cuentas:
+                  | {
+                      /** @description Id de la cuenta. */
+                      id: number;
+                      /** @description Id del concepto dueño de la cuenta. */
+                      idConcepto: number;
+                      /** @description A nombre de quién está la cuenta (el del depósito). */
+                      beneficiario: string;
+                      /** @description Banco, o null. */
+                      banco: string | null;
+                      /**
+                       * @description CLABE o tarjeta.
+                       * @enum {string}
+                       */
+                      tipoCuenta: 'clabe' | 'tarjeta';
+                      /** @description El número, sólo dígitos. */
+                      cuenta: string;
+                      /** @description Cómo se le llama en la relación de pago. */
+                      alias: string | null;
+                      /** @description Verdadero si a ella puede salir un pago CON factura. */
+                      esFiscal: boolean;
+                      /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                      esDefault: boolean;
+                      /** @description Notas, o null. */
+                      notas: string | null;
+                      /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                      activo: boolean;
+                    }[]
+                  | null;
               }[];
               total: number;
               pagina: number;
@@ -66196,34 +66208,36 @@ export interface paths {
               notas: string | null;
               /** @description Falso si está retirado del catálogo. */
               activo: boolean;
-              /** @description Cuentas/destinos de pago. */
-              cuentas: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del concepto dueño de la cuenta. */
-                idConcepto: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago. */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del concepto. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene. */
+              cuentas:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del concepto dueño de la cuenta. */
+                    idConcepto: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago. */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
             };
           };
         };
@@ -66359,34 +66373,36 @@ export interface paths {
               notas: string | null;
               /** @description Falso si está retirado del catálogo. */
               activo: boolean;
-              /** @description Cuentas/destinos de pago. */
-              cuentas: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del concepto dueño de la cuenta. */
-                idConcepto: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago. */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del concepto. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene. */
+              cuentas:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del concepto dueño de la cuenta. */
+                    idConcepto: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago. */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
             };
           };
         };
@@ -66527,34 +66543,36 @@ export interface paths {
               notas: string | null;
               /** @description Falso si está retirado del catálogo. */
               activo: boolean;
-              /** @description Cuentas/destinos de pago. */
-              cuentas: {
-                /** @description Id de la cuenta. */
-                id: number;
-                /** @description Id del concepto dueño de la cuenta. */
-                idConcepto: number;
-                /** @description A nombre de quién está la cuenta (el del depósito). */
-                beneficiario: string;
-                /** @description Banco, o null. */
-                banco: string | null;
-                /**
-                 * @description CLABE o tarjeta.
-                 * @enum {string}
-                 */
-                tipoCuenta: 'clabe' | 'tarjeta';
-                /** @description El número, sólo dígitos. */
-                cuenta: string;
-                /** @description Cómo se le llama en la relación de pago. */
-                alias: string | null;
-                /** @description Verdadero si a ella puede salir un pago CON factura. */
-                esFiscal: boolean;
-                /** @description Verdadero si es LA cuenta por omisión del concepto. */
-                esDefault: boolean;
-                /** @description Notas, o null. */
-                notas: string | null;
-                /** @description Falso si está retirada (sigue siendo historial reutilizable). */
-                activo: boolean;
-              }[];
+              /** @description Cuentas/destinos de pago. null = la sesión no ve datos bancarios (fila 0.249); [] = no tiene. */
+              cuentas:
+                | {
+                    /** @description Id de la cuenta. */
+                    id: number;
+                    /** @description Id del concepto dueño de la cuenta. */
+                    idConcepto: number;
+                    /** @description A nombre de quién está la cuenta (el del depósito). */
+                    beneficiario: string;
+                    /** @description Banco, o null. */
+                    banco: string | null;
+                    /**
+                     * @description CLABE o tarjeta.
+                     * @enum {string}
+                     */
+                    tipoCuenta: 'clabe' | 'tarjeta';
+                    /** @description El número, sólo dígitos. */
+                    cuenta: string;
+                    /** @description Cómo se le llama en la relación de pago. */
+                    alias: string | null;
+                    /** @description Verdadero si a ella puede salir un pago CON factura. */
+                    esFiscal: boolean;
+                    /** @description Verdadero si es LA cuenta por omisión del concepto. */
+                    esDefault: boolean;
+                    /** @description Notas, o null. */
+                    notas: string | null;
+                    /** @description Falso si está retirada (sigue siendo historial reutilizable). */
+                    activo: boolean;
+                  }[]
+                | null;
             };
           };
         };
@@ -66649,7 +66667,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Cuentas/destinos de pago de un concepto */
+    /** Cuentas/destinos de pago de un concepto. Son datos bancarios: exige además conceptos-pago.administrar o pagos.corrida-armar (fila 0.249) */
     get: {
       parameters: {
         query?: {

@@ -414,6 +414,39 @@ describe('<ProveedoresPagina>', () => {
     expect(within(detalle).getByText('2 archivos')).toBeInTheDocument();
   });
 
+  // 🔒 Fila 0.249: sin la llave de datos bancarios el SERVIDOR manda `cuentasPago: null` (no `[]`).
+  // El cajón no se rompe, no inventa «sin cuentas» y el resto de la sección de pago sigue saliendo.
+  it('🔒 con `cuentasPago: null` (tapadas por el servidor) el cajón no pinta cuentas ni se rompe', async () => {
+    const usuario = userEvent.setup();
+    const lector = proveedor(6, 'Proveedor Tapado');
+    lector.diasCredito = 15;
+    lector.cuentasPago = null;
+    useProveedores.mockReturnValue(consultaConDatos([lector]));
+    renderConProveedores(<ProveedoresPagina />, {
+      sesion: estadoSesionDePrueba(['proveedores.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('fila-proveedor'));
+    const detalle = screen.getByTestId('detalle-proveedor');
+    expect(within(detalle).getByText('15 días')).toBeInTheDocument();
+    expect(within(detalle).queryByTestId('cuentas-pago-detalle')).not.toBeInTheDocument();
+    expect(within(detalle).queryByText('Cuentas de pago')).not.toBeInTheDocument();
+  });
+
+  it('🔒 si lo único de pago eran las cuentas tapadas, la sección «Pago» no aparece vacía', async () => {
+    const usuario = userEvent.setup();
+    const lector = proveedor(8, 'Solo Cuentas');
+    lector.cuentasPago = null;
+    useProveedores.mockReturnValue(consultaConDatos([lector]));
+    renderConProveedores(<ProveedoresPagina />, {
+      sesion: estadoSesionDePrueba(['proveedores.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('fila-proveedor'));
+    const detalle = screen.getByTestId('detalle-proveedor');
+    expect(within(detalle).queryByText('Pago')).not.toBeInTheDocument();
+  });
+
   /**
    * ⭐ EL DIÁLOGO LEE LA VERSIÓN FRESCA, NO LA FOTO DE CUANDO SE ABRIÓ (0.112).
    *

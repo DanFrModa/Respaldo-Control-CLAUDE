@@ -25,8 +25,13 @@ import type { ConceptoPagoCuenta, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -43,6 +48,29 @@ import {
   promoverExigeReactivar,
   resolverJuegoDeDefault,
 } from './cuentas-pago-reglas.js';
+
+/**
+ * ⭐ ¿La sesión puede ver las CUENTAS de los conceptos de pago? (fila 0.249, mismo defecto que el
+ * de los proveedores).
+ *
+ * `conceptos-pago.ver` abre el CATÁLOGO (nombre, rubro, forma de pago, predeterminado), y hasta la
+ * fila 0.249 entregaba además beneficiario, banco y número COMPLETO de cada cuenta. En el seed la
+ * llevan sin administrar los roles de sistema **Directivo** y **Gerencial**.
+ *
+ * Sin llave nueva. Abren las cuentas DOS llaves que ya existen, y por la misma razón: a quien la
+ * lleva le toca decidir a dónde sale el dinero.
+ *  • `conceptos-pago.administrar`: da de alta y edita las cuentas, así que las tiene que leer.
+ *  • `pagos.corrida-armar`: al «Agregar un concepto del catálogo» a la corrida, la pantalla toma de
+ *    aquí la cuenta por omisión (`CorridaPagosPagina.tsx`). Sin ella, un concepto «por
+ *    transferencia» caería EN SILENCIO a efectivo. Es reserva del dueño (`SOLO_ADMINISTRADOR`), así
+ *    que no abre a nadie que hoy no las vea ya.
+ */
+export function puedeVerCuentasDeConcepto(sesion: SesionUsuario): boolean {
+  return (
+    tienePermiso(sesion, 'conceptos-pago.administrar') ||
+    tienePermiso(sesion, 'pagos.corrida-armar')
+  );
+}
 
 /**
  * Namespace del `pg_advisory_xact_lock` que serializa el juego de LA DEFAULT de UN concepto.
@@ -177,7 +205,8 @@ async function exigirConcepto(tx: Tx, idConcepto: number): Promise<void> {
 /**
  * Lista las cuentas de un concepto. Por omisión sólo las ACTIVAS; con `incluirInactivas` salen
  * también las retiradas, que es como se consulta el historial reutilizable. Permiso
- * `conceptos-pago.ver`.
+ * `conceptos-pago.ver` (la puerta) **y** {@link puedeVerCuentasDeConcepto} (fila 0.249): esta lista
+ * ES el dato bancario completo, así que sin la segunda contesta 403.
  */
 export async function listarCuentasConcepto(
   sesion: SesionUsuario,
@@ -186,6 +215,14 @@ export async function listarCuentasConcepto(
   bd?: ContextoBd,
 ): Promise<ConceptoPagoCuentaSalida[]> {
   verificarPermiso(sesion, 'conceptos-pago.ver');
+  if (!puedeVerCuentasDeConcepto(sesion)) {
+    // Nombra las DOS llaves que abren las cuentas (cualquiera de las dos basta).
+    throw new ErrorPermiso(
+      'Las cuentas de un concepto son datos bancarios: verlas exige conceptos-pago.administrar o ' +
+        'pagos.corrida-armar.',
+      'conceptos-pago.administrar o pagos.corrida-armar',
+    );
+  }
   const cliente = clienteLectura(bd);
   const concepto = await cliente.conceptoPago.findUnique({
     where: { id: idConcepto },
@@ -255,7 +292,7 @@ export async function crearCuentaConcepto(
       accion: 'CREAR',
       datos: {
         idConcepto,
-        beneficiario: creada.beneficiario,
+        // 🔒 Fila 0.249: sin el beneficiario (dato bancario: a nombre de quién va el depósito).
         tipoCuenta: creada.tipoCuenta,
         esFiscal: creada.esFiscal,
         esDefault: creada.esDefault === true,
@@ -303,7 +340,10 @@ export async function actualizarCuentaConcepto(
       const anterior = actual[campo];
       if (nuevo !== anterior) {
         (cambios as Record<string, unknown>)[campo] = nuevo;
-        detalle[campo] = { de: anterior, a: nuevo };
+        // 🔒 Fila 0.249: como el número, NINGÚN texto de la cuenta se copia a la bitácora
+        // (beneficiario y banco son el dato bancario; alias y notas se teclean libres y pueden
+        // llevarlo). La bitácora la lee quien no ve las cuentas (`admin.ver-bitacora`).
+        detalle[campo] = { cambio: true };
       }
     }
 
@@ -359,7 +399,7 @@ export async function actualizarCuentaConcepto(
       datos: {
         idConcepto,
         ...detalle,
-        ...(retira ? { operacion: 'retirar', beneficiario: actual.beneficiario } : {}),
+        ...(retira ? { operacion: 'retirar' } : {}),
         ...(revive ? { operacion: 'reactivar' } : {}),
         ...(promueve ? { operacion: 'default' } : {}),
         ...(degrada ? { operacion: 'quitar-default' } : {}),

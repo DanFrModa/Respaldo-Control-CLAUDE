@@ -322,11 +322,13 @@ describe('cuentas de pago del proveedor', () => {
       );
 
       const ficha = await obtenerProveedor(sesionAdmin(), idProveedor, bd());
-      expect(ficha.cuentasPago.map((c) => c.id)).toEqual([
+      expect(ficha.cuentasPago).not.toBeNull();
+      const cuentas = ficha.cuentasPago ?? [];
+      expect(cuentas.map((c) => c.id)).toEqual([
         segunda.id,
-        ...ficha.cuentasPago.filter((c) => c.id !== segunda.id).map((c) => c.id),
+        ...cuentas.filter((c) => c.id !== segunda.id).map((c) => c.id),
       ]);
-      expect(ficha.cuentasPago[0]?.esDefault).toBe(true);
+      expect(cuentas[0]?.esDefault).toBe(true);
     });
   });
 
@@ -452,7 +454,7 @@ describe('cuentas de pago del proveedor', () => {
       const [leida] = await listarCuentasPagoProveedor(sesionAdmin(), idProveedor, false, bd());
       expect(leida?.esFiscal).toBe(true);
       const ficha = await obtenerProveedor(sesionAdmin(), idProveedor, bd());
-      expect(ficha.cuentasPago[0]?.esFiscal).toBe(true);
+      expect(ficha.cuentasPago?.[0]?.esFiscal).toBe(true);
     });
 
     it('por omisión una cuenta NO es fiscal (lo informal es la regla en esta relación)', async () => {
@@ -641,7 +643,8 @@ describe('cuentas de pago del proveedor', () => {
       // número, ni marca fiscal — todos llegaron iguales a lo guardado.
       expect(renglones[0]?.datos).toEqual({
         idProveedor,
-        notas: { de: null, a: 'sólo hasta el día 15' },
+        // 🔒 Fila 0.249: ningún texto de la cuenta se copia; sólo que cambió.
+        notas: { cambio: true },
       });
     });
 
@@ -705,6 +708,26 @@ describe('cuentas de pago del proveedor', () => {
   });
 
   // ── Permisos y pertenencia ────────────────────────────────────────────────────────────────
+  // ⭐ Fila 0.249: leer las cuentas YA NO basta con `proveedores.ver` (el directorio). Son el dato
+  // bancario completo y piden la llave de datos bancarios (`proveedores.administrar`).
+  it('con SÓLO `proveedores.ver` (el directorio) listar las cuentas es 403 (fila 0.249)', async () => {
+    await alta('Fulana de Tal', CLABE_A);
+    await expect(
+      listarCuentasPagoProveedor(sesionSoloVer(), idProveedor, false, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(
+      listarCuentasPagoProveedor(sesionSoloVer(), idProveedor, true, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('quien administra proveedores SÍ lista las cuentas completas (fila 0.249)', async () => {
+    await alta('Fulana de Tal', CLABE_A, { banco: 'BBVA' });
+    const [cuenta] = await listarCuentasPagoProveedor(sesionAdmin(), idProveedor, false, bd());
+    expect(cuenta?.cuenta).toBe(CLABE_A);
+    expect(cuenta?.banco).toBe('BBVA');
+    expect(cuenta?.beneficiario).toBe('Fulana de Tal');
+  });
+
   it('leer exige `proveedores.ver` y escribir exige `proveedores.administrar`', async () => {
     const cuenta = await alta('Fulana de Tal', CLABE_A);
     await expect(

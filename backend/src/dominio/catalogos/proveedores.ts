@@ -28,6 +28,7 @@
  * la transacción y respaldada por el unique de la base.
  */
 import {
+  type ClavePermiso,
   esquemaProveedorAdjuntoCrear,
   esquemaProveedorAvioAsignar,
   esquemaProveedorContactoCrear,
@@ -63,7 +64,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma, unicidadDeCampo } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -85,13 +86,77 @@ export type EntradaCrearProveedorMigrado = z.input<typeof esquemaProveedorCrearM
 /** Edición: `id` + cambios parciales (incluye `activo` para des/reactivar). */
 export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
 
-/** Proveedor con sus roles y contactos cargados (forma que consume la ruta para la salida). */
+/**
+ * Proveedor con sus roles y contactos cargados (forma que consume la ruta para la salida).
+ *
+ * ⚠️ `cuentasPago` es **`null` cuando la sesión no puede ver datos bancarios** (fila 0.249, ver
+ * {@link ocultarDatosBancariosSiNoPuede}): `null` = «no te toca verlas», `[]` = «no tiene ninguna».
+ * Son dos respuestas distintas y la pantalla las pinta distinto.
+ */
 export type ProveedorConRoles = Proveedor & {
   roles: { rol: Pick<RolProveedor, 'id' | 'codigo' | 'nombre'> }[];
   contactos: ProveedorContacto[];
-  cuentasPago: ProveedorCuentaPago[];
+  cuentasPago: ProveedorCuentaPago[] | null;
   _count: { archivos: number };
 };
+
+/**
+ * ⭐ LA LLAVE QUE DEJA VER LOS DATOS BANCARIOS DEL PROVEEDOR (fila 0.249, §Post-F9.257(c)).
+ *
+ * `proveedores.ver` es la llave del DIRECTORIO (nombre, contacto, RFC, roles…) y Daniel pidió que el
+ * catálogo de proveedores lo viera todo el mundo. Pero la ficha traía además **banco, CLABE y el
+ * número de cada cuenta de pago** —la UI los enmascaraba y el API los entregaba completos— y eso
+ * NO puede bajar al piso de lectura.
+ *
+ * Se REUSA `proveedores.administrar` y no se inventa una llave: es la que **escribe** las cuentas
+ * (`crearCuentaPagoProveedor`/`actualizarCuentaPagoProveedor` la exigen), así que quien la lleva ya
+ * las teclea y las tiene que poder leer; darle la lectura a alguien más sería ABRIR, no tapar. La
+ * corrida semanal de pagos NO depende de esto: lee las cuentas por su propia consulta
+ * (`dominio/pagos/beneficiarios.ts`), gobernada por `pagos.*` y `consultas.ver-importes`.
+ *
+ * ⚠️ El frontend **NO** tiene guarda gemela a propósito: no decide por permiso, reacciona a lo que
+ * llega (`cuentasPago: null` ⇒ no pinta cuentas, esconde `obsPago` y NO lo manda al guardar — ver
+ * `datosBancariosTapados` en `frontend/src/modulos/proveedores/DialogoProveedor.tsx`). Así, si esta
+ * llave cambia, la pantalla la sigue sola.
+ */
+export const LLAVE_DATOS_BANCARIOS_PROVEEDOR: ClavePermiso = 'proveedores.administrar';
+
+/** ¿La sesión puede ver los datos bancarios del proveedor? Ver {@link LLAVE_DATOS_BANCARIOS_PROVEEDOR}. */
+export function puedeVerDatosBancariosDeProveedor(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, LLAVE_DATOS_BANCARIOS_PROVEEDOR);
+}
+
+/** Exige poder ver los datos bancarios del proveedor (lanza `ErrorPermiso` → 403). */
+export function exigirVerDatosBancariosDeProveedor(sesion: SesionUsuario): void {
+  verificarPermiso(sesion, LLAVE_DATOS_BANCARIOS_PROVEEDOR);
+}
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR los datos bancarios del proveedor para quien no lleva la llave (fila 0.249).
+ *
+ * Lo que se tapa —y por qué cada uno, medido—:
+ *  • `cuentasPago` → `null`: beneficiario, banco, tipo y número completo de cada cuenta (0.112).
+ *  • `banco` y `clabe` → `null`: el par viejo, superado por las cuentas pero todavía en la base.
+ *  • `obsPago` → `null`: «observaciones de pago» del antiguo maquilero. **No es nota cualquiera:** en
+ *    el volcado de Access (`Maquileros.ObsPago`) los 4 valores con texto traen números de cuenta, dos
+ *    de ellos de 18 dígitos (CLABE). Taparlo cuesta nada; dejarlo era dejar la CLABE por la ventana.
+ *
+ * Lo que NO se tapa: RFC, régimen, dirección, contactos, días de crédito, condiciones, notas. Son
+ * del directorio o de la relación comercial, no llaves para mover dinero.
+ *
+ * Es una PROYECCIÓN, no un cambio: nunca escribe. Quien edita lleva la llave (la edición exige
+ * `proveedores.administrar`), así que el formulario siempre parte de los datos completos y no hay
+ * PATCH que pise con `null` lo que no se vio.
+ */
+export function ocultarDatosBancariosSiNoPuede(
+  sesion: SesionUsuario,
+  proveedor: ProveedorConRoles,
+): ProveedorConRoles {
+  if (puedeVerDatosBancariosDeProveedor(sesion)) {
+    return proveedor;
+  }
+  return { ...proveedor, banco: null, clabe: null, obsPago: null, cuentasPago: null };
+}
 
 /**
  * `include` estándar: roles + contactos ACTIVOS + conteo de adjuntos. Los contactos archivados
@@ -335,6 +400,16 @@ const CAMPOS_TEXTO_EDITABLES = [
 ] as const;
 
 /**
+ * 🔒 Campos BANCARIOS cuyo valor NUNCA se copia a la bitácora (fila 0.249): sólo se anota
+ * `{ cambio: true }`, igual que el número de una cuenta de pago. La bitácora la lee quien lleva
+ * `admin.ver-bitacora` (Directivo, Gerencial, Ventas, Logística, Asistente, Secretarial), y ninguno
+ * de ellos lleva la llave de los datos bancarios ({@link LLAVE_DATOS_BANCARIOS_PROVEEDOR}): copiar
+ * aquí el antes y el después era sacar por la ventana lo que la ficha ya les tapa. `obsPago` entra
+ * porque en Access traía números de cuenta (ver {@link ocultarDatosBancariosSiNoPuede}).
+ */
+const CAMPOS_BANCARIOS_SIN_BITACORA: ReadonlySet<string> = new Set(['banco', 'clabe', 'obsPago']);
+
+/**
  * Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean).
  *
  * ⚠️ `factura` YA NO está (fila 0.124): la pregunta *"¿este proveedor factura?"* la contesta
@@ -372,7 +447,10 @@ function aplicarEnriquecidosEditar(
     const anterior = actual[campo];
     if (nuevo !== anterior) {
       (cambios as Record<string, unknown>)[campo] = nuevo;
-      detalle[campo] = { de: anterior, a: nuevo };
+      // 🔒 Fila 0.249: un dato bancario NO se copia a la bitácora. Basta con saber que cambió.
+      detalle[campo] = CAMPOS_BANCARIOS_SIN_BITACORA.has(campo)
+        ? { cambio: true }
+        : { de: anterior, a: nuevo };
     }
   }
 
@@ -459,7 +537,10 @@ export async function crearProveedor(
   bd?: ContextoBd,
 ): Promise<ProveedorConRoles> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrear, entrada), bd);
+  return ocultarDatosBancariosSiNoPuede(
+    sesion,
+    await crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrear, entrada), bd),
+  );
 }
 
 /**
@@ -480,7 +561,10 @@ export async function crearProveedorMigrado(
   bd?: ContextoBd,
 ): Promise<ProveedorConRoles> {
   verificarPermiso(sesion, 'proveedores.administrar');
-  return crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrearMigrado, entrada), bd);
+  return ocultarDatosBancariosSiNoPuede(
+    sesion,
+    await crearProveedorValidado(sesion, validarEntrada(esquemaProveedorCrearMigrado, entrada), bd),
+  );
 }
 
 /** Cuerpo compartido del alta (ya validada y con el permiso verificado). */
@@ -555,7 +639,7 @@ export async function actualizarProveedor(
   const datos = validarEntrada(esquemaProveedorEditar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const proveedor = await enTransaccion(async (tx) => {
       const actual = await exigirProveedor(tx, datos.id);
 
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
@@ -644,6 +728,7 @@ export async function actualizarProveedor(
         include: incluirRolesYConteo,
       });
     }, bd);
+    return ocultarDatosBancariosSiNoPuede(sesion, proveedor);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       if (unicidadDeCampo(error, 'nombre_corto')) {
@@ -705,7 +790,7 @@ export async function obtenerProveedor(
   if (proveedor === null) {
     throw new ErrorNoEncontrado('Proveedor', id);
   }
-  return proveedor;
+  return ocultarDatosBancariosSiNoPuede(sesion, proveedor);
 }
 
 /**
@@ -748,7 +833,11 @@ export async function listarProveedores(
     }),
   ]);
 
-  return armarPagina(datos, total, filtros);
+  return armarPagina(
+    datos.map((proveedor) => ocultarDatosBancariosSiNoPuede(sesion, proveedor)),
+    total,
+    filtros,
+  );
 }
 
 // ── Roles de proveedor (catálogo selector, R15 §4.1) ──────────────────────────
