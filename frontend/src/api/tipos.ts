@@ -1168,6 +1168,12 @@ export type TipoMovimiento = TiposMovimientoLista['datos'][number];
 
 /** Una etapa de producción (corte/envío) tal como la devuelve el API. */
 export type Etapa =
+  paths['/api/produccion/envios']['post']['responses']['201']['content']['application/json'];
+/**
+ * ⭐⭐ fila 0.232: la respuesta de REGISTRAR UN CORTE — la etapa más `piezasSobreCorteNuevas`, el
+ * sobre-corte que ese corte agregó a la base de avíos (lo calcula el servidor, packs plegados).
+ */
+export type CorteRegistrado =
   paths['/api/produccion/cortes']['post']['responses']['201']['content']['application/json'];
 /** Cuerpo de alta de un corte (`POST /api/produccion/cortes`). */
 export type CorteCrear =

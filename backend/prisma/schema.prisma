@@ -6336,6 +6336,15 @@ model RequerimientoOrden {
   /// para pre-llenar la OC. NULL si no hay proveedor/precio mapeado.
   precioSugerido Decimal? @map("precio_sugerido") @db.Decimal(12, 4)
 
+  /// ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — LAS PIEZAS DE LA ORDEN contra las que se calculó este
+  /// renglón** (el total de la orden, NO las del color del renglón). Telas: Σ de la matriz PEDIDA.
+  /// Avíos: Σ de `max(pedido, cortado vivo)` por celda — la segunda pasada después de un sobre-corte
+  /// (`produccion/base-de-materiales.ts`). Lo lee el costo REAL para escalar el snapshot a lo
+  /// cortado sin contar el extra dos veces (`costos/costo-real-compras.ts`).
+  /// NULL en los snapshots de antes de esta fila (REGLA 0-B, sin backfill): quien lo lee cae a lo
+  /// pedido, que es contra lo que se calcularon.
+  piezasBase Int? @map("piezas_base")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")

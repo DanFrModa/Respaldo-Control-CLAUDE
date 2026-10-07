@@ -22,6 +22,7 @@ function habDePrueba(over: Partial<HabilitacionOrden> = {}): HabilitacionOrden {
     idModelo: 5,
     modelo: 'MOD-1',
     totalPiezas: 30,
+    piezasSobreCorte: 0,
     idMaquilero: 9,
     maquilero: 'Costuras del Bajío',
     porcentajeGlobal: 55.5,
@@ -122,6 +123,23 @@ describe('PanelHabilitacionOrden (R6, B13)', () => {
     expect(estados).toContain('Sobre-surtido');
     expect(estados).toContain('Extra');
     expect(screen.getByTestId('hab-aviso-extra')).toBeInTheDocument();
+  });
+
+  it('⭐ fila 0.232: con sobre-corte, el encabezado lo dice junto a las piezas', () => {
+    useHabilitacionOrdenMock.mockReturnValue({
+      data: habDePrueba({ piezasSobreCorte: 12 }),
+      isPending: false,
+    });
+    renderPanel();
+    expect(
+      screen.getByText('MOD-1 · 30 pzas · +12 de sobre-corte · Maquilero Costuras del Bajío'),
+    ).toBeInTheDocument();
+  });
+
+  it('⭐ fila 0.232: sin sobre-corte el encabezado no cambia', () => {
+    useHabilitacionOrdenMock.mockReturnValue({ data: habDePrueba(), isPending: false });
+    renderPanel();
+    expect(screen.getByText('MOD-1 · 30 pzas · Maquilero Costuras del Bajío')).toBeInTheDocument();
   });
 
   it('⭐ §Post-F9.64: avisa (sin bloquear) las tallas de la orden sin medida capturada', () => {

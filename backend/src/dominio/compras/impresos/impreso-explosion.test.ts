@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ErrorNoEncontrado } from '../../../comun/errores.js';
+import { extraerTextoPdf } from '../../../comun/pdf-texto.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ExplosionSalida } from '../../../contrato/index.js';
 
@@ -39,6 +40,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
         idModelo: 9,
         modelo: 'A-100',
         totalPiezas: 30,
+        piezasSobreCorte: 0,
+        piezasSinExplotar: 0,
         idPedido: null,
         folioPedido: null,
         fechaEntrega: null,
@@ -201,6 +204,32 @@ describe('armarDatosImpresoExplosion', () => {
     expect(datos.grupos[0]?.lineas[0]?.aComprar).toBe(60);
     // Y el REQUERIDO no se toca: el impreso sigue diciendo cuánto lleva la orden en total.
     expect(datos.grupos[0]?.lineas[0]?.requerido).toBe(180);
+  });
+
+  it('⭐ fila 0.232: con sobre-corte el papel lo dice junto al total de piezas', async () => {
+    const base = explosionBase();
+    const datos = await armarDatosImpresoExplosion(sesionConVer(), 50, undefined, {
+      explosionarOrden: () =>
+        Promise.resolve({
+          ...base,
+          ordenes: base.ordenes.map((o) => ({ ...o, piezasSobreCorte: 20 })),
+        }),
+    });
+    expect(datos.leyendaSobreCorte).toBe('incluye 20 pzas de sobre-corte (avíos)');
+    // El renglón se parte en dos líneas en el papel: se compara con los espacios colapsados.
+    const texto = (await extraerTextoPdf(await generarPdfExplosion(datos)))
+      .join(' ')
+      .replace(/\s+/g, ' ');
+    expect(texto).toContain('SOBRE-CORTE incluye 20 pzas de sobre-corte (avíos)');
+  });
+
+  it('⭐ fila 0.232: sin sobre-corte no hay leyenda (ni en los datos ni en el papel)', async () => {
+    const datos = await armarDatosImpresoExplosion(sesionConVer(), 50, undefined, {
+      explosionarOrden: () => Promise.resolve(explosionBase()),
+    });
+    expect(datos.leyendaSobreCorte).toBeNull();
+    const texto = (await extraerTextoPdf(await generarPdfExplosion(datos))).join('\n');
+    expect(texto).not.toContain('sobre-corte');
   });
 
   it('propaga el ErrorNoEncontrado de explosionarOrden (orden de otra empresa → 404)', async () => {

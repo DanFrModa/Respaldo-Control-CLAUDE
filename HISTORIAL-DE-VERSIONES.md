@@ -71,6 +71,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.209 · 7-oct-2026 · **en prueba** — **Cuando se corta de más, la explosión pide los avíos de las prendas extra**
+
+> **La v0.209 cierra la fila 0.232.** Daniel: *«casi siempre se compra antes de cortar»* — así que cuando el corte sale
+> con más prendas que la orden, los avíos de esas prendas extra no los pedía nadie y había que comprarlos a mano.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Después de un corte de más, vuelves a explotar la orden y pide SÓLO los avíos del extra.** La explosión calcula los
+avíos de cada color y talla sobre lo que sea mayor: lo pedido o lo cortado. Lo que ya se compró se descuenta como
+siempre, así que genera una orden de compra nueva sólo por la diferencia; la que ya se recibió no se toca. **Antes de
+cortar no cambia nada.**
+
+**Al guardar un corte de más, el sistema te ofrece ir a la explosión de esa orden** (si puedes ver compras); la
+explosión y su impreso marcan **«incluye N pzas de sobre-corte (avíos)»**. Y si alguien abre la **revisión previa de
+compra** de una orden cuya base de avíos creció después de explotarla (se cortó de más o se pidió más), la previa lo
+avisa: *vuelve a explotar*.
+
+**El panel de habilitación también lo ve:** el extra aparece como falta por surtir, «Pasar a nota» lo propone para
+mandarlo al taller, y ya no sale rotulado «sobre-surtido».
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Si el corte reparte distinto las tallas** (menos de una, más de otra), se piden avíos para las tallas que crecieron
+aunque sobren en las que bajaron: el cálculo es por color y talla. **La tela no cambia**: sigue contra lo pedido, porque
+ya salió antes de cortar. **En la receta de la orden**, el aviso de un avío mal capturado y la bitácora de «Corregir»
+cuentan ahora también lo cortado de más, igual que la explosión. **El costo real de avíos** se calcula desde la cantidad con la que se explotó cada renglón,
+para no volver a escalarlo.
+
+### ⏳ Sigue pendiente o roto
+
+**No hay una bandeja de órdenes con sobre-corte que nadie volvió a explotar**: lo ven quien corta, quien explota y
+quien abre la previa de compra de esa orden. Y las órdenes de compra todavía no dicen *por qué* existen (reposición, merma, sobre-corte): eso es la fila
+0.231. Tres preguntas para Daniel en §Post-F9.277. ⚠️ **Y al revisar esta versión salió la fila 0.257:** si se
+corrige una receta y se re-libera sin volver a explotar, la revisión previa de compra deja salir la orden de compra con
+las cantidades viejas sin avisar.
+
 ## 0.208 · 7-oct-2026 · **en prueba** — **El costo de la orden ya no cuenta dos veces el estampado**
 
 > **La v0.208 cierra la fila 0.256**, que nació y cerró el mismo día.

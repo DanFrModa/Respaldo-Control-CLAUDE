@@ -12,6 +12,11 @@
  * Toda la lógica vive AQUÍ (A1); la ruta REST solo valida permiso + delega. Consulta ON-DEMAND (de
  * solo lectura, sin transacción de escritura): la habilitación es una foto del momento.
  *
+ *  • ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — LAS PIEZAS son las de los AVÍOS: cada celda color×talla en
+ *    `max(pedido, cortado vivo)`** (`./base-de-materiales.ts`, la MISMA regla con la que la explosión
+ *    los pide). Después de un sobre-corte, el extra aparece aquí como FALTA, «Pasar a nota» lo
+ *    propone para mandarlo al taller y deja de rotularse «sobre-surtido». Antes de cortar no cambia
+ *    nada.
  *  • REQUERIDO = consumo × piezas de la orden (R18 — por talla si el avío maneja `consumoPorTalla`;
  *    las tallas sin medida caen a `consumoPorPrenda`). El cálculo PURO vive en el helper COMPARTIDO
  *    `requeridoAvioReceta` (`./receta-avios.ts`), la MISMA fuente que usa la explosión MRP
@@ -47,7 +52,12 @@ import { EstatusNotaSalida, type Prisma } from '../../datos/index.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
+import {
+  canonizarLineasDeColor,
+  resolverColoresCanonicos,
+} from '../catalogos/colores-canonicos.js';
 import { num } from '../costos/decimales.js';
+import { cortadoVivoPorCelda, matrizParaAvios } from './base-de-materiales.js';
 import { requeridoAvioReceta } from './receta-avios.js';
 
 /** Tolerancia de redondeo al comparar cantidades decimales (igual criterio que el MRP). */
@@ -84,6 +94,10 @@ const seleccionOrdenHabilitacion = {
   },
   lineas: {
     select: {
+      // ⭐⭐ fila 0.232: el COLOR (id y nombre) para comparar la matriz con lo cortado celda por celda,
+      // en espacio canónico (fila 0.159), igual que la explosión.
+      idColor: true,
+      color: { select: { nombre: true } },
       // La ETIQUETA de la talla viaja para poder NOMBRAR las tallas sin medida en el aviso
       // (§Post-F9.64) sin una segunda consulta ni un pivote en el cliente.
       tallas: {
@@ -99,10 +113,13 @@ const seleccionOrdenHabilitacion = {
 
 type OrdenParaHabilitacion = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenHabilitacion }>;
 
-/** Σ de TODAS las piezas color×talla de la orden = base del requerido. */
-function totalPiezasOrden(orden: OrdenParaHabilitacion): number {
+/** Los renglones de la matriz (color × tallas) tal como los trae la selección. */
+type LineasDeOrden = OrdenParaHabilitacion['lineas'];
+
+/** Σ de TODAS las piezas color×talla de la matriz dada. */
+function totalPiezasOrden(lineas: LineasDeOrden): number {
   let total = 0;
-  for (const linea of orden.lineas) {
+  for (const linea of lineas) {
     for (const t of linea.tallas) {
       total += t.cantidad;
     }
@@ -115,10 +132,10 @@ function totalPiezasOrden(orden: OrdenParaHabilitacion): number {
  * mano para poder nombrar las tallas en el aviso sin una segunda consulta.
  */
 function piezasPorTallaOrden(
-  orden: OrdenParaHabilitacion,
+  lineas: LineasDeOrden,
 ): Map<number, { piezas: number; etiqueta: string; orden: number }> {
   const mapa = new Map<number, { piezas: number; etiqueta: string; orden: number }>();
-  for (const linea of orden.lineas) {
+  for (const linea of lineas) {
     for (const t of linea.tallas) {
       const previo = mapa.get(t.idTalla);
       if (previo === undefined) {
@@ -172,8 +189,20 @@ export async function habilitacionOrden(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  const totalPiezas = totalPiezasOrden(orden);
-  const piezasPorTalla = piezasPorTallaOrden(orden);
+  // ⭐⭐ fila 0.232 — la base de los AVÍOS: la matriz pedida (en espacio canónico) con cada celda
+  // subida a lo cortado vivo si lo rebasa. `totalPiezas` sigue diciendo lo PEDIDO (es lo que la
+  // pantalla enseña junto al folio) y `piezasSobreCorte` dice cuánto se le sumó.
+  const canonicos = await resolverColoresCanonicos(
+    cliente,
+    orden.lineas.map((l) => l.idColor),
+  );
+  const base = matrizParaAvios(
+    canonizarLineasDeColor(orden.lineas, canonicos),
+    await cortadoVivoPorCelda(cliente, idOrden),
+  );
+  const totalPiezas = totalPiezasOrden(orden.lineas);
+  const totalPiezasBase = totalPiezas + base.piezasSobreCorte;
+  const piezasPorTalla = piezasPorTallaOrden(base.lineas);
   const piezasSimples = new Map([...piezasPorTalla].map(([id, v]) => [id, v.piezas]));
 
   // ENVIADO por avío = Σ de renglones de notas CONFIRMADAS de esta orden×avío (una sola consulta).
@@ -207,7 +236,7 @@ export async function habilitacionOrden(
   let aviosSinMedida = 0;
   for (const ma of orden.recetaAvios) {
     idsReceta.add(ma.idAvio);
-    const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimples);
+    const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezasBase, piezasSimples);
     // Las etiquetas se resuelven con el mapa que ya se armó: sin consulta extra y sin pivotear en
     // el cliente. Se ordenan por el ORDEN CANÓNICO de la talla (CH, M, G…) y no por cómo hayan
     // caído en la matriz: el aviso se lee de corrido y no cambia de forma entre dos consultas.
@@ -287,6 +316,7 @@ export async function habilitacionOrden(
     idModelo: orden.idModelo,
     modelo: orden.modelo.codigo,
     totalPiezas,
+    piezasSobreCorte: base.piezasSobreCorte,
     idMaquilero: orden.idMaquilero,
     maquilero: orden.maquilero?.nombre ?? null,
     porcentajeGlobal,

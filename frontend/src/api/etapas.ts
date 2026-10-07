@@ -11,6 +11,7 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   CorteCrear,
+  CorteRegistrado,
   CorteSemanal,
   CorteSemanalQuery,
   EmpaqueCrear,
@@ -34,7 +35,7 @@ export const CLAVE_ETAPAS = ['produccion-etapas'] as const;
 
 // ── Llamadas ─────────────────────────────────────────────────────────────────
 
-async function crearCorte(cuerpo: CorteCrear): Promise<Etapa> {
+async function crearCorte(cuerpo: CorteCrear): Promise<CorteRegistrado> {
   const { data, error } = await api.POST('/api/produccion/cortes', { body: cuerpo });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -208,7 +209,7 @@ export function useCorteSemanal(
 }
 
 /** Registra un corte e invalida los pendientes y el corte semanal. */
-export function useCrearCorte(): UseMutationResult<Etapa, ErrorDeApi, CorteCrear> {
+export function useCrearCorte(): UseMutationResult<CorteRegistrado, ErrorDeApi, CorteCrear> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: crearCorte,

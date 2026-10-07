@@ -28945,8 +28945,10 @@ export interface paths {
               idModelo: number;
               /** @description Código del modelo. */
               modelo: string;
-              /** @description Σ de piezas color×talla de la orden (base del requerido). */
+              /** @description Σ de piezas color×talla PEDIDAS de la orden. La base del requerido es ésta más `piezasSobreCorte` (fila 0.232). */
               totalPiezas: number;
+              /** @description Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base del requerido — Σ por celda color×talla de max(0, cortado vivo − pedido). Es la MISMA base con la que la explosión pide los avíos, así que su falta se propone para mandarla al taller. */
+              piezasSobreCorte: number;
               /** @description Maquilero asignado a la orden, o null. */
               idMaquilero: number | null;
               /** @description Nombre del maquilero asignado, o null. */
@@ -41900,6 +41902,10 @@ export interface paths {
                 modelo: string;
                 /** @description Σ piezas color×talla de ESA orden. */
                 totalPiezas: number;
+                /** @description Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base de los AVÍOS de esta orden — Σ por celda color×talla de max(0, cortado vivo − pedido). 0 antes de cortar o sin sobre-corte. Las telas NO lo incluyen (salen antes de cortar). En la explosión es lo recién calculado; en la revisión previa, lo que trae el snapshot que se va a comprar. */
+                piezasSobreCorte: number;
+                /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
+                piezasSinExplotar: number;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
@@ -42246,6 +42252,10 @@ export interface paths {
                 modelo: string;
                 /** @description Σ piezas color×talla de ESA orden. */
                 totalPiezas: number;
+                /** @description Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base de los AVÍOS de esta orden — Σ por celda color×talla de max(0, cortado vivo − pedido). 0 antes de cortar o sin sobre-corte. Las telas NO lo incluyen (salen antes de cortar). En la explosión es lo recién calculado; en la revisión previa, lo que trae el snapshot que se va a comprar. */
+                piezasSobreCorte: number;
+                /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
+                piezasSinExplotar: number;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
@@ -42776,6 +42786,10 @@ export interface paths {
                 modelo: string;
                 /** @description Σ piezas color×talla de ESA orden. */
                 totalPiezas: number;
+                /** @description Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base de los AVÍOS de esta orden — Σ por celda color×talla de max(0, cortado vivo − pedido). 0 antes de cortar o sin sobre-corte. Las telas NO lo incluyen (salen antes de cortar). En la explosión es lo recién calculado; en la revisión previa, lo que trae el snapshot que se va a comprar. */
+                piezasSobreCorte: number;
+                /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
+                piezasSinExplotar: number;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
@@ -54636,7 +54650,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Etapa de producción (corte/envío) con su matriz color×talla. */
+        /** @description Corte registrado, con las piezas de sobre-corte que agregó a la orden. */
         201: {
           headers: {
             [name: string]: unknown;
@@ -54721,6 +54735,8 @@ export interface paths {
               creadoPorId: string | null;
               /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
               creadoPorNombre: string | null;
+              /** @description Fila 0.232: piezas que ESTE corte sumó a la base de avíos de la orden — Σ por celda color×talla (packs plegados, colores canónicos) de max(0, cortado − pedido), después menos antes del corte. 0 = no hay avíos nuevos que pedir por este corte. */
+              piezasSobreCorteNuevas: number;
             };
           };
         };

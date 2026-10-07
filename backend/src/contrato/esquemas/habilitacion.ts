@@ -81,7 +81,19 @@ export const esquemaHabilitacionOrden = z
     totalPiezas: z
       .number()
       .int()
-      .describe('Σ de piezas color×talla de la orden (base del requerido).'),
+      .describe(
+        'Σ de piezas color×talla PEDIDAS de la orden. La base del requerido es ésta más ' +
+          '`piezasSobreCorte` (fila 0.232).',
+      ),
+    piezasSobreCorte: z
+      .number()
+      .int()
+      .nonnegative()
+      .describe(
+        'Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base del requerido — ' +
+          'Σ por celda color×talla de max(0, cortado vivo − pedido). Es la MISMA base con la que la ' +
+          'explosión pide los avíos, así que su falta se propone para mandarla al taller.',
+      ),
     idMaquilero: z.number().int().nullable().describe('Maquilero asignado a la orden, o null.'),
     maquilero: z.string().nullable().describe('Nombre del maquilero asignado, o null.'),
     porcentajeGlobal: z

@@ -148,6 +148,8 @@ import {
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
+// ⭐⭐ fila 0.232 (H5): los AVÍOS de la receta se miden con la MISMA base que la explosión.
+import { piezasDeAviosDeOrden } from './base-de-materiales.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
 
@@ -1237,7 +1239,9 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // del aviso de la contradicción «por medida + cantidades por talla». Sin esto el aviso sólo
     // podía decir que había una contradicción, no cuánto se estaba pidiendo de más (que es lo que
     // hizo comprar 53 veces el cierre). Es la MISMA función que usan las guardas de la edición.
-    piezasDeLaOrden(tx, orden.id),
+    // ⭐⭐ fila 0.232 (H5): son las piezas de AVÍOS — `max(pedido, cortado)` por celda —, las mismas
+    // con las que la explosión pide; si no, la receta y la explosión dirían dos cifras del descuadre.
+    piezasDeAviosDeLaOrden(tx, orden.id),
     /*
      * ⭐⭐⭐ 0.085 (§Post-F9.173(a)) — **QUÉ DE ESTA ORDEN YA ESTÁ COMPRADO EN FIRME**, en vivo.
      *
@@ -2584,7 +2588,7 @@ export async function editarRenglonReceta(
               ? antesAvio.tallas
               : medidasResultantes(datos.tallas, fila.tallas, consumoResultante),
         };
-        const piezasOrden = await piezasDeLaOrden(tx, orden.id);
+        const piezasOrden = await piezasDeAviosDeLaOrden(tx, orden.id);
         if (sacaDeLaCompra(antesAvio, despuesAvio, piezasOrden)) {
           // 🔴 §Post-F9.105 — ¿QUIÉN DEJÓ EL REQUERIDO EN CERO: el usuario o la normalización?
           // Apagar la bandera cambia el requerido, y con un `consumoPorPrenda` en 0 lo deja en
@@ -2772,7 +2776,8 @@ export async function corregirCapturaAvio(
       if (fila.excluido) ctx.cayoSobreLapida();
       else ctx.tocoRenglon('avio', fila.id);
 
-      const piezas = await piezasDeLaOrden(tx, orden.id);
+      // ⭐⭐ fila 0.232 (H5): la bitácora `requeridoAntes/Despues` sobre la base de AVÍOS.
+      const piezas = await piezasDeAviosDeLaOrden(tx, orden.id);
       const antesRequerido = avioParaRequerido(fila);
       const despuesRequerido: RenglonParaRequerido = {
         ...antesRequerido,
@@ -2950,7 +2955,9 @@ export async function quitarRenglonReceta(
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
         // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta (ver la nota de la tela).
         // En un avío el requerido puede venir de sus MEDIDAS POR TALLA (R18), no del consumo.
-        if (sacaDeLaCompra(avioParaRequerido(fila), null, await piezasDeLaOrden(tx, orden.id))) {
+        if (
+          sacaDeLaCompra(avioParaRequerido(fila), null, await piezasDeAviosDeLaOrden(tx, orden.id))
+        ) {
           await exigirNoSacarLoComprado(
             tx,
             orden,
@@ -3154,7 +3161,7 @@ export async function restaurarRenglonReceta(
               consumoPorTalla: consumoPorTallaRestaurado,
               tallas: medidas.map((m) => ({ idTalla: m.idTalla, consumo: num(m.consumo) })),
             },
-            await piezasDeLaOrden(tx, orden.id),
+            await piezasDeAviosDeLaOrden(tx, orden.id),
           )
         ) {
           await exigirNoSacarLoComprado(
@@ -4126,9 +4133,21 @@ export function sacaDeLaCompra(
 }
 
 /**
- * Las piezas de la orden agrupadas por talla (D4) — el insumo de R18. Mismo dato que arma
- * `piezasPorTallaOrden` en el MRP, pero agregado en la BASE (`groupBy`) porque aquí no hace falta
- * traerse la matriz entera para contar.
+ * ⭐⭐ fila 0.232 (H5) — las piezas para los AVÍOS de la receta (el insumo de R18): la matriz con
+ * cada celda en `max(pedido, cortado vivo)` (`base-de-materiales.ts`), la MISMA base de la
+ * explosión y de la habilitación. La TELA sigue sobre {@link piezasDeLaOrden} (lo pedido: sale
+ * antes de cortar).
+ */
+async function piezasDeAviosDeLaOrden(tx: Tx, idOrden: number): Promise<PiezasDeLaOrden> {
+  const { total, porTalla } = await piezasDeAviosDeOrden(tx, idOrden);
+  return { total, porTalla };
+}
+
+/**
+ * Las piezas PEDIDAS de la orden agrupadas por talla (D4) — la base de la TELA en las guardas de la
+ * receta (fila 0.232: la tela sale antes de cortar, así que el sobre-corte no la mueve; los avíos
+ * van por {@link piezasDeAviosDeLaOrden}). Agregado en la BASE (`groupBy`) porque aquí no hace
+ * falta traerse la matriz entera para contar.
  */
 async function piezasDeLaOrden(tx: Tx, idOrden: number): Promise<PiezasDeLaOrden> {
   const filas = await tx.ordenLineaTalla.groupBy({

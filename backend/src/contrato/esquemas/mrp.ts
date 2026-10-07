@@ -344,6 +344,28 @@ export const esquemaOrdenExplosionada = z
     idModelo: z.number().int().describe('Modelo de la orden.'),
     modelo: z.string().describe('Código del modelo (para la UI).'),
     totalPiezas: z.number().int().describe('Σ piezas color×talla de ESA orden.'),
+    piezasSobreCorte: z
+      .number()
+      .int()
+      .nonnegative()
+      .describe(
+        'Fila 0.232 (§Post-F9.245(c)): piezas que el SOBRE-CORTE sumó a la base de los AVÍOS de ' +
+          'esta orden — Σ por celda color×talla de max(0, cortado vivo − pedido). 0 antes de ' +
+          'cortar o sin sobre-corte. Las telas NO lo incluyen (salen antes de cortar). En la ' +
+          'explosión es lo recién calculado; en la revisión previa, lo que trae el snapshot que se ' +
+          'va a comprar.',
+      ),
+    piezasSinExplotar: z
+      .number()
+      .int()
+      .nonnegative()
+      .describe(
+        'Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base ' +
+          'de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un ' +
+          'corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van ' +
+          'en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión ' +
+          '(acaba de calcular); en la revisión previa la acompaña un aviso.',
+      ),
     idPedido: z.number().int().nullable().describe('Pedido interno del que sale, o null.'),
     folioPedido: z.number().int().nullable().describe('Folio del pedido interno, o null.'),
     fechaEntrega: z.iso

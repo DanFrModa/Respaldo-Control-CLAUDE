@@ -202,6 +202,9 @@ function bdParaQuitarArte(opciones: {
       groupBy: vacio,
       aggregate: vi.fn(() => Promise.resolve({ _sum: { cantidad: null } })),
     },
+    // ⭐⭐ fila 0.232: las piezas de AVÍOS de la receta leen la matriz y lo cortado (aquí, nada).
+    ordenLinea: { findMany: vacio },
+    etapaMovimientoDet: { findMany: vacio },
     proveedor: { findMany: vacio },
     bitacora: { create: bitacoraCreate },
   } as unknown as Tx;

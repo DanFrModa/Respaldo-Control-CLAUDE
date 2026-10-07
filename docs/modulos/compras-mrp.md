@@ -796,3 +796,11 @@ A1 (lógica en dominio) · A2 (recepción/confirmación/reverso en transacción)
 secuencia) · A4 (permisos server-side, deny-by-default) · A7 (Bitácora) · A9 (idEmpresa) ·
 D1 (costo en el movimiento) · D3 (existencia = Σ movimientos, nunca editable) · D5 (lote N
 componentes) · R1 (proveedor/precio/factor) · R3 (explosión) · R7 (estatus por orden) · R9 (impresos).
+
+## Sobre-corte: la segunda pasada (fila 0.232, §Post-F9.277)
+
+Para los **avíos**, la base de piezas de cada celda color×talla es `max(pedido, cortado vivo)` (`dominio/produccion/base-de-materiales.ts`). Antes de cortar es lo pedido; tras un sobre-corte, re-explotar la OP pide sólo el extra con el neteo de siempre. El snapshot `RequerimientoOrden.piezasBase` guarda la base con que se explotó cada renglón (NULL en lo viejo = lo pedido) y `costo-real-compras.ts` escala desde ahí. La tela sigue contra lo pedido. La habilitación (`produccion/habilitacion-orden.ts`) usa la misma base. La explosión acepta `?idOrden=N` (sin precargar las hermanas del pedido).
+
+**Previa de compra (fila 0.232, revisión):** el aviso de contradicción §Post-F9.105 de la previa se mide contra el **snapshot** que se va a comprar (`piezasBase`, o lo pedido si es NULL), no contra la matriz de hoy; si la base de avíos de hoy ya supera la del snapshot, la previa lo dice y pide volver a explotar (no bloquea). La **receta de la orden** mide los avíos con la misma base (`piezasDeAviosDeOrden`) y la tela con lo pedido. El **impreso** de la explosión lleva la leyenda de sobre-corte. ⚠️ Hueco conocido, fila **0.257**: la previa no detecta una receta corregida y re-liberada sin re-explotar.
+
+**El corte responde su sobre-corte:** `POST /produccion/cortes` (`registrarCorte`, `produccion/etapas.ts`) devuelve `piezasSobreCorteNuevas` —medido en el servidor, dentro de la transacción y con el candado de la orden, por celda color×talla con packs plegados— y es la cifra que enseña la barra «recién guardado».

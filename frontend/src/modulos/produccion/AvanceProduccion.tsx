@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Ban, FileText, Loader2, Plus, Printer, Route, Scissors, Wand2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
@@ -557,8 +557,11 @@ export function AvanceProduccion({
 
             {/* Barra del movimiento RECIÉN guardado: su PDF, en el momento (V1-E3a). Solo aparece
                 si hay algo que imprimir — el CORTE no tiene impreso propio, y una barra sin acción
-                no aporta nada sobre el aviso y el renglón que ya salieron en la lista. */}
-            {recienGuardado !== null && recienGuardado.impresos.length > 0 ? (
+                no aporta nada sobre el aviso y el renglón que ya salieron en la lista. ⭐⭐ fila
+                0.232: o si el corte guardado EXCEDIÓ lo pendiente — entonces sí hay una acción:
+                ir a pedir los avíos de esas piezas. */}
+            {recienGuardado !== null &&
+            (recienGuardado.impresos.length > 0 || (recienGuardado.sobreCorte ?? 0) > 0) ? (
               <div
                 className="flex flex-wrap items-center gap-3 border-b bg-panel-2 px-4 py-2.5"
                 data-testid="avance-recien-guardado"
@@ -567,6 +570,30 @@ export function AvanceProduccion({
                   {recienGuardado.etiqueta} #{recienGuardado.folio} guardado
                 </span>
                 <BotonesImpresos movimiento={recienGuardado} />
+                {/* ⭐⭐ fila 0.232 (2ª vuelta, H1): el enlace a la SEGUNDA PASADA va aquí, con el
+                    corte YA guardado — ahora la explosión sí lo ve y pide sólo la diferencia. Sin
+                    `compras.ver` se dice igual, pero sin enlace (sería un enlace muerto). */}
+                {(recienGuardado.sobreCorte ?? 0) > 0 ? (
+                  <span
+                    className="text-sm text-amber-800 dark:text-amber-200"
+                    data-testid="avance-recien-sobrecorte"
+                  >
+                    Se cortaron {(recienGuardado.sobreCorte ?? 0).toLocaleString('es-MX')} pieza(s)
+                    de más: sus avíos no están comprados.
+                    {tienePermiso('compras.ver') ? (
+                      <>
+                        {' '}
+                        <Link
+                          to={`/compras/explosion?idOrden=${String(idOrden)}`}
+                          className="font-medium underline underline-offset-2"
+                          data-testid="avance-recien-sobrecorte-explosion"
+                        >
+                          Explotar materiales de esta OP
+                        </Link>
+                      </>
+                    ) : null}
+                  </span>
+                ) : null}
               </div>
             ) : null}
 
@@ -681,6 +708,11 @@ interface MovimientoImpreso {
   etiqueta: string;
   /** Qué impresos ofrece: el corte no tiene ninguno. */
   impresos: readonly { clave: string; etiqueta: string; url: string; icono: 'pdf' | 'ficha' }[];
+  /**
+   * ⭐⭐ fila 0.232: piezas cortadas POR ENCIMA de lo pendiente en ESTE corte (0/ausente = ninguna).
+   * Con ellas la barra del recién guardado ofrece ir a la explosión a pedir sus avíos.
+   */
+  sobreCorte?: number;
 }
 
 /** Movimiento a cancelar (etapa o entrega): el diálogo despacha por `tipo`. */
@@ -1075,7 +1107,7 @@ function CapturaMovimiento({
   /** Cierra la captura sin guardar (botón "Cancelar" del proto). */
   alCancelar: () => void;
 }): React.JSX.Element {
-  const { sesion } = useSesion();
+  const { sesion, tienePermiso } = useSesion();
   const [fecha, setFecha] = useState(hoy());
   // ENTREGA A MAQUILA: arranca con el maquilero YA PROGRAMADO en la OP (petición de Daniel,
   // 28-jul-2026: *"si ya tengo un maquilero programado en la OP… que me ponga por default el
@@ -1823,7 +1855,18 @@ function CapturaMovimiento({
         // 0.114: el corte ya lleva PRECIO por prenda — de ahí sale el cargo del cortador.
         { ...comunes, idCortador: idProveedor, ...precioApi() },
         {
-          onSuccess: (e) => alExito({ id: e.id, folio: e.folio, etiqueta: 'Corte', impresos: [] }),
+          // ⭐⭐ fila 0.232 (3ª vuelta, R2 del review): el sobre-corte lo dice el SERVIDOR —por celda
+          // color×talla, plegando los packs, como la explosión—. El `excede` de esta pantalla es
+          // por TENDIDO: con dos packs, 5 de más en uno y 5 de menos en el otro dan «5 de más» y la
+          // explosión no pediría nada.
+          onSuccess: (e) =>
+            alExito({
+              id: e.id,
+              folio: e.folio,
+              etiqueta: 'Corte',
+              impresos: [],
+              sobreCorte: e.piezasSobreCorteNuevas,
+            }),
           onError: (error) => toast.error(error.message),
         },
       );
@@ -2401,7 +2444,37 @@ function CapturaMovimiento({
           data-testid="avance-aviso-sobrecorte"
         >
           Estás cortando {excede.toLocaleString('es-MX')} pieza(s) por encima de lo pendiente de la
-          orden. <b>Se permite</b> (solo es un aviso): el sobre-corte queda registrado tal cual.
+          orden. <b>Se permite</b> (solo es un aviso): el sobre-corte queda registrado tal cual.{' '}
+          {/* ⭐⭐ fila 0.232 (§Post-F9.245(c)): los avíos de esas piezas NO se compraron con la orden
+              (casi siempre se compra antes de cortar). AQUÍ no va el enlace a la explosión, a
+              propósito (2ª vuelta, H1 del review): antes de guardar, la explosión todavía no ve
+              este corte y diría «0 de sobre-corte» — un falso negativo. El enlace aparece DESPUÉS
+              de guardar, en la barra del recién guardado del panel. */}
+          {/* R3 de la 3ª vuelta: la promesa de «podrás ir» sólo a quien puede abrir la explosión.
+              🔴 4ª vuelta: con PACKS, el exceso de arriba es por TENDIDO y los avíos se miden por
+              celda color×talla plegando los tendidos (un pack de más y otro de menos se
+              compensan; un pack de más sobre otro ya excedido suma entero). Ahí la pantalla no
+              sabe la cifra de avíos, así que no la afirma: la dice el servidor al guardar. */}
+          <span data-testid="avance-aviso-sobrecorte-material">
+            {manejaPacks ? (
+              <>
+                Al guardar te diré si quedan piezas <b>sin avíos comprados</b>
+                {tienePermiso('compras.ver')
+                  ? ' y podrás ir a la explosión de materiales de esta OP para pedir sólo la ' +
+                    'diferencia.'
+                  : '; si quedan, avisa a Compras para que vuelva a explotar los materiales de ' +
+                    'esta OP.'}
+              </>
+            ) : (
+              <>
+                Esas piezas <b>no tienen avíos comprados</b>
+                {tienePermiso('compras.ver')
+                  ? ': al guardar el corte podrás ir a la explosión de materiales de esta OP para ' +
+                    'pedir sólo la diferencia.'
+                  : ': avisa a Compras para que vuelva a explotar los materiales de esta OP.'}
+              </>
+            )}
+          </span>
         </p>
       ) : null}
       {/* ⭐ EMPAQUE (0.114): AVISO INFORMATIVO, nunca un tope. La cantidad del empaque es propia y el
