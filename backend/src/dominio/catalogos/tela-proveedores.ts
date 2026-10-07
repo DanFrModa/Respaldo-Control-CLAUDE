@@ -22,8 +22,11 @@
  *    transacción y respaldada por el unique de la base (P2002 → `ErrorConflicto`).
  *
  * Permisos (se gobierna con los de la Tela, sin permiso propio): `telas.ver` para leer,
- * `telas.administrar` para mutar. Los precios de compra los ve/edita quien administra el
- * catálogo, así que no se ocultan por permiso aquí.
+ * `telas.administrar` para mutar. ⚠️ Fila 0.249 parte B: este encabezado decía que los precios
+ * «los ve/edita quien administra el catálogo, así que no se ocultan por permiso aquí» y era FALSO
+ * — leer sólo pedía `telas.ver`, así que cualquiera con la llave del vocabulario recibía el precio
+ * de cada proveedor y de cada color. Ahora los tapa {@link ocultarPreciosDeTelaProveedorSiNoPuede}
+ * con la regla de `precios-de-catalogo.ts`.
  */
 import type { esquemaTelaProveedorColorEntrada } from '../../contrato/esquemas/tela-proveedor.js';
 import {
@@ -36,6 +39,7 @@ import type { z } from 'zod';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeTela } from './precios-de-catalogo.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -71,6 +75,33 @@ const incluirProveedorYColores = {
     orderBy: { color: { nombre: 'asc' } },
   },
 } satisfies Prisma.TelaProveedorInclude;
+
+/**
+ * Proveedor de tela TAL COMO SALE hacia quien lo consulta (fila 0.249 parte B): `preciosOcultos:
+ * true` = el `precio` del renglón y el de cada color del grid van `null` porque la sesión no lleva
+ * ninguna llave de `puedeVerPreciosDeTela` (no porque no tengan precio).
+ */
+export type TelaProveedorVisible = TelaProveedorConColores & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR el precio de un proveedor de tela y su grid de precio por color (fila
+ * 0.249 parte B). Proyección pura: nunca escribe. `condiciones` y `manejaPrecioPorColor` NO se
+ * tapan: dicen CÓMO se compra, no a cuánto.
+ */
+export function ocultarPreciosDeTelaProveedorSiNoPuede(
+  sesion: SesionUsuario,
+  fila: TelaProveedorConColores,
+): TelaProveedorVisible {
+  if (puedeVerPreciosDeTela(sesion)) {
+    return { ...fila, preciosOcultos: false };
+  }
+  return {
+    ...fila,
+    precio: null,
+    colores: fila.colores.map((c) => ({ ...c, precio: null })),
+    preciosOcultos: true,
+  };
+}
 
 /** Exige que la tela padre exista (o `ErrorNoEncontrado`). */
 async function exigirTelaExiste(tx: Tx, idTela: number): Promise<void> {
@@ -256,18 +287,19 @@ export async function listarProveedoresDeTela(
   sesion: SesionUsuario,
   idTela: number,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores[]> {
+): Promise<TelaProveedorVisible[]> {
   verificarPermiso(sesion, 'telas.ver');
   const cliente = clienteLectura(bd);
   const tela = await cliente.tela.findUnique({ where: { id: idTela }, select: { id: true } });
   if (tela === null) {
     throw new ErrorNoEncontrado('Tela', idTela);
   }
-  return cliente.telaProveedor.findMany({
+  const filas = await cliente.telaProveedor.findMany({
     where: { idTela },
     include: incluirProveedorYColores,
     orderBy: { proveedor: { nombre: 'asc' } },
   });
+  return filas.map((fila) => ocultarPreciosDeTelaProveedorSiNoPuede(sesion, fila));
 }
 
 /**
@@ -280,7 +312,7 @@ export async function obtenerTelaProveedor(
   idTela: number,
   idTelaProveedor: number,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores> {
+): Promise<TelaProveedorVisible> {
   verificarPermiso(sesion, 'telas.ver');
   const fila = await clienteLectura(bd).telaProveedor.findUnique({
     where: { id: idTelaProveedor },
@@ -289,7 +321,7 @@ export async function obtenerTelaProveedor(
   if (fila === null || fila.idTela !== idTela) {
     throw new ErrorNoEncontrado('TelaProveedor', idTelaProveedor);
   }
-  return fila;
+  return ocultarPreciosDeTelaProveedorSiNoPuede(sesion, fila);
 }
 
 /**
@@ -309,12 +341,12 @@ export async function crearTelaProveedor(
   idTela: number,
   entrada: EntradaCrearTelaProveedor,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores> {
+): Promise<TelaProveedorVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   const datos = validarEntrada(esquemaTelaProveedorCrear, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const fila = await enTransaccion(async (tx) => {
       await exigirTelaExiste(tx, idTela);
       await exigirProveedorValido(tx, datos.idProveedor);
       await exigirProveedorLibre(tx, idTela, datos.idProveedor);
@@ -354,6 +386,7 @@ export async function crearTelaProveedor(
         include: incluirProveedorYColores,
       });
     }, bd);
+    return ocultarPreciosDeTelaProveedorSiNoPuede(sesion, fila);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto('Este proveedor ya está asignado a la tela.', { causa: error });
@@ -378,12 +411,12 @@ export async function actualizarTelaProveedor(
   idTela: number,
   entrada: EntradaActualizarTelaProveedor,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores> {
+): Promise<TelaProveedorVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   const datos = validarEntrada(esquemaTelaProveedorEditar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const fila = await enTransaccion(async (tx) => {
       const actual = await exigirTelaProveedorDeTela(tx, idTela, datos.id);
 
       const cambiaProveedor =
@@ -492,6 +525,7 @@ export async function actualizarTelaProveedor(
         include: incluirProveedorYColores,
       });
     }, bd);
+    return ocultarPreciosDeTelaProveedorSiNoPuede(sesion, fila);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto('Este proveedor ya está asignado a la tela.', { causa: error });
@@ -510,7 +544,7 @@ export async function desactivarTelaProveedor(
   idTela: number,
   idTelaProveedor: number,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores> {
+): Promise<TelaProveedorVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTelaProveedorDeTela(tx, idTela, idTelaProveedor);
@@ -527,7 +561,7 @@ export async function reactivarTelaProveedor(
   idTela: number,
   idTelaProveedor: number,
   bd?: ContextoBd,
-): Promise<TelaProveedorConColores> {
+): Promise<TelaProveedorVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTelaProveedorDeTela(tx, idTela, idTelaProveedor);

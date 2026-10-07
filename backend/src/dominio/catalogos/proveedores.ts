@@ -65,6 +65,7 @@ import {
 } from '../../comun/paginacion.js';
 import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeAvio } from './precios-de-catalogo.js';
 import { CODIGO_PRISMA, codigoErrorPrisma, unicidadDeCampo } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -1053,14 +1054,22 @@ const seleccionAvioSurtido = {
 /** Fila de `AvioProveedor` con el avío embebido, tal como la trae `seleccionAvioSurtido`. */
 type FilaAvioSurtido = Prisma.AvioProveedorGetPayload<{ select: typeof seleccionAvioSurtido }>;
 
-/** Convierte una fila de avío surtido a la forma de salida del contrato (B17). */
-function aProveedorAvioSalida(fila: FilaAvioSurtido): ProveedorAvioSalida {
+/**
+ * Convierte una fila de avío surtido a la forma de salida del contrato (B17).
+ *
+ * ⭐ Fila 0.249 parte B: el `precio` es el MISMO precio del avío que tapa el catálogo de avíos, visto
+ * desde el proveedor — así que sigue LA MISMA regla (`puedeVerPreciosDeAvio`). Sin ella, «Avíos que
+ * surte» era una puerta lateral: con `proveedores.ver` se leía lo que `avios.ver` ya tapaba.
+ */
+function aProveedorAvioSalida(sesion: SesionUsuario, fila: FilaAvioSurtido): ProveedorAvioSalida {
+  const preciosOcultos = !puedeVerPreciosDeAvio(sesion);
   return {
     idAvio: fila.idAvio,
     clave: fila.avio.clave,
     descripcion: fila.avio.descripcion,
-    precio: fila.precio === null ? null : Number(fila.precio),
+    precio: preciosOcultos || fila.precio === null ? null : Number(fila.precio),
     condiciones: fila.condiciones,
+    preciosOcultos,
   };
 }
 
@@ -1106,7 +1115,7 @@ export async function listarAviosDeProveedor(
     select: seleccionAvioSurtido,
     orderBy: { avio: { clave: 'asc' } },
   });
-  return filas.map(aProveedorAvioSalida);
+  return filas.map((fila) => aProveedorAvioSalida(sesion, fila));
 }
 
 /**
@@ -1168,7 +1177,7 @@ export async function asignarAvioProveedor(
         select: seleccionAvioSurtido,
         orderBy: { avio: { clave: 'asc' } },
       });
-      return filas.map(aProveedorAvioSalida);
+      return filas.map((fila) => aProveedorAvioSalida(sesion, fila));
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
@@ -1215,7 +1224,7 @@ export async function quitarAvioProveedor(
       select: seleccionAvioSurtido,
       orderBy: { avio: { clave: 'asc' } },
     });
-    return filas.map(aProveedorAvioSalida);
+    return filas.map((fila) => aProveedorAvioSalida(sesion, fila));
   }, bd);
 }
 

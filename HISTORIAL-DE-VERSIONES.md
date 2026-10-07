@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.205 · 7-oct-2026 · **en prueba** — **Los precios de telas y avíos ya sólo le llegan a quien compra, administra o ve importes**
+
+> **La v0.205 no cierra ninguna fila del programa**: entrega la segunda parte de la 0.249. Para poder abrir algún día
+> los catálogos de telas y avíos a todo el mundo, había que tapar sus precios, que el sistema entregaba completos a
+> cualquiera con la llave de consultarlos.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Quien sólo consulta telas o avíos ve el catálogo sin precios** («—»): ni el precio sugerido de la tela, ni el de sus
+colores, ni el de cada proveedor, ni el precio de referencia del avío, ni el de sus medidas. Tampoco por la ficha de un
+proveedor («Avíos que surte»).
+
+**Los siguen viendo quienes los usan:** quien ve importes y precios, quien administra el catálogo de telas o de avíos,
+quien compra, quien administra modelos (elige el proveedor de cada tela y avío de la receta) y —en avíos— quien
+administra proveedores.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Dejan de ver los precios de catálogo de telas:** Producción, Encargado de Telas y Encargado de Corte. **Y los de avíos:**
+Habilitaciones. **Y el precio en «Avíos que surte»** de la ficha del proveedor: Habilitaciones, Encargado de Telas, Líder y
+Supervisor de Calidad y Diseño Gráfico. Los dejan de ver **en el catálogo**: quien consulta compras (Producción,
+Encargado de Telas, Habilitaciones) los sigue viendo por la orden de compra, la explosión y el color de la tela de la
+orden. Ninguno los usaba para capturar: la recepción toma el precio de la orden de compra y la entrada de tela ya no lo
+pide.
+
+**Ahora SÍ ven el precio de cada proveedor de tela (y su precio por color)** quienes antes lo tenían tapado en pantalla
+sólo por no tener la llave de importes: **Desarrollo de Producto, Ventas, Logística, Asistente, Secretarial, Compras y
+Gestión Técnica** — todos compran, administran el catálogo o eligen el proveedor de la receta.
+
+### ⏳ Sigue pendiente o roto
+
+**Falta la parte C de la 0.249: modelos y órdenes** (la maquila y el corte de referencia del modelo, los precios de su
+receta, los precios congelados de la receta de la orden y el histórico). Y antes de abrir cualquiera de estos catálogos a
+todos, Daniel tiene que decidirlo. Cuatro preguntas en §Post-F9.273.
+
 ## 0.204 · 7-oct-2026 · **en prueba** — **Los datos bancarios de proveedores y conceptos de pago ya sólo le llegan a quien los administra**
 
 > **La v0.204 no cierra ninguna fila del programa**: entrega la primera parte de la 0.249, la que la ficha pedía hacer

@@ -9120,6 +9120,10 @@
                               }
                             ],
                             "description": "Condiciones comerciales, o null."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -9127,7 +9131,8 @@
                           "clave",
                           "descripcion",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Avío que surte un proveedor con su precio y condiciones (R1/B17)."
@@ -9392,6 +9397,10 @@
                               }
                             ],
                             "description": "Condiciones comerciales, o null."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -9399,7 +9408,8 @@
                           "clave",
                           "descripcion",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Avío que surte un proveedor con su precio y condiciones (R1/B17)."
@@ -9647,6 +9657,10 @@
                               }
                             ],
                             "description": "Condiciones comerciales, o null."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -9654,7 +9668,8 @@
                           "clave",
                           "descripcion",
                           "precio",
-                          "condiciones"
+                          "condiciones",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Avío que surte un proveedor con su precio y condiciones (R1/B17)."
@@ -26537,7 +26552,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio de referencia por unidad, o null."
+                            "description": "Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249)."
                           },
                           "precioSugeridoComplemento": {
                             "anyOf": [
@@ -26636,6 +26651,10 @@
                                     }
                                   ],
                                   "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                                },
+                                "preciosOcultos": {
+                                  "type": "boolean",
+                                  "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                                 }
                               },
                               "required": [
@@ -26644,12 +26663,17 @@
                                 "precio",
                                 "precioComplemento",
                                 "pantone",
-                                "idColor"
+                                "idColor",
+                                "preciosOcultos"
                               ],
                               "additionalProperties": false,
                               "description": "Renglón de color de una tela (con sus precios y pantone)."
                             },
                             "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           },
                           "activo": {
                             "type": "boolean",
@@ -26713,6 +26737,7 @@
                           "ancho",
                           "paraProduccion",
                           "colores",
+                          "preciosOcultos",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -27225,7 +27250,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de referencia por unidad, o null."
+                      "description": "Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249)."
                     },
                     "precioSugeridoComplemento": {
                       "anyOf": [
@@ -27324,6 +27349,10 @@
                               }
                             ],
                             "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -27332,12 +27361,17 @@
                           "precio",
                           "precioComplemento",
                           "pantone",
-                          "idColor"
+                          "idColor",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
                       "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -27401,6 +27435,7 @@
                     "ancho",
                     "paraProduccion",
                     "colores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -27760,7 +27795,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de referencia por unidad, o null."
+                      "description": "Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249)."
                     },
                     "precioSugeridoComplemento": {
                       "anyOf": [
@@ -27859,6 +27894,10 @@
                               }
                             ],
                             "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -27867,12 +27906,17 @@
                           "precio",
                           "precioComplemento",
                           "pantone",
-                          "idColor"
+                          "idColor",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
                       "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -27936,6 +27980,7 @@
                     "ancho",
                     "paraProduccion",
                     "colores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -28488,7 +28533,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de referencia por unidad, o null."
+                      "description": "Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249)."
                     },
                     "precioSugeridoComplemento": {
                       "anyOf": [
@@ -28587,6 +28632,10 @@
                               }
                             ],
                             "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -28595,12 +28644,17 @@
                           "precio",
                           "precioComplemento",
                           "pantone",
-                          "idColor"
+                          "idColor",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
                       "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -28664,6 +28718,7 @@
                     "ancho",
                     "paraProduccion",
                     "colores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -29021,7 +29076,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de referencia por unidad, o null."
+                      "description": "Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249)."
                     },
                     "precioSugeridoComplemento": {
                       "anyOf": [
@@ -29120,6 +29175,10 @@
                               }
                             ],
                             "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -29128,12 +29187,17 @@
                           "precio",
                           "precioComplemento",
                           "pantone",
-                          "idColor"
+                          "idColor",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de color de una tela (con sus precios y pantone)."
                       },
                       "description": "Colores HIJOS de la tela (nombre libre + pantone + precios)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -29197,6 +29261,7 @@
                     "ancho",
                     "paraProduccion",
                     "colores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -29449,6 +29514,10 @@
                               }
                             ],
                             "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -29457,7 +29526,8 @@
                           "precio",
                           "precioComplemento",
                           "pantone",
-                          "idColor"
+                          "idColor",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de color de una tela (con sus precios y pantone)."
@@ -29741,6 +29811,10 @@
                         }
                       ],
                       "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     }
                   },
                   "required": [
@@ -29749,7 +29823,8 @@
                     "precio",
                     "precioComplemento",
                     "pantone",
-                    "idColor"
+                    "idColor",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Renglón de color de una tela (con sus precios y pantone)."
@@ -30122,6 +30197,10 @@
                                 "habitual": {
                                   "type": "boolean",
                                   "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                                },
+                                "preciosOcultos": {
+                                  "type": "boolean",
+                                  "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                                 }
                               },
                               "required": [
@@ -30129,12 +30208,17 @@
                                 "nombreProveedor",
                                 "precio",
                                 "condiciones",
-                                "habitual"
+                                "habitual",
+                                "preciosOcultos"
                               ],
                               "additionalProperties": false,
                               "description": "Proveedor de un avío con su precio y condiciones (R1)."
                             },
                             "description": "Proveedores del avío con su precio y condiciones (R1)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           },
                           "activo": {
                             "type": "boolean",
@@ -30187,6 +30271,7 @@
                           "seCompraSinColor",
                           "precioReferencia",
                           "proveedores",
+                          "preciosOcultos",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -30594,6 +30679,10 @@
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -30601,12 +30690,17 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "habitual"
+                          "habitual",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
                       },
                       "description": "Proveedores del avío con su precio y condiciones (R1)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -30659,6 +30753,7 @@
                     "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -30961,6 +31056,10 @@
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -30968,12 +31067,17 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "habitual"
+                          "habitual",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
                       },
                       "description": "Proveedores del avío con su precio y condiciones (R1)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -31026,6 +31130,7 @@
                     "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -31433,6 +31538,10 @@
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -31440,12 +31549,17 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "habitual"
+                          "habitual",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
                       },
                       "description": "Proveedores del avío con su precio y condiciones (R1)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -31498,6 +31612,7 @@
                     "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -31798,6 +31913,10 @@
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -31805,12 +31924,17 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "habitual"
+                          "habitual",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
                       },
                       "description": "Proveedores del avío con su precio y condiciones (R1)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     },
                     "activo": {
                       "type": "boolean",
@@ -31863,6 +31987,7 @@
                     "seCompraSinColor",
                     "precioReferencia",
                     "proveedores",
+                    "preciosOcultos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -32095,6 +32220,10 @@
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                           }
                         },
                         "required": [
@@ -32102,7 +32231,8 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "habitual"
+                          "habitual",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Proveedor de un avío con su precio y condiciones (R1)."
@@ -32330,8 +32460,15 @@
                             "description": "¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando."
                           },
                           "precio": {
-                            "type": "number",
-                            "description": "Precio real de compra de esta medida."
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio real de compra de esta medida. null SÓLO si la sesión no ve precios (`preciosOcultos` de la lista, fila 0.249)."
                           },
                           "orden": {
                             "type": "integer",
@@ -32386,13 +32523,18 @@
                         "type": "string"
                       },
                       "description": "Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     }
                   },
                   "required": [
                     "datos",
                     "unidadMedida",
                     "promedioPreCosto",
-                    "avisos"
+                    "avisos",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas de un avío con el promedio del precosteo."
@@ -32681,8 +32823,15 @@
                             "description": "¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando."
                           },
                           "precio": {
-                            "type": "number",
-                            "description": "Precio real de compra de esta medida."
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio real de compra de esta medida. null SÓLO si la sesión no ve precios (`preciosOcultos` de la lista, fila 0.249)."
                           },
                           "orden": {
                             "type": "integer",
@@ -32737,13 +32886,18 @@
                         "type": "string"
                       },
                       "description": "Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
                     }
                   },
                   "required": [
                     "datos",
                     "unidadMedida",
                     "promedioPreCosto",
-                    "avisos"
+                    "avisos",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas de un avío con el promedio del precosteo."
@@ -249191,6 +249345,10 @@
                             },
                             "description": "Grid de precio por color (si maneja precio por color)."
                           },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
+                          },
                           "creadoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -249236,6 +249394,7 @@
                           "condiciones",
                           "activo",
                           "colores",
+                          "preciosOcultos",
                           "creadoEn",
                           "creadoPorId",
                           "modificadoEn",
@@ -249579,6 +249738,10 @@
                       },
                       "description": "Grid de precio por color (si maneja precio por color)."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -249624,6 +249787,7 @@
                     "condiciones",
                     "activo",
                     "colores",
+                    "preciosOcultos",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -249915,6 +250079,10 @@
                       },
                       "description": "Grid de precio por color (si maneja precio por color)."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -249960,6 +250128,7 @@
                     "condiciones",
                     "activo",
                     "colores",
+                    "preciosOcultos",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -250316,6 +250485,10 @@
                       },
                       "description": "Grid de precio por color (si maneja precio por color)."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -250361,6 +250534,7 @@
                     "condiciones",
                     "activo",
                     "colores",
+                    "preciosOcultos",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",
@@ -250650,6 +250824,10 @@
                       },
                       "description": "Grid de precio por color (si maneja precio por color)."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene»."
+                    },
                     "creadoEn": {
                       "type": "string",
                       "format": "date-time",
@@ -250695,6 +250873,7 @@
                     "condiciones",
                     "activo",
                     "colores",
+                    "preciosOcultos",
                     "creadoEn",
                     "creadoPorId",
                     "modificadoEn",

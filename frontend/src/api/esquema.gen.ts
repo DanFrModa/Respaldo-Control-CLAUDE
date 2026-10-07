@@ -3370,6 +3370,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones comerciales, o null. */
                 condiciones: string | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -3498,6 +3500,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones comerciales, o null. */
                 condiciones: string | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -3634,6 +3638,8 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones comerciales, o null. */
                 condiciones: string | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -11606,7 +11612,7 @@ export interface paths {
                 tipoComponente: 'CUERPO' | 'CARDIGAN' | 'OTRO';
                 /** @description ¿Tela de uso frecuente? */
                 favorito: boolean;
-                /** @description Precio de referencia por unidad, o null. */
+                /** @description Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249). */
                 precioSugerido: number | null;
                 /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
                 precioSugeridoComplemento: number | null;
@@ -11630,7 +11636,11 @@ export interface paths {
                   pantone: string | null;
                   /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                   idColor: number | null;
+                  /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                  preciosOcultos: boolean;
                 }[];
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
                 /** @description Falso si está desactivada (borrado suave). */
                 activo: boolean;
                 /**
@@ -11834,7 +11844,7 @@ export interface paths {
               tipoComponente: 'CUERPO' | 'CARDIGAN' | 'OTRO';
               /** @description ¿Tela de uso frecuente? */
               favorito: boolean;
-              /** @description Precio de referencia por unidad, o null. */
+              /** @description Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249). */
               precioSugerido: number | null;
               /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
               precioSugeridoComplemento: number | null;
@@ -11858,7 +11868,11 @@ export interface paths {
                 pantone: string | null;
                 /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                 idColor: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
               /**
@@ -12031,7 +12045,7 @@ export interface paths {
               tipoComponente: 'CUERPO' | 'CARDIGAN' | 'OTRO';
               /** @description ¿Tela de uso frecuente? */
               favorito: boolean;
-              /** @description Precio de referencia por unidad, o null. */
+              /** @description Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249). */
               precioSugerido: number | null;
               /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
               precioSugeridoComplemento: number | null;
@@ -12055,7 +12069,11 @@ export interface paths {
                 pantone: string | null;
                 /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                 idColor: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
               /**
@@ -12217,7 +12235,7 @@ export interface paths {
               tipoComponente: 'CUERPO' | 'CARDIGAN' | 'OTRO';
               /** @description ¿Tela de uso frecuente? */
               favorito: boolean;
-              /** @description Precio de referencia por unidad, o null. */
+              /** @description Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249). */
               precioSugerido: number | null;
               /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
               precioSugeridoComplemento: number | null;
@@ -12241,7 +12259,11 @@ export interface paths {
                 pantone: string | null;
                 /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                 idColor: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
               /**
@@ -12435,7 +12457,7 @@ export interface paths {
               tipoComponente: 'CUERPO' | 'CARDIGAN' | 'OTRO';
               /** @description ¿Tela de uso frecuente? */
               favorito: boolean;
-              /** @description Precio de referencia por unidad, o null. */
+              /** @description Precio de referencia por unidad, o null (también null si `preciosOcultos`, fila 0.249). */
               precioSugerido: number | null;
               /** @description Costo ESTIMADO del complemento (cárdigan) por unidad, o null. Último escalón de la cascada que valúa el complemento al costear (0.163). */
               precioSugeridoComplemento: number | null;
@@ -12459,7 +12481,11 @@ export interface paths {
                 pantone: string | null;
                 /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                 idColor: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivada (borrado suave). */
               activo: boolean;
               /**
@@ -12604,6 +12630,8 @@ export interface paths {
                 pantone: string | null;
                 /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
                 idColor: number | null;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -12733,6 +12761,8 @@ export interface paths {
               pantone: string | null;
               /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
               idColor: number | null;
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -12897,7 +12927,11 @@ export interface paths {
                   condiciones: string | null;
                   /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                   habitual: boolean;
+                  /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                  preciosOcultos: boolean;
                 }[];
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
                 /**
@@ -13081,7 +13115,11 @@ export interface paths {
                 condiciones: string | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -13248,7 +13286,11 @@ export interface paths {
                 condiciones: string | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -13404,7 +13446,11 @@ export interface paths {
                 condiciones: string | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -13581,7 +13627,11 @@ export interface paths {
                 condiciones: string | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /**
@@ -13724,6 +13774,8 @@ export interface paths {
                 condiciones: string | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
               }[];
             };
           };
@@ -13855,8 +13907,8 @@ export interface paths {
                 valor: number | null;
                 /** @description ¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando. */
                 requiereRevision: boolean;
-                /** @description Precio real de compra de esta medida. */
-                precio: number;
+                /** @description Precio real de compra de esta medida. null SÓLO si la sesión no ve precios (`preciosOcultos` de la lista, fila 0.249). */
+                precio: number | null;
                 /** @description Orden de despliegue. */
                 orden: number;
                 /** @description Falso si está desactivada (borrado suave). */
@@ -13868,6 +13920,8 @@ export interface paths {
               promedioPreCosto: number | null;
               /** @description Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo). */
               avisos: string[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -14003,8 +14057,8 @@ export interface paths {
                 valor: number | null;
                 /** @description ¿Esta medida necesita que alguien la corrija a mano? La migración no pudo normalizarla y NO adivinó. Es un AVISO, no un bloqueo: la medida sigue viva y sigue promediando. */
                 requiereRevision: boolean;
-                /** @description Precio real de compra de esta medida. */
-                precio: number;
+                /** @description Precio real de compra de esta medida. null SÓLO si la sesión no ve precios (`preciosOcultos` de la lista, fila 0.249). */
+                precio: number | null;
                 /** @description Orden de despliegue. */
                 orden: number;
                 /** @description Falso si está desactivada (borrado suave). */
@@ -14016,6 +14070,8 @@ export interface paths {
               promedioPreCosto: number | null;
               /** @description Advertencias que NO bloquean (revisión pendiente, unidad faltante, valor absurdo). */
               avisos: string[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
             };
           };
         };
@@ -100271,6 +100327,8 @@ export interface paths {
                   /** @description Precio de la tela en este color, o null. */
                   precio: number | null;
                 }[];
+                /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+                preciosOcultos: boolean;
                 /**
                  * Format: date-time
                  * @description Fecha de alta (ISO 8601).
@@ -100432,6 +100490,8 @@ export interface paths {
                 /** @description Precio de la tela en este color, o null. */
                 precio: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -100591,6 +100651,8 @@ export interface paths {
                 /** @description Precio de la tela en este color, o null. */
                 precio: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -100739,6 +100801,8 @@ export interface paths {
                 /** @description Precio de la tela en este color, o null. */
                 precio: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).
@@ -100901,6 +100965,8 @@ export interface paths {
                 /** @description Precio de la tela en este color, o null. */
                 precio: number | null;
               }[];
+              /** @description ¿El servidor TAPÓ los precios de este objeto para esta sesión? (fila 0.249 parte B). true = los precios van null porque no te toca verlos; false = un precio null es «no tiene». */
+              preciosOcultos: boolean;
               /**
                * Format: date-time
                * @description Fecha de alta (ISO 8601).

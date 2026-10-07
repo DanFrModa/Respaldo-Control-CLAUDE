@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * Contrato Zod de TelaProveedor + TelaProveedorColor (F8-E1, D13/R17). Precio de una TELA
  * POR PROVEEDOR, con su grid opcional de precio POR COLOR. ESPEJO del contrato de
@@ -185,6 +187,7 @@ export const esquemaTelaProveedorSalida = z
     colores: z
       .array(esquemaTelaProveedorColorSalida)
       .describe('Grid de precio por color (si maneja precio por color).'),
+    preciosOcultos: esquemaPreciosOcultos,
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
     modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),

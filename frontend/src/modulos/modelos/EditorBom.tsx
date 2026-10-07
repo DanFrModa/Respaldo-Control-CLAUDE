@@ -123,6 +123,13 @@ interface RenglonComponente {
    * que costea" que prohíbe §Post-F9.47. Se dice que falta guardar y el servidor devuelve la real.
    */
   pendienteRecalculo: boolean;
+  /**
+   * 🔒 Fila 0.249 parte B: el precio de este renglón llegó TAPADO desde el catálogo
+   * (`preciosOcultos` de la tela o del avío). Sólo puede pasar en un renglón recién agregado, cuyo
+   * precio sale del catálogo: entonces `precioCosteo: null` significa «no te toca», NO «sin precio»,
+   * y la pantalla no puede gritar «sin precio» por una cifra que no conoce.
+   */
+  precioTapado: boolean;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -147,6 +154,7 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
     amarreIgnorado: t.amarreIgnorado,
     precioReferencia: t.precioReferencia,
     pendienteRecalculo: false,
+    precioTapado: false,
   };
 }
 
@@ -173,6 +181,7 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     amarreIgnorado: a.amarreIgnorado,
     precioReferencia: a.precioReferencia,
     pendienteRecalculo: false,
+    precioTapado: false,
   };
 }
 
@@ -287,12 +296,14 @@ export function EditorBom({
         // Renglón recién agregado, aún sin guardar: lo único que se conoce en cliente es el
         // catálogo. Al guardar, el servidor devuelve el escalón real de la cascada.
         precioCosteo: tela.precioSugerido,
+        // 🔒 0.249: si el precio llegó TAPADO, este origen no se pinta: manda `precioTapado`.
         origenPrecio: tela.precioSugerido === null ? 'sin-precio' : 'referencia',
         proveedorPrecio: null,
         amarreIgnorado: false,
         precioReferencia: tela.precioSugerido,
         // Renglón nuevo: el escalón real (¿ya se compró esta tela?) lo resuelve el servidor.
         pendienteRecalculo: true,
+        precioTapado: tela.preciosOcultos,
       },
     ]);
   }
@@ -318,12 +329,14 @@ export function EditorBom({
         proveedorAmarrado: null,
         precioPorColor: false,
         precioCosteo: avio.precioReferencia,
+        // 🔒 0.249: si el precio llegó TAPADO, este origen no se pinta: manda `precioTapado`.
         origenPrecio: avio.precioReferencia === null ? 'sin-precio' : 'referencia',
         proveedorPrecio: null,
         amarreIgnorado: false,
         precioReferencia: avio.precioReferencia,
         // Renglón nuevo: el escalón real (¿ya se compró este avío?) lo resuelve el servidor.
         pendienteRecalculo: true,
+        precioTapado: avio.preciosOcultos,
       },
     ]);
   }
@@ -916,6 +929,17 @@ function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.E
       </ChipEstado>
     </>
   ) : null;
+
+  // 🔒 Fila 0.249 parte B: con el precio del catálogo TAPADO no se sabe de qué escalón saldrá ni
+  // cuánto vale; se dice eso y nada más — nunca «sin precio» ni «referencia», que serían deducidos.
+  if (renglon.precioTapado) {
+    return (
+      <span className="flex flex-wrap items-center gap-1.5" data-testid="precio-renglon-tapado">
+        <span className="num text-sm text-muted-foreground">—</span>
+        {pendiente}
+      </span>
+    );
+  }
 
   switch (renglon.origenPrecio) {
     case 'ultimo-precio-compra':

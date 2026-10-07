@@ -74,6 +74,7 @@ function avio(id: number, clave: string, activo = true): Avio {
     seCompraSinColor: false,
     precioReferencia: null,
     proveedores: [],
+    preciosOcultos: false,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -256,6 +257,7 @@ describe('<AviosPagina>', () => {
         precio: 0.5,
         condiciones: 'contado',
         habitual: false,
+        preciosOcultos: false,
       },
       {
         idProveedor: 2,
@@ -264,6 +266,7 @@ describe('<AviosPagina>', () => {
         condiciones: null,
         // ⭐ V1-E3m: el HABITUAL es el que la explosión propone — y NO es el más barato.
         habitual: true,
+        preciosOcultos: false,
       },
     ];
     useAvios.mockReturnValue(consultaConDatos([conProveedores]));

@@ -135,7 +135,8 @@ export function AviosQueSurte({
               <div className="min-w-0">
                 <div className="text-sm font-medium">{a.descripcion}</div>
                 <div className="num text-xs text-faint">
-                  {a.clave} · {formatearPrecio(a.precio)} · su precio
+                  {/* 🔒 Fila 0.249: tapado por el servidor ≠ «sin precio». */}
+                  {a.clave} · {a.preciosOcultos ? '—' : formatearPrecio(a.precio)} · su precio
                   {a.condiciones !== null && a.condiciones.trim() !== ''
                     ? ` · ${a.condiciones}`
                     : ''}

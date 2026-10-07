@@ -96,6 +96,51 @@ vi.mock('@/api/modelos', () => ({
   }),
 }));
 
+// 🔒 Fila 0.249 parte B: los selectores de "agregar" se sustituyen por un botón que entrega el
+// material que la prueba ponga en `agregable` (la búsqueda en servidor no es lo que se mide aquí).
+const agregable = vi.hoisted(() => ({
+  tela: null as Record<string, unknown> | null,
+  avio: null as Record<string, unknown> | null,
+}));
+vi.mock('../inventarios/SelectorTela', () => ({
+  SelectorTela: ({
+    alSeleccionar,
+    testid,
+  }: {
+    alSeleccionar: (tela: never) => void;
+    testid?: string;
+  }) => (
+    <button
+      type="button"
+      data-testid={testid}
+      onClick={() => {
+        if (agregable.tela !== null) alSeleccionar(agregable.tela as never);
+      }}
+    >
+      agregar tela
+    </button>
+  ),
+}));
+vi.mock('../inventarios/SelectorAvio', () => ({
+  SelectorAvio: ({
+    alSeleccionar,
+    testid,
+  }: {
+    alSeleccionar: (avio: never) => void;
+    testid?: string;
+  }) => (
+    <button
+      type="button"
+      data-testid={testid}
+      onClick={() => {
+        if (agregable.avio !== null) alSeleccionar(agregable.avio as never);
+      }}
+    >
+      agregar avío
+    </button>
+  ),
+}));
+
 // Catálogos de los selectores de "agregar" (combobox con búsqueda server-side) y del amarre.
 vi.mock('@/api/telas', () => ({
   useTelas: () => ({ data: { datos: [] }, isPending: false, isError: false, error: null }),
@@ -1044,6 +1089,73 @@ describe('<EditorBom> — secciones de la receta', () => {
  * propio** y se captura AQUÍ, en el renglón —no en el panel que hay que desplegar: si hubiera que
  * abrirlo para verlo, seguiría sin verse—, rotulado con el nombre que le da el CATÁLOGO.
  */
+/**
+ * 🔒 Fila 0.249 parte B — el renglón RECIÉN AGREGADO toma su precio del catálogo, y el catálogo
+ * puede llegar con el precio TAPADO (`preciosOcultos`). `null` entonces es «no te toca», no «sin
+ * precio»: gritar «sin precio» (chip rojo: «el costeo lo tomaría como 0») sería deducir una mentira.
+ */
+describe('Renglón recién agregado con el precio TAPADO por el servidor (0.249)', () => {
+  const telaCatalogo = (sobre: Record<string, unknown>): Record<string, unknown> => ({
+    id: 77,
+    nombre: 'Felpa tapada',
+    nombreComplemento: null,
+    precioSugerido: null,
+    preciosOcultos: true,
+    ...sobre,
+  });
+
+  beforeEach(() => {
+    agregable.tela = null;
+    agregable.avio = null;
+  });
+
+  it('una TELA tapada se pinta «—», sin el chip «sin precio»', async () => {
+    const usuario = userEvent.setup();
+    agregable.tela = telaCatalogo({});
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('agregar-tela-bom'));
+    const renglon = screen.getByTestId('renglon-bom-77');
+    expect(within(renglon).getByTestId('precio-renglon-tapado')).toHaveTextContent('—');
+    expect(within(renglon).queryByText('sin precio')).not.toBeInTheDocument();
+  });
+
+  it('una TELA de verdad sin precio SÍ dice «sin precio» (control: la marca no lo apaga todo)', async () => {
+    const usuario = userEvent.setup();
+    agregable.tela = telaCatalogo({ preciosOcultos: false });
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('agregar-tela-bom'));
+    const renglon = screen.getByTestId('renglon-bom-77');
+    expect(within(renglon).getByText('sin precio')).toBeInTheDocument();
+    expect(within(renglon).queryByTestId('precio-renglon-tapado')).not.toBeInTheDocument();
+  });
+
+  it('un AVÍO tapado tampoco dice «sin precio»', async () => {
+    const usuario = userEvent.setup();
+    agregable.avio = {
+      id: 88,
+      clave: 'CIE-88',
+      descripcion: 'Cierre tapado',
+      precioReferencia: null,
+      preciosOcultos: true,
+    };
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    await usuario.click(screen.getByTestId('agregar-avio-bom'));
+    const renglon = screen.getByTestId('renglon-bom-88');
+    expect(within(renglon).getByTestId('precio-renglon-tapado')).toHaveTextContent('—');
+    expect(within(renglon).queryByText('sin precio')).not.toBeInTheDocument();
+  });
+});
+
 describe('El consumo del COMPLEMENTO de la tela (0.156)', () => {
   // ⚠️ Este bloque vive FUERA del describe grande, así que necesita su propio reseteo: sin él, la
   // prueba de «dejarlo en blanco» leía la llamada de la prueba ANTERIOR y pasaba/fallaba por

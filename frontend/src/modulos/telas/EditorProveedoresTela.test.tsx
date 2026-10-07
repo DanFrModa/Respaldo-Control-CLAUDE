@@ -16,11 +16,12 @@ type EstadoConsulta = {
 
 const useTelaProveedores = vi.fn<() => EstadoConsulta>();
 const crearMutate = vi.fn();
+const actualizarMutate = vi.fn();
 
 vi.mock('@/api/tela-proveedores', () => ({
   useTelaProveedores: () => useTelaProveedores(),
   useCrearTelaProveedor: () => ({ mutate: crearMutate, isPending: false }),
-  useActualizarTelaProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarTelaProveedor: () => ({ mutate: actualizarMutate, isPending: false }),
   useDesactivarTelaProveedor: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarTelaProveedor: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -57,6 +58,7 @@ function proveedorTela(sobre: Partial<TelaProveedor> = {}): TelaProveedor {
     condiciones: null,
     activo: true,
     colores: [],
+    preciosOcultos: false,
     creadoEn: '2026-07-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-07-01T00:00:00.000Z',
@@ -83,25 +85,23 @@ describe('<EditorProveedoresTela>', () => {
       isError: false,
       error: null,
     });
-    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} puedeVerImportes />);
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
 
     expect(screen.getByTestId('fila-proveedor-tela')).toBeInTheDocument();
     expect(screen.getByText('Textiles del Norte')).toBeInTheDocument();
     expect(screen.getByText(/\$50\.00/)).toBeInTheDocument();
   });
 
-  it('oculta el precio cuando la sesión no puede ver importes', () => {
+  it('pinta «—» (no «Sin precio») cuando el SERVIDOR tapó el precio (fila 0.249)', () => {
     useTelaProveedores.mockReturnValue({
-      data: [proveedorTela({ precio: 50 })],
+      data: [proveedorTela({ precio: null, preciosOcultos: true })],
       isPending: false,
       isError: false,
       error: null,
     });
-    renderConProveedores(
-      <EditorProveedoresTela idTela={5} colores={COLORES} puedeVerImportes={false} />,
-    );
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
 
-    expect(screen.queryByText(/\$50\.00/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Sin precio')).not.toBeInTheDocument();
     // Se muestra el marcador "—" en lugar del importe.
     expect(screen.getByText('—')).toBeInTheDocument();
   });
@@ -113,9 +113,7 @@ describe('<EditorProveedoresTela>', () => {
       isError: false,
       error: null,
     });
-    renderConProveedores(
-      <EditorProveedoresTela idTela={5} colores={COLORES} deshabilitado puedeVerImportes />,
-    );
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} deshabilitado />);
 
     expect(screen.getByText('Textiles del Norte')).toBeInTheDocument();
     expect(screen.queryByTestId('nuevo-proveedor-tela')).not.toBeInTheDocument();
@@ -130,7 +128,7 @@ describe('<EditorProveedoresTela>', () => {
       isError: false,
       error: null,
     });
-    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} puedeVerImportes />);
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
 
     await usuario.click(screen.getByTestId('nuevo-proveedor-tela'));
     const dialogo = await screen.findByRole('dialog');
@@ -157,7 +155,7 @@ describe('<EditorProveedoresTela>', () => {
         opciones?.onSuccess?.(proveedorTela());
       },
     );
-    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} puedeVerImportes />);
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
 
     await usuario.click(screen.getByTestId('nuevo-proveedor-tela'));
     const dialogo = await screen.findByRole('dialog');
@@ -199,7 +197,7 @@ describe('<EditorProveedoresTela>', () => {
       isError: false,
       error: null,
     });
-    renderConProveedores(<EditorProveedoresTela idTela={5} colores={[]} puedeVerImportes />);
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={[]} />);
 
     await usuario.click(screen.getByTestId('nuevo-proveedor-tela'));
     const dialogo = await screen.findByRole('dialog');
@@ -212,5 +210,52 @@ describe('<EditorProveedoresTela>', () => {
         'usa el precio base del proveedor.',
     );
     expect(within(dialogo).queryByTestId('grid-precio-por-color')).not.toBeInTheDocument();
+  });
+
+  // 🔒 Fila 0.249 parte B — la mitad «no pisar». Con los precios tapados por el servidor el
+  // diálogo nunca vio el precio base ni el grid: mandarlos (`precio: null`, `colores: []`) los
+  // BORRARÍA. Se omiten = "no tocar".
+  it('al editar un renglón con precios TAPADOS no manda ni el precio ni el grid de colores', async () => {
+    const usuario = userEvent.setup();
+    actualizarMutate.mockReset();
+    useTelaProveedores.mockReturnValue({
+      data: [proveedorTela({ precio: null, preciosOcultos: true, condiciones: 'contado' })],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
+
+    await usuario.click(screen.getByTestId('editar-proveedor-tela'));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByTestId('precio-proveedor-tela')).toBeDisabled();
+    await usuario.click(within(dialogo).getByTestId('guardar-proveedor-tela'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
+    expect(args.cuerpo).not.toHaveProperty('precio');
+    expect(args.cuerpo).not.toHaveProperty('colores');
+    expect(args.cuerpo.condiciones).toBe('contado');
+  });
+
+  it('al editar un renglón con precios VISIBLES sí los manda (control de la prueba de arriba)', async () => {
+    const usuario = userEvent.setup();
+    actualizarMutate.mockReset();
+    useTelaProveedores.mockReturnValue({
+      data: [proveedorTela({ precio: 50 })],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<EditorProveedoresTela idTela={5} colores={COLORES} />);
+
+    await usuario.click(screen.getByTestId('editar-proveedor-tela'));
+    const dialogo = await screen.findByRole('dialog');
+    await usuario.click(within(dialogo).getByTestId('guardar-proveedor-tela'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: Record<string, unknown> };
+    expect(args.cuerpo.precio).toBe(50);
+    expect(args.cuerpo).toHaveProperty('colores');
   });
 });

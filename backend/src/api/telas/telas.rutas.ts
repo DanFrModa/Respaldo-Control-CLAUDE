@@ -64,13 +64,13 @@ import {
   listarTelas,
   listarTelasCategorias,
   obtenerTela,
-  type TelaColorDetalle,
-  type TelaConColores,
+  type TelaColorVisible,
+  type TelaVisible,
 } from '../../dominio/catalogos/telas.js';
 import type { ComposicionTela, TelaCategoria } from '../../datos/index.js';
 
 /** Proyecta el modelo Prisma `Tela` (con categoría, composición, proveedor y colores) a JSON. */
-function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
+function aTelaSalida(tela: TelaVisible): z.infer<typeof esquemaTelaSalida> {
   return {
     id: tela.id,
     nombre: tela.nombre,
@@ -102,7 +102,10 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
       precioComplemento: c.precioComplemento === null ? null : c.precioComplemento.toNumber(),
       pantone: c.pantone,
       idColor: c.idColor,
+      preciosOcultos: tela.preciosOcultos,
     })),
+    // Fila 0.249 parte B: el DOMINIO decide si esta sesión ve los precios (aquí sólo se copia).
+    preciosOcultos: tela.preciosOcultos,
     activo: tela.activo,
     creadoEn: tela.creadoEn.toISOString(),
     creadoPorId: tela.creadoPorId,
@@ -112,7 +115,7 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
 }
 
 /** Proyecta un renglón de color de tela (hijo de la tela, §Post-F9.11) a JSON del contrato. */
-function aTelaColorSalida(color: TelaColorDetalle): z.infer<typeof esquemaTelaColorSalida> {
+function aTelaColorSalida(color: TelaColorVisible): z.infer<typeof esquemaTelaColorSalida> {
   return {
     id: color.id,
     nombre: color.nombre,
@@ -120,6 +123,7 @@ function aTelaColorSalida(color: TelaColorDetalle): z.infer<typeof esquemaTelaCo
     precioComplemento: color.precioComplemento === null ? null : color.precioComplemento.toNumber(),
     pantone: color.pantone,
     idColor: color.idColor,
+    preciosOcultos: color.preciosOcultos,
   };
 }
 

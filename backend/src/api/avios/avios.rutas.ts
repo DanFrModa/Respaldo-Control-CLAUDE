@@ -43,6 +43,7 @@ import {
   listarProveedoresDeAvio,
   obtenerAvio,
   type AvioConProveedores,
+  type AvioVisible,
 } from '../../dominio/catalogos/avios.js';
 import {
   listarMedidasDeAvio,
@@ -57,6 +58,7 @@ import {
  */
 function aProveedorSalida(
   fila: AvioConProveedores['proveedores'][number],
+  preciosOcultos: boolean,
 ): z.infer<typeof esquemaAvioProveedoresLista>['datos'][number] {
   return {
     idProveedor: fila.idProveedor,
@@ -64,11 +66,13 @@ function aProveedorSalida(
     precio: fila.precio === null ? null : Number(fila.precio),
     condiciones: fila.condiciones,
     habitual: fila.habitual,
+    // Fila 0.249 parte B: la marca la decide el DOMINIO (aquí sólo se copia).
+    preciosOcultos,
   };
 }
 
 /** Proyecta el modelo Prisma `Avio` (con proveedores) a la forma JSON del contrato. */
-function aAvioSalida(avio: AvioConProveedores): z.infer<typeof esquemaAvioSalida> {
+function aAvioSalida(avio: AvioVisible): z.infer<typeof esquemaAvioSalida> {
   return {
     id: avio.id,
     clave: avio.clave,
@@ -80,7 +84,8 @@ function aAvioSalida(avio: AvioConProveedores): z.infer<typeof esquemaAvioSalida
     esGenerico: avio.esGenerico,
     seCompraSinColor: avio.seCompraSinColor,
     precioReferencia: avio.precioReferencia === null ? null : Number(avio.precioReferencia),
-    proveedores: avio.proveedores.map(aProveedorSalida),
+    proveedores: avio.proveedores.map((p) => aProveedorSalida(p, avio.preciosOcultos)),
+    preciosOcultos: avio.preciosOcultos,
     activo: avio.activo,
     creadoEn: avio.creadoEn.toISOString(),
     creadoPorId: avio.creadoPorId,
@@ -171,7 +176,7 @@ export const rutasAvios: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const proveedores = await listarProveedoresDeAvio(sesion, request.params.id);
-      return { datos: proveedores.map(aProveedorSalida) };
+      return { datos: proveedores.map((p) => aProveedorSalida(p, p.preciosOcultos)) };
     },
   });
 

@@ -148,6 +148,7 @@ function telaEjemplo(sobre: Partial<Tela> = {}): Tela {
     ancho: null,
     paraProduccion: true,
     colores: [],
+    preciosOcultos: false,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -345,6 +346,48 @@ describe('<DialogoTela>', () => {
     const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: TelaEditar };
     expect(args.cuerpo.peso).toBeNull();
     expect(args.cuerpo.ancho).toBe(1.8);
+  });
+
+  // 🔒 Fila 0.249 parte B — «no pisar». Si el servidor TAPÓ los precios, el formulario nunca los
+  // vio: mandar `precioSugerido: null` lo BORRARÍA y el grid de colores (set-completo con dos precios
+  // por color) los vaciaría todos. Se omiten = "no tocar"; lo demás viaja como siempre.
+  it('en EDICIÓN con precios TAPADOS no manda ni los precios ni el grid de colores', async () => {
+    const usuario = userEvent.setup();
+    actualizarMutate.mockImplementation((_args, opciones?: { onSuccess?: (r: Tela) => void }) => {
+      opciones?.onSuccess?.(telaEjemplo());
+    });
+    renderConProveedores(
+      <DialogoTela
+        abierto
+        alCambiarAbierto={vi.fn()}
+        tela={telaEjemplo({
+          preciosOcultos: true,
+          colores: [
+            {
+              id: 1,
+              nombre: 'Negro',
+              precio: null,
+              precioComplemento: null,
+              pantone: null,
+              idColor: null,
+              preciosOcultos: true,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Precio sugerido')).not.toBeInTheDocument();
+    expect(screen.getByTestId('precios-tela-tapados')).toBeInTheDocument();
+    await usuario.selectOptions(screen.getByTestId('tela-unidad'), 'M');
+    await usuario.click(screen.getByTestId('guardar-tela'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as { cuerpo: TelaEditar };
+    expect(args.cuerpo.unidadMedida).toBe('M');
+    expect(args.cuerpo).not.toHaveProperty('precioSugerido');
+    expect(args.cuerpo).not.toHaveProperty('precioSugeridoComplemento');
+    expect(args.cuerpo).not.toHaveProperty('colores');
   });
 
   // Sin default a propósito: si el combo arrancara en kilos, una popelina (metros) nacería mal

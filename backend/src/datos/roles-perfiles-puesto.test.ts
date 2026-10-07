@@ -874,7 +874,8 @@ describe('🔴 el PISO y el DINERO son conjuntos disjuntos (regla del dueño)', 
     ).toEqual([]);
     expect(new Set(PERMISOS_DE_DINERO).size).toBe(PERMISOS_DE_DINERO.length);
     // ⭐ 0.251: 17 con `ventas.ver` (la facturación, partida de `edr.ver`: enseña importes de venta).
-    expect(PERMISOS_DE_DINERO).toHaveLength(17);
+    // ⭐ 0.249 parte B: 18 con `compras.ver` (OC, explosión y colores de tela de la orden: precios).
+    expect(PERMISOS_DE_DINERO).toHaveLength(18);
   });
 
   it('⭐ y el dinero sigue teniendo dueño: lo reparten los puestos que deben, no el piso', () => {

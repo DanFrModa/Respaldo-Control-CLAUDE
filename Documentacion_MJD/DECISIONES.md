@@ -18606,3 +18606,30 @@ puestos que no administran proveedores.
    Gerencial ya ven la corrida completa; pero Ventas, Logística, Asistente y Secretarial no tienen acceso a la corrida
    y por la bitácora sí lo ven. ¿Deben verlo? *Propuesta: ocultar el beneficiario y dejar el monto, que es lo
    auditable.*
+
+#### (Post-F9.273) — LOS PRECIOS DE TELAS Y AVÍOS SÓLO LE LLEGAN A QUIEN COMPRA, ADMINISTRA O VE IMPORTES (fila 0.249 parte B, v0.205) — cuatro preguntas para Daniel
+
+Segunda parte de la 0.249 (§Post-F9.257(c)). 📐 Las llaves de consultar telas y avíos entregaban **completos** sus precios:
+el sugerido de la tela y de cada color, el de cada proveedor, el de referencia del avío y el de sus medidas. Ahora se tapan
+en el servidor y sólo los recibe quien **ve importes y precios** (la llave que ya tapaba el precosto), quien **administra
+el catálogo**, quien **compra**, quien **administra modelos** (elige el proveedor de la receta con precio) y —en avíos—
+quien **administra proveedores**. Toda llave que escribe un precio puede
+leerlo, así que nadie edita a ciegas. Sin llaves nuevas. Las llaves de consultar siguen **fuera** del piso de lectura.
+
+❓ **Cuatro preguntas, las dos primeras con el default ya construido:**
+1. **Producción, Encargado de Telas y Encargado de Corte dejan de ver los precios de catálogo de telas, y Habilitaciones
+   los de avíos** (y varios puestos, el precio en «Avíos que surte» del proveedor). Los dejan de ver **en el catálogo**; quien consulta compras los sigue viendo por la orden de compra y la explosión.
+   *Default: sí — ninguno los usaba para capturar.*
+2. **Compras sigue viéndolos** (los usa para comprar) **y Administración y Finanzas los de avíos** (administra
+   proveedores). *Default: sí.* ⚠️ **Y el precio de cada proveedor de tela, que la pantalla tapaba con la llave de
+   importes, ahora lo ven** Desarrollo de Producto, Ventas, Logística, Asistente, Secretarial, Compras y Gestión Técnica
+   (todos compran, administran el catálogo o eligen el proveedor de la receta).
+3. **Parte C, modelos:** ¿Producción debe ver la maquila de referencia del modelo, ya que captura el precio real de
+   maquila? *Default propuesto: sí, sólo ese dato.*
+4. **Parte C, órdenes:** ¿quién de los que consultan órdenes debe ver los precios congelados de la receta de la orden?
+   *Default propuesto: quien ve importes y precios, y quien administra modelos.*
+
+📌 **Bitácora:** guarda precios de telas y avíos (antes y después), pero hoy **todos** los que la leen ya pueden verlos,
+así que no hay fuga — y una prueba del seed lo vigila. La habría si desde la pantalla de Roles se le da la llave de la
+bitácora a un puesto sin llave de precio; es la misma decisión de la fila 0.255. 📌 **`compras.ver` es llave de dinero**
+(entrega precios por la orden y la explosión): queda marcada para que nunca entre al piso.

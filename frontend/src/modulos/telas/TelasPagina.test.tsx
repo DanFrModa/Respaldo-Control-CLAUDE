@@ -86,6 +86,7 @@ function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
     ancho: null,
     paraProduccion: true,
     colores: [],
+    preciosOcultos: false,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -184,6 +185,7 @@ describe('<TelasPagina>', () => {
           precioComplemento: null,
           pantone: null,
           idColor: null,
+          preciosOcultos: false,
         },
         {
           id: 2,
@@ -192,6 +194,7 @@ describe('<TelasPagina>', () => {
           precioComplemento: null,
           pantone: null,
           idColor: null,
+          preciosOcultos: false,
         },
       ],
     });
@@ -204,6 +207,33 @@ describe('<TelasPagina>', () => {
     expect(within(detalle).getByText('Blanco')).toBeInTheDocument();
     // El precio capturado se muestra; el color sin precio dice "Sin precio".
     expect(within(detalle).getByText('Sin precio')).toBeInTheDocument();
+  });
+
+  // 🔒 Fila 0.249 parte B: con los precios TAPADOS por el servidor el color no «no tiene precio» —
+  // es que no te toca verlo. Decir «Sin precio» sería mentir sobre el catálogo.
+  it('con los precios TAPADOS por el servidor pinta «—» y nunca «Sin precio»', () => {
+    const tapada = tela(4, 'Felpa D', {
+      preciosOcultos: true,
+      colores: [
+        {
+          id: 1,
+          nombre: 'Negro',
+          precio: null,
+          precioComplemento: null,
+          pantone: null,
+          idColor: null,
+          preciosOcultos: true,
+        },
+      ],
+    });
+    useTelas.mockReturnValue(consultaConDatos([tapada]));
+    renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+
+    fireEvent.click(screen.getByTestId('fila-tela'));
+    const detalle = screen.getByTestId('tela-colores-detalle');
+    expect(within(detalle).getByText('Negro')).toBeInTheDocument();
+    expect(within(detalle).queryByText('Sin precio')).not.toBeInTheDocument();
+    expect(within(detalle).getByText('—')).toBeInTheDocument();
   });
 
   it('el renglón lee la identidad "nombre · proveedor · nombre del proveedor" (§Post-F9.11)', () => {
@@ -242,6 +272,7 @@ describe('<TelasPagina>', () => {
           precioComplemento: 60,
           pantone: '19-4005 TCX',
           idColor: null,
+          preciosOcultos: false,
         },
       ],
     });
@@ -269,6 +300,7 @@ describe('<TelasPagina>', () => {
           precioComplemento: null,
           pantone: null,
           idColor: null,
+          preciosOcultos: false,
         },
       ],
     });

@@ -71,6 +71,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeTela } from './precios-de-catalogo.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -697,6 +698,43 @@ const incluirCategoriaYColores = {
   },
 } satisfies Prisma.TelaInclude;
 
+/**
+ * ⭐ Tela TAL COMO SALE del dominio hacia quien la consulta (fila 0.249 parte B).
+ *
+ * `preciosOcultos: true` = la sesión no lleva ninguna llave de {@link puedeVerPreciosDeTela} y el
+ * servidor NO le manda los precios: `precioSugerido`, `precioSugeridoComplemento` y el `precio` /
+ * `precioComplemento` de cada color van `null`. Es la única forma de distinguir «no te toca» de «no
+ * tiene precio capturado», que en un campo escalar se escriben igual (`null`).
+ */
+export type TelaVisible = TelaConColores & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR los precios de una tela para quien no puede verlos (fila 0.249 parte B,
+ * §Post-F9.257(c)). Mismo patrón que `ocultarDatosBancariosSiNoPuede` de la parte A.
+ *
+ * Lo que se tapa: el precio sugerido (cuerpo y complemento) y los dos precios de cada color. Lo que
+ * NO: nombre, composición, proveedor dueño, unidad, peso, ancho, colores con su pantone — el
+ * vocabulario de la tela.
+ *
+ * Es una PROYECCIÓN, nunca escribe. Quien edita la tela lleva `telas.administrar`, que está en la
+ * regla de lectura, así que el formulario siempre parte de los precios completos.
+ */
+export function ocultarPreciosDeTelaSiNoPuede(
+  sesion: SesionUsuario,
+  tela: TelaConColores,
+): TelaVisible {
+  if (puedeVerPreciosDeTela(sesion)) {
+    return { ...tela, preciosOcultos: false };
+  }
+  return {
+    ...tela,
+    precioSugerido: null,
+    precioSugeridoComplemento: null,
+    colores: tela.colores.map((c) => ({ ...c, precio: null, precioComplemento: null })),
+    preciosOcultos: true,
+  };
+}
+
 /** Campos de TEXTO opcionales editables (clave del payload === clave del modelo). */
 // `unidadMedida` NO va aquí: es un enum NOT NULL desde el 30-jul-2026 y este loop convierte
 // ''/null en NULL — escribiría NULL en una columna que no lo admite (500). Se maneja abajo con
@@ -1160,9 +1198,12 @@ export async function crearTela(
   sesion: SesionUsuario,
   entrada: EntradaCrearTela,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.administrar'); // permiso PRIMERO (§9.2), antes del Zod
-  return crearTelaValidada(sesion, validarEntrada(esquemaTelaCrear, entrada), bd);
+  return ocultarPreciosDeTelaSiNoPuede(
+    sesion,
+    await crearTelaValidada(sesion, validarEntrada(esquemaTelaCrear, entrada), bd),
+  );
 }
 
 /**
@@ -1176,9 +1217,12 @@ export async function crearTelaMigracion(
   sesion: SesionUsuario,
   entrada: EntradaCrearTelaMigracion,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.administrar'); // permiso PRIMERO (§9.2), antes del Zod
-  return crearTelaValidada(sesion, validarEntrada(esquemaTelaCrearMigracion, entrada), bd);
+  return ocultarPreciosDeTelaSiNoPuede(
+    sesion,
+    await crearTelaValidada(sesion, validarEntrada(esquemaTelaCrearMigracion, entrada), bd),
+  );
 }
 
 /** Implementación compartida del alta (permiso ya verificado; datos YA validados). */
@@ -1258,12 +1302,12 @@ export async function actualizarTela(
   sesion: SesionUsuario,
   entrada: EntradaActualizarTela,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   const datos = validarEntrada(esquemaTelaEditar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const tela = await enTransaccion(async (tx) => {
       // R2-6: serializa las ediciones de la MISMA tela (grid de colores + complemento).
       await bloquearColoresTela(tx, datos.id);
       const actual = await exigirTela(tx, datos.id);
@@ -1408,6 +1452,7 @@ export async function actualizarTela(
         include: incluirCategoriaYColores,
       });
     }, bd);
+    return ocultarPreciosDeTelaSiNoPuede(sesion, tela);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto('Ya existe una tela con ese nombre.', { causa: error });
@@ -1530,7 +1575,7 @@ export async function desactivarTela(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTela(tx, id);
@@ -1546,7 +1591,7 @@ export async function reactivarTela(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirTela(tx, id);
@@ -1562,7 +1607,7 @@ export async function obtenerTela(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<TelaConColores> {
+): Promise<TelaVisible> {
   verificarPermiso(sesion, 'telas.ver');
   const tela = await clienteLectura(bd).tela.findUnique({
     where: { id },
@@ -1571,7 +1616,7 @@ export async function obtenerTela(
   if (tela === null) {
     throw new ErrorNoEncontrado('Tela', id);
   }
-  return tela;
+  return ocultarPreciosDeTelaSiNoPuede(sesion, tela);
 }
 
 /** Renglón de color de una tela para la salida del endpoint `/telas/:id/colores`. */
@@ -1585,6 +1630,20 @@ export type TelaColorDetalle = {
   idColor: number | null;
 };
 
+/** Color de tela tal como sale hacia quien lo consulta: con su marca de precios tapados (0.249). */
+export type TelaColorVisible = TelaColorDetalle & { preciosOcultos: boolean };
+
+/** Tapa los dos precios de un color de tela para quien no puede verlos (fila 0.249 parte B). */
+export function ocultarPreciosDeColorTelaSiNoPuede(
+  sesion: SesionUsuario,
+  color: TelaColorDetalle,
+): TelaColorVisible {
+  if (puedeVerPreciosDeTela(sesion)) {
+    return { ...color, preciosOcultos: false };
+  }
+  return { ...color, precio: null, precioComplemento: null, preciosOcultos: true };
+}
+
 /**
  * Lista los colores de una tela (hijos de la tela: nombre libre + pantone + dos precios,
  * §Post-F9.11), ordenados por nombre. Lectura de solo `telas.ver`. Lanza
@@ -1594,14 +1653,14 @@ export async function listarColoresDeTela(
   sesion: SesionUsuario,
   idTela: number,
   bd?: ContextoBd,
-): Promise<TelaColorDetalle[]> {
+): Promise<TelaColorVisible[]> {
   verificarPermiso(sesion, 'telas.ver');
   const cliente = clienteLectura(bd);
   const tela = await cliente.tela.findUnique({ where: { id: idTela }, select: { id: true } });
   if (tela === null) {
     throw new ErrorNoEncontrado('Tela', idTela);
   }
-  return cliente.telaColor.findMany({
+  const colores = await cliente.telaColor.findMany({
     where: { idTela },
     select: {
       id: true,
@@ -1613,6 +1672,7 @@ export async function listarColoresDeTela(
     },
     orderBy: { nombre: 'asc' },
   });
+  return colores.map((color) => ocultarPreciosDeColorTelaSiNoPuede(sesion, color));
 }
 
 /** Entrada que acepta {@link agregarColorATela} (un renglón de color, sin `id`). */
@@ -1681,13 +1741,13 @@ export async function agregarColorATela(
   idTela: number,
   entrada: EntradaAgregarColorTela,
   bd?: ContextoBd,
-): Promise<TelaColorDetalle> {
+): Promise<TelaColorVisible> {
   // ⚖️ `compras.administrar`, NO `telas.administrar` — ver el porqué en el encabezado.
   verificarPermiso(sesion, 'compras.administrar'); // permiso PRIMERO (§9.2), antes del Zod
   const datos = validarEntrada(esquemaTelaColorAgregar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const color = await enTransaccion(async (tx) => {
       // El bloqueo va ANTES de leer: lo que se comprueba (nombre libre, si lleva complemento) se
       // escribe después, y entre la lectura y la escritura no puede colarse otra edición de ESTA
       // tela (mismo namespace que el grid y que el ETL de reconciliación).
@@ -1753,6 +1813,7 @@ export async function agregarColorATela(
 
       return creado;
     }, bd);
+    return ocultarPreciosDeColorTelaSiNoPuede(sesion, color);
   } catch (error) {
     // Carrera residual: el bloqueo cubre a todos los caminos que escriben colores, pero el unique
     // `[idTela, nombre]` es la última palabra y su mensaje tiene que seguir siendo el del negocio.
@@ -1777,7 +1838,7 @@ export async function listarTelas(
   sesion: SesionUsuario,
   parametros: ParametrosListarTelas = {},
   bd?: ContextoBd,
-): Promise<Pagina<TelaConColores>> {
+): Promise<Pagina<TelaVisible>> {
   verificarPermiso(sesion, 'telas.ver');
   const filtros = validarEntrada(esquemaListarTelas, parametros);
   const cliente = clienteLectura(bd);
@@ -1816,5 +1877,9 @@ export async function listarTelas(
     }),
   ]);
 
-  return armarPagina(datos, total, filtros);
+  return armarPagina(
+    datos.map((tela) => ocultarPreciosDeTelaSiNoPuede(sesion, tela)),
+    total,
+    filtros,
+  );
 }

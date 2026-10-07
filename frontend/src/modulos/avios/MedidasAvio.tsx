@@ -31,7 +31,8 @@ interface RenglonMedida {
  * Medidas de un avío "POR MEDIDA" (rediseño R5, B11) — cierres, elástico… Se administran como un SET
  * completo: el usuario agrega/quita/edita renglones y guarda. El precosto usa el PROMEDIO de los
  * precios de las medidas activas (lo calcula el backend y se muestra como "Promedio (precosteo)").
- * En modo lectura (sin `puedeAdministrar`) sólo muestra la lista + el promedio.
+ * En modo lectura (sin `puedeAdministrar`, o con los precios TAPADOS por el servidor — fila 0.249)
+ * sólo muestra la lista + el promedio.
  *
  * ⭐ **V1-E3g (§Post-F9.66): la medida es un NÚMERO y la unidad se captura UNA vez.** Antes era texto
  * libre y `"53 cm"`, `"53cm"` y `"53"` eran tres medidas distintas — la orden de compra salía partida
@@ -61,7 +62,7 @@ export function MedidasAvio({
         // Una medida sin `valor` es una heredada que no se pudo convertir: su campo nace VACÍO
         // (nadie inventa el número) y el renglón queda marcado para revisión.
         valor: m.valor === null ? '' : String(m.valor),
-        precio: String(m.precio),
+        precio: m.precio === null ? '' : String(m.precio),
         requiereRevision: m.requiereRevision,
         etiquetaOriginal: m.medida,
         valorOriginal: m.valor,
@@ -72,6 +73,15 @@ export function MedidasAvio({
 
   const promedio = consulta.data?.promedioPreCosto ?? null;
   const esPorMedida = (consulta.data?.datos ?? []).some((m) => m.activo);
+  /**
+   * 🔒 Fila 0.249 parte B: ¿el servidor TAPÓ los precios de las medidas para esta sesión? Entonces
+   * el promedio llega `null` aunque el avío SÍ maneje medidas (no hay que decir lo contrario), y el
+   * editor NO se abre: el guardado es SET-COMPLETO con el precio de cada medida, y mandar un precio
+   * que no se vio lo borraría. Hoy no pasa —editar medidas pide `avios.administrar`, que ve los
+   * precios—, pero si un día se separan, la pantalla no debe pisar lo que no enseñó.
+   */
+  const preciosOcultos = consulta.data?.preciosOcultos ?? false;
+  const editable = puedeAdministrar && !preciosOcultos;
   const avisos = consulta.data?.avisos ?? [];
 
   function actualizar(indice: number, campo: 'valor' | 'precio', valor: string): void {
@@ -159,7 +169,13 @@ export function MedidasAvio({
             <RulerIcon className="size-3" aria-hidden /> Por medida
           </Badge>
         ) : null}
-        {promedio !== null ? (
+        {preciosOcultos ? (
+          esPorMedida ? (
+            <span className="text-sm text-muted-foreground" data-testid="promedio-precosteo">
+              Promedio (precosteo): —
+            </span>
+          ) : null
+        ) : promedio !== null ? (
           <span className="text-sm text-muted-foreground" data-testid="promedio-precosteo">
             Promedio (precosteo):{' '}
             <span className="font-medium text-foreground">{moneda(promedio)}</span>
@@ -185,7 +201,7 @@ export function MedidasAvio({
         </ul>
       ) : null}
 
-      {puedeAdministrar ? (
+      {editable ? (
         <div className="space-y-2">
           <div className="w-40">
             <label
@@ -289,6 +305,7 @@ export function MedidasAvio({
                     <span className="ml-1.5 text-xs text-warn">(revisar)</span>
                   ) : null}
                 </span>
+                {/* `moneda(null)` pinta «—»: el precio tapado (0.249) no se confunde con $0. */}
                 <span className="font-medium tabular-nums">{moneda(m.precio)}</span>
               </li>
             ))}
