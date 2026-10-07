@@ -63,6 +63,7 @@ import {
   type ColumnasDelDesenlace,
   type DesenlaceDeLaMeta,
 } from './meta-negociada.js';
+import { puedeVerMetaConseguida, puedeVerMetaPrometida } from './precios-de-modelo.js';
 import { resolverIdRecetaDeModelo } from './receta-compartida.js';
 
 /** Los tres estados de la firma (espejo del enum `EstadoRevisionModelo` de Prisma). */
@@ -349,10 +350,17 @@ function aSalida(
     revisadoEn: cuando.toISOString(),
     revisionNota: nota,
     metaResultado: desenlace.metaResultado,
+    // ⭐ Fila 0.249 parte D: la meta es dinero y se tapa con la MISMA regla que la salida del
+    // modelo (`ocultarPreciosDeModeloSiNoPuede`). Lo conseguido nunca se le tapa a quien firma
+    // (`modelos.aprobar-receta`: lo acaba de teclear); lo prometido, sí, sin `consultas.ver-importes`.
     metaCostoPrometido:
-      desenlace.metaCostoPrometido === null ? null : desenlace.metaCostoPrometido.toNumber(),
+      desenlace.metaCostoPrometido === null || !puedeVerMetaPrometida(sesion)
+        ? null
+        : desenlace.metaCostoPrometido.toNumber(),
     metaCostoConseguido:
-      desenlace.metaCostoConseguido === null ? null : desenlace.metaCostoConseguido.toNumber(),
+      desenlace.metaCostoConseguido === null || !puedeVerMetaConseguida(sesion)
+        ? null
+        : desenlace.metaCostoConseguido.toNumber(),
     metaNota: desenlace.metaNota,
   };
 }

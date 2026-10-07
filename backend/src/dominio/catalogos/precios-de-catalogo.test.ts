@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { definirRoles, PERFILES_EDITABLES } from '../../../prisma/seed.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { taparDatosBitacora } from '../admin/bitacora-tapado.js';
 import {
   LLAVES_PRECIO_AVIO,
   LLAVES_PRECIO_TELA,
@@ -191,12 +192,12 @@ describe('ninguna llave de VOCABULARIO se coló en la regla', () => {
 
 /**
  * 🔒 LA BITÁCORA GUARDA ESTOS PRECIOS (`{ de, a }` de `precioSugerido`, `precioReferencia`, el
- * precio de cada color y de cada proveedor…). No se tapan ahí —decisión aparte, fila 0.255—, así
- * que la única forma de que no sea una puerta lateral es que **quien lee la bitácora ya pueda ver
- * esos precios**. Hoy se cumple para todos los roles sembrados; esta prueba es la que avisa el día
- * que alguien le dé `admin.ver-bitacora` a un puesto sin llave de precio.
+ * precio de cada color y de cada proveedor…), y desde la fila 0.249 parte D los TAPA AL LEERLA con
+ * ESTA MISMA regla (`dominio/admin/bitacora-tapado.ts`): quien no ve el precio de una tela en el
+ * catálogo tampoco lo ve en la bitácora, y al revés. (Antes esta prueba exigía que todo lector de la
+ * bitácora pudiera ver estos precios, porque la bitácora no tapaba nada.)
  */
-describe('🔒 quien lee la BITÁCORA ya puede ver los precios que ella guarda', () => {
+describe('🔒 la BITÁCORA tapa los precios de tela y avío con la regla del catálogo', () => {
   const roles = [
     ...definirRoles().map((r) => ({ nombre: r.nombre, permisos: r.permisos })),
     ...PERFILES_EDITABLES.map((p) => ({
@@ -210,12 +211,22 @@ describe('🔒 quien lee la BITÁCORA ya puede ver los precios que ella guarda',
     expect(lectores.length).toBeGreaterThan(0);
   });
 
+  it('sin llave de precio de tela, la fila `Tela` de la bitácora llega tapada', () => {
+    const sesion = sesionDePrueba({ permisos: ['telas.ver', 'admin.ver-bitacora'] });
+    const t = taparDatosBitacora(sesion, 'Tela', { precioSugerido: { de: 10, a: 12 } });
+    expect(t.datos).toEqual({ precioSugerido: { oculto: true } });
+    const a = taparDatosBitacora(sesion, 'Avio', { precioReferencia: { de: 1, a: 2 } });
+    expect(a.datos).toEqual({ precioReferencia: { oculto: true } });
+  });
+
   it.each(lectores.map((r) => [r.nombre, r] as const))(
-    '%s lee la bitácora y ve precios de tela y de avío',
+    '%s: la bitácora le enseña los precios de tela y avío exactamente cuando su catálogo se los enseña',
     (_nombre, rol) => {
       const sesion = sesionDePrueba({ permisos: [...rol.permisos] as ClavePermiso[] });
-      expect(puedeVerPreciosDeTela(sesion), 'precios de tela').toBe(true);
-      expect(puedeVerPreciosDeAvio(sesion), 'precios de avío').toBe(true);
+      const tela = taparDatosBitacora(sesion, 'Tela', { precioSugerido: { de: 10, a: 12 } });
+      const avio = taparDatosBitacora(sesion, 'Avio', { precioReferencia: { de: 1, a: 2 } });
+      expect(tela.datosOcultos === 0, 'precios de tela').toBe(puedeVerPreciosDeTela(sesion));
+      expect(avio.datosOcultos === 0, 'precios de avío').toBe(puedeVerPreciosDeAvio(sesion));
     },
   );
 });

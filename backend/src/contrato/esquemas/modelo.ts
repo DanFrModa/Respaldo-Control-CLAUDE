@@ -311,12 +311,14 @@ const CAMPOS_DESENLACE_META = {
     .number()
     .nullable()
     .describe(
-      'La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada.',
+      'La META congelada al firmar: el costo con el que se cerró la mesa. Null = no se encontró negociación registrada, o tu usuario no tiene `consultas.ver-importes` (es un importe: se tapa en el servidor).',
     ),
   metaCostoConseguido: z
     .number()
     .nullable()
-    .describe('Lo que SÍ se consiguió (costo por prenda), o null.'),
+    .describe(
+      'Lo que SÍ se consiguió (costo por prenda), o null. También null si tu usuario no tiene `consultas.ver-importes` ni `modelos.aprobar-receta` (es un importe: se tapa en el servidor).',
+    ),
   metaNota: z
     .string()
     .nullable()

@@ -964,6 +964,24 @@ describe('aprobarRevisionModelo — el DESENLACE de la promesa', () => {
 
     expect(salida.revisionEstado).toBe('aprobada');
     expect(salida.metaResultado).toBe('no_lograda');
+    // ⭐ 0.249 parte D: el ECO tapa la meta como la salida del modelo. Quien firma SIN
+    // `consultas.ver-importes` ve lo que tecleó (lo conseguido) y NO lo prometido — aunque en la
+    // base se guardó entero (arriba).
+    expect(salida.metaCostoPrometido).toBeNull();
+    expect(salida.metaCostoConseguido).toBe(45);
+  });
+
+  it('⭐ 0.249 D: con `consultas.ver-importes`, el eco de la firma trae la meta completa', async () => {
+    const { tx } = txRegistrador(filaFalsa(), 43);
+    const conImportes = sesionDePrueba({
+      permisos: ['modelos.aprobar-receta', 'consultas.ver-importes'],
+    });
+    const salida = await aprobarRevisionModelo(
+      conImportes,
+      42,
+      { meta: { lograda: false, costoConseguido: 45, nota: 'n' } },
+      { tx },
+    );
     expect(salida.metaCostoPrometido).toBe(43);
     expect(salida.metaCostoConseguido).toBe(45);
   });

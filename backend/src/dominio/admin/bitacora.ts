@@ -4,7 +4,8 @@
  * paginado de los registros con filtros por entidad, folio (idEntidad), usuario, acción y rango de
  * fechas, para que la administración audite los cambios sin SQL (Gabriel no consulta la BD).
  *
- * Solo lectura (no muta nada). Permiso `admin.ver-bitacora` (A4). La bitácora es GLOBAL al sistema
+ * Solo lectura (no muta nada). Permiso `admin.ver-bitacora` (A4). ⭐ Fila 0.249 parte D: los importes
+ * de cada registro se TAPAN al leer según las llaves de quien consulta (`bitacora-tapado.ts`). La bitácora es GLOBAL al sistema
  * (no por empresa): registra QUIÉN tocó QUÉ. Resuelve el NOMBRE del usuario para mostrarlo (los
  * registros guardan solo `idUsuario`, sin FK física: es un log inmutable).
  */
@@ -18,13 +19,15 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { taparDatosBitacora } from './bitacora-tapado.js';
+
 /** Parámetros del listado de bitácora (los reutiliza la ruta REST en su entrada). */
 export type ParametrosListarBitacora = z.input<typeof esquemaBitacoraQuery>;
 
 /**
  * Lista los registros de bitácora con filtros, orden por fecha y paginación EN SERVIDOR. Devuelve
  * cada registro ya proyectado a la forma de salida del contrato (id BigInt → texto, fecha ISO,
- * datos JSON tal cual) con el NOMBRE del usuario resuelto. Solo lo ve quien tenga
+ * datos JSON con el dinero que la sesión no puede ver tapado) con el NOMBRE del usuario resuelto. Solo lo ve quien tenga
  * `admin.ver-bitacora`.
  *
  * @example
@@ -77,16 +80,22 @@ export async function listarBitacora(
     registros.map((r) => r.idUsuario),
   );
 
-  const datos: BitacoraSalida[] = registros.map((r) => ({
-    id: r.id.toString(),
-    entidad: r.entidad,
-    idEntidad: r.idEntidad,
-    accion: r.accion,
-    datos: r.datos ?? null,
-    idUsuario: r.idUsuario,
-    nombreUsuario: nombreDeUsuario(nombrePorId, r.idUsuario),
-    fecha: r.fecha.toISOString(),
-  }));
+  const datos: BitacoraSalida[] = registros.map((r) => {
+    // ⭐ Fila 0.249 parte D + 0.255: el dinero se tapa AL LEER, con las llaves de quien consulta (lo
+    // guardado queda completo). Ver `bitacora-tapado.ts`.
+    const tapado = taparDatosBitacora(sesion, r.entidad, r.datos ?? null);
+    return {
+      id: r.id.toString(),
+      entidad: r.entidad,
+      idEntidad: r.idEntidad,
+      accion: r.accion,
+      datos: tapado.datos,
+      datosOcultos: tapado.datosOcultos,
+      idUsuario: r.idUsuario,
+      nombreUsuario: nombreDeUsuario(nombrePorId, r.idUsuario),
+      fecha: r.fecha.toISOString(),
+    };
+  });
 
   return armarPagina(datos, total, filtros);
 }

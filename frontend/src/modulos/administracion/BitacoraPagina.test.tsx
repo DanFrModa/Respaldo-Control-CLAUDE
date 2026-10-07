@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BitacoraPagina as TipoPagina, BitacoraQuery } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
-import { BitacoraPagina } from './BitacoraPagina';
+import { BitacoraPagina, datosLegibles } from './BitacoraPagina';
 
 // El mock captura la `query` con la que la pantalla llama a `useBitacora`, para poder verificar
 // que el filtro de fechas manda ISO date-time COMPLETO (el contrato exige format: date-time).
@@ -40,6 +40,7 @@ function crearPagina(): TipoPagina {
         idUsuario: 'u-1',
         nombreUsuario: 'admin',
         datos: { nombre: 'Bodega A' },
+        datosOcultos: 0,
         fecha: '2026-06-01T10:00:00Z',
       },
     ],
@@ -100,5 +101,67 @@ describe('BitacoraPagina', () => {
     // formato date-time completo; mandar solo "YYYY-MM-DD" daba 400.
     expect(ultimaQuery.desde).toBe('2026-06-01T00:00:00.000Z');
     expect(ultimaQuery.hasta).toBe('2026-06-30T23:59:59.999Z');
+  });
+
+  // ⭐ Fila 0.249 parte D: el servidor tapa los importes que tu usuario no puede ver.
+  describe('importes ocultos', () => {
+    function conOcultos(): void {
+      bitacoraResult.data = {
+        ...crearPagina(),
+        datos: [
+          {
+            id: 'x-9',
+            entidad: 'Tela',
+            idEntidad: '7',
+            accion: 'MODIFICAR',
+            idUsuario: 'u-1',
+            nombreUsuario: 'admin',
+            datos: {
+              nombre: 'Felpa',
+              precioSugerido: { oculto: true },
+              colores: [{ precio: { oculto: true } }],
+            },
+            datosOcultos: 2,
+            fecha: '2026-06-01T10:00:00Z',
+          },
+        ],
+      };
+    }
+
+    it('la fila dice cuántos importes se taparon (tabla y tarjeta)', () => {
+      conOcultos();
+      renderConProveedores(<BitacoraPagina />, { sesion });
+      const tabla = within(screen.getByTestId('bitacora-tabla'));
+      expect(tabla.getByTestId('bitacora-ocultos').textContent).toBe('2 importes ocultos');
+      expect(screen.getAllByTestId('bitacora-ocultos')).toHaveLength(2);
+    });
+
+    it('sin importes ocultos no hay marca', () => {
+      renderConProveedores(<BitacoraPagina />, { sesion });
+      expect(screen.queryByTestId('bitacora-ocultos')).toBeNull();
+    });
+
+    it('el cajón avisa y pinta «oculto», nunca [object Object] ni el centinela crudo', async () => {
+      conOcultos();
+      const user = userEvent.setup();
+      renderConProveedores(<BitacoraPagina />, { sesion });
+      await user.click(within(screen.getByTestId('bitacora-tabla')).getByText('Ver datos'));
+      expect(screen.getByTestId('bitacora-aviso-ocultos').textContent).toContain(
+        '2 importes ocultos',
+      );
+      const json = screen.getByTestId('bitacora-json').textContent ?? '';
+      expect(json).toContain('"precioSugerido": «oculto»');
+      expect(json).toContain('"precio": «oculto»');
+      expect(json).toContain('"nombre": "Felpa"');
+      expect(json).not.toContain('[object Object]');
+      expect(json).not.toContain('"oculto"');
+    });
+
+    it('datosLegibles sólo sustituye el centinela exacto (un objeto con más claves queda igual)', () => {
+      expect(datosLegibles({ a: { oculto: true, b: 1 }, c: { oculto: false } })).toBe(
+        JSON.stringify({ a: { oculto: true, b: 1 }, c: { oculto: false } }, null, 2),
+      );
+      expect(datosLegibles(null)).toBe('null');
+    });
   });
 });

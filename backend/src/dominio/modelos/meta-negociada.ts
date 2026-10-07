@@ -433,10 +433,19 @@ export async function resolverCostoPrometido(
  * tres enseñan y congelan el mismo número.
  *
  * ⚠️ Permisos: `modelos.aprobar-receta` (quien firma) **y** `consultas.ver-importes` (es un
- * importe). En el reparto de `prisma/seed.ts` los dos los llevan EXACTAMENTE los mismos cuatro
- * perfiles (Administrador, AdministracionDireccion, Directivo y Gerencial), así que todo el que
- * puede firmar puede ver la meta: la pareja no cierra ninguna puerta que estuviera abierta.
- * **Sin permisos nuevos.**
+ * importe). **Sin permisos nuevos.**
+ *
+ * 🔴 **NO todo el que firma puede ver la meta** (medido contra `prisma/seed.ts` el 7-oct-2026, fila
+ * 0.249 parte D; este comentario afirmaba antes lo contrario y era falso). Firman y ven importes
+ * Administrador, AdministracionDireccion, Directivo, Gerencial y Director General; pero el perfil
+ * editable **«Desarrollo de Producto»** lleva `modelos.aprobar-receta` SIN `consultas.ver-importes`:
+ * puede firmar la revisión y este endpoint le contesta 403. La pantalla de la firma
+ * (`DialogoRevisionModelo.tsx`) no se rompe —la consulta fallida deja `costoPrometido` en null y el
+ * diálogo omite la frase «Se vendió con un costo de…», igual que cuando no hay negociación
+ * registrada—, así que esa persona contesta *«¿se logró lo prometido?»* SIN ver contra qué, y sin
+ * que la pantalla le diga por qué. Si debe verla es decisión de negocio pendiente con Daniel (no se
+ * abre aquí: la meta prometida es un importe y las otras dos puertas —la bandeja y «Promesas
+ * incumplidas»— también la cierran con `consultas.ver-importes`).
  */
 export async function consultarMetaPrometida(
   sesion: SesionUsuario,

@@ -18672,3 +18672,38 @@ histórico. Ahora se tapan en el servidor. **Sin llaves nuevas.** Lo decidido co
 guardiana congela la lista de precios que la bitácora guarda y la de los cuatro roles que la leen sin llave: cualquier
 precio nuevo escrito en las formas comunes, o lector nuevo,
 la pone en rojo — con límites medidos (HOJA §4); la garantía de raíz es la parte D.
+
+#### (Post-F9.275) — LA BITÁCORA TAPA LOS IMPORTES AL LEERLA, SEGÚN QUIÉN LA CONSULTA (filas 0.249 parte D y 0.255, v0.207) — preguntas para Daniel
+
+Cuarta y última parte de la 0.249 (§Post-F9.257(c), §Post-F9.274) y la 0.255 (§Post-F9.272 pregunta 4). 📐 La bitácora
+guardaba las cifras de cada cambio y la leían, con `admin.ver-bitacora`, roles que no podían verlas en sus pantallas.
+Medido contra los roles sembrados: no eran sólo Ventas, Logística, Asistente y Secretarial con los precios de modelos y
+órdenes — también veían EsMa, cuentas por pagar y cobrar, la corrida, cotizaciones, precostos y listas; y **Gerencial**
+veía el estado de resultados, el costo de la orden y los factores, que sus pantallas le niegan.
+
+**Construido con los defaults del lead** (Daniel puede corregir cualquiera):
+1. **Cada importe se tapa con la misma llave que su pantalla.** Lo no listado que parece dinero, con la llave de
+   importes. Lo guardado no cambia.
+2. **Corrida de pagos (0.255):** a quién ⇐ ver o armar la corrida; cuánto ⇐ eso y además la llave de importes.
+3. **Gerencial** deja de ver por la bitácora el estado de resultados, el costo de la orden y los factores.
+4. **Límite de crédito del proveedor y regalías de la etiqueta:** con la llave de su ficha (hoy todos los lectores la
+   tienen, así que nadie pierde nada).
+5. **Meta de costo partida:** prometido ⇐ importes; conseguido ⇐ importes o firmar la revisión (quien la escribe, la lee).
+6. **Un precio vacío no se tapa** (vacío no revela nada).
+7. **Quien recibe compras** ve en la bitácora los precios de recepción (los corrige).
+8. **Margen, descuentos, regalías y costo de ventas (factores)** se tapan con la llave de factores **en cualquier
+   registro** donde aparezcan (así lo cazó el reviewer en la fusión de departamentos del cliente), y cualquier
+   clave desconocida con «factor» en el nombre también va con la llave de factores, no con la de importes.
+
+❓ **Preguntas:**
+1. **¿Desarrollo de Producto debe ver el costo PROMETIDO al firmar la revisión del modelo?** Hoy no lo ve: la pantalla de
+   firma no se rompe, pero omite la frase *«se vendió con un costo de…»* sin avisar que está oculto, y él contesta
+   *«¿se logró?»* sin la meta a la vista. *Default: se queda así hasta que Daniel diga; si debe verlo, se le da la
+   lectura de la meta prometida sin darle la llave de importes.*
+2. **¿Se confirman los ocho defaults de arriba?**
+3. **Con esto, `modelos.ver` y `ordenes.ver` ya pueden entrar al piso de lectura** (las de telas y avíos desde la v0.205;
+   la de proveedores espera la pregunta 3 de §Post-F9.272, los adjuntos). ¿Entran? *Default: no se mueven hasta que
+   Daniel lo diga.*
+
+📌 **Límites declarados** (HOJA §4): una cifra escrita en una nota, un motivo o un acuerdo no se tapa; ni un importe que
+se pueda deducir de otros datos visibles.

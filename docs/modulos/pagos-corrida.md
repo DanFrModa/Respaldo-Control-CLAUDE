@@ -218,3 +218,7 @@ y `cuentas-pago-reglas.ts` · `backend/src/dominio/esma/pagos.ts::crearPagoACuen
 `cotejo-factura.ts` · `frontend/src/modulos/cxp/CotejoFacturasPagina.tsx` · `frontend/src/modulos/pagos/`
 (`CorridaPagosPagina`, `RelacionEjecutable`, `ConfirmarEjecutar`, `ConceptosPagoPagina`) ·
 `frontend/e2e/corrida-pagos.spec.ts`.
+
+## 🔒 La corrida en la bitácora (fila 0.255, §Post-F9.275)
+
+`bitacoraDeRenglon` guarda beneficiario y monto completos; la bitácora los **tapa al leer** (`dominio/admin/bitacora-tapado.ts`): `nombre`/`beneficiario` ⇐ `puedeVerCorrida` (`pagos.corrida-ver` ∨ `pagos.corrida-armar`, la reja de `exigirVerCorrida`); `monto`/`montoAnterior`/`total` ⇐ eso ∧ `consultas.ver-importes`, como la pantalla de la corrida.

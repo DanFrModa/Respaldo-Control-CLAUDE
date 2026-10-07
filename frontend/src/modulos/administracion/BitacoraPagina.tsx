@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { useState } from 'react';
 
 import { useBitacora } from '@/api/bitacora';
@@ -46,6 +46,55 @@ function formatearFecha(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** Marca temporal con la que se sustituye cada valor tapado antes de imprimir el JSON. */
+const MARCA_OCULTO = '\u0000OCULTO\u0000';
+
+/** ¿Es el centinela con que el servidor manda un importe tapado (`{ "oculto": true }`)? */
+function esOculto(valor: unknown): boolean {
+  return (
+    typeof valor === 'object' &&
+    valor !== null &&
+    !Array.isArray(valor) &&
+    Object.keys(valor).length === 1 &&
+    (valor as { oculto?: unknown }).oculto === true
+  );
+}
+
+/**
+ * ⭐ Fila 0.249 parte D — el JSON de un registro LISTO PARA LEER: cada importe que el servidor tapó
+ * (`{ "oculto": true }`) se pinta como `«oculto»`, sin comillas, para que no se confunda ni con un
+ * objeto del registro ni con un texto capturado. La pantalla NO decide qué se tapa (eso es del
+ * servidor, `bitacora-tapado.ts`): sólo lo hace legible.
+ */
+export function datosLegibles(datos: unknown): string {
+  const texto = JSON.stringify(
+    datos,
+    (_clave, valor: unknown) => (esOculto(valor) ? MARCA_OCULTO : valor),
+    2,
+  );
+  return (texto ?? '').replaceAll(JSON.stringify(MARCA_OCULTO), '«oculto»');
+}
+
+/** «1 importe oculto» / «N importes ocultos». */
+function textoOcultos(n: number): string {
+  return n === 1 ? '1 importe oculto' : `${String(n)} importes ocultos`;
+}
+
+/** La marca de cuántos importes se taparon en un registro (nada si ninguno). */
+function MarcaOcultos({ n }: { n: number }): React.JSX.Element | null {
+  if (n <= 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+      title="Tu usuario no tiene llave para ver esos importes; el registro guardado está completo."
+      data-testid="bitacora-ocultos"
+    >
+      <Lock className="size-3" aria-hidden="true" />
+      {textoOcultos(n)}
+    </span>
+  );
 }
 
 /**
@@ -215,6 +264,7 @@ export function BitacoraPagina(): React.JSX.Element {
                     {registro.nombreUsuario ?? registro.idUsuario ?? '(sistema)'}
                   </span>
                   <span className="num">{formatearFecha(registro.fecha)}</span>
+                  <MarcaOcultos n={registro.datosOcultos} />
                   {registro.datos !== null ? (
                     <button
                       type="button"
@@ -290,17 +340,20 @@ export function BitacoraPagina(): React.JSX.Element {
                       {formatearFecha(registro.fecha)}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
-                      {registro.datos !== null ? (
-                        <button
-                          type="button"
-                          className="cursor-pointer text-xs font-medium text-primary underline-offset-2 hover:underline"
-                          onClick={() => setDetalle(registro)}
-                        >
-                          Ver datos
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {registro.datos !== null ? (
+                          <button
+                            type="button"
+                            className="cursor-pointer text-xs font-medium text-primary underline-offset-2 hover:underline"
+                            onClick={() => setDetalle(registro)}
+                          >
+                            Ver datos
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                        <MarcaOcultos n={registro.datosOcultos} />
+                      </div>
                     </TablaDensaCelda>
                   </TablaDensaFila>
                 ))
@@ -325,8 +378,24 @@ export function BitacoraPagina(): React.JSX.Element {
                 } · ${formatearFecha(detalle.fecha)}`
           }
         >
-          <pre className="mono overflow-x-auto rounded-lg bg-muted p-3 text-xs">
-            {detalle === null ? '' : JSON.stringify(detalle.datos, null, 2)}
+          {detalle !== null && detalle.datosOcultos > 0 ? (
+            <p
+              className="mb-3 flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-[12.5px] text-muted-foreground"
+              data-testid="bitacora-aviso-ocultos"
+            >
+              <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Tu usuario no tiene llave para ver {textoOcultos(detalle.datosOcultos)} de este
+                registro: aparecen como <span className="mono">«oculto»</span>. El registro guardado
+                está completo; lo ve quien tiene la llave de esa pantalla.
+              </span>
+            </p>
+          ) : null}
+          <pre
+            className="mono overflow-x-auto rounded-lg bg-muted p-3 text-xs"
+            data-testid="bitacora-json"
+          >
+            {detalle === null ? '' : datosLegibles(detalle.datos)}
           </pre>
         </CajonDetalle>
 
