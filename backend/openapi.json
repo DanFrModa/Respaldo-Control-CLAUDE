@@ -1482,6 +1482,10 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el precio de la habilitación para esta sesión? (fila 0.249 parte C). true = cada `precio` va null porque no te toca verlo; false = un null es «el viejo no lo traía»."
                     }
                   },
                   "required": [
@@ -1510,7 +1514,8 @@
                     "idOrdenV1",
                     "lineas",
                     "procesos",
-                    "habilitacion"
+                    "habilitacion",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false
                 }
@@ -33628,7 +33633,11 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo de maquila base, o null."
+                            "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                          },
+                          "maquilaOculta": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                           },
                           "idTemporada": {
                             "anyOf": [
@@ -33748,7 +33757,11 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo de corte por prenda (R5/B8), o null."
+                            "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                           },
                           "idMaquileroCotizado": {
                             "anyOf": [
@@ -33907,6 +33920,7 @@
                           "descripcion",
                           "composicion",
                           "maquilaBase",
+                          "maquilaOculta",
                           "idTemporada",
                           "temporada",
                           "idCurvaTalla",
@@ -33917,6 +33931,7 @@
                           "tipoProducto",
                           "numOperaciones",
                           "corteBase",
+                          "preciosOcultos",
                           "idMaquileroCotizado",
                           "maquileroCotizado",
                           "secuenciaEstampado",
@@ -34466,7 +34481,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de maquila base, o null."
+                      "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                    },
+                    "maquilaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                     },
                     "idTemporada": {
                       "anyOf": [
@@ -34586,7 +34605,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de corte por prenda (R5/B8), o null."
+                      "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                     },
                     "idMaquileroCotizado": {
                       "anyOf": [
@@ -34745,6 +34768,7 @@
                     "descripcion",
                     "composicion",
                     "maquilaBase",
+                    "maquilaOculta",
                     "idTemporada",
                     "temporada",
                     "idCurvaTalla",
@@ -34755,6 +34779,7 @@
                     "tipoProducto",
                     "numOperaciones",
                     "corteBase",
+                    "preciosOcultos",
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
@@ -35201,7 +35226,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de maquila base, o null."
+                      "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                    },
+                    "maquilaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                     },
                     "idTemporada": {
                       "anyOf": [
@@ -35321,7 +35350,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de corte por prenda (R5/B8), o null."
+                      "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                     },
                     "idMaquileroCotizado": {
                       "anyOf": [
@@ -35585,6 +35618,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -35603,7 +35640,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -35721,6 +35759,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -35738,7 +35780,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -35800,6 +35843,10 @@
                               }
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
                           },
                           "idTipoArte": {
                             "type": "integer",
@@ -35923,6 +35970,7 @@
                           "posicion",
                           "puntadas",
                           "precio",
+                          "preciosOcultos",
                           "idTipoArte",
                           "tipoArte",
                           "codigoTipoArte",
@@ -36074,6 +36122,7 @@
                     "descripcion",
                     "composicion",
                     "maquilaBase",
+                    "maquilaOculta",
                     "idTemporada",
                     "temporada",
                     "idCurvaTalla",
@@ -36084,6 +36133,7 @@
                     "tipoProducto",
                     "numOperaciones",
                     "corteBase",
+                    "preciosOcultos",
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
@@ -36683,7 +36733,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de maquila base, o null."
+                      "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                    },
+                    "maquilaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                     },
                     "idTemporada": {
                       "anyOf": [
@@ -36803,7 +36857,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de corte por prenda (R5/B8), o null."
+                      "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                     },
                     "idMaquileroCotizado": {
                       "anyOf": [
@@ -36962,6 +37020,7 @@
                     "descripcion",
                     "composicion",
                     "maquilaBase",
+                    "maquilaOculta",
                     "idTemporada",
                     "temporada",
                     "idCurvaTalla",
@@ -36972,6 +37031,7 @@
                     "tipoProducto",
                     "numOperaciones",
                     "corteBase",
+                    "preciosOcultos",
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
@@ -37416,7 +37476,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de maquila base, o null."
+                      "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                    },
+                    "maquilaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                     },
                     "idTemporada": {
                       "anyOf": [
@@ -37536,7 +37600,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de corte por prenda (R5/B8), o null."
+                      "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                     },
                     "idMaquileroCotizado": {
                       "anyOf": [
@@ -37695,6 +37763,7 @@
                     "descripcion",
                     "composicion",
                     "maquilaBase",
+                    "maquilaOculta",
                     "idTemporada",
                     "temporada",
                     "idCurvaTalla",
@@ -37705,6 +37774,7 @@
                     "tipoProducto",
                     "numOperaciones",
                     "corteBase",
+                    "preciosOcultos",
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
@@ -38976,7 +39046,11 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Costo de maquila base, o null."
+                          "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                        },
+                        "maquilaOculta": {
+                          "type": "boolean",
+                          "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                         },
                         "idTemporada": {
                           "anyOf": [
@@ -39096,7 +39170,11 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Costo de corte por prenda (R5/B8), o null."
+                          "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                        },
+                        "preciosOcultos": {
+                          "type": "boolean",
+                          "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                         },
                         "idMaquileroCotizado": {
                           "anyOf": [
@@ -39255,6 +39333,7 @@
                         "descripcion",
                         "composicion",
                         "maquilaBase",
+                        "maquilaOculta",
                         "idTemporada",
                         "temporada",
                         "idCurvaTalla",
@@ -39265,6 +39344,7 @@
                         "tipoProducto",
                         "numOperaciones",
                         "corteBase",
+                        "preciosOcultos",
                         "idMaquileroCotizado",
                         "maquileroCotizado",
                         "secuenciaEstampado",
@@ -39758,7 +39838,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de maquila base, o null."
+                      "description": "Costo de maquila base, o null (sin captura, o tapado: ver `maquilaOculta`)."
+                    },
+                    "maquilaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ `maquilaBase` para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «sin captura». Con true el formulario NO manda `maquilaBase`."
                     },
                     "idTemporada": {
                       "anyOf": [
@@ -39878,7 +39962,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Costo de corte por prenda (R5/B8), o null."
+                      "description": "Costo de corte por prenda (R5/B8), o null (sin captura, o tapado)."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el dinero propio del modelo para esta sesión? (fila 0.249 parte C). true = `corteBase` va null porque no te toca verlo (la maquila tiene su propia marca, `maquilaOculta`); false = un null es «sin captura». Con true el formulario NO manda `corteBase`."
                     },
                     "idMaquileroCotizado": {
                       "anyOf": [
@@ -40037,6 +40125,7 @@
                     "descripcion",
                     "composicion",
                     "maquilaBase",
+                    "maquilaOculta",
                     "idTemporada",
                     "temporada",
                     "idCurvaTalla",
@@ -40047,6 +40136,7 @@
                     "tipoProducto",
                     "numOperaciones",
                     "corteBase",
+                    "preciosOcultos",
                     "idMaquileroCotizado",
                     "maquileroCotizado",
                     "secuenciaEstampado",
@@ -42104,6 +42194,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -42122,7 +42216,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -42522,6 +42617,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -42540,7 +42639,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -42848,6 +42948,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -42865,7 +42969,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -43235,6 +43340,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -43252,7 +43361,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -43886,6 +43996,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -43903,7 +44017,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -44158,6 +44273,10 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
+                          },
                           "idTipoArte": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -44280,6 +44399,7 @@
                           "posicion",
                           "puntadas",
                           "precio",
+                          "preciosOcultos",
                           "idTipoArte",
                           "tipoArte",
                           "codigoTipoArte",
@@ -44581,6 +44701,10 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
+                    },
                     "idTipoArte": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -44703,6 +44827,7 @@
                     "posicion",
                     "puntadas",
                     "precio",
+                    "preciosOcultos",
                     "idTipoArte",
                     "tipoArte",
                     "codigoTipoArte",
@@ -45032,6 +45157,10 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
+                    },
                     "idTipoArte": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -45154,6 +45283,7 @@
                     "posicion",
                     "puntadas",
                     "precio",
+                    "preciosOcultos",
                     "idTipoArte",
                     "tipoArte",
                     "codigoTipoArte",
@@ -45605,6 +45735,10 @@
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
                           },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
+                          },
                           "idTipoArte": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -45727,6 +45861,7 @@
                           "posicion",
                           "puntadas",
                           "precio",
+                          "preciosOcultos",
                           "idTipoArte",
                           "tipoArte",
                           "codigoTipoArte",
@@ -46013,6 +46148,10 @@
                       ],
                       "description": "Precio del arte (el que viaja a la OP), o null."
                     },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
+                    },
                     "idTipoArte": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -46135,6 +46274,7 @@
                     "posicion",
                     "puntadas",
                     "precio",
+                    "preciosOcultos",
                     "idTipoArte",
                     "tipoArte",
                     "codigoTipoArte",
@@ -47170,6 +47310,10 @@
                             ],
                             "description": "Precio del arte, o null."
                           },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C)."
+                          },
                           "idArchivoFoto": {
                             "anyOf": [
                               {
@@ -47210,6 +47354,7 @@
                           "idTipoArte",
                           "tipoArte",
                           "precio",
+                          "preciosOcultos",
                           "idArchivoFoto",
                           "idModelo",
                           "claveModelo",
@@ -47593,6 +47738,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de catálogo de la tela (precioSugerido)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de TELA de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -47611,7 +47760,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de tela del BOM del modelo."
@@ -47729,6 +47879,10 @@
                               }
                             ],
                             "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ los precios de este renglón? (fila 0.249 parte C, con la regla de precios de AVÍO de la parte B). true = `precioCosteo`, `proveedorPrecio` y `precioReferencia` van null porque no te toca verlos (y `origenPrecio` no se pinta); false = un null es «sin precio»."
                           }
                         },
                         "required": [
@@ -47746,7 +47900,8 @@
                           "origenPrecio",
                           "proveedorPrecio",
                           "amarreIgnorado",
-                          "precioReferencia"
+                          "precioReferencia",
+                          "preciosOcultos"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de avío del BOM del modelo."
@@ -47808,6 +47963,10 @@
                               }
                             ],
                             "description": "Precio del arte (el que viaja a la OP), o null."
+                          },
+                          "preciosOcultos": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario NO manda `precio`."
                           },
                           "idTipoArte": {
                             "type": "integer",
@@ -47931,6 +48090,7 @@
                           "posicion",
                           "puntadas",
                           "precio",
+                          "preciosOcultos",
                           "idTipoArte",
                           "tipoArte",
                           "codigoTipoArte",
@@ -71058,7 +71218,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null."
+                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null (sin captura, o tapado: ver `maquilaReferenciaOculta`)."
+                    },
+                    "maquilaReferenciaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ la maquila de referencia para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «el modelo no la tiene»."
                     },
                     "maquilaReal": {
                       "anyOf": [
@@ -71240,6 +71404,7 @@
                     "folioOrden",
                     "precioVenta",
                     "maquilaReferencia",
+                    "maquilaReferenciaOculta",
                     "maquilaReal",
                     "aplicacionReal",
                     "puedeVerReales",
@@ -71518,7 +71683,11 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null."
+                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null (sin captura, o tapado: ver `maquilaReferenciaOculta`)."
+                    },
+                    "maquilaReferenciaOculta": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ la maquila de referencia para esta sesión? (fila 0.249 parte C). true = va null porque no te toca verla; false = un null es «el modelo no la tiene»."
                     },
                     "maquilaReal": {
                       "anyOf": [
@@ -71700,6 +71869,7 @@
                     "folioOrden",
                     "precioVenta",
                     "maquilaReferencia",
+                    "maquilaReferenciaOculta",
                     "maquilaReal",
                     "aplicacionReal",
                     "puedeVerReales",
@@ -73853,6 +74023,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -74049,6 +74223,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -74160,6 +74335,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -74438,6 +74617,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -74554,6 +74734,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -74673,6 +74857,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -74887,6 +75072,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -74914,7 +75103,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -75712,6 +75902,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -75908,6 +76102,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -76019,6 +76214,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -76297,6 +76496,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -76413,6 +76613,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -76532,6 +76736,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -76746,6 +76951,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -76773,7 +76982,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -77490,6 +77700,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -77686,6 +77900,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -77797,6 +78012,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -78075,6 +78294,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -78191,6 +78411,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -78310,6 +78534,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -78524,6 +78749,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -78551,7 +78780,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -79115,6 +79345,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -79311,6 +79545,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -79422,6 +79657,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -79700,6 +79939,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -79816,6 +80056,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -79935,6 +80179,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -80149,6 +80394,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -80176,7 +80425,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -80724,6 +80974,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -80920,6 +81174,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -81031,6 +81286,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -81309,6 +81568,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -81425,6 +81685,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -81544,6 +81808,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -81758,6 +82023,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -81785,7 +82054,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -82320,6 +82590,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -82516,6 +82790,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -82627,6 +82902,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -82905,6 +83184,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -83021,6 +83301,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -83140,6 +83424,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -83354,6 +83639,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -83381,7 +83670,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -83904,6 +84194,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -84100,6 +84394,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -84211,6 +84506,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -84489,6 +84788,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -84605,6 +84905,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -84724,6 +85028,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -84938,6 +85243,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -84965,7 +85274,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -85534,6 +85844,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -85730,6 +86044,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -85841,6 +86156,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -86119,6 +86438,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -86235,6 +86555,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -86354,6 +86678,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -86568,6 +86893,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -86595,7 +86924,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -87141,6 +87471,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -87337,6 +87671,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -87448,6 +87783,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -87726,6 +88065,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -87842,6 +88182,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -87961,6 +88305,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -88175,6 +88520,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -88202,7 +88551,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -88725,6 +89075,10 @@
                             ],
                             "description": "Quién firmó este renglón, o null."
                           },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                          },
                           "idTela": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -88921,6 +89275,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idTela",
                           "nombre",
                           "unidad",
@@ -89032,6 +89387,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idAvio": {
                             "type": "integer",
@@ -89310,6 +89669,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idAvio",
                           "clave",
                           "descripcion",
@@ -89426,6 +89786,10 @@
                               }
                             ],
                             "description": "Quién firmó este renglón, o null."
+                          },
+                          "precioModeloOculto": {
+                            "type": "boolean",
+                            "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                           },
                           "idModeloArte": {
                             "anyOf": [
@@ -89545,6 +89909,7 @@
                           "cambios",
                           "liberadoEn",
                           "liberadoPor",
+                          "precioModeloOculto",
                           "idModeloArte",
                           "descripcion",
                           "posicion",
@@ -89759,6 +90124,10 @@
                       ],
                       "additionalProperties": false,
                       "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                     }
                   },
                   "required": [
@@ -89786,7 +90155,8 @@
                     "avios",
                     "artes",
                     "desalineacion",
-                    "frenteAlGrupo"
+                    "frenteAlGrupo",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -90395,6 +90765,10 @@
                                 ],
                                 "description": "Quién firmó este renglón, o null."
                               },
+                              "precioModeloOculto": {
+                                "type": "boolean",
+                                "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
+                              },
                               "idTela": {
                                 "type": "integer",
                                 "minimum": -9007199254740991,
@@ -90591,6 +90965,7 @@
                               "cambios",
                               "liberadoEn",
                               "liberadoPor",
+                              "precioModeloOculto",
                               "idTela",
                               "nombre",
                               "unidad",
@@ -90702,6 +91077,10 @@
                                   }
                                 ],
                                 "description": "Quién firmó este renglón, o null."
+                              },
+                              "precioModeloOculto": {
+                                "type": "boolean",
+                                "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                               },
                               "idAvio": {
                                 "type": "integer",
@@ -90980,6 +91359,7 @@
                               "cambios",
                               "liberadoEn",
                               "liberadoPor",
+                              "precioModeloOculto",
                               "idAvio",
                               "clave",
                               "descripcion",
@@ -91096,6 +91476,10 @@
                                   }
                                 ],
                                 "description": "Quién firmó este renglón, o null."
+                              },
+                              "precioModeloOculto": {
+                                "type": "boolean",
+                                "description": "¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = `precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla del modelo); false = un null es «no hay»."
                               },
                               "idModeloArte": {
                                 "anyOf": [
@@ -91215,6 +91599,7 @@
                               "cambios",
                               "liberadoEn",
                               "liberadoPor",
+                              "precioModeloOculto",
                               "idModeloArte",
                               "descripcion",
                               "posicion",
@@ -91429,6 +91814,10 @@
                           ],
                           "additionalProperties": false,
                           "description": "Cómo va esta OP frente a sus OP hermanas (mismo linaje de modelo), calculado al vuelo. INFORMATIVO: nunca bloquea nada."
+                        },
+                        "preciosOcultos": {
+                          "type": "boolean",
+                          "description": "¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta cualquiera de las dos. Con true, el formulario NO manda `precio`."
                         }
                       },
                       "required": [
@@ -91456,7 +91845,8 @@
                         "avios",
                         "artes",
                         "desalineacion",
-                        "frenteAlGrupo"
+                        "frenteAlGrupo",
+                        "preciosOcultos"
                       ],
                       "additionalProperties": false,
                       "description": "Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43)."
@@ -252922,6 +253312,10 @@
                         "description": "Renglón por talla de un avío del BOM: su CANTIDAD y/o su MEDIDA amarrada."
                       },
                       "description": "Medidas por talla del avío."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el `precioMedida` de las tallas para esta sesión? (fila 0.249 parte C). true = va null porque no te toca ver precios de avío; false = un null es «sin amarre»."
                     }
                   },
                   "required": [
@@ -252933,7 +253327,8 @@
                     "unidadConsumo",
                     "unidadMedida",
                     "avisos",
-                    "tallas"
+                    "tallas",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas por talla de un avío del BOM de un modelo."
@@ -253321,6 +253716,10 @@
                         "description": "Renglón por talla de un avío del BOM: su CANTIDAD y/o su MEDIDA amarrada."
                       },
                       "description": "Medidas por talla del avío."
+                    },
+                    "preciosOcultos": {
+                      "type": "boolean",
+                      "description": "¿El servidor TAPÓ el `precioMedida` de las tallas para esta sesión? (fila 0.249 parte C). true = va null porque no te toca ver precios de avío; false = un null es «sin amarre»."
                     }
                   },
                   "required": [
@@ -253332,7 +253731,8 @@
                     "unidadConsumo",
                     "unidadMedida",
                     "avisos",
-                    "tallas"
+                    "tallas",
+                    "preciosOcultos"
                   ],
                   "additionalProperties": false,
                   "description": "Medidas por talla de un avío del BOM de un modelo."

@@ -51,6 +51,7 @@ import type { z } from 'zod';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeAvio } from '../catalogos/precios-de-catalogo.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -486,6 +487,31 @@ async function sincronizarMedidas(
 }
 
 /**
+ * Medidas por talla TAL COMO SALEN hacia quien las consulta (fila 0.249 parte C):
+ * `preciosOcultos: true` = el `precioMedida` de cada talla va null porque la sesión no ve precios de
+ * avío (no porque la medida no tenga precio).
+ */
+export type MedidasAvioVisible = MedidasAvio & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR el precio de cada medida amarrada (fila 0.249 parte C). Es el precio de la
+ * `AvioMedida` del CATÁLOGO, que la parte B ya tapa con `puedeVerPreciosDeAvio` en el catálogo de
+ * avíos: aquí la misma regla, para que el BOM no sea su puerta lateral. El PUT no lleva precios
+ * (sólo el amarre `idAvioMedida`), así que no hay formulario que pueda pisarlos.
+ */
+export function ocultarPreciosDeMedidasSiNoPuede(
+  sesion: SesionUsuario,
+  medidas: MedidasAvio,
+): MedidasAvioVisible {
+  if (puedeVerPreciosDeAvio(sesion)) return { ...medidas, preciosOcultos: false };
+  return {
+    ...medidas,
+    tallas: medidas.tallas.map((t) => ({ ...t, precioMedida: null })),
+    preciosOcultos: true,
+  };
+}
+
+/**
  * Obtiene las medidas por talla de un avío del BOM. Requiere `modelos.ver`. Lanza
  * `ErrorNoEncontrado` si el avío no está en el BOM de ese modelo. Devuelve el toggle
  * `consumoPorTalla` + las tallas con su medida (ordenadas por orden de la talla luego etiqueta).
@@ -495,14 +521,17 @@ export async function obtenerMedidasAvio(
   idModelo: number,
   idAvio: number,
   bd?: ContextoBd,
-): Promise<MedidasAvio> {
+): Promise<MedidasAvioVisible> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   // V1-E9b — el renglón del BOM y sus medidas salen del modelo de la RECETA (con un hijo del
   // linaje 1:N son del padre); la CURVA y los avisos siguen siendo del modelo que se mira.
   const idReceta = await resolverIdRecetaDeModelo(cliente, idModelo);
   const contexto = await exigirRenglonAvio(cliente, idReceta, idAvio);
-  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva, idReceta);
+  return ocultarPreciosDeMedidasSiNoPuede(
+    sesion,
+    await leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva, idReceta),
+  );
 }
 
 /**
@@ -521,11 +550,11 @@ export async function guardarMedidasAvio(
   idAvio: number,
   entrada: EntradaMedidasAvio,
   bd?: ContextoBd,
-): Promise<MedidasAvio> {
+): Promise<MedidasAvioVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaMedidasAvioGuardar, entrada);
 
-  return enTransaccion(async (tx) => {
+  const guardado = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
     // ⭐ V1-E9b pieza B — VA ANTES de `exigirRenglonAvio`, y el orden es el mensaje: sobre un hijo
     // del linaje 1:N el renglón del BOM no existe (vive en el padre), así que sin esta línea la
@@ -593,4 +622,6 @@ export async function guardarMedidasAvio(
     }
     return resultado;
   }, bd);
+  // Fila 0.249 parte C: el eco pasa por el MISMO redactor (hoy `modelos.administrar` lo ve todo).
+  return ocultarPreciosDeMedidasSiNoPuede(sesion, guardado);
 }

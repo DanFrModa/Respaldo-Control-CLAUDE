@@ -265,6 +265,8 @@ function fichaBase(
     id: 1,
     codigo: '501',
     origen: 'produccion',
+    maquilaOculta: false,
+    preciosOcultos: false,
     codigoDesarrollo: null,
     numeroProduccion: null,
     // Linaje de versiones (V1-E7b): estos fixtures son de modelos RAÍZ (no nacieron de otro).
@@ -330,6 +332,7 @@ function fichaBase(
         proveedorPrecio: null,
         amarreIgnorado: false,
         precioReferencia: 40,
+        preciosOcultos: false,
       },
     ],
     avios: [],
@@ -414,6 +417,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: 'Zippers MX',
               amarreIgnorado: false,
               precioReferencia: 9,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -530,6 +534,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: 'Alsatex',
               amarreIgnorado: false,
               precioReferencia: 40,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -587,6 +592,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: null,
               amarreIgnorado: true,
               precioReferencia: 40,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -627,6 +633,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: 'Otro Textil',
               amarreIgnorado: true,
               precioReferencia: 40,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -665,6 +672,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               amarreIgnorado: false,
               // El catálogo dice 9, pero el motor NO costea con eso: costea 4.20.
               precioReferencia: 9,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -705,6 +713,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: null,
               amarreIgnorado: false,
               precioReferencia: 2,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -745,6 +754,7 @@ describe('<EditorBom> — secciones de la receta', () => {
           proveedorPrecio: 'Botones Caros',
           amarreIgnorado: false,
           precioReferencia: 1,
+          preciosOcultos: false,
         },
       ],
     });
@@ -786,6 +796,7 @@ describe('<EditorBom> — secciones de la receta', () => {
               proveedorPrecio: 'Textiles del Valle',
               amarreIgnorado: false,
               precioReferencia: 40,
+              preciosOcultos: false,
             },
           ],
         })}
@@ -819,6 +830,7 @@ describe('<EditorBom> — secciones de la receta', () => {
           proveedorPrecio: 'Botones SA',
           amarreIgnorado: false,
           precioReferencia: 1,
+          preciosOcultos: false,
         },
       ],
     });
@@ -862,6 +874,7 @@ describe('<EditorBom> — secciones de la receta', () => {
             posicion: null,
             puntadas: null,
             precio: 30,
+            preciosOcultos: false,
             idTipoArte: 9,
             tipoArte: 'Bordado',
             codigoTipoArte: 'bordado',
@@ -919,6 +932,7 @@ describe('<EditorBom> — secciones de la receta', () => {
         proveedorPrecio: null,
         amarreIgnorado: false,
         precioReferencia: 4.2,
+        preciosOcultos: false,
       },
     ];
 
@@ -1188,6 +1202,7 @@ describe('El consumo del COMPLEMENTO de la tela (0.156)', () => {
           proveedorPrecio: null,
           amarreIgnorado: false,
           precioReferencia: 40,
+          preciosOcultos: false,
         },
       ],
     });
@@ -1250,5 +1265,104 @@ describe('El consumo del COMPLEMENTO de la tela (0.156)', () => {
       telas: { consumoComplementoPorPrenda: number | null }[];
     };
     expect(args.telas[0]?.consumoComplementoPorPrenda).toBeNull();
+  });
+});
+
+/**
+ * 🔒 Fila 0.249 parte C — el BOM YA GUARDADO también llega con los precios TAPADOS cuando la sesión
+ * no ve precios de catálogo. El renglón pinta «—» y NUNCA «sin precio» ni el escalón (el origen sin
+ * la cifra deduciría lo que no se vio).
+ */
+describe('Renglón del BOM guardado con los precios TAPADOS (0.249 parte C)', () => {
+  const telaTapada = {
+    idTela: 9,
+    nombre: 'Jersey',
+    consumoPorPrenda: 1,
+    nombreComplemento: null,
+    consumoComplementoPorPrenda: null,
+    paraPreCosto: true,
+    paraProduccion: true,
+    paraCosto: true,
+    idTelaProveedor: null,
+    proveedorAmarrado: null,
+    precioPorColor: false,
+    precioCosteo: null,
+    origenPrecio: 'sin-precio' as const,
+    proveedorPrecio: null,
+    amarreIgnorado: false,
+    precioReferencia: null,
+    preciosOcultos: true,
+  };
+
+  it('tapado: «—», sin el chip «sin precio»', () => {
+    renderConProveedores(
+      <EditorBom ficha={fichaBase([], { telas: [telaTapada] })} puedeAdministrar={false} />,
+      {
+        sesion: estadoSesionDePrueba(['modelos.ver']),
+      },
+    );
+    const renglon = screen.getByTestId('renglon-bom-9');
+    expect(within(renglon).getByTestId('precio-renglon-tapado')).toHaveTextContent('—');
+    expect(within(renglon).queryByText('sin precio')).not.toBeInTheDocument();
+  });
+
+  /** H3 del reviewer: la gemela del AVÍO (su marca se lee en otro mapeo, `aRenglonAvio`). */
+  const avioTapado = {
+    idAvio: 66,
+    clave: 'CIE-66',
+    descripcion: 'Cierre guardado',
+    consumoPorPrenda: 1,
+    paraPreCosto: true,
+    paraProduccion: true,
+    paraCosto: true,
+    consumoPorTalla: false,
+    idAvioProveedor: null,
+    proveedorAmarrado: null,
+    precioCosteo: null,
+    origenPrecio: 'sin-precio' as const,
+    proveedorPrecio: null,
+    amarreIgnorado: false,
+    precioReferencia: null,
+    preciosOcultos: true,
+  };
+
+  it('AVÍO guardado tapado: «—», sin el chip «sin precio»', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <EditorBom ficha={fichaBase([], { avios: [avioTapado] })} puedeAdministrar={false} />,
+      { sesion: estadoSesionDePrueba(['modelos.ver']) },
+    );
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    const renglon = screen.getByTestId('renglon-bom-66');
+    expect(within(renglon).getByTestId('precio-renglon-tapado')).toHaveTextContent('—');
+    expect(within(renglon).queryByText('sin precio')).not.toBeInTheDocument();
+  });
+
+  it('control: el MISMO avío sin la marca sí dice «sin precio»', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], { avios: [{ ...avioTapado, preciosOcultos: false }] })}
+        puedeAdministrar={false}
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver']) },
+    );
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    const renglon = screen.getByTestId('renglon-bom-66');
+    expect(within(renglon).queryByTestId('precio-renglon-tapado')).not.toBeInTheDocument();
+    expect(within(renglon).getByText('sin precio')).toBeInTheDocument();
+  });
+
+  it('control: el MISMO renglón sin la marca sí dice «sin precio»', () => {
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], { telas: [{ ...telaTapada, preciosOcultos: false }] })}
+        puedeAdministrar={false}
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver']) },
+    );
+    const renglon = screen.getByTestId('renglon-bom-9');
+    expect(within(renglon).queryByTestId('precio-renglon-tapado')).not.toBeInTheDocument();
+    expect(within(renglon).getByText('sin precio')).toBeInTheDocument();
   });
 });

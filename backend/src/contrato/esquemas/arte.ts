@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
+
 /**
  * ARTE del modelo (bordado / estampado / aplicación / lavado…) — contrato compartido
  * (V1-E3d §Post-F9.35 + **V1-E3f §Post-F9.52/.58**).
@@ -141,6 +143,11 @@ export const esquemaArteSalida = z
     posicion: z.string().nullable().describe('Dónde va en la prenda (texto libre), o null.'),
     puntadas: z.number().int().nullable().describe('Número de puntadas (informativo), o null.'),
     precio: z.number().nullable().describe('Precio del arte (el que viaja a la OP), o null.'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C). true = ' +
+        'va null porque no te toca verlo; false = un null es «sin precio». Con true el formulario ' +
+        'NO manda `precio`.',
+    ),
     idTipoArte: z.number().int().describe('Id del tipo de arte (catálogo TipoProceso).'),
     tipoArte: z.string().describe('Nombre del tipo de arte, resuelto.'),
     codigoTipoArte: z.string().describe('Código estable del tipo de arte (ej. "bordado").'),
@@ -246,6 +253,9 @@ export const esquemaGaleriaArteItem = z
     // copiar un arte se copia SU PRECIO, así que hay que verlo ANTES de elegirlo. La rejilla de
     // la galería no lo muestra —ahí sobra—, pero el campo NO es decorativo.
     precio: z.number().nullable().describe('Precio del arte, o null.'),
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ el `precio` de este arte para esta sesión? (fila 0.249 parte C).',
+    ),
     idArchivoFoto: z
       .string()
       .nullable()

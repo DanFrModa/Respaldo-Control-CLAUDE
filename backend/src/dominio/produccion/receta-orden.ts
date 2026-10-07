@@ -122,6 +122,8 @@ import {
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerMedidasAvioBom, leerTelasBom } from '../modelos/bom-modelo.js';
 import { resolverIdRecetaDeModelo } from '../modelos/receta-compartida.js';
+import { puedeVerPreciosDeOrden, puedeVerPreciosDeModelo } from '../modelos/precios-de-modelo.js';
+import { puedeVerPreciosDeAvio, puedeVerPreciosDeTela } from '../catalogos/precios-de-catalogo.js';
 // ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
 // junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
 // comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
@@ -800,6 +802,96 @@ function pesos(valor: number | null): string {
 }
 
 /**
+ * El TEXTO del aviso de un cambio de precio. `precio` = las dos cifras (lo congelado en la orden y
+ * lo que dice hoy el modelo) o `null` = **sin cifras**, para quien no puede ver precios (fila 0.249
+ * parte C): el aviso le dice QUE el precio se movió —la desalineación es real y le toca saberla—
+ * pero no CUÁNTO. ⚠️ Los dos textos viven juntos a propósito: el redactor
+ * ({@link ocultarPreciosDeRecetaSiNoPuede}) reescribe el `detalle` con ESTA función, así que un
+ * cambio de redacción de un lado no puede dejar el número colgando en el otro.
+ */
+export function detalleCambioDePrecio(
+  que: 'precio' | 'precio-mercado',
+  material: string,
+  precio: { orden: number | null; modelo: number | null } | null,
+): string {
+  if (que === 'precio-mercado') {
+    return precio === null
+      ? `La última COMPRA REAL de "${material}" tiene otro precio que el que congeló esta orden. ` +
+          `El modelo no cambió: cambió el precio de compra.`
+      : `La última COMPRA REAL de "${material}" es de ${pesos(precio.modelo)} y esta orden ` +
+          `congeló ${pesos(precio.orden)}. El modelo no cambió: cambió el precio de compra.`;
+  }
+  return precio === null
+    ? `El precio de "${material}" cambió en el modelo.`
+    : `El precio de "${material}" pasó de ${pesos(precio.orden)} a ${pesos(precio.modelo)} en el modelo.`;
+}
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR los precios de la receta de una orden para quien no puede verlos (fila
+ * 0.249 parte C, §Post-F9.257(c)). Proyección pura sobre la receta ya armada: nunca escribe.
+ *
+ * 🔑 **Cada campo se tapa con la regla de DONDE SALE** (hallazgo del reviewer: con una sola regla,
+ * Ventas —que edita la receta— veía aquí el precio del arte del MODELO que en la ficha le sale
+ * tapado: una puerta lateral):
+ *  • el precio CONGELADO propio de cada renglón (`precio`) → regla de la ORDEN
+ *    (`puedeVerPreciosDeOrden`: la llave de quien lo escribe está en ella);
+ *  • lo que la tela REPITE del catálogo/BOM (`precioModelo`, `precioComplemento`) →
+ *    `puedeVerPreciosDeTela`;
+ *  • lo que el avío REPITE (`precioModelo`, el `precioMedida` de cada talla) → `puedeVerPreciosDeAvio`;
+ *  • lo que el arte REPITE del modelo (`precioModelo` = `ModeloArte.precio`) → `puedeVerPreciosDeModelo`.
+ *
+ * Y **las cifras dentro del TEXTO** de los avisos de cambio de precio —un número escrito en una frase
+ * llega igual que en un campo—: el aviso compara lo congelado contra lo del origen, así que sólo
+ * lleva cifras si la sesión ve LAS DOS cosas; si falta cualquiera, dice QUE cambió, no cuánto. Lo que
+ * NO se tapa: el `que: 'precio'` del renglón (la desalineación es un hecho que quien ve la orden tiene
+ * que saber) ni `precioModeloDeCompra` (dice de dónde sale, no cuánto).
+ */
+export function ocultarPreciosDeRecetaSiNoPuede(
+  sesion: SesionUsuario,
+  receta: RecetaOrden,
+): RecetaOrden {
+  const verOrden = puedeVerPreciosDeOrden(sesion);
+  const verTela = puedeVerPreciosDeTela(sesion);
+  const verAvio = puedeVerPreciosDeAvio(sesion);
+  const verModelo = puedeVerPreciosDeModelo(sesion);
+  /** ¿La sesión ve el ORIGEN del renglón de este tipo? */
+  const veOrigen = (tipo: TipoRenglonRecetaClave): boolean =>
+    tipo === 'tela' ? verTela : tipo === 'avio' ? verAvio : verModelo;
+  return {
+    ...receta,
+    preciosOcultos: !verOrden,
+    telas: receta.telas.map((t) => ({
+      ...t,
+      precio: verOrden ? t.precio : null,
+      precioModelo: verTela ? t.precioModelo : null,
+      precioComplemento: verTela ? t.precioComplemento : null,
+      precioModeloOculto: !verTela,
+    })),
+    avios: receta.avios.map((a) => ({
+      ...a,
+      precio: verOrden ? a.precio : null,
+      precioModelo: verAvio ? a.precioModelo : null,
+      tallas: verAvio ? a.tallas : a.tallas.map((t) => ({ ...t, precioMedida: null })),
+      precioModeloOculto: !verAvio,
+    })),
+    artes: receta.artes.map((ar) => ({
+      ...ar,
+      precio: verOrden ? ar.precio : null,
+      precioModelo: verModelo ? ar.precioModelo : null,
+      precioModeloOculto: !verModelo,
+    })),
+    desalineacion: {
+      ...receta.desalineacion,
+      cambios: receta.desalineacion.cambios.map((c) =>
+        (c.que === 'precio' || c.que === 'precio-mercado') && !(verOrden && veOrigen(c.tipo))
+          ? { ...c, detalle: detalleCambioDePrecio(c.que, c.material, null) }
+          : c,
+      ),
+    },
+  };
+}
+
+/**
  * ⭐⭐ 0.165 (§Post-F9.219) — LA PUERTA DEL COMPLEMENTO **EN LA ORDEN**: un consumo de complemento
  * sólo se captura donde el CATÁLOGO declara complemento (`Tela.nombreComplemento`). Es palabra por
  * palabra la misma guarda que el BOM del modelo (`modelos/bom-modelo.ts::exigirTelasValidas`) y el
@@ -921,27 +1013,15 @@ export function calcularDesalineacion(
     // con esa tela—. Cuando el precio del modelo viene del escalón de COMPRA, el aviso lo dice así
     // y NO enciende el rojo de `conOrdenCompra`.
     if (precio.orden !== null && difieren(precio.orden, precio.modelo)) {
-      propios.push(
-        precio.deCompra
-          ? {
-              tipo,
-              idRenglon: r.id,
-              material,
-              idMaterialModelo: null,
-              que: 'precio-mercado',
-              detalle:
-                `La última COMPRA REAL de "${material}" es de ${pesos(precio.modelo)} y esta orden ` +
-                `congeló ${pesos(precio.orden)}. El modelo no cambió: cambió el precio de compra.`,
-            }
-          : {
-              tipo,
-              idRenglon: r.id,
-              material,
-              idMaterialModelo: null,
-              que: 'precio',
-              detalle: `El precio de "${material}" pasó de ${pesos(precio.orden)} a ${pesos(precio.modelo)} en el modelo.`,
-            },
-      );
+      const que = precio.deCompra ? ('precio-mercado' as const) : ('precio' as const);
+      propios.push({
+        tipo,
+        idRenglon: r.id,
+        material,
+        idMaterialModelo: null,
+        que,
+        detalle: detalleCambioDePrecio(que, material, precio),
+      });
     }
     return propios;
   };
@@ -1091,7 +1171,9 @@ export async function obtenerRecetaOrden(
   exigirVerLaReceta(sesion);
   const cliente = clienteLectura(bd);
   const orden = await exigirOrdenDeLaEmpresa(cliente, idOrden, sesion.idEmpresaActiva);
-  return armarReceta(cliente, orden);
+  // ⭐ Fila 0.249 parte C: la lectura llega con `ordenes.ver` o `desarrollo.ver`, que son llaves de
+  // vocabulario: los precios sólo salen para quien `puedeVerPreciosDeOrden`.
+  return ocultarPreciosDeRecetaSiNoPuede(sesion, await armarReceta(cliente, orden));
 }
 
 /** Arma la salida completa de la receta (compartido por la lectura y por cada mutación). */
@@ -1259,6 +1341,8 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      // Fila 0.249 parte C: se arma completo; la tapa la pone `ocultarPreciosDeRecetaSiNoPuede`.
+      precioModeloOculto: false,
       // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTA tela para esta orden.
       ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: f.idTela, idAvio: null }),
     };
@@ -1303,6 +1387,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoModelo: delModelo?.consumoPorPrenda ?? null,
       precioModelo: delModelo?.precioCosteo ?? null,
       precioModeloDeCompra: delModelo?.origenPrecio === 'ultimo-precio-compra',
+      precioModeloOculto: false,
       // ⭐⭐⭐ 0.085: las OC ya comprometidas que compraron ESTE avío para esta orden.
       ocsComprometidas: ocsDeMaterial(comprometidas, { idTela: null, idAvio: f.idAvio }),
     };
@@ -1340,6 +1425,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       proveedor: f.proveedor?.nombre ?? null,
       precioModelo: delModelo?.precio ?? null,
       precioModeloDeCompra: false,
+      precioModeloOculto: false,
     };
   });
 
@@ -1475,6 +1561,9 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // CANCELADA (una cancelada no es del grupo ni recibe aviso), y ahí lo honesto es no decir nada
     // en vez de inventar un grupo. Es INFORMATIVO: no toca `puedeComprar` ni ninguna guarda.
     frenteAlGrupo: frenteAlGrupo.get(orden.id) ?? sinHermanas(),
+    // ⭐ Fila 0.249 parte C: la receta se ARMA completa; la tapa la pone después
+    // `ocultarPreciosDeRecetaSiNoPuede`, que es quien conoce la sesión.
+    preciosOcultos: false,
   };
 }
 
@@ -1829,7 +1918,7 @@ async function enRecetaEditable<T>(
   } = {},
 ): Promise<RecetaOrden> {
   verificarPermiso(sesion, 'desarrollo.administrar');
-  return enTransaccion(async (tx) => {
+  const resultado = await enTransaccion(async (tx) => {
     // ⭐ 0.061 / 0.226a: la orden CERRADA no admite mover su receta. Guarda ÚNICA con candado
     // compartido, PRIMERA instrucción. `permitirOrdenNoViva` (cerrar la receta) la salta entera, a
     // propósito — ver el TSDoc de la opción.
@@ -1939,6 +2028,10 @@ async function enRecetaEditable<T>(
     }
     return receta;
   }, bd);
+  // ⭐ Fila 0.249 parte C: el ECO de la mutación pasa por el MISMO redactor que la lectura. Hoy
+  // `desarrollo.administrar` (la llave de arriba) está en la regla y nunca tapa nada; se aplica igual
+  // para que el eco no pueda volverse la puerta lateral el día que la regla o la llave cambien.
+  return ocultarPreciosDeRecetaSiNoPuede(sesion, resultado);
 }
 
 /**

@@ -109,14 +109,38 @@ describe('precios de la orden — gateo de lectura del resumen (§4.4.3)', () =>
     expect(resumen.ultimoEventoAplicacion?.capturadoPor).toBe('Daniel Masri');
   });
 
-  it('SIN ver-precio-real-maquila: los montos reales van null (la referencia del modelo sí sale)', async () => {
-    const s = sesionDePrueba({ permisos: ['ordenes.ver', 'pedidos.importes'] });
+  it('SIN ver-precio-real-maquila: los montos reales van null (la referencia sale a quien captura maquila)', async () => {
+    const s = sesionDePrueba({
+      permisos: ['ordenes.ver', 'pedidos.importes', 'ordenes.precio-maquila'],
+    });
     const resumen = await obtenerPreciosOrden(s, 5, bdLectura());
     expect(resumen.puedeVerReales).toBe(false);
     expect(resumen.maquilaReal).toBeNull();
     expect(resumen.aplicacionReal).toBeNull();
     expect(resumen.maquilaReferencia).toBe(23.5);
+    expect(resumen.maquilaReferenciaOculta).toBe(false);
   });
+
+  // ⭐ Fila 0.249 parte C: la referencia era el ÚNICO monto del resumen sin reja.
+  it('con SÓLO ordenes.ver la maquila de referencia va TAPADA (null + marca), no «sin dato»', async () => {
+    const s = sesionDePrueba({ permisos: ['ordenes.ver'] });
+    const resumen = await obtenerPreciosOrden(s, 5, bdLectura());
+    expect(resumen.maquilaReferencia).toBeNull();
+    expect(resumen.maquilaReferenciaOculta).toBe(true);
+    // Y el rastro (quién/cuándo/proveedor) sigue llegando: no es dinero.
+    expect(resumen.ultimoEventoMaquila?.capturadoPor).toBe('Daniel Masri');
+  });
+
+  // Escritas a mano a propósito (no importadas de la regla): si alguien quita una, esto lo dice.
+  it.each(['consultas.ver-importes', 'modelos.administrar', 'ordenes.precio-maquila'] as const)(
+    'con ordenes.ver + %s la maquila de referencia SÍ sale',
+    async (llave) => {
+      const s = sesionDePrueba({ permisos: ['ordenes.ver', llave] });
+      const resumen = await obtenerPreciosOrden(s, 5, bdLectura());
+      expect(resumen.maquilaReferencia).toBe(23.5);
+      expect(resumen.maquilaReferenciaOculta).toBe(false);
+    },
+  );
 
   it('SIN pedidos.importes: precioVenta va null (regla de importes del doc 02 §3)', async () => {
     const s = sesionDePrueba({ permisos: ['ordenes.ver', 'ordenes.ver-precio-real-maquila'] });

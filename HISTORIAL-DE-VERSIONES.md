@@ -71,6 +71,56 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.206 · 7-oct-2026 · **en prueba** — **Los precios de modelos y órdenes ya sólo le llegan a quien tiene llave de dinero**
+
+> **La v0.206 no cierra ninguna fila del programa**: entrega la tercera parte de la 0.249. Quien consultaba modelos u
+> órdenes recibía de paso la maquila y el corte de referencia, los precios de la receta del modelo, los precios
+> congelados de la receta de la orden y el histórico. Ahora se tapan en el servidor, igual que se hizo con telas y avíos.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Quien sólo consulta modelos ve el modelo sin dinero** («—»): ni el corte de referencia, ni el precio del arte, ni los
+precios de su receta (tela y avío) ni los de sus medidas por talla. **Quien sólo consulta órdenes ve la orden sin
+precios**: ni los congelados de su receta, ni la maquila de referencia, ni el precio de habilitación del histórico. Los
+avisos de la receta **siguen diciendo que un precio cambió, pero no cuánto**.
+
+**Los siguen viendo quienes los usan:** quien ve importes y precios, quien administra modelos, y quien edita recetas de
+orden (la llave de desarrollo) ve los precios que él mismo escribe. **La maquila de referencia la ve también quien
+captura el precio de maquila** (Producción y Ventas), porque es su punto de comparación.
+
+**Nadie borra un precio sin querer:** quien no ve un precio no puede mandarlo vacío al guardar el modelo, el arte o la
+receta.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**En el modelo, dejan de ver el corte de referencia y el precio del arte:** Producción, Ventas, Logística, Asistente,
+Secretarial, Compras, Habilitaciones, Encargado de Telas, Encargado de Corte, Almacén de Producto Terminado, Líder y
+Supervisor de Calidad, Diseño Gráfico y Auxiliar. **Y la maquila de referencia**, todos ésos menos Producción y Ventas.
+**Los precios de tela y avío de la receta del modelo** los dejan de ver Producción, Habilitaciones, Encargado de Telas,
+Encargado de Corte, Almacén de Producto Terminado, Líder y Supervisor de Calidad, Diseño Gráfico y Auxiliar (los demás
+los siguen viendo porque compran).
+
+**En la orden, dejan de ver los precios congelados de la receta y el histórico:** Logística, Asistente, Secretarial,
+Administración y Finanzas, Producción, Compras, Habilitaciones, Encargado de Telas, Encargado de Corte, Almacén de
+Producto Terminado, Entregas, Líder y Supervisor de Calidad, Diseño Gráfico y Auxiliar. Administración y Finanzas y
+Entregas tampoco ven ya la maquila de referencia de la orden. Compras sigue viendo en la explosión de materiales y en la
+orden de compra los precios de compra del proveedor, que son otro dato.
+
+**Ventas** sigue viendo en la receta de la orden los precios que escribe, pero **ya no el precio del arte del modelo**
+(que en Modelos tampoco ve): el aviso de cambio de precio del arte le llega sin cifras. ⚠️ Ojo: el precio
+congelado del arte en cada orden nace como copia del precio del modelo, y ése sí lo ve porque lo edita — pregunta a
+Daniel en §Post-F9.274.
+
+**Sin cambio:** Dirección, Gerencia, Gerente de Ventas, Desarrollo de Producto y Gestión Técnica lo siguen viendo todo.
+
+### ⏳ Sigue pendiente o roto
+
+**Falta la parte D de la 0.249: la bitácora.** Guarda en claro los cambios de maquila, corte, arte, receta de la orden y
+maquila real, y la leen Ventas, Logística, Asistente y Secretarial, que no tienen llave para todos esos precios. Una prueba ya
+vigila que no se agregue ningún precio nuevo a la bitácora sin decidirlo. **Y la meta de costo del modelo** (prometido y
+conseguido) todavía la ve cualquiera que consulta modelos. Tres preguntas a Daniel en §Post-F9.274; hasta resolverlas,
+modelos y órdenes **no pueden entrar** al piso de lectura.
+
 ## 0.205 · 7-oct-2026 · **en prueba** — **Los precios de telas y avíos ya sólo le llegan a quien compra, administra o ve importes**
 
 > **La v0.205 no cierra ninguna fila del programa**: entrega la segunda parte de la 0.249. Para poder abrir algún día

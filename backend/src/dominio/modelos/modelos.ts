@@ -36,6 +36,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { ocultarPreciosDeModeloSiNoPuede, type MarcasPreciosModelo } from './precios-de-modelo.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -108,6 +109,14 @@ export type ModeloConRelaciones = Modelo & {
    */
   costoActual?: number | null;
 };
+
+/**
+ * Modelo TAL COMO SALE hacia quien lo consulta (fila 0.249 parte C): `maquilaBase` y `corteBase` ya
+ * van tapados según la sesión, con sus dos marcas (`maquilaOculta`/`preciosOcultos`). Todas las
+ * funciones de este archivo que DEVUELVEN un modelo a una ruta devuelven este tipo, así que el
+ * mapeador de la ruta no puede recibir un modelo sin tapar (no compila).
+ */
+export type ModeloVisible = ModeloConRelaciones & MarcasPreciosModelo;
 
 /** `include` estándar para traer nombres de relaciones + conteo de fotos. */
 export const incluirRelacionesModelo = {
@@ -764,17 +773,19 @@ export async function crearModelo(
   sesion: SesionUsuario,
   entrada: EntradaCrearModelo,
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCrear, entrada);
 
-  return conConflictoDeCodigo(datos.codigo, () =>
+  const modelo = await conConflictoDeCodigo(datos.codigo, () =>
     enTransaccion(async (tx) => {
       // ⭐ La regla del alta normal, ANTES del núcleo (el modo migración entra por debajo).
       await exigirDigitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
       return crearModeloNucleo(tx, sesion, datos, marcaDesarrollo(datos.codigo));
     }, bd),
   );
+  // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return ocultarPreciosDeModeloSiNoPuede(sesion, modelo);
 }
 
 /**
@@ -787,12 +798,12 @@ export async function actualizarModelo(
   sesion: SesionUsuario,
   entrada: EntradaActualizarModelo,
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloEditar, entrada);
 
   try {
-    return await enTransaccion(async (tx) => {
+    const modelo = await enTransaccion(async (tx) => {
       const actual = await exigirModelo(tx, datos.id);
 
       const cambiaCodigo = datos.codigo !== undefined && datos.codigo !== actual.codigo;
@@ -915,6 +926,8 @@ export async function actualizarModelo(
         include: incluirRelacionesModelo,
       });
     }, bd);
+    // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+    return ocultarPreciosDeModeloSiNoPuede(sesion, modelo);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
       throw new ErrorConflicto('Ya existe un modelo con ese código.', { causa: error });
@@ -932,7 +945,7 @@ export async function descontinuarModelo(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirModelo(tx, id);
@@ -948,7 +961,7 @@ export async function reactivarModelo(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirModelo(tx, id);
@@ -961,7 +974,7 @@ export async function reactivarModelo(
 
 /** Resultado de «pasar a producción»: el modelo ya promovido + el detalle de la promoción. */
 export interface ModeloPromovido extends ResultadoPromocion {
-  modelo: ModeloConRelaciones;
+  modelo: ModeloVisible;
 }
 
 /**
@@ -1027,7 +1040,8 @@ export async function pasarModeloAProduccion(
         where: { id },
         include: incluirRelacionesModelo,
       });
-      return { ...resultado, modelo };
+      // ⭐ Fila 0.249 parte C: el modelo promovido sale con la MISMA tapa que la lectura.
+      return { ...resultado, modelo: ocultarPreciosDeModeloSiNoPuede(sesion, modelo) };
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
@@ -1046,7 +1060,7 @@ export async function obtenerModelo(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<ModeloConRelaciones> {
+): Promise<ModeloVisible> {
   verificarPermiso(sesion, 'modelos.ver');
   const modelo = await clienteLectura(bd).modelo.findUnique({
     where: { id },
@@ -1055,7 +1069,7 @@ export async function obtenerModelo(
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', id);
   }
-  return modelo;
+  return ocultarPreciosDeModeloSiNoPuede(sesion, modelo);
 }
 
 /**
@@ -1071,7 +1085,7 @@ export async function listarModelos(
   parametros: ParametrosListarModelos = {},
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
-): Promise<Pagina<ModeloConRelaciones>> {
+): Promise<Pagina<ModeloVisible>> {
   verificarPermiso(sesion, 'modelos.ver');
   const filtros = validarEntrada(esquemaListarModelosDominio, parametros);
   const cliente = clienteLectura(bd);
@@ -1106,7 +1120,12 @@ export async function listarModelos(
 
   const conFoto = await adjuntarFotoPrincipal(cliente, datos, archivos);
   const conAgregados = await adjuntarAgregadosListado(cliente, sesion, conFoto, bd);
-  return armarPagina(conAgregados, total, filtros);
+  // ⭐ Fila 0.249 parte C: el listado sale con la MISMA tapa que la ficha.
+  return armarPagina(
+    conAgregados.map((m) => ocultarPreciosDeModeloSiNoPuede(sesion, m)),
+    total,
+    filtros,
+  );
 }
 
 /**

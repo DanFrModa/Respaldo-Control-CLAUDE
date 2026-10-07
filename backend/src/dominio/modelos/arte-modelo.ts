@@ -62,6 +62,7 @@ import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeModelo } from './precios-de-modelo.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -240,6 +241,23 @@ function aDetalle(f: FilaArte): ModeloArteDetalle {
   };
 }
 
+/** Arte TAL COMO SALE hacia quien lo consulta (fila 0.249 parte C): precio ya tapado + su marca. */
+export type ModeloArteVisible = ModeloArteDetalle & { preciosOcultos: boolean };
+
+/**
+ * ⭐ Tapa EN EL SERVIDOR el precio de un ARTE del modelo para quien no puede verlo (fila 0.249 parte
+ * C, §Post-F9.257(c); regla en `precios-de-modelo.ts`). Lo cumplen el renglón del arte y la celda
+ * de la galería. Proyección pura: nunca escribe. Quien edita el arte lleva `modelos.administrar`,
+ * que está en la regla, así que el formulario siempre parte del precio completo.
+ */
+export function ocultarPrecioDeArteSiNoPuede<T extends { precio: number | null }>(
+  sesion: SesionUsuario,
+  arte: T,
+): T & { preciosOcultos: boolean } {
+  if (puedeVerPreciosDeModelo(sesion)) return { ...arte, preciosOcultos: false };
+  return { ...arte, precio: null, preciosOcultos: true };
+}
+
 /**
  * Lee el ARTE de un modelo, ORDENADO con el principal primero (ver {@link ORDEN_ARTES}). La usa la
  * ficha del modelo (`leerBom`), el impreso de la orden y los listados.
@@ -351,14 +369,17 @@ export async function listarArtesModelo(
   sesion: SesionUsuario,
   idModelo: number,
   bd?: ContextoBd,
-): Promise<ModeloArteDetalle[]> {
+): Promise<ModeloArteVisible[]> {
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const existe = await cliente.modelo.findUnique({ where: { id: idModelo }, select: { id: true } });
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  return leerArtesModelo(cliente, idModelo);
+  // ⭐ Fila 0.249 parte C: el precio del arte con la regla del MODELO.
+  return (await leerArtesModelo(cliente, idModelo)).map((a) =>
+    ocultarPrecioDeArteSiNoPuede(sesion, a),
+  );
 }
 
 /**
@@ -379,11 +400,11 @@ export async function crearArte(
   idModelo: number,
   entrada: EntradaCrearArte,
   bd?: ContextoBd,
-): Promise<ModeloArteDetalle> {
+): Promise<ModeloArteVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteCrear, entrada);
 
-  return enTransaccion(async (tx) => {
+  const arte = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
     // ⭐ V1-E9b pieza B — el arte de un HIJO del linaje 1:N es el de su desarrollo: agregarle uno
     // aquí crearía un renglón que su propia ficha NO enseña (ella lee la del padre) y que ninguna
@@ -423,6 +444,8 @@ export async function crearArte(
 
     return aDetalle(creado);
   }, bd);
+  // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return ocultarPrecioDeArteSiNoPuede(sesion, arte);
 }
 
 /** Detalle de un cambio de campo para la bitácora (de → a). */
@@ -451,11 +474,11 @@ export async function actualizarArte(
   idModelo: number,
   entrada: EntradaActualizarArte,
   bd?: ContextoBd,
-): Promise<ModeloArteDetalle> {
+): Promise<ModeloArteVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteEditar, entrada);
 
-  return enTransaccion(async (tx) => {
+  const arte = await enTransaccion(async (tx) => {
     // ⭐ V1-E9b pieza B — ANTES de `exigirArte`, y el orden es el mensaje: sobre un hijo el arte no
     // le pertenece (vive en el padre) y la respuesta era un 404 sobre un renglón que la ficha ACABA
     // de listar. Primero se dice de quién es la receta.
@@ -520,6 +543,8 @@ export async function actualizarArte(
 
     return aDetalle(arte);
   }, bd);
+  // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return ocultarPrecioDeArteSiNoPuede(sesion, arte);
 }
 
 /**
@@ -603,10 +628,10 @@ export async function marcarArtePrincipal(
   idModelo: number,
   idArte: number,
   bd?: ContextoBd,
-): Promise<ModeloArteDetalle[]> {
+): Promise<ModeloArteVisible[]> {
   verificarPermiso(sesion, 'modelos.administrar');
 
-  return enTransaccion(async (tx) => {
+  const artes = await enTransaccion(async (tx) => {
     // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_ARTE}::int, ${idModelo}::int)`;
     await exigirModelo(tx, idModelo);
@@ -646,6 +671,8 @@ export async function marcarArtePrincipal(
 
     return leerArtesModelo(tx, idModelo);
   }, bd);
+  // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return artes.map((a) => ocultarPrecioDeArteSiNoPuede(sesion, a));
 }
 
 /**
@@ -663,11 +690,11 @@ export async function copiarArteDeOtroModelo(
   idModelo: number,
   entrada: EntradaCopiarArte,
   bd?: ContextoBd,
-): Promise<ModeloArteDetalle> {
+): Promise<ModeloArteVisible> {
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaArteCopiarCuerpo, entrada);
 
-  return enTransaccion(async (tx) => {
+  const arte = await enTransaccion(async (tx) => {
     await exigirModelo(tx, idModelo);
     // ⭐ V1-E9b pieza B — el DESTINO no puede ser un hijo del linaje 1:N (misma razón que en
     // `crearArte`: el renglón caería en un modelo cuya ficha enseña la receta de otro).
@@ -730,6 +757,8 @@ export async function copiarArteDeOtroModelo(
 
     return aDetalle(creado);
   }, bd);
+  // ⭐ Fila 0.249 parte C: el eco pasa por la MISMA tapa que la lectura.
+  return ocultarPrecioDeArteSiNoPuede(sesion, arte);
 }
 
 // ── Galería de arte (armada DESDE los modelos, §Post-F9.35 punto 4) ───────────
@@ -744,7 +773,7 @@ export async function galeriaArte(
   sesion: SesionUsuario,
   parametros: ParametrosGaleriaArte = {},
   bd?: ContextoBd,
-): Promise<Pagina<GaleriaArteItem>> {
+): Promise<Pagina<GaleriaArteItem & { preciosOcultos: boolean }>> {
   verificarPermiso(sesion, 'modelos.ver');
   const filtros = validarEntrada(esquemaParametrosGaleria, parametros);
 
@@ -799,7 +828,13 @@ export async function galeriaArte(
     nombreModelo: f.modelo.descripcion,
   }));
 
-  return armarPagina(datos, total, filtros);
+  // ⭐ Fila 0.249 parte C: el precio del arte con la regla del MODELO (el diálogo «copiar arte»
+  // lo pinta: al copiar se copia SU precio).
+  return armarPagina(
+    datos.map((a) => ocultarPrecioDeArteSiNoPuede(sesion, a)),
+    total,
+    filtros,
+  );
 }
 
 // ── Fotos del arte en R2 (presigned, 1 arte → N fotos) ───────────────────────

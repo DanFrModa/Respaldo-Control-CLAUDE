@@ -116,7 +116,12 @@ export function SeccionArte({
                 <p className="truncate text-xs text-muted-foreground">
                   {arte.tipoArte}
                   {arte.posicion === null ? '' : ` · ${arte.posicion}`}
-                  {arte.precio === null ? ' · sin precio' : ` · $${arte.precio.toFixed(2)}`}
+                  {/* 🔒 0.249 parte C: tapado por el servidor ⇒ «—», nunca «sin precio». */}
+                  {arte.preciosOcultos
+                    ? ' · —'
+                    : arte.precio === null
+                      ? ' · sin precio'
+                      : ` · $${arte.precio.toFixed(2)}`}
                   {arte.proveedor === null ? '' : ` · ${arte.proveedor}`}
                   {arte.fotos.length > 1 ? ` · ${String(arte.fotos.length)} fotos` : ''}
                 </p>

@@ -89,6 +89,7 @@ export function PanelPreciosOrden({
           campo="maquila"
           real={datos.maquilaReal}
           referencia={datos.maquilaReferencia}
+          referenciaOculta={datos.maquilaReferenciaOculta}
           puedeVerReales={datos.puedeVerReales}
           evento={datos.ultimoEventoMaquila}
           puedeEditar={puedeEditar}
@@ -99,6 +100,7 @@ export function PanelPreciosOrden({
           campo="aplicacion"
           real={datos.aplicacionReal}
           referencia={null}
+          referenciaOculta={false}
           puedeVerReales={datos.puedeVerReales}
           evento={datos.ultimoEventoAplicacion}
           puedeEditar={puedeEditar}
@@ -235,6 +237,7 @@ function CampoPrecioEditable({
   campo,
   real,
   referencia,
+  referenciaOculta,
   puedeVerReales,
   evento,
   puedeEditar,
@@ -244,6 +247,11 @@ function CampoPrecioEditable({
   campo: CampoPrecioOrden;
   real: number | null;
   referencia: number | null;
+  /**
+   * 🔒 Fila 0.249 parte C: el servidor TAPÓ la referencia (no te toca verla). Se pinta como el
+   * resto de los montos ocultos de este panel (•••••), NUNCA como «—», que aquí significa «no hay».
+   */
+  referenciaOculta: boolean;
   puedeVerReales: boolean;
   evento: OrdenPrecios['ultimoEventoMaquila'];
   puedeEditar: boolean;
@@ -270,8 +278,10 @@ function CampoPrecioEditable({
       </p>
       <p className="num text-sm font-semibold">
         {montoVisible === null ? (
-          hayReal && !puedeVerReales ? (
-            <span className="tracking-[2px] text-faint">•••••</span>
+          (hayReal && !puedeVerReales) || (!hayReal && referenciaOculta) ? (
+            <span className="tracking-[2px] text-faint" data-testid={`precio-${campo}-oculto`}>
+              •••••
+            </span>
           ) : (
             <span className="text-faint">—</span>
           )
@@ -388,7 +398,13 @@ function DialogoEditarPrecio({
             <FieldLabel htmlFor="precio-referencia">Precio de referencia (del modelo)</FieldLabel>
             <Input
               id="precio-referencia"
-              value={referencia === null ? 'Sin referencia' : `$${referencia.toFixed(2)}`}
+              value={
+                esMaquila && datos.maquilaReferenciaOculta
+                  ? '•••••'
+                  : referencia === null
+                    ? 'Sin referencia'
+                    : `$${referencia.toFixed(2)}`
+              }
               disabled
             />
           </Field>

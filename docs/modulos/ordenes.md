@@ -100,6 +100,7 @@ tableros/consultas de F2-E4.
 
 ## Decisiones de diseño
 
+- 🔒 **Precios tapados (fila 0.249 parte C, §Post-F9.274):** la receta de la orden (`produccion/receta-orden.ts`, `ocultarPreciosDeRecetaSiNoPuede`), el resumen de precios (`maquilaReferencia`, marca `maquilaReferenciaOculta`) y el histórico se redactan en el dominio. El congelado propio de cada renglón ⇐ `consultas.ver-importes` | `modelos.administrar` | `desarrollo.administrar` (quien escribe lee); lo que la receta **repite** de su origen (`precioModelo`, `precioComplemento`, `precioMedida`, el precio del arte del modelo) ⇐ la regla de ese origen, con `precioModeloOculto` por renglón. Los avisos de cambio de precio llevan cifras sólo si se ven la orden **y** el origen. Una prueba de contención recorre todas las combinaciones de llaves de dinero.
 - **D4 tallas ilimitadas:** las columnas fijas `T1..T8` del viejo → `OrdenLineaTalla` (catálogo
   `Talla`). El total NUNCA se persiste: se deriva por suma (espíritu D3).
 - **D7 referencias por cliente:** el `Monarch` del viejo se generaliza a `OrdenReferencia` (valor de

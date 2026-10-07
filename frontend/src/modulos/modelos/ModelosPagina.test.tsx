@@ -128,6 +128,8 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
   return {
     id,
     codigo,
+    maquilaOculta: false,
+    preciosOcultos: false,
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion: null,
@@ -268,6 +270,29 @@ describe('<ModelosPagina>', () => {
     expect(within(detalle).getByText('$35.00')).toBeInTheDocument();
     // Sin fotos → placeholder NoFoto.
     expect(within(detalle).getByTestId('modelo-sin-fotos')).toBeInTheDocument();
+  });
+
+  // 🔒 Fila 0.249 parte C: la maquila TAPADA por el servidor se dice «—»; una que no hay, no se pinta.
+  it('la maquila base TAPADA sale como «—» en el detalle (y la que no existe, no sale)', () => {
+    const tapada = modelo(1, '501', true, { maquilaBase: null, maquilaOculta: true });
+    useModelos.mockReturnValue(listaConDatos([tapada]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(tapada)));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(
+      within(screen.getByTestId('detalle-modelo')).getByTestId('maquila-base-oculta'),
+    ).toHaveTextContent('—');
+  });
+
+  it('control: sin la marca y sin maquila, el campo no aparece', () => {
+    const sinMaquila = modelo(1, '501', true, { maquilaBase: null, maquilaOculta: false });
+    useModelos.mockReturnValue(listaConDatos([sinMaquila]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(sinMaquila)));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(
+      within(screen.getByTestId('detalle-modelo')).queryByTestId('maquila-base-oculta'),
+    ).not.toBeInTheDocument();
   });
 
   // ── ¿Lleva arte? (Daniel 26-jul-2026) ──

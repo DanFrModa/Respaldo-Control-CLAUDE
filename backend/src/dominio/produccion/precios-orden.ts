@@ -40,6 +40,8 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
+// ⭐ Fila 0.249 parte C: la maquila de referencia ES `Modelo.maquilaBase` — misma regla en los dos.
+import { puedeVerMaquilaDeReferencia } from '../modelos/precios-de-modelo.js';
 
 /** Fila cruda de un evento con sus nombres (proveedor incluido). */
 interface EventoCrudo {
@@ -157,6 +159,10 @@ export async function proyectarPreciosOrden(
 
   const puedeVerReales = tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
   const puedeVerImportes = tienePermiso(sesion, 'pedidos.importes');
+  // ⭐ Fila 0.249 parte C (§Post-F9.257(c)): la referencia era el ÚNICO monto de este resumen que
+  // salía sin reja. Es el mismo dato que `Modelo.maquilaBase`, así que lo gobierna la misma regla
+  // (`puedeVerMaquilaDeReferencia`), que incluye a quien captura el precio real de maquila.
+  const verReferencia = puedeVerMaquilaDeReferencia(sesion);
 
   // Solo el ÚLTIMO evento por campo (acotado a ≤2 filas con distinct + orden desc), NO todo el
   // historial: el resumen no debe crecer con la vida de la orden.
@@ -177,7 +183,8 @@ export async function proyectarPreciosOrden(
     idOrden: orden.id,
     folioOrden: Number(orden.folio),
     precioVenta: puedeVerImportes ? (orden.pedidoLinea?.precio.toNumber() ?? null) : null,
-    maquilaReferencia: orden.modelo.maquilaBase?.toNumber() ?? null,
+    maquilaReferencia: verReferencia ? (orden.modelo.maquilaBase?.toNumber() ?? null) : null,
+    maquilaReferenciaOculta: !verReferencia,
     maquilaReal: puedeVerReales ? (orden.maquilaOrd?.toNumber() ?? null) : null,
     aplicacionReal: puedeVerReales ? (orden.aplicacionOrd?.toNumber() ?? null) : null,
     puedeVerReales,

@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderConProveedores } from '@/pruebas/utilidades';
 
+import type { Modelo } from '@/api/modelos';
+
 import { DialogoModelo } from './DialogoModelo';
 
 /**
@@ -15,10 +17,12 @@ import { DialogoModelo } from './DialogoModelo';
 // `useCrearModelo`: espía del POST. La prueba que envía el alta le pone una implementación que
 // simula el éxito (invoca `onSuccess` con el modelo creado); las demás lo dejan como espía inerte.
 const crearMutate = vi.fn();
+// Espía del PATCH (fila 0.249 parte C: qué manda la edición cuando el servidor tapó precios).
+const actualizarMutate = vi.fn();
 
 vi.mock('@/api/modelos', () => ({
   useCrearModelo: () => ({ mutate: crearMutate, isPending: false }),
-  useActualizarModelo: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarModelo: () => ({ mutate: actualizarMutate, isPending: false }),
   // ⭐ V1-E8j — el alta EXIGE género y tipo de prenda, así que los catálogos ya no pueden ir
   // vacíos: sin opciones no habría cómo cumplir la regla (y la prueba mediría el mock, no el alta).
   useGeneros: () => ({ data: [{ id: 1, nombre: 'Caballero', activo: true }], isPending: false }),
@@ -211,4 +215,91 @@ describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', ()
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
     expect(crearMutate.mock.calls[0]?.[0]).toMatchObject({ codigo: 'M-LISA', llevaArte: false });
   });
+});
+
+/**
+ * 🔒 Fila 0.249 parte C — EL FORMULARIO NO PISA LO QUE NO VIO. En la edición un campo vacío viaja como
+ * `null` = BORRAR; si el servidor tapó la maquila o el corte (vienen `null` con su marca), mandarlos
+ * borraría el dato de verdad. La prueba edita SÓLO la descripción y mira el cuerpo del PATCH.
+ */
+describe('DialogoModelo · edición con precios TAPADOS (fila 0.249 parte C)', () => {
+  /** Modelo con cada marca por separado: maquila (su propia regla) y corte (la del modelo). */
+  function modeloDePrueba(ocultos: { maquila: boolean; corte: boolean }): Modelo {
+    return {
+      id: 41,
+      codigo: 'M-249',
+      descripcion: 'Antes',
+      composicion: null,
+      maquilaBase: ocultos.maquila ? null : 23.5,
+      maquilaOculta: ocultos.maquila,
+      corteBase: ocultos.corte ? null : 4.25,
+      preciosOcultos: ocultos.corte,
+      numOperaciones: null,
+      secuenciaEstampado: 'antes',
+      llevaArte: true,
+      idTemporada: null,
+      idCurvaTalla: null,
+      idGenero: 1,
+      idTipoProducto: 7,
+      idMaquileroCotizado: null,
+    } as unknown as Modelo;
+  }
+
+  beforeEach(() => {
+    actualizarMutate.mockReset();
+  });
+
+  async function editarSoloDescripcion(modelo: Modelo): Promise<Record<string, unknown>> {
+    renderConProveedores(<DialogoModelo abierto alCambiarAbierto={vi.fn()} modelo={modelo} />);
+    fireEvent.change(screen.getByLabelText(/Descripción/), { target: { value: 'Después' } });
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalled());
+    const [{ cuerpo }] = actualizarMutate.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
+    return cuerpo;
+  }
+
+  it('con maquila y corte TAPADOS el PATCH no los manda (no los borra)', async () => {
+    const cuerpo = await editarSoloDescripcion(modeloDePrueba({ maquila: true, corte: true }));
+    expect(cuerpo.descripcion).toBe('Después');
+    expect(cuerpo).not.toHaveProperty('maquilaBase');
+    expect(cuerpo).not.toHaveProperty('corteBase');
+  });
+
+  it('MIXTO (perfil de Producción: maquila visible, corte tapado): manda la maquila, no el corte', async () => {
+    const cuerpo = await editarSoloDescripcion(modeloDePrueba({ maquila: false, corte: true }));
+    expect(cuerpo.maquilaBase).toBe(23.5);
+    expect(cuerpo).not.toHaveProperty('corteBase');
+  });
+
+  it('MIXTO inverso (maquila tapada, corte visible): manda el corte, no la maquila', async () => {
+    const cuerpo = await editarSoloDescripcion(modeloDePrueba({ maquila: true, corte: false }));
+    expect(cuerpo).not.toHaveProperty('maquilaBase');
+    expect(cuerpo.corteBase).toBe(4.25);
+  });
+
+  it('control: VISIBLES, el PATCH sí los manda con su valor', async () => {
+    const cuerpo = await editarSoloDescripcion(modeloDePrueba({ maquila: false, corte: false }));
+    expect(cuerpo.maquilaBase).toBe(23.5);
+    expect(cuerpo.corteBase).toBe(4.25);
+  });
+
+  it.each([
+    [{ maquila: true, corte: false }, true, false],
+    [{ maquila: false, corte: true }, false, true],
+    [{ maquila: true, corte: true }, true, true],
+    [{ maquila: false, corte: false }, false, false],
+  ] as const)(
+    'marcas %o ⇒ maquila deshabilitada: %s · corte deshabilitado: %s',
+    (ocultos, maquilaDeshabilitada, corteDeshabilitado) => {
+      renderConProveedores(
+        <DialogoModelo abierto alCambiarAbierto={vi.fn()} modelo={modeloDePrueba(ocultos)} />,
+      );
+      const maquila = screen.getByLabelText(/Maquila base/);
+      const corte = screen.getByLabelText(/^Corte$/);
+      if (maquilaDeshabilitada) expect(maquila).toBeDisabled();
+      else expect(maquila).toBeEnabled();
+      if (corteDeshabilitado) expect(corte).toBeDisabled();
+      else expect(corte).toBeEnabled();
+    },
+  );
 });

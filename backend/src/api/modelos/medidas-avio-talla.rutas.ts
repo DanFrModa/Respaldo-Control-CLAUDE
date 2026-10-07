@@ -28,11 +28,11 @@ import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
   guardarMedidasAvio,
   obtenerMedidasAvio,
-  type MedidasAvio,
+  type MedidasAvioVisible,
 } from '../../dominio/modelos/medidas-avio-talla.js';
 
 /** Proyecta las medidas por talla de un avío a la forma JSON del contrato. */
-function aMedidasSalida(m: MedidasAvio): z.infer<typeof esquemaModeloAvioMedidasSalida> {
+function aMedidasSalida(m: MedidasAvioVisible): z.infer<typeof esquemaModeloAvioMedidasSalida> {
   return {
     idModelo: m.idModelo,
     idAvio: m.idAvio,
@@ -51,6 +51,8 @@ function aMedidasSalida(m: MedidasAvio): z.infer<typeof esquemaModeloAvioMedidas
       medidaAmarrada: t.medidaAmarrada,
       precioMedida: t.precioMedida,
     })),
+    // Fila 0.249 parte C: la marca la decide el DOMINIO (aquí sólo se copia).
+    preciosOcultos: m.preciosOcultos,
   };
 }
 

@@ -38,6 +38,7 @@ import type { Prisma } from '../../datos/index.js';
 import { idsSiHayBusqueda } from '../../comun/busqueda.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { puedeVerPreciosDeOrden } from '../modelos/precios-de-modelo.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -235,6 +236,11 @@ export async function obtenerHistoricoOrden(
   });
   if (orden === null) throw new ErrorNoEncontrado('Orden histórica', id);
 
+  // ⭐ Fila 0.249 parte C (§Post-F9.257(c)): `PrecioHabOrd` es el precio CONGELADO de la receta de
+  // esa orden del viejo — el mismo dato que la receta de una orden de hoy, con la misma regla.
+  // `ordenes.ver` es vocabulario: el precio sólo sale para quien `puedeVerPreciosDeOrden`.
+  const verPrecios = puedeVerPreciosDeOrden(sesion);
+
   return {
     ...aResumen(orden),
     empresaV1: orden.empresaV1,
@@ -255,7 +261,8 @@ export async function obtenerHistoricoOrden(
       avio: h.avio,
       claveV1: h.claveV1,
       cantidad: h.cantidad === null ? null : h.cantidad.toNumber(),
-      precio: h.precio === null ? null : h.precio.toNumber(),
+      precio: !verPrecios || h.precio === null ? null : h.precio.toNumber(),
     })),
+    preciosOcultos: !verPrecios,
   };
 }

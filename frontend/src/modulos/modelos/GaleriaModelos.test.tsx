@@ -58,6 +58,8 @@ function modelo(
   return {
     id,
     codigo,
+    maquilaOculta: false,
+    preciosOcultos: false,
     origen,
     // Mientras el modelo es de desarrollo, el código vigente y el de desarrollo valen lo mismo
     // (§Post-F9.34 punto 5) — el fixture lo respeta para no probar una forma imposible.

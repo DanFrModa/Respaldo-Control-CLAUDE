@@ -18633,3 +18633,42 @@ leerlo, así que nadie edita a ciegas. Sin llaves nuevas. Las llaves de consulta
 así que no hay fuga — y una prueba del seed lo vigila. La habría si desde la pantalla de Roles se le da la llave de la
 bitácora a un puesto sin llave de precio; es la misma decisión de la fila 0.255. 📌 **`compras.ver` es llave de dinero**
 (entrega precios por la orden y la explosión): queda marcada para que nunca entre al piso.
+
+#### (Post-F9.274) — LOS PRECIOS DE MODELOS Y ÓRDENES SÓLO LE LLEGAN A QUIEN TIENE LLAVE DE DINERO (fila 0.249 parte C, v0.206) — tres preguntas para Daniel
+
+Tercera parte de la 0.249 (§Post-F9.257(c)). 📐 Las llaves de consultar modelos, órdenes y desarrollo entregaban
+**completos** el corte y la maquila de referencia, el precio del arte, los precios de la receta del modelo y de sus
+medidas, los precios congelados de la receta de la orden (también dentro del texto de sus avisos) y el precio del
+histórico. Ahora se tapan en el servidor. **Sin llaves nuevas.** Lo decidido con default del lead (§Post-F9.273, preguntas
+3 y 4):
+- **Corte y arte del modelo:** quien ve importes y precios o administra modelos.
+- **Maquila de referencia:** lo mismo, **más quien captura o ve el precio real de maquila** (Producción y Ventas): es su
+  punto de comparación.
+- **Precios congelados de la receta de la orden y del histórico:** quien ve importes, administra modelos o **edita la
+  receta** (llave de desarrollo) — quien escribe un precio lo lee.
+- **Lo que la receta repite del modelo o del catálogo** se tapa con la regla de donde sale. Por eso **Ventas**, que edita
+  recetas, ve los precios que escribe pero no el precio del arte del modelo (que en Modelos tampoco ve), y el aviso de
+  ese cambio le llega sin cifras.
+- **Compras** deja de ver los congelados de la receta por la orden. En la explosión y la orden de compra sigue viendo los
+  precios de **compra** (del proveedor y del catálogo), que son otro dato: los congelados de la receta no aparecen ahí.
+
+❓ **Tres preguntas, con su default (la 1 y la 2 son la parte D):**
+1. **La bitácora guarda esos precios en claro** (cambios de maquila, corte, arte, receta de la orden y maquila real), y la
+   leen **Ventas, Logística, Asistente y Secretarial**, que no tienen llave para verlos todos (Ventas tiene llave para los
+   congelados de la receta y la maquila de referencia, pero no para el corte, el arte ni la meta de costo — la meta hoy
+   le llega igual por consultar modelos, ver la pregunta 2). *Default propuesto: que la
+   bitácora tape los precios **al leerla**, según las llaves de quien la consulta — el registro queda completo y cada quien
+   ve lo que su llave le deja. Lo mismo resolvería la fila 0.255 (la corrida de pagos).*
+2. **La meta de costo del modelo** (prometido y conseguido) la ve cualquiera que consulta modelos. *Default propuesto:
+   que la vean sólo quien ve importes (`consultas.ver-importes`) o quien firma la revisión que la escribe
+   (`modelos.aprobar-receta`, la llave con la que firma Desarrollo de Producto) — quien la escribe, la lee.*
+3. **Ventas y el precio del arte.** Ventas edita recetas de orden, así que ve el precio **congelado** del arte en cada
+   orden — que nace como copia del precio del arte del modelo (y «restaurar renglón» lo vuelve a copiar). O sea que por la
+   orden puede conocer el precio que en el modelo se le tapa. Es inherente a «quien escribe un precio, lo lee». ¿Ventas
+   debe ver los precios del arte? *Default: sí lo ve por la orden (edita esos precios); si no debe, hay que quitarle a
+   Ventas editar los precios de la receta.*
+
+📌 Mientras no se resuelva la parte D, **`modelos.ver` y `ordenes.ver` no pueden entrar al piso de lectura**. Una prueba
+guardiana congela la lista de precios que la bitácora guarda y la de los cuatro roles que la leen sin llave: cualquier
+precio nuevo escrito en las formas comunes, o lector nuevo,
+la pone en rojo — con límites medidos (HOJA §4); la garantía de raíz es la parte D.

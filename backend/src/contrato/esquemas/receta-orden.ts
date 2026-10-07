@@ -23,6 +23,7 @@ import { esquemaEstatusOrdenCompra } from './compra.js';
 import { esquemaFrenteAlGrupo } from './hermanas-op.js';
 import { esquemaEstadoOrden } from './orden.js';
 import { esquemaTipoRenglonReceta } from './renglon-receta.js';
+import { esquemaPreciosOcultos } from './precios-ocultos.js';
 
 // ── Vocabulario ────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,21 @@ const camposComunesRenglon = {
     .describe('Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra.'),
   /** Quién firmó este renglón. `null` con fecha presente = lo firmó la migración. */
   liberadoPor: z.string().nullable().describe('Quién firmó este renglón, o null.'),
+  /*
+   * 🔒 Fila 0.249 parte C — lo que el renglón REPITE de su ORIGEN se tapa con la regla del ORIGEN,
+   * no con la de la orden: `precioModelo` (y en la tela `precioComplemento`, en el avío el
+   * `precioMedida` de cada talla) es el MISMO dato que la ficha del modelo o el catálogo enseñan, así
+   * que quien no lo ve allá tampoco lo ve aquí. El precio CONGELADO propio del renglón sigue con la
+   * regla de la orden (`preciosOcultos` de la receta).
+   */
+  precioModeloOculto: z
+    .boolean()
+    .describe(
+      '¿El servidor TAPÓ lo que este renglón repite de su origen? (fila 0.249 parte C). true = ' +
+        '`precioModelo` —y en tela `precioComplemento`, en avío el `precioMedida` de las tallas— ' +
+        'van null porque no te toca verlos en su origen (tela/avío: regla de catálogo; arte: regla ' +
+        'del modelo); false = un null es «no hay».',
+    ),
 };
 
 /** Renglón de TELA de la receta de la orden. */
@@ -630,6 +646,13 @@ export const esquemaRecetaOrden = z
      * al vuelo en cada lectura y **nunca se guarda**.
      */
     frenteAlGrupo: esquemaFrenteAlGrupo,
+    preciosOcultos: esquemaPreciosOcultos.describe(
+      '¿El servidor TAPÓ los precios CONGELADOS de esta orden para esta sesión? (fila 0.249 parte ' +
+        'C). true = el `precio` propio de TODOS los renglones va null porque no te toca verlo; ' +
+        'false = un precio null es «no congeló». Lo que cada renglón repite de su origen lleva su ' +
+        'propia marca (`precioModeloOculto`). Un aviso de cambio de precio llega SIN cifras si falta ' +
+        'cualquiera de las dos. Con true, el formulario NO manda `precio`.',
+    ),
   })
   .describe('Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43).');
 
