@@ -45,7 +45,12 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { contarUsosConRastro, repuntarReferenciasDeColor } from './colores-fusion-referencias.js';
+import {
+  contarUsosConRastro,
+  ordenesConColorDeTela,
+  repuntarReferenciasDeColor,
+} from './colores-fusion-referencias.js';
+import { bloquearVersionReceta } from '../produccion/version-receta.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearColor = z.input<typeof esquemaColorCrear>;
@@ -325,6 +330,12 @@ export async function fusionarColores(
   const datos = validarEntrada(esquemaColorFusionar, entrada);
 
   return enTransaccion(async (tx) => {
+    // ⭐⭐ fila 0.257 (H5/H1) — el candado de la versión de la receta de las órdenes cuyo color de
+    // tela va a repuntarse, PRIMERA instrucción y en orden ascendente: antes de escribir nada, así
+    // ninguna mutación de esas recetas (que toma este candado ANTES de escribir) queda esperando una
+    // fila que esta fusión ya tocó mientras la fusión espera su candado.
+    const ordenesConCandado = new Set(await ordenesConColorDeTela(tx, datos.origenes));
+    await bloquearVersionReceta(tx, [...ordenesConCandado]);
     const destino = await exigirColor(tx, datos.idDestino);
 
     let referenciasMovidas = 0;
@@ -340,6 +351,7 @@ export async function fusionarColores(
       const repunte = await repuntarReferenciasDeColor(tx, {
         idOrigen,
         idDestino: datos.idDestino,
+        ordenesConCandado,
       });
       referenciasMovidas += repunte.movidos;
 

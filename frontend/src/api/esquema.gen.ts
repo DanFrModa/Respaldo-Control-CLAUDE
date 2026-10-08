@@ -41906,6 +41906,8 @@ export interface paths {
                 piezasSobreCorte: number;
                 /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
                 piezasSinExplotar: number;
+                /** @description Fila 0.257: ¿la receta (o lo pedido) de la orden cambió en algo que se compra DESPUÉS de su última explosión? — un consumo corregido, un material quitado o recién firmado, el color de una tela, la matriz. true = el snapshot ya no corresponde: la revisión previa lo trae como BLOQUEO y la generación de OC lo rechaza hasta volver a explotar. También true si la orden tiene un snapshot de antes de esta fila. Siempre false en la explosión. */
+                recetaCambioDesdeExplosion: boolean;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
@@ -42256,6 +42258,8 @@ export interface paths {
                 piezasSobreCorte: number;
                 /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
                 piezasSinExplotar: number;
+                /** @description Fila 0.257: ¿la receta (o lo pedido) de la orden cambió en algo que se compra DESPUÉS de su última explosión? — un consumo corregido, un material quitado o recién firmado, el color de una tela, la matriz. true = el snapshot ya no corresponde: la revisión previa lo trae como BLOQUEO y la generación de OC lo rechaza hasta volver a explotar. También true si la orden tiene un snapshot de antes de esta fila. Siempre false en la explosión. */
+                recetaCambioDesdeExplosion: boolean;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
@@ -42790,6 +42794,8 @@ export interface paths {
                 piezasSobreCorte: number;
                 /** @description Fila 0.232: cuánto CRECIÓ la base de avíos de la orden desde su última explosión — la base de hoy (max(pedido, cortado vivo) por celda) menos la del snapshot. Puede venir de un corte de más o de una matriz pedida que creció: no se atribuye causa. Esas piezas NO van en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión (acaba de calcular); en la revisión previa la acompaña un aviso. */
                 piezasSinExplotar: number;
+                /** @description Fila 0.257: ¿la receta (o lo pedido) de la orden cambió en algo que se compra DESPUÉS de su última explosión? — un consumo corregido, un material quitado o recién firmado, el color de una tela, la matriz. true = el snapshot ya no corresponde: la revisión previa lo trae como BLOQUEO y la generación de OC lo rechaza hasta volver a explotar. También true si la orden tiene un snapshot de antes de esta fila. Siempre false en la explosión. */
+                recetaCambioDesdeExplosion: boolean;
                 /** @description Pedido interno del que sale, o null. */
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */

@@ -366,6 +366,15 @@ export const esquemaOrdenExplosionada = z
           'en la compra que se está revisando: hay que volver a explotar. Siempre 0 en la explosión ' +
           '(acaba de calcular); en la revisión previa la acompaña un aviso.',
       ),
+    recetaCambioDesdeExplosion: z
+      .boolean()
+      .describe(
+        'Fila 0.257: ¿la receta (o lo pedido) de la orden cambió en algo que se compra DESPUÉS de ' +
+          'su última explosión? — un consumo corregido, un material quitado o recién firmado, el ' +
+          'color de una tela, la matriz. true = el snapshot ya no corresponde: la revisión previa ' +
+          'lo trae como BLOQUEO y la generación de OC lo rechaza hasta volver a explotar. También ' +
+          'true si la orden tiene un snapshot de antes de esta fila. Siempre false en la explosión.',
+      ),
     idPedido: z.number().int().nullable().describe('Pedido interno del que sale, o null.'),
     folioPedido: z.number().int().nullable().describe('Folio del pedido interno, o null.'),
     fechaEntrega: z.iso

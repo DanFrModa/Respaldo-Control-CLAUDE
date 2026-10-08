@@ -190,6 +190,17 @@ const ESCRITORES: Record<string, Record<string, Declarada>> = {
     cancelarAuditoria: G('Las cancelaciones también se bloquean (D3, precedente 0.061).'),
     crearAuditoriaMigrada: MIG,
   },
+  // ── Catálogos ──
+  [`${D}catalogos/colores-fusion-referencias.ts`]: {
+    REFERENCIAS_DE_COLOR: {
+      disciplina: 'no-aplica',
+      razon:
+        'Fusionar colores es un acto de CATÁLOGO: repunta el amarre de color de tela de las órdenes ' +
+        'que usaban el absorbido (ya lo hacía antes de la 0.257, sin mencionar `idOrden`) y, desde la ' +
+        '0.257, sube la versión de su receta para que la previa pida re-explotar. No es una captura ' +
+        'sobre la orden: no mueve producción, ni costo, ni dinero.',
+    },
+  },
   // ── Compras (A, salvo lo dicho) ──
   [`${D}compras/color-de-la-tela.ts`]: {
     asignarColorDeTela: G('Escribe la receta CONGELADA de la orden (puerta trasera de la receta).'),

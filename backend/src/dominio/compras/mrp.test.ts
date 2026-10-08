@@ -8,6 +8,7 @@ import { Prisma } from '../../datos/index.js';
 import {
   avisosDeAvioPorMedida,
   avisosDeBaseSinExplotar,
+  bloqueosDeRecetaCambiada,
   baseDelSnapshot,
   requeridoDelSnapshotPorAvio,
   avisosDeMaterialSinLiberar,
@@ -1119,6 +1120,9 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
       modelo: { codigo: 'MJD-1' },
       pedidoLinea: null,
       lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+      // ⭐⭐ fila 0.257: el snapshot de este doble es el de la receta vigente (explotado con la
+      // versión de hoy). Sin esto, la orden tendría snapshot y nunca se habría explotado: bloquea.
+      versionDeReceta: { versionReceta: 0, versionExplotada: 0 },
     };
     const tablas: Record<string, Record<string, (args?: never) => Promise<unknown>>> = {
       orden: {
@@ -1443,6 +1447,9 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
       modelo: { codigo: 'MJD-1' },
       pedidoLinea: null,
       lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+      // ⭐⭐ fila 0.257: el snapshot de este doble es el de la receta vigente (explotado con la
+      // versión de hoy). Sin esto, la orden tendría snapshot y nunca se habría explotado: bloquea.
+      versionDeReceta: { versionReceta: 0, versionExplotada: 0 },
     };
     const tablas: Record<string, Record<string, (args?: never) => Promise<unknown>>> = {
       // ⭐ fila 0.159 — el rastro de la fusión de colores (`colores-canonicos.ts`). Aquí no hay
@@ -1882,6 +1889,45 @@ describe('fila 0.232 (2ª vuelta) — lo que la PREVIA lee del snapshot', () => 
     ).toEqual([
       'Orden 7: la base de avíos creció 1,200 pieza(s) desde la última explosión (corte de más ' +
         'o más piezas pedidas): vuelve a explotar para pedir lo que falta.',
+    ]);
+  });
+});
+
+describe('MRP — fila 0.257: el bloqueo de la receta cambiada (puro)', () => {
+  it('ninguna OP desfasada: no hay bloqueo', () => {
+    expect(
+      bloqueosDeRecetaCambiada([
+        { folio: 7, recetaCambioDesdeExplosion: false },
+        { folio: 8, recetaCambioDesdeExplosion: false },
+      ]),
+    ).toEqual([]);
+    expect(bloqueosDeRecetaCambiada([])).toEqual([]);
+  });
+
+  it('una OP: una frase que la nombra SÓLO a ella, en singular', () => {
+    expect(
+      bloqueosDeRecetaCambiada([
+        { folio: 7, recetaCambioDesdeExplosion: false },
+        { folio: 8, recetaCambioDesdeExplosion: true },
+      ]),
+    ).toEqual([
+      'La receta de la orden 8 cambió desde la última explosión (se corrigió, se quitó o se ' +
+        'firmó un material, o cambió lo pedido): lo que se iba a comprar ya no corresponde. ' +
+        'Vuelve a explotar, o quítala de esta compra para generar la de las demás.',
+    ]);
+  });
+
+  it('varias OP: UNA sola frase, en plural, con los folios en el orden de las fichas', () => {
+    expect(
+      bloqueosDeRecetaCambiada([
+        { folio: 3, recetaCambioDesdeExplosion: true },
+        { folio: 5, recetaCambioDesdeExplosion: false },
+        { folio: 9, recetaCambioDesdeExplosion: true },
+      ]),
+    ).toEqual([
+      'La receta de las órdenes 3, 9 cambió desde la última explosión (se corrigió, se quitó o ' +
+        'se firmó un material, o cambió lo pedido): lo que se iba a comprar ya no corresponde. ' +
+        'Vuelve a explotar, o quítalas de esta compra para generar la de las demás.',
     ]);
   });
 });

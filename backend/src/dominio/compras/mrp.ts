@@ -178,6 +178,13 @@ import {
   requeridoContradictorioPorMedida,
 } from '../produccion/receta-avios.js';
 import { mensajeOrdenCerrada } from '../produccion/cierre-orden.js';
+// ⭐⭐ fila 0.257: ¿el snapshot sigue siendo el de la receta de hoy?
+import {
+  bloquearVersionReceta,
+  leerVersionReceta,
+  recetaDesfasada,
+  sellarVersionExplotada,
+} from '../produccion/version-receta.js';
 import {
   desalineacionDeOrden,
   exigirMaterialesLiberados,
@@ -1653,6 +1660,8 @@ function fichaDeOrden(
     piezasSobreCorte,
     // La explosión acaba de calcular contra lo cortado de hoy: no puede haber corte sin explotar.
     piezasSinExplotar: 0,
+    // ⭐⭐ fila 0.257: y contra la receta de hoy — el snapshot que acaba de escribir es el vigente.
+    recetaCambioDesdeExplosion: false,
     idPedido: orden.pedidoLinea?.idPedido ?? null,
     folioPedido:
       orden.pedidoLinea?.pedido === undefined ? null : Number(orden.pedidoLinea.pedido.folio),
@@ -1980,6 +1989,15 @@ async function explosionarUna(
   consumirGenerico: (idAvio: number, cantidad: number) => void,
   avisos: string[],
 ): Promise<ExplosionDeOrden> {
+  // ⭐⭐ fila 0.257 (H1) — el candado ANTES de leer `versionReceta` y la receta: mientras esta
+  // explosión lee, calcula, reescribe el snapshot y lo sella, ninguna mutación de la receta de esta
+  // orden puede preguntarle al snapshot (vería el viejo, comiteado) ni subir la versión. El lote ya
+  // lo tomó en orden ascendente; aquí es re-entrante y deja la garantía pegada a quien la necesita.
+  await bloquearVersionReceta(tx, [idOrden]);
+  // ⭐⭐ fila 0.257 — la versión de la receta se lee ANTES que la receta, en su propia consulta: así
+  // «qué versión explotó» nunca depende de en qué orden reparta Prisma las lecturas anidadas de
+  // `cargarOrden`. (Con el candado no hay quien la mueva en medio, pero el orden queda explícito.)
+  const versionLeida = await leerVersionReceta(tx, idOrden);
   // La orden PRIMERO (A9): si es de otra empresa se responde 404 y no se dice nada más de ella —
   // ni siquiera si su receta está liberada.
   const orden = await cargarOrden(tx, idOrden, idEmpresa);
@@ -2215,6 +2233,14 @@ async function explosionarUna(
     });
   }
 
+  // ⭐⭐ fila 0.257 — EL SNAPSHOT QUEDA SELLADO CON LA VERSIÓN DE LA RECETA QUE SE LEYÓ (antes que la
+  // receta), no con la del momento de escribir: si alguna vez una corrección se colara entre la
+  // lectura y este sello, el contador iría una adelante y la orden quedaría DESFASADA — pide
+  // re-explotar, que es la dirección segura del error. Bajo el candado RCPV no se cuela ninguna.
+  // ⚠️ Escribe `orden_version_receta`, NUNCA `ordenes`: la explosión no sostiene filas de la orden
+  // (H6 de la 2ª revisión: con `UPDATE ordenes` aquí daba deadlocks contra quien sí las escribe).
+  await sellarVersionExplotada(tx, idOrden, versionLeida);
+
   await registrarBitacora(tx, sesion, {
     entidad: 'Orden',
     idEntidad: idOrden,
@@ -2295,6 +2321,15 @@ export async function explosionarOrdenes(
     if (ajeno !== undefined) {
       throw new ErrorNoEncontrado('Orden', ajeno);
     }
+
+    // ⭐⭐ fila 0.257 (H1) — EL CANDADO DE LA VERSIÓN DE LA RECETA, de TODAS las OP del lote y en
+    // orden de id ASCENDENTE, antes de leer nada de su receta. Se recorren por folio (abajo), pero
+    // los candados van por id: es el orden que usan todas las demás transacciones que los toman
+    // varios a la vez, y así dos lotes que comparten órdenes no se esperan en cruz.
+    await bloquearVersionReceta(
+      tx,
+      folios.map((o) => o.id),
+    );
 
     const { existenciaGenerico, consumirGenerico } = existenciaCompartida(tx, idEmpresa);
 
@@ -2777,6 +2812,8 @@ async function planearCompra(
       id: true,
       folio: true,
       cerradaEn: true,
+      // ⭐⭐ fila 0.257: ¿la receta cambió desde la última explosión? Misma consulta, cero extra.
+      versionDeReceta: { select: { versionReceta: true, versionExplotada: true } },
       idModelo: true,
       fechaEntrega: true,
       modelo: { select: { codigo: true } },
@@ -2844,6 +2881,8 @@ async function planearCompra(
     piezasSobreCorte: 0,
     // ⭐⭐ fila 0.232 (2ª vuelta): también se llena abajo, contra lo cortado de HOY.
     piezasSinExplotar: 0,
+    // ⭐⭐ fila 0.257: se llena abajo, cuando ya se sabe si la orden tiene snapshot.
+    recetaCambioDesdeExplosion: false,
     idPedido: o.pedidoLinea?.idPedido ?? null,
     folioPedido: o.pedidoLinea?.pedido === undefined ? null : Number(o.pedidoLinea.pedido.folio),
     fechaEntrega: o.fechaEntrega === null ? null : o.fechaEntrega.toISOString().slice(0, 10),
@@ -2919,6 +2958,20 @@ async function planearCompra(
   //    la atribuye. La previa no lo recalcula por su cuenta (compraría una cosa y diría otra): lo
   //    DICE, para re-explotar.
   const baseHoy = await baseDeAviosDeHoy(tx, ordenes);
+  // ⭐⭐ fila 0.257 — ¿EL SNAPSHOT TODAVÍA ES EL DE ESTA RECETA? Una corrección (el avío de 5,300 que
+  // eran 600), un renglón quitado o uno recién firmado DESPUÉS de explotar dejan a la previa
+  // comprando lo viejo. Se marca la ficha y abajo se convierte en un BLOQUEO.
+  const conSnapshot = new Set(filasCrudas.map((f) => f.idOrden));
+  for (const o of ordenes) {
+    const ficha = fichas.find((f) => f.idOrden === o.id);
+    if (ficha === undefined) continue;
+    ficha.recetaCambioDesdeExplosion = recetaDesfasada({
+      // Sin fila = versión 0, nunca explotada (REGLA 0-B: la fila nace cuando hace falta).
+      versionReceta: o.versionDeReceta?.versionReceta ?? 0,
+      versionRecetaExplotada: o.versionDeReceta?.versionExplotada ?? null,
+      tieneSnapshot: conSnapshot.has(o.id),
+    });
+  }
   for (const ficha of fichas) {
     const base = baseDelSnapshot(
       filasCrudas.filter((f) => f.idOrden === ficha.idOrden),
@@ -3427,6 +3480,12 @@ async function planearCompra(
     ),
   );
 
+  // ⭐⭐ fila 0.257 — 🔴 LA RECETA CAMBIÓ DESDE LA ÚLTIMA EXPLOSIÓN: lo que se iba a comprar ya no
+  // corresponde. Es un bloqueo DEL ACTO (como la orden cerrada de abajo): una sola OP desfasada frena
+  // la generación de todas y el mensaje nombra SÓLO a la desfasada. Y bloquea aunque hoy no aporte
+  // ninguna línea: lo que le falta es justo lo que el snapshot no trae (un material recién firmado).
+  bloqueos.push(...bloqueosDeRecetaCambiada(fichas));
+
   // ⭐⭐ 0.226a (§Post-F9.244) — 🔴 LA PREVIA NO PROMETE UNA COMPRA QUE LA GENERACIÓN VA A RECHAZAR.
   // Explotar una orden CERRADA sigue libre (decisión 3: el MRP «marca, no esconde»), pero COMPRARLE
   // no: `crearOC` la rechaza con su guarda. Sin esto, la previa enseñaba la OC entera y «Generar»
@@ -3601,6 +3660,30 @@ export function requeridoDelSnapshotPorAvio(
 /** Llave (OP, avío) del requerido del snapshot. */
 function claveSnapshotAvio(idOrden: number, idAvio: number): string {
   return `${String(idOrden)}|${String(idAvio)}`;
+}
+
+/**
+ * ⭐⭐ **fila 0.257 — EL BLOQUEO DE LA PREVIA cuando la receta de una OP cambió desde su última
+ * explosión.** Función PURA: una sola frase con los folios desfasados (en el orden de las fichas,
+ * que es el del folio), o nada.
+ *
+ * 🔴 BLOQUEA, no avisa (a diferencia de {@link avisosDeBaseSinExplotar}): el caso medido es una OC
+ * por 5,300 piezas donde la receta ya dice 600. Firmar eso no es «pedir lo demás luego», es comprar
+ * 8.8 veces de más. El remedio cuesta un clic —volver a explotar— y lo dice; y si el comprador no
+ * quiere tocar esa OP ahora, sacarla de esta compra libera a las demás.
+ */
+export function bloqueosDeRecetaCambiada(
+  fichas: readonly { folio: number; recetaCambioDesdeExplosion: boolean }[],
+): string[] {
+  const folios = fichas.filter((f) => f.recetaCambioDesdeExplosion).map((f) => f.folio);
+  if (folios.length === 0) return [];
+  const una = folios.length === 1;
+  return [
+    `La receta ${una ? 'de la orden' : 'de las órdenes'} ${folios.map(String).join(', ')} ` +
+      `cambió desde la última explosión (se corrigió, se quitó o se firmó un material, o cambió ` +
+      `lo pedido): lo que se iba a comprar ya no corresponde. Vuelve a explotar, o ` +
+      `quíta${una ? 'la' : 'las'} de esta compra para generar la de las demás.`,
+  ];
 }
 
 /**

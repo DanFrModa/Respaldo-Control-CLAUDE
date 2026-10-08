@@ -801,6 +801,14 @@ componentes) · R1 (proveedor/precio/factor) · R3 (explosión) · R7 (estatus p
 
 Para los **avíos**, la base de piezas de cada celda color×talla es `max(pedido, cortado vivo)` (`dominio/produccion/base-de-materiales.ts`). Antes de cortar es lo pedido; tras un sobre-corte, re-explotar la OP pide sólo el extra con el neteo de siempre. El snapshot `RequerimientoOrden.piezasBase` guarda la base con que se explotó cada renglón (NULL en lo viejo = lo pedido) y `costo-real-compras.ts` escala desde ahí. La tela sigue contra lo pedido. La habilitación (`produccion/habilitacion-orden.ts`) usa la misma base. La explosión acepta `?idOrden=N` (sin precargar las hermanas del pedido).
 
-**Previa de compra (fila 0.232, revisión):** el aviso de contradicción §Post-F9.105 de la previa se mide contra el **snapshot** que se va a comprar (`piezasBase`, o lo pedido si es NULL), no contra la matriz de hoy; si la base de avíos de hoy ya supera la del snapshot, la previa lo dice y pide volver a explotar (no bloquea). La **receta de la orden** mide los avíos con la misma base (`piezasDeAviosDeOrden`) y la tela con lo pedido. El **impreso** de la explosión lleva la leyenda de sobre-corte. ⚠️ Hueco conocido, fila **0.257**: la previa no detecta una receta corregida y re-liberada sin re-explotar.
+**Previa de compra (fila 0.232, revisión):** el aviso de contradicción §Post-F9.105 de la previa se mide contra el **snapshot** que se va a comprar (`piezasBase`, o lo pedido si es NULL), no contra la matriz de hoy; si la base de avíos de hoy ya supera la del snapshot, la previa lo dice y pide volver a explotar (no bloquea). La **receta de la orden** mide los avíos con la misma base (`piezasDeAviosDeOrden`) y la tela con lo pedido. El **impreso** de la explosión lleva la leyenda de sobre-corte. La receta corregida y re-liberada sin re-explotar la cubre la fila **0.257** (abajo).
 
 **El corte responde su sobre-corte:** `POST /produccion/cortes` (`registrarCorte`, `produccion/etapas.ts`) devuelve `piezasSobreCorteNuevas` —medido en el servidor, dentro de la transacción y con el candado de la orden, por celda color×talla con packs plegados— y es la cifra que enseña la barra «recién guardado».
+
+## La receta cambió después de explotar (fila 0.257, §Post-F9.278)
+
+`orden_version_receta.version_receta` (tabla propia, para no tocar la fila de `ordenes`) sube (`dominio/produccion/version-receta.ts`) sólo cuando un cambio mueve lo que se compra y
+toca material que ya está en el snapshot, o cuando `liberarReceta` firma un renglón de producción que el snapshot no
+trae, o cuando Compras reasigna el proveedor o el precio de un material explotado, o la fusión de colores cambia el color de tela; la explosión sella `version_explotada` con la versión que leyó, y la explosión y esos cambios se serializan con un candado por orden. Si no coinciden (o es NULL con snapshot),
+la previa enseña `recetaCambioDesdeExplosion` y `generarOCDesdeExplosion` rechaza nombrando la OP. Los cambios del
+catálogo no desfasan (límite declarado).
