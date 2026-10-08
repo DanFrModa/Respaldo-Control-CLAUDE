@@ -71,6 +71,41 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.210 · 8-oct-2026 · **en prueba** — **Si la receta cambió después de explotar, la compra se frena hasta volver a explotar**
+
+> **La v0.210 cierra la fila 0.257**, que nació al revisar la v0.209. Si alguien corregía la receta de una orden y la
+> volvía a liberar sin explotar de nuevo, la revisión previa de compra dejaba salir la orden de compra con las cantidades
+> viejas — medido: 5,300 piezas de un avío donde debían ser 600.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**La revisión previa de compra sabe si la receta cambió desde la última explosión.** Si cambió algo que mueve lo que se
+compra (el consumo de una tela o un avío, quitar o restaurar un material, corregir una captura, firmar un material nuevo,
+el color de la tela, las cantidades de la orden o que Compras **cambie** el proveedor o el precio de un material), la
+previa lo enseña y **no deja generar las órdenes de compra de esa
+orden** hasta volver a explotar. El botón **«Volver a explotar»** lo hace en un clic y desbloquea.
+
+**Fusionar dos colores** también frena la compra de las órdenes cuya tela cambió de color, hasta volver a explotar. Y
+al volver a explotar, **lo que tenías seleccionado se conserva**; si ya no existe, la pantalla te pide volver a elegir en
+vez de proponer todo.
+
+**Lo que no mueve la compra no frena nada:** cambiar un precio, una nota, el arte, abrir o cerrar la receta, volver a
+firmar lo ya firmado o el **primer** proveedor que asigna Compras a un material que no lo tenía.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Si alguien está explotando una orden mientras otra persona le cambia la receta**, una de las dos espera a que termine
+la otra: así la explosión nunca queda marcada como al día con cantidades viejas. **Si se explotan varias órdenes juntas
+y una cambió, se frena todo el acto** y el mensaje nombra la orden: se vuelve a
+explotar o se saca de la selección. **Una orden explotada antes de esta versión** pide volver a explotar una vez, porque
+no hay forma de saber contra qué receta se explotó. **Si alguien liga un color justo mientras otra persona lo
+fusiona**, la fusión se rechaza completa sin cambiar nada y pide volver a intentarla.
+
+### ⏳ Sigue pendiente o roto
+
+**Los cambios en el catálogo** (medidas o proveedores de un avío) no frenan la compra; la pantalla de explosión vuelve a
+explotar cada vez que se abre. Preguntas para Daniel en §Post-F9.278.
+
 ## 0.209 · 7-oct-2026 · **en prueba** — **Cuando se corta de más, la explosión pide los avíos de las prendas extra**
 
 > **La v0.209 cierra la fila 0.232.** Daniel: *«casi siempre se compra antes de cortar»* — así que cuando el corte sale

@@ -42,6 +42,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
         totalPiezas: 30,
         piezasSobreCorte: 0,
         piezasSinExplotar: 0,
+        recetaCambioDesdeExplosion: false,
         idPedido: null,
         folioPedido: null,
         fechaEntrega: null,

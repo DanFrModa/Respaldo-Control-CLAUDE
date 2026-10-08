@@ -3698,6 +3698,11 @@ model Orden {
   /// la razón deja al comprador adivinando, y es lo que el 409 le enseña.
   recetaAbiertaMotivo String?   @map("receta_abierta_motivo")
 
+  /// ⭐⭐ Fila 0.257: la versión de la receta de esta orden (¿cambió desde la última explosión?).
+  /// Vive en SU PROPIA TABLA a propósito —ver `OrdenVersionReceta`—: ni la explosión ni las
+  /// mutaciones de receta deben escribir la fila de `ordenes` para llevar este contador.
+  versionDeReceta OrdenVersionReceta?
+
   /// Renglones de TELA de la receta congelada de esta orden. Cascade.
   recetaTelas OrdenTela[]
   /// Renglones de AVÍO de la receta congelada de esta orden. Cascade.
@@ -10172,4 +10177,41 @@ model RenglonCorridaPago {
   @@index([idCuentaProveedor])
   @@index([idCuentaConcepto])
   @@map("renglon_corrida_pago")
+}
+
+/// ⭐⭐ **Fila 0.257 — LA VERSIÓN DE LA RECETA DE UNA ORDEN, y contra cuál se explotó.**
+///
+/// La previa y la generación de OC compran el SNAPSHOT de la explosión (`requerimiento_orden`). Si
+/// después de explotar se corrige la receta (un avío que pedía 5,300 donde eran 600), se re-firma y
+/// se pide la previa sin re-explotar, la OC salía con el número viejo sin avisar. Ninguna fecha que
+/// ya existía sirve para saberlo: hace falta un CONTADOR que sólo suban los cambios que mueven lo que
+/// se compra (`produccion/version-receta.ts`).
+///
+/// 🔴 **POR QUÉ UNA TABLA APARTE y no dos columnas en `ordenes`** (2ª revisión de la fila, medido por
+/// el reviewer): con las columnas en `ordenes`, sellar la explosión hacía `UPDATE ordenes` por cada
+/// OP del lote y sostenía esas filas hasta el COMMIT — la explosión, que antes NO escribía `ordenes`,
+/// entraba al grafo de candados de fila de todos los que sí la escriben. Contra
+/// `recalcularEstadoOrdenesDeModelo` (guardar «lleva arte» de un modelo) daba 8-11 deadlocks de 25.
+/// Escribir AQUÍ sólo toma `FOR KEY SHARE` sobre la orden (la FK), que no choca con ningún `UPDATE`
+/// que no toque su llave.
+///
+/// Reglas: se escribe SIEMPRE bajo el candado RCPV de la orden y con upsert. **Que no exista la fila
+/// = versión 0, nunca explotada** (REGLA 0-B: sin backfill; nace cuando hace falta).
+model OrdenVersionReceta {
+  /// La orden (1:1). Cascade: es un dato técnico de la orden y se va con ella.
+  idOrden          Int   @id @map("id_orden")
+  orden            Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  /// Cuántas veces ha cambiado lo que la explosión LEE de esta orden: consumo, banderas de
+  /// producción, medidas por talla, amarre de proveedor de Desarrollo, color de la tela —también el
+  /// que repunta una fusión de colores—, renglones firmados o quitados, la matriz pedida, y
+  /// REASIGNAR el proveedor/precio que Compras ya había asignado. NO lo suben: precio, notas,
+  /// banderas de costo, complemento, arte, marcar revisado, abrir/cerrar la receta, ni la PRIMERA
+  /// asignación de proveedor de Compras (el snapshot se calculó sin ella).
+  versionReceta    Int   @default(0) @map("version_receta")
+  /// La `versionReceta` que LEYÓ la última explosión. Distinta de `versionReceta` (o NULL con
+  /// snapshot: de antes de esta fila) = el snapshot ya no corresponde y la compra se bloquea hasta
+  /// volver a explotar.
+  versionExplotada Int?  @map("version_explotada")
+
+  @@map("orden_version_receta")
 }

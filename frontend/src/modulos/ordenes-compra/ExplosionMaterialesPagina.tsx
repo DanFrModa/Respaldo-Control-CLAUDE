@@ -141,6 +141,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   // Selección de renglones a comprar; vacío = todo lo pendiente con proveedor.
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
   /**
+   * ⭐⭐ fila 0.257 (3ª vuelta) — **LA SELECCIÓN SE PERDIÓ AL VOLVER A EXPLOTAR.** Había algo elegido
+   * y la explosión nueva ya no trae ninguno de esos renglones (cambió el color de la tela, se quitó
+   * el material…). La selección queda vacía — y vacía significa «TODO lo pendiente». Sin esta marca,
+   * re-explotar cambiaba de dirección en silencio: de comprar lo elegido a proponerlo todo. Mientras
+   * esté puesta, «Revisar y generar OC» no avanza: hay que volver a elegir, o decir EXPLÍCITAMENTE
+   * «todo lo pendiente».
+   */
+  const [seleccionPerdida, setSeleccionPerdida] = useState(false);
+  /**
    * ⭐ §Post-F9.71 (opción A de Daniel) — FECHA POR OC. Aquí nace UNA OC POR PROVEEDOR de un clic, y
    * *"cada OC interna va a tener una fecha de entrega diferente"*: la tela se necesita semanas antes
    * que los avíos. Sólo se guardan las fechas que el usuario TOCÓ; las demás siguen a la de arriba
@@ -508,6 +517,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
   function elegirOrdenBase(id: number): void {
+    setSeleccionPerdida(false);
     precargadoPara.current = null;
     setIdOrdenBase(id);
     setIdsOrden([id]);
@@ -527,6 +537,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /** Agrega una OP suelta al conjunto (el caso de las cajas, que cruzan pedidos). */
   function agregarOrden(id: number): void {
+    setSeleccionPerdida(false);
     setIdsOrden((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setSeleccion(new Set());
     setAjustes({});
@@ -540,6 +551,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /** Quita una OP del conjunto (quitar la última deja la pantalla en blanco, no en un estado raro). */
   function quitarOrden(id: number): void {
+    setSeleccionPerdida(false);
     setIdsOrden((prev) => {
       const siguiente = prev.filter((x) => x !== id);
       if (siguiente.length === 0) setIdOrdenBase(null);
@@ -588,6 +600,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * sabe dibujar y que el servidor compraría a medias.
    */
   function alternarRenglon(ids: readonly number[], marcado: boolean): void {
+    // Elegir (o quitar) un renglón ES volver a elegir: el aviso de la selección perdida se cae.
+    setSeleccionPerdida(false);
     setSeleccion((prev) => {
       const siguiente = new Set(prev);
       for (const id of ids) {
@@ -752,6 +766,25 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setPlan(null);
   }
 
+  /**
+   * ⭐⭐ **fila 0.257 — «VOLVER» DESDE LA PREVIA, Y SI LA RECETA CAMBIÓ, VOLVER A EXPLOTAR.**
+   *
+   * Si alguna OP del plan trae `recetaCambioDesdeExplosion`, la previa está BLOQUEADA (el servidor
+   * no deja comprar un snapshot que ya no es el de la receta) y la salida es re-explotar. Pero la
+   * explosión de esta pantalla es una consulta en caché: volver a ella sin pedirla otra vez enseñaría
+   * el resultado VIEJO y el bloqueo no tendría salida dentro de la pantalla (no hay otro botón de
+   * re-explotar: la pantalla explota al CARGAR). Por eso el regreso, en ese caso, la vuelve a pedir
+   * —que en el servidor es explotar de verdad: reescribe el snapshot—.
+   *
+   * Sin la marca, «Volver y corregir» hace lo de siempre (cerrar la previa y nada más): re-explotar
+   * de gratis le movería al comprador los números que estaba mirando.
+   */
+  function volverDeLaPrevia(): void {
+    const recetaCambiada = plan?.ordenes.some((o) => o.recetaCambioDesdeExplosion) ?? false;
+    cerrarPrevia();
+    if (recetaCambiada) void explosion.refetch();
+  }
+
   /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
   function cuerpoDeCompra(
     ajustesActuales: Record<string, string> = ajustes,
@@ -871,6 +904,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   function revisar(): void {
     if (idsOrden.length === 0) return;
+    // ⭐⭐ fila 0.257: con la selección perdida, mandar `[]` sería pedir «todo» sin que nadie lo
+    // dijera. El botón ya está apagado; esto es el cinturón por si se llega por otra vía.
+    if (seleccionPerdida) return;
     // ⭐⭐ **V1-E4f (§Post-F9.103) — SON DOS LOS DATOS BLOQUEANTES DEL DOCUMENTO: la fecha de
     // entrega y la dirección.** Se evalúan LAS DOS antes de frenar (y no en cascada) porque con las
     // dos vacías un `return` temprano dejaría la segunda en gris: el comprador arreglaría una, daría
@@ -912,9 +948,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   function confirmarGeneracion(): void {
     if (idsOrden.length === 0) return;
+    // ⭐⭐ fila 0.257 — el mismo cinturón que `revisar`, y aquí SÍ hace falta: la explosión puede
+    // re-calcularse con la previa ABIERTA (cualquier invalidación) y dejar la selección perdida. El
+    // cuerpo viajaría con `[]` = «todo lo pendiente» sin que nadie lo dijera. Se cierra la previa
+    // para que el aviso de la selección perdida quede a la vista.
+    if (seleccionPerdida) {
+      cerrarPrevia();
+      return;
+    }
     generar.mutate(cuerpoDeCompra(), {
       onSuccess: () => {
         setSeleccion(new Set());
+        setSeleccionPerdida(false);
         setAjustes({});
         setPrecios({});
         setColoresAvio({});
@@ -950,6 +995,28 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   }
 
   const datos = explosion.data;
+  /**
+   * ⭐⭐ fila 0.257 (H4) — **LA SELECCIÓN SOBREVIVE A VOLVER A EXPLOTAR.** La selección guarda ids de
+   * `RequerimientoOrden`, y cada explosión BORRA el snapshot y lo reescribe con ids nuevos. Sin esto,
+   * después de «Volver a explotar» (o de cualquier recálculo de la explosión) la selección apuntaba a
+   * renglones que ya no existen y la previa siguiente los omitía TODOS como «no seleccionado».
+   * Se re-mapea por lo que el renglón ES —orden, material y color—, que sí sobrevive
+   * ({@link remapearSeleccion}); lo que la nueva explosión ya no trae, se cae de la selección.
+   */
+  const datosAnteriores = useRef(datos);
+  useEffect(() => {
+    const antes = datosAnteriores.current;
+    datosAnteriores.current = datos;
+    if (antes === undefined || datos === undefined || antes === datos) return;
+    const remapeada = remapearSeleccion(seleccion, antes.grupos, datos.grupos);
+    if (remapeada === seleccion) return;
+    setSeleccion(remapeada);
+    // Había algo elegido y no sobrevivió NADA: no se vale pasar a «todo» en silencio.
+    if (seleccion.size > 0 && remapeada.size === 0) setSeleccionPerdida(true);
+    // Sólo cuando llega una explosión NUEVA: la selección se lee tal como está en ese render (si
+    // estuviera en las dependencias, cada clic de una casilla volvería a re-mapear contra sí misma).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datos]);
   const cerradas: ReadonlyMap<number, number> = new Map(
     (datos?.ordenes ?? []).filter((o) => o.ordenCerrada).map((o) => [o.idOrden, o.folio]),
   );
@@ -1074,7 +1141,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               recalculando={previo.isPending}
               errorRecalculo={previo.isError ? previo.error.message : null}
               error={generar.isError ? generar.error.message : null}
-              onVolver={cerrarPrevia}
+              onVolver={volverDeLaPrevia}
               onConfirmar={confirmarGeneracion}
               onAjustar={ajustarDesdeLaPrevia}
             />
@@ -1360,14 +1427,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
                            Sigue apagado mientras el servidor prepara el plan (`isPending`): dos
                            planes en vuelo es justo lo que V1-E3z vino a cerrar. */
-                          disabled={previo.isPending}
+                          disabled={previo.isPending || seleccionPerdida}
                           // V1-E3m: el botón dice qué falta también al pasar el ratón.
                           title={
-                            avisoFecha !== null
-                              ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
-                              : (avisoDireccion?.bloquea ?? false)
-                                ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
-                                : (motivoSinOc ?? undefined)
+                            seleccionPerdida
+                              ? 'Tu selección ya no existe tras volver a explotar: vuelve a elegir.'
+                              : avisoFecha !== null
+                                ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
+                                : (avisoDireccion?.bloquea ?? false)
+                                  ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
+                                  : (motivoSinOc ?? undefined)
                           }
                           data-testid="exp-generar-oc"
                         >
@@ -1377,6 +1446,29 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       ) : null}
                     </div>
                   </div>
+
+                  {/* ⭐⭐ fila 0.257 — la selección se perdió al volver a explotar. Se dice, y se
+                      ofrece la salida EXPLÍCITA a «todo lo pendiente»: nunca se elige sola. */}
+                  {seleccionPerdida ? (
+                    <div
+                      className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-warn/30 bg-warn-soft p-3 text-sm text-warn"
+                      role="alert"
+                      data-testid="exp-seleccion-perdida"
+                    >
+                      <span className="min-w-0 flex-1">
+                        Tu selección ya no existe tras volver a explotar (los renglones cambiaron):
+                        vuelve a elegir lo que quieres comprar.
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSeleccionPerdida(false)}
+                        data-testid="exp-seleccion-todo"
+                      >
+                        Comprar todo lo pendiente
+                      </Button>
+                    </div>
+                  ) : null}
 
                   {previo.isError ? (
                     <p className="mb-3 text-sm text-destructive" data-testid="exp-error-previo">
@@ -1881,6 +1973,67 @@ export function ocPlaneadasEnPantalla(
   return planeadas;
 }
 
+/** Lo mínimo de un renglón de la explosión para re-mapear la selección (ver {@link remapearSeleccion}). */
+interface RenglonParaSeleccion {
+  tipo: 'tela' | 'avio';
+  idTela: number | null;
+  idAvio: number | null;
+  idTelaColor: number | null;
+  idColorPrenda: number | null;
+  porOrden: readonly { idRequerimiento: number; idOrden: number }[];
+}
+
+/** Lo que un requerimiento ES, sin su id: la orden, el material y su color. Sobrevive a re-explotar. */
+function claveDelRequerimiento(r: RenglonParaSeleccion, idOrden: number): string {
+  return [
+    String(idOrden),
+    r.tipo,
+    String(r.tipo === 'tela' ? r.idTela : r.idAvio),
+    String(r.idTelaColor),
+    String(r.idColorPrenda),
+  ].join('|');
+}
+
+/**
+ * ⭐⭐ fila 0.257 (H4) — RE-MAPEA la selección de la explosión ANTERIOR a la nueva. Pura (y
+ * exportada para probarla sin pantalla).
+ *
+ * Cada id seleccionado se traduce a lo que el requerimiento ES (orden + material + color) y se
+ * busca en la explosión nueva; lo que ya no está, se cae. Devuelve **el mismo `Set`** si nada
+ * cambió, para que React no repinte en balde (y una explosión que llega idéntica no entre en un
+ * ciclo de renders).
+ */
+export function remapearSeleccion(
+  seleccion: ReadonlySet<number>,
+  gruposAntes: readonly { renglones: readonly RenglonParaSeleccion[] }[],
+  gruposAhora: readonly { renglones: readonly RenglonParaSeleccion[] }[],
+): Set<number> {
+  const actual = seleccion instanceof Set ? (seleccion as Set<number>) : new Set(seleccion);
+  if (seleccion.size === 0) return actual;
+  const claveDeId = new Map<number, string>();
+  for (const g of gruposAntes) {
+    for (const r of g.renglones) {
+      for (const l of r.porOrden)
+        claveDeId.set(l.idRequerimiento, claveDelRequerimiento(r, l.idOrden));
+    }
+  }
+  const idDeClave = new Map<string, number>();
+  for (const g of gruposAhora) {
+    for (const r of g.renglones) {
+      for (const l of r.porOrden)
+        idDeClave.set(claveDelRequerimiento(r, l.idOrden), l.idRequerimiento);
+    }
+  }
+  const nueva = new Set<number>();
+  for (const id of seleccion) {
+    const clave = claveDeId.get(id);
+    const nuevo = clave === undefined ? undefined : idDeClave.get(clave);
+    if (nuevo !== undefined) nueva.add(nuevo);
+  }
+  if (nueva.size === seleccion.size && [...nueva].every((id) => seleccion.has(id))) return actual;
+  return nueva;
+}
+
 /**
  * ⭐⭐ **V1-E4f (§Post-F9.103) — CUÁLES DE ESAS OC NACERÍAN SIN FECHA.**
  *
@@ -2153,6 +2306,8 @@ function RevisionPrevia({
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
+  // ⭐⭐ fila 0.257: la receta de alguna OP cambió desde la explosión ⇒ volver = volver a explotar.
+  const recetaCambiada = plan.ordenes.some((o) => o.recetaCambioDesdeExplosion);
   // 🔴 EL PLAN DE LA PANTALLA NO ES EL DE LOS CAMPOS: o el servidor está recalculando, o el último
   // recálculo lo rechazó. En los dos casos los totales que se ven son de ANTES de lo que se tecleó,
   // y confirmar emitiría una OC con un número que nadie revisó.
@@ -2169,7 +2324,7 @@ function RevisionPrevia({
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onVolver} data-testid="exp-volver-explosion">
-            <ArrowLeft aria-hidden /> Volver y corregir
+            <ArrowLeft aria-hidden /> {recetaCambiada ? 'Volver a explotar' : 'Volver y corregir'}
           </Button>
           <Button
             size="sm"

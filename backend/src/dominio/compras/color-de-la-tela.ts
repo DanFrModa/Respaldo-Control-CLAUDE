@@ -56,6 +56,11 @@ import {
   resolverColoresCanonicos,
 } from '../catalogos/colores-canonicos.js';
 import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
+import {
+  bloquearVersionReceta,
+  estaEnElSnapshot,
+  marcarRecetaCambiada,
+} from '../produccion/version-receta.js';
 import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from './comprometido-en-oc.js';
 import { proponerColorDeTela, type ColorDeTelaCandidato } from './casar-color-de-tela.js';
 
@@ -412,6 +417,9 @@ export async function asignarColorDeTela(
       idOrden,
       'le puede amarrar el color de compra de una tela',
     );
+    // ⭐⭐ fila 0.257 (H1) — el candado de la versión de la receta, después del compartido del cierre
+    // y ANTES de preguntarle al snapshot si trae esta tela (abajo).
+    await bloquearVersionReceta(tx, [idOrden]);
     const orden = await cargarOrden(tx, idOrden, idEmpresa);
 
     const renglon = orden.recetaTelas.find((t) => t.idTela === datos.idTela);
@@ -485,6 +493,16 @@ export async function asignarColorDeTela(
       if (motivo !== null) {
         throw new ErrorConflicto(motivo);
       }
+    }
+
+    // ⭐⭐ fila 0.257 — cambiar el color de una tela que la compra ya trae deja el snapshot pidiendo
+    // el color VIEJO: la OC saldría «marino» donde ahora dice «azul», sin aviso. Reenviar lo mismo
+    // no cambia nada; y una tela que el snapshot no trae (sin firmar) no tiene compra vieja.
+    if (
+      datos.idTelaColor !== idAnterior &&
+      (await estaEnElSnapshot(tx, idOrden, { idTela: renglon.idTela }))
+    ) {
+      await marcarRecetaCambiada(tx, idOrden);
     }
 
     if (datos.idTelaColor === null) {

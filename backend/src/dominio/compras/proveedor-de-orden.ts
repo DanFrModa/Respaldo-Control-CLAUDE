@@ -36,6 +36,12 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { numOrNull } from '../costos/decimales.js';
 import { exigirOrdenAbiertaPorId, exigirOrdenesAbiertas } from '../produccion/cierre-orden.js';
+import {
+  bloquearVersionReceta,
+  estaEnElSnapshot,
+  marcarRecetaCambiada,
+  reasignaLoQueSeCompra,
+} from '../produccion/version-receta.js';
 
 /** El renglón de receta afectado, en la forma mínima que esta operación necesita. */
 interface RenglonReceta {
@@ -154,6 +160,10 @@ export async function asignarProveedorDeMaterial(
       idOrden,
       'le puede asignar proveedor de compra a un material',
     );
+    // ⭐⭐ fila 0.257 (H1/H2) — el candado de la versión de la receta, después del compartido del
+    // cierre y ANTES de preguntarle al snapshot (abajo). En el acto en bloque ya lo tomó el llamador
+    // para todas sus órdenes en orden ascendente; aquí es re-entrante.
+    await bloquearVersionReceta(tx, [idOrden]);
     // A9: si la orden es de otra empresa se responde 404 y no se dice nada más de ella.
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa },
@@ -196,6 +206,27 @@ export async function asignarProveedorDeMaterial(
     // El precio solo tiene sentido con proveedor: al QUITAR la asignación se va con ella (dejarlo
     // colgando escondería un número que ya no vale para nada, y alguien lo leería como vigente).
     const precio = datos.idProveedor === null ? null : (datos.precio ?? null);
+
+    // ⭐⭐ fila 0.257 (H2) — REASIGNAR (o cambiarle el precio, o quitar) lo que Compras ya había
+    // decidido deja viejo el snapshot: si el material no tiene proveedor por Desarrollo ni por
+    // catálogo, la explosión compró a ESE proveedor a ESE precio (`asignado-compras`, el último
+    // escalón), y la previa seguiría comprándole a X a $1.5 después de reasignarlo a Y a $3.
+    // La PRIMERA asignación no lo deja viejo: el snapshot se calculó sin ella, así que o trae el
+    // proveedor que resolvió Desarrollo/el catálogo (que esta asignación no pisa) o lo trae como
+    // omitido «sin proveedor», visible en la previa. Por eso pide que HUBIERA algo antes.
+    if (
+      reasignaLoQueSeCompra(
+        { idProveedor: renglon.idProveedorCompraPrevio, precio: renglon.precioCompraPrevio },
+        { idProveedor: datos.idProveedor, precio },
+      ) &&
+      (await estaEnElSnapshot(
+        tx,
+        idOrden,
+        datos.tipo === 'tela' ? { idTela: datos.idMaterial } : { idAvio: datos.idMaterial },
+      ))
+    ) {
+      await marcarRecetaCambiada(tx, idOrden);
+    }
 
     const cambios = {
       idProveedorCompra: datos.idProveedor,
@@ -341,6 +372,13 @@ export async function asignarProveedorDeMaterialEnBloque(
     });
     // `Orden.folio` es BigInt en el esquema; el contrato del MRP lo expone como `number`
     // (mismo trato que `mrp.ts`), así que se convierte UNA vez, aquí.
+    // ⭐⭐ fila 0.257 (H1) — los candados de la versión de la receta de TODAS las órdenes del acto,
+    // de entrada y en orden ASCENDENTE: el bucle de abajo las recorre en el orden del cuerpo, y
+    // tomarlos ahí dejaría a dos actos en bloque esperándose en cruz.
+    await bloquearVersionReceta(
+      tx,
+      ordenes.map((o) => o.id),
+    );
     const folioPorOrden = new Map(ordenes.map((o) => [o.id, Number(o.folio)]));
     for (const id of idsOrden) {
       if (!folioPorOrden.has(id)) {

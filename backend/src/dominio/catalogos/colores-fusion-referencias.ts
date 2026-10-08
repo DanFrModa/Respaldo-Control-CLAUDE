@@ -53,7 +53,9 @@
 import type { Prisma } from '../../datos/index.js';
 import type { Tx } from '../../comun/transaccion.js';
 
+import { ErrorConflicto } from '../../comun/errores.js';
 import { bloquearModelosDelDesarrollo } from '../modelos/nomenclatura.js';
+import { estaEnElSnapshot, marcarRecetaCambiada } from '../produccion/version-receta.js';
 
 /** Qué hace la fusión con una referencia entrante de `Color`. */
 export type TratoDeReferencia = 'repuntar' | 'rastro';
@@ -73,6 +75,12 @@ export interface RepunteHecho {
 export interface ContextoRepunte {
   idOrigen: number;
   idDestino: number;
+  /**
+   * ⭐⭐ fila 0.257 — las órdenes cuyo candado RCPV la fusión ya tomó DE ENTRADA, en orden ascendente
+   * ({@link ordenesConColorDeTela}). El repunte del color de tela sólo puede tocar ésas: pedir aquí
+   * el candado de una orden NUEVA sería tomarlo fuera de orden (después de otros con id mayor).
+   */
+  ordenesConCandado: ReadonlySet<number>;
 }
 
 /**
@@ -303,7 +311,7 @@ export const REFERENCIAS_DE_COLOR: ReferenciaDeColor[] = [
     etiqueta: 'colores de tela amarrados a órdenes',
     trato: 'repuntar',
     contar: (tx, id) => tx.ordenTelaColor.count({ where: { idColor: id } }),
-    repuntar: async (tx, { idOrigen, idDestino }) => {
+    repuntar: async (tx, { idOrigen, idDestino, ordenesConCandado }) => {
       const delOrigen = await tx.ordenTelaColor.findMany({
         where: { idColor: idOrigen },
         select: { id: true, idOrdenTela: true, idTelaColor: true },
@@ -316,6 +324,34 @@ export const REFERENCIAS_DE_COLOR: ReferenciaDeColor[] = [
         select: { idOrdenTela: true },
       });
       const ocupados = new Set(delDestino.map((r) => r.idOrdenTela));
+
+      // ⭐⭐ fila 0.257 (H5) — repuntar o descartar el color de tela de una orden cambia DE QUÉ COLOR
+      // se compra su tela: el grupo de la explosión (por color de tela) ya no es el que el snapshot
+      // trae. Si esa tela está en el snapshot, la versión de la receta de la orden sube y la previa
+      // pide re-explotar. La pregunta al snapshot va BAJO el candado RCPV de la orden, que
+      // `fusionarColores` tomó de entrada, ascendente y antes de escribir nada.
+      //
+      // 🔴 Si aparece una orden que NO estaba en ese conjunto (alguien amarró este color en otra
+      // orden entre que la fusión leyó el conjunto y llegó aquí), NO se toma su candado ahora —sería
+      // fuera de orden, después de otros con id mayor, y podría cruzarse con una explosión de varias
+      // OP—: se rechaza la fusión entera (A2: no queda nada a medias) y basta con volver a intentarla.
+      const renglones = await tx.ordenTela.findMany({
+        where: { id: { in: [...new Set(delOrigen.map((r) => r.idOrdenTela))] } },
+        select: { idOrden: true, idTela: true, orden: { select: { folio: true } } },
+      });
+      const sinCandado = renglones.filter((r) => !ordenesConCandado.has(r.idOrden));
+      if (sinCandado.length > 0) {
+        throw new ErrorConflicto(
+          `Mientras se fusionaba, alguien amarró este color de prenda en la orden ` +
+            `${[...new Set(sinCandado.map((r) => String(r.orden.folio)))].join(', ')}: vuelve a ` +
+            'intentar la fusión (no se cambió nada).',
+        );
+      }
+      const ordenesASubir = new Set<number>();
+      for (const r of renglones) {
+        if (await estaEnElSnapshot(tx, r.idOrden, { idTela: r.idTela }))
+          ordenesASubir.add(r.idOrden);
+      }
 
       let movidos = 0;
       const descartados: Prisma.JsonObject[] = [];
@@ -333,6 +369,9 @@ export const REFERENCIAS_DE_COLOR: ReferenciaDeColor[] = [
         await tx.ordenTelaColor.update({ where: { id: ref.id }, data: { idColor: idDestino } });
         ocupados.add(ref.idOrdenTela);
         movidos++;
+      }
+      for (const idOrden of [...ordenesASubir].toSorted((a, b) => a - b)) {
+        await marcarRecetaCambiada(tx, idOrden);
       }
       return { movidos, ...(descartados.length > 0 ? { descartados } : {}) };
     },
@@ -458,6 +497,23 @@ export async function contarUsosConRastro(tx: Tx, idColor: number): Promise<UsoD
     }
   }
   return usos;
+}
+
+/**
+ * ⭐⭐ fila 0.257 (H5) — las órdenes cuyo color de tela amarrado apunta a alguno de estos colores de
+ * PRENDA: son las que la fusión va a repuntar. `fusionarColores` toma el candado de la versión de su
+ * receta de ENTRADA (ascendente, antes de escribir nada), porque los repuntes corren origen por
+ * origen y tomarlos ahí los pediría en cualquier orden.
+ */
+export async function ordenesConColorDeTela(
+  tx: Tx,
+  idsColor: readonly number[],
+): Promise<number[]> {
+  const filas = await tx.ordenTelaColor.findMany({
+    where: { idColor: { in: [...idsColor] } },
+    select: { ordenTela: { select: { idOrden: true } } },
+  });
+  return [...new Set(filas.map((f) => f.ordenTela.idOrden))].toSorted((a, b) => a - b);
 }
 
 /** Lo que el repunte completo de UN origen dejó hecho, ya agregado. */

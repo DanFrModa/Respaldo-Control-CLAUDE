@@ -18750,3 +18750,26 @@ de habilitación para mandarlo al taller.
    explosión), quien explota (una marca) y quien abre la previa de compra de esa orden (un aviso de volver a explotar).* Una bandeja de «órdenes con sobre-corte sin volver a explotar» sería otra fila.
 
 📌 Cuando exista el motivo de la OC (fila 0.231), la OC del extra podría nacer con el motivo «sobre-corte» propuesto.
+
+#### (Post-F9.278) — SI LA RECETA CAMBIÓ DESPUÉS DE EXPLOTAR, LA COMPRA SE FRENA HASTA VOLVER A EXPLOTAR (fila 0.257, v0.210) — preguntas para Daniel
+
+📐 Medido al revisar la v0.209: corregir un avío mal capturado en la receta y re-liberarla sin volver a explotar dejaba
+salir la orden de compra con la cantidad vieja (5,300 donde debían ser 600), sin aviso. **Construido con el default del
+lead: BLOQUEAR** — la previa lo enseña, la generación de OC lo rechaza nombrando la orden, y «Volver a explotar» lo
+destraba. Sólo cuentan los cambios que mueven lo que se compra (consumo, material quitado o restaurado, captura
+corregida, material nuevo firmado, color de la tela, cantidades de la orden, fusión de colores que cambia el color de la
+tela, y que Compras **cambie** el proveedor o el precio de un material ya explotado); precio, notas, arte y firmas
+repetidas no frenan. La explosión y los cambios de receta de una misma orden **se turnan** (uno espera al otro), para que
+una explosión en curso no quede como «al día» con cantidades viejas — lo cazó el reviewer con dos conexiones a la vez.
+
+❓ **Preguntas, con el default ya construido:**
+1. **¿Qué tan seguido se corrige una receta ya liberada sin volver a explotar?** Define si la fila **bloqueaba** (🔴) o
+   **dolía** (🔶). *Default construido: bloquear.*
+2. **Las cantidades de la orden** (subir, bajar o repartir distinto colores y tallas) también frenan la compra hasta
+   re-explotar. *Default: sí.* El sobre-corte (fila 0.232) se queda como aviso, no como freno.
+3. **El color de la tela** frena. **El proveedor que asigna Compras:** la primera asignación no frena (el material sale
+   como omitido, visible); **reasignarlo o cambiarle el precio después de explotar, sí** — lo midió el reviewer: la OC
+   salía al proveedor y precio viejos. *Default: así.*
+4. **Los cambios del catálogo** de avíos (medidas, proveedores) no frenan. *Default: fuera de esta fila; la pantalla de
+   explosión re-explota al abrirse.*
+5. **Una orden que nunca se explotó no se frena** (no hay nada viejo que comprar). *Default: así.*

@@ -160,6 +160,12 @@ import {
   requisitosOrden,
   tieneActividadProduccion,
 } from './requisitos-orden.js';
+// ⭐⭐ fila 0.257: cambiar lo pedido deja vieja la explosión (la versión de la receta sube).
+import {
+  bloquearVersionReceta,
+  marcarRecetaCambiada,
+  matrizCambiaLoQueSeCompra,
+} from './version-receta.js';
 
 /** Clave de la secuencia de folios de órdenes (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN = 'orden';
@@ -580,10 +586,20 @@ async function sincronizarMatriz(
     }
   }
 
+  // ⭐⭐ fila 0.257 (H1) — el candado de la versión de la receta ANTES de leer la matriz de antes:
+  // una explosión en vuelo de esta orden la leería a medias de este cambio.
+  await bloquearVersionReceta(tx, [idOrden]);
+
   // 4) Diff de renglones (color × pack) por id.
   const actuales = await tx.ordenLinea.findMany({
     where: { idOrden },
-    select: { id: true, idColor: true, pack: true },
+    select: {
+      id: true,
+      idColor: true,
+      pack: true,
+      // ⭐⭐ fila 0.257: las piezas de ANTES, para saber si lo pedido cambió (ver abajo).
+      tallas: { select: { idTalla: true, cantidad: true } },
+    },
   });
   const idsActuales = new Set(actuales.map((l) => l.id));
 
@@ -654,6 +670,23 @@ async function sincronizarMatriz(
       });
       await reemplazarTallas(tx, sesion, creada.id, linea.tallas);
     }
+  }
+
+  // ⭐⭐ fila 0.257 — LO PEDIDO ES LO QUE SE COMPRA. Si las piezas por celda cambian (suben, BAJAN o
+  // se reparten distinto entre colores/tallas), el snapshot de la explosión ya no corresponde y la
+  // previa de compra lo bloquea hasta volver a explotar. La 0.232 sólo AVISABA cuando la base
+  // crecía: un pedido recortado compraba de más en silencio. Guardar la misma matriz no cuenta.
+  if (
+    matrizCambiaLoQueSeCompra(
+      actuales.flatMap((l) =>
+        l.tallas.map((t) => ({ idColor: l.idColor, idTalla: t.idTalla, cantidad: t.cantidad })),
+      ),
+      set.flatMap((l) =>
+        l.tallas.map((t) => ({ idColor: l.idColor, idTalla: t.idTalla, cantidad: t.cantidad })),
+      ),
+    )
+  ) {
+    await marcarRecetaCambiada(tx, idOrden);
   }
 
   return set.length;

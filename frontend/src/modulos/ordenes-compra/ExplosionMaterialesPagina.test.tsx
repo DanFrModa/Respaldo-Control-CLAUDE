@@ -11,7 +11,11 @@ import {
   renderConProveedores,
 } from '@/pruebas/utilidades';
 
-import { ExplosionMaterialesPagina, ocPlaneadasEnPantalla } from './ExplosionMaterialesPagina';
+import {
+  ExplosionMaterialesPagina,
+  ocPlaneadasEnPantalla,
+  remapearSeleccion,
+} from './ExplosionMaterialesPagina';
 
 // ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
 // se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
@@ -163,6 +167,7 @@ function explosionDePrueba() {
         // ⭐⭐ fila 0.232: sin sobre-corte (la explosión de casi siempre: antes de cortar).
         piezasSobreCorte: 0,
         piezasSinExplotar: 0,
+        recetaCambioDesdeExplosion: false,
         idPedido: 300,
         folioPedido: 1515,
         fechaEntrega: '2026-09-30',
@@ -1847,6 +1852,254 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(mutateMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
     expect(screen.getByTestId('exp-grupos')).toBeInTheDocument();
+  });
+
+  // ── ⭐⭐ fila 0.257 — LA RECETA CAMBIÓ DESDE LA EXPLOSIÓN: el bloqueo tiene que tener SALIDA ─────
+  //
+  // El servidor bloquea la compra de un snapshot que ya no es el de la receta (la OC de 5,300 donde
+  // eran 600). La salida es re-explotar, y en esta pantalla la explosión es una consulta en caché:
+  // «volver» sin pedirla otra vez enseñaría el resultado viejo y el bloqueo no se iría nunca.
+
+  /** El plan de siempre, con la OP 7 desfasada y el bloqueo que la nombra. */
+  function planConRecetaCambiada() {
+    const base = planDePrueba();
+    return {
+      ...base,
+      ordenes: base.ordenes.map((o, i) => ({ ...o, recetaCambioDesdeExplosion: i === 0 })),
+      bloqueos: [
+        'La receta de la orden 7 cambió desde la última explosión (se corrigió, se quitó o se ' +
+          'firmó un material, o cambió lo pedido): lo que se iba a comprar ya no corresponde. ' +
+          'Vuelve a explotar, o quítala de esta compra para generar la de las demás.',
+      ],
+    };
+  }
+
+  it('⭐⭐ 0.257: con la receta cambiada, el bloqueo se ve, no se confirma y «Volver a explotar» re-explota', async () => {
+    const refetch = vi.fn();
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+      refetch,
+    });
+    const usuario = userEvent.setup();
+    await llegarALaPrevia(planConRecetaCambiada());
+
+    expect(screen.getByTestId('exp-bloqueo')).toHaveTextContent(
+      'La receta de la orden 7 cambió desde la última explosión',
+    );
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+    const volver = screen.getByTestId('exp-volver-explosion');
+    expect(volver).toHaveTextContent('Volver a explotar');
+
+    await usuario.click(volver);
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  it('⭐⭐ 0.257 (H4): la selección SOBREVIVE a «Volver a explotar» (los ids del snapshot cambian)', async () => {
+    // La explosión nueva trae el MISMO botón de la MISMA orden, con otro id de requerimiento: el
+    // servidor borra y reescribe el snapshot en cada explosión.
+    const vieja = explosionDePrueba();
+    const nueva = {
+      ...vieja,
+      grupos: vieja.grupos.map((g) => ({
+        ...g,
+        renglones: g.renglones.map((r) => ({
+          ...r,
+          idsRequerimiento: r.idsRequerimiento.map((id) => id + 100),
+          porOrden: r.porOrden.map((l) => ({ ...l, idRequerimiento: l.idRequerimiento + 100 })),
+        })),
+      })),
+    };
+    const refetch = vi.fn(() => {
+      useExplosionMock.mockReturnValue({ data: nueva, isPending: false, isError: false, refetch });
+    });
+    useExplosionMock.mockReturnValue({ data: vieja, isPending: false, isError: false, refetch });
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(planConRecetaCambiada());
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
+    await usuario.click(screen.getByRole('checkbox', { name: 'Seleccionar BOT-01 — Botón' }));
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [primero] = previoMutateMock.mock.calls[0] as [{ idsRequerimiento: number[] }];
+    expect(primero.idsRequerimiento).toEqual([1]);
+
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+    expect(refetch).toHaveBeenCalledOnce();
+    // La casilla sigue marcada sobre el renglón NUEVO…
+    expect(screen.getByRole('checkbox', { name: 'Seleccionar BOT-01 — Botón' })).toBeChecked();
+    // …y la previa siguiente pide ESE renglón, no el id que ya no existe.
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [segundo] = previoMutateMock.mock.calls[1] as [{ idsRequerimiento: number[] }];
+    expect(segundo.idsRequerimiento).toEqual([101]);
+  });
+
+  /**
+   * ⭐⭐ 0.257 (3ª vuelta) — si lo elegido YA NO EXISTE tras re-explotar, la selección queda vacía, y
+   * vacía significa «todo lo pendiente». El caso real: cambiar el color de la tela ⇒ frena ⇒
+   * re-explotar ⇒ el renglón cambia de clave. No se vale pasar a «todo» en silencio.
+   */
+  async function seleccionarYReexplotarHacia(
+    nueva: unknown,
+  ): Promise<ReturnType<typeof userEvent.setup>> {
+    const refetch = vi.fn(() => {
+      useExplosionMock.mockReturnValue({ data: nueva, isPending: false, isError: false, refetch });
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+      refetch,
+    });
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(planConRecetaCambiada());
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
+    await usuario.click(screen.getByRole('checkbox', { name: 'Seleccionar BOT-01 — Botón' }));
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+    return usuario;
+  }
+
+  /** La explosión de prueba, con el botón convertido en OTRO renglón (otro color de prenda). */
+  function explosionConElBotonCambiado() {
+    const base = explosionDePrueba();
+    return {
+      ...base,
+      grupos: base.grupos.map((g) => ({
+        ...g,
+        renglones: g.renglones.map((r) =>
+          r.idAvio === 3
+            ? {
+                ...r,
+                idColorPrenda: 77,
+                idsRequerimiento: [301],
+                porOrden: r.porOrden.map((l) => ({ ...l, idRequerimiento: 301 })),
+              }
+            : r,
+        ),
+      })),
+    };
+  }
+
+  it('⭐⭐ 0.257: si la selección NO sobrevive a re-explotar, se AVISA y no se pasa a «todo»', async () => {
+    const usuario = await seleccionarYReexplotarHacia(explosionConElBotonCambiado());
+    expect(screen.getByTestId('exp-seleccion-perdida')).toHaveTextContent(
+      'Tu selección ya no existe tras volver a explotar',
+    );
+    const revisar = screen.getByTestId('exp-generar-oc');
+    expect(revisar).toBeDisabled();
+    // Sólo la primera previa salió; con la selección perdida no se pide nada más.
+    expect(previoMutateMock).toHaveBeenCalledTimes(1);
+
+    // «Todo lo pendiente» se elige EXPLÍCITAMENTE, y entonces sí viaja vacío.
+    await usuario.click(screen.getByTestId('exp-seleccion-todo'));
+    expect(screen.queryByTestId('exp-seleccion-perdida')).toBeNull();
+    expect(revisar).toBeEnabled();
+    await usuario.click(revisar);
+    const [cuerpo] = previoMutateMock.mock.calls[1] as [{ idsRequerimiento: number[] }];
+    expect(cuerpo.idsRequerimiento).toEqual([]);
+  });
+
+  it('⭐⭐ 0.257: si la selección se pierde con la previa ABIERTA, «Confirmar» NO genera (cinturón)', async () => {
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(planDePrueba());
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
+    await usuario.click(screen.getByRole('checkbox', { name: 'Seleccionar BOT-01 — Botón' }));
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    // Con la previa abierta, la explosión se recalcula (cualquier invalidación) y el botón cambia de
+    // clave: el siguiente render —el que dispara corregir un número de la previa— la recibe.
+    useExplosionMock.mockReturnValue({
+      data: explosionConElBotonCambiado(),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '301');
+    await usuario.tab();
+
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+    expect(mutateMock).not.toHaveBeenCalled();
+    // Se vuelve a la explosión, donde el aviso dice qué pasó y cómo seguir.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+    expect(screen.getByTestId('exp-seleccion-perdida')).toBeInTheDocument();
+  });
+
+  it('⭐⭐ 0.257 (inversa): volver a ELEGIR un renglón también quita el aviso, y se pide ése', async () => {
+    const usuario = await seleccionarYReexplotarHacia(explosionConElBotonCambiado());
+    expect(screen.getByTestId('exp-seleccion-perdida')).toBeInTheDocument();
+    await usuario.click(screen.getByRole('checkbox', { name: 'Seleccionar BOT-01 — Botón' }));
+    expect(screen.queryByTestId('exp-seleccion-perdida')).toBeNull();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[1] as [{ idsRequerimiento: number[] }];
+    expect(cuerpo.idsRequerimiento).toEqual([301]);
+  });
+
+  it('⭐⭐ 0.257 (inversa): si la selección SÍ sobrevive, no hay aviso', async () => {
+    const base = explosionDePrueba();
+    await seleccionarYReexplotarHacia({
+      ...base,
+      grupos: base.grupos.map((g) => ({
+        ...g,
+        renglones: g.renglones.map((r) => ({
+          ...r,
+          idsRequerimiento: r.idsRequerimiento.map((id) => id + 100),
+          porOrden: r.porOrden.map((l) => ({ ...l, idRequerimiento: l.idRequerimiento + 100 })),
+        })),
+      })),
+    });
+    expect(screen.queryByTestId('exp-seleccion-perdida')).toBeNull();
+    expect(screen.getByTestId('exp-generar-oc')).toBeEnabled();
+  });
+
+  it('⭐⭐ 0.257 (inversa): sin la marca, «Volver y corregir» NO re-explota', async () => {
+    const refetch = vi.fn();
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+      refetch,
+    });
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const volver = screen.getByTestId('exp-volver-explosion');
+    expect(volver).toHaveTextContent('Volver y corregir');
+    await usuario.click(volver);
+    expect(refetch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
   });
 
   // ── ⭐⭐ V1-E3z (§Post-F9.94) — LA PREVIA ES EDITABLE: CANTIDAD Y PRECIO ────────────────────────
@@ -6038,6 +6291,57 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
  * tipo permite y el servidor de hoy no produce. Es a propósito: lo que se está fijando es que la
  * pantalla **no pida una fecha por una OC que no existe** aunque el agrupador de allá cambie.
  */
+describe('remapearSeleccion — fila 0.257 (H4): la selección cruza la re-explosión', () => {
+  const renglon = (
+    idRequerimiento: number,
+    extra: Partial<{ idAvio: number; idColorPrenda: number | null; idOrden: number }> = {},
+  ) => ({
+    tipo: 'avio' as const,
+    idTela: null,
+    idAvio: extra.idAvio ?? 3,
+    idTelaColor: null,
+    idColorPrenda: extra.idColorPrenda ?? null,
+    porOrden: [{ idRequerimiento, idOrden: extra.idOrden ?? 50 }],
+  });
+
+  it('traduce cada id al renglón NUEVO de la misma orden, material y color', () => {
+    const antes = [{ renglones: [renglon(1), renglon(2, { idAvio: 4 })] }];
+    const ahora = [{ renglones: [renglon(11), renglon(12, { idAvio: 4 })] }];
+    expect([...remapearSeleccion(new Set([1, 2]), antes, ahora)].sort()).toEqual([11, 12]);
+  });
+
+  it('lo que la explosión nueva ya no trae se CAE (la PANTALLA no lo trata como «todo»: ver «se AVISA»)', () => {
+    const antes = [{ renglones: [renglon(1), renglon(2, { idColorPrenda: 7 })] }];
+    const ahora = [
+      { renglones: [renglon(11, { idColorPrenda: 8 }), renglon(12, { idOrden: 51 })] },
+    ];
+    expect([...remapearSeleccion(new Set([1, 2]), antes, ahora)]).toEqual([]);
+  });
+
+  it('el COLOR DE TELA es parte de lo que el renglón ES: dos colores de la misma tela no se confunden', () => {
+    const tela = (idRequerimiento: number, idTelaColor: number) => ({
+      tipo: 'tela' as const,
+      idTela: 4,
+      idAvio: null,
+      idTelaColor,
+      idColorPrenda: null,
+      porOrden: [{ idRequerimiento, idOrden: 50 }],
+    });
+    const antes = [{ renglones: [tela(1, 10), tela(2, 20)] }];
+    const ahora = [{ renglones: [tela(11, 10), tela(12, 20)] }];
+    expect([...remapearSeleccion(new Set([1]), antes, ahora)]).toEqual([11]);
+    expect([...remapearSeleccion(new Set([2]), antes, ahora)]).toEqual([12]);
+  });
+
+  it('si nada cambió devuelve el MISMO Set (React no repinta en balde)', () => {
+    const grupos = [{ renglones: [renglon(1)] }];
+    const seleccion = new Set([1]);
+    expect(remapearSeleccion(seleccion, grupos, grupos)).toBe(seleccion);
+    const vacia = new Set<number>();
+    expect(remapearSeleccion(vacia, grupos, [{ renglones: [renglon(9)] }])).toBe(vacia);
+  });
+});
+
 describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por separado', () => {
   /** Un renglón comprable, con lo mínimo que la función mira. */
   function renglon(idProveedorSugerido: number | null, extra?: { cantidadPendiente?: number }) {

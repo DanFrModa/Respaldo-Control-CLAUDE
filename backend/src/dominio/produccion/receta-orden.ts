@@ -151,6 +151,13 @@ import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-
 // ⭐⭐ fila 0.232 (H5): los AVÍOS de la receta se miden con la MISMA base que la explosión.
 import { piezasDeAviosDeOrden } from './base-de-materiales.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
+// ⭐⭐ fila 0.257: la versión de la receta que dice si el snapshot de la explosión sigue vigente.
+import {
+  bloquearVersionReceta,
+  cambiaLoQueSeCompra,
+  estaEnElSnapshot,
+  marcarRecetaCambiada,
+} from './version-receta.js';
 import { num, redondear2 } from '../costos/decimales.js';
 
 /** Tolerancia al comparar cantidades/precios decimales (misma que el MRP y la habilitación). */
@@ -1887,6 +1894,16 @@ interface ContextoMutacionReceta {
    * re-cierra por partes). Una mutación que no declara nada no revoca nada.
    */
   tocoRenglon: (tipo: TipoRenglonRecetaClave, idRenglon: number) => void;
+  /**
+   * ⭐⭐ fila 0.257: la mutación DECLARA que cambió algo que la explosión LEE (consumo, banderas de
+   * producción, medidas por talla, amarre, renglón quitado o recién firmado). `enRecetaEditable`
+   * sube entonces la versión de la receta UNA vez, en la misma transacción
+   * (`version-receta.ts`), y la previa de compra sabe que el snapshot ya no corresponde.
+   *
+   * ⚠️ NO es `tocoRenglon`: ése también lo dispara el PRECIO (y el arte), que revoca la firma pero
+   * no mueve ni una pieza de lo que se compra. Confundirlos bloquearía la compra por un precio.
+   */
+  cambioLoQueSeCompra: () => void;
 }
 
 /** Lo que toda mutación de la receta comparte: permiso, orden viva, transacción y salida completa. */
@@ -1934,9 +1951,14 @@ async function enRecetaEditable<T>(
         'puede modificar su receta',
       );
     }
+    // ⭐⭐ fila 0.257 (H1) — el candado de la versión de la receta, DESPUÉS del compartido del cierre
+    // (el orden de todas las puertas) y ANTES de que la mutación le pregunte nada al snapshot: una
+    // explosión en vuelo de esta orden termina primero, o espera a que esto termine.
+    await bloquearVersionReceta(tx, [idOrden]);
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
     if (opciones.permitirOrdenNoViva !== true) exigirOrdenViva(orden);
     let sobreLapida = false;
+    let cambioLoQueSeCompra = false;
     const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
     await accion(tx, orden, {
       cayoSobreLapida: () => {
@@ -1945,7 +1967,13 @@ async function enRecetaEditable<T>(
       tocoRenglon: (tipo, idRenglon) => {
         tocados.push({ tipo, idRenglon });
       },
+      cambioLoQueSeCompra: () => {
+        cambioLoQueSeCompra = true;
+      },
     });
+    // ⭐⭐ fila 0.257 — el snapshot de la explosión deja de corresponder a esta receta. Una sola vez
+    // por acto (A2: dentro de la MISMA transacción que el cambio).
+    if (cambioLoQueSeCompra) await marcarRecetaCambiada(tx, orden.id);
 
     // ⭐ TOCAR EL CONTENIDO DE UN RENGLÓN YA LIBERADO LO VUELVE A CERRAR (hallazgo del reviewer,
     // ahora POR RENGLÓN — V1-E3h/§Post-F9.72).
@@ -2512,6 +2540,27 @@ export async function editarRenglonReceta(
         // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de Desarrollo.
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
+        // ⭐⭐ fila 0.257: SÓLO lo que la explosión lee sube la versión (el precio, las notas, las
+        // banderas de costo y el complemento no: ver `cambiaLoQueSeCompra`).
+        if (
+          !fila.excluido &&
+          cambiaLoQueSeCompra(
+            {
+              consumoPorPrenda: antesTela.consumoPorPrenda,
+              paraProduccion: fila.paraProduccion,
+              idAmarreProveedor: fila.idTelaProveedor,
+            },
+            {
+              consumoPorPrenda: despuesTela.consumoPorPrenda,
+              paraProduccion: despuesTela.paraProduccion,
+              idAmarreProveedor:
+                datos.idTelaProveedor === undefined ? fila.idTelaProveedor : datos.idTelaProveedor,
+            },
+          ) &&
+          (await estaEnElSnapshot(tx, orden.id, { idTela: fila.idTela }))
+        ) {
+          ctx.cambioLoQueSeCompra();
+        }
         await tx.ordenTela.update({
           where: { id: fila.id },
           data: {
@@ -2624,6 +2673,47 @@ export async function editarRenglonReceta(
                   'por prenda que de verdad lleva (en un cierre, normalmente 1) y se arregla.'
               : null,
           );
+        }
+
+        // ⭐⭐ fila 0.257: ¿este guardado mueve lo que se compra? Se compara el estado RESULTANTE
+        // —con la bandera ya NORMALIZADA—, no lo que pidió el PATCH: guardar sólo el precio de un
+        // avío con la contradicción heredada la apaga (§Post-F9.105), y eso SÍ cambia el requerido
+        // (de 5,300 a 600). Las medidas por talla, igual: lo que va a quedar escrito.
+        if (
+          !fila.excluido &&
+          cambiaLoQueSeCompra(
+            {
+              consumoPorPrenda: antesAvio.consumoPorPrenda,
+              paraProduccion: fila.paraProduccion,
+              idAmarreProveedor: fila.idAvioProveedor,
+              consumoPorTalla: fila.consumoPorTalla,
+              tallas: fila.tallas.map((t) => ({
+                idTalla: t.idTalla,
+                consumo: num(t.consumo),
+                idAvioMedida: t.idAvioMedida,
+              })),
+            },
+            {
+              consumoPorPrenda: consumoResultante,
+              paraProduccion: despuesAvio.paraProduccion,
+              idAmarreProveedor:
+                datos.idAvioProveedor === undefined ? fila.idAvioProveedor : datos.idAvioProveedor,
+              consumoPorTalla: despuesAvio.consumoPorTalla ?? fila.consumoPorTalla,
+              tallas:
+                datos.tallas === undefined
+                  ? fila.tallas.map((t) => ({
+                      idTalla: t.idTalla,
+                      consumo: num(t.consumo),
+                      idAvioMedida: t.idAvioMedida,
+                    }))
+                  : medidasResultantes(datos.tallas, fila.tallas, consumoResultante).map(
+                      (t, i) => ({ ...t, idAvioMedida: datos.tallas?.[i]?.idAvioMedida ?? null }),
+                    ),
+            },
+          ) &&
+          (await estaEnElSnapshot(tx, orden.id, { idAvio: fila.idAvio }))
+        ) {
+          ctx.cambioLoQueSeCompra();
         }
 
         await tx.ordenAvio.update({
@@ -2775,6 +2865,11 @@ export async function corregirCapturaAvio(
       // revivir después, y más vale que reviva ya sano.
       if (fila.excluido) ctx.cayoSobreLapida();
       else ctx.tocoRenglon('avio', fila.id);
+      // ⭐⭐ fila 0.257 — EL CASO DEL REVIEWER: el requerido baja de 5,300 a 600, y el snapshot que la
+      // previa compraría sigue diciendo 5,300. Si ese avío está en la compra, la receta cambió.
+      if (!fila.excluido && (await estaEnElSnapshot(tx, orden.id, { idAvio: fila.idAvio }))) {
+        ctx.cambioLoQueSeCompra();
+      }
 
       // ⭐⭐ fila 0.232 (H5): la bitácora `requeridoAntes/Despues` sobre la base de AVÍOS.
       const piezas = await piezasDeAviosDeLaOrden(tx, orden.id);
@@ -2915,7 +3010,7 @@ export async function quitarRenglonReceta(
     sesion,
     idOrden,
     bd,
-    async (tx, orden) => {
+    async (tx, orden, ctx) => {
       const marca = {
         excluido: true,
         estado: EstadoRenglonReceta.ajustado,
@@ -2937,6 +3032,11 @@ export async function quitarRenglonReceta(
             fila.tela.nombre,
             'quitarlo de la receta de esta orden',
           );
+        }
+        // ⭐⭐ fila 0.257 — quitar NO revoca ninguna firma, así que nada más avisaba: el snapshot
+        // seguía trayendo el material y la OC lo compraba. Si está en la compra, la receta cambió.
+        if (!fila.excluido && (await estaEnElSnapshot(tx, orden.id, { idTela: fila.idTela }))) {
+          ctx.cambioLoQueSeCompra();
         }
         // D3: la copia ÍNTEGRA la arma el MISMO helper que usa el revivir — una sola definición de
         // "qué hay que conservar de este renglón", para que no puedan divergir.
@@ -2966,6 +3066,10 @@ export async function quitarRenglonReceta(
             `${fila.avio.clave} — ${fila.avio.descripcion}`,
             'quitarlo de la receta de esta orden',
           );
+        }
+        // ⭐⭐ fila 0.257 — la misma razón que en la tela: quitarlo no toca ninguna firma.
+        if (!fila.excluido && (await estaEnElSnapshot(tx, orden.id, { idAvio: fila.idAvio }))) {
+          ctx.cambioLoQueSeCompra();
         }
         // D3: copia ÍNTEGRA (incluidas sus medidas por talla) con el MISMO helper del revivir.
         const copia = { tipo, idRenglon, ...fotoAvio(fila), motivo: datos.motivo ?? null };
@@ -3090,6 +3194,26 @@ export async function restaurarRenglonReceta(
             'restaurarlo a lo que dice el modelo (lo dejaría fuera de la compra)',
           );
         }
+        // ⭐⭐ fila 0.257: restaurar PISA consumo, banderas y amarre con lo del modelo. Si eso mueve lo
+        // que el snapshot iba a comprar, la receta cambió.
+        if (
+          !fila.excluido &&
+          cambiaLoQueSeCompra(
+            {
+              consumoPorPrenda: num(fila.consumoPorPrenda),
+              paraProduccion: fila.paraProduccion,
+              idAmarreProveedor: fila.idTelaProveedor,
+            },
+            {
+              consumoPorPrenda: delModelo.consumoPorPrenda,
+              paraProduccion: delModelo.paraProduccion,
+              idAmarreProveedor: delModelo.idTelaProveedor,
+            },
+          ) &&
+          (await estaEnElSnapshot(tx, orden.id, { idTela: fila.idTela }))
+        ) {
+          ctx.cambioLoQueSeCompra();
+        }
         await tx.ordenTela.update({
           where: { id: fila.id },
           data: {
@@ -3172,6 +3296,37 @@ export async function restaurarRenglonReceta(
             `${fila.avio.clave} — ${fila.avio.descripcion}`,
             'restaurarlo a lo que dice el modelo (lo dejaría fuera de la compra)',
           );
+        }
+        // ⭐⭐ fila 0.257: lo mismo que la tela, con la bandera por talla y las MEDIDAS del modelo.
+        if (
+          !fila.excluido &&
+          cambiaLoQueSeCompra(
+            {
+              consumoPorPrenda: num(fila.consumoPorPrenda),
+              paraProduccion: fila.paraProduccion,
+              idAmarreProveedor: fila.idAvioProveedor,
+              consumoPorTalla: fila.consumoPorTalla,
+              tallas: fila.tallas.map((t) => ({
+                idTalla: t.idTalla,
+                consumo: num(t.consumo),
+                idAvioMedida: t.idAvioMedida,
+              })),
+            },
+            {
+              consumoPorPrenda: delModelo.consumoPorPrenda,
+              paraProduccion: delModelo.paraProduccion,
+              idAmarreProveedor: delModelo.idAvioProveedor,
+              consumoPorTalla: consumoPorTallaRestaurado,
+              tallas: medidas.map((m) => ({
+                idTalla: m.idTalla,
+                consumo: num(m.consumo),
+                idAvioMedida: m.idAvioMedida,
+              })),
+            },
+          ) &&
+          (await estaEnElSnapshot(tx, orden.id, { idAvio: fila.idAvio }))
+        ) {
+          ctx.cambioLoQueSeCompra();
         }
         await tx.ordenAvio.update({
           where: { id: fila.id },
@@ -3348,7 +3503,7 @@ export async function liberarReceta(
   bd?: ContextoBd,
 ): Promise<RecetaOrden> {
   const datos = validarEntrada(esquemaLiberarRecetaCuerpo, cuerpo);
-  return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
+  return enRecetaEditable(sesion, idOrden, bd, async (tx, orden, ctx) => {
     const seleccion = datos.renglones;
     if (seleccion.length === 0) {
       throw new ErrorValidacion(
@@ -3378,13 +3533,27 @@ export async function liberarReceta(
         ? Promise.resolve([])
         : tx.ordenTela.findMany({
             where: dondeTela,
-            select: { id: true, estado: true, excluido: true, liberadoEn: true },
+            select: {
+              id: true,
+              estado: true,
+              excluido: true,
+              liberadoEn: true,
+              idTela: true,
+              paraProduccion: true,
+            },
           }),
       dondeAvio === null
         ? Promise.resolve([])
         : tx.ordenAvio.findMany({
             where: dondeAvio,
-            select: { id: true, estado: true, excluido: true, liberadoEn: true },
+            select: {
+              id: true,
+              estado: true,
+              excluido: true,
+              liberadoEn: true,
+              idAvio: true,
+              paraProduccion: true,
+            },
           }),
       dondeArte === null
         ? Promise.resolve([])
@@ -3431,6 +3600,33 @@ export async function liberarReceta(
           : `Quedan ${String(resumen.sinRevisar)} renglones sin revisar. Revísalos (o usa "marcar ` +
               'todo revisado") antes de liberar.',
       );
+    }
+
+    // ⭐⭐ fila 0.257 — FIRMAR LO QUE EL SNAPSHOT NO TRAE deja la compra corta. La explosión sólo
+    // explota lo firmado: un renglón que se firma DESPUÉS no está en lo que la previa compraría, y
+    // al firmarse se calla el aviso «Desarrollo todavía no libera…» — la OC salía sin él, en
+    // silencio. Re-firmar lo ya firmado NO cuenta (no cambia nada que comprar), y tampoco firmar de
+    // nuevo un renglón cuya firma se cayó por un cambio que NO mueve la compra (el precio): ése
+    // sigue en el snapshot tal cual, y bloquearía la compra por un precio. Por eso se le pregunta al
+    // snapshot y no a la firma.
+    //
+    // ⚠️ El filtro `liberadoEn === null` es ECONOMÍA, no la regla: un renglón ya firmado y de
+    // producción ya está en el snapshot (si se firmó después de explotar, ESA firma ya subió la
+    // versión), así que preguntarle al snapshot por él contestaría lo mismo con una consulta más.
+    // Quitarlo no cambia ninguna respuesta (la mutación sobrevive, y es correcto que sobreviva).
+    const firmadosDeNuevo = [
+      ...telas
+        .filter((t) => t.liberadoEn === null && t.paraProduccion)
+        .map((t) => ({ idTela: t.idTela })),
+      ...avios
+        .filter((a) => a.liberadoEn === null && a.paraProduccion)
+        .map((a) => ({ idAvio: a.idAvio })),
+    ];
+    for (const material of firmadosDeNuevo) {
+      if (!(await estaEnElSnapshot(tx, orden.id, material))) {
+        ctx.cambioLoQueSeCompra();
+        break;
+      }
     }
 
     const firma = {
