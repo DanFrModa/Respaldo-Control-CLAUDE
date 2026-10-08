@@ -7,6 +7,9 @@ import { Prisma } from '../../datos/index.js';
 
 import {
   avisosDeAvioPorMedida,
+  avisosDeBaseSinExplotar,
+  baseDelSnapshot,
+  requeridoDelSnapshotPorAvio,
   avisosDeMaterialSinLiberar,
   contradiccionesDeLasOrdenes,
   motivoDeOmision,
@@ -947,6 +950,44 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
     expect(halladas[0]?.aviso).toContain('Esta orden pide 2,120 pza y deberían ser 40 pza');
   });
 
+  /**
+   * ⭐⭐ fila 0.232 (2ª vuelta, H2 del review) — con el SNAPSHOT a la mano, la magnitud es la de la
+   * compra que se va a firmar: su requerido y su base. La matriz de hoy no sabe si el snapshot se
+   * explotó antes o después de cortar de más.
+   */
+  it('⭐ fila 0.232: con snapshot, mide con SU requerido y SU base (no con la matriz)', () => {
+    const snapshot = new Map([['50|3', { hoy: 2120, piezasBase: 40 }]]);
+    const halladas = contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe, snapshot);
+    // 2,120 del snapshot contra 1 × 40 — no los 1,590/30 que daría la matriz pedida.
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 2,120 pza y deberían ser 40 pza');
+  });
+
+  it('⭐ fila 0.232: el snapshot de OTRA OP o de OTRO avío no se usa (cae a la matriz)', () => {
+    const snapshot = new Map([
+      ['51|3', { hoy: 9999, piezasBase: 99 }],
+      ['50|4', { hoy: 9999, piezasBase: 99 }],
+    ]);
+    const halladas = contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe, snapshot);
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 1,590 pza y deberían ser 30 pza');
+  });
+
+  it('⭐ fila 0.232: con snapshot pero SIN la bandera, no hay contradicción', () => {
+    const snapshot = new Map([['50|3', { hoy: 2120, piezasBase: 40 }]]);
+    expect(
+      contradiccionesDeLasOrdenes(
+        [renglonCierre({ consumoPorTalla: false })],
+        ordenes,
+        folioDe,
+        snapshot,
+      ),
+    ).toEqual([]);
+  });
+
+  it('⭐ fila 0.232: con snapshot que NO descuadra (hoy = normalizado), se abstiene', () => {
+    const snapshot = new Map([['50|3', { hoy: 40, piezasBase: 40 }]]);
+    expect(contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe, snapshot)).toEqual([]);
+  });
+
   it('se abstiene si el renglón NO trae la bandera (no hay contradicción que medir)', () => {
     expect(
       contradiccionesDeLasOrdenes([renglonCierre({ consumoPorTalla: false })], ordenes, folioDe),
@@ -1142,6 +1183,8 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
       ordenCompraLinea: { findMany: () => Promise.resolve([]) },
       // ⭐⭐ V1-E8e (§Post-F9.99): esta OP no tiene nada dado por cubierto — el DEFAULT.
       requerimientoCubierto: { findMany: () => Promise.resolve([]) },
+      // ⭐⭐ fila 0.232: la OP no tiene corte — la base de los avíos es la pedida.
+      etapaMovimientoDet: { findMany: () => Promise.resolve([]) },
       proveedor: {
         findMany: (args?: never) => {
           const w = (args as unknown as { where: { id: { in: number[] } } }).where;
@@ -1462,6 +1505,8 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
       ordenCompraLinea: { findMany: () => Promise.resolve(lineasOc) },
       // ⭐⭐ V1-E8e: la tabla DURABLE de la marca — la que sobrevive a reescribir el snapshot.
       requerimientoCubierto: { findMany: () => Promise.resolve(cubiertos) },
+      // ⭐⭐ fila 0.232: la OP no tiene corte — la base de los avíos es la pedida.
+      etapaMovimientoDet: { findMany: () => Promise.resolve([]) },
       proveedor: {
         findMany: () => Promise.resolve([{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }]),
       },
@@ -1786,5 +1831,57 @@ describe('⭐⭐ 0.158 — el avío que se compra SIN tomar en cuenta el color (
       expect(grupos[0]?.idColor).toBeNull();
       expect(grupos[0]?.piezas).toBe(40);
     }
+  });
+});
+
+describe('fila 0.232 (2ª vuelta) — lo que la PREVIA lee del snapshot', () => {
+  it('baseDelSnapshot: la base de los renglones de AVÍO; lo pedido si es viejo; null sin avíos', () => {
+    expect(
+      baseDelSnapshot(
+        [
+          { idAvio: null, piezasBase: 100 },
+          { idAvio: 3, piezasBase: 120 },
+          { idAvio: 4, piezasBase: 120 },
+        ],
+        100,
+      ),
+    ).toBe(120);
+    // La TELA no cuenta: su base es siempre lo pedido.
+    expect(baseDelSnapshot([{ idAvio: null, piezasBase: 999 }], 100)).toBeNull();
+    // Un snapshot VIEJO (NULL) cae a lo pedido.
+    expect(baseDelSnapshot([{ idAvio: 3, piezasBase: null }], 100)).toBe(100);
+    expect(baseDelSnapshot([], 100)).toBeNull();
+  });
+
+  it('requeridoDelSnapshotPorAvio: suma los colores de un avío y guarda su base', () => {
+    const r = requeridoDelSnapshotPorAvio(
+      [
+        { idOrden: 50, idAvio: 3, piezasBase: 120, cantidadRequerida: 400 },
+        { idOrden: 50, idAvio: 3, piezasBase: 120, cantidadRequerida: 320 },
+        { idOrden: 50, idAvio: null, piezasBase: 100, cantidadRequerida: 150 },
+        { idOrden: 51, idAvio: 3, piezasBase: null, cantidadRequerida: 60 },
+      ],
+      new Map([
+        [50, 100],
+        [51, 10],
+      ]),
+    );
+    expect(r.get('50|3')).toEqual({ hoy: 720, piezasBase: 120 });
+    // Sin base (snapshot viejo): lo pedido de ESA orden.
+    expect(r.get('51|3')).toEqual({ hoy: 60, piezasBase: 10 });
+    // La tela no entra.
+    expect(r.size).toBe(2);
+  });
+
+  it('avisosDeBaseSinExplotar: sólo las OP cuya base creció sin explotar (y sin atribuir causa)', () => {
+    expect(
+      avisosDeBaseSinExplotar([
+        { folio: 7, piezasSinExplotar: 1200 },
+        { folio: 8, piezasSinExplotar: 0 },
+      ]),
+    ).toEqual([
+      'Orden 7: la base de avíos creció 1,200 pieza(s) desde la última explosión (corte de más ' +
+        'o más piezas pedidas): vuelve a explotar para pedir lo que falta.',
+    ]);
   });
 });

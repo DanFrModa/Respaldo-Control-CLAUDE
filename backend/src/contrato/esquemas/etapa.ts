@@ -310,6 +310,30 @@ export const esquemaEtapaSalida = z
 export type EtapaSalida = z.infer<typeof esquemaEtapaSalida>;
 
 /**
+ * ⭐⭐ fila 0.232 (3ª vuelta, R2 del review) — la respuesta de REGISTRAR UN CORTE: la etapa más
+ * cuántas piezas le sumó ESTE corte a la base de avíos de la orden. Lo calcula el servidor —por
+ * celda color×talla, plegando los packs y con los colores canónicos, igual que la explosión— para
+ * que la pantalla no afirme un sobre-corte que la explosión no va a ver (un tendido de más
+ * compensado por otro de menos en la misma celda no es sobre-corte).
+ */
+export const esquemaCorteSalida = esquemaEtapaSalida
+  .extend({
+    piezasSobreCorteNuevas: z
+      .number()
+      .int()
+      .nonnegative()
+      .describe(
+        'Fila 0.232: piezas que ESTE corte sumó a la base de avíos de la orden — Σ por celda ' +
+          'color×talla (packs plegados, colores canónicos) de max(0, cortado − pedido), después ' +
+          'menos antes del corte. 0 = no hay avíos nuevos que pedir por este corte.',
+      ),
+  })
+  .describe('Corte registrado, con las piezas de sobre-corte que agregó a la orden.');
+
+/** Forma de la respuesta de registrar un corte. */
+export type CorteSalida = z.infer<typeof esquemaCorteSalida>;
+
+/**
  * Historial de etapas de una orden (F3-E2): cortes Y envíos, VIVOS y CANCELADOS (las canceladas se
  * conservan como historial, marcadas). Cada etapa lleva su matriz color×talla y su estado de
  * cancelación. Es lo que las pantallas de captura muestran para poder CANCELAR una etapa con motivo.

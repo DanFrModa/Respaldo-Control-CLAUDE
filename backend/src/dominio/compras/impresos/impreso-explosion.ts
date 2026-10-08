@@ -85,7 +85,23 @@ export interface DatosImpresoExplosion {
   folioOrden: number;
   modelo: string;
   totalPiezas: number;
+  /**
+   * ⭐⭐ fila 0.232 — la leyenda del sobre-corte, o `null` sin él. El total de piezas del papel es lo
+   * PEDIDO, pero los avíos ya se calcularon sobre lo cortado: sin esta línea el impreso diría
+   * «100 piezas» junto a botones para 120.
+   */
+  leyendaSobreCorte: string | null;
   grupos: GrupoImpresoExplosion[];
+}
+
+/**
+ * ⭐⭐ fila 0.232 — el texto de la leyenda del sobre-corte (el MISMO que el chip de la pantalla), o
+ * `null` cuando no hay sobre-corte que explicar.
+ */
+export function leyendaSobreCorte(piezasSobreCorte: number): string | null {
+  return piezasSobreCorte > 0
+    ? `incluye ${piezasSobreCorte.toLocaleString('es-MX')} pzas de sobre-corte (avíos)`
+    : null;
 }
 
 // ── Resolución de datos (lo único que toca BD) ───────────────────────────────────────────────────
@@ -114,6 +130,9 @@ export async function armarDatosImpresoExplosion(
     folioOrden: ex.folioOrden,
     modelo: ex.modelo,
     totalPiezas: ex.totalPiezas,
+    leyendaSobreCorte: leyendaSobreCorte(
+      ex.ordenes.reduce((suma, o) => suma + o.piezasSobreCorte, 0),
+    ),
     grupos: ex.grupos.map((g) => ({
       proveedor: g.proveedor,
       lineas: g.renglones.map((r) => ({
@@ -239,6 +258,7 @@ function paginaExplosion(datos: DatosImpresoExplosion): ReactElement {
       { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Modelo', datos.modelo),
       campo('Total de piezas', num(datos.totalPiezas)),
+      ...(datos.leyendaSobreCorte === null ? [] : [campo('Sobre-corte', datos.leyendaSobreCorte)]),
     ),
     ...cuerpo,
     PieDocumento({

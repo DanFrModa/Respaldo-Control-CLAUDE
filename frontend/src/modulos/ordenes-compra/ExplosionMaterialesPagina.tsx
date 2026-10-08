@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
@@ -481,6 +481,30 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setAsignandoId(null);
     setColorAbiertoId(null);
   }
+
+  /**
+   * ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — EL ENLACE DESDE EL CORTE: `?idOrden=`.** El aviso del
+   * sobre-corte (`AvanceProduccion`) manda aquí para la SEGUNDA PASADA: volver a explotar esa OP
+   * pide sólo los avíos de las piezas cortadas de más. Se consume UNA vez (y se quita de la URL,
+   * para que recargar no vuelva a empezar de cero encima de lo que el comprador ya armó).
+   *
+   * ⚠️ Arranca con ESA orden sola, sin la precarga de sus hermanas del pedido: quien llega desde
+   * el corte quiere el extra de esta OP, no re-explotar el pedido entero. Puede agregar las que
+   * quiera, como siempre.
+   */
+  const [parametros, setParametros] = useSearchParams();
+  const enlaceConsumido = useRef(false);
+  useEffect(() => {
+    if (enlaceConsumido.current) return;
+    enlaceConsumido.current = true;
+    const id = Number(parametros.get('idOrden'));
+    if (!Number.isInteger(id) || id <= 0) return;
+    elegirOrdenBase(id);
+    precargadoPara.current = id;
+    setParametros({}, { replace: true });
+    // Sólo al montar: el enlace es una entrada, no un estado que la pantalla siga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
   function elegirOrdenBase(id: number): void {
@@ -970,6 +994,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
 
   const ordenesElegidas = datos?.ordenes ?? [];
+  /** ⭐⭐ fila 0.232: Σ de las piezas de sobre-corte de las OP (lo calcula el servidor, por OP). */
+  const piezasSobreCorte = ordenesElegidas.reduce((s, o) => s + o.piezasSobreCorte, 0);
 
   /**
    * ⭐⭐ **V1-E4f (§Post-F9.103) — LAS OC QUE NACERÍAN SIN FECHA, dicho ANTES de pedirlas.**
@@ -1174,6 +1200,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       {datos
                         ? ` · ${String(datos.ordenes.length)} OP · ${datos.totalPiezas} pzas`
                         : ''}
+                      {/* ⭐⭐ fila 0.232 (§Post-F9.245(c)): POR QUÉ creció el requerido de avíos sin que
+                          cambiara la receta. El número es del servidor (Σ por OP); aquí sólo se pinta. */}
+                      {piezasSobreCorte > 0 ? (
+                        <span
+                          className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-normal text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                          title="Se cortaron más piezas de las pedidas: los avíos se calculan sobre lo cortado (la tela no, ya salió antes de cortar). Lo ya comprado se descuenta, así que lo pendiente es sólo la diferencia."
+                          data-testid="exp-chip-sobrecorte"
+                        >
+                          incluye {piezasSobreCorte.toLocaleString('es-MX')} pzas de sobre-corte
+                          (avíos)
+                        </span>
+                      ) : null}
                     </h2>
                     <div className="flex items-center gap-2">
                       {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta

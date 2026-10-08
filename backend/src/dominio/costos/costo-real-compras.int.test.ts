@@ -500,6 +500,35 @@ describe('costoRealOrden — el requerido va SIEMPRE en la base del COSTEO (piez
     expect(real.avisos.some((a) => a.includes('todavía no tiene corte'))).toBe(true);
   });
 
+  /**
+   * ⭐⭐ fila 0.232 (§Post-F9.245(c)) — desde que los avíos se explotan contra `max(pedido, cortado)`,
+   * cada renglón del snapshot guarda SU base (`piezasBase`). Escalar todos desde lo pedido contaría
+   * el sobre-corte dos veces en los avíos: 480 botones calculados sobre 120 × (120 ÷ 100) = 576.
+   */
+  it('⭐ fila 0.232: cada renglón se escala desde SU base; uno viejo (NULL) cae a lo pedido', async () => {
+    await cortar(120); // 100 pedidas, 120 cortadas
+    // El botón se explotó DESPUÉS del sobre-corte: 4 × 120 = 480, sobre una base de 120.
+    await cliente.requerimientoOrden.updateMany({
+      where: { idOrden, idAvio },
+      data: { cantidadRequerida: 480, cantidadAComprar: 480, piezasBase: 120 },
+    });
+    // La tela queda como un snapshot VIEJO (sin base): 200 m sobre las 100 pedidas.
+
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.piezasBase).toBe(120);
+    expect(real.materiales.find((m) => m.idAvio === idAvio)?.requerido).toBe(480); // NO 576
+    expect(real.materiales.find((m) => m.idTela === idTela)?.requerido).toBe(240); // 200 × 1.2
+    expect(real.avisos.some((a) => a.includes('CORTADAS'))).toBe(true);
+  });
+
+  it('⭐ fila 0.232: si NINGÚN renglón cambia de escala, no se avisa de un ajuste que no hubo', async () => {
+    await cortar(120);
+    await cliente.requerimientoOrden.updateMany({ where: { idOrden }, data: { piezasBase: 120 } });
+    const real = await costoRealOrden(sesion(), idOrden, bd());
+    expect(real.materiales.find((m) => m.idTela === idTela)?.requerido).toBe(200);
+    expect(real.avisos.some((a) => a.includes('CORTADAS'))).toBe(false);
+  });
+
   it('un material `paraCosto` AUSENTE del snapshot se costea con la receta y AVISA (antes: $0 mudo)', async () => {
     // El BOM creció después de explosionar: el botón ya no está en el snapshot.
     await cliente.requerimientoOrden.deleteMany({ where: { idOrden, idAvio } });

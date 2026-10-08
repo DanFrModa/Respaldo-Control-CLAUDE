@@ -18733,3 +18733,20 @@ guardado no se recalcula.
 
 📌 **Recomendación (no construida):** desglosar en la pantalla de costeo «Procesos» en costura y estampado, para que un
 error así se vea al revisar.
+
+#### (Post-F9.277) — CUANDO SE CORTA DE MÁS, LA EXPLOSIÓN PIDE LOS AVÍOS DEL EXTRA (fila 0.232, v0.209) — tres preguntas para Daniel
+
+Construido como lo planteó Daniel en §Post-F9.245(c): **no es un modo de la explosión, es una segunda pasada después de
+cortar** que pide exactamente la diferencia. Para los avíos, cada color y talla se calcula sobre lo mayor entre lo
+pedido y lo cortado; antes de cortar no cambia nada; lo ya comprado se descuenta. El extra aparece también en el panel
+de habilitación para mandarlo al taller.
+
+❓ **Preguntas, con el default ya construido:**
+1. **¿El extra pide también tela?** *Default: no — la tela ya salió antes de cortar.*
+2. **Si el corte reparte distinto las tallas** (menos de una, más de otra), ¿se piden avíos para las que crecieron
+   aunque sobren en las que bajaron? *Default: sí, por color y talla.* Puede comprar de más en avíos que no dependen de
+   la talla (una etiqueta genérica). **¿Qué tan seguido se rebalancean tallas al cortar?**
+3. **¿Quién se entera de que hay un extra que comprar?** *Default: quien corta (al guardar se le ofrece la liga a la
+   explosión), quien explota (una marca) y quien abre la previa de compra de esa orden (un aviso de volver a explotar).* Una bandeja de «órdenes con sobre-corte sin volver a explotar» sería otra fila.
+
+📌 Cuando exista el motivo de la OC (fila 0.231), la OC del extra podría nacer con el motivo «sobre-corte» propuesto.

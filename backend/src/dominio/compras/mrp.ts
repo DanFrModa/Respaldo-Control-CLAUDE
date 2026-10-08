@@ -219,6 +219,13 @@ import {
   canonizarLineasDeColor,
   resolverColoresCanonicos,
 } from '../catalogos/colores-canonicos.js';
+// ⭐⭐ fila 0.232 (§Post-F9.245(c)) — la base de piezas de los AVÍOS: `max(pedido, cortado vivo)` por
+// celda. Una sola definición, la MISMA que usa la habilitación (lo que se compra = lo que se manda).
+import {
+  cortadoVivoDeOrdenes,
+  cortadoVivoPorCelda,
+  matrizParaAvios,
+} from '../produccion/base-de-materiales.js';
 // ⭐⭐ V1-E8e (§Post-F9.99) — el TERCER sumando de "¿qué falta comprar?": lo que alguien decidió no
 // perseguir. Vive en su propio módulo (y en su propia tabla) porque el snapshot se reescribe entero
 // en cada explosión y una bandera ahí se borraría sola.
@@ -1260,10 +1267,18 @@ function cerrarEleccion(
  * de la última compra REAL **a ese mismo proveedor** ({@link conUltimoPrecioDelProveedor}); si nunca
  * se le compró, queda el de catálogo/negociado. La elección del proveedor NO cambia y jamás se usa
  * el precio de un tercero.
+ *
+ * ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — DOS MATRICES, UNA POR FAMILIA.** Las TELAS se calculan contra
+ * `orden` (la matriz PEDIDA: la tela sale antes de cortar) y los AVÍOS contra `ordenAvios`, la misma
+ * orden con cada celda en `max(pedido, cortado vivo)` (`produccion/base-de-materiales.ts`). Antes de
+ * cortar las dos son la misma; después de un sobre-corte, la de avíos trae el extra y el neteo contra
+ * lo comprado deja pendiente exactamente esa diferencia.
  */
 async function calcularRequerimientos(
   tx: Tx,
   orden: OrdenParaExplosion,
+  /** ⭐⭐ fila 0.232: la orden con la matriz de AVÍOS (`max(pedido, cortado)` por celda). */
+  ordenAvios: OrdenParaExplosion,
   totalPiezas: number,
   existenciaGenerico: (idAvio: number) => Promise<number>,
   avisos: string[],
@@ -1273,7 +1288,6 @@ async function calcularRequerimientos(
   const resultado: RequerimientoCalculado[] = [];
   const colores = coloresDeOrden(orden);
   const piezasPorColor = piezasPorColorOrden(orden);
-  const piezasPorTalla = piezasPorTallaOrden(orden);
   // ⭐ D1/§Post-F9.48: últimas compras REALES de toda la RECETA, EN UN LOTE y acotadas a la empresa
   // de la orden (A9). Solo se usa el mapa POR PROVEEDOR: la línea de OC jamás nace con el precio de
   // un tercero. Si la receta está vacía, ni se consulta.
@@ -1432,7 +1446,14 @@ async function calcularRequerimientos(
   // 🔴 **La Σ no cambia:** Σ(piezas por color) = total de piezas, así que la orden compra lo mismo
   // que antes de partirse. Lo que cambia es que ahora se puede PEDIR por color — y que quien recibe
   // no tiene que inventar la correspondencia.
-  const gruposColor = piezasPorColorYTallaOrden(orden);
+  //
+  // ⭐⭐ **fila 0.232 — y la matriz de los avíos es la de `ordenAvios`**: cada celda en
+  // `max(pedido, cortado vivo)`. Las TRES cuentas que el bloque usa (por color×talla, el total y el
+  // desglose por talla de la orden sin matriz) salen de ella, para que ninguna se quede en lo pedido
+  // mientras las otras ya ven el sobre-corte.
+  const gruposColor = piezasPorColorYTallaOrden(ordenAvios);
+  const totalPiezasAvios = totalPiezasOrden(ordenAvios);
+  const piezasPorTallaAvios = piezasPorTallaOrden(ordenAvios);
   for (const ma of orden.recetaAvios) {
     if (!ma.paraProduccion) continue;
     const esGenerico = ma.avio.esGenerico;
@@ -1457,8 +1478,8 @@ async function calcularRequerimientos(
      * matriz. La regla vive en `gruposDeCompraDelAvio` (pura y probada aparte).
      */
     const porColor = gruposDeCompraDelAvio(ma.avio.seCompraSinColor, gruposColor, {
-      piezas: totalPiezas,
-      porTalla: piezasPorTalla,
+      piezas: totalPiezasAvios,
+      porTalla: piezasPorTallaAvios,
     });
 
     for (const grupo of porColor) {
@@ -1616,7 +1637,12 @@ interface ExplosionDeOrden {
 }
 
 /** Ficha ligera de una orden para la salida (incluye su pedido interno, §Post-F9.86). */
-function fichaDeOrden(orden: OrdenParaExplosion, totalPiezas: number): OrdenExplosionada {
+function fichaDeOrden(
+  orden: OrdenParaExplosion,
+  totalPiezas: number,
+  /** ⭐⭐ fila 0.232: piezas que el sobre-corte sumó a la base de los avíos (0 sin sobre-corte). */
+  piezasSobreCorte: number,
+): OrdenExplosionada {
   return {
     idOrden: orden.id,
     folio: Number(orden.folio),
@@ -1624,6 +1650,9 @@ function fichaDeOrden(orden: OrdenParaExplosion, totalPiezas: number): OrdenExpl
     idModelo: orden.idModelo,
     modelo: orden.modelo.codigo,
     totalPiezas,
+    piezasSobreCorte,
+    // La explosión acaba de calcular contra lo cortado de hoy: no puede haber corte sin explotar.
+    piezasSinExplotar: 0,
     idPedido: orden.pedidoLinea?.idPedido ?? null,
     folioPedido:
       orden.pedidoLinea?.pedido === undefined ? null : Number(orden.pedidoLinea.pedido.folio),
@@ -1960,7 +1989,14 @@ async function explosionarUna(
   // no antes de producir: cortar, enviar a maquila, recibir y entregar NO pasan por aquí.
   const porLiberar = await exigirRecetaLiberada(tx, idOrden, idEmpresa);
   const totalPiezas = totalPiezasOrden(orden);
-  const ficha = fichaDeOrden(orden, totalPiezas);
+  // ⭐⭐ fila 0.232 (§Post-F9.245(c)) — LA SEGUNDA PASADA. La matriz de los AVÍOS es la pedida con
+  // cada celda subida a lo cortado vivo, si lo rebasa. Antes de cortar es idéntica a la pedida (lo
+  // de casi siempre: *«casi siempre se compra antes de cortar»*); después de un sobre-corte trae el
+  // extra, y el neteo de siempre contra lo comprado deja pendiente sólo esa diferencia.
+  const baseAvios = matrizParaAvios(orden.lineas, await cortadoVivoPorCelda(tx, idOrden));
+  const ordenAvios: OrdenParaExplosion = { ...orden, lineas: baseAvios.lineas };
+  const totalPiezasAvios = totalPiezas + baseAvios.piezasSobreCorte;
+  const ficha = fichaDeOrden(orden, totalPiezas, baseAvios.piezasSobreCorte);
   // El ARTE no se compra por MRP (igual que en el reparto de la desalineación): listarlo aquí
   // sería ruido para quien está viendo materiales.
   const pendientesLiberar: PendienteLiberar[] = porLiberar
@@ -1986,6 +2022,7 @@ async function explosionarUna(
   const calculados = await calcularRequerimientos(
     tx,
     orden,
+    ordenAvios,
     totalPiezas,
     existenciaGenerico,
     avisosDeEsta,
@@ -2138,6 +2175,10 @@ async function explosionarUna(
         cantidadAComprar: c.cantidadAComprar,
         idProveedorSugerido: c.idProveedorSugerido,
         precioSugerido: c.precioSugerido,
+        // ⭐⭐ fila 0.232: las piezas de la ORDEN contra las que se calculó este renglón — la tela,
+        // lo pedido; el avío, la base con el sobre-corte. Es lo que el costo real necesita para
+        // escalar el snapshot a lo cortado sin contar el extra dos veces (`costo-real-compras.ts`).
+        piezasBase: c.tipo === 'tela' ? totalPiezas : totalPiezasAvios,
         ...datosCreacion(sesion),
       },
       include: {
@@ -2182,6 +2223,9 @@ async function explosionarUna(
       explosionMrp: true,
       renglones: filas.length,
       totalPiezas,
+      // ⭐⭐ fila 0.232: queda escrito si la explosión ya incluyó un sobre-corte (y de cuántas piezas):
+      // es lo que explica por qué el requerido de avíos de esta OP creció sin que cambiara la receta.
+      piezasSobreCorte: baseAvios.piezasSobreCorte,
       regenerado,
       desalineada: desalineacion.hayCambios,
       // V1-E3h: queda escrito CONTRA QUÉ se explotó — cuántos renglones se quedaron fuera por no
@@ -2740,7 +2784,17 @@ async function planearCompra(
       // ⭐ §Post-F9.105: la matriz venía SIN `idTalla` porque sólo se sumaba para `totalPiezas`.
       // Con la talla —un campo más en la MISMA consulta, ni una query extra— se puede medir cuánto
       // se está pidiendo de más por la contradicción «por medida + cantidades por talla» (R18).
-      lineas: { select: { tallas: { select: { idTalla: true, cantidad: true } } } },
+      //
+      // ⭐⭐ fila 0.232: y el COLOR (id y nombre), para poner la matriz en espacio canónico y subirla
+      // a lo cortado con la MISMA regla que la explosión (`matrizParaAvios`): así la previa puede
+      // decir si la base de avíos creció DESPUÉS de la última explosión (`piezasSinExplotar`).
+      lineas: {
+        select: {
+          idColor: true,
+          color: { select: { nombre: true } },
+          tallas: { select: { idTalla: true, cantidad: true } },
+        },
+      },
     },
     orderBy: { folio: 'asc' },
   });
@@ -2785,6 +2839,11 @@ async function planearCompra(
     idModelo: o.idModelo,
     modelo: o.modelo.codigo,
     totalPiezas: o.lineas.reduce((s, l) => s + l.tallas.reduce((st, t) => st + t.cantidad, 0), 0),
+    // ⭐⭐ fila 0.232: se llena abajo, de lo que dice el SNAPSHOT que se va a comprar (no de un
+    // recálculo): la previa enseña lo que la OC va a llevar, no lo que llevaría si se re-explotara.
+    piezasSobreCorte: 0,
+    // ⭐⭐ fila 0.232 (2ª vuelta): también se llena abajo, contra lo cortado de HOY.
+    piezasSinExplotar: 0,
     idPedido: o.pedidoLinea?.idPedido ?? null,
     folioPedido: o.pedidoLinea?.pedido === undefined ? null : Number(o.pedidoLinea.pedido.folio),
     fechaEntrega: o.fechaEntrega === null ? null : o.fechaEntrega.toISOString().slice(0, 10),
@@ -2828,6 +2887,11 @@ async function planearCompra(
       cantidadAComprar: true,
       idProveedorSugerido: true,
       precioSugerido: true,
+      // ⭐⭐ fila 0.232: la base del renglón (con el sobre-corte, si lo hubo) — de aquí sale el
+      // `piezasSobreCorte` de la ficha de la previa, y contra ella se mide la contradicción de
+      // §Post-F9.105 (con el requerido del MISMO renglón: lo que se va a comprar).
+      piezasBase: true,
+      cantidadRequerida: true,
       tela: { select: { nombre: true } },
       avio: { select: { clave: true, descripcion: true } },
       telaColor: { select: { nombre: true } },
@@ -2846,6 +2910,24 @@ async function planearCompra(
   // cubre y la previa propondría comprarlo otra vez (el defecto de §Post-F9.85, resucitado por una
   // limpieza de catálogo). Los dos lados se resuelven por el canónico.
   const filas = await canonizarColorPrenda(filasCrudas, { tx });
+  // ⭐⭐ fila 0.232 — LA PREVIA HABLA DEL SNAPSHOT, que es lo que se va a comprar.
+  //  • `piezasSobreCorte`: cuántas piezas de sobre-corte ya trae el snapshot de cada OP (base del
+  //    avío menos lo pedido). Un snapshot viejo (sin `piezasBase`) dice 0: es lo que se calculó.
+  //  • `piezasSinExplotar` (2ª y 3ª vuelta del review): si DESPUÉS de la última explosión la base
+  //    de avíos CRECIÓ, el snapshot no lo sabe y la OC saldría corta. Puede ser por un corte de más
+  //    o porque la matriz pedida creció: el número no distingue la causa, así que el aviso tampoco
+  //    la atribuye. La previa no lo recalcula por su cuenta (compraría una cosa y diría otra): lo
+  //    DICE, para re-explotar.
+  const baseHoy = await baseDeAviosDeHoy(tx, ordenes);
+  for (const ficha of fichas) {
+    const base = baseDelSnapshot(
+      filasCrudas.filter((f) => f.idOrden === ficha.idOrden),
+      ficha.totalPiezas,
+    );
+    ficha.piezasSobreCorte = base === null ? 0 : Math.max(0, base - ficha.totalPiezas);
+    ficha.piezasSinExplotar =
+      base === null ? 0 : Math.max(0, (baseHoy.get(ficha.idOrden) ?? 0) - base);
+  }
   const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
   // ⭐⭐ V1-E8e (§Post-F9.99): y lo que alguien dio por cubierto, el otro sumando del MISMO criterio.
   const cubierto = await dadoPorCubierto(unicos, { tx });
@@ -2876,6 +2958,12 @@ async function planearCompra(
     }),
     ordenes,
     folioDe,
+    // ⭐⭐ fila 0.232 (2ª vuelta): la magnitud se mide contra el SNAPSHOT —su requerido y su base—,
+    // no contra lo cortado de hoy: la cifra del aviso tiene que ser la de la OC que se va a firmar.
+    requeridoDelSnapshotPorAvio(
+      filasCrudas,
+      new Map(fichas.map((f) => [f.idOrden, f.totalPiezas])),
+    ),
   );
 
   // ⭐⭐ V1-E3u — el neteo POR COLOR, con la MISMA función que usa la explosión (una sola verdad).
@@ -3387,6 +3475,8 @@ async function planearCompra(
         // ⭐⭐ §Post-F9.105 va PRIMERO: los otros dos hablan de un dato que FALTA; éste habla de
         // dinero que se va a gastar de más AHORA, en la OC que se está a punto de firmar.
         ...avisosDeAvioPorMedida(contradicciones, proveedores),
+        // ⭐⭐ fila 0.232 (2ª vuelta): se cortó de más después de la última explosión.
+        ...avisosDeBaseSinExplotar(fichas),
         ...avisosDeTelaSinColor(proveedores),
         ...avisosDeMaterialSinLiberar(sinLiberar, proveedores),
       ],
@@ -3427,6 +3517,118 @@ interface OrdenConMatriz {
 }
 
 /**
+ * ⭐⭐ fila 0.232 — la base de AVÍOS de HOY de cada OP del plan: Σ de su matriz en espacio canónico
+ * (fila 0.159) con cada celda en `max(pedido, cortado vivo)` (`produccion/base-de-materiales.ts`),
+ * la MISMA regla con la que la explosión calcula. Dos consultas para todo el lote (colores y cortes).
+ */
+async function baseDeAviosDeHoy(
+  tx: Tx,
+  ordenes: readonly {
+    id: number;
+    lineas: {
+      idColor: number;
+      color: { nombre: string };
+      tallas: { idTalla: number; cantidad: number }[];
+    }[];
+  }[],
+): Promise<Map<number, number>> {
+  const canonicos = await resolverColoresCanonicos(
+    tx,
+    ordenes.flatMap((o) => o.lineas.map((l) => l.idColor)),
+  );
+  const cortado = await cortadoVivoDeOrdenes(
+    tx,
+    ordenes.map((o) => o.id),
+  );
+  return new Map(
+    ordenes.map((o) => {
+      const base = matrizParaAvios(
+        canonizarLineasDeColor(o.lineas, canonicos),
+        cortado.get(o.id) ?? new Map<string, number>(),
+      );
+      const pedido = o.lineas.reduce(
+        (s, l) => s + l.tallas.reduce((st, t) => st + t.cantidad, 0),
+        0,
+      );
+      return [o.id, pedido + base.piezasSobreCorte];
+    }),
+  );
+}
+
+/**
+ * ⭐⭐ fila 0.232 — las piezas contra las que se explotaron los AVÍOS de una OP, según su snapshot:
+ * la `piezasBase` de sus renglones de avío, o lo PEDIDO en un snapshot viejo (NULL, REGLA 0-B).
+ * `null` = la OP no tiene renglones de avío en el snapshot (no hay base de avíos de la que hablar).
+ * Pura: se exporta para probarla sin base de datos.
+ */
+export function baseDelSnapshot(
+  renglones: readonly { idAvio: number | null; piezasBase: number | null }[],
+  piezasPedidas: number,
+): number | null {
+  const avios = renglones.filter((r) => r.idAvio !== null);
+  if (avios.length === 0) return null;
+  return Math.max(...avios.map((r) => r.piezasBase ?? piezasPedidas));
+}
+
+/**
+ * ⭐⭐ fila 0.232 — lo que el SNAPSHOT de cada (OP, avío) dice que se va a comprar: Σ del requerido
+ * de sus renglones (uno por color de prenda) y la base contra la que se calculó. Es la entrada con
+ * la que {@link contradiccionesDeLasOrdenes} mide la magnitud del aviso en la previa.
+ */
+export function requeridoDelSnapshotPorAvio(
+  renglones: readonly {
+    idOrden: number;
+    idAvio: number | null;
+    piezasBase: number | null;
+    cantidadRequerida: Prisma.Decimal | number;
+  }[],
+  pedidoPorOrden: ReadonlyMap<number, number>,
+): Map<string, { hoy: number; piezasBase: number }> {
+  const salida = new Map<string, { hoy: number; piezasBase: number }>();
+  for (const r of renglones) {
+    if (r.idAvio === null) continue;
+    const clave = claveSnapshotAvio(r.idOrden, r.idAvio);
+    const previo = salida.get(clave);
+    const base = r.piezasBase ?? pedidoPorOrden.get(r.idOrden) ?? 0;
+    salida.set(clave, {
+      hoy: (previo?.hoy ?? 0) + Number(r.cantidadRequerida),
+      piezasBase: Math.max(previo?.piezasBase ?? 0, base),
+    });
+  }
+  return salida;
+}
+
+/** Llave (OP, avío) del requerido del snapshot. */
+function claveSnapshotAvio(idOrden: number, idAvio: number): string {
+  return `${String(idOrden)}|${String(idAvio)}`;
+}
+
+/**
+ * ⭐⭐ fila 0.232 (2ª y 3ª vuelta) — el aviso de la previa cuando la base de avíos de una OP CRECIÓ
+ * después de su última explosión: el snapshot (lo que se va a comprar) no lleva esas piezas.
+ *
+ * 🔴 **NO atribuye causa** (3ª vuelta, R1 del review): la diferencia `base de hoy − base del
+ * snapshot` sale igual de un corte de más que de una matriz pedida que creció, y decir «se
+ * cortaron» de una orden a la que sólo le subieron lo pedido es afirmar un hecho falso. Nombra las
+ * dos causas posibles y el remedio, que es el mismo.
+ *
+ * NO bloquea: quizá el comprador quiere firmar lo que ya está y pedir lo demás luego; lo que ya no
+ * puede es firmarlo creyendo que trae todo.
+ */
+export function avisosDeBaseSinExplotar(
+  fichas: readonly { folio: number; piezasSinExplotar: number }[],
+): string[] {
+  return fichas
+    .filter((f) => f.piezasSinExplotar > 0)
+    .map(
+      (f) =>
+        `Orden ${String(f.folio)}: la base de avíos creció ` +
+        `${f.piezasSinExplotar.toLocaleString('es-MX')} pieza(s) desde la última explosión ` +
+        `(corte de más o más piezas pedidas): vuelve a explotar para pedir lo que falta.`,
+    );
+}
+
+/**
  * ⭐⭐ §Post-F9.105 — MIDE las contradicciones de un lote de OP contra las piezas de cada orden.
  *
  * Es PURA (recibe las filas ya leídas) por la misma razón que sus vecinas: la regla que decide qué
@@ -3438,6 +3640,13 @@ export function contradiccionesDeLasOrdenes(
   renglones: readonly RenglonContradictorio[],
   ordenes: readonly OrdenConMatriz[],
   folioDe: ReadonlyMap<number, number>,
+  /**
+   * ⭐⭐ fila 0.232 (2ª vuelta) — lo que dice el SNAPSHOT por (OP, avío)
+   * ({@link requeridoDelSnapshotPorAvio}). Cuando el avío está ahí, la magnitud se mide con SU
+   * requerido y SU base —la cifra de la OC que se va a firmar—, no recalculando contra la matriz
+   * (que no sabe si se cortó de más después de explotar). Sin entrada, la matriz, como siempre.
+   */
+  snapshot: ReadonlyMap<string, { hoy: number; piezasBase: number }> = new Map(),
 ): ContradiccionPorMedida[] {
   const piezasDe = new Map<number, { total: number; porTalla: Map<number, number> }>();
   for (const o of ordenes) {
@@ -3455,12 +3664,23 @@ export function contradiccionesDeLasOrdenes(
   const salida: ContradiccionPorMedida[] = [];
   for (const r of renglones) {
     const piezas = piezasDe.get(r.idOrden) ?? { total: 0, porTalla: new Map<number, number>() };
-    const medido = requeridoContradictorioPorMedida(
-      r,
-      piezas.total,
-      piezas.porTalla,
-      r.avio.unidad,
-    );
+    const delSnapshot = snapshot.get(claveSnapshotAvio(r.idOrden, r.idAvio));
+    const medido =
+      delSnapshot === undefined
+        ? requeridoContradictorioPorMedida(r, piezas.total, piezas.porTalla, r.avio.unidad)
+        : r.consumoPorTalla
+          ? {
+              hoy: delSnapshot.hoy,
+              // El normalizado NO se re-escribe a mano: es la MISMA función con la bandera apagada
+              // (consumo por prenda × la base del snapshot), igual que hace la receta.
+              normalizado: requeridoAvioReceta(
+                { ...r, consumoPorTalla: false },
+                delSnapshot.piezasBase,
+                new Map(),
+              ).requerido,
+              unidad: r.avio.unidad,
+            }
+          : null;
     // 🔴 Mismo criterio que la explosión: sin descuadre el número es correcto y el aviso sobra.
     if (medido === null || !hayDescuadreDeRequerido(medido)) continue;
     salida.push({

@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
@@ -159,6 +160,9 @@ function explosionDePrueba() {
         idModelo: 9,
         modelo: 'A-100',
         totalPiezas: 30,
+        // ⭐⭐ fila 0.232: sin sobre-corte (la explosión de casi siempre: antes de cortar).
+        piezasSobreCorte: 0,
+        piezasSinExplotar: 0,
         idPedido: 300,
         folioPedido: 1515,
         fechaEntrega: '2026-09-30',
@@ -456,6 +460,103 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(screen.getByText('BOT-01 — Botón')).toBeInTheDocument();
     // El genérico cubierto por stock se marca.
     expect(screen.getByText('Cubierto por stock')).toBeInTheDocument();
+    // ⭐⭐ fila 0.232: sin sobre-corte no hay chip.
+    expect(screen.queryByTestId('exp-chip-sobrecorte')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ fila 0.232 (§Post-F9.245(c)) — EL ENLACE DESDE EL CORTE. El aviso del sobre-corte manda aquí
+   * con `?idOrden=`: la pantalla arranca con ESA OP elegida, sin precargar sus hermanas del pedido
+   * (quien llega del corte quiere el extra de esta OP, no re-explotar el pedido entero).
+   */
+  it('⭐ fila 0.232: `?idOrden=` arranca con esa OP elegida y SIN la precarga de hermanas', async () => {
+    useOrdenesDelPedidoMock.mockReturnValue({
+      data: {
+        folioPedido: 1515,
+        ordenes: [
+          { idOrden: 50, folio: 7, cancelada: false },
+          { idOrden: 51, folio: 8, cancelada: false },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+      rutaInicial: '/compras/explosion?idOrden=50',
+    });
+
+    await waitFor(() => expect(useExplosionMock).toHaveBeenLastCalledWith([50]));
+    expect(screen.getAllByTestId('exp-op-chip').map((c) => c.getAttribute('data-orden'))).toEqual([
+      '50',
+    ]);
+    // La hermana NO se coló por la precarga.
+    expect(useExplosionMock).not.toHaveBeenCalledWith([50, 51]);
+  });
+
+  /**
+   * ⭐⭐ fila 0.232 (H4 del review) — el enlace es una ENTRADA, no un estado: se consume y se QUITA
+   * de la URL. Si se quedara, recargar la página volvería a empezar de cero con esa OP encima de lo
+   * que el comprador ya armó. Y quitar la OP después no la vuelve a meter.
+   */
+  it('⭐ fila 0.232: el `?idOrden=` se limpia de la URL y no se vuelve a aplicar', async () => {
+    function Ubicacion(): React.JSX.Element {
+      const ubicacion = useLocation();
+      return <span data-testid="ubicacion-prueba">{ubicacion.pathname + ubicacion.search}</span>;
+    }
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <>
+        <ExplosionMaterialesPagina />
+        <Ubicacion />
+      </>,
+      {
+        sesion: estadoSesionDePrueba(['compras.ver']),
+        rutaInicial: '/compras/explosion?idOrden=50',
+      },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('ubicacion-prueba')).toHaveTextContent(/^\/compras\/explosion$/),
+    );
+    expect(screen.getAllByTestId('exp-op-chip')).toHaveLength(1);
+
+    // Quitar la OP deja la pantalla vacía: el enlace ya se consumió y no la vuelve a meter.
+    await usuario.click(screen.getByTestId('exp-quitar-op'));
+    await waitFor(() => expect(screen.queryByTestId('exp-op-chip')).not.toBeInTheDocument());
+    expect(screen.getByTestId('ubicacion-prueba')).toHaveTextContent(/^\/compras\/explosion$/);
+  });
+
+  it('⭐ fila 0.232: un `?idOrden=` que no es un id no elige nada', async () => {
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+      rutaInicial: '/compras/explosion?idOrden=abc',
+    });
+    await screen.findAllByTestId('exp-orden-opcion');
+    expect(screen.queryByTestId('exp-op-chip')).not.toBeInTheDocument();
+    expect(useExplosionMock).not.toHaveBeenCalledWith([expect.any(Number)]);
+  });
+
+  it('⭐ fila 0.232: con sobre-corte, el encabezado dice cuántas piezas lo explican (Σ de las OP)', async () => {
+    const base = explosionDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: {
+        ...base,
+        ordenes: [
+          { ...base.ordenes[0], piezasSobreCorte: 15 },
+          { ...base.ordenes[0], idOrden: 51, folio: 8, piezasSobreCorte: 5 },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    expect(screen.getByTestId('exp-chip-sobrecorte')).toHaveTextContent(
+      'incluye 20 pzas de sobre-corte (avíos)',
+    );
   });
 
   /**

@@ -58,10 +58,13 @@
  *  • **Base de piezas = `cantidades.cortado`** (la misma del teórico). Si la orden aún no se corta,
  *    el requerido es 0 y el real refleja SOLO lo comprado (con aviso). NUNCA se cae a `pedido`: eso
  *    era justo el sesgo (1,000 pedidas / 900 cortadas ⇒ ~11 % de sobrecosto silencioso).
- *  • **El snapshot del MRP se ESCALA** de su base (piezas pedidas = Σ de la matriz) a las cortadas:
- *    `requerido = cantidadRequerida × (cortado ÷ pedido)`. Se usa el snapshot porque su consumo es
+ *  • **El snapshot del MRP se ESCALA** de su base a las cortadas:
+ *    `requerido = cantidadRequerida × (cortado ÷ base)`. Se usa el snapshot porque su consumo es
  *    más fino que el BOM plano (matriz real, consumo por talla R18). Si la orden no tiene matriz
- *    (pedido = 0) no se puede escalar: se usa tal cual y se AVISA.
+ *    (base = 0) no se puede escalar: se usa tal cual y se AVISA.
+ *    ⭐⭐ **fila 0.232: la base es la de CADA RENGLÓN (`RequerimientoOrden.piezasBase`)** — las telas
+ *    se explotan contra lo pedido, pero los avíos contra `max(pedido, cortado vivo)` por celda; un
+ *    snapshot viejo (NULL) cae a lo pedido, que es contra lo que se calculó.
  *  • **Se RECONCILIA contra el BOM `paraCosto`**, que es el que manda para costear:
  *      – material `paraCosto` **ausente** del snapshot ⇒ se AGREGA con `consumoPorPrenda × cortado`
  *        y se AVISA (BOM que creció después de explosionar, o avío `paraCosto` sin `paraProduccion`).
@@ -902,9 +905,29 @@ interface BaseRequerido {
 }
 
 /**
+ * ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — CUÁNTO SE ESCALA UN RENGLÓN DEL SNAPSHOT** para llevarlo de
+ * las piezas contra las que se explotó a las CORTADAS: `cortado ÷ base`, con la base del RENGLÓN
+ * (`RequerimientoOrden.piezasBase`). Un renglón viejo (NULL) cae a lo PEDIDO, que es contra lo que
+ * se calculó antes de esta fila. Sin base (orden sin matriz) no se escala: factor 1.
+ *
+ * Es PURA y se exporta para poder ponerla roja sin base de datos: confundir las dos bases es justo
+ * el error que esta fila evita (un avío explotado con el sobre-corte, re-escalado desde lo pedido,
+ * contaría el extra dos veces).
+ */
+export function escalaDelRenglon(
+  piezasBaseRenglon: number | null,
+  piezasPedidas: number,
+  piezasCortadas: number,
+): number {
+  const base = piezasBaseRenglon ?? piezasPedidas;
+  return base > 0 ? piezasCortadas / base : 1;
+}
+
+/**
  * Arma el REQUERIDO del COSTEO (ver el bloque "DE DÓNDE SALE EL REQUERIDO" del encabezado):
  * BOM `paraCosto` × piezas CORTADAS como esqueleto, afinado con el snapshot del MRP ESCALADO de su
- * base (piezas pedidas) a las cortadas, y reconciliado en los dos sentidos con avisos explícitos.
+ * base (la de CADA renglón, `piezasBase` — fila 0.232; lo pedido si es un snapshot viejo) a las
+ * cortadas, y reconciliado en los dos sentidos con avisos explícitos.
  */
 async function armarRequerido(
   cliente: ClienteLectura,
@@ -955,6 +978,8 @@ async function armarRequerido(
       cantidadRequerida: true,
       unidad: true,
       esGenerico: true,
+      // ⭐⭐ fila 0.232: contra cuántas piezas se calculó el renglón (NULL en snapshots viejos).
+      piezasBase: true,
       tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
       avio: { select: { clave: true, descripcion: true, unidad: true, precioReferencia: true } },
     },
@@ -985,9 +1010,17 @@ async function armarRequerido(
     };
   }
 
-  // ── Con explosión: se ESCALA de piezas PEDIDAS (su base, `mrp.ts`) a piezas CORTADAS ────────────
-  const piezasSnapshot = cant.pedido;
-  const escala = piezasSnapshot > 0 ? piezasBase / piezasSnapshot : 1;
+  // ── Con explosión: se ESCALA de la base de cada renglón (`mrp.ts`) a piezas CORTADAS ────────────
+  //
+  // ⭐⭐ **fila 0.232 (§Post-F9.245(c)) — LA BASE ES DEL RENGLÓN, no de la orden.** Desde que la
+  // explosión pide los avíos contra `max(pedido, cortado vivo)` por celda, un renglón de avío
+  // explotado después de un sobre-corte ya trae el extra. Escalarlo desde lo PEDIDO lo inflaría por
+  // segunda vez (120 calculadas × 120/100). Cada renglón guarda su base (`piezasBase`); uno viejo
+  // (NULL) cae a lo pedido, que es contra lo que se calculó (REGLA 0-B: se tolera, no se repara).
+  const escalaDe = (base: number | null): number => escalaDelRenglon(base, cant.pedido, piezasBase);
+  /** ¿Algún renglón costeable se escaló (≠ 1)? ¿Alguno no se pudo escalar (base 0)? */
+  let huboEscala = false;
+  let sinBaseParaEscalar = false;
 
   // Suma el snapshot por material (no hay índice único que lo garantice) y descarta lo no costeable.
   const requeridoSnapshot = new Map<string, { cantidad: number; unidad: string | null }>();
@@ -1006,9 +1039,13 @@ async function armarRequerido(
       }
       continue;
     }
+    const escalaFila = escalaDe(r.piezasBase);
+    if (Math.abs(escalaFila - 1) > TOLERANCIA) huboEscala = true;
+    if ((r.piezasBase ?? cant.pedido) <= 0) sinBaseParaEscalar = true;
     const previo = requeridoSnapshot.get(clave);
     requeridoSnapshot.set(clave, {
-      cantidad: (previo?.cantidad ?? 0) + num(r.cantidadRequerida),
+      // Ya ESCALADO a las piezas cortadas, renglón por renglón (cada uno con su base).
+      cantidad: (previo?.cantidad ?? 0) + num(r.cantidadRequerida) * escalaFila,
       unidad: previo?.unidad ?? r.unidad,
     });
   }
@@ -1016,11 +1053,12 @@ async function armarRequerido(
   // Los avisos del ESCALADO solo tienen sentido si el snapshot aportó algo costeable (si no aportó
   // nada, ningún requerido salió de él y hablar de "ajustar la explosión" sería mentira).
   if (requeridoSnapshot.size > 0) {
-    if (piezasSnapshot > 0) {
-      if (Math.abs(escala - 1) > TOLERANCIA) {
+    if (!sinBaseParaEscalar) {
+      if (huboEscala) {
         avisos.push(
-          `La explosión de materiales se calculó sobre las piezas PEDIDAS y el costo se prorratea ` +
-            `sobre las CORTADAS: el consumo requerido se ajustó a esa proporción.`,
+          `La explosión de materiales se calculó sobre las piezas PEDIDAS (en los avíos, más el ` +
+            `sobre-corte si ya lo había) y el costo se prorratea sobre las CORTADAS: el consumo ` +
+            `requerido se ajustó a esa proporción.`,
         );
       }
     } else if (piezasBase > 0) {
@@ -1048,8 +1086,7 @@ async function armarRequerido(
       material: b.material,
       unidad: delSnapshot?.unidad ?? b.unidad,
       esGenerico: b.esGenerico,
-      requerido:
-        delSnapshot === undefined ? b.consumoPorPrenda * piezasBase : delSnapshot.cantidad * escala,
+      requerido: delSnapshot === undefined ? b.consumoPorPrenda * piezasBase : delSnapshot.cantidad,
       precioCatalogo: b.precioCatalogo,
       // ⭐⭐ 0.163 — el requerido del COMPLEMENTO sale SIEMPRE de la receta × piezas cortadas, aunque
       // el del cuerpo venga del snapshot del MRP. No es una inconsistencia: `RequerimientoOrden` no

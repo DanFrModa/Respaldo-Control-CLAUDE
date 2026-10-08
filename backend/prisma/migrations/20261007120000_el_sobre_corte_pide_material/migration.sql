@@ -1,0 +1,21 @@
+-- ════════════════════════════════════════════════════════════════════════════════════════════
+-- Fila 0.232 · EL SOBRE-CORTE PIDE SU MATERIAL: la segunda pasada de la explosión
+-- (§Post-F9.245(c) de Documentacion_MJD/DECISIONES.md)
+-- ════════════════════════════════════════════════════════════════════════════════════════════
+--
+-- POR QUÉ EXISTE:
+--   Desde esta fila la explosión calcula los AVÍOS contra `max(pedido, cortado vivo)` por celda
+--   color×talla, y las TELAS siguen contra lo pedido. El snapshot `requerimiento_orden` deja de
+--   tener una sola base posible, y el costo REAL —que escala el snapshot a las piezas cortadas—
+--   necesita saber contra cuántas piezas se calculó cada renglón, o contaría el sobre-corte dos
+--   veces.
+--
+-- QUÉ HACE: agrega `piezas_base` (entero, NULL permitido). La llena la explosión al escribir el
+--   snapshot.
+--
+-- ES ADITIVA y sin backfill (REGLA 0-B): los snapshots viejos quedan en NULL y quien la lee cae a
+--   las piezas pedidas, que es exactamente contra lo que se calcularon.
+-- ════════════════════════════════════════════════════════════════════════════════════════════
+
+-- AlterTable
+ALTER TABLE "requerimiento_orden" ADD COLUMN "piezas_base" INTEGER;

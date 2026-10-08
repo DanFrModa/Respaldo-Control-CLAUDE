@@ -1152,8 +1152,115 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
     expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
     // Lo importante: el botón sigue habilitado (el servidor acepta el sobre-corte).
     expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+    // ⭐⭐ fila 0.232: y dice que esas piezas no tienen avíos comprados — pero ANTES de guardar no
+    // ofrece el enlace (la explosión todavía no vería este corte: falso negativo, H1 del review).
+    // R3: esta sesión NO trae `compras.ver`, así que no se le promete «podrás ir a la explosión».
+    expect(screen.getByTestId('avance-aviso-sobrecorte-material')).toHaveTextContent(
+      'Esas piezas no tienen avíos comprados: avisa a Compras para que vuelva a explotar los ' +
+        'materiales de esta OP.',
+    );
+    expect(screen.getByTestId('avance-aviso-sobrecorte-material')).not.toHaveTextContent(
+      'podrás ir',
+    );
+  });
+});
+
+/**
+ * ⭐⭐ fila 0.232 (2ª vuelta, H1 del review) — EL ENLACE A LA SEGUNDA PASADA VA DESPUÉS DE GUARDAR.
+ * Antes de guardar, la explosión no ve el corte y diría «0 de sobre-corte»; al guardar, la captura
+ * se cierra. Por eso el enlace vive en la barra del recién guardado, y sólo si el corte excedió.
+ */
+describe('Captura del avance · fila 0.232: tras un SOBRE-CORTE, ir a pedir sus avíos', () => {
+  /**
+   * Pedido con 4 por cortar en Rojo/CH; corta `cantidad` y guarda. El servidor responde OK con el
+   * sobre-corte que ÉL midió (`delServidor`, por celda y con los packs plegados).
+   */
+  async function cortarYGuardar(
+    cantidad: string,
+    permisos: readonly string[],
+    delServidor: number,
+  ): Promise<void> {
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([{ idMaquilero: 77, maquilero: 'Maquila del Norte', pendiente: 6 }]),
+        porCortar: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', pack: '', cantidad: 4 },
+        ],
+      },
+    });
+    crearCorte.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess: (e: unknown) => void }) => {
+        opciones.onSuccess({ id: 90, folio: 12, piezasSobreCorteNuevas: delServidor });
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...permisos] as never),
+    });
+    await abrirCaptura(usuario, 'corte');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'sur');
+    await usuario.click(await screen.findByText('Maquila del Sur'));
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), cantidad);
+    // R3: con `compras.ver` sí se promete la explosión (sin enlace todavía).
+    if (permisos.includes('compras.ver') && Number(cantidad) > 4) {
+      expect(screen.getByTestId('avance-aviso-sobrecorte-material')).toHaveTextContent(
+        'Esas piezas no tienen avíos comprados: al guardar el corte podrás ir a la explosión de ' +
+          'materiales de esta OP para pedir sólo la diferencia.',
+      );
+    }
+    // ANTES de guardar: el aviso sí, el enlace NO (con o sin permiso).
+    expect(screen.queryByTestId('avance-recien-sobrecorte-explosion')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /explotar materiales/i })).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    expect(crearCorte).toHaveBeenCalledTimes(1);
+  }
+
+  it('con exceso y `compras.ver`: la barra del recién guardado enlaza a la explosión DE ESA OP', async () => {
+    await cortarYGuardar('9', [...PERMISOS, 'compras.ver'], 5);
+    const barra = await screen.findByTestId('avance-recien-guardado');
+    expect(barra).toHaveTextContent('Corte #12 guardado');
+    expect(screen.getByTestId('avance-recien-sobrecorte')).toHaveTextContent(
+      'Se cortaron 5 pieza(s) de más: sus avíos no están comprados.',
+    );
+    expect(screen.getByTestId('avance-recien-sobrecorte-explosion')).toHaveAttribute(
+      'href',
+      '/compras/explosion?idOrden=1',
+    );
   });
 
+  it('con exceso pero SIN `compras.ver`: se dice, pero sin enlace (sería un enlace muerto)', async () => {
+    await cortarYGuardar('9', PERMISOS, 5);
+    expect(await screen.findByTestId('avance-recien-sobrecorte')).toHaveTextContent(
+      'Se cortaron 5 pieza(s) de más',
+    );
+    expect(screen.queryByTestId('avance-recien-sobrecorte-explosion')).not.toBeInTheDocument();
+  });
+
+  it('R2: la cifra es la del SERVIDOR, no la de la pantalla (que mide por tendido)', async () => {
+    // La pantalla ve 5 de más (9 contra 4); el servidor dice 7 ⇒ se dice 7.
+    await cortarYGuardar('9', [...PERMISOS, 'compras.ver'], 7);
+    expect(await screen.findByTestId('avance-recien-sobrecorte')).toHaveTextContent(
+      'Se cortaron 7 pieza(s) de más',
+    );
+  });
+
+  it('R2: si el servidor dice 0 (compensado en la celda), no hay barra aunque la pantalla viera exceso', async () => {
+    await cortarYGuardar('9', [...PERMISOS, 'compras.ver'], 0);
+    await waitFor(() => expect(screen.queryByTestId('avance-abrir-captura')).toBeInTheDocument());
+    expect(screen.queryByTestId('avance-recien-sobrecorte')).not.toBeInTheDocument();
+  });
+
+  it('SIN exceso no hay nada que pedir: ni barra ni enlace, aunque tenga `compras.ver`', async () => {
+    await cortarYGuardar('4', [...PERMISOS, 'compras.ver'], 0);
+    // El corte no tiene impreso: sin exceso, la barra no tiene ninguna acción que ofrecer.
+    await waitFor(() => expect(screen.queryByTestId('avance-abrir-captura')).toBeInTheDocument());
+    expect(screen.queryByTestId('avance-recien-guardado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('avance-recien-sobrecorte')).not.toBeInTheDocument();
+  });
+});
+
+describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto (cont.)', () => {
   it('el SOBRE-ENVÍO se bloquea antes de mandarlo (el servidor lo rechaza)', async () => {
     // La orden tiene 10 cortadas y nada enviado a costura: 12 excede en 2.
     useWipOrden.mockReturnValue({
@@ -2549,6 +2656,92 @@ function wipConPacks(celdasMaquilero: { pack: string; cantidad: number }[]): Wip
 }
 
 describe('Captura del avance · EL PACK / TENDIDO (§Post-F9.10)', () => {
+  /**
+   * ⭐⭐ fila 0.232 (R2 de la 3ª vuelta): pack A 8 de 6 pendientes y pack B 2 de 4 — 2 de más en un
+   * tendido, 0 en la celda color×talla. La pantalla pinta su aviso por tendido, pero la barra del
+   * recién guardado sólo dice lo que el SERVIDOR midió plegando los packs: aquí, nada.
+   */
+  async function cortarPacks(a: string, b: string, delServidor: number): Promise<void> {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    crearCorte.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess: (e: unknown) => void }) => {
+        opciones.onSuccess({ id: 91, folio: 13, piezasSobreCorteNuevas: delServidor });
+      },
+    );
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...PERMISOS, 'compras.ver']),
+    });
+    await abrirCaptura(usuario, 'corte');
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), a);
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), b);
+    // 🔴 4ª vuelta: con packs, el aviso de ANTES de guardar no afirma una cifra de avíos (la
+    // pantalla mide por tendido; los avíos van por celda plegada). La regla (f) por tendido sigue.
+    const material = screen.getByTestId('avance-aviso-sobrecorte-material');
+    expect(material).toHaveTextContent(
+      'Al guardar te diré si quedan piezas sin avíos comprados y podrás ir a la explosión de ' +
+        'materiales de esta OP para pedir sólo la diferencia.',
+    );
+    expect(material.textContent).not.toMatch(/\d/);
+    expect(material).not.toHaveTextContent('Esas piezas');
+    expect(screen.getByTestId('avance-aviso-sobrecorte')).toHaveTextContent('por encima');
+    await usuario.type(screen.getByTestId('avance-proveedor-input'), 'Maquila del Sur');
+    await usuario.click(await screen.findByTestId('avance-proveedor-opcion'));
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    expect(crearCorte).toHaveBeenCalledTimes(1);
+  }
+
+  it('⭐ fila 0.232: con packs y SIN `compras.ver`, el aviso previo no promete la explosión', async () => {
+    const usuario = userEvent.setup();
+    useOrden.mockReturnValue({
+      data: ordenConPacks(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useWipOrden.mockReturnValue({ data: wipConPacks([]), isPending: false });
+    renderConProveedores(<AvanceProduccion idOrden={1} alCerrar={vi.fn()} />, {
+      sesion: estadoSesionDePrueba([...PERMISOS]),
+    });
+    await abrirCaptura(usuario, 'corte');
+    await usuario.type(screen.getByLabelText('Rojo pack A, talla CH'), '8');
+    await usuario.type(screen.getByLabelText('Rojo pack B, talla CH'), '2');
+    const material = screen.getByTestId('avance-aviso-sobrecorte-material');
+    expect(material).toHaveTextContent(
+      'Al guardar te diré si quedan piezas sin avíos comprados; si quedan, avisa a Compras para ' +
+        'que vuelva a explotar los materiales de esta OP.',
+    );
+    expect(material).not.toHaveTextContent('podrás ir a la explosión');
+  });
+
+  it('⭐ fila 0.232: dos packs que se compensan en la celda ⇒ sin barra de sobre-corte', async () => {
+    await cortarPacks('8', '2', 0);
+    await waitFor(() => expect(screen.queryByTestId('avance-abrir-captura')).toBeInTheDocument());
+    expect(screen.queryByTestId('avance-recien-sobrecorte')).not.toBeInTheDocument();
+  });
+
+  it('⭐ fila 0.232: B+3 con A ya excedido ⇒ el aviso previo no dice «1»; la barra dice 3', async () => {
+    // A 8 de 6 (2 de más) y B 7 de 4 (3 de más): la pantalla, por tendido, vería otra cosa; la
+    // celda plegada lleva 15 de 10 y el servidor mide lo que de verdad agregó.
+    await cortarPacks('8', '7', 3);
+    expect(await screen.findByTestId('avance-recien-sobrecorte')).toHaveTextContent(
+      'Se cortaron 3 pieza(s) de más',
+    );
+  });
+
+  it('⭐ fila 0.232: dos packs con exceso en la celda ⇒ la barra dice la cifra del servidor', async () => {
+    await cortarPacks('8', '4', 2);
+    expect(await screen.findByTestId('avance-recien-sobrecorte')).toHaveTextContent(
+      'Se cortaron 2 pieza(s) de más',
+    );
+  });
+
   it('el CORTE pinta un renglón por tendido y manda cada uno con SU pack', async () => {
     const usuario = userEvent.setup();
     useOrden.mockReturnValue({

@@ -161,6 +161,11 @@ export function PanelHabilitacionOrden({
   const subtitulo = [
     hab?.modelo ?? encabezado?.modelo,
     hab !== undefined ? `${hab.totalPiezas.toLocaleString('es-MX')} pzas` : undefined,
+    // ⭐⭐ fila 0.232 (§Post-F9.245(c)): con sobre-corte, el requerido de avíos va sobre lo CORTADO.
+    // Dicho aquí, junto a las piezas, para que una falta que apareció después de cortar se entienda.
+    hab !== undefined && hab.piezasSobreCorte > 0
+      ? `+${hab.piezasSobreCorte.toLocaleString('es-MX')} de sobre-corte`
+      : undefined,
     hab?.maquilero !== undefined && hab.maquilero !== null
       ? `Maquilero ${hab.maquilero}`
       : undefined,

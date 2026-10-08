@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   combinarCostoReal,
+  escalaDelRenglon,
   type CostoRealCalculado,
   type LineaCompraLigada,
   type ReferenciaCompra,
@@ -776,5 +777,28 @@ describe('combinarCostoReal · el COMPLEMENTO de la tela (0.163)', () => {
     expect(r.importeDirecto).toBe(1000); // 40×25
     expect(r.importeValuado).toBe(1200); // 60×20
     expect(r.tela).toBe(2200);
+  });
+});
+
+describe('escalaDelRenglon — fila 0.232: cada renglón del snapshot se escala desde SU base', () => {
+  it('renglón con base (avío explotado con el sobre-corte): cortado ÷ esa base, no ÷ lo pedido', () => {
+    // Pedidas 100, cortadas 120; el avío ya se explotó contra 120 ⇒ no se escala (factor 1). Si se
+    // escalara desde lo pedido (120/100) el extra se contaría dos veces.
+    expect(escalaDelRenglon(120, 100, 120)).toBe(1);
+  });
+
+  it('renglón de tela (base = lo pedido): se escala a lo cortado', () => {
+    expect(escalaDelRenglon(100, 100, 120)).toBeCloseTo(1.2, 10);
+  });
+
+  it('snapshot VIEJO (base NULL): cae a lo pedido, que es contra lo que se calculó', () => {
+    expect(escalaDelRenglon(null, 100, 90)).toBeCloseTo(0.9, 10);
+    // …y NO a «sin escala»: una base nula no significa que no haya nada que ajustar.
+    expect(escalaDelRenglon(null, 100, 120)).not.toBe(1);
+  });
+
+  it('sin base (orden sin matriz): no se escala', () => {
+    expect(escalaDelRenglon(0, 0, 50)).toBe(1);
+    expect(escalaDelRenglon(null, 0, 50)).toBe(1);
   });
 });

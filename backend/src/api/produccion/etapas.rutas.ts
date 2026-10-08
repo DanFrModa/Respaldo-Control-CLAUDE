@@ -31,6 +31,7 @@ import {
   esquemaEmpaqueCrear,
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
+  esquemaCorteSalida,
   esquemaEtapaSalida,
   esquemaEtapasOrdenLista,
   esquemaEtapasOrdenQuery,
@@ -98,7 +99,8 @@ export const rutasEtapasProduccion: FastifyPluginCallbackZod = (app, _opciones, 
       summary: 'Registrar un corte de una orden (color×talla; sobre-corte libre)',
       security: SEGURIDAD_SESION,
       body: esquemaCorteCrear,
-      response: { 201: esquemaEtapaSalida, ...respuestasError },
+      // ⭐⭐ fila 0.232: el corte responde además las piezas de sobre-corte que agregó.
+      response: { 201: esquemaCorteSalida, ...respuestasError },
     },
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());

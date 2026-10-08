@@ -57,6 +57,7 @@ import {
   esquemaCorteSemanalQuery,
   esquemaSugerenciaCapturaQuery,
   type DatosEtapaLineaEntrada,
+  type CorteSalida,
   type EtapaSalida,
   type EtapasOrdenLista,
   type PendientesOrden,
@@ -88,6 +89,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { piezasDeAviosDeOrden } from './base-de-materiales.js';
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 import { claveCeldaPack, esSinPack, normalizarPack, ordenManejaPacks } from './packs.js';
 import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
@@ -694,14 +696,27 @@ export async function registrarCorte(
   sesion: SesionUsuario,
   entrada: EntradaRegistrarCorte,
   bd?: ContextoBd,
-): Promise<EtapaSalida> {
+): Promise<CorteSalida> {
   verificarPermiso(sesion, 'produccion.corte');
   const datos = validarEntrada(esquemaCorteCrear, entrada);
 
-  const idEtapa = await enTransaccion(async (tx) => {
+  const { idEtapa, piezasSobreCorteNuevas } = await enTransaccion(async (tx) => {
     const orden = await resolverOrden(tx, datos.idOrden, sesion.idEmpresaActiva);
     const celdas = aplanarYValidar(datos.lineas, orden);
     await exigirTerceroConRol(tx, datos.idCortador, ROL_CORTADOR, 'Corte');
+    // ⭐⭐ fila 0.232 (3ª vuelta, R2 del review): el sobre-corte que ESTE corte agrega a la base de
+    // avíos, medido como la explosión —por celda color×talla, plegando los packs, en espacio
+    // canónico—: lo de DESPUÉS menos lo de ANTES. La pantalla lo usa para ofrecer ir a la
+    // explosión; si lo calculara ella por tendido, afirmaría un sobre-corte que la explosión no ve.
+    //
+    // 🔒 4ª vuelta del review: el ANTES y el DESPUÉS sólo significan algo si nadie corta la misma
+    // orden en medio. Sin candado, dos cortes de 60 sobre 100 leen los dos «antes = 0» y los dos
+    // «después» sin ver al otro: los dos dirían 0 aunque juntos dejen 20 de más. Se toma el MISMO
+    // candado de etapas que el envío y el recibo, y en el MISMO orden que ellos —primero el
+    // compartido del cierre (dentro de `resolverOrden` → `exigirOrdenAbiertaPorId`), después éste—,
+    // para que no pueda haber un bloqueo mutuo.
+    await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+    const sobreCorteAntes = (await piezasDeAviosDeOrden(tx, datos.idOrden)).piezasSobreCorte;
 
     // Decisión (f): sobre-corte LIBRE — no se compara la cantidad contra lo pedido (ver el TSDoc
     // de TOLERANCIA_SOBRE_CORTE). La pantalla AVISA cuánto excede; el servidor acepta.
@@ -769,7 +784,11 @@ export async function registrarCorte(
       idTipoProceso: null,
     });
 
-    return etapa.id;
+    const sobreCorteDespues = (await piezasDeAviosDeOrden(tx, datos.idOrden)).piezasSobreCorte;
+    return {
+      idEtapa: etapa.id,
+      piezasSobreCorteNuevas: Math.max(0, sobreCorteDespues - sobreCorteAntes),
+    };
   }, bd);
 
   // Quien captura ve SU captura completa, precio incluido (desde 0.114 el corte SÍ lleva precio):
@@ -778,7 +797,7 @@ export async function registrarCorte(
   // lleva `produccion.corte` pero no `produccion.wip-ver` recibía un 403 con el corte YA escrito.
   const salida = await proyectarEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
-  return salida;
+  return { ...salida, piezasSobreCorteNuevas };
 }
 
 /**
