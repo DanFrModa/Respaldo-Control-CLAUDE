@@ -71,6 +71,24 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.213 · 12-oct-2026 · **en prueba** — **Se cierra en el papel lo que la v0.212 ya arregló: la Ruta Crítica ya no fecha mañana**
+
+> **La v0.213 cierra la fila 0.184** sin tocar el programa. Esa fila avisaba que, cuando un evento llegaba sin fecha, la
+> Ruta Crítica podía anotar como día real del proceso el de mañana (de 6 de la tarde a medianoche). La v0.212 ya lo
+> corrigió al pasar todo el sistema al día de México; aquí sólo se comprueba y se deja escrito.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+Nada nuevo: es lo mismo que ya trae la v0.212.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+Nada.
+
+### ⏳ Sigue pendiente o roto
+
+Nada nuevo de esta fila.
+
 ## 0.212 · 12-oct-2026 · **en prueba** — **Después de las 6 de la tarde, el sistema ya no cree que es mañana**
 
 > **La v0.212 cierra la fila 0.230.** Muchas pantallas y cálculos sacaban «hoy» del reloj de Londres (UTC), que va seis
