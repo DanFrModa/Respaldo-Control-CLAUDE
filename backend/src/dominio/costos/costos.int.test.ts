@@ -757,6 +757,22 @@ describe('cerrarOrden / reabrirOrden: el costo deja de "ir cambiando"', () => {
    * reabierta clavada en su divisor viejo. Medido con mutación: quitar `cerrada_en IS NOT NULL` de
    * la consulta NO rompía ninguna prueba hasta que existió ésta.
    */
+  /**
+   * ⭐ FILA 0.230 — el aviso de «ya está cerrada» dice el día en que se cerró **en México**. `cerradaEn`
+   * es un sello de tiempo: cerrada a las 23:30 de allá, su parte UTC ya es el día siguiente, y el
+   * `.toISOString().slice(0, 10)` de antes le decía al usuario un día que no fue.
+   */
+  it('⭐ 0.230 · el aviso de orden ya cerrada nombra el día de MÉXICO del cierre', async () => {
+    await cerrarOrden(sesionCierre(), idOrden, {}, bd());
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { cerradaEn: new Date('2026-10-13T05:30:00.000Z') }, // 23:30 del 12 en México
+    });
+    await expect(cerrarOrden(sesionCierre(), idOrden, {}, bd())).rejects.toThrow(
+      /ya está cerrada \(desde el 12\/10\/2026\)/,
+    );
+  });
+
   it('0.061 · una orden REABIERTA vuelve al margen VIVO (el congelado quedó de historia)', async () => {
     await guardarCostoOrden(sesionCierre(), idOrden, { baseProrrateo: 'recibido' }, bd());
     await cerrarOrden(sesionCierre(), idOrden, {}, bd());

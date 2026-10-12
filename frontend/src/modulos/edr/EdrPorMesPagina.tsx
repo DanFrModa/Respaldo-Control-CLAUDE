@@ -18,6 +18,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 
 import { BarraPeso } from '../analisis-rc/piezas';
 import { etiquetaMes, MESES, moneda } from './comun';
+import { anioDelNegocio, mesDelNegocio } from '@/lib/fecha-negocio';
 
 function num(s: string): number {
   const v = Number(s);
@@ -32,9 +33,8 @@ function num(s: string): number {
  */
 export function EdrPorMesPagina(): React.JSX.Element {
   const [params, setParams] = useSearchParams();
-  const hoy = new Date();
-  const anio = num(params.get('anio') ?? '') || hoy.getFullYear();
-  const mes = num(params.get('mes') ?? '') || hoy.getMonth() + 1;
+  const anio = num(params.get('anio') ?? '') || anioDelNegocio();
+  const mes = num(params.get('mes') ?? '') || mesDelNegocio();
 
   const consulta = useEdrPorMes(anio, mes);
   const edr = consulta.data?.edr ?? null;

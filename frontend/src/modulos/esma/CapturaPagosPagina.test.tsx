@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CargoEsMaFila } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -153,5 +153,27 @@ describe('CapturaPagosPagina (F6-E4)', () => {
     await elegirMaquilero(user);
     await user.click(screen.getByTestId('pago-cargo-check-7'));
     expect(screen.getByTestId('pago-guardar')).toBeDisabled();
+  });
+});
+
+/**
+ * ⭐ FILA 0.230 — la fecha del pago arranca en el día DEL NEGOCIO. Antes salía de `hoyISO()` de
+ * `esma/comun.ts` (`toISOString()`, el día UTC): de 18:00 a 23:59 de México proponía MAÑANA.
+ */
+describe('CapturaPagosPagina — la fecha propone HOY en México (0.230)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['23:30 del 12-oct (UTC ya es 13)', '2026-10-13T05:30:00.000Z', '2026-10-12'],
+    ['00:30 del 13-oct', '2026-10-13T06:30:00.000Z', '2026-10-13'],
+  ])('a las %s (instante %s) propone %s', (_franja, instante, esperado) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(instante));
+    renderConProveedores(<CapturaPagosPagina />, {
+      sesion: estadoSesionDePrueba(['esma.modificar', 'esma.ver-pagos']),
+    });
+    expect(screen.getByTestId('pago-fecha')).toHaveValue(esperado);
   });
 });

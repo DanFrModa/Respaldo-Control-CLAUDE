@@ -2,7 +2,7 @@
 // `tsconfig.node.json` (lo arrastra `src/ventana-fecha-pt.test.ts`, que lee el `openapi.json` con
 // `node:fs`), y ese proyecto no declara `baseUrl`/`paths` — con el alias, el typecheck del
 // frontend truena con «Cannot find module '@/lib/fecha-negocio'» (medido).
-import { hoy } from '../../lib/fecha-negocio';
+import { hoy, sumarDias } from '../../lib/fecha-negocio';
 
 /**
  * La VENTANA de fecha de la captura de PT (fila 0.171; el huso, fila 0.174) — el lado de la
@@ -30,8 +30,7 @@ export { hoy };
 
 /** El día más viejo que acepta el servidor sin `ipt.fecha-libre`, en YYYY-MM-DD. */
 export function inicioVentanaCapturaPt(): string {
-  const base = Date.parse(`${hoy()}T00:00:00.000Z`);
-  return new Date(base - DIAS_VENTANA_CAPTURA_PT * 86_400_000).toISOString().slice(0, 10);
+  return sumarDias(hoy(), -DIAS_VENTANA_CAPTURA_PT);
 }
 
 /**

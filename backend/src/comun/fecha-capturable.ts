@@ -24,7 +24,7 @@
 import type { ClavePermiso } from '../contrato/index.js';
 
 import { ErrorPermiso } from './errores.js';
-import { hoyDelNegocio } from './fecha-negocio.js';
+import { hoyDelNegocioUtc } from './fecha-negocio.js';
 import { tienePermiso, type SesionUsuario } from './permisos.js';
 
 /**
@@ -41,28 +41,10 @@ export const DIAS_VENTANA_CAPTURA = 7;
 /** Milisegundos de un día (la ventana se mide en días completos, sobre fechas a medianoche UTC). */
 const MS_POR_DIA = 86_400_000;
 
-/**
- * El día de HOY **del negocio**, a medianoche UTC — la base contra la que se mide la ventana.
- *
- * ⭐ **EL HUSO, ARREGLADO EN LA FILA 0.174.** Hasta entonces el ancla era el día **UTC**
- * (`new Date()` a medianoche UTC), heredado de F7-E4. El servidor corre en UTC y la gente captura
- * en México (−06:00, sin horario de verano desde 2022), así que **entre las 18:00 y las 23:59 de
- * allá el día UTC ya había avanzado**, y en esa franja —el turno de la tarde entero— la pieza
- * rompía sus dos promesas:
- *  • *«nunca una fecha futura»* dejaba pasar el día SIGUIENTE del calendario mexicano, y
- *  • la ventana valía {@link DIAS_VENTANA_CAPTURA} − 1 días de negocio completos, no N.
- *
- * Ahora el ancla es {@link hoyDelNegocio} —la MISMA que usa el periodo de LECTURA del kardex
- * (`dominio/inventarios/periodo-kardex.ts`)—, así que el sistema tiene **un solo «hoy»**: el que
- * decide qué se puede capturar y el que decide qué se puede leer son el mismo día. Se mide en
- * `fecha-capturable.test.ts`, con el reloj anclado en las dos franjas.
- *
- * Se devuelve a **medianoche UTC** porque así es como se guardan las columnas `@db.Date` y así
- * llegan las fechas que hay que comparar: el huso decide QUÉ día es hoy, no cómo se representa.
- */
-export function hoyDelNegocioUtc(): Date {
-  return new Date(`${hoyDelNegocio()}T00:00:00.000Z`);
-}
+// `hoyDelNegocioUtc` —la base contra la que se mide la ventana— vive en `comun/fecha-negocio.ts`
+// desde la fila 0.230 (lo necesitaron también la RC, el kardex y los cobros, que fechaban «hoy» con
+// el día UTC). Se re-exporta aquí para no mover a quienes ya lo importaban de este archivo.
+export { hoyDelNegocioUtc };
 
 /** Opciones de la ventana: qué llave la abre y de cuántos días es. */
 export interface OpcionesFechaCapturable {

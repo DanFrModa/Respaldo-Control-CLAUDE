@@ -39,10 +39,10 @@ import {
   esSegmentoCxp,
   ETIQUETAS_ORIGEN_CXP,
   etiquetaOrigen,
-  hoyISO,
   moneda,
   type SegmentoCxp,
 } from './comun';
+import { hoy } from '@/lib/fecha-negocio';
 
 /** ¿El renglón se puede cancelar? Solo los del MOTOR, no cancelados ni inversos (los EsMa no aquí). */
 function esCancelable(m: CxpEstadoCuentaMovimiento): boolean {
@@ -468,7 +468,7 @@ function CajonCaptura({
   const registrar = useRegistrarMovimientoCxp();
   const [origen, setOrigen] = useState<CxpOrigen>('pago');
   const [importe, setImporte] = useState('');
-  const [fecha, setFecha] = useState(hoyISO());
+  const [fecha, setFecha] = useState(hoy());
   const [esFiscal, setEsFiscal] = useState<'no' | 'si'>('no');
   const [observaciones, setObservaciones] = useState('');
 

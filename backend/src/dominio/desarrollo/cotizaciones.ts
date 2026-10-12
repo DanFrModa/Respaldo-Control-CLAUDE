@@ -68,6 +68,7 @@ import {
 } from '../../contrato/esquemas/cotizacion.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -430,7 +431,8 @@ export async function emitirCotizacion(
     const vigentes = exigirRenglonesAprobados(renglones, 'emitir la cotización');
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA);
-    const fecha = datos.fecha === undefined ? new Date() : new Date(datos.fecha);
+    // Sin fecha, HOY del negocio (fila 0.230): `fecha` es `@db.Date` y `new Date()` guardaba el día UTC.
+    const fecha = datos.fecha === undefined ? hoyDelNegocioUtc() : new Date(datos.fecha);
 
     const cotizacion = await tx.cotizacion.create({
       data: {

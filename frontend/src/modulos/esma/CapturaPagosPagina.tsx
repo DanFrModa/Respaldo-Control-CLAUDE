@@ -22,7 +22,8 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
 import { ComboboxMaquilero } from './SelectorMaquilero';
-import { hoyISO, moneda, type PartidaInicial } from './comun';
+import { moneda, type PartidaInicial } from './comun';
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * CAPTURA DE PAGOS a un maquilero (F6-E4, decisión g "prendas por pagar"): se elige el maquilero,
@@ -43,7 +44,7 @@ export function CapturaPagosPagina(): React.JSX.Element {
   const [idMaquilero, setIdMaquilero] = useState<string>(
     inicial?.idMaquilero !== undefined ? String(inicial.idMaquilero) : '',
   );
-  const [fecha, setFecha] = useState(hoyISO());
+  const [fecha, setFecha] = useState(hoy());
   const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
   const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
   // Cargos seleccionados: idCargo → cantidad (texto). La presencia de la clave = incluido.

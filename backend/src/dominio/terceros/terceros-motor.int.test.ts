@@ -16,7 +16,7 @@
  *  (j) exclusividad del tercero (D15a): el CHECK impide poblar ambas FKs;
  *  (k) importe mínimo (D1): un sub-centavo se rechaza como validación (no revienta el CHECK monto<>0).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Cliente, Empresa, PrismaClient, Proveedor } from '../../datos/index.js';
 import {
@@ -317,6 +317,32 @@ describe('cancelación por inverso auditado (D3)', () => {
     await expect(
       cancelarMovimientoTercero(sesion(), inverso.id, { motivo: 'cancelar el inverso' }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  /**
+   * ⭐ FILA 0.230 — el inverso se fecha HOY DEL NEGOCIO. `fecha` es `@db.Date` y nacía con
+   * `new Date()`: cancelado a las 23:30 de México, quedaba fechado MAÑANA en el estado de cuenta.
+   */
+  it('⭐ cancelado a las 23:30 de México, el inverso se fecha HOY (no el día UTC)', async () => {
+    const cargo = await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'proveedor',
+        idTercero: proveedor.id,
+        fecha: '2026-07-01',
+        origen: 'factura_proveedor',
+        importe: 100,
+      },
+      bd(),
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+    try {
+      const inverso = await cancelarMovimientoTercero(sesion(), cargo.id, { motivo: 'x' }, bd());
+      expect(inverso.fecha).toBe('2026-10-12');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('dos cancelaciones CONCURRENTES del mismo movimiento crean UN solo inverso (D3)', async () => {

@@ -24,6 +24,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { fechaCorta } from './formato';
 import { EstadoOrdenBadge } from './piezas';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 /** Renglones por página de la consulta. */
 const POR_PAGINA = 20;
@@ -33,7 +34,7 @@ const TODOS = 'TODOS';
 
 /** Años disponibles en el filtro (del actual hacia atrás). */
 function aniosDisponibles(): number[] {
-  const actual = new Date().getFullYear();
+  const actual = anioDelNegocio();
   const lista: number[] = [];
   for (let a = actual; a >= actual - 8; a -= 1) {
     lista.push(a);

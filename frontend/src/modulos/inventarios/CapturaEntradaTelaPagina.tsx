@@ -26,11 +26,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 import type { EstadoPendientesOc, LineaOcPendiente } from './CapturaRenglonesTelaColor';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 type TipoDocumento = 'factura' | 'remision';
 

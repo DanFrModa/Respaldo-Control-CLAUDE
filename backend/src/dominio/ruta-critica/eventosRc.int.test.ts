@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TipoEventoProceso } from '../../datos/index.js';
 import type {
@@ -208,6 +208,36 @@ describe('compraTela: OC de tela autorizada/cancelada (post-F9)', () => {
     r = await renglon(idRuta);
     expect(r.estado).not.toBe('completado');
     expect(r.fechaReal).toBeNull();
+  });
+
+  /**
+   * ⭐ FILA 0.230 — la fecha FÍSICA del proceso es el DÍA DEL NEGOCIO de la autorización. La OC se
+   * autoriza a las 23:30 de México (en UTC ya es el día siguiente): `fechaAutorizado` es un sello de
+   * tiempo, y pasado tal cual a `fechaReal` el KPI de puntualidad contaba el proceso cumplido MAÑANA.
+   */
+  it('⭐ autorizada a las 23:30 de México, el proceso se cumple HOY (no el día UTC)', async () => {
+    const idRuta = await crearRenglonRuta('orden-compra-tela-noche', TipoEventoProceso.compraTela);
+    const oc = await crearOC(
+      sesion(),
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: tela.id, cantidad: 100, precio: 12, idOrden }],
+      },
+      bd(),
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+    try {
+      await autorizarOC(sesion(), oc.id, bd());
+      await drenarUltimoEvento('oc-tela-resuelta');
+    } finally {
+      vi.useRealTimers();
+    }
+    const r = await renglon(idRuta);
+    expect(r.estado).toBe('completado');
+    expect(r.fechaReal?.toISOString()).toBe('2026-10-12T00:00:00.000Z');
   });
 
   it('⭐ V1-E3y: DES-AUTORIZAR la OC de tela también des-completa el proceso (§Post-F9.79)', async () => {

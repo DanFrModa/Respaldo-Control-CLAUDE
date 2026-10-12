@@ -12,6 +12,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { etiquetaMes, MESES, moneda } from './comun';
+import { anioDelNegocio, mesDelNegocio } from '@/lib/fecha-negocio';
 
 /** Texto de input a número (vacío/no numérico → 0). */
 function num(s: string): number {
@@ -28,9 +29,8 @@ function num(s: string): number {
 export function GestionMesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeCapturar = tienePermiso('edr.capturar');
-  const hoy = new Date();
-  const [anio, setAnio] = useState(String(hoy.getFullYear()));
-  const [mes, setMes] = useState(String(hoy.getMonth() + 1));
+  const [anio, setAnio] = useState(() => String(anioDelNegocio()));
+  const [mes, setMes] = useState(() => String(mesDelNegocio()));
 
   const anioN = num(anio);
   const mesN = num(mes);

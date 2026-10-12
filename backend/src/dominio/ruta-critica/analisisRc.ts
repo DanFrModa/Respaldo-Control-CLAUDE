@@ -31,6 +31,7 @@ import type {
 } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 
@@ -519,7 +520,9 @@ export async function analisisRc(
   verificarPermiso(sesion, 'rc.ruta-ver');
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
-  const hoy = aMedianocheUtc(ahora);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   const agregados = await cargarAgregadoOrdenes(cliente, idEmpresa, hoy);
 
@@ -626,7 +629,9 @@ export async function desempenoRc(
   verificarPermiso(sesion, 'rc.programar');
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
-  const hoy = aMedianocheUtc(ahora);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   // ── Población: usuarios activos con algún rol responsable de procesos activos (el equipo de la RC).
   const usuarios = await cliente.usuario.findMany({

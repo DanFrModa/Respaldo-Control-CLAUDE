@@ -30,6 +30,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { etiquetaMes, etiquetaOrigen, MESES, moneda } from './comun';
+import { anioDelNegocio, mesDelNegocio } from '@/lib/fecha-negocio';
 
 function num(s: string): number {
   const v = Number(s);
@@ -53,9 +54,8 @@ export function ConciliacionPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeCapturar = tienePermiso('edr.capturar');
   const [params, setParams] = useSearchParams();
-  const hoy = new Date();
-  const anio = num(params.get('anio') ?? '') || hoy.getFullYear();
-  const mes = num(params.get('mes') ?? '') || hoy.getMonth() + 1;
+  const anio = num(params.get('anio') ?? '') || anioDelNegocio();
+  const mes = num(params.get('mes') ?? '') || mesDelNegocio();
 
   const [origen, setOrigen] = useState('');
   const [idEmpresa, setIdEmpresa] = useState('');

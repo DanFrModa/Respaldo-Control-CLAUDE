@@ -18,6 +18,12 @@
  * null para EsMa (su CFDI se concilia en E3 sobre el propio cargo, sin salir de EsMa).
  */
 import type { MovimientoTerceroSalida } from '../../contrato/index.js';
+import {
+  diaDelNegocio,
+  diaDelNegocioUtc,
+  inicioDelDiaDelNegocio,
+  inicioDelDiaSiguienteDelNegocio,
+} from '../../comun/fecha-negocio.js';
 import { type Tx } from '../../comun/transaccion.js';
 import type { PrismaClient } from '../../datos/index.js';
 
@@ -76,8 +82,10 @@ function rangoCreado(
   }
   return {
     creadoEn: {
-      ...(desde === undefined ? {} : { gte: aDateColumna(desde) }),
-      ...(hasta === undefined ? {} : { lt: new Date(aDateColumna(hasta).getTime() + 86_400_000) }),
+      // Días DEL NEGOCIO (fila 0.230): `creadoEn` es un sello de tiempo, y leer el día como UTC
+      // dejaba fuera la tarde del último día y metía la del anterior.
+      ...(desde === undefined ? {} : { gte: inicioDelDiaDelNegocio(desde) }),
+      ...(hasta === undefined ? {} : { lt: inicioDelDiaSiguienteDelNegocio(hasta) }),
     },
   };
 }
@@ -329,14 +337,15 @@ export async function proyectarMovimientosEsMa(
     filas.push({
       ...base(c.id, c.conFactura),
       // El cargo de EsMa no tiene columna de fecha propia: su fecha ES `creadoEn` (la misma que
-      // viaja abajo en `fecha`), así que el plazo se cuenta desde ahí.
-      fechaVencimiento: vence('cargo', c.creadoEn),
+      // viaja abajo en `fecha`), así que el plazo se cuenta desde ahí — desde su día DEL NEGOCIO.
+      fechaVencimiento: vence('cargo', diaDelNegocioUtc(c.creadoEn)),
       origen: 'recibo_maquila',
       monto,
       observaciones:
         c.observaciones ??
         `Orden #${String(Number(c.orden.folio))} · ${etiquetaProcesoDelCargo(c)}${c.sinCosto ? ' (sin costo)' : ''}`,
-      fecha: c.creadoEn.toISOString().slice(0, 10),
+      // Su día es el DEL NEGOCIO (fila 0.230): `creadoEn` es un sello de tiempo, no un día.
+      fecha: diaDelNegocio(c.creadoEn),
       creadoEn: c.creadoEn.toISOString(),
       creadoPorId: c.creadoPorId,
     });

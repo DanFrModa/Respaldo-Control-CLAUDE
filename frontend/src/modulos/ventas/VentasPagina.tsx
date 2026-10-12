@@ -19,6 +19,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 
 import { moneda } from '../edr/comun';
+import { anioDelNegocio, mesDelNegocio } from '@/lib/fecha-negocio';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 50;
@@ -54,10 +55,9 @@ function mesCorto(mes: number): string {
  * factura en el EDR → la columna identificadora es el FOLIO DE LA OP (o "—" en líneas manuales).
  */
 export function VentasPagina(): React.JSX.Element {
-  const hoy = new Date();
-  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [anio, setAnio] = useState(() => anioDelNegocio());
   // 0 = "Todos" (todos los meses del año). Default: el mes corriente.
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
+  const [mes, setMes] = useState(() => mesDelNegocio());
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [pagina, setPagina] = useState(1);
@@ -166,7 +166,7 @@ export function VentasPagina(): React.JSX.Element {
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => {
-              setAnio(Number(e.target.value) || hoy.getFullYear());
+              setAnio(Number(e.target.value) || anioDelNegocio());
               reiniciarPagina();
             }}
             aria-label="Año del período"

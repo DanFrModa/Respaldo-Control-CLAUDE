@@ -72,6 +72,7 @@ import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { estaCerrada } from '@/lib/orden-cerrada';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * AVANCE DE PRODUCCIÓN (rediseño R2, §4.3 — el form "Proceso" del Access, reconstruido): panel de
@@ -121,11 +122,6 @@ const ETAPAS: readonly { clave: ClaveEtapa; etiqueta: string; etiquetaProveedor:
   // tiene "proveedor" — el destinatario es el cliente de la orden.
   { clave: 'entrega-cliente', etiqueta: 'Entrega a cliente', etiquetaProveedor: 'Cliente' },
 ];
-
-/** Fecha de hoy (YYYY-MM-DD) para el default de captura. */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Formatea una fecha date-only `YYYY-MM-DD` como "4 jul 2026". */
 function fechaCorta(valor: string | null): string {

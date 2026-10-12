@@ -16,13 +16,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 /** Valor del filtro de cliente que significa "todos". */
 const TODOS = 'TODOS';
 
 /** Años disponibles en el filtro. */
 function aniosDisponibles(): number[] {
-  const actual = new Date().getFullYear();
+  const actual = anioDelNegocio();
   const lista: number[] = [];
   for (let a = actual; a >= actual - 8; a -= 1) lista.push(a);
   return lista;
@@ -36,7 +37,7 @@ function aniosDisponibles(): number[] {
  */
 export function TableroPedidosMesPagina(): React.JSX.Element {
   const navigate = useNavigate();
-  const [anio, setAnio] = useState<number | null>(new Date().getFullYear());
+  const [anio, setAnio] = useState<number | null>(() => anioDelNegocio());
   const [idCliente, setIdCliente] = useState<number | null>(null);
   // El NOMBRE del cliente se conserva —no sólo su id— porque viaja en el deep-link: la Consulta
   // llega con el filtro puesto y, con búsqueda server-side, sin el nombre no tendría cómo

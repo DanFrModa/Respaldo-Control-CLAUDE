@@ -23,11 +23,6 @@ export function celdaAging(monto: number | null): string {
   return moneda(monto);
 }
 
-/** Fecha de hoy en formato YYYY-MM-DD (default de los campos fecha). */
-export function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** Etiquetas legibles de los orígenes capturables de CxC (para el formulario y la tabla). */
 export const ETIQUETAS_ORIGEN_CXC: Record<CxcOrigen, string> = {
   entrada_sin_factura: 'Cargo sin factura (venta)',

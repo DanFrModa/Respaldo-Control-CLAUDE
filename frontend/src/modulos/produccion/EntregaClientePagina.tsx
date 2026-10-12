@@ -40,11 +40,7 @@ import { existenciaDeCelda, existenciaDeSeguimiento, piezasExcedidas } from './e
 import { LeyendaExistenciaEntrega } from './LeyendaExistenciaEntrega';
 import { SelectorOrden } from './SelectorOrden';
 import { coloresDeOrden, lineasVaciasDeOrden, tallasDeOrden, totalMatriz } from './matriz-orden';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 /** Lee un id entero positivo del `state` del deep-link, o null (mismo patrón que la salida de tela). */
 function leerIdDeepLink(state: unknown, clave: string): number | null {

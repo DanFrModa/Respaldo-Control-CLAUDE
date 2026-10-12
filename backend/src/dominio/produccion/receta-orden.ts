@@ -97,6 +97,7 @@ import {
   ErrorPermiso,
   ErrorValidacion,
 } from '../../comun/errores.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
@@ -1649,7 +1650,7 @@ export function exigirCompraNoCongelada(orden: {
   recetaAbiertaMotivo: string | null;
 }): void {
   if (orden.recetaAbiertaEn === null) return;
-  const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+  const desde = fechaDelActo(orden.recetaAbiertaEn);
   const motivo =
     orden.recetaAbiertaMotivo === null ? '' : ` Motivo: "${orden.recetaAbiertaMotivo}".`;
   throw new ErrorConflicto(
@@ -3716,7 +3717,7 @@ export async function abrirReceta(
   const datos = validarEntrada(esquemaAbrirRecetaCuerpo, cuerpo);
   return enRecetaEditable(sesion, idOrden, bd, async (tx, orden) => {
     if (orden.recetaAbiertaEn !== null) {
-      const desde = orden.recetaAbiertaEn.toISOString().slice(0, 10);
+      const desde = fechaDelActo(orden.recetaAbiertaEn);
       throw new ErrorConflicto(
         `La receta de la orden ${String(orden.folio)} YA está abierta desde el ${desde}` +
           (orden.recetaAbiertaMotivo === null ? '' : ` ("${orden.recetaAbiertaMotivo}")`) +

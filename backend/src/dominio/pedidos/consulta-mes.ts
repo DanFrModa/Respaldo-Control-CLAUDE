@@ -31,6 +31,7 @@ import type {
 } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
+import { ZONA_DEL_NEGOCIO } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -97,7 +98,10 @@ export async function pedidosPorMes(
   // pedido o de su captura) por SQL crudo parametrizado.
   let idsDeEntrega: number[] | undefined;
   if (filtros.mes !== undefined || filtros.anio !== undefined) {
-    const fechaEntrega = Prisma.sql`COALESCE(fecha_hasta, fecha_de, fecha_pedido, creado_en)`;
+    // `creado_en` es un SELLO DE TIEMPO (UTC, sin huso): su mes es el del día DEL NEGOCIO (fila
+    // 0.230). Leído en UTC, un pedido capturado después de las 18:00 del último día del mes caía en
+    // el mes siguiente. Las tres columnas `@db.Date` ya son días y no se tocan.
+    const fechaEntrega = Prisma.sql`COALESCE(fecha_hasta, fecha_de, fecha_pedido, ((creado_en AT TIME ZONE 'UTC') AT TIME ZONE ${ZONA_DEL_NEGOCIO})::date)`;
     const condiciones = [Prisma.sql`id_empresa = ${sesion.idEmpresaActiva}`];
     if (filtros.mes !== undefined) {
       condiciones.push(Prisma.sql`EXTRACT(MONTH FROM ${fechaEntrega}) = ${filtros.mes}`);

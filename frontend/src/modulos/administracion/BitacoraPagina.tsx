@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { finDelDiaDelNegocio, inicioDelDiaDelNegocio } from '@/lib/fecha-negocio';
 
 /** Tipo de accion para el filtro de la bitacora (solo las claves literales). */
 type AccionFiltro = NonNullable<BitacoraQuery['accion']>;
@@ -131,9 +132,10 @@ export function BitacoraPagina(): React.JSX.Element {
     ...(accionFiltro !== '' ? { accion: accionFiltro } : {}),
     // El <input type="date"> entrega "YYYY-MM-DD" pero el contrato exige ISO date-time completo
     // (format: date-time → 400 si no). Se convierte conservando el rango INCLUSIVO: `desde` desde
-    // el inicio del día y `hasta` hasta el final del día (23:59:59.999).
-    ...(desde.length > 0 ? { desde: new Date(`${desde}T00:00:00.000Z`).toISOString() } : {}),
-    ...(hasta.length > 0 ? { hasta: new Date(`${hasta}T23:59:59.999Z`).toISOString() } : {}),
+    // el inicio del día y `hasta` hasta el final del día — los dos EN MÉXICO (fila 0.230): leídos
+    // como UTC, el filtro de un día se corría seis horas y perdía la tarde de ese día.
+    ...(desde.length > 0 ? { desde: inicioDelDiaDelNegocio(desde) } : {}),
+    ...(hasta.length > 0 ? { hasta: finDelDiaDelNegocio(hasta) } : {}),
   };
 
   const consulta = useBitacora(query);

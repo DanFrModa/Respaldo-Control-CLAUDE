@@ -34,6 +34,7 @@ import type {
 import { Prisma } from '../../datos/index.js';
 
 import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { armarPagina, rangoPrisma, type Paginacion } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -45,11 +46,6 @@ import {
   UMBRAL_RIESGO_DIAS,
   type EstadoSemaforo,
 } from './semaforoYRiesgo.js';
-
-/** Trunca un `Date` a medianoche UTC (solo el día calendario importa para el semáforo/atraso). */
-function aMedianocheUtc(fecha: Date): Date {
-  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-}
 
 /**
  * Esquema de los filtros del concentrado EN DOMINIO (tipos ya nativos: `boolean`/`number`), distinto
@@ -376,7 +372,9 @@ export async function consultarConcentrado(
   verificarPermiso(sesion, 'rc.ruta-ver');
   const filtros = validarEntrada(esquemaConcentradoDominio, parametros);
   const cliente = clienteLectura(bd);
-  const hoy = aMedianocheUtc(ahora);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   const { filas, total, resumen } = await agregadosPorOrden(
     cliente,

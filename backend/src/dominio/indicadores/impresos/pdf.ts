@@ -20,6 +20,7 @@ import {
 type Style = Styles[string];
 
 import type { KpisRc, KpisCalidad, KpisWip } from '../../../contrato/index.js';
+import { ZONA_DEL_NEGOCIO } from '../../../comun/fecha-negocio.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 
@@ -90,7 +91,8 @@ function tabla(clave: string, columnas: Columna[], filas: string[][]): ReactElem
 /** Sello "datos al:" legible. */
 function selloDatosAl(datosAl: string | null): string {
   if (datosAl === null) return 'Datos al: (aún no se calculan)';
-  return `Datos al: ${new Date(datosAl).toLocaleString('es-MX')}`;
+  // Con el huso del NEGOCIO (fila 0.230): el servidor corre en UTC y la hora salía seis horas adelante.
+  return `Datos al: ${new Date(datosAl).toLocaleString('es-MX', { timeZone: ZONA_DEL_NEGOCIO })}`;
 }
 
 /** Encabezado común del impreso (identidad compartida + sello "datos al"). */

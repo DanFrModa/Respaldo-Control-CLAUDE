@@ -28,7 +28,8 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SelectorCliente } from './SelectorCliente';
-import { ETIQUETAS_ORIGEN_CXC, etiquetaOrigen, hoyISO, moneda } from './comun';
+import { ETIQUETAS_ORIGEN_CXC, etiquetaOrigen, moneda } from './comun';
+import { hoy } from '@/lib/fecha-negocio';
 
 /** ¿El renglón se puede cancelar? Solo los del MOTOR, no cancelados ni inversos. */
 function esCancelable(m: CxcEstadoCuentaMovimiento): boolean {
@@ -359,7 +360,7 @@ function CajonCaptura({
   const registrar = useRegistrarMovimientoCxc();
   const [origen, setOrigen] = useState<CxcOrigen>('pago');
   const [importe, setImporte] = useState('');
-  const [fecha, setFecha] = useState(hoyISO());
+  const [fecha, setFecha] = useState(hoy());
   const [esFiscal, setEsFiscal] = useState<'no' | 'si'>('no');
   const [observaciones, setObservaciones] = useState('');
 

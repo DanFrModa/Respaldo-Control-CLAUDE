@@ -26,6 +26,7 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { hoy, lunesDeLaSemana } from '@/lib/fecha-negocio';
 import { useSesion } from '@/sesion/useSesion';
 
 import { RelacionEjecutable } from './RelacionEjecutable';
@@ -33,7 +34,6 @@ import { RenglonPago } from './RenglonPago';
 import {
   ETIQUETA_ESTADO,
   ETIQUETA_RUBRO,
-  lunesDeLaSemana,
   moneda,
   nombreSegmento,
   textoTotales,
@@ -78,7 +78,7 @@ export function CorridaPagosPagina(): React.JSX.Element {
   // ⭐ Ejecutar NO tiene marcha atrás (hoy no existe cancelación de `PagoMaquilero`), así que se
   // confirma enseñando lo que se va a mover: cuántos pagos y cuánto, por rubro y en total.
   const [confirmandoEjecutar, setConfirmandoEjecutar] = useState(false);
-  const [semanaNueva, setSemanaNueva] = useState(() => lunesDeLaSemana(new Date()));
+  const [semanaNueva, setSemanaNueva] = useState(() => lunesDeLaSemana(hoy()));
   const [segmentoNuevo, setSegmentoNuevo] = useState<'sin' | 'con'>('sin');
 
   const listado = useCorridas({ pagina: 1, porPagina: 50 });

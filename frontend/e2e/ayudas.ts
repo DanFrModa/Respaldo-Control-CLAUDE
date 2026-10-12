@@ -1,5 +1,9 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+// ⚠️ Import RELATIVO a la fuente única de la app (fila 0.230): el día del negocio se calcula en UN
+// sitio, y las pruebas e2e lo piden ahí en vez de copiarlo. `tsconfig.e2e.json` no declara el alias `@/`.
+import { anioDelNegocio, hoy, sumarDias } from '../src/lib/fecha-negocio';
+
 /** Credenciales del admin sembrado (backend `prisma/seed.ts`) y su empresa. */
 export const CREDENCIALES_ADMIN = {
   usuario: 'admin',
@@ -205,4 +209,21 @@ export async function elegirProveedor(
   testid = 'selector-proveedor',
 ): Promise<void> {
   await elegirEnCombobox(page, contenedor, nombre, testid);
+}
+
+/**
+ * `YYYY-MM-DD` a `dias` del HOY DEL NEGOCIO (México), para llenar fechas de entrega (fila 0.230).
+ *
+ * ⚠️ No el reloj del runner: el CI corre en UTC, y de 18:00 a 23:59 de México su día ya es mañana.
+ * La app abre sus filtros en el mes del NEGOCIO (`mesDelNegocio()`), así que una entrega «de hoy»
+ * armada con el día UTC la última noche del mes caía en el mes siguiente y la prueba no la veía; y
+ * «+3 días» UTC eran 4 del negocio, el tope de «esta semana» de Mis pendientes.
+ */
+export function fechaDelNegocioRelativa(dias: number): string {
+  return sumarDias(hoy(), dias);
+}
+
+/** Los dos últimos dígitos del año DEL NEGOCIO (el que propone el diálogo de desarrollo). */
+export function anioCortoDelNegocio(): string {
+  return String(anioDelNegocio() % 100).padStart(2, '0');
 }

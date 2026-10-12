@@ -6,7 +6,7 @@
  * (D1/D2), dos renglones del mismo artículo suman bien en la vista (nit #3), y el traspaso no
  * cambia la existencia TOTAL y mueve la cantidad de origen a destino (nit #1).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   Almacen,
@@ -404,6 +404,40 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
       await expect(
         cancelarMovimientoPt(sesion(), original.id, traspasoEntrada.id, 'dirección mala', bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    /**
+     * ⭐ FILA 0.230 — el inverso se fecha HOY DEL NEGOCIO. `fecha` es `@db.Date` y el inverso nacía
+     * con `new Date()`: Prisma guarda su parte UTC, así que cancelado a las 23:30 de México quedaba
+     * fechado MAÑANA. Se falsea sólo `Date`, y sólo alrededor de la cancelación.
+     */
+    it('⭐ cancelado a las 23:30 de México, el inverso se fecha HOY (no el día UTC)', async () => {
+      const original = await registrarMovimientoPt(
+        sesion(),
+        {
+          idEmpresa: empresa.id,
+          idTipoMov: entradaInicial.id,
+          idAlmacen: almPrimeras.id,
+          fecha: new Date('2026-10-12T00:00:00.000Z'),
+          origenTipo: ORIGEN.movimientoManual,
+          lineas: [{ idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaM.id, cantidad: 8 }],
+        },
+        bd(),
+      );
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+      try {
+        const inverso = await cancelarMovimientoPt(
+          sesion(),
+          original.id,
+          salidaCliente.id,
+          'cancelado de noche',
+          bd(),
+        );
+        expect(inverso.fecha.toISOString()).toBe('2026-10-12T00:00:00.000Z');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

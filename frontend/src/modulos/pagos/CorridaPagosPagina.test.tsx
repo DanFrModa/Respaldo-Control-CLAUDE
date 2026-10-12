@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClavePermiso, CorridaDetalle, CorridasLista } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -752,5 +752,26 @@ describe('los permisos', () => {
     expect(screen.queryByLabelText('A pagar a TALLER NORTE')).not.toBeInTheDocument();
     expect(screen.queryByTestId('corrida-cerrar')).not.toBeInTheDocument();
     expect(screen.getByTestId('corrida-ejecutar')).toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ FILA 0.230 — la semana que se propone para armar la corrida es la DEL NEGOCIO. Antes salía de
+ * `lunesDeLaSemana(new Date())` con `getUTC*`: el DOMINGO de 18:00 a 23:59 de México en UTC ya es
+ * lunes, y la pantalla proponía la corrida de la semana SIGUIENTE.
+ */
+describe('la semana nueva se propone en el día de México (0.230)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['domingo 11-oct a las 23:30 (UTC ya es lunes 12)', '2026-10-12T05:30:00.000Z', '2026-10-05'],
+    ['lunes 12-oct a las 00:30', '2026-10-12T06:30:00.000Z', '2026-10-12'],
+  ])('el %s (instante %s) propone la semana del %s', (_franja, instante, esperado) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(instante));
+    pintar();
+    expect(screen.getByTestId('corrida-semana')).toHaveValue(esperado);
   });
 });

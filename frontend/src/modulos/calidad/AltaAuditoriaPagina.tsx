@@ -14,11 +14,7 @@ import { SelectorOrden } from '@/modulos/produccion/SelectorOrden';
 import { useSesion } from '@/sesion/useSesion';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { estaCerrada } from '@/lib/orden-cerrada';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local), para el default de los campos fecha. */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * ALTA DE AUDITORÍA (F6-E2, doc 09 §2 — ex `CC_AltaAuditorias`). Móvil-primero (la auditoría se hace

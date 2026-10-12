@@ -26,6 +26,7 @@ import type { Prisma } from '../../datos/index.js';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
 import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -405,7 +406,7 @@ export async function generarRutaOrden(
     const llevaAplicacion = aplicacion.dias > 0;
 
     // 6) Construye la ruta: omite condicionales no aplicables RECONECTANDO transitivamente.
-    const fechaInicio = datos.fechaInicioRC ?? hoyUtc();
+    const fechaInicio = datos.fechaInicioRC ?? hoyDelNegocioUtc();
     const esResurtido = datos.esResurtido ?? false;
     const advertencias: string[] = [];
 
@@ -918,12 +919,6 @@ export async function ajustarRutaOrden(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Fecha de hoy a medianoche UTC (sin hora). */
-function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
-}
-
 /** Encola (fire-and-forget) el recálculo del CPM de una orden. Nunca lanza al llamador. */
 export async function encolarRecalculo(
   idOrden: number,
@@ -1125,7 +1120,9 @@ function armarDto(
 
   // Semáforo (F5-E4): HOY vs fechaPlaneadaVigente de cada proceso. Estado del recálculo: si algún
   // proceso aún NO tiene fecha vigente, el CPM no ha terminado de fechar ("recalculando…", E5).
-  const hoy = new Date();
+  // HOY es el día DEL NEGOCIO (fila 0.230): con el instante UTC, de 18:00 a 23:59 de México el
+  // semáforo ya juzgaba contra mañana.
+  const hoy = hoyDelNegocioUtc();
   const semaforoOrden = estadoSemaforoOrden(
     filas.map((f) => ({ fechaPlaneadaVigente: f.fechaPlaneadaVigente, fechaReal: f.fechaReal })),
     hoy,

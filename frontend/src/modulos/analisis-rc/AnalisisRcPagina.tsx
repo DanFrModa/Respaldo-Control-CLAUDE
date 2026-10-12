@@ -27,6 +27,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { fechaRc } from '../ruta-critica/piezas';
 import { BarraPeso, Sparkline } from './piezas';
+import { hoyLegible } from '@/lib/fecha-negocio';
 
 /**
  * TABLERO DE GESTIÓN "ANÁLISIS RC" (rediseño R7; doc `REDISENO-FRONTEND.md` §4.10). De CAPTURAR a
@@ -42,11 +43,7 @@ export function AnalisisRcPagina(): React.JSX.Element {
   const puedeGestion = tienePermiso('rc.programar');
 
   // "hoy 6 jul 2026" del proto: solo presentación (ancla temporal del tablero).
-  const hoy = new Date().toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const hoy = hoyLegible({ day: 'numeric', month: 'short', year: 'numeric' });
 
   const consulta = useAnalisisRc();
   const desempeno = useDesempenoRc({ habilitado: puedeGestion });

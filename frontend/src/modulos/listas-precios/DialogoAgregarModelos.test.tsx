@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoAgregarModelos, type MesaDeLaLista } from './DialogoAgregarModelos';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 const agregarMutate = vi.fn();
 const crearModeloMutate = vi.fn();
@@ -218,7 +219,7 @@ describe('<DialogoAgregarModelos> — la mesa abierta (§Post-F9.152)', () => {
     await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
 
     expect(screen.getByTestId('agregar-genero')).toHaveValue('');
-    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(new Date().getFullYear()));
+    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(anioDelNegocio()));
   });
 
   // 🔴 RONDA 2 — LA QUE FALTABA: CAMBIAR de proyecto no puede dejar pegado lo del anterior.
@@ -239,7 +240,7 @@ describe('<DialogoAgregarModelos> — la mesa abierta (§Post-F9.152)', () => {
     await usuario.selectOptions(screen.getByTestId('agregar-proyecto'), '30');
 
     expect(screen.getByTestId('agregar-genero')).toHaveValue('');
-    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(new Date().getFullYear()));
+    expect(screen.getByTestId('agregar-anio')).toHaveValue(String(anioDelNegocio()));
   });
 
   it('🔴 y lo que se envía tras ese cambio NO lleva el género del proyecto anterior', async () => {

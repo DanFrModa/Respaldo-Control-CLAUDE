@@ -19,7 +19,12 @@ let cliente: PrismaClient;
 let idEmpresa: number;
 
 const bd = () => ({ cliente });
-const hoy = new Date('2026-06-22T00:00:00Z'); // lunes
+// «Hoy» = lunes 22 en MÉXICO, a las 23:30 de allá — que en UTC ya es el martes 23. Desde la fila
+// 0.230 el dominio convierte el `ahora` que recibe al día DEL NEGOCIO; se ancla A PROPÓSITO en la
+// franja en que las dos cuentas se separan, así cada aserción de este archivo (escrita para el 22)
+// se pone roja si alguna entrada vuelve a truncar en UTC. (Antes iba la medianoche UTC del 22, que
+// en México todavía es el domingo 21 a las 18:00.)
+const hoy = new Date('2026-06-23T05:30:00Z');
 
 beforeAll(() => {
   cliente = clientePruebas();
@@ -326,6 +331,32 @@ describe('desempenoRc — scoring + bono', () => {
     expect(res.personas[0]?.idUsuario).toBe(ana.id);
     expect(res.conBono).toBe(1);
     expect(res.parametros.umbralBono).toBe(90);
+  });
+
+  /**
+   * ⭐ FILA 0.230 — `hoy` (23:30 del 22 en México; en UTC ya es el 23). Un proceso ACTIVO planeado
+   * para el 22 vence HOY: no cuenta como vencido ni le quita el bono a nadie. Con el día UTC del
+   * instante, contaba como vencido seis horas antes de tiempo.
+   */
+  it('⭐ un proceso planeado para HOY no es «vencido» a las 23:30 de México', async () => {
+    const rolCorte = await cliente.rol.create({ data: { nombre: 'Cortadores', descripcion: 'x' } });
+    const corte = await crearProcesoDef('corte');
+    await cliente.procesoDefRol.create({ data: { idProcesoDef: corte, idRol: rolCorte.id } });
+    const ana = await cliente.usuario.create({
+      data: { username: 'ana', nombre: 'Ana Pérez', email: 'ana@control.local' },
+    });
+    await cliente.usuarioRol.create({ data: { idUsuario: ana.id, idRol: rolCorte.id } });
+    const viva = await crearOrden({ rcActiva: true });
+    await crearRenglon(viva.idOrden, corte, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-22',
+    });
+
+    const res = await desempenoRc(gestion(), bd(), hoy);
+    const ap = res.personas.find((p) => p.idUsuario === ana.id);
+    expect(ap?.activos).toBe(1);
+    expect(ap?.vencidos).toBe(0);
   });
 
   it('calcula la REACCIÓN (h desde que el proceso cae en su cancha) y la TENDENCIA vs la semana pasada', async () => {

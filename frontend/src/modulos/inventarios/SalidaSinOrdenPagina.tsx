@@ -15,13 +15,10 @@ import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
+import { hoy } from '@/lib/fecha-negocio';
 
 /** Qué material se está sacando. */
 type Dimension = 'tela' | 'avio';
-
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Los tres conceptos del contrato, con el texto que ve quien captura. */
 const CONCEPTOS: readonly { valor: ConceptoSalidaSinOrden; etiqueta: string }[] = [

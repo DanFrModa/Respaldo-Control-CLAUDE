@@ -280,6 +280,33 @@ beforeEach(async () => {
   await cortarBase();
 });
 
+/**
+ * ⭐ FILA 0.230 — los CARGOS SIN RECIBO se filtran por su alta (`creadoEn`, un SELLO DE TIEMPO) en el
+ * día DEL NEGOCIO. Dado de alta a las 23:30 del 12 en México (en UTC ya es el 13), es del 12: el filtro
+ * de ese día lo trae y el del 13 no. Con bordes en `T00:00:00Z` era al revés.
+ */
+describe('Conciliación EsMa — el periodo de los cargos sin recibo es el del negocio (0.230)', () => {
+  it('⭐ un cargo de las 23:30 del 12 sale en el filtro del 12, no en el del 13', async () => {
+    const cargo = await cliente.esMaCargo.create({
+      data: {
+        idEmpresa: empresa.id,
+        idMaquilero: maquileroLimpio.id,
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        estado: 'validado',
+        cantidadReal: 1,
+        precioReal: 10,
+        conFactura: false,
+        creadoEn: new Date('2026-10-13T05:30:00.000Z'), // 23:30 del 12 en México
+      },
+    });
+    const del12 = await conciliarEsMa(sesion(), { desde: '2026-10-12', hasta: '2026-10-12' }, bd());
+    expect(del12.cargosSinRecibo.map((c) => c.idCargo)).toContain(cargo.id);
+    const del13 = await conciliarEsMa(sesion(), { desde: '2026-10-13', hasta: '2026-10-13' }, bd());
+    expect(del13.cargosSinRecibo.map((c) => c.idCargo)).not.toContain(cargo.id);
+  });
+});
+
 describe('Conciliación EsMa — permiso (A4, deny-by-default)', () => {
   it('sin `esma.ver-pagos` → ErrorPermiso (ni siquiera consulta la BD)', async () => {
     await expect(conciliarEsMa(sesionDePrueba({ permisos: [] }), {}, {})).rejects.toBeInstanceOf(

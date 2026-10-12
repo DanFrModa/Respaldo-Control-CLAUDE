@@ -24,6 +24,7 @@ import type { OrdenPorVencer, ResumenOperativo } from '../../contrato/index.js';
 import { Prisma } from '../../datos/index.js';
 
 import { ErrorPermiso } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 
@@ -414,6 +415,9 @@ export async function resumenOperativo(
 
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
   // Universo del WIP: órdenes vivas de la empresa (mismo default que el tablero de F3-E5).
   const whereOrdenesVivas = { idEmpresa, estado: { not: 'cancelada' as const } };
 
@@ -422,10 +426,10 @@ export async function resumenOperativo(
       puedeWip ? contarOrdenesAbiertas(cliente, idEmpresa) : null,
       puedeWip ? agregadoWip(cliente, whereOrdenesVivas) : null,
       puedeWip ? contarMaquilerosConSaldo(cliente, idEmpresa) : null,
-      puedeWip ? cortesPorSemana(cliente, idEmpresa, ahora) : null,
-      puedeIndicadores ? entregasATiempo30d(cliente, idEmpresa, ahora) : null,
+      puedeWip ? cortesPorSemana(cliente, idEmpresa, hoy) : null,
+      puedeIndicadores ? entregasATiempo30d(cliente, idEmpresa, hoy) : null,
       puedePt ? existenciaPtTotal(cliente, idEmpresa) : null,
-      puedeRc ? ordenesPorVencer(cliente, idEmpresa, ahora) : null,
+      puedeRc ? ordenesPorVencer(cliente, idEmpresa, hoy) : null,
     ]);
 
   // "Cortado esta semana": el último bucket de la serie es la semana ACTUAL; el penúltimo, la

@@ -64,7 +64,7 @@ import {
   registrarBitacora,
 } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
-import { fechaDelActo } from '../../comun/fecha-negocio.js';
+import { fechaDelActo, hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -693,7 +693,8 @@ export async function crearLista(
     }
 
     const folio = await siguienteFolio(tx, idEmpresa, 'lista-precios');
-    const fecha = datos.fecha === undefined ? new Date() : new Date(datos.fecha);
+    // Sin fecha, HOY del negocio (fila 0.230): `fecha` es `@db.Date` y `new Date()` guardaba el día UTC.
+    const fecha = datos.fecha === undefined ? hoyDelNegocioUtc() : new Date(datos.fecha);
 
     const lista = await tx.listaPrecios.create({
       data: {

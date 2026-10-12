@@ -13,6 +13,7 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { pedidosPorMes } from './consulta-mes.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 
 let cliente: PrismaClient;
 let idEmpresa: number;
@@ -161,13 +162,32 @@ describe('pedidosPorMes (R3, B6)', () => {
 
     // Sin ventana de entrega: el pedido cae al mes/año de su CAPTURA (creadoEn = hoy) — bajo el
     // filtro de año en curso sigue alcanzable (ningún pedido queda huérfano de las tabs).
-    const hoy = new Date();
+    // El mes de la CAPTURA es el del día DEL NEGOCIO (fila 0.230), no el del reloj en UTC.
+    const hoy = hoyDelNegocio();
     const anioActual = await pedidosPorMes(
       sesion(),
-      { anio: hoy.getUTCFullYear(), mes: hoy.getUTCMonth() + 1 },
+      { anio: Number(hoy.slice(0, 4)), mes: Number(hoy.slice(5, 7)) },
       bd(),
     );
     expect(anioActual.datos.some((p) => p.id === sinVentana.idPedido)).toBe(true);
+  });
+
+  /**
+   * ⭐ FILA 0.230 — sin ventana de entrega, el pedido cae al mes de su CAPTURA, y `creado_en` es un
+   * sello de tiempo: su mes es el del día DEL NEGOCIO. Capturado a las 23:30 del 31 de octubre en
+   * México (en UTC ya es 1 de noviembre), es de OCTUBRE. Leído en UTC caía en noviembre.
+   */
+  it('⭐ un pedido capturado a las 23:30 del último día del mes es de ESE mes', async () => {
+    const { idPedido } = await sembrarPedido({ folio: 40 });
+    await cliente.pedido.update({
+      where: { id: idPedido },
+      data: { creadoEn: new Date('2026-11-01T05:30:00.000Z') }, // 23:30 del 31-oct en México
+    });
+
+    const octubre = await pedidosPorMes(sesion(), { anio: 2026, mes: 10 }, bd());
+    expect(octubre.datos.map((p) => p.id)).toContain(idPedido);
+    const noviembre = await pedidosPorMes(sesion(), { anio: 2026, mes: 11 }, bd());
+    expect(noviembre.datos.map((p) => p.id)).not.toContain(idPedido);
   });
 
   it('estatus: vigentes excluye cancelados; cancelados solo los cancelados', async () => {

@@ -34,6 +34,7 @@ import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { esquemaDesarrolloFormulario, type DatosDesarrolloFormulario } from './esquemas';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 /** Valores por defecto (liga un modelo existente por defecto; el año de entrega, el actual). */
 const VALORES_INICIALES: DatosDesarrolloFormulario = {
@@ -42,7 +43,7 @@ const VALORES_INICIALES: DatosDesarrolloFormulario = {
   descripcionNuevo: '',
   idTipoProductoNuevo: '',
   idGeneroNuevo: '',
-  anioEntregaNuevo: String(new Date().getFullYear()),
+  anioEntregaNuevo: String(anioDelNegocio()),
   numeroCliente: '',
   notas: '',
 };

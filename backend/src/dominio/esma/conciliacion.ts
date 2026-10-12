@@ -22,6 +22,10 @@ import {
 import { TipoEtapaMovimiento } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import {
+  inicioDelDiaDelNegocio,
+  inicioDelDiaSiguienteDelNegocio,
+} from '../../comun/fecha-negocio.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -227,10 +231,11 @@ export async function conciliarEsMa(
       ? {}
       : {
           creadoEn: {
-            ...(filtros.desde === undefined ? {} : { gte: aDateColumna(filtros.desde) }),
+            // Días DEL NEGOCIO (fila 0.230): `creadoEn` es un sello de tiempo, no un día.
+            ...(filtros.desde === undefined ? {} : { gte: inicioDelDiaDelNegocio(filtros.desde) }),
             ...(filtros.hasta === undefined
               ? {}
-              : { lt: new Date(aDateColumna(filtros.hasta).getTime() + 86_400_000) }),
+              : { lt: inicioDelDiaSiguienteDelNegocio(filtros.hasta) }),
           },
         };
   const sinRecibo = await cliente.esMaCargo.findMany({
