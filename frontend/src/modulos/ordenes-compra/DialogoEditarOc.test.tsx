@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoEditarOc } from './DialogoEditarOc';
-import { ocDePrueba } from './fixtures';
+import { MOTIVOS_DE_PRUEBA, ocDePrueba } from './fixtures';
 
 /**
  * Pruebas del selector de PROVEEDOR del diálogo de OC (ajuste 07-ago-2026): la lista se acota al
@@ -67,6 +67,8 @@ vi.mock('@/api/proveedores', () => ({
 vi.mock('@/api/ordenes-compra', () => ({
   useCrearOc: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarOc: () => ({ mutate: actualizarMutate, isPending: false }),
+  // ⭐ Fila 0.231: el catálogo de motivos de compra extra.
+  useMotivosCompra: () => ({ data: MOTIVOS_DE_PRUEBA }),
 }));
 const espiaTelasQuery = vi.fn<(query: { idProveedor?: number }, opciones?: unknown) => void>();
 /**
@@ -526,5 +528,75 @@ describe('DialogoEditarOc · ⭐ 0.225 la OC con renglones fijos (lo dice el ser
     });
     expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
     expect(screen.getByTestId('confirmar-oc')).toBeEnabled();
+  });
+});
+
+/**
+ * ⭐ Fila 0.231 (§Post-F9.245(b)) — EL MOTIVO DE LA COMPRA EXTRA. Un selector junto a «Corresponde
+ * a» (que NO sustituye): vacío = compra normal. Es una anotación, así que también viaja en una OC
+ * con renglones fijos (recibida).
+ */
+describe('DialogoEditarOc · ⭐ 0.231 el motivo de la compra extra', () => {
+  /** El cuerpo con el que se llamó la última vez a guardar la edición. */
+  function ultimoCuerpo(): Record<string, unknown> {
+    const llamada = actualizarMutate.mock.calls.at(-1) as
+      | [{ id: number; cuerpo: Record<string, unknown> }, unknown]
+      | undefined;
+    if (llamada === undefined) throw new Error('no se guardó nada');
+    return llamada[0].cuerpo;
+  }
+
+  it('ofrece «Compra normal» más el catálogo, y explica la diferencia con «Corresponde a»', () => {
+    montar();
+    const select = screen.getByTestId('oc-motivo');
+    const opciones = [...select.querySelectorAll('option')].map((o) => o.textContent);
+    expect(opciones).toEqual(['Compra normal (la planeada)', 'Reposición', 'Merma', 'Sobre-corte']);
+    expect(select).toHaveValue('');
+    expect(screen.getByTestId('oc-motivo-ayuda')).toHaveTextContent(
+      'el motivo dice por qué se compra de más',
+    );
+  });
+
+  it('al editar trae el motivo de la OC y manda el que se elija (o null al volver a compra normal)', () => {
+    actualizarMutate.mockClear();
+    montar({
+      ...ocDePrueba(),
+      idMotivoCompra: 1,
+      motivoCompra: { codigo: 'reposicion', nombre: 'Reposición' },
+    });
+    expect(screen.getByTestId('oc-motivo')).toHaveValue('1');
+    fireEvent.change(screen.getByTestId('oc-motivo'), { target: { value: '2' } });
+    fireEvent.click(screen.getByTestId('confirmar-oc'));
+    expect(ultimoCuerpo()).toMatchObject({ idMotivoCompra: 2 });
+
+    fireEvent.change(screen.getByTestId('oc-motivo'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('confirmar-oc'));
+    expect(ultimoCuerpo()).toHaveProperty('idMotivoCompra', null);
+  });
+
+  it('⭐ en una OC RECIBIDA (renglones fijos) el motivo sigue editable y viaja con las anotaciones', () => {
+    actualizarMutate.mockClear();
+    montar({
+      ...ocDePrueba(),
+      estatus: 'recibida_total',
+      renglonesFijos: 'La orden de compra 1 ya se recibió completa.',
+    });
+    expect(screen.getByTestId('oc-motivo')).toBeEnabled();
+    fireEvent.change(screen.getByTestId('oc-motivo'), { target: { value: '2' } });
+    fireEvent.click(screen.getByTestId('confirmar-oc'));
+    const cuerpo = ultimoCuerpo();
+    expect(cuerpo).toMatchObject({ idMotivoCompra: 2 });
+    expect(cuerpo).not.toHaveProperty('lineas');
+  });
+
+  it('un motivo que ya no está en el catálogo (desactivado) no se pierde de la OC que lo tenía', () => {
+    montar({
+      ...ocDePrueba(),
+      idMotivoCompra: 99,
+      motivoCompra: { codigo: 'urgencia', nombre: 'Urgencia' },
+    });
+    const select = screen.getByTestId('oc-motivo');
+    expect(select).toHaveValue('99');
+    expect(select).toHaveTextContent('Urgencia');
   });
 });

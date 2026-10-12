@@ -812,3 +812,11 @@ toca material que ya está en el snapshot, o cuando `liberarReceta` firma un ren
 trae, o cuando Compras reasigna el proveedor o el precio de un material explotado, o la fusión de colores cambia el color de tela; la explosión sella `version_explotada` con la versión que leyó, y la explosión y esos cambios se serializan con un candado por orden. Si no coinciden (o es NULL con snapshot),
 la previa enseña `recetaCambioDesdeExplosion` y `generarOCDesdeExplosion` rechaza nombrando la OP. Los cambios del
 catálogo no desfasan (límite declarado).
+
+## El motivo de la OC (fila 0.231, §Post-F9.279)
+
+Catálogo global `MotivoCompra` (`dominio/compras/motivos-compra.ts`, seed `reposicion`/`merma`/`sobre-corte` — este
+último fijo) y `OrdenCompra.idMotivoCompra` opcional (NULL = compra normal). Complementa a `correspondeA`. Editable con
+recepciones (no cae bajo la 0.225), con bitácora. `listarOC` filtra por motivo y `resumenOC` agrega `importePorMotivo`
+en SQL. La generación desde la explosión propone `sobre-corte` con `propuestaDeMotivo` (`motivo-propuesto.ts`): todas
+las líneas avío, de OP con `piezasSobreCorte > 0`, y lo ya comprado (en OC viva **más** lo dado por cubierto) cubría la necesidad **exacta** de lo pedido —calculada con la receta de la OP talla por talla, no por regla de tres— (atribución por cantidad); mixto ⇒ sin motivo y aviso.

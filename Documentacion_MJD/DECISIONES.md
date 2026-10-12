@@ -18773,3 +18773,25 @@ una explosión en curso no quede como «al día» con cantidades viejas — lo c
 4. **Los cambios del catálogo** de avíos (medidas, proveedores) no frenan. *Default: fuera de esta fila; la pantalla de
    explosión re-explota al abrirse.*
 5. **Una orden que nunca se explotó no se frena** (no hay nada viejo que comprar). *Default: así.*
+
+#### (Post-F9.279) — CADA ORDEN DE COMPRA PUEDE DECIR POR QUÉ EXISTE (fila 0.231, v0.211) — preguntas para Daniel
+
+Daniel, §Post-F9.245(b): *«reposición y merma podrían ser las primeras dos del catálogo»*, y *«una nueva OC justo para
+saber que fue un sobre precio»*; el tercer motivo, **sobre-corte**, lo dedujo el lead de su pregunta siguiente. 📐 En el
+sistema viejo el campo libre «Corresponde a» casi nunca dijo el porqué (vacío en el 67 % de 7,978 OC; «reposición» en
+13), así que **el motivo es un dato aparte que lo complementa**: uno dice a qué o a quién va la compra, el otro por qué.
+
+**Construido con los defaults del lead:** tres motivos (reposición, merma, sobre-corte); opcional (sin motivo = compra
+normal); editable aunque la OC ya tenga recepciones, con bitácora; no se imprime al proveedor; la OC del sobre-corte
+(segunda pasada de la 0.232) nace con el motivo propuesto **sólo si lo ya comprado cubría lo pedido** —atribución por
+cantidad; así un faltante normal o una receta corregida no se cuentan como sobre-corte, que lo cazó el reviewer—; los
+motivos los da de alta el sistema. El importe por motivo de la lista respeta sus mismos filtros.
+
+❓ **Preguntas, con el default ya construido:**
+1. **¿Bastan los tres motivos?** (Al lead se le ocurren «muestras» y «urgencia/flete extra», pero la lista es suya.)
+2. **¿En qué se distinguen para ti reposición y merma?** *Default: reposición = volver a comprar algo que se dañó o
+   perdió; merma = lo que se consume de más en el proceso.* Las definiciones son del lead.
+3. **¿El motivo debe ser obligatorio en alguna OC?** *Default: no.*
+4. **¿Se imprime en la OC que recibe el proveedor?** *Default: no.*
+5. **¿Quieres una pantalla para agregar motivos tú mismo?** *Default: no; me los pides.*
+6. **Confirmar la clasificación** (🔶, la puso el lead).

@@ -203,6 +203,17 @@ import {
 } from './proveedor-material.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
+import { CODIGO_MOTIVO_SOBRE_CORTE, motivoActivoPorCodigo } from './motivos-compra.js';
+import {
+  avisoDeSobreCorteMixto,
+  cubriaLoPedido,
+  lineasParaMotivo,
+  llaveOrdenMaterial,
+  propuestaDeMotivo,
+  requeridoPedidoDelAvio,
+  snapshotPorMaterial,
+  type RenglonDelSnapshot,
+} from './motivo-propuesto.js';
 import {
   aplicarAjusteDelComprador,
   precioComunDelRenglon,
@@ -3466,6 +3477,10 @@ async function planearCompra(
       ordenes: [...new Set(renglones.flatMap((r) => r.porOrden.map((l) => l.folioOrden)))].sort(
         (a, b) => a - b,
       ),
+      // ⭐ Fila 0.231: se llenan abajo (`motivosDelPlan`), cuando ya están todos los proveedores.
+      motivoPropuesto: null,
+      sobreCorteMixto: false,
+      idMotivoCompra: null,
     });
   }
   // ⭐⭐ V1-E8c (§Post-F9.126) — 🔴 UN AJUSTE QUE NO ENCONTRÓ SU RENGLÓN **NO SE TRAGA EN SILENCIO**.
@@ -3479,6 +3494,19 @@ async function planearCompra(
       delPlan,
     ),
   );
+
+  // ⭐ Fila 0.231 (§Post-F9.245(b) + §Post-F9.277) — EL MOTIVO DE CADA OC: la propuesta del sistema
+  // (sobre-corte en la segunda pasada) y lo que el comprador eligió en la previa.
+  const avisosDeMotivo = await motivosDelPlan(tx, {
+    proveedores,
+    fichas,
+    ordenes,
+    filas,
+    comprometido,
+    cubierto,
+    cuerpo,
+  });
+  bloqueos.push(...avisosDeMotivo.bloqueos);
 
   // ⭐⭐ fila 0.257 — 🔴 LA RECETA CAMBIÓ DESDE LA ÚLTIMA EXPLOSIÓN: lo que se iba a comprar ya no
   // corresponde. Es un bloqueo DEL ACTO (como la orden cerrada de abajo): una sola OP desfasada frena
@@ -3536,6 +3564,8 @@ async function planearCompra(
         ...avisosDeAvioPorMedida(contradicciones, proveedores),
         // ⭐⭐ fila 0.232 (2ª vuelta): se cortó de más después de la última explosión.
         ...avisosDeBaseSinExplotar(fichas),
+        // ⭐ Fila 0.231: una OC que mezcla el extra del sobre-corte con compra de primera vez.
+        ...avisosDeMotivo.avisos,
         ...avisosDeTelaSinColor(proveedores),
         ...avisosDeMaterialSinLiberar(sinLiberar, proveedores),
       ],
@@ -3543,6 +3573,142 @@ async function planearCompra(
     },
     idDireccionEntrega,
   };
+}
+
+/**
+ * ⭐ Fila 0.231 (§Post-F9.245(b) + §Post-F9.277) — **EL MOTIVO CON EL QUE NACE CADA OC DEL PLAN.**
+ * Escribe en cada proveedor (in situ) la propuesta del sistema y el motivo efectivo, y devuelve los
+ * avisos (OC mixta sin elección) y los bloqueos (un motivo elegido que no existe o se desactivó).
+ *
+ *  • **La propuesta** la decide la regla pura {@link propuestaDeMotivo} con las líneas que SE
+ *    ESCRIBEN (`seEscribe`): una línea que no se escribe no compra nada y no puede decidir el motivo.
+ *    🔴 Una línea es del extra sólo si lo ya comprado CUBRÍA LO PEDIDO ({@link cubriaLoPedido}, H1
+ *    del reviewer): «ya comprado» = `comprometido` (la única verdad de lo que está en una OC viva, la
+ *    MISMA con la que el plan netea) + lo dado por cubierto, a nivel (orden, material) sin color —
+ *    los renglones de color del snapshot se suman, como suma la OC.
+ *  • **Lo elegido** en la previa (`motivosPorProveedor`) gana, incluido `null` (= compra normal).
+ *  • Si el motivo «sobre-corte» no está sembrado o se desactivó, no se propone nada (se tolera: la
+ *    OC nace como compra normal, igual que antes de esta fila).
+ */
+async function motivosDelPlan(
+  tx: Tx,
+  datos: {
+    proveedores: PlanProveedor[];
+    fichas: readonly { idOrden: number; piezasSobreCorte: number }[];
+    /** La matriz PEDIDA de cada OP (sin el sobre-corte): contra ella se calcula lo pedido (H5). */
+    ordenes: readonly {
+      id: number;
+      lineas: { tallas: { idTalla: number; cantidad: number }[] }[];
+    }[];
+    /** El snapshot que se va a comprar (requerido y a comprar de cada renglón). */
+    filas: readonly RenglonDelSnapshot[];
+    comprometido: Awaited<ReturnType<typeof comprometidoEnOc>>;
+    cubierto: Awaited<ReturnType<typeof dadoPorCubierto>>;
+    cuerpo: DatosGenerarOc;
+  },
+): Promise<{ avisos: string[]; bloqueos: string[] }> {
+  const { proveedores, fichas, ordenes, filas, comprometido, cubierto, cuerpo } = datos;
+  const avisos: string[] = [];
+  const bloqueos: string[] = [];
+
+  // Lo que el snapshot pide de cada (orden, material), con los renglones de color sumados.
+  const snapshot = snapshotPorMaterial(filas);
+  // ⭐ H5: la matriz PEDIDA por talla de cada OP (todos sus renglones: colores y packs sumados) y la
+  // receta de sus avíos — con las dos se calcula lo pedido EXACTO, con la regla R18 de la explosión.
+  // La receta es la misma que explotó: si hubiera cambiado, la fila 0.257 ya bloqueó la compra.
+  const pedidasPorTalla = new Map<number, Map<number, number>>();
+  for (const o of ordenes) {
+    const porTalla = new Map<number, number>();
+    for (const l of o.lineas) {
+      for (const t of l.tallas)
+        porTalla.set(t.idTalla, (porTalla.get(t.idTalla) ?? 0) + t.cantidad);
+    }
+    pedidasPorTalla.set(o.id, porTalla);
+  }
+  const recetaDe = new Map(
+    (
+      await tx.ordenAvio.findMany({
+        where: { idOrden: { in: ordenes.map((o) => o.id) } },
+        select: {
+          idOrden: true,
+          idAvio: true,
+          consumoPorPrenda: true,
+          consumoPorTalla: true,
+          tallas: { select: { idTalla: true, consumo: true } },
+        },
+      })
+    ).map((r) => [
+      llaveOrdenMaterial(r.idOrden, claveMaterial({ idTela: null, idAvio: r.idAvio })),
+      r,
+    ]),
+  );
+
+  const conSobreCorte = new Set(fichas.filter((f) => f.piezasSobreCorte > 0).map((f) => f.idOrden));
+  const sobreCorte = await motivoActivoPorCodigo(tx, CODIGO_MOTIVO_SOBRE_CORTE);
+
+  const elegidos = new Map<number, number | null>(
+    (cuerpo.motivosPorProveedor ?? []).map((m) => [m.idProveedor, m.idMotivoCompra]),
+  );
+  const idsElegidos = [
+    ...new Set([...elegidos.values()].filter((id): id is number => id !== null)),
+  ];
+  /** De los motivos elegidos, los que existen y están ACTIVOS (los demás bloquean). */
+  const activos = new Set(
+    idsElegidos.length === 0
+      ? []
+      : (
+          await tx.motivoCompra.findMany({
+            where: { id: { in: idsElegidos }, activo: true },
+            select: { id: true },
+          })
+        ).map((m) => m.id),
+  );
+
+  for (const p of proveedores) {
+    const propuesta = propuestaDeMotivo(
+      lineasParaMotivo(p, conSobreCorte, (idOrden, tipo, idMaterial) => {
+        const clave = claveMaterial({
+          idTela: tipo === 'tela' ? idMaterial : null,
+          idAvio: tipo === 'avio' ? idMaterial : null,
+        });
+        const delSnapshot = snapshot.get(llaveOrdenMaterial(idOrden, clave));
+        if (delSnapshot === undefined) return false;
+        const enOc = comprometido.get(idOrden)?.get(clave)?.enOc ?? 0;
+        let dado = 0;
+        for (const c of cubierto.get(idOrden)?.get(clave)?.values() ?? []) dado += c;
+        // Lo pedido EXACTO. La tela no se mueve con el sobre-corte (su requerido ya es el pedido) y
+        // de todos modos no vota como extra; un avío sin renglón de receta no se puede afirmar.
+        const receta = recetaDe.get(llaveOrdenMaterial(idOrden, clave));
+        const requeridoPedido =
+          tipo === 'tela'
+            ? delSnapshot.requerido
+            : receta === undefined
+              ? null
+              : requeridoPedidoDelAvio(receta, pedidasPorTalla.get(idOrden) ?? new Map());
+        return cubriaLoPedido({ ...delSnapshot, requeridoPedido, yaComprado: enOc + dado });
+      }),
+    );
+    p.sobreCorteMixto = propuesta === 'mixto';
+    p.motivoPropuesto =
+      propuesta === 'sobre-corte' && sobreCorte !== null
+        ? { idMotivoCompra: sobreCorte.id, codigo: sobreCorte.codigo, nombre: sobreCorte.nombre }
+        : null;
+
+    if (elegidos.has(p.idProveedor)) {
+      const elegido = elegidos.get(p.idProveedor) ?? null;
+      if (elegido !== null && !activos.has(elegido)) {
+        bloqueos.push(
+          `El motivo elegido para la compra a ${p.proveedor} no existe o está desactivado: ` +
+            `elige otro, o déjala como compra normal.`,
+        );
+      }
+      p.idMotivoCompra = elegido;
+    } else {
+      p.idMotivoCompra = p.motivoPropuesto?.idMotivoCompra ?? null;
+      if (p.sobreCorteMixto) avisos.push(avisoDeSobreCorteMixto(p.proveedor));
+    }
+  }
+  return { avisos, bloqueos };
 }
 
 /**
@@ -4251,6 +4417,8 @@ export async function generarOCDesdeExplosion(
         // en su `validarEntrada` — nunca se escribe una OC con fecha inventada.
         fechaEntrega: p.fechaEntrega ?? '',
         idDireccionEntrega,
+        // ⭐ Fila 0.231: el motivo que el plan resolvió (lo elegido en la previa o lo propuesto).
+        idMotivoCompra: p.idMotivoCompra,
         lineas,
       };
       // REUSA crearOC (se une a esta tx): folio atómico, auditoría, ligas N:N — sin duplicar nada.
@@ -4259,7 +4427,12 @@ export async function generarOCDesdeExplosion(
       // tela; ahora la receta lo trae y la línea nace con su cantidad ya calculada. Sigue naciendo
       // pendiente cuando la receta NO lo capturó (o la tela no lleva complemento), y para ese caso
       // `autorizarOC` mantiene intacta su guarda (§Post-F9.18): nadie compra media tela.
-      const oc = await crearOC(sesion, entrada, { tx }, { automatica: true });
+      const oc = await crearOC(
+        sesion,
+        entrada,
+        { tx },
+        { automatica: true, motivoPropuesto: p.motivoPropuesto?.codigo ?? null },
+      );
       conOc.add(p.idProveedor);
       ordenesCompra.push({
         idOrdenCompra: oc.id,

@@ -37457,6 +37457,10 @@ export interface paths {
           fechaHasta?: string;
           /** @description Filtra las OC ligadas a una orden de producción (R7; pantalla "Compras por orden"). */
           idOrden?: number;
+          /** @description ⭐ Fila 0.231: sólo las OC con ese motivo de compra extra. */
+          idMotivoCompra?: number;
+          /** @description ⭐ Fila 0.231: true = sólo compras extra (con algún motivo); false = sólo compras normales (sin motivo). `idMotivoCompra` gana si vienen los dos. */
+          conMotivo?: string;
           /** @description Incluye las OC canceladas (cancelación suave). */
           incluirCanceladas?: string;
           /** @description Columna de orden. */
@@ -37519,6 +37523,15 @@ export interface paths {
                 observaciones: string | null;
                 /** @description A qué corresponde la compra, o null. */
                 correspondeA: string | null;
+                /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+                idMotivoCompra: number | null;
+                /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+                motivoCompra: {
+                  /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                  codigo: string;
+                  /** @description Nombre del motivo (para la UI). */
+                  nombre: string;
+                } | null;
                 /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
                 facturasAmparadasLegacy: string | null;
                 /** @description Usuario que autorizó, o null. */
@@ -37752,6 +37765,8 @@ export interface paths {
             observaciones?: string | null;
             /** @description A qué corresponde la compra (texto libre). */
             correspondeA?: string | null;
+            /** @description ⭐ Fila 0.231 — POR QUÉ se compra de más (reposición, merma, sobre-corte…; catálogo `GET /api/compras/motivos-compra`). null/ausente = compra normal. COMPLEMENTA a `correspondeA` (para qué / para quién), no lo sustituye. */
+            idMotivoCompra?: number | null;
             /**
              * @description Renglones de la OC (materiales a comprar).
              * @default []
@@ -37857,6 +37872,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -38083,6 +38107,20 @@ export interface paths {
           fechaHasta?: string;
           /** @description Filtra las OC ligadas a una orden de producción (R7). */
           idOrden?: number;
+          /** @description ⭐ Fila 0.231: sólo las OC con ese motivo de compra extra. */
+          idMotivoCompra?: number;
+          /** @description ⭐ Fila 0.231: true = sólo compras extra (con algún motivo); false = sólo compras normales (sin motivo). `idMotivoCompra` gana si vienen los dos. */
+          conMotivo?: string;
+          /** @description Estatus de la lista: acota SÓLO el importe por motivo (fila 0.231). */
+          estatus?:
+            | 'borrador'
+            | 'pendiente_autorizacion'
+            | 'autorizada'
+            | 'recibida_parcial'
+            | 'recibida_total'
+            | 'cancelada';
+          /** @description Canceladas de la lista: acota SÓLO el importe por motivo (fila 0.231). */
+          incluirCanceladas?: string;
         };
         header?: never;
         path?: never;
@@ -38101,7 +38139,147 @@ export interface paths {
               ocAbiertas: number;
               /** @description Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0). */
               porRecibir: number;
+              /** @description ⭐ Fila 0.231 — CUÁNTO SE COMPRÓ Y POR QUÉ: Σ de los totales de las OC que cumplen EXACTAMENTE el filtro de la lista (estatus y canceladas incluidos), agrupado por motivo en el SERVIDOR. Un renglón por motivo con OC; el de `idMotivoCompra: null` es la compra normal. Primero la compra normal, después los motivos en su orden de catálogo. */
+              importePorMotivo: {
+                /** @description Motivo; null = compra normal. */
+                idMotivoCompra: number | null;
+                /** @description Código del motivo; null = compra normal. */
+                codigo: string | null;
+                /** @description Nombre del motivo ("Compra normal" cuando no hay). */
+                nombre: string;
+                /** @description # de OC de ese motivo que cumplen el filtro. */
+                ocs: number;
+                /** @description Σ de los totales de esas OC (cuerpo + complemento). */
+                importe: number;
+              }[];
             };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/compras/motivos-compra': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los motivos de compra extra (reposición, merma, sobre-corte…) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Motivos de compra extra activos, en su orden de despliegue. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del motivo. */
+              id: number;
+              /** @description Código estable ("reposicion", "merma", "sobre-corte"…). */
+              codigo: string;
+              /** @description Nombre para la UI. */
+              nombre: string;
+              /** @description Orden de despliegue. */
+              orden: number;
+              /** @description Lo usa el sistema por su código (sobre-corte): no se desactiva. */
+              fijo: boolean;
+            }[];
           };
         };
         /** @description Respuesta de error de la API. */
@@ -38261,6 +38439,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -38492,6 +38679,8 @@ export interface paths {
             observaciones?: string | null;
             /** @description A qué corresponde la compra (texto libre). */
             correspondeA?: string | null;
+            /** @description ⭐ Fila 0.231 — POR QUÉ se compra de más (reposición, merma, sobre-corte…; catálogo `GET /api/compras/motivos-compra`). null/ausente = compra normal. COMPLEMENTA a `correspondeA` (para qué / para quién), no lo sustituye. */
+            idMotivoCompra?: number | null;
             /** @description Set COMPLETO de renglones (si viene, reemplaza los actuales). */
             lineas?: {
               /** @description Tela del catálogo (XOR avío/libre). */
@@ -38594,6 +38783,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -38974,6 +39172,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -39255,6 +39462,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -39536,6 +39752,15 @@ export interface paths {
               observaciones: string | null;
               /** @description A qué corresponde la compra, o null. */
               correspondeA: string | null;
+              /** @description ⭐ Fila 0.231: motivo de la compra extra; null = compra normal. */
+              idMotivoCompra: number | null;
+              /** @description ⭐ Fila 0.231: el motivo, con su nombre; null = compra normal. */
+              motivoCompra: {
+                /** @description Código estable del motivo ("reposicion", "sobre-corte"…). */
+                codigo: string;
+                /** @description Nombre del motivo (para la UI). */
+                nombre: string;
+              } | null;
               /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
               facturasAmparadasLegacy: string | null;
               /** @description Usuario que autorizó, o null. */
@@ -42743,6 +42968,13 @@ export interface paths {
                */
               fechaEntrega: string;
             }[];
+            /** @description ⭐ Fila 0.231: motivo de compra extra POR PROVEEDOR; gana sobre la propuesta del sistema. Vacío = cada OC nace con lo que el sistema propuso (sobre-corte o nada). */
+            motivosPorProveedor?: {
+              /** @description Proveedor al que aplica el motivo. */
+              idProveedor: number;
+              /** @description Motivo de la OC de ESE proveedor; null = compra normal. */
+              idMotivoCompra: number | null;
+            }[];
             /** @description Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto. */
             ajustes?: {
               /**
@@ -42896,6 +43128,16 @@ export interface paths {
                 total: number;
                 /** @description Folios de las OP que esta OC va a surtir (§Post-F9.86). */
                 ordenes: number[];
+                /** @description ⭐ Fila 0.231 — el motivo que el SISTEMA propone: «sobre-corte» cuando TODAS las líneas de esta OC son avíos de órdenes que se cortaron de más y que ya tenían una OC viva de ese material (la segunda pasada pide sólo el extra). null = no propone nada. */
+                motivoPropuesto: {
+                  idMotivoCompra: number;
+                  codigo: string;
+                  nombre: string;
+                } | null;
+                /** @description ⭐ Fila 0.231 — esta OC MEZCLA material del sobre-corte con material que se compra por primera vez: el sistema no adivina, nace sin motivo y la previa lo avisa. */
+                sobreCorteMixto: boolean;
+                /** @description ⭐ Fila 0.231 — el motivo con el que NACERÍA la OC: el elegido en la previa (`motivosPorProveedor`) o, si no se eligió, el propuesto. null = compra normal. */
+                idMotivoCompra: number | null;
               }[];
               /** @description Lo que NO va a entrar, con su razón (nada se omite en silencio, D3). */
               omitidos: {
@@ -43077,6 +43319,13 @@ export interface paths {
                * @description Fecha de entrega de la OC de ESE proveedor (YYYY-MM-DD).
                */
               fechaEntrega: string;
+            }[];
+            /** @description ⭐ Fila 0.231: motivo de compra extra POR PROVEEDOR; gana sobre la propuesta del sistema. Vacío = cada OC nace con lo que el sistema propuso (sobre-corte o nada). */
+            motivosPorProveedor?: {
+              /** @description Proveedor al que aplica el motivo. */
+              idProveedor: number;
+              /** @description Motivo de la OC de ESE proveedor; null = compra normal. */
+              idMotivoCompra: number | null;
             }[];
             /** @description Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto. */
             ajustes?: {

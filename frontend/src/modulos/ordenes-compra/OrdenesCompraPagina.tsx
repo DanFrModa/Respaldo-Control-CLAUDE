@@ -21,10 +21,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { imprimirOc, useAutorizarOc, useOrdenesCompra, useResumenOc } from '@/api/ordenes-compra';
+import {
+  imprimirOc,
+  useAutorizarOc,
+  useMotivosCompra,
+  useOrdenesCompra,
+  useResumenOc,
+} from '@/api/ordenes-compra';
 import { useLineasPendientesDeOc } from '@/api/recepciones';
 import type {
   EstatusOrdenCompra,
+  ImportePorMotivo,
   OrdenCompra,
   OrdenesCompraQuery,
   ResumenComprasQuery,
@@ -55,6 +62,7 @@ import { DetalleRenglonesOc, type AvanceRecepcionOc } from './DetalleRenglonesOc
 import { DialogoCancelarOc } from './DialogoCancelarOc';
 import { DialogoDesautorizarOc } from './DialogoDesautorizarOc';
 import { DialogoEditarOc } from './DialogoEditarOc';
+import { paramsFiltroMotivo, type FiltroMotivo } from './motivo';
 import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc, motivoNoImprimirOc } from './piezas';
 
 /** Renglones por página del listado. */
@@ -80,6 +88,27 @@ function monedaCompacta(valor: number): { valor: string; sufijo?: string } {
     };
   }
   return { valor: formatearMoneda(valor) };
+}
+
+/**
+ * ⭐ Fila 0.231 — el KPI «Compras extra»: el importe de las OC con motivo, desglosado por motivo,
+ * de EXACTAMENTE las OC de la lista filtrada (estatus y canceladas incluidos: H2 del reviewer).
+ * Cada importe lo agregó el SERVIDOR (`importePorMotivo`); aquí sólo se juntan los renglones con
+ * motivo para el número grande del tile (presentación, como el importe de la página).
+ */
+function kpiComprasExtra(importes: readonly ImportePorMotivo[]): Kpi {
+  const extra = importes.filter((r) => r.idMotivoCompra !== null);
+  const total = monedaCompacta(extra.reduce((a, r) => a + r.importe, 0));
+  return {
+    clave: 'compras-extra',
+    etiqueta: 'Compras extra',
+    valor: total.valor,
+    ...(total.sufijo === undefined ? {} : { sufijo: total.sufijo }),
+    pie:
+      extra.length === 0
+        ? 'ninguna OC con motivo en la lista filtrada'
+        : extra.map((r) => `${r.nombre} ${formatearMoneda(r.importe)}`).join(' · '),
+  };
 }
 
 /** Estatus para el filtro (todos los del enum). */
@@ -142,33 +171,36 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const [estatus, setEstatus] = useState<EstatusOrdenCompra | ''>('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroMotivo, setFiltroMotivo] = useState<FiltroMotivo>('');
   const [pagina, setPagina] = useState(1);
+  const motivos = useMotivosCompra();
 
-  const query: OrdenesCompraQuery = {
-    pagina,
-    porPagina: POR_PAGINA,
-    ordenarPor: 'numCompra',
-    direccion: 'desc',
+  // El FILTRO de la lista (sin paginación ni orden): lo comparten la lista y el resumen.
+  const filtroLista: ResumenComprasQuery = {
     incluirCanceladas: incluirCanceladas ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(idProveedor !== null ? { idProveedor } : {}),
     ...(estatus !== '' ? { estatus } : {}),
     ...(fechaDesde !== '' ? { fechaDesde } : {}),
     ...(fechaHasta !== '' ? { fechaHasta } : {}),
+    ...paramsFiltroMotivo(filtroMotivo),
+  };
+  const query: OrdenesCompraQuery = {
+    pagina,
+    porPagina: POR_PAGINA,
+    ordenarPor: 'numCompra',
+    direccion: 'desc',
+    ...filtroLista,
   };
 
   const consulta = useOrdenesCompra(query);
   const autorizar = useAutorizarOc();
 
-  // Resumen de cabecera (KPIs): mismo universo por proveedor/fecha/búsqueda, pero SOLO OC abiertas
-  // (el servidor fuerza `autorizada`/`recibida_parcial`); no toma estatus/incluir-canceladas.
-  const resumenQuery: ResumenComprasQuery = {
-    ...(busqueda.length > 0 ? { busqueda } : {}),
-    ...(idProveedor !== null ? { idProveedor } : {}),
-    ...(fechaDesde !== '' ? { fechaDesde } : {}),
-    ...(fechaHasta !== '' ? { fechaHasta } : {}),
-  };
-  const resumen = useResumenOc(resumenQuery);
+  // Resumen de cabecera (KPIs): EL MISMO filtro de la lista (`filtroLista`, el objeto que también
+  // arma `query`, para que no puedan separarse). El servidor decide qué usa cada KPI: «OC abiertas» y
+  // «Por recibir» miran SIEMPRE las abiertas (ignoran estatus y canceladas); «Compras extra» usa el
+  // filtro COMPLETO, estatus y canceladas incluidos, para cuadrar con las filas de abajo (fila 0.231).
+  const resumen = useResumenOc(filtroLista);
   const porRecibir = monedaCompacta(resumen.data?.porRecibir ?? 0);
   const kpis: Kpi[] = [
     {
@@ -184,6 +216,8 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       ...(porRecibir.sufijo === undefined ? {} : { sufijo: porRecibir.sufijo }),
       pie: 'pendiente de recepción (a precio de OC)',
     },
+    // ⭐ Fila 0.231: cuánto se compró de más y por qué (OC no canceladas del filtro).
+    kpiComprasExtra(resumen.data?.importePorMotivo ?? []),
   ];
 
   // ── Diálogos + cajón ─────────────────────────────────────────────────────────
@@ -328,6 +362,26 @@ export function OrdenesCompraPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
+          {/* ⭐ Fila 0.231: por qué se compró (compra normal, extra, o un motivo en particular). */}
+          <SelectNativo
+            className="w-44 h-8 text-sm"
+            aria-label="Filtrar por motivo"
+            value={filtroMotivo}
+            onChange={(e) => {
+              setFiltroMotivo(e.target.value as FiltroMotivo);
+              reiniciar();
+            }}
+            data-testid="filtro-motivo-oc"
+          >
+            <option value="">Todos los motivos</option>
+            <option value="normal">Compra normal</option>
+            <option value="extra">Compras extra (con motivo)</option>
+            {(motivos.data ?? []).map((m) => (
+              <option key={m.id} value={String(m.id)}>
+                {m.nombre}
+              </option>
+            ))}
+          </SelectNativo>
           <Input
             type="date"
             className="h-8 w-auto text-sm"
@@ -433,6 +487,11 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                         {formatearMoneda(oc.total)}
                       </span>
                     </div>
+                    {oc.motivoCompra !== null ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Compra extra: {oc.motivoCompra.nombre}
+                      </p>
+                    ) : null}
                     <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
                       Contra orden:{' '}
                       {oc.ordenesLigadas.length === 0
@@ -457,6 +516,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                       <TablaDensaHead>Entrega</TablaDensaHead>
                       <TablaDensaHead>Contra orden</TablaDensaHead>
                       <TablaDensaHead>Estado</TablaDensaHead>
+                      <TablaDensaHead>Motivo</TablaDensaHead>
                       <TablaDensaHead numerica>Total</TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -491,6 +551,12 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                         </TablaDensaCelda>
                         <TablaDensaCelda>
                           <EstatusOcBadge estatus={oc.estatus} />
+                        </TablaDensaCelda>
+                        <TablaDensaCelda
+                          className="text-xs text-muted-foreground"
+                          data-testid="celda-motivo-oc"
+                        >
+                          {oc.motivoCompra?.nombre ?? '—'}
                         </TablaDensaCelda>
                         <TablaDensaCelda numerica className="font-semibold">
                           {formatearMoneda(oc.total)}
@@ -780,6 +846,12 @@ function DetalleOc({ oc }: { oc: OrdenCompra }): React.JSX.Element {
           </CampoDetalle>
           <CampoDetalle icono={FileText} etiqueta="Corresponde a">
             {oc.correspondeA ?? '—'}
+          </CampoDetalle>
+          {/* ⭐ Fila 0.231: por qué se compró de más (o «Compra normal»). */}
+          <CampoDetalle icono={FileText} etiqueta="Motivo">
+            <span data-testid="detalle-motivo-oc">
+              {oc.motivoCompra?.nombre ?? 'Compra normal'}
+            </span>
           </CampoDetalle>
         </RejillaCampos>
 

@@ -97359,6 +97359,26 @@
           },
           {
             "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMotivoCompra",
+            "required": false,
+            "description": "⭐ Fila 0.231: sólo las OC con ese motivo de compra extra."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "conMotivo",
+            "required": false,
+            "description": "⭐ Fila 0.231: true = sólo compras extra (con algún motivo); false = sólo compras normales (sin motivo). `idMotivoCompra` gana si vienen los dos."
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "in": "query",
@@ -97546,6 +97566,45 @@
                               }
                             ],
                             "description": "A qué corresponde la compra, o null."
+                          },
+                          "idMotivoCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                          },
+                          "motivoCompra": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "codigo": {
+                                    "type": "string",
+                                    "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                                  },
+                                  "nombre": {
+                                    "type": "string",
+                                    "description": "Nombre del motivo (para la UI)."
+                                  }
+                                },
+                                "required": [
+                                  "codigo",
+                                  "nombre"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
                           },
                           "facturasAmparadasLegacy": {
                             "anyOf": [
@@ -98092,6 +98151,8 @@
                           "entregaEn",
                           "observaciones",
                           "correspondeA",
+                          "idMotivoCompra",
+                          "motivoCompra",
                           "facturasAmparadasLegacy",
                           "idUsuAutorizado",
                           "fechaAutorizado",
@@ -98345,6 +98406,19 @@
                       {
                         "type": "string",
                         "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idMotivoCompra": {
+                    "description": "⭐ Fila 0.231 — POR QUÉ se compra de más (reposición, merma, sobre-corte…; catálogo `GET /api/compras/motivos-compra`). null/ausente = compra normal. COMPLEMENTA a `correspondeA` (para qué / para quién), no lo sustituye.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -98755,6 +98829,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -99300,6 +99413,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -99529,6 +99644,52 @@
             "name": "idOrden",
             "required": false,
             "description": "Filtra las OC ligadas a una orden de producción (R7)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMotivoCompra",
+            "required": false,
+            "description": "⭐ Fila 0.231: sólo las OC con ese motivo de compra extra."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "conMotivo",
+            "required": false,
+            "description": "⭐ Fila 0.231: true = sólo compras extra (con algún motivo); false = sólo compras normales (sin motivo). `idMotivoCompra` gana si vienen los dos."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "borrador",
+                "pendiente_autorizacion",
+                "autorizada",
+                "recibida_parcial",
+                "recibida_total",
+                "cancelada"
+              ]
+            },
+            "in": "query",
+            "name": "estatus",
+            "required": false,
+            "description": "Estatus de la lista: acota SÓLO el importe por motivo (fila 0.231)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Canceladas de la lista: acota SÓLO el importe por motivo (fila 0.231)."
           }
         ],
         "security": [
@@ -99553,14 +99714,280 @@
                     "porRecibir": {
                       "type": "number",
                       "description": "Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0)."
+                    },
+                    "importePorMotivo": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idMotivoCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo; null = compra normal."
+                          },
+                          "codigo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del motivo; null = compra normal."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre del motivo (\"Compra normal\" cuando no hay)."
+                          },
+                          "ocs": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "# de OC de ese motivo que cumplen el filtro."
+                          },
+                          "importe": {
+                            "type": "number",
+                            "description": "Σ de los totales de esas OC (cuerpo + complemento)."
+                          }
+                        },
+                        "required": [
+                          "idMotivoCompra",
+                          "codigo",
+                          "nombre",
+                          "ocs",
+                          "importe"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Importe comprado por motivo de compra (fila 0.231)."
+                      },
+                      "description": "⭐ Fila 0.231 — CUÁNTO SE COMPRÓ Y POR QUÉ: Σ de los totales de las OC que cumplen EXACTAMENTE el filtro de la lista (estatus y canceladas incluidos), agrupado por motivo en el SERVIDOR. Un renglón por motivo con OC; el de `idMotivoCompra: null` es la compra normal. Primero la compra normal, después los motivos en su orden de catálogo."
                     }
                   },
                   "required": [
                     "ocAbiertas",
-                    "porRecibir"
+                    "porRecibir",
+                    "importePorMotivo"
                   ],
                   "additionalProperties": false,
                   "description": "Resumen de cabecera de órdenes de compra (KPIs)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compras/motivos-compra": {
+      "get": {
+        "summary": "Listar los motivos de compra extra (reposición, merma, sobre-corte…)",
+        "tags": [
+          "compras"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Motivos de compra extra activos, en su orden de despliegue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del motivo."
+                      },
+                      "codigo": {
+                        "type": "string",
+                        "description": "Código estable (\"reposicion\", \"merma\", \"sobre-corte\"…)."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre para la UI."
+                      },
+                      "orden": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Orden de despliegue."
+                      },
+                      "fijo": {
+                        "type": "boolean",
+                        "description": "Lo usa el sistema por su código (sobre-corte): no se desactiva."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "codigo",
+                      "nombre",
+                      "orden",
+                      "fijo"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Motivo de una compra extra (fila 0.231, §Post-F9.245(b))."
+                  },
+                  "description": "Motivos de compra extra activos, en su orden de despliegue."
                 }
               }
             }
@@ -99877,6 +100304,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -100422,6 +100888,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -100638,6 +101106,19 @@
                       {
                         "type": "string",
                         "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idMotivoCompra": {
+                    "description": "⭐ Fila 0.231 — POR QUÉ se compra de más (reposición, merma, sobre-corte…; catálogo `GET /api/compras/motivos-compra`). null/ausente = compra normal. COMPLEMENTA a `correspondeA` (para qué / para quién), no lo sustituye.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -101055,6 +101536,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -101600,6 +102120,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -102106,6 +102628,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -102651,6 +103212,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -103005,6 +103568,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -103550,6 +104152,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -103904,6 +104508,45 @@
                       ],
                       "description": "A qué corresponde la compra, o null."
                     },
+                    "idMotivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: motivo de la compra extra; null = compra normal."
+                    },
+                    "motivoCompra": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "codigo": {
+                              "type": "string",
+                              "description": "Código estable del motivo (\"reposicion\", \"sobre-corte\"…)."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del motivo (para la UI)."
+                            }
+                          },
+                          "required": [
+                            "codigo",
+                            "nombre"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ Fila 0.231: el motivo, con su nombre; null = compra normal."
+                    },
                     "facturasAmparadasLegacy": {
                       "anyOf": [
                         {
@@ -104449,6 +105092,8 @@
                     "entregaEn",
                     "observaciones",
                     "correspondeA",
+                    "idMotivoCompra",
+                    "motivoCompra",
                     "facturasAmparadasLegacy",
                     "idUsuAutorizado",
                     "fechaAutorizado",
@@ -112247,6 +112892,38 @@
                       ]
                     }
                   },
+                  "motivosPorProveedor": {
+                    "description": "⭐ Fila 0.231: motivo de compra extra POR PROVEEDOR; gana sobre la propuesta del sistema. Vacío = cada OC nace con lo que el sistema propuso (sobre-corte o nada).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idProveedor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Proveedor al que aplica el motivo."
+                        },
+                        "idMotivoCompra": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Motivo de la OC de ESE proveedor; null = compra normal."
+                        }
+                      },
+                      "required": [
+                        "idProveedor",
+                        "idMotivoCompra"
+                      ]
+                    }
+                  },
                   "ajustes": {
                     "description": "Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto.",
                     "type": "array",
@@ -112835,6 +113512,53 @@
                               "maximum": 9007199254740991
                             },
                             "description": "Folios de las OP que esta OC va a surtir (§Post-F9.86)."
+                          },
+                          "motivoPropuesto": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "idMotivoCompra": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "codigo": {
+                                    "type": "string"
+                                  },
+                                  "nombre": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "idMotivoCompra",
+                                  "codigo",
+                                  "nombre"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ Fila 0.231 — el motivo que el SISTEMA propone: «sobre-corte» cuando TODAS las líneas de esta OC son avíos de órdenes que se cortaron de más y que ya tenían una OC viva de ese material (la segunda pasada pide sólo el extra). null = no propone nada."
+                          },
+                          "sobreCorteMixto": {
+                            "type": "boolean",
+                            "description": "⭐ Fila 0.231 — esta OC MEZCLA material del sobre-corte con material que se compra por primera vez: el sistema no adivina, nace sin motivo y la previa lo avisa."
+                          },
+                          "idMotivoCompra": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ Fila 0.231 — el motivo con el que NACERÍA la OC: el elegido en la previa (`motivosPorProveedor`) o, si no se eligió, el propuesto. null = compra normal."
                           }
                         },
                         "required": [
@@ -112843,7 +113567,10 @@
                           "fechaEntrega",
                           "renglones",
                           "total",
-                          "ordenes"
+                          "ordenes",
+                          "motivoPropuesto",
+                          "sobreCorteMixto",
+                          "idMotivoCompra"
                         ],
                         "additionalProperties": false,
                         "description": "Orden de compra que se va a crear, completa, ANTES de crearla."
@@ -113197,6 +113924,38 @@
                       "required": [
                         "idProveedor",
                         "fechaEntrega"
+                      ]
+                    }
+                  },
+                  "motivosPorProveedor": {
+                    "description": "⭐ Fila 0.231: motivo de compra extra POR PROVEEDOR; gana sobre la propuesta del sistema. Vacío = cada OC nace con lo que el sistema propuso (sobre-corte o nada).",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idProveedor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Proveedor al que aplica el motivo."
+                        },
+                        "idMotivoCompra": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Motivo de la OC de ESE proveedor; null = compra normal."
+                        }
+                      },
+                      "required": [
+                        "idProveedor",
+                        "idMotivoCompra"
                       ]
                     }
                   },

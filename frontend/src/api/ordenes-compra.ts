@@ -10,6 +10,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  MotivoCompra,
   OrdenCompra,
   OrdenCompraCancelar,
   OrdenCompraCrear,
@@ -56,6 +57,15 @@ async function listarOc(query: OrdenesCompraQuery): Promise<OrdenesCompraPagina>
 /** Resumen de cabecera: # OC abiertas + $ por recibir del universo filtrado (KPIs). */
 async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
   const { data, error } = await api.GET('/api/ordenes-compra/resumen', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** ⭐ Fila 0.231 — los motivos de compra extra ACTIVOS (reposición, merma, sobre-corte…). */
+async function listarMotivos(): Promise<MotivoCompra[]> {
+  const { data, error } = await api.GET('/api/compras/motivos-compra');
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -154,6 +164,18 @@ export function useResumenOc(
     queryKey: [...CLAVE_OC, 'resumen', query],
     queryFn: () => resumenOc(query),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * ⭐ Fila 0.231 — el catálogo de motivos de compra extra para los selectores (diálogo de la OC,
+ * filtro de la lista, previa de la explosión). Cambia casi nunca: se cachea un buen rato.
+ */
+export function useMotivosCompra(): UseQueryResult<MotivoCompra[], ErrorDeApi> {
+  return useQuery({
+    queryKey: ['motivos-compra'],
+    queryFn: listarMotivos,
+    staleTime: 5 * 60_000,
   });
 }
 

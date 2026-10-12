@@ -24,6 +24,7 @@ import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/con
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { CLAVES_GOBIERNO } from '../src/dominio/admin/guard-administradores.js';
 import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from '../src/dominio/catalogos/orden-de-tallas.js';
+import { MOTIVOS_COMPRA_BASE } from '../src/dominio/compras/motivos-compra.js';
 import {
   CAMPOS_VARIABLES_DEFAULT_CYA,
   esNombreDeCya,
@@ -2470,6 +2471,31 @@ async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3h-bis. Motivos de compra extra (fila 0.231, §Post-F9.245(b)) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Motivos de una compra extra: reposición, merma y sobre-corte (este último `fijo`: la explosión lo
+ * propone por su código). La lista vive en el dominio (`MOTIVOS_COMPRA_BASE`) para que seed y
+ * pruebas no puedan divergir. Se siembran por `codigo`; `update` NO pisa nada si ya existe (pudo
+ * editarse en producción). Llega solo a `prueba` con `SEED_ON_START`.
+ */
+async function sembrarMotivosCompra(prisma: PrismaClient): Promise<void> {
+  for (const motivo of MOTIVOS_COMPRA_BASE) {
+    await prisma.motivoCompra.upsert({
+      where: { codigo: motivo.codigo },
+      update: {},
+      create: {
+        codigo: motivo.codigo,
+        nombre: motivo.nombre,
+        orden: motivo.orden,
+        fijo: motivo.fijo,
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3i. Estados de lista de precios (F8-E1, R20) — catálogo base, idempotente
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2701,6 +2727,8 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // migración) → el deploy a `prueba` requiere SEED_ON_START=true.
   await sembrarConceptosCosto(prisma);
   await sembrarEstadosLista(prisma);
+  // Fila 0.231: motivos de compra extra (reposición/merma/sobre-corte). Idempotente por `codigo`.
+  await sembrarMotivosCompra(prisma);
   // Importador de OC por PDF (§Post-F9.70 punto 2): la plantilla de C&A con su 7% de
   // sobre-pedido. Depende de que el cliente exista (lo carga el ETL): si no está, avisa y sigue.
   await sembrarPlantillaImportacionCya(prisma);

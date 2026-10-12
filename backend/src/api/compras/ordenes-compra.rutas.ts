@@ -10,6 +10,7 @@
  *  3. **Delega** a los servicios de dominio (`dominio/compras/ordenes-compra.ts`).
  *
  * Endpoints: `GET /ordenes-compra` (listado/filtros), `GET /ordenes-compra/:id`,
+ * `GET /compras/motivos-compra` (fila 0.231: catálogo de motivos de compra extra, sólo lectura),
  * `GET /ordenes-compra/:id/impreso` (PDF binario), `POST /ordenes-compra` (crear borrador),
  * `PATCH /ordenes-compra/:id` (encabezado + líneas; el dominio exige `compras.editar-autorizada`
  * si la OC ya salió de borrador, fila 0.120),
@@ -40,6 +41,7 @@ import {
   esquemaComprasPagina,
   esquemaErrorApi,
   esquemaListarCompras,
+  esquemaMotivosCompraLista,
   esquemaResumenCompras,
   esquemaResumenComprasQuery,
 } from '../../contrato/index.js';
@@ -56,6 +58,7 @@ import {
   resumenOC,
 } from '../../dominio/compras/ordenes-compra.js';
 import { impresoOrdenCompra } from '../../dominio/compras/impresos/impreso-orden-compra.js';
+import { listarMotivosCompra } from '../../dominio/compras/motivos-compra.js';
 
 /** Parámetro de ruta `:id` (orden de compra). */
 const esquemaParamId = z.object({
@@ -122,6 +125,25 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return resumenOC(sesion, request.query);
+    },
+  });
+
+  // ⭐ Fila 0.231 — catálogo de MOTIVOS de compra extra (sólo lectura, los activos). Lo usan el
+  // diálogo de la OC, el filtro de la lista y la previa de la explosión. Sin llaves nuevas: lo pide
+  // quien VE compras o quien las CAPTURA (la previa es de `compras.administrar`).
+  app.route({
+    method: 'GET',
+    url: '/compras/motivos-compra',
+    preHandler: app.conAlgunPermiso('compras.ver', 'compras.administrar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Listar los motivos de compra extra (reposición, merma, sobre-corte…)',
+      security: SEGURIDAD_SESION,
+      response: { 200: esquemaMotivosCompraLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarMotivosCompra(sesion);
     },
   });
 

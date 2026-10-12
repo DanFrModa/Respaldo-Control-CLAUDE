@@ -614,6 +614,11 @@ export type ResumenCompras =
 export type ResumenComprasQuery = NonNullable<
   paths['/api/ordenes-compra/resumen']['get']['parameters']['query']
 >;
+/** ⭐ Fila 0.231 — un renglón del importe comprado por motivo (agregado en el servidor). */
+export type ImportePorMotivo = ResumenCompras['importePorMotivo'][number];
+/** ⭐ Fila 0.231 — un motivo de compra extra (`GET /api/compras/motivos-compra`). */
+export type MotivoCompra =
+  paths['/api/compras/motivos-compra']['get']['responses']['200']['content']['application/json'][number];
 
 // ── Notas de salida estructuradas (Módulo 5, F4-E5) ───────────────────────────
 
