@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoDesarrollo } from './DialogoDesarrollo';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 /**
  * El selector de modelo del alta de desarrollo (Daniel, ago-2026). El catálogo real tiene ~5,000
@@ -286,9 +287,7 @@ describe('<DialogoDesarrollo>', () => {
       await usuario.selectOptions(screen.getByLabelText('Modelo'), 'nuevo');
 
       expect(screen.getByTestId('desarrollo-genero')).toHaveValue('');
-      expect(screen.getByTestId('desarrollo-anio-entrega')).toHaveValue(
-        String(new Date().getFullYear()),
-      );
+      expect(screen.getByTestId('desarrollo-anio-entrega')).toHaveValue(String(anioDelNegocio()));
     });
   });
 

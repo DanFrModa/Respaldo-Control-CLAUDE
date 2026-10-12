@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Orden } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -90,5 +90,30 @@ describe('AltaAuditoriaPagina — orden cerrada (0.226b)', () => {
 
     expect(screen.queryByTestId('aviso-orden-cerrada')).not.toBeInTheDocument();
     expect(screen.getByTestId('auditoria-crear')).toBeEnabled();
+  });
+});
+
+/**
+ * ⭐ FILA 0.230 — las dos fechas arrancan en el día DEL NEGOCIO. Antes salían de un `hoy()` local con
+ * `toISOString()` (el día UTC), y de 18:00 a 23:59 de México proponían MAÑANA. El reloj se ancla
+ * en las dos franjas: 23:30 (UTC ya es el día siguiente) y 00:30 (los dos coinciden).
+ */
+describe('AltaAuditoriaPagina — las fechas proponen HOY en México (0.230)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['23:30 del 12-oct (UTC ya es 13)', '2026-10-13T05:30:00.000Z', '2026-10-12'],
+    ['00:30 del 13-oct', '2026-10-13T06:30:00.000Z', '2026-10-13'],
+  ])('a las %s (instante %s) propone %s', async (_franja, instante, esperado) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(instante));
+    const usuario = userEvent.setup();
+    pintar();
+    await usuario.click(screen.getByTestId('elegir-orden'));
+
+    expect(screen.getByTestId('auditoria-fecha-elaboracion')).toHaveValue(esperado);
+    expect(screen.getByTestId('auditoria-fecha-auditoria')).toHaveValue(esperado);
   });
 });

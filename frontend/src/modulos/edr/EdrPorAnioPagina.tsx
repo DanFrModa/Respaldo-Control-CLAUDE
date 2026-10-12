@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 import { MESES, moneda } from './comun';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 function num(s: string): number {
   const v = Number(s);
@@ -29,8 +30,7 @@ function num(s: string): number {
  */
 export function EdrPorAnioPagina(): React.JSX.Element {
   const [params, setParams] = useSearchParams();
-  const hoy = new Date();
-  const anio = num(params.get('anio') ?? '') || hoy.getFullYear();
+  const anio = num(params.get('anio') ?? '') || anioDelNegocio();
 
   const consulta = useEdrPorAnio(anio);
   const datos = consulta.data ?? null;

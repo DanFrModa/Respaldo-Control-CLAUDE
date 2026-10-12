@@ -9,7 +9,7 @@
  *  (f) avíos: ajuste, traspaso, no-negativo, multi-almacén y distinción esGenerico;
  *  (g) ex-acceso #7: sin `telas.ver-totales` el kardex omite costos/importes.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   Almacen,
@@ -403,6 +403,37 @@ describe('Telas — cancelación por inverso (D3/A7)', () => {
     await expect(
       cancelarMovimientoTela(sesion(PERM_TELAS), salida.id, { motivo: 'otra vez' }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  /**
+   * ⭐ FILA 0.230 — la rama GEMELA del motor (tela/avío, `cancelarMovimientoMaterial`) también fecha
+   * su inverso HOY DEL NEGOCIO: con `new Date()` en una columna `@db.Date`, cancelar a las 23:30 de
+   * México dejaba el inverso fechado MAÑANA.
+   */
+  it('⭐ cancelado a las 23:30 de México, el inverso se fecha HOY (no el día UTC)', async () => {
+    const idLote = await entrarLote(100, 40);
+    const salida = await ajustarInventarioTela(
+      sesion(PERM_TELAS),
+      {
+        idTipoMov: idTipoAjusteSalida,
+        idAlmacen: almA.id,
+        fecha: '2026-06-21',
+        motivo: 'merma',
+        lineas: [{ idTela: telaFelpa.id, idLote, cantidad: 30 }],
+      },
+      bd(),
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+    try {
+      await cancelarMovimientoTela(sesion(PERM_TELAS), salida.id, { motivo: 'de noche' }, bd());
+    } finally {
+      vi.useRealTimers();
+    }
+    const inverso = await cliente.movimiento.findFirstOrThrow({
+      where: { idMovimientoInverso: salida.id },
+    });
+    expect(inverso.fecha.toISOString()).toBe('2026-10-12T00:00:00.000Z');
   });
 });
 

@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { fechaRc } from '@/modulos/ruta-critica/piezas';
 import { useSesion } from '@/sesion/useSesion';
+import { aDiaLocal, hoy as hoyDelNegocio } from '@/lib/fecha-negocio';
 
 /**
  * RESUMEN OPERATIVO (portada `/`, rediseño R9 — fidelidad al proto `vResumen`): encabezado con la
@@ -56,7 +57,8 @@ export function Inicio(): React.JSX.Element {
     return () => clearInterval(timer);
   }, []);
 
-  const hoy = new Date();
+  // El DÍA lo decide el negocio (fila 0.230); el navegador sólo lo dibuja y cuenta sobre él.
+  const hoy = aDiaLocal(hoyDelNegocio());
   // El rótulo de la semana sale del ÚLTIMO bucket de la serie del servidor (la misma fuente que
   // las barras "S##"): así jamás desfasa de la gráfica en la frontera de semana (UTC vs local).
   const serieCortes = datos?.cortesPorSemana ?? [];

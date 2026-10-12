@@ -35,6 +35,7 @@ import { registrarConsumidorEventos, type MensajeEventoDominio } from '../../com
 import { EVENTOS_OUTBOX, type EventoOrdenCreada } from '../../comun/eventos-dominio.js';
 import { procesarOrdenCreada, registrarFalloRcAutomatica } from './rcAutomatica.js';
 import { tipoEventoDeHito } from './hitosOrden.js';
+import { diaDelNegocioUtc, hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
 import {
   EstatusNotaSalida,
@@ -45,12 +46,6 @@ import {
   type TipoHitoOrden,
 } from '../../datos/index.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
-
-/** Fecha de hoy a medianoche UTC (sin hora). Misma convención que el resto de la RC. */
-function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
-}
 
 /** Clave estable de una celda color×talla (para los mapas de cantidades). */
 function claveCelda(idColor: number, idTalla: number): string {
@@ -365,7 +360,7 @@ async function aplicarAProceso(
     await tx.rutaOrden.update({
       where: { id: renglon.id },
       data: {
-        // fechaReal = la fecha FÍSICA del hecho que completó el proceso (no hoyUtc): KPI D11 + "el
+        // fechaReal = la fecha FÍSICA del hecho que completó el proceso (no «hoy»): KPI D11 + "el
         // dato físico manda". `capturadoEn` sí es el sello de registro del sistema.
         fechaReal: contexto.fechaFisica,
         estado: 'completado',
@@ -512,7 +507,7 @@ async function fechaDeEtapa(tx: Tx, idEtapaMovimiento: number): Promise<Date> {
     where: { id: idEtapaMovimiento },
     select: { fecha: true },
   });
-  return etapa?.fecha ?? hoyUtc();
+  return etapa?.fecha ?? hoyDelNegocioUtc();
 }
 
 /**
@@ -766,9 +761,9 @@ async function procesarMaterialRecibido(
 
 /** Convierte el `fecha` (YYYY-MM-DD) del payload de recepción a `Date` UTC; hoy si falta (defensivo). */
 function fechaDeRecepcionPayload(fecha: string | undefined): Date {
-  if (fecha === undefined || fecha === '') return hoyUtc();
+  if (fecha === undefined || fecha === '') return hoyDelNegocioUtc();
   const d = new Date(`${fecha}T00:00:00.000Z`);
-  return Number.isNaN(d.getTime()) ? hoyUtc() : d;
+  return Number.isNaN(d.getTime()) ? hoyDelNegocioUtc() : d;
 }
 
 /** Re-evalúa `recepcionTela` de las órdenes de una recepción reversada (decisión (f)). */
@@ -813,7 +808,7 @@ async function reevaluarAuditoria(tx: Tx, idOrden: number, evento: string): Prom
   });
   const completo = aprobada !== null;
   const comp: ResultadoCompletitud = { completo, hayAvance: completo };
-  const fechaFisica = aprobada?.fechaAuditoria ?? hoyUtc();
+  const fechaFisica = aprobada?.fechaAuditoria ?? hoyDelNegocioUtc();
 
   let cambio = false;
   for (const renglon of renglones) {
@@ -869,7 +864,7 @@ async function reevaluarAuditoriaCorte(tx: Tx, idOrden: number, evento: string):
   });
   const completo = aprobada !== null;
   const comp: ResultadoCompletitud = { completo, hayAvance: completo };
-  const fechaFisica = aprobada?.fechaAuditoria ?? hoyUtc();
+  const fechaFisica = aprobada?.fechaAuditoria ?? hoyDelNegocioUtc();
 
   return aplicarCompATodos(tx, renglones, comp, {
     evento,
@@ -947,7 +942,10 @@ async function reevaluarCompraTela(
   });
   const completo = oc !== null;
   const comp: ResultadoCompletitud = { completo, hayAvance: completo };
-  const fechaFisica = oc?.fechaAutorizado ?? hoyUtc();
+  // `fechaAutorizado` es un SELLO DE TIEMPO: su día es el del negocio, no su parte UTC (fila 0.230).
+  // Una OC autorizada a las 19:00 de México cuenta para HOY en la RC, no para mañana.
+  const fechaFisica =
+    oc?.fechaAutorizado == null ? hoyDelNegocioUtc() : diaDelNegocioUtc(oc.fechaAutorizado);
 
   return aplicarCompATodos(tx, renglones, comp, {
     evento,
@@ -982,7 +980,7 @@ async function reevaluarSurtidoAvios(
   });
   const completo = nota !== null;
   const comp: ResultadoCompletitud = { completo, hayAvance: completo };
-  const fechaFisica = nota?.fechaElaboracion ?? hoyUtc();
+  const fechaFisica = nota?.fechaElaboracion ?? hoyDelNegocioUtc();
 
   return aplicarCompATodos(tx, renglones, comp, {
     evento,
@@ -1014,7 +1012,7 @@ async function reevaluarHito(
   });
   const completo = hito !== null;
   const comp: ResultadoCompletitud = { completo, hayAvance: completo };
-  const fechaFisica = hito?.fecha ?? hoyUtc();
+  const fechaFisica = hito?.fecha ?? hoyDelNegocioUtc();
 
   return aplicarCompATodos(tx, renglones, comp, { evento, tipoEvento, fechaFisica });
 }
@@ -1038,7 +1036,7 @@ async function fechaDeRecepcion(tx: Tx, idRecepcion: number): Promise<Date> {
     where: { id: idRecepcion },
     select: { fecha: true },
   });
-  return rec?.fecha ?? hoyUtc();
+  return rec?.fecha ?? hoyDelNegocioUtc();
 }
 
 /**

@@ -39,6 +39,7 @@ import type { z } from 'zod';
 
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import {
   tienePermiso,
   verificarCorrectorSinFactura,
@@ -423,8 +424,9 @@ export async function cancelarMovimientoTerceroInterno(
         tipoTercero: original.tipoTercero,
         idCliente: original.idCliente,
         idProveedor: original.idProveedor,
-        // El inverso se fecha HOY (es un hecho nuevo — patrón kardex); el saldo neta all-time.
-        fecha: new Date(),
+        // El inverso se fecha HOY (es un hecho nuevo — patrón kardex); el saldo neta all-time. HOY del
+        // NEGOCIO (fila 0.230): `fecha` es `@db.Date` y `new Date()` guardaba el día UTC.
+        fecha: hoyDelNegocioUtc(),
         origen: original.origen,
         monto: redondear2(-original.monto.toNumber()),
         // El reverso no vence; conserva la marca fiscal para que la vista fiscal también nete.

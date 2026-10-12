@@ -13,10 +13,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
-
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * TRASPASO de AVÍOS entre almacenes (F4-E1, doc 04-Inventarios §B.3 — Transferencia entre

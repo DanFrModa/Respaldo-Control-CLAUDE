@@ -300,6 +300,43 @@ describe('Estado de cuenta unificado (F6-E5)', () => {
   });
 });
 
+/**
+ * ⭐ FILA 0.230 — el cargo de EsMa no tiene fecha propia: su fecha es su alta (`creadoEn`, un SELLO DE
+ * TIEMPO). Dado de alta a las 23:30 de México —en UTC ya es el día siguiente— su día es HOY: así sale
+ * en el estado de cuenta, en el desglosado, y así lo encuentra el filtro por periodo. Con
+ * `creadoEn.toISOString().slice(0, 10)` salía fechado MAÑANA y el filtro del día no lo traía.
+ */
+describe('el cargo de EsMa se fecha en el día del negocio (fila 0.230)', () => {
+  it('⭐ alta a las 23:30 de México: fecha, desglosado y filtro dicen el 12, no el 13', async () => {
+    const idCargo = await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8);
+    await cliente.esMaCargo.update({
+      where: { id: idCargo },
+      data: { creadoEn: new Date('2026-10-13T05:30:00.000Z') }, // 23:30 del 12 en México
+    });
+
+    const edc = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
+    expect(edc.movimientos.find((m) => m.concepto === 'cargo')?.fecha).toBe('2026-10-12');
+
+    const desg = await estadoCuentaDesglosado(sesion(), maquileroCostura.id, {}, bd());
+    expect(desg.cargos[0]?.fecha).toBe('2026-10-12');
+
+    const delDia = await estadoCuentaMaquilero(
+      sesion(),
+      maquileroCostura.id,
+      { desde: '2026-10-12', hasta: '2026-10-12' },
+      bd(),
+    );
+    expect(delDia.movimientos.map((m) => m.concepto)).toContain('cargo');
+    const delSiguiente = await estadoCuentaMaquilero(
+      sesion(),
+      maquileroCostura.id,
+      { desde: '2026-10-13', hasta: '2026-10-13' },
+      bd(),
+    );
+    expect(delSiguiente.movimientos.map((m) => m.concepto)).not.toContain('cargo');
+  });
+});
+
 describe('Saldos de todos los maquileros (F6-E5)', () => {
   it('(b) SQL agregado == fórmula, excluye saldo 0', async () => {
     await cargoValidado(procesoCostura, maquileroCostura, 10, 10, 8); // saldo 80

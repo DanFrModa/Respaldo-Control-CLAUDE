@@ -24,6 +24,7 @@ import { DireccionMovimiento, Prisma, type Movimiento } from '../datos/index.js'
 
 import { registrarBitacora } from './auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from './errores.js';
+import { hoyDelNegocioUtc } from './fecha-negocio.js';
 import { ORIGEN, type OrigenMovimiento } from './origenes.js';
 import type { SesionUsuario } from './permisos.js';
 import { siguienteFolio } from './secuencias.js';
@@ -554,7 +555,9 @@ export async function cancelarMovimientoPt(
         idEmpresa: original.idEmpresa,
         idTipoMov: idTipoMovInverso,
         idAlmacen: original.idAlmacen,
-        fecha: new Date(),
+        // El inverso se fecha HOY del negocio (fila 0.230): `fecha` es `@db.Date` y un `new Date()`
+        // se guardaba con el día UTC, o sea MAÑANA si se cancelaba por la tarde.
+        fecha: hoyDelNegocioUtc(),
         origenTipo: ORIGEN.cancelacion,
         origenId: String(original.id),
         idUsuario: sesion.id,
@@ -1383,7 +1386,9 @@ export async function cancelarMovimientoMaterial(
         idEmpresa: original.idEmpresa,
         idTipoMov: idTipoMovInverso,
         idAlmacen: original.idAlmacen,
-        fecha: new Date(),
+        // El inverso se fecha HOY del negocio (fila 0.230): `fecha` es `@db.Date` y un `new Date()`
+        // se guardaba con el día UTC, o sea MAÑANA si se cancelaba por la tarde.
+        fecha: hoyDelNegocioUtc(),
         origenTipo: ORIGEN.cancelacion,
         origenId: String(original.id),
         idUsuario: sesion.id,

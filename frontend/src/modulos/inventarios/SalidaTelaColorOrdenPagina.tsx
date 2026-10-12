@@ -19,11 +19,7 @@ import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { estaCerrada } from '@/lib/orden-cerrada';
 import { AvisoSobreSalidaTela } from './AvisoSobreSalidaTela';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 /** Lee un id entero positivo de una clave del `state` del deep-link, o null. */
 function leerIdDeepLink(state: unknown, clave: string): number | null {

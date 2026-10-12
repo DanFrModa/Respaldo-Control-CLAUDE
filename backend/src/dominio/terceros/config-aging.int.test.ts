@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Cliente, Empresa, PrismaClient } from '../../datos/index.js';
 import { ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
@@ -33,11 +34,11 @@ const PERM: ClavePermiso[] = [
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM });
 const bd = () => ({ cliente });
 
-/** `YYYY-MM-DD` de hace `dias` días (UTC). */
+/** `YYYY-MM-DD` de hace `dias` días DEL NEGOCIO. */
 function hace(dias: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - dias);
-  return d.toISOString().slice(0, 10);
+  // Contado desde HOY DEL NEGOCIO (fila 0.230): el aging ya no resta contra `CURRENT_DATE` (el día
+  // UTC), así que contar aquí desde el día UTC haría fallar la prueba de 18:00 a 23:59 de México.
+  return new Date(hoyDelNegocioUtc().getTime() - dias * 86_400_000).toISOString().slice(0, 10);
 }
 
 /** Cargo de un cliente de CONTADO (0 días de crédito) fechado hace `dias` → atraso = `dias`. */

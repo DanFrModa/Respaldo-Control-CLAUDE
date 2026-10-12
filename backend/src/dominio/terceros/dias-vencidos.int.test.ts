@@ -19,7 +19,7 @@
  *  (f) el segmento (con/sin factura) parte los días igual que parte la cartera;
  *  (g) A9: los movimientos de otra empresa no se cuelan.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Cliente, Empresa, PrismaClient, Proveedor } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -29,6 +29,7 @@ import type { ClavePermiso } from '../../contrato/index.js';
 import { crearCorrida, obtenerCorridaDetalle } from '../pagos/corrida.js';
 import { registrarMovimientoTercero, estadoDeCuentaTercero } from './cuenta-terceros.js';
 import { diasVencidosPorProveedor } from './dias-vencidos.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -48,11 +49,18 @@ const PERM: ClavePermiso[] = [
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM });
 const bd = () => ({ cliente });
 
-/** Hace `dias` días, a medianoche UTC (la misma referencia que usa `CURRENT_DATE`). */
+/** Hace `dias` días DEL NEGOCIO, a medianoche UTC (la referencia del agregado desde la fila 0.230). */
 function haceDias(dias: number): Date {
-  const hoy = new Date();
-  const utc = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
-  return new Date(utc - dias * 86_400_000);
+  return new Date(hoyDelNegocioUtc().getTime() - dias * 86_400_000);
+}
+
+/**
+ * El `creadoEn` (un SELLO DE TIEMPO) de un cargo dado de alta hace `dias` días: a mediodía de México
+ * de ese día. Desde la fila 0.230 su día es el DEL NEGOCIO, así que la medianoche UTC —que allá
+ * todavía es la tarde del día anterior— ya no sirve para decir «hace N días».
+ */
+function creadoHaceDias(dias: number): Date {
+  return new Date(haceDias(dias).getTime() + 18 * 3_600_000);
 }
 
 beforeAll(() => {
@@ -116,6 +124,8 @@ async function cargoMaquila(opciones: {
   idEmpresa?: number;
   idMaquilero?: number;
   folio: bigint;
+  /** El sello de alta exacto (por omisión, mediodía de México de hace `hace` días). */
+  creadoEn?: Date;
 }): Promise<void> {
   const idEmpresa = opciones.idEmpresa ?? empresa.id;
   const tipoProceso = await cliente.tipoProceso.create({
@@ -135,7 +145,7 @@ async function cargoMaquila(opciones: {
       cantidadReal: 1,
       precioReal: opciones.importe,
       conFactura: opciones.conFactura ?? false,
-      creadoEn: haceDias(opciones.hace),
+      creadoEn: opciones.creadoEn ?? creadoHaceDias(opciones.hace),
     },
   });
 }
@@ -397,6 +407,53 @@ describe('⭐ el estado de cuenta ya enseña el vencimiento de los renglones de 
     // Los créditos no vencen.
     expect(porOrigen.get('pago')).toBeNull();
     expect(porOrigen.get('descuento')).toBeNull();
+  });
+});
+
+/**
+ * ⭐ FILA 0.230 — el cargo de EsMa se fecha en el DÍA DEL NEGOCIO de su alta. Dado de alta a las 23:30
+ * de México (en UTC ya es el día siguiente) su día es el 12: así sale su fecha y su vencimiento en el
+ * estado de cuenta del proveedor, y desde ahí cuenta su atraso. Antes el atraso salía del
+ * `"creado_en"::date` (el día UTC) contra `CURRENT_DATE` (el día UTC de la sesión de Postgres).
+ */
+describe('el cargo de EsMa envejece desde su día DEL NEGOCIO (fila 0.230)', () => {
+  const ALTA_DE_NOCHE = new Date('2026-10-13T05:30:00.000Z'); // 23:30 del 12 en México
+
+  it('⭐ el estado de cuenta lo fecha el 12 y lo hace vencer 8 días después', async () => {
+    await cargoMaquila({ hace: 0, importe: 1000, folio: 1n, creadoEn: ALTA_DE_NOCHE });
+    const estado = await estadoDeCuentaTercero(sesion(), 'proveedor', maquilero.id, {}, bd());
+    const cargo = estado.movimientos.find((m) => m.origen === 'recibo_maquila');
+    expect(cargo?.fecha).toBe('2026-10-12');
+    expect(cargo?.fechaVencimiento).toBe('2026-10-20');
+  });
+
+  it('⭐ el filtro por periodo del estado de cuenta lo trae en el día 12 y no en el 13', async () => {
+    await cargoMaquila({ hace: 0, importe: 1000, folio: 1n, creadoEn: ALTA_DE_NOCHE });
+    const origenes = async (dia: string) =>
+      (
+        await estadoDeCuentaTercero(
+          sesion(),
+          'proveedor',
+          maquilero.id,
+          { desde: dia, hasta: dia },
+          bd(),
+        )
+      ).movimientos.map((m) => m.origen);
+    expect(await origenes('2026-10-12')).toContain('recibo_maquila');
+    expect(await origenes('2026-10-13')).not.toContain('recibo_maquila');
+  });
+
+  it('⭐ y su atraso se cuenta desde el 12 contra HOY del negocio', async () => {
+    await cliente.proveedor.update({ where: { id: maquilero.id }, data: { diasCredito: null } });
+    await cargoMaquila({ hace: 0, importe: 1000, folio: 1n, creadoEn: ALTA_DE_NOCHE });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-20T18:00:00.000Z')); // mediodía del 20 en México
+    try {
+      // Contado (sin plazo): vence el día del alta ⇒ 20 − 12 = 8 días.
+      expect((await diasVencidosPorProveedor(cliente, empresa.id)).get(maquilero.id)).toBe(8);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

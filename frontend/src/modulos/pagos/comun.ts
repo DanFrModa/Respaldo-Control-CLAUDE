@@ -50,14 +50,6 @@ export function tituloCorrida(c: CorridaResumen): string {
   return `Semana del ${c.semana} · ${nombreSegmento(c.conFactura)} · folio ${String(c.folio)}`;
 }
 
-/** El lunes de la semana de una fecha, en `YYYY-MM-DD` (para proponer la corrida de esta semana). */
-export function lunesDeLaSemana(fecha: Date): string {
-  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const dia = d.getUTCDay(); // 0 = domingo … 6 = sábado
-  d.setUTCDate(d.getUTCDate() + (dia === 0 ? -6 : 1 - dia));
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * El texto del resumen de totales: efectivo y transferencia POR SEPARADO, que es como Daniel cierra
  * su relación (*«30,000 efectivo + 108,201 transferencia»*).

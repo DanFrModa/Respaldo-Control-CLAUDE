@@ -1,6 +1,12 @@
 import { expect, test, type APIRequestContext, type Locator } from '@playwright/test';
 
-import { crearColorYTalla, elegirCliente, elegirEnCombobox, entrarComoAdmin } from './ayudas';
+import {
+  crearColorYTalla,
+  elegirCliente,
+  elegirEnCombobox,
+  entrarComoAdmin,
+  fechaDelNegocioRelativa,
+} from './ayudas';
 
 /**
  * E2E del MOTOR de la Ruta Crítica por orden (F5-E5; pantalla R4 "Mis pendientes") contra el stack
@@ -193,7 +199,9 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     // ninguna de las dos. Con la entrega a 3 días la urgencia es `semana` DESPUÉS del CPM y `sinFecha`
     // ANTES: la fila se pinta en LOS DOS estados y la prueba deja de depender de cuándo corre el job.
     // ⚠️ No volver a alejar esta fecha más de 4 días (`DIAS_SEMANA_PENDIENTES` en `bandeja.ts`).
-    await page.getByTestId('prog-entrega').fill(fechaRelativa(3));
+    // Y los 3 días se cuentan desde HOY DEL NEGOCIO (fila 0.230): contados desde el día UTC del runner,
+    // de 18:00 a 23:59 de México eran 4 del negocio — el tope exacto, sin el colchón que pide arriba.
+    await page.getByTestId('prog-entrega').fill(fechaDelNegocioRelativa(3));
     await page.getByTestId('prog-enviar').click();
     await expect(page.getByText('Ruta Crítica programada.')).toBeVisible();
     // La ruta resultante muestra sus renglones (procesos con fecha).
@@ -283,16 +291,6 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await expect(page.getByTestId('kpi-total')).toBeVisible();
   });
 });
-
-/** Fecha date-only `YYYY-MM-DD` a `dias` de HOY (hora local), para el campo de entrega. */
-function fechaRelativa(dias: number): string {
-  const f = new Date();
-  f.setDate(f.getDate() + dias);
-  const a = f.getFullYear();
-  const m = String(f.getMonth() + 1).padStart(2, '0');
-  const d = String(f.getDate()).padStart(2, '0');
-  return `${a}-${m}-${d}`;
-}
 
 /**
  * Siembra por API la familia, el artículo, el tipo de tela y la aplicación de la RC (sin UI de alta

@@ -26,11 +26,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { descripcionMaterial, EstatusOcBadge, fechaCortaOc } from './piezas';
-
-/** Fecha de hoy en YYYY-MM-DD (zona local). */
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoy } from '@/lib/fecha-negocio';
 
 /** Tipo del material de un renglón de OC (decide qué captura pide la recepción). */
 function tipoLinea(linea: OrdenCompraLinea): 'tela' | 'avio' | 'libre' {

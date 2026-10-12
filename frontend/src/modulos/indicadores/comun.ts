@@ -1,3 +1,5 @@
+import { diaDeLaSemana, hoy as hoyDelNegocio, sumarDias } from '@/lib/fecha-negocio';
+
 /**
  * Helpers de presentación del módulo Indicadores (F7-E3). Módulo de DATOS (no componentes) para no
  * romper fast-refresh. Los KPIs vienen calculados y AGREGADOS del servidor; aquí solo se formatean.
@@ -71,30 +73,21 @@ export function numero(valor: number | null | undefined, dec = 2): string {
   return valor.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: dec });
 }
 
-/** Fecha ISO (AAAA-MM-DD) de un Date en zona local. */
-function aIso(fecha: Date): string {
-  const y = fecha.getFullYear();
-  const m = String(fecha.getMonth() + 1).padStart(2, '0');
-  const d = String(fecha.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-/** Atajos de fecha de la captura móvil (F7-E4, doc 05 §A.1 "Hoy/Ayer/Sábado"). */
+/**
+ * Atajos de fecha de la captura móvil (F7-E4, doc 05 §A.1 "Hoy/Ayer/Sábado"). El día es el DEL
+ * NEGOCIO (fila 0.230): el mismo «hoy» contra el que el servidor mide la ventana de captura.
+ */
 export const atajosFecha = {
   hoy(): string {
-    return aIso(new Date());
+    return hoyDelNegocio();
   },
   ayer(): string {
-    const f = new Date();
-    f.setDate(f.getDate() - 1);
-    return aIso(f);
+    return sumarDias(hoyDelNegocio(), -1);
   },
   /** El sábado más reciente (hoy si es sábado). */
   sabado(): string {
-    const f = new Date();
-    // getDay(): 0=domingo … 6=sábado. Retrocede al sábado anterior o de hoy.
-    const dif = (f.getDay() - 6 + 7) % 7;
-    f.setDate(f.getDate() - dif);
-    return aIso(f);
+    const base = hoyDelNegocio();
+    // diaDeLaSemana: 0=domingo … 6=sábado. Retrocede al sábado anterior o de hoy.
+    return sumarDias(base, -((diaDeLaSemana(base) - 6 + 7) % 7));
   },
 };

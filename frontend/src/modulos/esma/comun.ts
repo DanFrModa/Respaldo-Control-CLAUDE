@@ -118,24 +118,3 @@ export interface PartidaInicial {
   conFactura?: '' | 'con' | 'sin';
   observaciones?: string;
 }
-
-/** Fecha de hoy en formato YYYY-MM-DD (default de los campos fecha). */
-export function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Lunes (inicio de semana ISO) de la fecha dada, en YYYY-MM-DD. */
-export function inicioSemana(fecha: Date): string {
-  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const dia = d.getUTCDay(); // 0=domingo … 6=sábado
-  const desplazamiento = dia === 0 ? -6 : 1 - dia; // al lunes
-  d.setUTCDate(d.getUTCDate() + desplazamiento);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Domingo (fin de semana ISO) a partir del lunes en YYYY-MM-DD. */
-export function finSemana(inicioISO: string): string {
-  const d = new Date(`${inicioISO}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + 6);
-  return d.toISOString().slice(0, 10);
-}

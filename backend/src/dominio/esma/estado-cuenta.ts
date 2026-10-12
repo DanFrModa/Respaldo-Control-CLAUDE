@@ -35,6 +35,11 @@ import { type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
+import {
+  diaDelNegocio,
+  inicioDelDiaDelNegocio,
+  inicioDelDiaSiguienteDelNegocio,
+} from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -107,8 +112,10 @@ function rangoCreado(
   }
   return {
     creadoEn: {
-      ...(desde === undefined ? {} : { gte: aDateColumna(desde) }),
-      ...(hasta === undefined ? {} : { lt: new Date(aDateColumna(hasta).getTime() + 86_400_000) }),
+      // Días DEL NEGOCIO (fila 0.230): `creadoEn` es un sello de tiempo, y leer el día como UTC
+      // dejaba fuera la tarde del último día y metía la del anterior.
+      ...(desde === undefined ? {} : { gte: inicioDelDiaDelNegocio(desde) }),
+      ...(hasta === undefined ? {} : { lt: inicioDelDiaSiguienteDelNegocio(hasta) }),
     },
   };
 }
@@ -262,7 +269,9 @@ export async function estadoCuentaMaquilero(
     movimientos.push({
       concepto: 'cargo',
       id: c.id,
-      fecha: c.creadoEn.toISOString().slice(0, 10),
+      // El cargo no tiene fecha propia: es su alta (`creadoEn`, un sello de tiempo) en el día DEL
+      // NEGOCIO (fila 0.230), no su parte UTC — dado de alta a las 19:00 salía fechado mañana.
+      fecha: diaDelNegocio(c.creadoEn),
       referencia: `Orden #${String(Number(c.orden.folio))} · ${etiquetaProcesoDelCargo(c)}${c.sinCosto ? ' (sin costo)' : ''}`,
       monto,
       estadoRevision: c.estado,
@@ -478,7 +487,9 @@ export async function estadoCuentaDesglosado(
       importeBruto === null ? null : puedeVerImportes ? redondear2(importeBruto) : null;
     return {
       idCargo: c.id,
-      fecha: c.creadoEn.toISOString().slice(0, 10),
+      // El cargo no tiene fecha propia: es su alta (`creadoEn`, un sello de tiempo) en el día DEL
+      // NEGOCIO (fila 0.230), no su parte UTC — dado de alta a las 19:00 salía fechado mañana.
+      fecha: diaDelNegocio(c.creadoEn),
       folioOrden: Number(c.orden.folio),
       codigoModelo: c.orden.modelo.codigo,
       descripcionModelo: c.orden.modelo.descripcion,

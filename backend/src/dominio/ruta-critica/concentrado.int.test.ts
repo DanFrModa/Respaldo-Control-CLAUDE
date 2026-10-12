@@ -20,7 +20,12 @@ let cliente: PrismaClient;
 let idEmpresa: number;
 
 const bd = () => ({ cliente });
-const hoy = new Date('2026-06-22T00:00:00Z');
+// «Hoy» = lunes 22 en MÉXICO, a las 23:30 de allá — que en UTC ya es el martes 23. Desde la fila
+// 0.230 el dominio convierte el `ahora` que recibe al día DEL NEGOCIO; se ancla A PROPÓSITO en la
+// franja en que las dos cuentas se separan, así cada aserción de este archivo (escrita para el 22)
+// se pone roja si alguna entrada vuelve a truncar en UTC. (Antes iba la medianoche UTC del 22, que
+// en México todavía es el domingo 21 a las 18:00.)
+const hoy = new Date('2026-06-23T05:30:00Z');
 
 beforeAll(() => {
   cliente = clientePruebas();

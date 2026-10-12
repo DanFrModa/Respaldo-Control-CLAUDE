@@ -24,6 +24,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { ServicioArchivos } from '../../comun/archivos.js';
 import { ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import type { Cliente, Empresa, PrismaClient, Proveedor } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -95,11 +96,21 @@ function archivosFalsos(): ServicioArchivos {
   };
 }
 
-/** Hace `dias` días, a medianoche UTC (la misma referencia que `CURRENT_DATE`). */
+/**
+ * Hace `dias` días DEL NEGOCIO, a medianoche UTC (la referencia que usa el agregado desde la fila
+ * 0.230; antes era `CURRENT_DATE`, el día UTC).
+ */
 function haceDias(dias: number): Date {
-  const hoy = new Date();
-  const utc = Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate());
-  return new Date(utc - dias * 86_400_000);
+  return new Date(hoyDelNegocioUtc().getTime() - dias * 86_400_000);
+}
+
+/**
+ * El `creadoEn` (un SELLO DE TIEMPO) de un cargo dado de alta hace `dias` días: a mediodía de México
+ * de ese día. Desde la fila 0.230 su día es el DEL NEGOCIO, así que la medianoche UTC —que allá
+ * todavía es la tarde del día anterior— ya no sirve para decir «hace N días».
+ */
+function creadoHaceDias(dias: number): Date {
+  return new Date(haceDias(dias).getTime() + 18 * 3_600_000);
 }
 
 beforeAll(() => {
@@ -178,7 +189,7 @@ async function reciboValidado(importe = 11_600, hace = 20): Promise<void> {
       cantidadReal: 1,
       precioReal: importe,
       conFactura: true,
-      creadoEn: haceDias(hace),
+      creadoEn: creadoHaceDias(hace),
     },
   });
 }

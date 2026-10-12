@@ -4,6 +4,7 @@
  * circular) sólo para resolver un tipo de movimiento o una fecha.
  */
 import { ErrorValidacion } from '../../../comun/errores.js';
+import { hoyDelNegocio } from '../../../comun/fecha-negocio.js';
 import type { Tx } from '../../../comun/transaccion.js';
 
 /** Tipo de movimiento del ajuste con existencia FALTANTE (real > teórico → entra). */
@@ -40,7 +41,10 @@ export function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
 }
 
-/** Fecha de HOY como `YYYY-MM-DD` (UTC). */
+/**
+ * Fecha de HOY como `YYYY-MM-DD`, **del negocio** (fila 0.230). Era el día UTC: un conteo abierto
+ * de 18:00 a 23:59 de México quedaba fechado mañana.
+ */
 export function hoyIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hoyDelNegocio();
 }

@@ -71,6 +71,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.212 · 12-oct-2026 · **en prueba** — **Después de las 6 de la tarde, el sistema ya no cree que es mañana**
+
+> **La v0.212 cierra la fila 0.230.** Muchas pantallas y cálculos sacaban «hoy» del reloj de Londres (UTC), que va seis
+> horas adelante de México: desde las 18:00 proponían la fecha de MAÑANA. Al medirlo resultó bastante más grande que los
+> formularios.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Toda la «fecha de hoy» sale del día de México**, en pantallas y en el servidor:
+- **Las capturas** (entradas, salidas, ajustes, traspasos, recepciones, auditorías, entregas, avance de producción,
+  pagos, EsMa, cuentas por pagar y cobrar) proponen hoy, aunque sean las 11 de la noche.
+- **La corrida y EsMa** el domingo por la noche ya no proponen la semana siguiente.
+- **Al cancelar** un movimiento de inventario o de cuentas por la tarde, el movimiento inverso queda con la fecha de hoy,
+  no la de mañana.
+- **La Ruta Crítica** ya no marca de noche como atrasado lo que estaba planeado para hoy, y una orden de compra autorizada
+  a las 7 de la noche cuenta para hoy.
+- **Los días de atraso** de cuentas por pagar, por cobrar y EsMa se cuentan contra el día de México; la fecha de un cargo
+  de EsMa capturado de noche es la de ese día, y los filtros por fecha del estado de cuenta y la conciliación de EsMa lo
+  respetan.
+- **Los pedidos del mes:** un pedido capturado la noche del último día del mes ya no cae en el mes siguiente.
+
+Una prueba nueva avisa si alguien vuelve a escribir una fecha de hoy con el reloj de Londres.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El filtro de fechas de la bitácora** ahora toma el día completo de México (antes perdía la tarde del último día).
+**Los mensajes** de «receta abierta desde» y «orden cerrada desde» muestran la fecha como `D/M/AAAA`. Lo ya guardado con
+la fecha equivocada **no se corrige** (son datos de prueba).
+
+### ⏳ Sigue pendiente o roto
+
+Nada nuevo de esta fila.
+
 ## 0.211 · 12-oct-2026 · **en prueba** — **Cada orden de compra puede decir por qué existe: reposición, merma o sobre-corte**
 
 > **La v0.211 cierra la fila 0.231**, que pidió Daniel: *«reposición y merma podrían ser las primeras dos del

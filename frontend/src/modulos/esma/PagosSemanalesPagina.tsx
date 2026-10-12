@@ -12,15 +12,9 @@ import {
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { hoy, lunesDeLaSemana, sumarDias } from '@/lib/fecha-negocio';
 
-import { finSemana, inicioSemana, moneda } from './comun';
-
-/** Desplaza un `YYYY-MM-DD` en `dias` días (UTC). */
-function desplazar(iso: string, dias: number): string {
-  const d = new Date(`${iso}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString().slice(0, 10);
-}
+import { moneda } from './comun';
 
 /**
  * PAGOS SEMANALES (F6-E5, ex `EsMa_PagosSem`): los pagos de la semana con navegación semana
@@ -28,9 +22,9 @@ function desplazar(iso: string, dias: number): string {
  * "—" sin `consultas.ver-importes`.
  */
 export function PagosSemanalesPagina(): React.JSX.Element {
-  const [semana, setSemana] = useState(() => inicioSemana(new Date()));
+  const [semana, setSemana] = useState(() => lunesDeLaSemana(hoy()));
   const desde = semana;
-  const hasta = finSemana(semana);
+  const hasta = sumarDias(semana, 6);
   const consulta = usePagosSemanales({ desde, hasta });
   const filas = consulta.data?.filas ?? [];
 
@@ -61,7 +55,7 @@ export function PagosSemanalesPagina(): React.JSX.Element {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setSemana((s) => desplazar(s, -7))}
+                onClick={() => setSemana((s) => sumarDias(s, -7))}
                 data-testid="pagsem-anterior"
               >
                 <ChevronLeft aria-hidden /> Anterior
@@ -70,7 +64,7 @@ export function PagosSemanalesPagina(): React.JSX.Element {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setSemana(inicioSemana(new Date()))}
+                onClick={() => setSemana(lunesDeLaSemana(hoy()))}
                 data-testid="pagsem-actual"
               >
                 Semana actual
@@ -79,7 +73,7 @@ export function PagosSemanalesPagina(): React.JSX.Element {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setSemana((s) => desplazar(s, 7))}
+                onClick={() => setSemana((s) => sumarDias(s, 7))}
                 data-testid="pagsem-siguiente"
               >
                 Siguiente <ChevronRight aria-hidden />

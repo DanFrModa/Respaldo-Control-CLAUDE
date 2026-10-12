@@ -57,7 +57,10 @@
          el backend anuncia — el numero vive en cuatro sitios y es provisional.
        - `src/tope-existencias-pt.test.ts` lee frontend/openapi.json para exigir que el
          `limite` que piden las pantallas de captura de PT (fila 0.143) sea el techo
-         REAL publicado: si se separan, cada carga seria un 400. */
+         REAL publicado: si se separan, cada carga seria un 400.
+       - `src/fecha-negocio-guardian.test.ts` (fila 0.230) recorre los fuentes de
+         frontend/src y backend/src para exigir que ninguna fecha de negocio se calcule
+         en UTC fuera de su fuente unica (`lib/fecha-negocio.ts`). */
   "exclude": [
     "src/documentos.test.ts",
     "src/version.test.ts",
@@ -68,6 +71,7 @@
     "src/aviso-orden-cerrada-guardian.test.ts",
     "src/selectores-orden-cerradas-guardian.test.ts",
     "src/ventana-fecha-pt.test.ts",
-    "src/tope-existencias-pt.test.ts"
+    "src/tope-existencias-pt.test.ts",
+    "src/fecha-negocio-guardian.test.ts"
   ]
 }

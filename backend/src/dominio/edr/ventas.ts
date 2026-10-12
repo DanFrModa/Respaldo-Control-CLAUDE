@@ -29,6 +29,7 @@ import { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { condicionContieneSinAcentos } from '../../comun/busqueda.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import { armarPagina, rangoPrisma, type Paginacion } from '../../comun/paginacion.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -133,7 +134,7 @@ function aVentaLinea(f: FilaCruda): VentaLinea {
  */
 export async function listarVentas(
   sesion: SesionUsuario,
-  parametros: z.input<typeof esquemaVentasQuery> = { anio: new Date().getFullYear() },
+  parametros: z.input<typeof esquemaVentasQuery> = { anio: Number(hoyDelNegocio().slice(0, 4)) },
   bd?: ContextoBd,
 ): Promise<VentasSalida> {
   exigirVerVentas(sesion);

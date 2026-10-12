@@ -767,9 +767,15 @@ describe('exigirCompraNoCongelada — la puerta del candado (V1-E8z)', () => {
 
     expect(error).not.toBeNull();
     expect(error?.message).toContain('1234');
-    expect(error?.message).toContain('2026-08-31');
+    expect(error?.message).toContain('31/8/2026');
     expect(error?.message).toContain('el cliente cambió el cierre');
     expect(error?.message).toContain('CONGELADA');
+  });
+
+  it('⭐ 0.230 · la FECHA es el día de México en que se abrió, no su parte UTC', () => {
+    // Abierta a las 23:30 del 12 en México: en UTC ya es el 13.
+    const deNoche = { ...abierta, recetaAbiertaEn: new Date('2026-10-13T05:30:00.000Z') };
+    expect(() => exigirCompraNoCongelada(deNoche)).toThrow(/desde el 12\/10\/2026/);
   });
 
   it('⭐ y NO dice «todavía no la libera Desarrollo»: eso sería mentira y manda a pedir una firma que ya existe', () => {

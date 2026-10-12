@@ -71,6 +71,7 @@ import type { z } from 'zod';
 
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import type { Tx } from '../../comun/transaccion.js';
@@ -322,7 +323,7 @@ export async function cerrarOrden(
     if (actual.cerradaEn !== null) {
       throw new ErrorConflicto(
         `La orden ${String(actual.folio)} ya está cerrada (desde el ` +
-          `${actual.cerradaEn.toISOString().slice(0, 10)}). Para volver a cerrarla con números ` +
+          `${fechaDelActo(actual.cerradaEn)}). Para volver a cerrarla con números ` +
           'nuevos hay que reabrirla primero.',
       );
     }

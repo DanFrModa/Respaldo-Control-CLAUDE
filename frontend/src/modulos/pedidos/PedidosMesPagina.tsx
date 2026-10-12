@@ -37,6 +37,7 @@ import { ImportadorPedido } from './ImportadorPedido';
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
 import { notaSinExpedienteDesarrollo, numerosDeProduccion } from './numeros-produccion';
 import { PanelGenerarOP } from './PanelGenerarOP';
+import { anioDelNegocio, mesDelNegocio } from '@/lib/fecha-negocio';
 
 /**
  * PEDIDOS POR MES (rediseño R3, §4.1 — proto `vPedidos`): la pantalla nueva de Pedidos. Tabs
@@ -128,10 +129,9 @@ export function PedidosMesPagina(): React.JSX.Element {
   const puedeVerImportes = tienePermiso('pedidos.importes');
 
   // ── Filtros (server-side) ──────────────────────────────────────────────────
-  const hoy = new Date();
-  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [anio, setAnio] = useState(() => anioDelNegocio());
   // El proto abre en el MES ACTUAL (hallazgo del reviewer); "Todos" = 0 se elige con su tab.
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
+  const [mes, setMes] = useState(() => mesDelNegocio());
   const [idCliente, setIdCliente] = useState<number | null>(null);
   const [textoCliente, setTextoCliente] = useState('');
   const busquedaCliente = useDebounce(textoCliente.trim(), 250);

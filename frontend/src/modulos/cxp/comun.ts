@@ -51,11 +51,6 @@ export function textoDiasVencidos(dias: number | null): string {
   return `${String(dias)} d`;
 }
 
-/** Fecha de hoy en formato YYYY-MM-DD (default de los campos fecha). */
-export function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** Etiquetas legibles de los orígenes capturables de CxP (para el formulario y la tabla). */
 export const ETIQUETAS_ORIGEN_CXP: Record<CxpOrigen, string> = {
   entrada_sin_factura: 'Entrada sin factura (cargo)',

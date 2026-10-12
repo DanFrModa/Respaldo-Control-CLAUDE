@@ -34,6 +34,7 @@ import {
 } from '../../src/dominio/terceros/migracion.js';
 import { normalizarRfc } from '../../src/dominio/terceros/cfdi/parser-cfdi.js';
 import type { OrigenMovimientoTercero, PrismaClient, TipoTercero } from '../../src/datos/index.js';
+import { hoyDelNegocioUtc } from '../../src/comun/fecha-negocio.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
@@ -75,7 +76,7 @@ export interface ResultadoParseoAperturas {
 
 /** Opciones del parseo. */
 export interface OpcionesParseo {
-  /** Fecha de corte por defecto para renglones sin fecha (saldo neto). Default: hoy. */
+  /** Fecha de corte por defecto para renglones sin fecha (saldo neto). Default: hoy DEL NEGOCIO. */
   corte?: Date;
 }
 
@@ -129,7 +130,9 @@ export function parsearAperturas(
   filas: Record<string, string>[],
   opciones: OpcionesParseo = {},
 ): ResultadoParseoAperturas {
-  const corte = opciones.corte ?? new Date();
+  // Sin corte explícito, HOY DEL NEGOCIO a medianoche UTC (fila 0.230): `fecha` es `@db.Date`, y un
+  // `new Date()` se guardaba con el día UTC — corrido de noche, la apertura salía fechada mañana.
+  const corte = opciones.corte ?? hoyDelNegocioUtc();
   const salida: AperturaParseada[] = [];
   const incidencias: IncidenciaApertura[] = [];
 

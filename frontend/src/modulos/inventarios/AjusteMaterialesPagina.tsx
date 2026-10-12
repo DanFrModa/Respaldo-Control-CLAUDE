@@ -15,12 +15,9 @@ import { useSesion } from '@/sesion/useSesion';
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { useStockAvioEnAlmacen } from './useStockAvioEnAlmacen';
+import { hoy } from '@/lib/fecha-negocio';
 
 type Direccion = 'entrada' | 'salida';
-
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * AJUSTE / INVENTARIO FÍSICO de AVÍOS (F4-E1, doc 04-Inventarios §B). Sustituye el viejo

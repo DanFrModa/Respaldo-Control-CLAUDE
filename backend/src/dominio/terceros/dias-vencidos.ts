@@ -24,7 +24,8 @@
  * esta columna y las cubetas de la bandeja cuenten historias distintas del mismo proveedor.
  *
  * ## De dónde salen los días (y por qué NO se calculan en JavaScript)
- * El `diasAtraso` de cada cargo lo calcula **Postgres**, con `CURRENT_DATE − vencimiento`, que es
+ * El `diasAtraso` de cada cargo lo calcula **Postgres**, con `hoy del negocio − vencimiento` (el día
+ * lo pone `hoyDelNegocio()`, fila 0.230; antes era `CURRENT_DATE`, el día UTC de la sesión), que es
  * literalmente la misma expresión con la que `cxp.ts` reparte las cubetas. Si el servidor de la
  * aplicación hiciera la resta con su propio reloj, dos números que salen de la misma pantalla
  * podrían quedar desfasados un día. Aquí sólo se **elige cuál** de esos días se enseña.
@@ -49,6 +50,7 @@
  */
 import { Prisma } from '../../datos/index.js';
 import type { PrismaClient } from '../../datos/index.js';
+import { ZONA_DEL_NEGOCIO, hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import type { Tx } from '../../comun/transaccion.js';
 
 import {
@@ -68,7 +70,7 @@ import { SQL_SUMA_AL_SALDO } from './ampara-esma.js';
  * `diasAtraso` negativo = todavía no vence.
  */
 export interface CargoPorEdad {
-  /** `CURRENT_DATE − vencimiento`, en días. Negativo mientras esté dentro del plazo. */
+  /** `hoy del negocio − vencimiento`, en días. Negativo mientras esté dentro del plazo. */
   diasAtraso: number;
   /** Importe POSITIVO de lo que se debe con esa edad. */
   importe: number;
@@ -161,6 +163,12 @@ export async function diasVencidosPorProveedor(
   const factura = Prisma.sql`AND ${sqlSegmentoFactura(segmento)}`;
   const facturaMotor = segmentoMotor(segmento);
 
+  // «Hoy» es el día DEL NEGOCIO (fila 0.230), no `CURRENT_DATE`: ésa es la fecha de la SESIÓN de
+  // Postgres (UTC en el servidor), y de 18:00 a 23:59 de México ya es mañana — cada deuda salía
+  // con un día más de atraso.
+  const hoy = Prisma.sql`${hoyDelNegocio()}::date`;
+  // El día del negocio de un sello de tiempo: `creado_en` es TIMESTAMP en UTC (sin huso).
+  const diaDeCreado = Prisma.sql`(("creado_en" AT TIME ZONE 'UTC') AT TIME ZONE ${ZONA_DEL_NEGOCIO})::date`;
   const [cargos, creditos] = await Promise.all([
     cliente.$queryRaw<CargoCrudo[]>(Prisma.sql`
       SELECT
@@ -171,7 +179,7 @@ export async function diasVencidosPorProveedor(
         -- MOTOR: el vencimiento ya viene sellado del alta (calcularVencimiento).
         SELECT
           m."id_proveedor"                            AS "idProveedor",
-          (CURRENT_DATE - m."fecha_vencimiento")::int AS "diasAtraso",
+          (${hoy} - m."fecha_vencimiento")::int AS "diasAtraso",
           m."monto"                                   AS "importe"
         FROM "movimientos_tercero" m
         WHERE m."id_empresa" = ${idEmpresa}
@@ -186,12 +194,12 @@ export async function diasVencidosPorProveedor(
         -- enseña el estado de cuenta. El plazo lo pone el proveedor; sin plazo, vence el mismo día.
         SELECT
           c."id_maquilero",
-          (CURRENT_DATE - (c."fecha_base" + COALESCE(p."dias_credito", 0)))::int,
+          (${hoy} - (c."fecha_base" + COALESCE(p."dias_credito", 0)))::int,
           c."importe"
         FROM (
           SELECT
             "id_maquilero",
-            "creado_en"::date                  AS "fecha_base",
+            ${diaDeCreado}                     AS "fecha_base",
             "cantidad_real" * "precio_real"    AS "importe"
           FROM "esma_cargo"
           WHERE "id_empresa" = ${idEmpresa} AND ${sqlCuenta('cargo')} ${factura}
@@ -201,7 +209,7 @@ export async function diasVencidosPorProveedor(
         -- EsMa ABONO: en EsMa SUMA (es un cargo extra al maquilero), así que envejece como un cargo.
         SELECT
           a."id_maquilero",
-          (CURRENT_DATE - (a."fecha" + COALESCE(p."dias_credito", 0)))::int,
+          (${hoy} - (a."fecha" + COALESCE(p."dias_credito", 0)))::int,
           a."monto"
         FROM (
           SELECT "id_maquilero", "fecha", "monto"

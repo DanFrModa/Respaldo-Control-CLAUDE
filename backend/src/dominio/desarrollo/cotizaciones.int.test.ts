@@ -14,7 +14,7 @@
  *
  * NO corre en local (Docker prohibido): la juzga CI.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
@@ -206,6 +206,26 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
     expect(cotizacion.lineas[0]?.descripcionModelo).toBe('Modelo MOD-A');
     expect(cotizacion.lineas[0]?.versionPrecosto).toBe(1);
     expect(cotizacion.total).toBe(530); // 5 × 106 (⭐ V1-E8w: +2.20 de empaque por prenda)
+  });
+
+  /**
+   * ⭐ FILA 0.230 — sin fecha, la LISTA y la COTIZACIÓN nacen HOY DEL NEGOCIO. Las dos columnas son
+   * `@db.Date` y el default era `new Date()`: armadas a las 23:30 de México, el papel que se le manda
+   * al cliente salía fechado MAÑANA. Se falsea sólo `Date`.
+   */
+  it('⭐ sin fecha, a las 23:30 de México la lista y la cotización se fechan HOY', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+    try {
+      const { idLista } = await listaConModelos(['MOD-A']);
+      const lista = await cliente.listaPrecios.findUniqueOrThrow({ where: { id: idLista } });
+      expect(lista.fecha.toISOString()).toBe('2026-10-12T00:00:00.000Z');
+
+      const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
+      expect(cotizacion.fecha).toBe('2026-10-12');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('🔴 mover el precio de la LISTA después de emitir NO cambia la cotización', async () => {

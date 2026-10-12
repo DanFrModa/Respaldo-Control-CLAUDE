@@ -32,6 +32,7 @@ import type {
 import type { Prisma } from '../../datos/index.js';
 
 import { idsSiHayBusqueda } from '../../comun/busqueda.js';
+import { hoyDelNegocioUtc } from '../../comun/fecha-negocio.js';
 import {
   armarPagina,
   esquemaPaginacion,
@@ -289,6 +290,9 @@ export async function consultarBandeja(
   verificarPermiso(sesion, 'rc.ruta-ver');
   const filtros = validarEntrada(esquemaBandejaDominio, parametros);
   const cliente = clienteLectura(bd);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   // `todas` (supervisión): ver TODAS las tareas activas de la empresa exige el permiso de
   // programación (planeación/supervisión). Sin él, el flag se ignora y se acota a las propias.
@@ -337,7 +341,7 @@ export async function consultarBandeja(
   // el filtro, se ordenan y se corta la página pedida. El universo (tareas ACTIVAS de la empresa) es
   // acotado por diseño, así que esto es seguro.
   const filas = await cliente.rutaOrden.findMany({ where, include: INCLUDE_TAREA });
-  const tareas = ordenarTareasPorUrgencia(filas.map((f) => aTareaSalida(f, ahora)));
+  const tareas = ordenarTareasPorUrgencia(filas.map((f) => aTareaSalida(f, hoy)));
 
   const total = tareas.length;
   const inicio = rangoPrisma(paginacion).skip;
@@ -358,6 +362,9 @@ export async function contarAlertas(
 ): Promise<AlertasRcConteo> {
   verificarPermiso(sesion, 'rc.ruta-ver');
   const cliente = clienteLectura(bd);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   const idsResponsable = await procesosResponsablesDe(cliente, sesion);
   const filas = await cliente.rutaOrden.findMany({
@@ -370,7 +377,7 @@ export async function contarAlertas(
   for (const f of filas) {
     const estado = estadoSemaforoProceso(
       { fechaPlaneadaVigente: f.fechaPlaneadaVigente, fechaReal: f.fechaReal },
-      ahora,
+      hoy,
     );
     if (estado === 'atrasado') atrasados += 1;
     else if (estado === 'enRiesgo') enRiesgo += 1;
@@ -404,6 +411,9 @@ export async function resumenPendientes(
   verificarPermiso(sesion, 'rc.ruta-ver');
   const filtros = validarEntrada(esquemaResumenDominio, parametros);
   const cliente = clienteLectura(bd);
+  // HOY es el día DEL NEGOCIO (fila 0.230), no el día UTC del instante: de 18:00 a 23:59 de México
+  // el día UTC ya es mañana, y todo lo que se mide contra hoy se corría un día.
+  const hoy = hoyDelNegocioUtc(ahora);
 
   const deOtro = filtros.deUsuario !== undefined && filtros.deUsuario !== sesion.id;
   if (deOtro) {
@@ -442,7 +452,7 @@ export async function resumenPendientes(
     }
   >();
   for (const f of filas) {
-    const urgencia = urgenciaProceso(f.fechaPlaneadaVigente, ahora);
+    const urgencia = urgenciaProceso(f.fechaPlaneadaVigente, hoy);
     if (urgencia === 'vencida') resumen.vencidas += 1;
     else if (urgencia === 'hoy') resumen.paraHoy += 1;
     else if (urgencia === 'semana') resumen.estaSemana += 1;

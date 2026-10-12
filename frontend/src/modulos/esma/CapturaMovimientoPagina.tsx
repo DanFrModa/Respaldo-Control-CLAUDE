@@ -21,7 +21,8 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
 import { ComboboxMaquilero } from './SelectorMaquilero';
-import { hoyISO, moneda, type PartidaInicial } from './comun';
+import { moneda, type PartidaInicial } from './comun';
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * CAPTURA de un ABONO o un DESCUENTO a la cuenta de un maquilero (F6-E4). Formulario simple:
@@ -54,7 +55,7 @@ export function CapturaMovimientoPagina({
     inicial?.idMaquilero !== undefined ? String(inicial.idMaquilero) : '',
   );
   const [monto, setMonto] = useState(inicial?.monto ?? '');
-  const [fecha, setFecha] = useState(hoyISO());
+  const [fecha, setFecha] = useState(hoy());
   const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
   const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
 

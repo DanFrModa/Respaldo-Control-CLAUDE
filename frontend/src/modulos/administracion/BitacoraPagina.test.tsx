@@ -99,8 +99,11 @@ describe('BitacoraPagina', () => {
 
     // `desde` = inicio del día; `hasta` = fin del día (rango inclusivo). El contrato exige el
     // formato date-time completo; mandar solo "YYYY-MM-DD" daba 400.
-    expect(ultimaQuery.desde).toBe('2026-06-01T00:00:00.000Z');
-    expect(ultimaQuery.hasta).toBe('2026-06-30T23:59:59.999Z');
+    // ⭐ Fila 0.230: los días son de MÉXICO (−06:00), no de UTC. Antes esto pedía
+    // `…T00:00:00.000Z`/`…T23:59:59.999Z`: el filtro del 30 de junio terminaba a las 17:59 de allá
+    // y perdía la tarde entera; el del 1 empezaba a las 18:00 del 31 de mayo.
+    expect(ultimaQuery.desde).toBe('2026-06-01T06:00:00.000Z');
+    expect(ultimaQuery.hasta).toBe('2026-07-01T05:59:59.999Z');
   });
 
   // ⭐ Fila 0.249 parte D: el servidor tapa los importes que tu usuario no puede ver.

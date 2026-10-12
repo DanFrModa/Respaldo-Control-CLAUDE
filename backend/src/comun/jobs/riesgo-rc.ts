@@ -20,6 +20,7 @@ import {
   estadoSemaforoOrden,
   evaluarRiesgoOrdenSinRuta,
 } from '../../dominio/ruta-critica/semaforoYRiesgo.js';
+import { hoyDelNegocioUtc } from '../fecha-negocio.js';
 import { enTransaccion, type ContextoBd } from '../transaccion.js';
 
 import { COLAS_JOBS, motorJobs } from './index.js';
@@ -29,12 +30,6 @@ const CRON_BARRIDO = process.env.RC_RIESGO_CRON ?? '0 * * * *';
 
 /** Tope de órdenes que procesa un barrido (acota la carga; sobra para el volumen de la RC viva). */
 const LOTE_BARRIDO = 5_000;
-
-/** Hoy a medianoche UTC (el semáforo solo mira el día calendario). */
-function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
-}
 
 /**
  * CUERPO del barrido (sin pg-boss): recalcula el semáforo de las órdenes de la RC y actualiza
@@ -47,7 +42,7 @@ function hoyUtc(): Date {
  * @param bd  contexto de BD opcional (tests de integración apuntan a su contenedor).
  */
 export async function barrerRiesgoRc(bd?: ContextoBd): Promise<number> {
-  const hoy = hoyUtc();
+  const hoy = hoyDelNegocioUtc();
   const cliente = bd?.tx ?? bd?.cliente ?? prisma;
 
   const ordenes = await cliente.orden.findMany({

@@ -14,6 +14,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { CapturaConteoTelaColor, type RenglonConteoTelaColor } from './CapturaConteoTelaColor';
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
 import { PestanasSegmentadas } from './PestanasSegmentadas';
+import { hoy } from '@/lib/fecha-negocio';
 
 /**
  * Los tres modos de la pantalla. `conteo` es el PRINCIPAL y el que arranca (fila 0.098): se captura
@@ -22,10 +23,6 @@ import { PestanasSegmentadas } from './PestanasSegmentadas';
  * "cuánto queda" obligaría a la resta al revés.
  */
 type Modo = 'conteo' | 'entrada' | 'salida';
-
-function hoy(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * CONTEO FÍSICO / AJUSTE del inventario de telas NUEVO por COLOR (etapa A2 — la puerta del arranque

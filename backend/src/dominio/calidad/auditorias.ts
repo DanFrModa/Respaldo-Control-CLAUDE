@@ -55,6 +55,7 @@ import { z } from 'zod';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import {
   armarPagina,
   esquemaPaginacion,
@@ -363,7 +364,8 @@ export async function crearAuditoria(
   verificarPermiso(sesion, 'calidad.generar-auditorias');
   const datos = validarEntrada(esquemaAuditoriaCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
-  const hoy = aFechaIso(new Date());
+  // El default de las fechas es HOY del negocio (fila 0.230), no el día UTC.
+  const hoy = hoyDelNegocio();
 
   const idAuditoria = await enTransaccion(async (tx) => {
     // ⭐ 0.226a (§Post-F9.244): no se audita una orden CERRADA. Guarda ÚNICA con candado
@@ -685,7 +687,8 @@ export async function reclasificar(
   verificarPermiso(sesion, 'calidad.actualizar-auditorias');
   const datos = validarEntrada(esquemaReclasificacionCuerpo, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
-  const hoy = aFechaIso(new Date());
+  // El default de las fechas es HOY del negocio (fila 0.230), no el día UTC.
+  const hoy = hoyDelNegocio();
 
   await enTransaccion(async (tx) => {
     const auditoria = await tx.auditoria.findFirst({

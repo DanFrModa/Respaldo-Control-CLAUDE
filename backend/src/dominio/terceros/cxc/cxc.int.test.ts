@@ -12,10 +12,11 @@
  *      además `terceros.administrar` → falla cerrado sin él);
  *  (h) la cancelación de CxC es por inverso auditado y rechaza un movimiento que NO es de cliente.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Cliente, Empresa, PrismaClient } from '../../../datos/index.js';
 import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../../comun/errores.js';
+import { hoyDelNegocioUtc } from '../../../comun/fecha-negocio.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../../contrato/index.js';
@@ -46,11 +47,11 @@ const sesion = (permisos: ClavePermiso[] = PERM_TODOS, idEmpresaActiva = empresa
   sesionDePrueba({ idEmpresaActiva, permisos });
 const bd = () => ({ cliente });
 
-/** `YYYY-MM-DD` de hace `dias` días (UTC), para fechar cargos dentro de una cubeta de aging. */
+/** `YYYY-MM-DD` de hace `dias` días DEL NEGOCIO, para fechar cargos dentro de una cubeta de aging. */
 function hace(dias: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - dias);
-  return d.toISOString().slice(0, 10);
+  // Contado desde HOY DEL NEGOCIO (fila 0.230): el aging ya no resta contra `CURRENT_DATE` (el día
+  // UTC), así que contar aquí desde el día UTC haría fallar la prueba de 18:00 a 23:59 de México.
+  return new Date(hoyDelNegocioUtc().getTime() - dias * 86_400_000).toISOString().slice(0, 10);
 }
 
 beforeAll(() => {
@@ -303,5 +304,30 @@ describe('cancelación (inverso auditado)', () => {
     await expect(
       cancelarMovimientoCxc(sesion(), movProv.id, { motivo: 'no aplica' }, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+/**
+ * ⭐ FILA 0.230 — el atraso se cuenta contra HOY DEL NEGOCIO, no contra `CURRENT_DATE` (el día de la
+ * sesión de Postgres, que corre en UTC). El reloj de la aplicación se adelanta al 10-nov a mediodía de
+ * México: un cargo del 1-oct con 5 días de crédito vence el 6-oct y lleva 35 días ⇒ cubeta 31–60.
+ * Contado contra el reloj de la base, el cargo caía en otra cubeta.
+ */
+describe('el aging cuenta contra el día del negocio (fila 0.230)', () => {
+  it('⭐ el atraso sale del HOY de México, no del `CURRENT_DATE` de Postgres', async () => {
+    await registrarMovimientoCxc(
+      sesion(),
+      clienteFr.id,
+      { fecha: '2026-10-01', origen: 'entrada_sin_factura', importe: 70 },
+      bd(),
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-10T18:00:00.000Z')); // mediodía del 10-nov en México
+    try {
+      const bandeja = await bandejaPorCobrar(sesion(), {}, bd());
+      expect(bandeja.filas[0]).toMatchObject({ corriente: 0, d1a30: 0, d31a60: 70, mas60: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

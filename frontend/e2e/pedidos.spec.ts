@@ -1,7 +1,14 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 import { generarAbreviaturaCliente } from './abreviatura';
-import { cerrarCajon, crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
+import {
+  anioCortoDelNegocio,
+  cerrarCajon,
+  crearColorYTalla,
+  elegirCliente,
+  entrarComoAdmin,
+  fechaDelNegocioRelativa,
+} from './ayudas';
 
 /**
  * E2E del FLUJO NUEVO de Pedidos (rediseño R3, §4.1) contra el stack real:
@@ -54,7 +61,9 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     const tipoPrenda = 'Pantalón (7)';
     const genero = 'Caballero';
     const par = '71';
-    const anioCodigo = String(new Date().getFullYear() % 100).padStart(2, '0');
+    // El año que propone el diálogo es el DEL NEGOCIO (fila 0.230), no el del reloj del runner (UTC):
+    // la noche del 31 de diciembre en México, en UTC ya es el año siguiente.
+    const anioCodigo = anioCortoDelNegocio();
 
     await entrarComoAdmin(page);
     const { color, talla } = await crearColorYTalla(page, sufijo);
@@ -125,7 +134,7 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await constructor.getByTestId('constructor-cliente-input').fill(cliente);
     await page.getByTestId('constructor-cliente-opcion').first().click();
     // Fecha de entrega HOY (cae en el mes/año de los filtros por defecto) + OC del cliente.
-    await constructor.getByTestId('constructor-fecha').fill(fechaRelativa(0));
+    await constructor.getByTestId('constructor-fecha').fill(fechaDelNegocioRelativa(0));
     await constructor.getByTestId('constructor-oc').fill(ocCliente);
     // Renglón: el modelo se elige del SELECTOR de desarrollos (nombre + proyecto/cliente).
     await constructor.getByTestId('constructor-desarrollo-input').fill(codigoDesarrollo);
@@ -393,14 +402,4 @@ async function idOrdenPorFolio(
     throw new Error(`El buscador no encontró la OP ${folio} del modelo ${codigoModelo}.`);
   }
   return hit.id;
-}
-
-/** Fecha date-only `YYYY-MM-DD` a `dias` de HOY (hora local), para la fecha de entrega. */
-function fechaRelativa(dias: number): string {
-  const f = new Date();
-  f.setDate(f.getDate() + dias);
-  const a = f.getFullYear();
-  const m = String(f.getMonth() + 1).padStart(2, '0');
-  const d = String(f.getDate()).padStart(2, '0');
-  return `${a}-${m}-${d}`;
 }

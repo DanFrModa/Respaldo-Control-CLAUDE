@@ -20,6 +20,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { PanelRutaOrden, type EncabezadoRutaOrden } from './PanelRutaOrden';
 import { EVENTO_RC_DESCRIPCION, PANTALLA_EVENTO, esProcesoAutomatico, fechaRc } from './piezas';
+import { hoyLegible } from '@/lib/fecha-negocio';
 
 /**
  * MIS PENDIENTES (rediseño R4 — proto §4.9, la pantalla que pidió Daniel): la GUÍA DIARIA de la
@@ -65,13 +66,8 @@ export function MisPendientesPagina(): React.JSX.Element {
   const esSupervisor = tienePermiso('rc.programar');
 
   // "hoy 6 jul 2026" del proto: solo presentación (ancla temporal de la guía diaria).
-  const ahora = new Date();
-  const hoyLargo = ahora.toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  const hoyCorto = ahora.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  const hoyLargo = hoyLegible({ day: 'numeric', month: 'short', year: 'numeric' });
+  const hoyCorto = hoyLegible({ day: 'numeric', month: 'short' });
 
   // "Viendo pendientes de:" — null = los míos. El Combobox trabaja con ids numéricos, así que se
   // mapea por índice sobre la lista de responsables (presentación, no negocio).

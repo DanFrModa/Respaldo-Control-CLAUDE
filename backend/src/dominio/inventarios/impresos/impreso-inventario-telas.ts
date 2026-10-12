@@ -34,6 +34,7 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { hoyDelNegocio } from '../../../comun/fecha-negocio.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
@@ -134,7 +135,8 @@ export async function armarDatosImpresoInventarioTelas(
   // conteo y las Σ siguen siendo del universo COMPLETO del filtro (no del truncado).
   return {
     empresa: sesion.nombreEmpresaActiva,
-    fecha: new Date().toISOString().slice(0, 10),
+    // El día del NEGOCIO (fila 0.230): impreso por la tarde, el día UTC ya decía mañana.
+    fecha: hoyDelNegocio(),
     filas: todas.slice(0, MAX_FILAS_PDF),
     totalRenglones: todas.length,
     totalColores: lista.telas.reduce((suma, t) => suma + t.colores.length, 0),

@@ -3,7 +3,7 @@
  * sobre filas crudas: los dos modos (detalle de factura pendiente / saldo neto), la decisión de
  * origen+fiscal, las claves de idempotencia y las incidencias (nada se pierde en silencio, §7).
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { parsearAperturas } from './terceros-saldos.js';
 
@@ -101,6 +101,21 @@ describe('parsearAperturas — modo SALDO NETO', () => {
     expect(m.esFiscal).toBe(false);
     expect(m.claveFuente).toBe('neto:proveedor:AAA010101AA1');
     expect(m.fecha.toISOString().slice(0, 10)).toBe('2026-06-30');
+  });
+
+  describe('sin corte explícito, la fecha es HOY DEL NEGOCIO (fila 0.230)', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('⭐ corrida a las 23:30 de México, la apertura se fecha el 12 (no el día UTC)', () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T05:30:00.000Z')); // 23:30 del 12 en México
+      const { filas } = parsearAperturas([
+        { tipo: 'proveedor', rfc: 'AAA010101AA1', saldo: '3000' },
+      ]);
+      expect(filas[0]!.movimiento.fecha.toISOString()).toBe('2026-10-12T00:00:00.000Z');
+    });
   });
 
   it('saldo negativo → abono, importe = |saldo|', () => {

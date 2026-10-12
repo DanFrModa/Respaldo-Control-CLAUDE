@@ -18795,3 +18795,15 @@ motivos los da de alta el sistema. El importe por motivo de la lista respeta sus
 4. **¿Se imprime en la OC que recibe el proveedor?** *Default: no.*
 5. **¿Quieres una pantalla para agregar motivos tú mismo?** *Default: no; me los pides.*
 6. **Confirmar la clasificación** (🔶, la puso el lead).
+
+#### (Post-F9.280) — «HOY» ES EL DÍA DE MÉXICO, EN TODO EL SISTEMA (fila 0.230, v0.212)
+
+📐 El sistema calculaba «hoy» con el reloj de Londres (UTC), seis horas adelante de México: desde las 18:00 proponía y
+guardaba la fecha de mañana. Medido: no eran sólo doce formularios — también el lunes de la semana de la corrida y EsMa,
+la fecha del movimiento inverso de una cancelación, el semáforo y los avances de la Ruta Crítica, la fecha de los cargos
+de EsMa, los días de atraso de cuentas por pagar y cobrar, y el filtro de la bitácora.
+
+**Decisión técnica (sin pregunta de negocio):** una sola fuente del día del negocio por lado (`fecha-negocio.ts` en
+frontend y backend, y la misma zona en el SQL), y un guardián que falla si aparece otra forma de calcular «hoy». Lo ya
+guardado con la fecha equivocada no se corrige (REGLA 0-B). Clasificación: 🟢 *puede esperar* (recomendación del lead);
+al medirla resultó tocar dinero (días de atraso, fecha de cargos) — Daniel puede subirla, aunque ya está construida.

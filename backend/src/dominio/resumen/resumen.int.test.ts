@@ -30,8 +30,12 @@ import type { ClavePermiso } from '../../contrato/index.js';
 
 import { resumenOperativo } from './resumen.js';
 
-/** "Hoy" fijo: miércoles 8-jul-2026 → semana ISO 28 (lun 6-jul a dom 12-jul). */
-const AHORA = new Date('2026-07-08T12:00:00.000Z');
+/**
+ * "Hoy" fijo: miércoles 8-jul-2026 → semana ISO 28 (lun 6-jul a dom 12-jul). Es el 8 a las 23:30 de
+ * MÉXICO, que en UTC ya es el 9 (fila 0.230): anclado en esa franja a propósito, cada aserción —escrita
+ * para el 8— se pone roja si el Resumen vuelve a tomar el día UTC del instante.
+ */
+const AHORA = new Date('2026-07-09T05:30:00.000Z');
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -452,6 +456,27 @@ describe('resumenOperativo — órdenes por vencer (rc.ruta-ver)', () => {
       cliente: 'Tienda X',
       piezas: 35,
       avancePct: 50,
+      semaforo: 'enRiesgo',
+      etapasAtrasadas: 0,
+    });
+  });
+});
+
+describe('resumenOperativo — «hoy» es el día de México (fila 0.230)', () => {
+  /**
+   * ⭐ {@link AHORA} es el 8 a las 23:30 de México (en UTC ya es el 9). Un pendiente planeado para el
+   * 8 vence HOY: está en riesgo, no atrasado. Con el día UTC del instante, el Resumen lo pintaba
+   * «Atrasada 1 etapa» seis horas antes de tiempo.
+   */
+  it('⭐ un pendiente planeado para HOY no sale atrasado a las 23:30 de México', async () => {
+    const proc = await cliente.procesoDef.create({ data: { codigo: 'corte', nombre: 'Corte' } });
+    const orden = await crearOrden({ idEmpresa: empresa.id, folio: 30n, rcActiva: true });
+    await crearProcesoRuta({ idOrden: orden, idProcesoDef: proc.id, planeada: '2026-07-08' });
+
+    const r = await resumenOperativo(sesion(['rc.ruta-ver']), bd(), AHORA);
+    expect(r.ordenesPorVencer).toHaveLength(1);
+    expect(r.ordenesPorVencer?.[0]).toMatchObject({
+      idOrden: orden,
       semaforo: 'enRiesgo',
       etapasAtrasadas: 0,
     });

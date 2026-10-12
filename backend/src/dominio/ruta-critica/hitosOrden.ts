@@ -39,6 +39,7 @@ import {
   registrarEventoOutbox,
   type EventoHitoOrden,
 } from '../../comun/eventos-dominio.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import { nombreDeUsuario, nombresDeUsuarios } from '../../comun/nombres-usuario.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
@@ -80,9 +81,13 @@ function aFechaIso(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
 }
 
-/** Convierte un `YYYY-MM-DD` (o undefined → hoy) al `Date` que Prisma guarda en `@db.Date`. */
+/**
+ * Convierte un `YYYY-MM-DD` (o undefined → hoy) al `Date` que Prisma guarda en `@db.Date`. «Hoy» es
+ * el día DEL NEGOCIO (fila 0.230): con `toISOString()`, un hito marcado por la tarde salía con la
+ * fecha de mañana.
+ */
 function aDateColumna(valor: string | undefined): Date {
-  const iso = valor ?? new Date().toISOString().slice(0, 10);
+  const iso = valor ?? hoyDelNegocio();
   return new Date(`${iso}T00:00:00.000Z`);
 }
 

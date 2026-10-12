@@ -29,6 +29,7 @@ import { formatearMoneda } from '@/lib/formato';
 import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 import { agruparDescartados, etiquetaDescartado } from './motivos-candidatura';
+import { anioDelNegocio } from '@/lib/fecha-negocio';
 
 /** Valor del selector de proyecto que significa «crear uno nuevo con este nombre». */
 const PROYECTO_NUEVO = 'nuevo';
@@ -115,7 +116,7 @@ export function DialogoAgregarModelos({
 
   const [copiar, setCopiar] = useState(false);
   const [idModeloOrigen, setIdModeloOrigen] = useState<number | undefined>(undefined);
-  const [anio, setAnio] = useState(String(new Date().getFullYear()));
+  const [anio, setAnio] = useState(() => String(anioDelNegocio()));
   const [idTipo, setIdTipo] = useState('');
   const [idGenero, setIdGenero] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -177,9 +178,7 @@ export function DialogoAgregarModelos({
     });
     setAnio((actual) => {
       if (anioDelProyecto !== null) return anioDelProyecto;
-      return anterior !== null && actual === anterior.anio
-        ? String(new Date().getFullYear())
-        : actual;
+      return anterior !== null && actual === anterior.anio ? String(anioDelNegocio()) : actual;
     });
 
     precargado.current = { genero: generoDelProyecto ?? '', anio: anioDelProyecto ?? '' };

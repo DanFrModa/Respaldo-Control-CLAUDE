@@ -3933,6 +3933,23 @@ describe('⭐⭐⭐ V1-E8z — EL CANDADO DE COMPRA (§Post-F9.160(a))', () => {
       expect(r.abiertaMotivo).toBe('primera razón');
     });
 
+    /**
+     * ⭐ FILA 0.230 — el «desde cuándo» es el día de MÉXICO en que se abrió. `recetaAbiertaEn` es un
+     * sello de tiempo: abierta a las 23:30 de allá, su parte UTC ya es el día siguiente.
+     */
+    it('⭐ 0.230 · el «desde» de la receta abierta es el día de México, no su parte UTC', async () => {
+      await liberadaCompleta();
+      await abrirReceta(sesion(), ordenA, { motivo: 'primera razón' }, bd());
+      await cliente.orden.update({
+        where: { id: ordenA },
+        data: { recetaAbiertaEn: new Date('2026-10-13T05:30:00.000Z') }, // 23:30 del 12 en México
+      });
+      const mensaje = await mensajeDe(
+        abrirReceta(sesion(), ordenA, { motivo: 'segunda razón' }, bd()),
+      );
+      expect(mensaje).toContain('YA está abierta desde el 12/10/2026');
+    });
+
     it('⚠️ no se puede abrir una receta que NO está liberada completa (nada que reabrir)', async () => {
       // Sin firmar nada: lo que no está firmado ya no se compra, así que no necesita candado — y
       // permitirlo dejaría órdenes imposibles de cerrar (un renglón que el cliente no autoriza).

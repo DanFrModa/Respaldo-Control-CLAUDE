@@ -119,7 +119,12 @@ async function crearUsuarioConRol(
   return { idRol: rol.id, idUsuario: usuario.id };
 }
 
-const hoy = new Date('2026-06-22T00:00:00Z');
+// «Hoy» = lunes 22 en MÉXICO, a las 23:30 de allá — que en UTC ya es el martes 23. Desde la fila
+// 0.230 el dominio convierte el `ahora` que recibe al día DEL NEGOCIO; se ancla A PROPÓSITO en la
+// franja en que las dos cuentas se separan, así cada aserción de este archivo (escrita para el 22)
+// se pone roja si alguna entrada vuelve a truncar en UTC. (Antes iba la medianoche UTC del 22, que
+// en México todavía es el domingo 21 a las 18:00.)
+const hoy = new Date('2026-06-23T05:30:00Z');
 
 describe('consultarBandeja — "mis tareas"', () => {
   it('(a) un proceso con 2 antecesores, uno incompleto, NO aparece (no está activo)', async () => {
@@ -151,6 +156,28 @@ describe('consultarBandeja — "mis tareas"', () => {
     expect(ids).toContain(rb); // b está activo → aparece.
     expect(ids).not.toContain(rc); // c pendiente (falta b) → NO aparece.
     expect(ids).not.toContain(ra); // a completado → no es tarea.
+  });
+
+  /**
+   * ⭐ FILA 0.230 — `hoy` es el 22 a las 23:30 de México (en UTC ya es el 23). La tarea planeada
+   * para el 22 es «para hoy», sin días de atraso. Con el día UTC del instante salía «vencida» con un
+   * día de atraso seis horas antes de tiempo.
+   */
+  it('⭐ a las 23:30 de México una tarea planeada para HOY es «hoy», no vencida', async () => {
+    const idOrden = await crearOrdenConRc();
+    const proc = await crearProcesoDef('corte');
+    const idRuta = await crearRenglon(idOrden, proc, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-22',
+    });
+    const conBandejaCompleta = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
+    });
+    const pagina = await consultarBandeja(conBandejaCompleta, {}, bd(), hoy);
+    expect(pagina.datos).toHaveLength(1);
+    expect(pagina.datos[0]).toMatchObject({ idRutaOrden: idRuta, urgencia: 'hoy', diasAtraso: 0 });
   });
 
   it('(b) un usuario con un rol SECUNDARIO del proceso SÍ lo ve', async () => {
@@ -320,6 +347,37 @@ describe('contarAlertas', () => {
     });
     const conteo = await contarAlertas(conBandejaCompleta, bd(), hoy);
     expect(conteo).toEqual({ atrasados: 1, enRiesgo: 1 });
+  });
+
+  /**
+   * ⭐ FILA 0.230 — «hoy» es el día DE MÉXICO. A las 23:30 del 22 allá, en UTC ya es el 23; con el
+   * truncado UTC de antes, un proceso planeado para el 22 salía ATRASADO media noche antes de
+   * tiempo (y el `riesgo-rc` lo marcaba en riesgo). Ahora sigue en el día: `enRiesgo`, no atrasado.
+   */
+  it('⭐ a las 23:30 de México un proceso planeado para HOY no está atrasado (fila 0.230)', async () => {
+    const idOrden = await crearOrdenConRc();
+    const a = await crearProcesoDef('a');
+    await crearRenglon(idOrden, a, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-22',
+    });
+    const conBandejaCompleta = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver', 'rc.bandeja-completa'],
+    });
+
+    const nocheEnMexico = new Date('2026-06-23T05:30:00.000Z'); // 23:30 del 22 en México
+    expect(await contarAlertas(conBandejaCompleta, bd(), nocheEnMexico)).toEqual({
+      atrasados: 0,
+      enRiesgo: 1,
+    });
+    // Y a las 00:30 del 23 ya sí: el día cambió de verdad.
+    const madrugadaEnMexico = new Date('2026-06-23T06:30:00.000Z');
+    expect(await contarAlertas(conBandejaCompleta, bd(), madrugadaEnMexico)).toEqual({
+      atrasados: 1,
+      enRiesgo: 0,
+    });
   });
 });
 

@@ -24,6 +24,7 @@ import { createElement as h, type ReactElement } from 'react';
 
 import { Image, Text, View, StyleSheet } from '@react-pdf/renderer';
 
+import { ZONA_DEL_NEGOCIO } from './fecha-negocio.js';
 import { LOGO_EMPAQUETADO_DATA_URL } from './logo-empaquetado.js';
 
 // ── Paleta (identidad VERDE del rediseño — tokens de `frontend/src/index.css`, tema claro) ─────────
@@ -372,12 +373,16 @@ export function EncabezadoDocumento(opts: EncabezadoOpciones): ReactElement {
   );
 }
 
-/** Fecha de generación (día de hoy, formato es-MX) — una sola vez por documento. */
+/**
+ * Fecha de generación (día de hoy, formato es-MX) — una sola vez por documento. Con el huso del
+ * NEGOCIO (fila 0.230): el servidor corre en UTC y, sin él, un papel impreso por la tarde decía mañana.
+ */
 function fechaGeneracion(): string {
   return new Date().toLocaleDateString('es-MX', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    timeZone: ZONA_DEL_NEGOCIO,
   });
 }
 

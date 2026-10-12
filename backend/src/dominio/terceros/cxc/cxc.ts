@@ -34,6 +34,7 @@ import {
 import type { z } from 'zod';
 
 import { ErrorNoEncontrado } from '../../../comun/errores.js';
+import { hoyDelNegocio } from '../../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { validarEntrada } from '../../../comun/validacion.js';
@@ -175,7 +176,7 @@ interface FilaNeta extends CubetasAging {
 
 /**
  * Agrega, por cliente, sus movimientos del motor en las cuatro cubetas de aging (BRUTAS) + los créditos,
- * por la empresa activa (A9). Cubetas por días de atraso sobre `fecha_vencimiento` (`CURRENT_DATE −
+ * por la empresa activa (A9). Cubetas por días de atraso sobre `fecha_vencimiento` (`hoy del negocio −
  * fecha_vencimiento`); los límites llegan como parámetro (F9-E5/D15d: configurables por empresa,
  * `leerLimitesAging`). Filtrar por `id_cliente IS NOT NULL` equivale a `tipo_tercero='cliente'`
  * (CHECK de exclusividad D15a) y evita castear el enum en crudo. Los subtotales viajan en `::numeric`
@@ -187,22 +188,26 @@ async function agregarPorCliente(
   limites: LimitesAging,
 ): Promise<FilaAgregadoCxc[]> {
   const { d30, d60 } = limites;
+  // «Hoy» es el día DEL NEGOCIO (fila 0.230), no `CURRENT_DATE`: ésa es la fecha de la SESIÓN de
+  // Postgres (UTC en el servidor), y de 18:00 a 23:59 de México ya es mañana — cada deuda salía
+  // con un día más de atraso.
+  const hoy = Prisma.sql`${hoyDelNegocio()}::date`;
   const crudas = await cliente.$queryRaw<FilaAgregadoCxcCruda[]>(Prisma.sql`
     SELECT
       m.id_cliente AS "idCliente",
       c.nombre     AS "cliente",
       COALESCE(c.dias_credito, 0)::int AS "diasCredito",
       COALESCE(SUM(m.monto) FILTER (
-        WHERE m.monto > 0 AND (m.fecha_vencimiento IS NULL OR CURRENT_DATE - m.fecha_vencimiento <= 0)
+        WHERE m.monto > 0 AND (m.fecha_vencimiento IS NULL OR ${hoy} - m.fecha_vencimiento <= 0)
       ), 0)::numeric AS "corriente",
       COALESCE(SUM(m.monto) FILTER (
-        WHERE m.monto > 0 AND CURRENT_DATE - m.fecha_vencimiento BETWEEN 1 AND ${d30}
+        WHERE m.monto > 0 AND ${hoy} - m.fecha_vencimiento BETWEEN 1 AND ${d30}
       ), 0)::numeric AS "d1a30",
       COALESCE(SUM(m.monto) FILTER (
-        WHERE m.monto > 0 AND CURRENT_DATE - m.fecha_vencimiento BETWEEN ${d30 + 1} AND ${d60}
+        WHERE m.monto > 0 AND ${hoy} - m.fecha_vencimiento BETWEEN ${d30 + 1} AND ${d60}
       ), 0)::numeric AS "d31a60",
       COALESCE(SUM(m.monto) FILTER (
-        WHERE m.monto > 0 AND CURRENT_DATE - m.fecha_vencimiento > ${d60}
+        WHERE m.monto > 0 AND ${hoy} - m.fecha_vencimiento > ${d60}
       ), 0)::numeric AS "mas60",
       COALESCE(-SUM(m.monto) FILTER (WHERE m.monto < 0), 0)::numeric AS "creditos"
     FROM movimientos_tercero m

@@ -64,6 +64,7 @@ import { esquemaSalidaProduccionCuerpo } from '../../contrato/index.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { hoyDelNegocio } from '../../comun/fecha-negocio.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
@@ -199,7 +200,8 @@ export async function salidaAProduccion(
       {
         idPedidoLinea,
         lineas: datos.lineas,
-        fecha: datos.fecha ?? aFechaIso(new Date()),
+        // Sin fecha, la OP nace HOY del negocio (fila 0.230), no el día UTC.
+        fecha: datos.fecha ?? hoyDelNegocio(),
         // Sin fecha explícita, la OP hereda la ventana de entrega del pedido (la RC automática
         // la usa como fecha de entrega de la ruta).
         fechaEntrega:
