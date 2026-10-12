@@ -230,3 +230,40 @@ describe('BandejaAutorizacionPagina — V1-E3u: el desvío AVISA a quien autoriz
     expect(screen.getByTestId('fila-aviso-desvio-oc')).toHaveTextContent('el sistema calculó 45 m');
   });
 });
+
+/** ⭐ Fila 0.231 — quien autoriza ve que es una COMPRA EXTRA (sobrecosto) y por qué. */
+describe('BandejaAutorizacionPagina · ⭐ 0.231 el motivo de la compra', () => {
+  function conMotivo(motivoCompra: { codigo: string; nombre: string } | null) {
+    useOrdenesCompraMock.mockReturnValue({
+      data: {
+        datos: [
+          ocDePrueba({
+            estatus: 'borrador',
+            idMotivoCompra: motivoCompra === null ? null : 2,
+            motivoCompra,
+          }),
+        ],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+  }
+
+  it('una OC con motivo lleva su insignia', () => {
+    conMotivo({ codigo: 'merma', nombre: 'Merma' });
+    expect(screen.getByTestId('insignia-motivo-oc')).toHaveTextContent('Compra extra: Merma');
+  });
+
+  it('una compra normal no lleva insignia', () => {
+    conMotivo(null);
+    expect(screen.queryByTestId('insignia-motivo-oc')).toBeNull();
+  });
+});

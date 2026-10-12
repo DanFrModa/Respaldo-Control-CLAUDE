@@ -41,12 +41,14 @@ import {
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
+import { exigirMotivoCompraValido } from './motivos-compra.js';
 import { motivoDesgloseInvalido } from './desglose-por-medida.js';
 import { modalidadFactura } from '../terceros/facturacion-proveedor.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
   CompraLineaSalida,
+  ImportePorMotivo,
   ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
@@ -55,9 +57,8 @@ import type {
   OrdenCompraLinea,
   OrdenCompraLineaMedida,
   OrdenCompraLineaTalla,
-  Prisma,
 } from '../../datos/index.js';
-import { EstatusOrdenCompra } from '../../datos/index.js';
+import { EstatusOrdenCompra, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { idsPorTextoSinAcentos } from '../../comun/busqueda.js';
@@ -124,6 +125,9 @@ const esquemaListarComprasDominio = esquemaPaginacion.extend({
   fechaDesde: z.iso.date().optional(),
   fechaHasta: z.iso.date().optional(),
   idOrden: z.number().int().positive().optional(),
+  // ⭐ Fila 0.231: filtro por motivo de la compra extra (ver `whereDeLista`).
+  idMotivoCompra: z.number().int().positive().optional(),
+  conMotivo: z.boolean().optional(),
   incluirCanceladas: z.boolean().default(false),
   ordenarPor: z.enum(['numCompra', 'fecha', 'fechaEntrega', 'creadoEn']).default('numCompra'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
@@ -143,6 +147,8 @@ type OCConDetalle = OrdenCompra & {
   /** `modalidadFacturacion` (fila 0.129): lo que decide qué deuda nace al RECIBIR (fila 0.124). */
   proveedor: { nombre: string; modalidadFacturacion: ModalidadFacturacion | null };
   direccionEntrega: { nombre: string; direccion: string } | null;
+  /** ⭐ Fila 0.231: el motivo de la compra extra (null = compra normal). */
+  motivoCompra: { codigo: string; nombre: string } | null;
   lineas: (OrdenCompraLinea & {
     tela: { nombre: string; nombreComplemento: string | null } | null;
     telaColor: { nombre: string; pantone: string | null } | null;
@@ -168,6 +174,7 @@ const incluirDetalle = {
   // `modalidadFacturacion` y no la casilla vieja: desde la fila 0.124 es la única que contesta.
   proveedor: { select: { nombre: true, modalidadFacturacion: true } },
   direccionEntrega: { select: { nombre: true, direccion: true } },
+  motivoCompra: { select: { codigo: true, nombre: true } },
   lineas: {
     orderBy: { id: 'asc' },
     include: {
@@ -1003,6 +1010,8 @@ function aCompraSalida(
     entregaEn: oc.entregaEn,
     observaciones: oc.observaciones,
     correspondeA: oc.correspondeA,
+    idMotivoCompra: oc.idMotivoCompra,
+    motivoCompra: oc.motivoCompra,
     facturasAmparadasLegacy: oc.facturasAmparadasLegacy,
     idUsuAutorizado: oc.idUsuAutorizado,
     fechaAutorizado: oc.fechaAutorizado === null ? null : oc.fechaAutorizado.toISOString(),
@@ -1113,7 +1122,15 @@ export async function crearOC(
    * que pueden nacer con el COMPLEMENTO de la tela pendiente (§Post-F9.18). La captura de una
    * persona siempre entra sin esto, y la autorización exige el complemento en ambos casos.
    */
-  opciones: { automatica?: boolean } = {},
+  opciones: {
+    automatica?: boolean;
+    /**
+     * ⭐ Fila 0.231 — Uso INTERNO de la explosión: el código del motivo que el SISTEMA propuso para
+     * esta OC (`sobre-corte`), o `null` si no propuso ninguno. Sólo va a la bitácora; el motivo que
+     * se guarda es el de `entrada.idMotivoCompra` (que el comprador pudo cambiar en la previa).
+     */
+    motivoPropuesto?: string | null;
+  } = {},
 ): Promise<CompraSalida> {
   verificarPermiso(sesion, 'compras.administrar');
   const datos = validarEntrada(esquemaCompraCrear, entrada);
@@ -1131,6 +1148,11 @@ export async function crearOC(
     );
     await exigirProveedorExiste(tx, datos.idProveedor);
     const direccion = await exigirDireccionEntregaValida(tx, datos.idDireccionEntrega);
+    // ⭐ Fila 0.231: el motivo de la compra extra, si viene, tiene que existir y estar ACTIVO.
+    const motivo =
+      datos.idMotivoCompra == null
+        ? null
+        : await exigirMotivoCompraValido(tx, datos.idMotivoCompra);
     const { idsOrden, lineas } = await validarLineas(
       tx,
       sesion.idEmpresaActiva,
@@ -1164,6 +1186,7 @@ export async function crearOC(
         entregaEn: direccion.direccion,
         observaciones: aTexto(datos.observaciones) ?? null,
         correspondeA: aTexto(datos.correspondeA) ?? null,
+        idMotivoCompra: motivo?.id ?? null,
         estatus: 'borrador',
         ...datosCreacion(sesion),
       },
@@ -1180,6 +1203,13 @@ export async function crearOC(
         numCompra: Number(folio),
         idProveedor: datos.idProveedor,
         renglones: datos.lineas.length,
+        // ⭐ Fila 0.231: con qué motivo nació (null = compra normal). Si la propuso la explosión,
+        // también queda dicho: un sobre-corte propuesto por el sistema no es lo mismo que uno
+        // elegido por una persona.
+        motivoCompra: motivo?.codigo ?? null,
+        ...(opciones.motivoPropuesto === undefined
+          ? {}
+          : { motivoPropuestoPorExplosion: opciones.motivoPropuesto }),
       },
     });
 
@@ -1269,6 +1299,20 @@ export async function actualizarOC(
     if (datos.observaciones !== undefined)
       cambios.observaciones = aTexto(datos.observaciones) ?? null;
     if (datos.correspondeA !== undefined) cambios.correspondeA = aTexto(datos.correspondeA) ?? null;
+    // ⭐ Fila 0.231 — el MOTIVO es una anotación, como `correspondeA`: se cambia aunque la OC tenga
+    // material recibido (la puerta de la 0.225 mira renglones y proveedor, no esto). Pero cambia lo
+    // que suman los informes, así que el antes → después va a la bitácora. Sólo se valida el motivo
+    // NUEVO: si no cambia, una OC cuyo motivo se desactivó después lo conserva al editar otra cosa.
+    const nuevoMotivo = datos.idMotivoCompra;
+    const cambioDeMotivo =
+      nuevoMotivo !== undefined && nuevoMotivo !== actual.idMotivoCompra
+        ? {
+            antes: actual.idMotivoCompra,
+            despues:
+              nuevoMotivo === null ? null : (await exigirMotivoCompraValido(tx, nuevoMotivo)).id,
+          }
+        : null;
+    if (cambioDeMotivo !== null) cambios.idMotivoCompra = cambioDeMotivo.despues;
 
     await tx.ordenCompra.update({ where: { id }, data: cambios });
 
@@ -1321,6 +1365,8 @@ export async function actualizarOC(
       datos: {
         encabezado: true,
         lineas: datos.lineas?.length,
+        // ⭐ Fila 0.231: el cambio de motivo (ids antes → después; null = compra normal).
+        ...(cambioDeMotivo === null ? {} : { motivoCompra: cambioDeMotivo }),
         // Marca de que ESTA edición cayó sobre una OC ya firmada (A7: la bitácora tiene que poder
         // distinguirla de corregir un borrador). Se llamaba `edicionAdminSobreAutorizada`: se
         // renombró en la fila 0.120 porque ya no hay «admin» que la haga, sino quien tenga
@@ -1670,22 +1716,9 @@ export async function listarOC(
   verificarPermiso(sesion, 'compras.ver');
   const filtros = validarEntrada(esquemaListarComprasDominio, parametros);
 
-  const where: Prisma.OrdenCompraWhereInput = {
-    idEmpresa: sesion.idEmpresaActiva,
-    ...(filtros.estatus === undefined ? {} : { estatus: filtros.estatus }),
-    ...(filtros.estatus === undefined && !filtros.incluirCanceladas
-      ? { estatus: { not: 'cancelada' } }
-      : {}),
-    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
-    // OC ligadas a una orden de PRODUCCIÓN (pantalla "Compras por orden", R7): vía el N:N de
-    // encabezado `OrdenCompraOrden` (que el dominio deriva de los idOrden de las líneas). La
-    // empresa ya está sellada arriba (A9), así que no hace falta re-filtrar la orden por empresa.
-    ...(filtros.idOrden === undefined
-      ? {}
-      : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
-    ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
-    ...(await armarBusqueda(filtros.busqueda, bd)),
-  };
+  // ⭐ Fila 0.231 (H2/H4): el filtro de la lista se RESUELVE una vez y se pinta en Prisma (aquí) o en
+  // SQL (el importe por motivo del resumen) desde la MISMA estructura — ver `FiltroListaOc`.
+  const where = whereDeLista(await resolverFiltroLista(sesion.idEmpresaActiva, filtros, bd));
 
   const cliente = clienteLectura(bd);
   const pctDesvio = await pctDesvioDeEmpresa(cliente, sesion.idEmpresaActiva);
@@ -1716,16 +1749,16 @@ const ESTATUS_ABIERTOS: readonly EstatusOrdenCompra[] = [
 ];
 
 /**
- * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
- * del listado que ACOTAN el universo de OC abiertas (proveedor/fecha/búsqueda/orden ligada); el
- * estatus NO entra (el resumen SIEMPRE mira las abiertas).
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring): LOS MISMOS de la
+ * lista (sin orden ni paginación). Los KPIs de OC abiertas y por recibir ignoran `estatus` e
+ * `incluirCanceladas` (SIEMPRE miran las abiertas); el importe por motivo (fila 0.231) los respeta,
+ * para cuadrar exactamente con la lista que se está viendo.
  */
-const esquemaResumenOCDominio = z.object({
-  busqueda: z.string().trim().max(200).optional(),
-  idProveedor: z.number().int().positive().optional(),
-  fechaDesde: z.iso.date().optional(),
-  fechaHasta: z.iso.date().optional(),
-  idOrden: z.number().int().positive().optional(),
+const esquemaResumenOCDominio = esquemaListarComprasDominio.omit({
+  pagina: true,
+  porPagina: true,
+  ordenarPor: true,
+  direccion: true,
 });
 
 /** Parámetros del resumen (los reutiliza la ruta REST). */
@@ -1748,16 +1781,15 @@ export async function resumenOC(
   const filtros = validarEntrada(esquemaResumenOCDominio, parametros);
   const cliente = clienteLectura(bd);
 
+  const filtro = await resolverFiltroLista(sesion.idEmpresaActiva, filtros, bd);
+  // Las abiertas: el filtro de la lista SIN su estatus (el resumen siempre mira las abiertas).
   const where: Prisma.OrdenCompraWhereInput = {
-    idEmpresa: sesion.idEmpresaActiva,
+    ...whereDeLista({ ...filtro, estatus: undefined, incluirCanceladas: true }),
     estatus: { in: [...ESTATUS_ABIERTOS] },
-    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
-    ...(filtros.idOrden === undefined
-      ? {}
-      : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
-    ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
-    ...(await armarBusqueda(filtros.busqueda, bd)),
   };
+
+  // ⭐ Fila 0.231 (H2): el importe por motivo, con EXACTAMENTE el filtro de la lista.
+  const importePorMotivo = await importePorMotivoDe(cliente, sqlDeLista(filtro));
 
   const abiertas = await cliente.ordenCompra.findMany({
     where,
@@ -1778,7 +1810,7 @@ export async function resumenOC(
   });
   const ocAbiertas = abiertas.length;
   if (ocAbiertas === 0) {
-    return { ocAbiertas: 0, porRecibir: 0 };
+    return { ocAbiertas: 0, porRecibir: 0, importePorMotivo };
   }
 
   // Σ recibido por línea de OC en recepciones ACTIVAS (reversadaEn = null): MISMO criterio que
@@ -1820,52 +1852,211 @@ export async function resumenOC(
       porRecibir += falta.complemento * (l.precioComplemento?.toNumber() ?? precio);
     }
   }
-  return { ocAbiertas, porRecibir: redondear2(porRecibir) };
+  return { ocAbiertas, porRecibir: redondear2(porRecibir), importePorMotivo };
 }
 
+/** Nombre del renglón sin motivo en el importe por motivo. */
+const NOMBRE_COMPRA_NORMAL = 'Compra normal';
+
 /**
- * Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR.
+ * ⭐ Fila 0.231 (§Post-F9.245(b)) — **CUÁNTO SE COMPRÓ Y POR QUÉ**, agregado EN EL SERVIDOR (un
+ * `GROUP BY` en SQL, nunca un pivote en el cliente). El universo lo decide el llamador con el filtro
+ * de la lista ya pintado en SQL (`sqlDeLista`): va DIRECTO en el `WHERE`, sin traer ids primero
+ * (H4 del reviewer: un `IN` con miles de ids topa con los 65 535 parámetros de Postgres);
+ * aquí se suman los TOTALES de esas OC con la MISMA regla que `aCompraSalida` usa para el subtotal
+ * de cada renglón: `round2(cantidad × precio + complemento × (precioComplemento ?? precio))`. Así
+ * la suma de un motivo es exactamente la suma de la columna «Total» de esas OC en la lista.
  *
- * El nombre del proveedor se compara SIN acentos ni mayúsculas (fila 0.214): el pre-filtro corre
- * contra el CATÁLOGO de proveedores (chico) y se compone por `idProveedor`.
+ * Primero la compra normal (sin motivo) y luego los motivos en su orden de catálogo. Sólo salen los
+ * motivos con al menos una OC: un renglón en cero no le dice nada a quien lee el KPI.
  */
-async function armarBusqueda(
-  busqueda: string | undefined,
-  bd?: ContextoBd,
-): Promise<Prisma.OrdenCompraWhereInput> {
-  if (busqueda === undefined || busqueda === '') {
-    return {};
-  }
-  const idsProveedor = await idsPorTextoSinAcentos(clienteLectura(bd), 'proveedor', busqueda);
-  const or: Prisma.OrdenCompraWhereInput[] = [{ idProveedor: { in: idsProveedor } }];
-  if (/^\d+$/.test(busqueda.trim())) {
-    try {
-      or.push({ numCompra: BigInt(busqueda.trim()) });
-    } catch {
-      // No es un bigint válido; se ignora.
-    }
-  }
-  return { OR: or };
+async function importePorMotivoDe(
+  cliente: ClienteLectura,
+  where: Prisma.Sql,
+): Promise<ImportePorMotivo[]> {
+  const filas = await cliente.$queryRaw<
+    {
+      idMotivoCompra: number | null;
+      codigo: string | null;
+      nombre: string | null;
+      ocs: bigint;
+      importe: Prisma.Decimal | null;
+    }[]
+  >(Prisma.sql`
+    SELECT
+      oc."id_motivo_compra"       AS "idMotivoCompra",
+      m."codigo"                  AS "codigo",
+      m."nombre"                  AS "nombre",
+      COUNT(DISTINCT oc."id")     AS "ocs",
+      SUM(ROUND(
+        l."cantidad" * l."precio"
+          + COALESCE(l."cantidad_complemento", 0) * COALESCE(l."precio_complemento", l."precio"),
+        2
+      ))                          AS "importe"
+    FROM "ordenes_compra" oc
+    LEFT JOIN "orden_compra_linea" l ON l."id_orden_compra" = oc."id"
+    LEFT JOIN "motivo_compra" m ON m."id" = oc."id_motivo_compra"
+    WHERE ${where}
+    GROUP BY oc."id_motivo_compra", m."codigo", m."nombre", m."orden"
+    ORDER BY (oc."id_motivo_compra" IS NOT NULL), m."orden", oc."id_motivo_compra"
+  `);
+  return filas.map((f) => ({
+    idMotivoCompra: f.idMotivoCompra,
+    codigo: f.codigo,
+    nombre: f.nombre ?? NOMBRE_COMPRA_NORMAL,
+    ocs: Number(f.ocs),
+    importe: redondear2(f.importe === null ? 0 : Number(f.importe)),
+  }));
 }
 
 /**
- * Arma el filtro por rango de fecha de emisión (`@db.Date`): `desde` inclusivo (gte) y `hasta`
- * inclusivo del DÍA COMPLETO (lt del día siguiente, para no excluir las horas de la fecha "hasta").
+ * ⭐ Fila 0.231 (H2/H4 del reviewer) — **EL FILTRO DE LA LISTA DE OC, RESUELTO UNA SOLA VEZ.**
+ *
+ * La lista lo usa como `where` de Prisma ({@link whereDeLista}) y el importe por motivo del resumen
+ * como `WHERE` de SQL ({@link sqlDeLista}), porque un `GROUP BY` con multiplicación de columnas no
+ * se puede escribir en Prisma y traer los ids para pasarlos en un `IN` topa con el límite de
+ * parámetros. Los dos pintan ESTA estructura, campo por campo y en el mismo orden; lo que no puede
+ * divergir en silencio lo cuida la prueba de integración que cruza la lista contra el importe con
+ * cada filtro (`motivo-de-la-oc.int.test.ts`).
+ *
+ * La búsqueda se resuelve aquí (los ids de proveedor por texto sin acentos — catálogo chico — y el
+ * folio si es número) para que los dos lados comparen contra los MISMOS valores.
  */
-function armarFiltroFecha(
-  desde: string | undefined,
-  hasta: string | undefined,
-): Prisma.OrdenCompraWhereInput {
-  if (desde === undefined && hasta === undefined) {
-    return {};
+interface FiltroListaOc {
+  idEmpresa: number;
+  estatus: EstatusOrdenCompra | undefined;
+  incluirCanceladas: boolean;
+  idProveedor: number | undefined;
+  idOrden: number | undefined;
+  idMotivoCompra: number | undefined;
+  conMotivo: boolean | undefined;
+  fechaDesde: string | undefined;
+  fechaHasta: string | undefined;
+  busqueda: { idsProveedor: number[]; numCompra: bigint | null } | null;
+}
+
+async function resolverFiltroLista(
+  idEmpresa: number,
+  filtros: {
+    busqueda?: string | undefined;
+    idProveedor?: number | undefined;
+    estatus?: EstatusOrdenCompra | undefined;
+    fechaDesde?: string | undefined;
+    fechaHasta?: string | undefined;
+    idOrden?: number | undefined;
+    idMotivoCompra?: number | undefined;
+    conMotivo?: boolean | undefined;
+    incluirCanceladas: boolean;
+  },
+  bd?: ContextoBd,
+): Promise<FiltroListaOc> {
+  const texto = filtros.busqueda?.trim() ?? '';
+  let busqueda: FiltroListaOc['busqueda'] = null;
+  if (texto !== '') {
+    // El nombre del proveedor se compara SIN acentos ni mayúsculas (fila 0.214): el pre-filtro
+    // corre contra el CATÁLOGO de proveedores (chico) y se compone por `idProveedor`.
+    const idsProveedor = await idsPorTextoSinAcentos(clienteLectura(bd), 'proveedor', texto);
+    let numCompra: bigint | null = null;
+    if (/^\d+$/.test(texto)) {
+      try {
+        numCompra = BigInt(texto);
+      } catch {
+        // No es un bigint válido; se ignora.
+      }
+    }
+    busqueda = { idsProveedor, numCompra };
   }
-  const fecha: Prisma.DateTimeNullableFilter = {};
-  if (desde !== undefined) fecha.gte = new Date(`${desde}T00:00:00.000Z`);
-  // Hasta el FINAL del día (lt del día siguiente) para incluir toda la fecha "hasta".
-  if (hasta !== undefined) {
-    const d = new Date(`${hasta}T00:00:00.000Z`);
-    d.setUTCDate(d.getUTCDate() + 1);
-    fecha.lt = d;
+  return {
+    idEmpresa,
+    estatus: filtros.estatus,
+    incluirCanceladas: filtros.incluirCanceladas,
+    idProveedor: filtros.idProveedor,
+    idOrden: filtros.idOrden,
+    idMotivoCompra: filtros.idMotivoCompra,
+    conMotivo: filtros.conMotivo,
+    fechaDesde: filtros.fechaDesde,
+    fechaHasta: filtros.fechaHasta,
+    busqueda,
+  };
+}
+
+/** Fecha `YYYY-MM-DD` como el `Date` (00:00 UTC) con el que Prisma compara un `@db.Date`. */
+function diaUtc(fecha: string, masDias = 0): Date {
+  const d = new Date(`${fecha}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + masDias);
+  return d;
+}
+
+/** El filtro de la lista como `where` de Prisma. */
+function whereDeLista(f: FiltroListaOc): Prisma.OrdenCompraWhereInput {
+  const where: Prisma.OrdenCompraWhereInput = { idEmpresa: f.idEmpresa };
+  // Estatus: el pedido gana; sin él, las canceladas sólo si se piden.
+  if (f.estatus !== undefined) where.estatus = f.estatus;
+  else if (!f.incluirCanceladas) where.estatus = { not: EstatusOrdenCompra.cancelada };
+  if (f.idProveedor !== undefined) where.idProveedor = f.idProveedor;
+  // OC ligadas a una orden de PRODUCCIÓN (pantalla "Compras por orden", R7): vía el N:N de
+  // encabezado `OrdenCompraOrden` (que el dominio deriva de los idOrden de las líneas). La
+  // empresa ya está sellada arriba (A9), así que no hace falta re-filtrar la orden por empresa.
+  if (f.idOrden !== undefined) where.ordenesLigadas = { some: { idOrden: f.idOrden } };
+  // ⭐ Fila 0.231: `idMotivoCompra` gana; si no, `conMotivo` separa extra (true) de normal (false).
+  if (f.idMotivoCompra !== undefined) where.idMotivoCompra = f.idMotivoCompra;
+  else if (f.conMotivo !== undefined) where.idMotivoCompra = f.conMotivo ? { not: null } : null;
+  // Fecha de emisión: `desde` inclusivo y `hasta` inclusivo del DÍA COMPLETO (lt del día siguiente).
+  if (f.fechaDesde !== undefined || f.fechaHasta !== undefined) {
+    where.fecha = {
+      ...(f.fechaDesde === undefined ? {} : { gte: diaUtc(f.fechaDesde) }),
+      ...(f.fechaHasta === undefined ? {} : { lt: diaUtc(f.fechaHasta, 1) }),
+    };
   }
-  return { fecha };
+  // Búsqueda: proveedor (por nombre) o folio.
+  if (f.busqueda !== null) {
+    where.OR = [
+      { idProveedor: { in: f.busqueda.idsProveedor } },
+      ...(f.busqueda.numCompra === null ? [] : [{ numCompra: f.busqueda.numCompra }]),
+    ];
+  }
+  return where;
+}
+
+/**
+ * El MISMO filtro como `WHERE` de SQL sobre `ordenes_compra oc`. Campo por campo, en el orden de
+ * {@link whereDeLista}. Los arreglos viajan como UN parámetro (`= ANY($n::int[])`), nunca expandidos.
+ */
+function sqlDeLista(f: FiltroListaOc): Prisma.Sql {
+  const condiciones: Prisma.Sql[] = [Prisma.sql`oc."id_empresa" = ${f.idEmpresa}`];
+  if (f.estatus !== undefined) condiciones.push(Prisma.sql`oc."estatus"::text = ${f.estatus}`);
+  else if (!f.incluirCanceladas) condiciones.push(Prisma.sql`oc."estatus"::text <> 'cancelada'`);
+  if (f.idProveedor !== undefined) {
+    condiciones.push(Prisma.sql`oc."id_proveedor" = ${f.idProveedor}`);
+  }
+  if (f.idOrden !== undefined) {
+    condiciones.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM "orden_compra_orden" oco
+        WHERE oco."id_orden_compra" = oc."id" AND oco."id_orden" = ${f.idOrden})`,
+    );
+  }
+  if (f.idMotivoCompra !== undefined) {
+    condiciones.push(Prisma.sql`oc."id_motivo_compra" = ${f.idMotivoCompra}`);
+  } else if (f.conMotivo !== undefined) {
+    condiciones.push(
+      f.conMotivo
+        ? Prisma.sql`oc."id_motivo_compra" IS NOT NULL`
+        : Prisma.sql`oc."id_motivo_compra" IS NULL`,
+    );
+  }
+  if (f.fechaDesde !== undefined) {
+    condiciones.push(Prisma.sql`oc."fecha" >= ${diaUtc(f.fechaDesde)}`);
+  }
+  if (f.fechaHasta !== undefined) {
+    condiciones.push(Prisma.sql`oc."fecha" < ${diaUtc(f.fechaHasta, 1)}`);
+  }
+  if (f.busqueda !== null) {
+    condiciones.push(
+      f.busqueda.numCompra === null
+        ? Prisma.sql`oc."id_proveedor" = ANY(${f.busqueda.idsProveedor}::int[])`
+        : Prisma.sql`(oc."id_proveedor" = ANY(${f.busqueda.idsProveedor}::int[])
+            OR oc."num_compra" = ${f.busqueda.numCompra})`,
+    );
+  }
+  return Prisma.join(condiciones, ' AND ');
 }

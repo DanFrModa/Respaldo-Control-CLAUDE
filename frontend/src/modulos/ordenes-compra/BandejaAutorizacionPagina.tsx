@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useSesion } from '@/sesion/useSesion';
 
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { foliosDeOrdenesCerradas } from '@/lib/orden-cerrada';
 import { DetalleRenglonesOc } from './DetalleRenglonesOc';
@@ -172,6 +173,13 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
                     <span className="text-muted-foreground">Corresponde a: </span>
                     {oc.correspondeA}
                   </p>
+                ) : null}
+
+                {/* ⭐ Fila 0.231: quien autoriza ve que es una compra EXTRA (sobrecosto) y por qué. */}
+                {oc.motivoCompra !== null ? (
+                  <ChipEstado tono="warn" className="mt-2" data-testid="insignia-motivo-oc">
+                    Compra extra: {oc.motivoCompra.nombre}
+                  </ChipEstado>
                 ) : null}
 
                 <AvisoDesvioOc oc={oc} />

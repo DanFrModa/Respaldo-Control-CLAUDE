@@ -1,4 +1,11 @@
-import type { OrdenCompra } from '@/api/tipos';
+import type { MotivoCompra, OrdenCompra } from '@/api/tipos';
+
+/** ⭐ Fila 0.231 — el catálogo de motivos tal como lo siembra el servidor. */
+export const MOTIVOS_DE_PRUEBA: MotivoCompra[] = [
+  { id: 1, codigo: 'reposicion', nombre: 'Reposición', orden: 1, fijo: false },
+  { id: 2, codigo: 'merma', nombre: 'Merma', orden: 2, fijo: false },
+  { id: 3, codigo: 'sobre-corte', nombre: 'Sobre-corte', orden: 3, fijo: true },
+];
 
 /**
  * Fixtures de OC para las pruebas de componente del módulo Órdenes de compra (F4-E2). Construye una
@@ -22,6 +29,9 @@ export function ocDePrueba(sobrescribir: Partial<OrdenCompra> = {}): OrdenCompra
     entregaEn: 'Almacén central',
     observaciones: null,
     correspondeA: null,
+    // ⭐ Fila 0.231: por defecto, compra normal (sin motivo).
+    idMotivoCompra: null,
+    motivoCompra: null,
     facturasAmparadasLegacy: null,
     idUsuAutorizado: null,
     fechaAutorizado: null,

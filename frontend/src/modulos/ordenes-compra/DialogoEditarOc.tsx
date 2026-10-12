@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
-import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
+import { useActualizarOc, useCrearOc, useMotivosCompra } from '@/api/ordenes-compra';
 import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTelas } from '@/api/telas';
@@ -125,6 +125,14 @@ export function DialogoEditarOc({
   const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
   const [observaciones, setObservaciones] = useState('');
   const [correspondeA, setCorrespondeA] = useState('');
+  /**
+   * ⭐ Fila 0.231 (§Post-F9.245(b)) — POR QUÉ se compra de más (reposición, merma, sobre-corte…).
+   * `null` = compra normal. Es una ANOTACIÓN como «Corresponde a»: se cambia aunque la OC ya tenga
+   * material recibido (el servidor lo deja y lo anota en la bitácora).
+   */
+  const [idMotivoCompra, setIdMotivoCompra] = useState<number | null>(null);
+  const motivos = useMotivosCompra();
+  const listaMotivos = motivos.data ?? [];
   const [renglones, setRenglones] = useState<RenglonOcCaptura[]>([]);
   /**
    * Nombre del proveedor elegido. Se guarda aparte porque la lista se acota en vivo: si el
@@ -203,6 +211,7 @@ export function DialogoEditarOc({
       setIdDireccionEntrega(oc.idDireccionEntrega);
       setObservaciones(oc.observaciones ?? '');
       setCorrespondeA(oc.correspondeA ?? '');
+      setIdMotivoCompra(oc.idMotivoCompra);
       setRenglones(capturaDesdeOc(oc));
     } else {
       setIdProveedor(null);
@@ -211,6 +220,7 @@ export function DialogoEditarOc({
       setIdDireccionEntrega(null);
       setObservaciones('');
       setCorrespondeA('');
+      setIdMotivoCompra(null);
       setRenglones([renglonVacio()]);
     }
   }, [abierto, oc]);
@@ -283,6 +293,8 @@ export function DialogoEditarOc({
       idDireccionEntrega,
       observaciones: observaciones.trim() || null,
       correspondeA: correspondeA.trim() || null,
+      // ⭐ Fila 0.231: el motivo viaja con las anotaciones (también en una OC con renglones fijos).
+      idMotivoCompra,
     };
     const encabezado = { ...anotaciones, idProveedor, lineas: renglones.map(renglonApi) };
 
@@ -329,7 +341,7 @@ export function DialogoEditarOc({
             {soloLectura
               ? 'Esta orden está autorizada: se muestra en solo lectura.'
               : conRenglonesFijos
-                ? 'Sus renglones y su proveedor ya no se cambian: sólo se corrigen sus notas y su entrega.'
+                ? 'Sus renglones y su proveedor ya no se cambian: sólo se corrigen sus notas, su motivo y su entrega.'
                 : 'Captura el encabezado y los renglones. El folio y el total los asigna el sistema.'}
           </DialogDescription>
         </DialogHeader>
@@ -432,6 +444,37 @@ export function DialogoEditarOc({
                 onChange={(e) => setCorrespondeA(e.target.value)}
                 data-testid="oc-corresponde-a"
               />
+            </Field>
+            {/* ⭐ Fila 0.231: el motivo NO sustituye a «Corresponde a»: contestan cosas distintas. */}
+            <Field>
+              <FieldLabel htmlFor="oc-motivo">Motivo de la compra extra</FieldLabel>
+              <SelectNativo
+                id="oc-motivo"
+                disabled={soloLectura}
+                value={idMotivoCompra === null ? '' : String(idMotivoCompra)}
+                onChange={(e) =>
+                  setIdMotivoCompra(e.target.value === '' ? null : Number(e.target.value))
+                }
+                data-testid="oc-motivo"
+              >
+                <option value="">Compra normal (la planeada)</option>
+                {/* Un motivo que se desactivó después no se pierde de la OC que ya lo tenía. */}
+                {idMotivoCompra !== null && !listaMotivos.some((m) => m.id === idMotivoCompra) ? (
+                  <option value={String(idMotivoCompra)}>
+                    {oc?.idMotivoCompra === idMotivoCompra
+                      ? (oc.motivoCompra?.nombre ?? 'Motivo actual')
+                      : 'Motivo actual'}
+                  </option>
+                ) : null}
+                {listaMotivos.map((m) => (
+                  <option key={m.id} value={String(m.id)}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </SelectNativo>
+              <p className="text-xs text-muted-foreground" data-testid="oc-motivo-ayuda">
+                «Corresponde a» dice para qué o para quién; el motivo dice por qué se compra de más.
+              </p>
             </Field>
             <Field>
               <FieldLabel htmlFor="oc-observaciones">Observaciones</FieldLabel>

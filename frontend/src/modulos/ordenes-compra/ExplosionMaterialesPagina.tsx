@@ -27,6 +27,7 @@ import {
   usePrevioCompra,
   imprimirExplosion,
 } from '@/api/mrp';
+import { useMotivosCompra } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
@@ -43,6 +44,7 @@ import type {
   AsignarProveedorEnBloqueCuerpo,
   ColorDeLaOrden,
   GenerarOcCuerpo,
+  MotivoCompra,
   OrdenExplosionada,
   PlanCompra,
   Proveedor,
@@ -157,6 +159,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * nadie tocó se mueven con ella, que es lo que "valor inicial" significa).
    */
   const [fechasProveedor, setFechasProveedor] = useState<Record<number, string>>({});
+  /**
+   * ⭐ Fila 0.231 (§Post-F9.245(b)) — EL MOTIVO DE CADA OC, elegido en la previa. Mapa de
+   * EXCEPCIONES, como las fechas: sólo se guarda lo que el comprador TOCÓ (la clave presente con
+   * `null` = «compra normal», dicho a propósito). Lo que nadie tocó nace con lo que propone el
+   * servidor (sobre-corte en la segunda pasada). La pantalla pinta SIEMPRE el motivo que el plan
+   * devuelve (`idMotivoCompra`): el servidor resuelve, la pantalla no (A1).
+   */
+  const [motivosProveedor, setMotivosProveedor] = useState<Record<number, number | null>>({});
+  const motivos = useMotivosCompra();
   /**
    * ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. *"Comprar el rollo completo es una decisión del
    * comprador en el momento de comprar — es un hecho entonces, y por eso sí se reparte"*. La
@@ -529,6 +540,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setPrecios({});
     setColoresAvio({});
     setCubiertos({});
+    // ⭐ Fila 0.231: otro conjunto de OP = otras OC; el motivo elegido para la anterior no aplica.
+    setMotivosProveedor({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
@@ -544,6 +557,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setPrecios({});
     setColoresAvio({});
     setCubiertos({});
+    // ⭐ Fila 0.231: otro conjunto de OP = otras OC; el motivo elegido para la anterior no aplica.
+    setMotivosProveedor({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -562,6 +577,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setPrecios({});
     setColoresAvio({});
     setCubiertos({});
+    // ⭐ Fila 0.231: otro conjunto de OP = otras OC; el motivo elegido para la anterior no aplica.
+    setMotivosProveedor({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -687,6 +704,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   }
 
   /**
+   * ⭐ Fila 0.231 — ELEGIR EL MOTIVO DE UNA OC desde la previa: se guarda la excepción y se le vuelve
+   * a pedir el plan al servidor (mismo camino que la cantidad y el precio), que es quien lo resuelve
+   * y lo valida. El cuerpo se arma con el mapa NUEVO, no con el estado (que todavía no cambió).
+   */
+  function elegirMotivoDesdeLaPrevia(idProveedor: number, idMotivoCompra: number | null): void {
+    const nuevos = { ...motivosProveedor, [idProveedor]: idMotivoCompra };
+    setMotivosProveedor(nuevos);
+    pedirPlan(cuerpoDeCompra(ajustes, precios, coloresAvio, cubiertos, nuevos));
+  }
+
+  /**
    * 🔴 **V1-E3z, 2ª vuelta — SÓLO SE PINTA LA RESPUESTA DE LA ÚLTIMA PETICIÓN.** Dos ediciones
    * seguidas dejan dos `mutate` en vuelo, y si las respuestas llegan al revés la pantalla acabaría
    * enseñando el plan de la PRIMERA mientras el estado ya lleva las dos correcciones — un total que
@@ -791,6 +819,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     preciosActuales: Record<string, string> = precios,
     coloresActuales: Record<string, string> = coloresAvio,
     cubiertosActuales: Record<string, string> = cubiertos,
+    motivosActuales: Record<number, number | null> = motivosProveedor,
   ): GenerarOcCuerpo {
     // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
     // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
@@ -801,6 +830,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
       idProveedor: Number(id),
       fechaEntrega: fecha,
+    }));
+    const motivosPorProveedor = Object.entries(motivosActuales).map(([id, idMotivoCompra]) => ({
+      idProveedor: Number(id),
+      idMotivoCompra,
     }));
     // ⭐⭐ V1-E3z (§Post-F9.94): un renglón puede traer AJUSTADA la cantidad, el precio, o los dos,
     // así que la lista se arma sobre la UNIÓN de las dos claves. Antes bastaba recorrer `ajustes`;
@@ -883,6 +916,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
       ...(direccionEfectiva === null ? {} : { idDireccionEntrega: direccionEfectiva }),
       ...(fechasPorProveedor.length === 0 ? {} : { fechasPorProveedor }),
       ...(listaAjustes.length === 0 ? {} : { ajustes: listaAjustes }),
+      // ⭐ Fila 0.231: sólo viajan los motivos TOCADOS (incluido el `null` = «compra normal»).
+      ...(motivosPorProveedor.length === 0 ? {} : { motivosPorProveedor }),
     };
   }
 
@@ -1144,6 +1179,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               onVolver={volverDeLaPrevia}
               onConfirmar={confirmarGeneracion}
               onAjustar={ajustarDesdeLaPrevia}
+              motivos={motivos.data ?? []}
+              onElegirMotivo={elegirMotivoDesdeLaPrevia}
             />
           ) : (
             <>
@@ -2279,6 +2316,8 @@ function RevisionPrevia({
   onVolver,
   onConfirmar,
   onAjustar,
+  motivos,
+  onElegirMotivo,
 }: {
   plan: PlanCompra;
   /**
@@ -2303,6 +2342,10 @@ function RevisionPrevia({
     campo: 'cantidad' | 'precio' | 'color' | 'cubierto',
     valor: string,
   ) => void;
+  /** ⭐ Fila 0.231: el catálogo de motivos de compra extra (para el selector de cada OC). */
+  motivos: readonly MotivoCompra[];
+  /** ⭐ Fila 0.231: elige el motivo de la OC de un proveedor y vuelve a pedir el plan. */
+  onElegirMotivo: (idProveedor: number, idMotivoCompra: number | null) => void;
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
@@ -2441,6 +2484,49 @@ function RevisionPrevia({
               </span>
               <span className="font-medium tabular-nums">{formatearMoneda(p.total)}</span>
             </span>
+          </div>
+          {/* ⭐ Fila 0.231 (§Post-F9.245(b) + §Post-F9.277): POR QUÉ existe esta OC. El valor es el
+              que resolvió el SERVIDOR (lo elegido aquí, o lo que él propone); la pantalla sólo lo
+              pinta y manda lo que el comprador cambie. */}
+          <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs">
+            <label htmlFor={`exp-previa-motivo-${p.idProveedor}`} className="text-muted-foreground">
+              Motivo de la compra
+            </label>
+            <SelectNativo
+              id={`exp-previa-motivo-${p.idProveedor}`}
+              className="h-7 w-56 text-xs"
+              value={p.idMotivoCompra === null ? '' : String(p.idMotivoCompra)}
+              disabled={generando}
+              onChange={(e) =>
+                onElegirMotivo(p.idProveedor, e.target.value === '' ? null : Number(e.target.value))
+              }
+              data-testid="exp-previa-motivo"
+            >
+              <option value="">Compra normal (la planeada)</option>
+              {/* Lo que el plan trae aunque el catálogo de la pantalla no lo tenga (desactivado). */}
+              {p.idMotivoCompra !== null && !motivos.some((m) => m.id === p.idMotivoCompra) ? (
+                <option value={String(p.idMotivoCompra)}>
+                  {p.motivoPropuesto?.idMotivoCompra === p.idMotivoCompra
+                    ? p.motivoPropuesto.nombre
+                    : 'Motivo elegido'}
+                </option>
+              ) : null}
+              {motivos.map((m) => (
+                <option key={m.id} value={String(m.id)}>
+                  {m.nombre}
+                </option>
+              ))}
+            </SelectNativo>
+            {p.motivoPropuesto !== null && p.idMotivoCompra === p.motivoPropuesto.idMotivoCompra ? (
+              <ChipEstado tono="info" sinPunto data-testid="exp-previa-motivo-propuesto">
+                Propuesto por el sistema: se cortó de más y esta orden ya tenía compra
+              </ChipEstado>
+            ) : null}
+            {p.sobreCorteMixto ? (
+              <ChipEstado tono="warn" sinPunto data-testid="exp-previa-motivo-mixto">
+                Mezcla material del sobre-corte con compra normal
+              </ChipEstado>
+            ) : null}
           </div>
           <ul>
             {p.renglones.map((r) => (

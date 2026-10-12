@@ -5836,6 +5836,12 @@ model OrdenCompra {
   /// en v2 lo supera la factura por recepción (E3+). No se captura por UI.
   facturasAmparadasLegacy String? @map("facturas_amparadas_legacy") @db.Text
 
+  /// ⭐ Fila 0.231 (§Post-F9.245(b)) — POR QUÉ SE COMPRA DE MÁS: reposición, merma, sobre-corte…
+  /// NULL = compra normal (la planeada). COMPLEMENTA a `correspondeA` (para qué / para quién), no lo
+  /// sustituye. Es una anotación: se edita aunque la OC ya tenga material recibido. Restrict.
+  idMotivoCompra Int?          @map("id_motivo_compra")
+  motivoCompra   MotivoCompra? @relation(fields: [idMotivoCompra], references: [id], onDelete: Restrict)
+
   lineas         OrdenCompraLinea[]
   /// Ligas N:N (a nivel encabezado) a las órdenes de producción de la OC (F4-E2). Cascade.
   ordenesLigadas OrdenCompraOrden[]
@@ -5853,7 +5859,34 @@ model OrdenCompra {
   @@index([estatus])
   @@index([fecha])
   @@index([idDireccionEntrega])
+  @@index([idMotivoCompra])
   @@map("ordenes_compra")
+}
+
+/// ⭐ Fila 0.231 (§Post-F9.245(b)) — MOTIVO DE UNA COMPRA EXTRA. Catálogo GLOBAL (A9 / ADR-0007,
+/// mismo patrón que `ConceptoCosto`): dice POR QUÉ existe una OC que es sobrecosto, para poder SUMAR
+/// cuánto se gastó de más y por qué. Daniel: *«reposición y merma podrían ser las primeras dos del
+/// catálogo»*; el tercero, sobre-corte, salió de su pregunta siguiente. `fijo=true` = el sistema lo
+/// usa por su `codigo` (la explosión propone `sobre-corte`), así que no se desactiva.
+model MotivoCompra {
+  id     Int     @id @default(autoincrement())
+  /// Clave estable kebab-case (ej. "reposicion", "sobre-corte"). Única global.
+  codigo String  @unique
+  nombre String
+  /// Orden de despliegue en los selectores.
+  orden  Int     @default(0)
+  /// Motivo que el SISTEMA usa por código (sobre-corte): no se desactiva ni se renombra el código.
+  fijo   Boolean @default(false)
+  activo Boolean @default(true)
+
+  ordenesCompra OrdenCompra[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("motivo_compra")
 }
 
 /// Renglón de una orden de compra (F4-E2 — ex `OrdCompraDet`). Un material a comprar:

@@ -273,6 +273,17 @@ export const esquemaCompraCrear = z.object({
     .nullable()
     .optional()
     .describe('A qué corresponde la compra (texto libre).'),
+  idMotivoCompra: z
+    .number()
+    .int({ error: 'El id del motivo de compra debe ser entero' })
+    .positive({ error: 'El id del motivo de compra debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe(
+      '⭐ Fila 0.231 — POR QUÉ se compra de más (reposición, merma, sobre-corte…; catálogo ' +
+        '`GET /api/compras/motivos-compra`). null/ausente = compra normal. COMPLEMENTA a ' +
+        '`correspondeA` (para qué / para quién), no lo sustituye.',
+    ),
   lineas: z
     .array(esquemaCompraLineaEntrada)
     .default([])
@@ -303,6 +314,10 @@ export const esquemaCompraEditarCuerpo = z.object({
   idDireccionEntrega: esquemaCompraCrear.shape.idDireccionEntrega.optional(),
   observaciones: esquemaCompraCrear.shape.observaciones,
   correspondeA: esquemaCompraCrear.shape.correspondeA,
+  // ⭐ Fila 0.231: el motivo es una ANOTACIÓN, como `correspondeA` — se cambia aunque la OC ya tenga
+  // material recibido (no cae bajo la puerta de renglones/proveedor de la fila 0.225). null = vuelve
+  // a compra normal; ausente = no se toca. El cambio queda en la bitácora (antes → después).
+  idMotivoCompra: esquemaCompraCrear.shape.idMotivoCompra,
   lineas: z
     .array(esquemaCompraLineaEntrada)
     .optional()
@@ -537,6 +552,18 @@ export const esquemaCompraSalida = z
     entregaEn: z.string().nullable().describe('Dónde se entrega, o null.'),
     observaciones: z.string().nullable().describe('Observaciones, o null.'),
     correspondeA: z.string().nullable().describe('A qué corresponde la compra, o null.'),
+    idMotivoCompra: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐ Fila 0.231: motivo de la compra extra; null = compra normal.'),
+    motivoCompra: z
+      .object({
+        codigo: z.string().describe('Código estable del motivo ("reposicion", "sobre-corte"…).'),
+        nombre: z.string().describe('Nombre del motivo (para la UI).'),
+      })
+      .nullable()
+      .describe('⭐ Fila 0.231: el motivo, con su nombre; null = compra normal.'),
     facturasAmparadasLegacy: z
       .string()
       .nullable()
@@ -572,6 +599,31 @@ export type CompraSalida = z.infer<typeof esquemaCompraSalida>;
 // ── Listado / búsqueda ────────────────────────────────────────────────────────────────
 
 /**
+ * ⭐ Fila 0.231 — el filtro por MOTIVO de la compra (listado y resumen). Dos parámetros y no uno,
+ * porque «compra normal» es la AUSENCIA de motivo (NULL), no un motivo más del catálogo:
+ *  • `idMotivoCompra`: sólo las OC de ese motivo (gana sobre `conMotivo`).
+ *  • `conMotivo`: `true` = cualquier compra extra (con algún motivo); `false` = sólo compras normales.
+ * Devuelto por una función para no reusar la MISMA instancia de Zod en dos objetos.
+ */
+function camposFiltroMotivo() {
+  return {
+    idMotivoCompra: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('⭐ Fila 0.231: sólo las OC con ese motivo de compra extra.'),
+    conMotivo: z
+      .stringbool()
+      .optional()
+      .describe(
+        '⭐ Fila 0.231: true = sólo compras extra (con algún motivo); false = sólo compras ' +
+          'normales (sin motivo). `idMotivoCompra` gana si vienen los dos.',
+      ),
+  } as const;
+}
+
+/**
  * Parámetros del listado de OC EN LA URL (querystring). Filtros por proveedor/estatus/rango de
  * fechas + búsqueda (folio o nombre de proveedor), orden y paginación de servidor.
  */
@@ -603,6 +655,7 @@ export const esquemaListarCompras = z
       .describe(
         'Filtra las OC ligadas a una orden de producción (R7; pantalla "Compras por orden").',
       ),
+    ...camposFiltroMotivo(),
     incluirCanceladas: z
       .stringbool()
       .default(false)
@@ -635,9 +688,10 @@ export type ComprasPagina = z.infer<typeof esquemaComprasPagina>;
 // ── Resumen de cabecera (KPIs `vCompras`, rediseño R9) ─────────────────────────────────
 
 /**
- * Filtros del resumen de OC (querystring). Sub-conjunto de los del listado que ACOTAN el universo
- * de "OC abiertas": proveedor, rango de fecha de emisión, búsqueda (folio/proveedor) y orden ligada.
- * El estatus NO se recibe: el resumen SIEMPRE mira las OC abiertas (autorizada + recibida_parcial).
+ * Filtros del resumen de OC (querystring): los del listado, sin orden ni paginación. Las "OC
+ * abiertas" y lo por recibir usan proveedor, fechas, búsqueda, orden ligada y motivo, e IGNORAN el
+ * estatus y las canceladas (SIEMPRE miran autorizada + recibida_parcial). El importe por motivo
+ * (fila 0.231) usa TODO el filtro, estatus y canceladas incluidos, para cuadrar con la lista.
  */
 export const esquemaResumenComprasQuery = z
   .object({
@@ -656,11 +710,35 @@ export const esquemaResumenComprasQuery = z
       .positive()
       .optional()
       .describe('Filtra las OC ligadas a una orden de producción (R7).'),
+    ...camposFiltroMotivo(),
+    // ⭐ Fila 0.231 (H2): el estatus y las canceladas de la LISTA. Sólo acotan el importe por
+    // motivo (que cuadra con lo que se ve); las OC abiertas y lo por recibir los ignoran.
+    estatus: esquemaEstatusOrdenCompra
+      .optional()
+      .describe('Estatus de la lista: acota SÓLO el importe por motivo (fila 0.231).'),
+    incluirCanceladas: z
+      .stringbool()
+      .default(false)
+      .describe('Canceladas de la lista: acota SÓLO el importe por motivo (fila 0.231).'),
   })
   .describe('Filtros del resumen de órdenes de compra (KPIs de cabecera).');
 
 /** Parámetros del resumen de OC ya coaccionados desde la URL. */
 export type ResumenComprasQuery = z.infer<typeof esquemaResumenComprasQuery>;
+
+/** ⭐ Fila 0.231 — un renglón del importe por motivo del resumen. */
+export const esquemaImportePorMotivo = z
+  .object({
+    idMotivoCompra: z.number().int().nullable().describe('Motivo; null = compra normal.'),
+    codigo: z.string().nullable().describe('Código del motivo; null = compra normal.'),
+    nombre: z.string().describe('Nombre del motivo ("Compra normal" cuando no hay).'),
+    ocs: z.number().int().describe('# de OC de ese motivo que cumplen el filtro.'),
+    importe: z.number().describe('Σ de los totales de esas OC (cuerpo + complemento).'),
+  })
+  .describe('Importe comprado por motivo de compra (fila 0.231).');
+
+/** Forma de un renglón del importe por motivo. */
+export type ImportePorMotivo = z.infer<typeof esquemaImportePorMotivo>;
 
 /**
  * Resumen de cabecera de OC (KPIs `vCompras`): número de OC ABIERTAS (autorizada + recibida_parcial)
@@ -677,8 +755,37 @@ export const esquemaResumenCompras = z
     porRecibir: z
       .number()
       .describe('Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0).'),
+    importePorMotivo: z
+      .array(esquemaImportePorMotivo)
+      .describe(
+        '⭐ Fila 0.231 — CUÁNTO SE COMPRÓ Y POR QUÉ: Σ de los totales de las OC que cumplen ' +
+          'EXACTAMENTE el filtro de la lista (estatus y canceladas incluidos), agrupado por motivo ' +
+          'en el SERVIDOR. Un renglón por motivo con OC; el de `idMotivoCompra: null` es la compra ' +
+          'normal. Primero la compra normal, después los motivos en su orden de catálogo.',
+      ),
   })
   .describe('Resumen de cabecera de órdenes de compra (KPIs).');
 
 /** Forma del resumen de OC. */
 export type ResumenCompras = z.infer<typeof esquemaResumenCompras>;
+
+// ── ⭐ Fila 0.231 — catálogo de MOTIVOS de compra extra (sólo lectura) ─────────────────────────────
+
+/** Un motivo de compra extra tal como sale a los selectores. */
+export const esquemaMotivoCompraSalida = z
+  .object({
+    id: z.number().int().describe('Id del motivo.'),
+    codigo: z.string().describe('Código estable ("reposicion", "merma", "sobre-corte"…).'),
+    nombre: z.string().describe('Nombre para la UI.'),
+    orden: z.number().int().describe('Orden de despliegue.'),
+    fijo: z.boolean().describe('Lo usa el sistema por su código (sobre-corte): no se desactiva.'),
+  })
+  .describe('Motivo de una compra extra (fila 0.231, §Post-F9.245(b)).');
+
+/** Forma de un motivo de compra en la API. */
+export type MotivoCompraSalida = z.infer<typeof esquemaMotivoCompraSalida>;
+
+/** Lista de motivos ACTIVOS (para los selectores). */
+export const esquemaMotivosCompraLista = z
+  .array(esquemaMotivoCompraSalida)
+  .describe('Motivos de compra extra activos, en su orden de despliegue.');

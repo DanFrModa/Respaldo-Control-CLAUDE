@@ -7,18 +7,39 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import type * as ReactRouter from 'react-router-dom';
 
 import { OrdenesCompraPagina } from './OrdenesCompraPagina';
-import { ocDePrueba } from './fixtures';
+import { MOTIVOS_DE_PRUEBA, ocDePrueba } from './fixtures';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const autorizarMutate = vi.fn();
 const useOrdenesCompraMock = vi.fn();
 // Resumen de cabecera (KPIs): cada test lo puede POBLAR; default = vacío.
-let resumenOc: { data: { ocAbiertas: number; porRecibir: number } | undefined };
+let resumenOc: {
+  data:
+    | {
+        ocAbiertas: number;
+        porRecibir: number;
+        // ⭐ Fila 0.231: el importe por motivo (agregado en el servidor). Opcional en el fixture.
+        importePorMotivo?: {
+          idMotivoCompra: number | null;
+          codigo: string | null;
+          nombre: string;
+          ocs: number;
+          importe: number;
+        }[];
+      }
+    | undefined;
+};
+const useResumenOcMock = vi.fn();
 
 vi.mock('@/api/ordenes-compra', () => ({
   useOrdenesCompra: (q: unknown) => useOrdenesCompraMock(q) as unknown,
-  useResumenOc: () => resumenOc,
+  useResumenOc: (q: unknown) => {
+    useResumenOcMock(q);
+    return resumenOc;
+  },
   useAutorizarOc: () => ({ mutate: autorizarMutate, isPending: false }),
+  // ⭐ Fila 0.231: el catálogo de motivos (filtro de la lista y selector del diálogo).
+  useMotivosCompra: () => ({ data: MOTIVOS_DE_PRUEBA }),
   imprimirOc: vi.fn(),
 }));
 
@@ -567,6 +588,130 @@ describe('OrdenesCompraPagina — imprimir sólo lo autorizado (V1-E4e)', () => 
     expect(within(detalle).queryByTestId('imprimir-oc')).not.toBeInTheDocument();
     expect(within(detalle).getByTestId('oc-sin-imprimir')).toHaveTextContent(
       'La orden está cancelada',
+    );
+  });
+});
+
+/**
+ * ⭐ Fila 0.231 (§Post-F9.245(b)) — POR QUÉ SE COMPRÓ: la columna, el filtro (que aplica el
+ * SERVIDOR: la pantalla sólo traduce la opción a sus parámetros) y el KPI de compras extra, cuyas
+ * cifras por motivo vienen ya agregadas del resumen.
+ */
+describe('OrdenesCompraPagina · ⭐ 0.231 el motivo de la compra', () => {
+  beforeEach(() => {
+    useOrdenesCompraMock.mockReset();
+    useResumenOcMock.mockReset();
+    resumenOc = { data: { ocAbiertas: 0, porRecibir: 0, importePorMotivo: [] } };
+    pendientesOc = { data: [], isPending: false, isError: false };
+    useOrdenesCompraMock.mockReturnValue({
+      data: {
+        datos: [
+          ocDePrueba({ id: 1, numCompra: 1001 }),
+          ocDePrueba({
+            id: 2,
+            numCompra: 1002,
+            idMotivoCompra: 2,
+            motivoCompra: { codigo: 'merma', nombre: 'Merma' },
+          }),
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 10,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+  });
+
+  const montar = () =>
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+
+  it('la columna «Motivo» dice el motivo, o «—» en la compra normal; el detalle lo nombra', () => {
+    montar();
+    expect(screen.getAllByTestId('celda-motivo-oc').map((c) => c.textContent)).toEqual([
+      '—',
+      'Merma',
+    ]);
+    const fila = screen.getAllByTestId('fila-oc')[1];
+    if (fila === undefined) throw new Error('falta la fila');
+    fireEvent.click(fila);
+    expect(screen.getByTestId('detalle-motivo-oc')).toHaveTextContent('Merma');
+  });
+
+  it.each([
+    ['normal', { conMotivo: 'false' }],
+    ['extra', { conMotivo: 'true' }],
+    ['3', { idMotivoCompra: 3 }],
+  ] as const)(
+    'el filtro «%s» viaja al SERVIDOR en la lista y en el resumen',
+    (opcion, esperado) => {
+      montar();
+      fireEvent.change(screen.getByTestId('filtro-motivo-oc'), { target: { value: opcion } });
+      expect(useOrdenesCompraMock).toHaveBeenLastCalledWith(expect.objectContaining(esperado));
+      expect(useResumenOcMock).toHaveBeenLastCalledWith(expect.objectContaining(esperado));
+    },
+  );
+
+  it('H2: el resumen recibe EXACTAMENTE el filtro de la lista (estatus y canceladas incluidos)', () => {
+    montar();
+    fireEvent.change(screen.getByTestId('filtro-estatus-oc'), { target: { value: 'autorizada' } });
+    fireEvent.click(screen.getByTestId('incluir-canceladas-oc'));
+    fireEvent.change(screen.getByTestId('filtro-motivo-oc'), { target: { value: 'extra' } });
+    const lista = useOrdenesCompraMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    const resumen = useResumenOcMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(resumen).toMatchObject({
+      estatus: 'autorizada',
+      incluirCanceladas: 'true',
+      conMotivo: 'true',
+    });
+    // Lo mismo que la lista, quitando sólo la paginación y el orden.
+    const { pagina: _p, porPagina: _pp, ordenarPor: _o, direccion: _d, ...filtroDeLaLista } = lista;
+    expect(resumen).toEqual(filtroDeLaLista);
+  });
+
+  it('sin filtro no manda parámetros de motivo; el filtro ofrece el catálogo', () => {
+    montar();
+    const ultima = useOrdenesCompraMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(ultima).not.toHaveProperty('conMotivo');
+    expect(ultima).not.toHaveProperty('idMotivoCompra');
+    const opciones = [...screen.getByTestId('filtro-motivo-oc').querySelectorAll('option')].map(
+      (o) => o.textContent,
+    );
+    expect(opciones).toEqual([
+      'Todos los motivos',
+      'Compra normal',
+      'Compras extra (con motivo)',
+      ...MOTIVOS_DE_PRUEBA.map((m) => m.nombre),
+    ]);
+  });
+
+  it('el KPI «Compras extra» junta los motivos (sin la compra normal) y los desglosa', () => {
+    resumenOc = {
+      data: {
+        ocAbiertas: 0,
+        porRecibir: 0,
+        importePorMotivo: [
+          { idMotivoCompra: null, codigo: null, nombre: 'Compra normal', ocs: 9, importe: 90_000 },
+          { idMotivoCompra: 1, codigo: 'reposicion', nombre: 'Reposición', ocs: 2, importe: 1_500 },
+          { idMotivoCompra: 2, codigo: 'merma', nombre: 'Merma', ocs: 1, importe: 250.5 },
+        ],
+      },
+    };
+    montar();
+    const kpi = screen.getByTestId('kpi-compras-extra');
+    expect(kpi).toHaveTextContent('$1,750.50');
+    expect(kpi).toHaveTextContent('Reposición $1,500.00 · Merma $250.50');
+    expect(kpi).not.toHaveTextContent('Compra normal');
+  });
+
+  it('sin compras extra el KPI lo dice', () => {
+    montar();
+    expect(screen.getByTestId('kpi-compras-extra')).toHaveTextContent(
+      'ninguna OC con motivo en la lista filtrada',
     );
   });
 });

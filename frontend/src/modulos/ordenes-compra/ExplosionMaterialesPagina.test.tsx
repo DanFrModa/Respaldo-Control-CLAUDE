@@ -16,6 +16,7 @@ import {
   ocPlaneadasEnPantalla,
   remapearSeleccion,
 } from './ExplosionMaterialesPagina';
+import { MOTIVOS_DE_PRUEBA } from './fixtures';
 
 // ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
 // se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
@@ -104,6 +105,10 @@ vi.mock('@/api/mrp', () => ({
   useAgregarColorDeTela: () => useAgregarColorDeTelaMock() as unknown,
   // ⭐⭐ V1-E8e (§Post-F9.99): «con esto queda cubierto» / «volver a pedirlo», desde el renglón.
   useDarPorCubierto: () => useDarPorCubiertoMock() as unknown,
+}));
+// ⭐ Fila 0.231: el catálogo de motivos de compra extra (selector de la previa).
+vi.mock('@/api/ordenes-compra', () => ({
+  useMotivosCompra: () => ({ data: MOTIVOS_DE_PRUEBA }),
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => useConsultaOrdenesMock() as unknown,
@@ -1605,6 +1610,14 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
           ],
           total: 600,
           ordenes: [7, 8],
+          // ⭐ Fila 0.231: el motivo con el que nacería la OC (compra normal por defecto).
+          motivoPropuesto: null as {
+            idMotivoCompra: number;
+            codigo: string;
+            nombre: string;
+          } | null,
+          sobreCorteMixto: false,
+          idMotivoCompra: null as number | null,
         },
       ],
       omitidos: [
@@ -1696,6 +1709,72 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
+
+  /**
+   * ⭐ **Fila 0.231 (§Post-F9.245(b) + §Post-F9.277) — EL MOTIVO DE CADA OC, EN LA PREVIA.** El valor
+   * lo resuelve el SERVIDOR (lo elegido aquí o lo que él propone: sobre-corte en la segunda pasada);
+   * la pantalla lo pinta, y lo que el comprador cambie viaja como `motivosPorProveedor` en el MISMO
+   * cuerpo de la previa y de la generación.
+   */
+  describe('⭐ fila 0.231 — el motivo de cada OC', () => {
+    /** El plan de siempre con el motivo que el servidor resolvió para su único proveedor. */
+    function planConMotivo(motivo: {
+      idMotivoCompra: number | null;
+      motivoPropuesto?: { idMotivoCompra: number; codigo: string; nombre: string } | null;
+      sobreCorteMixto?: boolean;
+    }) {
+      const plan = planDePrueba();
+      const proveedor = plan.proveedores[0];
+      if (proveedor === undefined) throw new Error('fixture sin proveedor');
+      proveedor.idMotivoCompra = motivo.idMotivoCompra;
+      proveedor.motivoPropuesto = motivo.motivoPropuesto ?? null;
+      proveedor.sobreCorteMixto = motivo.sobreCorteMixto ?? false;
+      return plan;
+    }
+    const SOBRE_CORTE = { idMotivoCompra: 3, codigo: 'sobre-corte', nombre: 'Sobre-corte' };
+
+    it('pinta el motivo que propuso el servidor, marcado como propuesto', async () => {
+      await llegarALaPrevia(planConMotivo({ idMotivoCompra: 3, motivoPropuesto: SOBRE_CORTE }));
+      expect(screen.getByTestId('exp-previa-motivo')).toHaveValue('3');
+      expect(screen.getByTestId('exp-previa-motivo-propuesto')).toBeInTheDocument();
+      expect(screen.queryByTestId('exp-previa-motivo-mixto')).toBeNull();
+    });
+
+    it('si el comprador eligió otro, ya no se marca como propuesto', async () => {
+      await llegarALaPrevia(planConMotivo({ idMotivoCompra: null, motivoPropuesto: SOBRE_CORTE }));
+      expect(screen.getByTestId('exp-previa-motivo')).toHaveValue('');
+      expect(screen.queryByTestId('exp-previa-motivo-propuesto')).toBeNull();
+    });
+
+    it('una compra normal no manda motivos: el servidor decide lo propuesto', async () => {
+      await llegarALaPrevia(planConMotivo({ idMotivoCompra: null }));
+      const [cuerpo] = previoMutateMock.mock.calls.at(-1) as [Record<string, unknown>];
+      expect(cuerpo).not.toHaveProperty('motivosPorProveedor');
+      expect(screen.getByTestId('exp-previa-motivo')).toHaveValue('');
+    });
+
+    it('cambiarlo vuelve a pedir el plan con el motivo elegido, y la generación lo lleva igual', async () => {
+      await llegarALaPrevia(planConMotivo({ idMotivoCompra: 3, motivoPropuesto: SOBRE_CORTE }));
+      previoMutateMock.mockClear();
+      fireEvent.change(screen.getByTestId('exp-previa-motivo'), { target: { value: '' } });
+      const [cuerpo] = previoMutateMock.mock.calls.at(-1) as [Record<string, unknown>];
+      // `null` DICHO: «es compra normal», no «no lo toqué».
+      expect(cuerpo.motivosPorProveedor).toEqual([{ idProveedor: 11, idMotivoCompra: null }]);
+
+      fireEvent.change(screen.getByTestId('exp-previa-motivo'), { target: { value: '1' } });
+      const [otro] = previoMutateMock.mock.calls.at(-1) as [Record<string, unknown>];
+      expect(otro.motivosPorProveedor).toEqual([{ idProveedor: 11, idMotivoCompra: 1 }]);
+
+      fireEvent.click(screen.getByTestId('exp-confirmar-generar'));
+      const [generado] = mutateMock.mock.calls.at(-1) as [Record<string, unknown>];
+      expect(generado.motivosPorProveedor).toEqual([{ idProveedor: 11, idMotivoCompra: 1 }]);
+    });
+
+    it('una OC mixta lo dice junto al selector', async () => {
+      await llegarALaPrevia(planConMotivo({ idMotivoCompra: null, sobreCorteMixto: true }));
+      expect(screen.getByTestId('exp-previa-motivo-mixto')).toBeInTheDocument();
+    });
+  });
 
   /**
    * ⭐⭐ **0.156 (§Post-F9.219) — EL CÁRDIGAN, DICHO EN LA LÍNEA QUE LO COBRA.**
@@ -5403,6 +5482,14 @@ describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISI
           ],
           total: 2250,
           ordenes: [7],
+          // ⭐ Fila 0.231: el motivo con el que nacería la OC (compra normal por defecto).
+          motivoPropuesto: null as {
+            idMotivoCompra: number;
+            codigo: string;
+            nombre: string;
+          } | null,
+          sobreCorteMixto: false,
+          idMotivoCompra: null as number | null,
         },
       ],
       omitidos: [],
@@ -6809,6 +6896,14 @@ describe('ExplosionMaterialesPagina — V1-E8e: «con esto queda cubierto» (§P
           ],
           total: 2 * (180 - faltante),
           ordenes: [7],
+          // ⭐ Fila 0.231: el motivo con el que nacería la OC (compra normal por defecto).
+          motivoPropuesto: null as {
+            idMotivoCompra: number;
+            codigo: string;
+            nombre: string;
+          } | null,
+          sobreCorteMixto: false,
+          idMotivoCompra: null as number | null,
         },
       ],
       omitidos: [],

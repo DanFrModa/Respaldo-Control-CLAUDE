@@ -566,6 +566,27 @@ export const esquemaGenerarOcCuerpo = z
           'proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la ' +
           'generación se rechaza (§Post-F9.120).',
       ),
+    // ⭐ Fila 0.231 (§Post-F9.245(b)) — EL MOTIVO DE CADA OC, ELEGIDO EN LA PREVIA. El sistema
+    // PROPONE «sobre-corte» para la OC de la segunda pasada después de cortar de más
+    // (`motivoPropuesto` del plan); lo que venga aquí GANA para ese proveedor, incluido `null`
+    // (= «es compra normal»). Un proveedor sin entrada propia se queda con la propuesta.
+    motivosPorProveedor: z
+      .array(
+        z.object({
+          idProveedor: z.number().int().positive().describe('Proveedor al que aplica el motivo.'),
+          idMotivoCompra: z
+            .number()
+            .int()
+            .positive()
+            .nullable()
+            .describe('Motivo de la OC de ESE proveedor; null = compra normal.'),
+        }),
+      )
+      .optional()
+      .describe(
+        '⭐ Fila 0.231: motivo de compra extra POR PROVEEDOR; gana sobre la propuesta del ' +
+          'sistema. Vacío = cada OC nace con lo que el sistema propuso (sobre-corte o nada).',
+      ),
     // ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. Daniel: *"el sobrante de compra se reparte
     // entre las OP de la compra… comprar el rollo completo es una decisión del comprador EN EL
     // MOMENTO de comprar: es un hecho entonces, y por eso sí se reparte"*. Aquí el comprador fija
@@ -961,6 +982,32 @@ export const esquemaPlanProveedor = z
     ordenes: z
       .array(z.number().int())
       .describe('Folios de las OP que esta OC va a surtir (§Post-F9.86).'),
+    motivoPropuesto: z
+      .object({
+        idMotivoCompra: z.number().int(),
+        codigo: z.string(),
+        nombre: z.string(),
+      })
+      .nullable()
+      .describe(
+        '⭐ Fila 0.231 — el motivo que el SISTEMA propone: «sobre-corte» cuando TODAS las líneas ' +
+          'de esta OC son avíos de órdenes que se cortaron de más y que ya tenían una OC viva de ' +
+          'ese material (la segunda pasada pide sólo el extra). null = no propone nada.',
+      ),
+    sobreCorteMixto: z
+      .boolean()
+      .describe(
+        '⭐ Fila 0.231 — esta OC MEZCLA material del sobre-corte con material que se compra por ' +
+          'primera vez: el sistema no adivina, nace sin motivo y la previa lo avisa.',
+      ),
+    idMotivoCompra: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐ Fila 0.231 — el motivo con el que NACERÍA la OC: el elegido en la previa ' +
+          '(`motivosPorProveedor`) o, si no se eligió, el propuesto. null = compra normal.',
+      ),
   })
   .describe('Orden de compra que se va a crear, completa, ANTES de crearla.');
 

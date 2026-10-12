@@ -464,6 +464,9 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
         ],
         total: 90,
         ordenes: [7],
+        motivoPropuesto: null,
+        sobreCorteMixto: false,
+        idMotivoCompra: null,
       },
     ];
   }
@@ -612,6 +615,9 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
         renglones,
         total: 2250,
         ordenes: [7],
+        motivoPropuesto: null,
+        sobreCorteMixto: false,
+        idMotivoCompra: null,
       },
     ];
   }
@@ -910,6 +916,9 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
       renglones,
       total: 9540,
       ordenes: [5559],
+      motivoPropuesto: null,
+      sobreCorteMixto: false,
+      idMotivoCompra: null,
     },
   ];
 
@@ -1189,6 +1198,8 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
       requerimientoCubierto: { findMany: () => Promise.resolve([]) },
       // ⭐⭐ fila 0.232: la OP no tiene corte — la base de los avíos es la pedida.
       etapaMovimientoDet: { findMany: () => Promise.resolve([]) },
+      // ⭐ fila 0.231: el motivo «sobre-corte» (sin sobre-corte en la OP no se propone nada).
+      motivoCompra: { findFirst: () => Promise.resolve(null) },
       proveedor: {
         findMany: (args?: never) => {
           const w = (args as unknown as { where: { id: { in: number[] } } }).where;
@@ -1514,6 +1525,8 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
       requerimientoCubierto: { findMany: () => Promise.resolve(cubiertos) },
       // ⭐⭐ fila 0.232: la OP no tiene corte — la base de los avíos es la pedida.
       etapaMovimientoDet: { findMany: () => Promise.resolve([]) },
+      // ⭐ fila 0.231: el motivo «sobre-corte» (sin sobre-corte en la OP no se propone nada).
+      motivoCompra: { findFirst: () => Promise.resolve(null) },
       proveedor: {
         findMany: () => Promise.resolve([{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }]),
       },

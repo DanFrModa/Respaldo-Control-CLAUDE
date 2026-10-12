@@ -71,6 +71,33 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.211 · 12-oct-2026 · **en prueba** — **Cada orden de compra puede decir por qué existe: reposición, merma o sobre-corte**
+
+> **La v0.211 cierra la fila 0.231**, que pidió Daniel: *«reposición y merma podrían ser las primeras dos del
+> catálogo»*, y el sobre-corte salió de su pregunta siguiente. Hasta hoy el porqué de una compra extra sólo vivía en
+> texto libre, así que nadie podía sumar cuánto se gastó en reponer o en mermas.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Al crear o editar una orden de compra eliges un motivo:** reposición, merma o sobre-corte. Si no eliges ninguno, es
+una compra normal. Se puede poner o corregir **aunque la orden ya tenga material recibido** (queda en la bitácora).
+
+**La lista de órdenes de compra filtra por motivo** y muestra **cuánto se compró por cada motivo**, en una tarjeta
+«Compras extra» que respeta los mismos filtros que la lista. La bandeja de autorización marca las compras extra.
+
+**La orden de compra del sobre-corte nace con su motivo puesto:** cuando la explosión pide los avíos de un corte de
+más (la segunda pasada de la v0.209), la previa propone «sobre-corte» —sólo si lo que falta viene de verdad del corte de más, no de un faltante normal o de una receta corregida— y lo puedes cambiar. Si en la misma orden de
+compra se mezcla lo del sobre-corte con compra normal, nace sin motivo y la previa lo avisa.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**«Corresponde a» se queda como está**: dice a qué o a quién va la compra; el motivo dice por qué. **El motivo no se
+imprime** en la orden de compra que recibe el proveedor.
+
+### ⏳ Sigue pendiente o roto
+
+**Los motivos los da de alta el sistema** (no hay pantalla para agregar más). Preguntas para Daniel en §Post-F9.279.
+
 ## 0.210 · 8-oct-2026 · **en prueba** — **Si la receta cambió después de explotar, la compra se frena hasta volver a explotar**
 
 > **La v0.210 cierra la fila 0.257**, que nació al revisar la v0.209. Si alguien corregía la receta de una orden y la
