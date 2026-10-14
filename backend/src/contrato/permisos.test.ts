@@ -121,8 +121,10 @@ describe('catálogo de permisos', () => {
       'inventario-telas.mover',
       'inventario-telas.ver',
       // Listas de precios por cliente (Módulo 15, F8-E4/E5, R20): ver/administrar/aprobar/negociar.
+      // ⭐ `listas.comentar` es de la fila 0.238 (§Post-F9.248(b)): comentar sin negociar.
       'listas.administrar',
       'listas.aprobar',
+      'listas.comentar',
       'listas.negociar',
       'listas.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos + aprobar la receta creando

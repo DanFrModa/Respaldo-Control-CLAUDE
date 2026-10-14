@@ -252,6 +252,10 @@ function txFake(estado: EstadoFake): Tx {
     listaPreciosLineaPendiente: {
       findMany: () => Promise.resolve([]),
     },
+    // ⭐ Fila 0.238: y los COMENTARIOS de la negociación del renglón, por la misma razón.
+    negociacionComentario: {
+      findMany: () => Promise.resolve([]),
+    },
     bitacora: {
       create: ({ data }: { data: Record<string, unknown> }) => {
         estado.bitacora.push(data);

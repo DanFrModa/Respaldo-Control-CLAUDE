@@ -9088,6 +9088,9 @@ model ListaPrecios {
   /// Cotizaciones EMITIDAS desde esta lista (V1-E7c). Restrict: el papel que ya salió al cliente
   /// no deja borrar la mesa que lo produjo.
   cotizaciones Cotizacion[]
+  /// ⭐ Fila 0.238 (§Post-F9.248(b)) — los COMENTARIOS de la negociación (`listas.comentar`).
+  /// Cascade: mueren con la lista; `eliminarLista` los fotografía antes en la bitácora.
+  comentarios  NegociacionComentario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -9189,6 +9192,9 @@ model ListaPreciosLinea {
   /// precio de jareta"*). Van por MODELO y no por cita: lo decidió Daniel así porque son de un
   /// modelo concreto. Cascade (mueren con el renglón; `quitarLineaLista` los fotografía antes).
   pendientes       ListaPreciosLineaPendiente[]
+  /// ⭐ Fila 0.238 — los comentarios de la negociación que apuntan a ESTE modelo (opcional: un
+  /// comentario puede ser de la lista entera). Cascade; `quitarLineaLista` los fotografía antes.
+  comentarios      NegociacionComentario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -9274,6 +9280,44 @@ model NegociacionEvento {
   @@index([idPrecostoAnterior])
   @@index([idPrecostoNuevo])
   @@map("negociacion_evento")
+}
+
+/// ⭐⭐ Fila 0.238 (§Post-F9.248(b)) — UN COMENTARIO sobre la negociación de una lista.
+///
+/// Daniel, sobre Aurora: *«las listas negociar **solo de lectura y poder agregar comentarios**, pero
+/// no modificar lo que yo hice»*. Lo escribe quien tiene `listas.comentar` (o `listas.negociar`, que
+/// lo implica); se lee con `listas.ver`.
+///
+/// 🔴 **NO es un `NegociacionEvento`, y NO se reusa esa tabla.** El evento no tiene columna de tipo
+/// y SEIS lectores lo interpretan por sus columnas: el «último precio de la negociación» del renglón
+/// (`ultimoPrecioDeNegociacion`), la meta negociada del modelo (`meta-negociada.ts`, por
+/// `costo_estimado`), el hilo del diálogo, la vista 360 de la orden (`liga-orden.ts`, que lo pinta
+/// como «acuerdos») y las fotos de bitácora al quitar un renglón o borrar la lista. Un comentario
+/// metido ahí saldría como acuerdo pactado en la vista de la orden — exactamente lo que Daniel no
+/// quiere que Aurora pueda escribir.
+///
+/// 🔴 **INMUTABLE (D3).** Nace y no se edita ni se borra: si alguien se equivoca, escribe otro. Por
+/// eso no lleva `modificadoEn`/`modificadoPorId`.
+///
+/// Cuelga de la LISTA (obligatorio) y, opcionalmente, de UN renglón (`idListaLinea`), que debe ser
+/// de esa misma lista (lo valida el dominio). Cascade hacia los dos: muere con la lista o con el
+/// renglón, y las dos operaciones que los borran lo fotografían antes en la bitácora.
+model NegociacionComentario {
+  id           Int                @id @default(autoincrement())
+  idLista      Int                @map("id_lista")
+  lista        ListaPrecios       @relation(fields: [idLista], references: [id], onDelete: Cascade)
+  idListaLinea Int?               @map("id_lista_linea")
+  listaLinea   ListaPreciosLinea? @relation(fields: [idListaLinea], references: [id], onDelete: Cascade)
+
+  /// El comentario, en palabras de quien lo escribió. Obligatorio. Inmutable.
+  texto String @db.Text
+
+  registradoPorId String?  @map("registrado_por_id")
+  registradoEn    DateTime @default(now()) @map("registrado_en")
+
+  @@index([idLista])
+  @@index([idListaLinea])
+  @@map("negociacion_comentario")
 }
 
 /// ⭐⭐ V1-E8w (§Post-F9.149) — UN RENGLÓN del DESGLOSE de costos con el que se cerró una mesa de

@@ -18811,8 +18811,8 @@ al medirla resultó tocar dinero (días de atraso, fecha de cargos) — Daniel p
 #### (Post-F9.281) — «MODIFICAR CLIENTES» YA SIRVE: COMPRADORES Y DEPARTAMENTOS SIN EL ALTA DE CLIENTES (fila 0.239, v0.214) — preguntas para Daniel
 
 Daniel, §Post-F9.248(b): *«Administración o yo damos de alta al cliente. Ella puede meter información de compradores,
-departamentos, datos de cada comprador»*. 📐 El permiso «Modificar clientes» existía y **no lo exigía nada**; todo lo de
-un cliente pedía «Administrar clientes», que también da de alta y desactiva. **Construido:** «Modificar» gobierna las
+departamentos, datos de cada comprador»*. 📐 El permiso «Modificar clientes» (`clientes.modificar`) existía y **no lo exigía nada**; todo lo de
+un cliente pedía «Administrar clientes» (`clientes.administrar`), que también da de alta y desactiva. **Construido:** «Modificar» gobierna las
 personas, los departamentos y los campos propios de cada cliente; «Administrar» se queda con el alta, la ficha, la
 baja y **juntar departamentos duplicados**, y además puede todo lo de «Modificar». 📐 Juntar duplicados se quedó
 reservado porque **mueve o borra los factores de precio** del departamento absorbido, que son tuyos.
@@ -18832,3 +18832,26 @@ reservado porque **mueve o borra los factores de precio** del departamento absor
 
 📌 **De paso (sin construir):** «Modificar proveedores» está en la misma situación que estaba éste —existe en el
 catálogo y nada lo exige—. Si quieres que alguien edite datos de proveedores sin darlos de alta, sería otra fila.
+
+#### (Post-F9.282) — COMENTAR LA NEGOCIACIÓN SIN PODER CAMBIARLA (fila 0.238, v0.215) — preguntas para Daniel
+
+Daniel, §Post-F9.248(b), sobre Aurora: *«las listas negociar solo de lectura y poder agregar comentarios, pero no
+modificar lo que yo hice»*. 📐 Comentar exigía el permiso de negociar, que también mueve estados, guarda la mesa y
+**emite y cancela cotizaciones**. **Construido:** un permiso nuevo, **«Comentar listas»** (`listas.comentar`; en la pantalla de Roles: *«Agregar comentarios a la negociación de una lista…»*), que sólo deja escribir
+comentarios en una sección propia de la lista (para toda la lista o para un modelo). El comentario queda con quién y
+cuándo, no se edita ni se borra, y **no es una ronda ni un acuerdo**: no cambia precios ni aparece como pactado en la
+vista de la orden. Quien negocia también puede comentar.
+
+❓ **Preguntas, con el default ya construido:**
+1. **¿Se puede comentar una lista cerrada o un modelo que ya se cayó?** *Default: sí — un comentario no cambia el
+   papel.*
+2. **¿Los comentarios se pueden corregir o borrar?** *Default: no; si alguien se equivoca, escribe otro.*
+3. **¿Quién más comenta?** *Default: Gerente de Ventas (se le da solo al desplegar), y los que ya negocian
+   (Directivo y Gerencial). El rol heredado «Ventas» no lo lleva.*
+4. **¿Te sirve el comentario en la página de la lista, o lo quieres dentro de la ventana de negociación de cada
+   modelo?** *Default: en la página, con un selector de modelo.*
+5. ⚠️ **Lo que choca con «no modificar lo que yo hice»:** Gerente de Ventas tiene «Administrar listas» (`listas.administrar`, *«Crear y editar listas de precios…»*), y con eso
+   puede **quitar un modelo de la lista** (se borran sus rondas y acuerdos, aunque quedan fotografiados en la
+   bitácora), **borrar una lista que no esté cerrada**, fijar el precio objetivo y editar los pendientes. ¿Se lo
+   dejamos? *Default: sí, como hoy, hasta que digas; quitarlo le quitaría también crear listas, agregarles modelos y editar su
+   encabezado y sus pendientes (precostear no: eso es otra llave, `desarrollo.precostear`).*

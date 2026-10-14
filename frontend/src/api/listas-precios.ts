@@ -84,6 +84,14 @@ export type DesgloseCostoLinea =
 /** Clave raíz de la cache de listas. */
 export const CLAVE_LISTAS = ['listas-precios'] as const;
 
+/**
+ * ⭐ Fila 0.238 — clave raíz de la cache de COMENTARIOS de la negociación (por lista: se le agrega
+ * el id). Vive AQUÍ y no en `negociacion.ts` porque la invalidan también las mutaciones de este
+ * archivo que borran en cascada (quitar un renglón, borrar la lista), y `negociacion.ts` ya importa
+ * de éste: ponerla allá cerraría un ciclo.
+ */
+export const CLAVE_COMENTARIOS = ['negociacion-comentarios'] as const;
+
 function claveLista(query: ListasQuery): readonly unknown[] {
   return [...CLAVE_LISTAS, 'lista', query];
 }
@@ -285,16 +293,34 @@ async function eliminarLista(id: number): Promise<void> {
   if (error) throw new ErrorDeApi(error);
 }
 
-/** Quita un renglón de la lista e invalida listas + proyectos (el desarrollo vuelve a candidato). */
+/**
+ * Quita un renglón de la lista e invalida listas + proyectos (el desarrollo vuelve a candidato) y
+ * ⭐ (fila 0.238) los COMENTARIOS de esa lista: los del renglón se van en cascada en el servidor, y
+ * sin esto la pantalla los seguía enseñando.
+ */
 export function useQuitarLineaLista(): UseMutationResult<ListaDetalle, ErrorDeApi, number> {
   const invalidar = useInvalidar();
-  return useMutation({ mutationFn: quitarLinea, onSuccess: invalidar });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quitarLinea,
+    onSuccess: (lista) => {
+      invalidar();
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_COMENTARIOS, lista.id] });
+    },
+  });
 }
 
-/** Borra una lista e invalida listas + proyectos. */
+/** Borra una lista e invalida listas + proyectos y ⭐ (fila 0.238) sus comentarios (cascada). */
 export function useEliminarLista(): UseMutationResult<void, ErrorDeApi, number> {
   const invalidar = useInvalidar();
-  return useMutation({ mutationFn: eliminarLista, onSuccess: invalidar });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: eliminarLista,
+    onSuccess: (_vacio, id) => {
+      invalidar();
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_COMENTARIOS, id] });
+    },
+  });
 }
 
 /** Aprueba el precio calculado de un renglón. */

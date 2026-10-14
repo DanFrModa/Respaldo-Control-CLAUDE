@@ -439,6 +439,9 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'ipt.modificar-movimientos',
   'listas.administrar',
   'listas.aprobar',
+  // ⭐ Fila 0.238: quien negocia también comenta (`listas.negociar` lo implica en el dominio; va
+  // explícita para que la pantalla de Roles lo diga).
+  'listas.comentar',
   'listas.negociar',
   'listas.ver',
   'modelos.administrar',
@@ -563,6 +566,8 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'ipt.fecha-libre',
   'ipt.modificar-movimientos',
   'listas.administrar',
+  // ⭐ Fila 0.238: quien negocia también comenta (ver DIRECTIVO).
+  'listas.comentar',
   'listas.negociar',
   'listas.ver',
   'modelos.administrar',
@@ -981,11 +986,12 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **319 asignaciones**: las 136 del catálogo para `Director General` y 183 repartidas entre los
+ * **321 asignaciones**: las 137 del catálogo para `Director General` y 184 repartidas entre los
  * otros 15 (eran 317 = 134 + 183 hasta la fila 0.228, que estrenó `ordenes.reabrir` en el catálogo:
- * el dueño la recibe por derivación y ninguno de los otros 15; y 318 hasta la fila 0.251, que estrenó
+ * el dueño la recibe por derivación y ninguno de los otros 15; 318 hasta la fila 0.251, que estrenó
  * `ventas.ver` del mismo modo —ningún puesto la recibe, ni siquiera Administración y Finanzas: darla
- * es decisión de Daniel). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
+ * es decisión de Daniel—; y 319 = 136 + 183 hasta la fila 0.238, que estrenó `listas.comentar`: el
+ * dueño la recibe por derivación y «Gerente de Ventas» por decisión de Daniel, §Post-F9.248(b)). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
  * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
  *
  * *(Eran 306 = 134 + 172 en su primera revisión. Las **11 llaves de más** las agregó él mismo al
@@ -1067,7 +1073,7 @@ export type PerfilDePuesto = {
  *
  * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
  * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
- * llegarle solo. Una lista literal de 136 claves quedaría obsoleta en el siguiente `clave:` que
+ * llegarle solo. Una lista literal de 137 claves quedaría obsoleta en el siguiente `clave:` que
  * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
  *
  * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
@@ -1116,6 +1122,10 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
       'etiquetas-marca.ver',
       'indicadores.ver',
       'listas.administrar',
+      // ⭐ Fila 0.238 (§Post-F9.248(b)): Aurora COMENTA la negociación sin poder negociarla — *«solo
+      // de lectura y poder agregar comentarios, pero no modificar lo que yo hice»*. NO lleva
+      // `listas.negociar` (rondas, acuerdos, estados, mesa, emitir/cancelar cotizaciones).
+      'listas.comentar',
       'listas.ver',
       'modelos.ver',
       'ordenes.ver',
@@ -1391,9 +1401,9 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 319 asignaciones de los 16 puestos (las 317 que él
+ * un puesto**, y meterlo aquí falsearía las 321 asignaciones de los 16 puestos (las 317 que él
  * revisó, más `ordenes.reabrir` y `ventas.ver`, que las filas 0.228 y 0.251 le sumaron al dueño por
- * derivación).
+ * derivación, y `listas.comentar`, que la fila 0.238 le sumó al dueño y a «Gerente de Ventas»).
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1530,7 +1540,8 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * `conAlgunPermiso` y los guards declarados en variable) y con el criterio dicho, porque sin criterio
  * no se reproduce *(medido ANTES de la fila 0.228; esa fila sumó `ordenes.reabrir`, que guarda un
  * `POST` ⇒ eran 135 claves y una más que ESCRIBE; y la fila 0.251 sumó `ventas.ver`, de pura
- * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ hoy son 136)*: de las
+ * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ 136; y la fila 0.238
+ * sumó `listas.comentar`, que guarda un `POST` ⇒ hoy son 137)*: de las
  * **134** claves que tenía entonces el catálogo, **sólo 34 son de PURA LECTURA** —todas sus
  * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
  * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no
@@ -1589,7 +1600,7 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * **No adelgaza los 15 perfiles de puesto.** Siguen con las llaves que el dueño marcó aunque **12 de
  * las 16 del piso** estén también en algún puesto: los permisos efectivos son la **UNIÓN** de los
  * roles del usuario (`comun/permisos.ts`), así que la redundancia no cambia el comportamiento, las
- * 183 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
+ * 184 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
  * llave la conserva.
  *
  * 🔑 **Y eso es lo que hace inocuo recortar el piso.** Las cuatro llaves de saldos y movimientos que

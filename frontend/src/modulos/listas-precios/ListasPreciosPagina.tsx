@@ -80,6 +80,7 @@ import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { Historial } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { ComentariosNegociacion } from './ComentariosNegociacion';
 import { CotizacionesDeLista } from './CotizacionesDeLista';
 import { DialogoAgregarModelos } from './DialogoAgregarModelos';
 import { DialogoCrearLista } from './DialogoCrearLista';
@@ -722,6 +723,11 @@ function PaginaLista({
 
       {/* ── Cotizaciones emitidas (V1-E7c): el papel que salió de esta mesa ── */}
       <CotizacionesDeLista lista={lista} />
+
+      {/* ── ⭐ Fila 0.238 (§Post-F9.248(b)): COMENTARIOS de la negociación. Se leen con
+          `listas.ver`; el cuadro para agregar uno sale con `listas.comentar` o `listas.negociar`.
+          No toca nada de lo negociado (los controles de arriba siguen siendo de `negociar`). ── */}
+      <ComentariosNegociacion idLista={lista.id} lineas={lista.lineas} />
 
       {/* ── Panel de factores del cliente (proto .lp-factores) ──────────────── */}
       {/* §Post-F9.125(b): sólo el dueño. Para los demás la sección entera NO se pinta —ni su
