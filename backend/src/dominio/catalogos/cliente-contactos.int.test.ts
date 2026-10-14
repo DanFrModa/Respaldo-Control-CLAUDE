@@ -13,7 +13,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { Cliente, ClienteDepartamento, Empresa, PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -54,6 +59,31 @@ beforeEach(async () => {
 });
 
 describe('contactos del cliente', () => {
+  // ⭐⭐ Fila 0.239 (§Post-F9.248(b)): *«Ella puede meter información de compradores… datos de cada
+  // comprador»*. Con SÓLO `clientes.modificar` (sin el reservado) la persona se escribe y se edita
+  // contra la base; con sólo `clientes.ver`, no.
+  it('⭐ 0.239: con SÓLO `clientes.modificar` da de alta y edita a la compradora; con sólo ver, no', async () => {
+    const aurora = sesion(['clientes.ver', 'clientes.modificar']);
+    const laura = await crearContactoCliente(
+      aurora,
+      clienteNegocio.id,
+      { nombre: 'Laura', idClienteDepartamento: ninos.id },
+      bd(),
+    );
+    const editada = await actualizarContactoCliente(
+      aurora,
+      clienteNegocio.id,
+      laura.id,
+      { puesto: 'compradora' },
+      bd(),
+    );
+    expect(editada.puesto).toBe('compradora');
+
+    await expect(
+      crearContactoCliente(sesion(['clientes.ver']), clienteNegocio.id, { nombre: 'Otro' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
   it('⭐ el departamento es OPCIONAL: la compradora lo lleva, crédito y cobranza no', async () => {
     const laura = await crearContactoCliente(
       sesion(),

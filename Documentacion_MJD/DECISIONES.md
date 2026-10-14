@@ -18807,3 +18807,28 @@ de EsMa, los días de atraso de cuentas por pagar y cobrar, y el filtro de la bi
 frontend y backend, y la misma zona en el SQL), y un guardián que falla si aparece otra forma de calcular «hoy». Lo ya
 guardado con la fecha equivocada no se corrige (REGLA 0-B). Clasificación: 🟢 *puede esperar* (recomendación del lead);
 al medirla resultó tocar dinero (días de atraso, fecha de cargos) — Daniel puede subirla, aunque ya está construida.
+
+#### (Post-F9.281) — «MODIFICAR CLIENTES» YA SIRVE: COMPRADORES Y DEPARTAMENTOS SIN EL ALTA DE CLIENTES (fila 0.239, v0.214) — preguntas para Daniel
+
+Daniel, §Post-F9.248(b): *«Administración o yo damos de alta al cliente. Ella puede meter información de compradores,
+departamentos, datos de cada comprador»*. 📐 El permiso «Modificar clientes» existía y **no lo exigía nada**; todo lo de
+un cliente pedía «Administrar clientes», que también da de alta y desactiva. **Construido:** «Modificar» gobierna las
+personas, los departamentos y los campos propios de cada cliente; «Administrar» se queda con el alta, la ficha, la
+baja y **juntar departamentos duplicados**, y además puede todo lo de «Modificar». 📐 Juntar duplicados se quedó
+reservado porque **mueve o borra los factores de precio** del departamento absorbido, que son tuyos.
+
+❓ **Preguntas, con lo que quedó hoy:**
+1. **¿Le quitamos «Administrar clientes» al perfil Gerente de Ventas?** Se lo diste el 1-oct (§Post-F9.260) con la
+   advertencia de que también da de alta y desactiva clientes, porque «Modificar» no servía. Ahora sí sirve, así que con
+   quitárselo queda exactamente la línea que trazaste. *Default: se queda como está hasta que digas.*
+2. **Seis roles heredados del sistema viejo** (Directivo, Gerencial, Ventas, Logística, Asistente y Secretarial) ya
+   tenían «Modificar clientes» y desde hoy pueden editar personas, departamentos y campos de cualquier cliente. ¿Está
+   bien? *Default: sí; esos roles se revisan con los perfiles por puesto (fila 0.234).*
+3. **¿Juntar departamentos duplicados** se queda reservado? *Default: sí, con «Administrar clientes», porque toca tus
+   factores de precio.* ⚠️ **Y ojo:** Gerente de Ventas, al tener «Administrar clientes» sin el permiso de aprobar
+   listas, ya puede juntar departamentos y con eso mover o borrar factores — otra razón para la pregunta 1.
+4. **Tú dijiste «Administración o yo damos de alta al cliente»**, pero el perfil Administración y Finanzas hoy sólo
+   puede **ver** clientes. ¿Le damos «Administrar clientes»? *Default: no hasta que lo confirmes.*
+
+📌 **De paso (sin construir):** «Modificar proveedores» está en la misma situación que estaba éste —existe en el
+catálogo y nada lo exige—. Si quieres que alguien edite datos de proveedores sin darlos de alta, sería otra fila.

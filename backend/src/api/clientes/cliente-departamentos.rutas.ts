@@ -5,8 +5,11 @@
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
- *     `clientes.ver` para leer, `clientes.administrar` para mutar (los MISMOS del
- *     cliente; los departamentos NO tienen permiso propio).
+ *     `clientes.ver` para leer; `clientes.modificar` **o** `clientes.administrar` para agregar,
+ *     editar y desactivar (fila 0.239: los departamentos los captura quien tiene `modificar` sin
+ *     poder dar de alta clientes; quien administra el cliente entero sigue pudiendo). La FUSIÓN y
+ *     su previa siguen en `clientes.administrar` a secas: mueven o borran los factores de precio
+ *     del dueño. El dominio re-exige lo mismo (`dominio/catalogos/acceso-clientes.ts`).
  *  3. **Delega** al servicio de dominio `dominio/catalogos/cliente-departamentos`.
  *
  * Endpoints: `GET/POST/PATCH/DELETE /clientes/:idCliente/departamentos[/:id]`. CERO
@@ -133,7 +136,7 @@ export const rutasClienteDepartamentos: FastifyPluginCallbackZod = (app, _opcion
   app.route({
     method: 'POST',
     url: '/clientes/:idCliente/departamentos',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Agregar un departamento a un cliente (D13/R16)',
@@ -204,7 +207,7 @@ export const rutasClienteDepartamentos: FastifyPluginCallbackZod = (app, _opcion
   app.route({
     method: 'PATCH',
     url: '/clientes/:idCliente/departamentos/:id',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Actualizar un departamento de un cliente (D13/R16)',
@@ -227,7 +230,7 @@ export const rutasClienteDepartamentos: FastifyPluginCallbackZod = (app, _opcion
   app.route({
     method: 'DELETE',
     url: '/clientes/:idCliente/departamentos/:id',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Desactivar un departamento de un cliente (D13/R16)',

@@ -323,7 +323,12 @@ export const CATALOGO_PERMISOS = [
   {
     clave: 'clientes.modificar',
     modulo: 'clientes',
-    descripcion: 'Modificar clientes (cualquiera puede agregar)',
+    // ⭐ Fila 0.239 (§Post-F9.248(b)): hasta aquí era una llave MUERTA —nadie la exigía— y su
+    // descripción («cualquiera puede agregar») era falsa: el alta siempre exigió `.administrar`.
+    // Ahora gobierna lo que CUELGA del cliente; el cliente mismo sigue en `.administrar`, que
+    // además implica ésta (`dominio/catalogos/acceso-clientes.ts`).
+    descripcion:
+      'Capturar lo que cuelga de un cliente: sus personas (compradoras), sus departamentos (agregar, editar, desactivar y reactivar) y sus campos de referencia. NO da de alta, edita la ficha ni desactiva clientes, ni fusiona departamentos (eso es `clientes.administrar`)',
     origen: {
       idAcceso: 6,
       formulario: 'Clientes',
@@ -1005,7 +1010,7 @@ export const CATALOGO_PERMISOS = [
     clave: 'clientes.administrar',
     modulo: 'clientes',
     descripcion:
-      'Administrar el catálogo de clientes y sus campos de referencia (alta, edición, desactivación)',
+      'Administrar el catálogo de clientes: alta, edición de la ficha, desactivación y reactivación, y la fusión de departamentos (mueve sus factores de precio). Incluye todo lo de `clientes.modificar` (personas, departamentos y campos de referencia)',
   },
 
   // ── Catálogos de materiales (F1-E3, globales — ADR-0007/ADR-0009; CRUD patrón Almacenes) ─

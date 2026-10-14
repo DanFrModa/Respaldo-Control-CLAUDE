@@ -66,9 +66,17 @@ type DatosDepartamentoFormulario = z.infer<typeof esquemaDepartamentoFormulario>
 export function EditorDepartamentosCliente({
   idCliente,
   deshabilitado = false,
+  puedeFusionar = false,
 }: {
   idCliente: number;
   deshabilitado?: boolean;
+  /**
+   * ⚠️ Fila 0.239: ¿se ofrece «Juntar duplicados»? Va APARTE de `deshabilitado` porque la fusión NO
+   * se abrió a `clientes.modificar` como el resto: mueve o borra los factores de precio del
+   * absorbido, que son del dueño, y el servidor la sigue exigiendo con `clientes.administrar`. Por
+   * omisión NO se ofrece (deny-by-default): quien monta el editor tiene que decirlo a propósito.
+   */
+  puedeFusionar?: boolean;
 }): React.JSX.Element {
   const consulta = useDepartamentosCliente(idCliente);
   const desactivar = useDesactivarDepartamentoCliente();
@@ -132,7 +140,7 @@ export function EditorDepartamentosCliente({
                 trae la OC ("2-HOMBRE" vs "Caballeros"), asi que el catalogo se llena de sinonimos y
                 la lista de precios —que cuelga de cliente + departamento— se parte en dos mundos
                 que no se ven. Solo tiene sentido ofrecerlo cuando hay al menos dos que juntar. */}
-            {departamentos.filter((d) => d.activo).length >= 2 ? (
+            {puedeFusionar && departamentos.filter((d) => d.activo).length >= 2 ? (
               <Button
                 type="button"
                 variant="outline"

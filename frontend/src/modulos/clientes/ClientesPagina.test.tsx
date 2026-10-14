@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Cliente, ClientesPagina as TipoPagina } from '@/api/tipos';
+import type { Cliente, ClienteDepartamento, ClientesPagina as TipoPagina } from '@/api/tipos';
 import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
@@ -26,6 +26,13 @@ const useCliente = vi.fn<(id: number | undefined) => { data: Cliente | undefined
 }));
 const desactivarMutate = vi.fn();
 const reactivarMutate = vi.fn();
+/** Departamentos del cliente en el cajón: vacíos por defecto (las pruebas de la 0.239 ponen dos). */
+const useDepartamentosCliente = vi.fn(() => ({
+  data: [] as ClienteDepartamento[],
+  isPending: false,
+  isError: false,
+  error: null,
+}));
 let ultimaQuery: Record<string, unknown> | undefined;
 
 vi.mock('@/api/clientes', () => ({
@@ -45,7 +52,7 @@ vi.mock('@/api/clientes', () => ({
   useDesactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   // Hooks del editor de departamentos (montado en el detalle): inertes.
-  useDepartamentosCliente: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useDepartamentosCliente: () => useDepartamentosCliente(),
   useAgregarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
@@ -114,6 +121,7 @@ describe('<ClientesPagina>', () => {
     useClientes.mockReset();
     useCliente.mockReset();
     useCliente.mockReturnValue({ data: undefined });
+    useDepartamentosCliente.mockClear();
     desactivarMutate.mockReset();
     reactivarMutate.mockReset();
     ultimaQuery = undefined;
@@ -168,6 +176,78 @@ describe('<ClientesPagina>', () => {
     expect(screen.queryByTestId('desactivar-cliente')).not.toBeInTheDocument();
     // Sin permiso de administrar el editor de campos no se monta (modo lectura).
     expect(screen.queryByTestId('editor-campos-cliente')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ Fila 0.239 (§Post-F9.248(b)) — DOS REJAS en la misma ficha. Daniel, sobre Aurora:
+   * *«Administración o yo damos de alta al cliente. Ella puede meter información de compradores,
+   * departamentos, datos de cada comprador»*. `clientes.modificar` abre las personas, los
+   * departamentos y los campos de referencia; el alta, la edición de la ficha y la baja siguen en
+   * `clientes.administrar`. Las tres pruebas fijan las tres combinaciones que importan.
+   */
+  describe('0.239: `clientes.modificar` captura lo que cuelga del cliente; el cliente mismo es de `administrar`', () => {
+    /** Dos departamentos ACTIVOS: el mínimo para que «Juntar duplicados» pueda ofrecerse. */
+    function dosDepartamentos(): ClienteDepartamento[] {
+      return [1, 2].map((id) => ({
+        id,
+        idCliente: 1,
+        nombre: id === 1 ? 'Caballeros' : '2-HOMBRE',
+        activo: true,
+        creadoEn: '2026-07-01T00:00:00.000Z',
+        creadoPorId: null,
+        modificadoEn: '2026-07-01T00:00:00.000Z',
+        modificadoPorId: null,
+      }));
+    }
+
+    async function abrirFicha(permisos: Parameters<typeof estadoSesionDePrueba>[0]) {
+      const usuario = userEvent.setup();
+      useDepartamentosCliente.mockReturnValue({
+        data: dosDepartamentos(),
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
+      renderConProveedores(<ClientesPagina />, { sesion: estadoSesionDePrueba(permisos) });
+      await usuario.click(screen.getByTestId('fila-cliente'));
+      return screen.getByTestId('detalle-cliente');
+    }
+
+    it('con SÓLO `clientes.modificar`: edita personas, departamentos y campos, pero NO da de alta, edita la ficha, desactiva ni junta duplicados', async () => {
+      const detalle = await abrirFicha(['clientes.ver', 'clientes.modificar']);
+
+      expect(within(detalle).getByTestId('editor-campos-cliente')).toBeInTheDocument();
+      expect(within(detalle).getByTestId('nuevo-departamento')).toBeInTheDocument();
+      expect(within(detalle).getByTestId('agregar-contacto-cliente')).toBeInTheDocument();
+      // ⚠️ La fusión toca los factores de precio del dueño: con sólo `modificar` NO se ofrece,
+      // aunque haya dos departamentos activos (hallazgo del reviewer de la 0.239).
+      expect(within(detalle).queryByTestId('fusionar-departamentos')).not.toBeInTheDocument();
+
+      expect(screen.queryByTestId('nuevo-cliente')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('editar-cliente')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('desactivar-cliente')).not.toBeInTheDocument();
+    });
+
+    it('con SÓLO `clientes.administrar` (sin `modificar`): también edita lo que cuelga —administrar lo implica—', async () => {
+      const detalle = await abrirFicha(['clientes.ver', 'clientes.administrar']);
+
+      expect(within(detalle).getByTestId('editor-campos-cliente')).toBeInTheDocument();
+      expect(within(detalle).getByTestId('nuevo-departamento')).toBeInTheDocument();
+      expect(within(detalle).getByTestId('agregar-contacto-cliente')).toBeInTheDocument();
+      expect(within(detalle).getByTestId('fusionar-departamentos')).toBeInTheDocument();
+      expect(screen.getByTestId('nuevo-cliente')).toBeInTheDocument();
+      expect(screen.getByTestId('editar-cliente')).toBeInTheDocument();
+      expect(screen.getByTestId('desactivar-cliente')).toBeInTheDocument();
+    });
+
+    it('sin ninguna de las dos: personas, departamentos y campos quedan en sólo lectura', async () => {
+      const detalle = await abrirFicha(['clientes.ver']);
+
+      expect(within(detalle).queryByTestId('editor-campos-cliente')).not.toBeInTheDocument();
+      expect(within(detalle).queryByTestId('nuevo-departamento')).not.toBeInTheDocument();
+      expect(within(detalle).queryByTestId('agregar-contacto-cliente')).not.toBeInTheDocument();
+    });
   });
 
   it('pide confirmación antes de desactivar y llama a la mutación al confirmar', async () => {

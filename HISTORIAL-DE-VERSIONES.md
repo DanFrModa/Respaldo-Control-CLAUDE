@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.214 · 14-oct-2026 · **en prueba** — **Meter compradores y departamentos ya no exige poder dar de alta clientes**
+
+> **La v0.214 cierra la fila 0.239.** Daniel: *«Administración o yo damos de alta al cliente. Ella puede meter
+> información de compradores, departamentos, datos de cada comprador»*. Hasta hoy el sistema no podía trazar esa línea:
+> todo lo de un cliente colgaba de la misma llave que da de alta y desactiva clientes.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El permiso «Modificar clientes» ya sirve:** con él se agregan y editan las **personas (compradores)** de un cliente,
+sus **departamentos** (agregar, editar, desactivar y reactivar) y sus **campos propios**. **Dar de alta un cliente,
+editar su ficha, desactivarlo y juntar departamentos duplicados** siguen siendo de «Administrar clientes», que además
+puede todo lo anterior. Juntar duplicados se queda reservado porque mueve o borra los factores de precio del
+departamento, que son tuyos.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Ese permiso existía pero no hacía nada; ahora sí.** Ya lo tenían seis roles heredados del sistema viejo (Directivo,
+Gerencial, Ventas, Logística, Asistente y Secretarial): quien tenga alguno de ellos ahora puede editar personas,
+departamentos y campos de cualquier cliente, pero no juntar duplicados. **Gerente de Ventas** también lo tenía, pero no
+le cambia nada: ya podía todo eso, y juntar duplicados, con «Administrar clientes».
+
+**Gerente de Ventas conserva también «Administrar clientes»**, que Daniel le dio a sabiendas el 1-oct porque el otro no
+servía. Mientras lo tenga, sigue pudiendo dar de alta y desactivar clientes. Se le pregunta si se le quita ahora.
+
+### ⏳ Sigue pendiente o roto
+
+Las preguntas para Daniel están en §Post-F9.281.
+
 ## 0.213 · 12-oct-2026 · **en prueba** — **Se cierra en el papel lo que la v0.212 ya arregló: la Ruta Crítica ya no fecha mañana**
 
 > **La v0.213 cierra la fila 0.184** sin tocar el programa. Esa fila avisaba que, cuando un evento llegaba sin fecha, la

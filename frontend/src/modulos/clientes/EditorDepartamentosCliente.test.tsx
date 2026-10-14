@@ -71,6 +71,25 @@ describe('<EditorDepartamentosCliente>', () => {
     toastError.mockReset();
   });
 
+  // ⭐ Fila 0.239: «Juntar duplicados» NO se abrió a `clientes.modificar` (la fusión toca los
+  // factores de precio del dueño). Sin `puedeFusionar` el botón no existe aunque haya dos activos.
+  it('0.239: sin `puedeFusionar` NO ofrece «Juntar duplicados» aunque haya dos activos', () => {
+    useDepartamentosCliente.mockReturnValue(
+      consultaConDatos([departamento(1, 'Caballeros'), departamento(2, '2-HOMBRE')]),
+    );
+    renderConProveedores(<EditorDepartamentosCliente idCliente={1} />);
+    expect(screen.getByTestId('nuevo-departamento')).toBeInTheDocument();
+    expect(screen.queryByTestId('fusionar-departamentos')).not.toBeInTheDocument();
+  });
+
+  it('0.239: con `puedeFusionar` sí lo ofrece (la gemela positiva)', () => {
+    useDepartamentosCliente.mockReturnValue(
+      consultaConDatos([departamento(1, 'Caballeros'), departamento(2, '2-HOMBRE')]),
+    );
+    renderConProveedores(<EditorDepartamentosCliente idCliente={1} puedeFusionar />);
+    expect(screen.getByTestId('fusionar-departamentos')).toBeInTheDocument();
+  });
+
   it('lista los departamentos del cliente', () => {
     useDepartamentosCliente.mockReturnValue(
       consultaConDatos([departamento(1, 'Dama'), departamento(2, 'Caballero')]),

@@ -45,6 +45,7 @@ import { EditorContactosCliente } from './EditorContactosCliente';
 import { EditorDepartamentosCliente } from './EditorDepartamentosCliente';
 import { EditorFactoresCliente } from './EditorFactoresCliente';
 import { leerDeepLinkFactores, puedeVerFactoresDePrecio } from './factores-precio';
+import { puedeModificarCliente } from './permisos-clientes';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -114,11 +115,15 @@ function CampoTextoSiHay({
  * (los factores viven en el módulo de listas; los departamentos y su conteo son un endpoint aparte) →
  * no se inventan en la tabla; se muestran DENTRO del cajón (donde sí hay endpoint). Hueco reportado.
  *
- * `clientes.ver` gobierna el acceso; `clientes.administrar` decide las acciones (A1).
+ * `clientes.ver` gobierna el acceso; `clientes.administrar` decide las acciones sobre el cliente
+ * mismo (alta, editar, desactivar/activar) y `clientes.modificar` —o `.administrar`, que lo implica—
+ * las de lo que cuelga de él: personas, departamentos y campos de referencia (fila 0.239,
+ * {@link puedeModificarCliente}). El servidor decide igual (A1).
  */
 export function ClientesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('clientes.administrar');
+  const puedeModificar = puedeModificarCliente(tienePermiso);
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -423,6 +428,7 @@ export function ClientesPagina(): React.JSX.Element {
           <DetalleCliente
             cliente={seleccion}
             puedeAdministrar={puedeAdministrar}
+            puedeModificar={puedeModificar}
             enfocarFactores={idAbrir !== null && idAbrir === seleccion.id}
           />
         ) : null}
@@ -461,16 +467,22 @@ export function ClientesPagina(): React.JSX.Element {
 /**
  * Panel de DETALLE de un cliente: sus datos de contacto (solo los capturados) y la
  * sección "Campos de referencia" (D7) con el editor inline. El editor solo se monta si
- * el cliente está ACTIVO y el usuario puede administrar; si no, se muestran los campos
- * en modo lectura (o un aviso). El editor mismo necesita el id del cliente.
+ * el cliente está ACTIVO y el usuario puede modificarlo (`clientes.modificar` o
+ * `.administrar`, fila 0.239); si no, se muestran los campos en modo lectura (o un aviso).
+ * Las personas y los departamentos siguen la MISMA reja. El editor mismo necesita el id del
+ * cliente.
  */
 function DetalleCliente({
   cliente,
   puedeAdministrar,
+  puedeModificar,
   enfocarFactores = false,
 }: {
   cliente: Cliente;
+  /** `clientes.administrar`: además de lo de `puedeModificar`, juntar departamentos duplicados. */
   puedeAdministrar: boolean;
+  /** `clientes.modificar` o `.administrar`: personas, departamentos y campos de referencia. */
+  puedeModificar: boolean;
   /** Llegó por el deep-link «Capturar factores»: trae esa sección a la vista al abrirse. */
   enfocarFactores?: boolean;
 }): React.JSX.Element {
@@ -529,7 +541,7 @@ function DetalleCliente({
       ) : null}
 
       <SeccionDetalle titulo="Campos de referencia (D7)" icono={ListChecks}>
-        {puedeAdministrar && cliente.activo ? (
+        {puedeModificar && cliente.activo ? (
           <EditorCamposCliente idCliente={cliente.id} />
         ) : (
           <CamposSoloLectura cliente={cliente} />
@@ -545,16 +557,18 @@ function DetalleCliente({
       <SeccionDetalle titulo="Personas del cliente (la compradora)" icono={UsersRound}>
         <EditorContactosCliente
           idCliente={cliente.id}
-          deshabilitado={!puedeAdministrar || !cliente.activo}
+          deshabilitado={!puedeModificar || !cliente.activo}
         />
       </SeccionDetalle>
 
       <SeccionDetalle titulo="Departamentos (D13/R16)" icono={Building2}>
         {/* Los departamentos no van embebidos en el cliente: el editor los lista siempre
-            (solo lectura sin permiso o cliente inactivo) y habilita el CRUD para administrar. */}
+            (solo lectura sin permiso o cliente inactivo) y habilita el CRUD con `clientes.modificar`; «Juntar duplicados» sólo con
+            `clientes.administrar`, porque la fusión toca los factores del dueño (0.239). */}
         <EditorDepartamentosCliente
           idCliente={cliente.id}
-          deshabilitado={!puedeAdministrar || !cliente.activo}
+          deshabilitado={!puedeModificar || !cliente.activo}
+          puedeFusionar={puedeAdministrar}
         />
       </SeccionDetalle>
 

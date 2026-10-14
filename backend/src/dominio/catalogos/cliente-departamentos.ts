@@ -44,6 +44,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirModificarCliente } from './acceso-clientes.js';
+
 /** Alta de un departamento: forma del esquema compartido. */
 export type EntradaCrearDepartamentoCliente = z.input<typeof esquemaClienteDepartamentoCrear>;
 
@@ -151,9 +153,9 @@ export async function listarDepartamentosCliente(
 
 /**
  * Agrega un departamento a un cliente (D13/R16) en UNA transacción (A2). Reglas:
- * permiso `clientes.administrar`; el cliente debe existir y estar ACTIVO; `nombre`
- * único dentro del cliente → `ErrorConflicto`. Auditoría/bitácora en la misma
- * transacción.
+ * permiso `clientes.modificar` o `clientes.administrar` ({@link exigirModificarCliente}, fila
+ * 0.239); el cliente debe existir y estar ACTIVO; `nombre` único dentro del cliente →
+ * `ErrorConflicto`. Auditoría/bitácora en la misma transacción.
  */
 export async function agregarDepartamentoCliente(
   sesion: SesionUsuario,
@@ -161,7 +163,7 @@ export async function agregarDepartamentoCliente(
   entrada: EntradaCrearDepartamentoCliente,
   bd?: ContextoBd,
 ): Promise<ClienteDepartamento> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteDepartamentoCrear, entrada);
 
   try {
@@ -212,7 +214,7 @@ export async function actualizarDepartamentoCliente(
   entrada: EntradaActualizarDepartamentoCliente,
   bd?: ContextoBd,
 ): Promise<ClienteDepartamento> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteDepartamentoEditar, entrada);
 
   try {
@@ -305,7 +307,7 @@ export async function desactivarDepartamentoCliente(
   idDepartamento: number,
   bd?: ContextoBd,
 ): Promise<ClienteDepartamento> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   return enTransaccion(async (tx) => {
     await exigirClienteActivo(tx, idCliente);
     const actual = await exigirDepartamentoDeCliente(tx, idCliente, idDepartamento);
@@ -328,7 +330,7 @@ export async function reactivarDepartamentoCliente(
   idDepartamento: number,
   bd?: ContextoBd,
 ): Promise<ClienteDepartamento> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   return enTransaccion(async (tx) => {
     await exigirClienteActivo(tx, idCliente);
     const actual = await exigirDepartamentoDeCliente(tx, idCliente, idDepartamento);
@@ -377,10 +379,13 @@ export async function reactivarDepartamentoCliente(
  * {@link colisionDeFactores}, que es la MISMA función con la que
  * {@link previsualizarFusionDepartamentos} avisa antes de apretar el botón.
  *
- * Reglas: permiso `clientes.administrar` (el mismo que ya administra departamentos, sin permiso
- * nuevo); el cliente debe existir y estar ACTIVO; **el canónico y cada absorbido tienen que ser de
- * ESE cliente** (`exigirDepartamentoDeCliente`, que es lo que impide fusionar entre clientes
- * distintos); Zod ya excluye el destino de la lista de orígenes y prohíbe repetidos.
+ * Reglas: permiso `clientes.administrar` A SECAS. ⚠️ Fila 0.239: el resto de los departamentos
+ * se abrió a `clientes.modificar`, pero la fusión NO, porque **mueve o BORRA los factores de precio**
+ * del absorbido (`cliente-departamentos-fusion-referencias.ts`, relación `factores`), y esos son del
+ * DUEÑO —sólo `listas.aprobar` los guarda, §Post-F9.125—. Con `modificar` bastaría para borrarlos
+ * por la puerta de atrás. El cliente debe existir y estar ACTIVO; **el canónico y cada absorbido
+ * tienen que ser de ESE cliente** (`exigirDepartamentoDeCliente`, que es lo que impide fusionar entre
+ * clientes distintos); Zod ya excluye el destino de la lista de orígenes y prohíbe repetidos.
  *
  * @returns el departamento CANÓNICO sobreviviente, ya consolidado y activo.
  */
@@ -498,7 +503,9 @@ export async function fusionarDepartamentosCliente(
  * estar.
  *
  * Es de sólo lectura: no escribe nada. Permiso `clientes.administrar` (el de la operación que
- * previsualiza: quien no puede fusionar tampoco tiene por qué inventariar lo que colgaría).
+ * previsualiza, {@link fusionarDepartamentosCliente} —que NO se abrió a `clientes.modificar` en la
+ * fila 0.239 porque toca los factores del dueño—: quien no puede fusionar tampoco tiene por qué
+ * inventariar lo que colgaría).
  */
 export async function previsualizarFusionDepartamentos(
   sesion: SesionUsuario,

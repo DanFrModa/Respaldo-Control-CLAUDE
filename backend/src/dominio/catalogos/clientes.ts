@@ -53,6 +53,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirModificarCliente } from './acceso-clientes.js';
 import { agregarDepartamentoCliente } from './cliente-departamentos.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
@@ -595,9 +596,10 @@ export async function listarCamposCliente(
 
 /**
  * Agrega un campo de referencia a un cliente (D7) en UNA transacción (A2). Reglas:
- * permiso `clientes.administrar`; el cliente debe existir y estar ACTIVO; `etiqueta`
- * única dentro del cliente → `ErrorConflicto`; si no se da `orden`, se coloca al final.
- * Auditoría/bitácora en la misma transacción.
+ * permiso `clientes.modificar` o `clientes.administrar` ({@link exigirModificarCliente}, fila
+ * 0.239); el cliente debe existir y estar ACTIVO; `etiqueta` única dentro del cliente →
+ * `ErrorConflicto`; si no se da `orden`, se coloca al final. Auditoría/bitácora en la misma
+ * transacción.
  */
 export async function agregarCampoCliente(
   sesion: SesionUsuario,
@@ -605,7 +607,7 @@ export async function agregarCampoCliente(
   entrada: EntradaCrearCampoCliente,
   bd?: ContextoBd,
 ): Promise<ClienteCampo> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteCampoCrear, entrada);
 
   try {
@@ -659,7 +661,7 @@ export async function actualizarCampoCliente(
   entrada: EntradaActualizarCampoCliente,
   bd?: ContextoBd,
 ): Promise<ClienteCampo> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteCampoEditar, entrada);
 
   try {
@@ -744,7 +746,7 @@ export async function desactivarCampoCliente(
   idCampo: number,
   bd?: ContextoBd,
 ): Promise<ClienteCampo> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   return enTransaccion(async (tx) => {
     await exigirClienteActivo(tx, idCliente);
     const actual = await exigirCampoDeCliente(tx, idCliente, idCampo);
@@ -762,7 +764,7 @@ export async function reactivarCampoCliente(
   idCampo: number,
   bd?: ContextoBd,
 ): Promise<ClienteCampo> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   return enTransaccion(async (tx) => {
     await exigirClienteActivo(tx, idCliente);
     const actual = await exigirCampoDeCliente(tx, idCliente, idCampo);
