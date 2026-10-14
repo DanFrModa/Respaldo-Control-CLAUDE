@@ -36,11 +36,12 @@ import {
   galeriaArte,
   listarArtesModelo,
   listarFotosArte,
+  marcarArtePrincipal,
   quitarFotoArte,
   solicitarSubidaFotoArte,
   actualizarArte,
 } from './arte-modelo.js';
-import { copiarBom } from './bom-modelo.js';
+import { copiarBom, reemplazarAviosBom, reemplazarTelasBom } from './bom-modelo.js';
 
 let cliente: PrismaClient;
 
@@ -594,5 +595,89 @@ describe('galería y edición', () => {
     expect(artes.map((a) => a.descripcion)).toEqual(['Logo', 'Logo']);
     // Y se distinguen por su id: el orden es determinista (orden, luego id).
     expect(artes[0]?.id).toBeLessThan(artes[1]?.id ?? 0);
+  });
+});
+
+/**
+ * ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — EL ARTE CON SU LLAVE, de punta a punta contra la base. Daniel,
+ * sobre Diseño Gráfico: *«desarrolla todos los artes, define quién es el proveedor y cotiza cuánto
+ * cuesta cada uno»*. Con `modelos.arte` (sin `modelos.administrar`) se hace TODO el ciclo del arte
+ * —con su proveedor, su precio (que VE, porque lo cotiza) y sus fotos—, y la receta de telas y avíos
+ * del mismo modelo se niega.
+ */
+describe('⭐ 0.235 — el arte con sólo `modelos.arte`', () => {
+  const sesionArte = () => sesionDePrueba({ permisos: ['modelos.ver', 'modelos.arte'] });
+
+  it('⭐ captura, cotiza, pone proveedor y fotos, marca principal, copia y quita — y VE su precio', async () => {
+    const s = sesionArte();
+    const idModelo = await crearModelo('ARTE-1');
+    const idOtro = await crearModelo('ARTE-2');
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Bordados SA' } });
+
+    const arte = await crearArte(
+      s,
+      idModelo,
+      { descripcion: 'Logo pecho', idTipoArte, precio: 12.5, idProveedor: proveedor.id },
+      bd(),
+    );
+    // Quien lo cotiza lo ve: el eco NO viene tapado.
+    expect(arte).toMatchObject({ precio: 12.5, preciosOcultos: false, idProveedor: proveedor.id });
+
+    const editado = await actualizarArte(s, idModelo, { id: arte.id, precio: 14 }, bd());
+    expect(editado.precio).toBe(14);
+    const listados = await listarArtesModelo(s, idModelo, bd());
+    expect(listados.map((a) => [a.precio, a.preciosOcultos])).toEqual([[14, false]]);
+
+    const subida = await solicitarSubidaFotoArte(
+      s,
+      idModelo,
+      arte.id,
+      { nombreOriginal: 'logo.png', tipoMime: 'image/png', tamanoBytes: 10 },
+      bd(),
+      archivosFalsos(),
+    );
+    expect(await cliente.modeloArteFoto.count({ where: { idModeloArte: arte.id } })).toBe(1);
+
+    const segundo = await crearArte(s, idModelo, { descripcion: 'Manga', idTipoArte }, bd());
+    const reordenados = await marcarArtePrincipal(s, idModelo, segundo.id, bd());
+    expect(reordenados[0]?.id).toBe(segundo.id);
+
+    const copia = await copiarArteDeOtroModelo(s, idOtro, { idArteOrigen: arte.id }, bd());
+    expect(copia).toMatchObject({ idModelo: idOtro, precio: 14, preciosOcultos: false });
+
+    await quitarFotoArte(s, idModelo, arte.id, subida.idFoto, bd(), archivosFalsos());
+    await eliminarArte(s, idModelo, segundo.id, bd(), archivosFalsos());
+    expect((await listarArtesModelo(s, idModelo, bd())).map((a) => a.id)).toEqual([arte.id]);
+
+    // El rastro (A7) lleva el precio que tecleó.
+    const rastro = await cliente.bitacora.findFirst({
+      where: { entidad: 'ModeloArte', idEntidad: String(arte.id), accion: 'MODIFICAR' },
+    });
+    expect(rastro?.datos).toMatchObject({ precio: { de: 12.5, a: 14 } });
+  });
+
+  it('🔴 con la misma llave, las TELAS y los AVÍOS del modelo se niegan (y no se escribe nada)', async () => {
+    const s = sesionArte();
+    const idModelo = await crearModelo('ARTE-3');
+
+    await expect(reemplazarTelasBom(s, idModelo, [], bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(reemplazarAviosBom(s, idModelo, [], bd())).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(
+      copiarBom(s, idModelo, { idModeloOrigen: idModelo } as never, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    expect(await cliente.bitacora.count({ where: { entidad: 'Modelo' } })).toBe(0);
+  });
+
+  it('control: sin `modelos.arte` ni `modelos.administrar`, el arte se niega', async () => {
+    const idModelo = await crearModelo('ARTE-4');
+    await expect(
+      crearArte(
+        sesionDePrueba({ permisos: ['modelos.ver'] }),
+        idModelo,
+        { descripcion: 'Logo', idTipoArte },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    expect(await cliente.modeloArte.count()).toBe(0);
   });
 });

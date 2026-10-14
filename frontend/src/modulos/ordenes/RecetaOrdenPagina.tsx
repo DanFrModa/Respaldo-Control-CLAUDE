@@ -45,6 +45,10 @@ export function RecetaOrdenPagina(): React.JSX.Element {
   const puedeAdministrar = tienePermiso('desarrollo.administrar');
   // Volver a la OP exige `ordenes.ver`: sin él no se ofrece un enlace muerto (§Post-F9.68).
   const puedeAbrirLaOrden = tienePermiso('ordenes.ver');
+  // ⭐ Fila 0.235: a esta pantalla también se entra con `modelos.arte` (Diseño Gráfico, a poner las
+  // fotos del arte). La bandeja «Recetas por liberar» es `desarrollo.ver`: sin él no se pinta el
+  // botón que lleva a ella, que sería un enlace a un 403 (§Post-F9.68).
+  const puedeAbrirLaBandeja = tienePermiso('desarrollo.ver');
 
   // MISMA consulta que monta el panel (misma clave de TanStack Query): una sola petición de red,
   // y el encabezado y las tablas no pueden discrepar entre sí.
@@ -72,14 +76,16 @@ export function RecetaOrdenPagina(): React.JSX.Element {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void navigate('/desarrollo/recetas-por-liberar')}
-              data-testid="receta-ir-bandeja"
-            >
-              <ArrowLeft aria-hidden /> Recetas por liberar
-            </Button>
+            {puedeAbrirLaBandeja ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void navigate('/desarrollo/recetas-por-liberar')}
+                data-testid="receta-ir-bandeja"
+              >
+                <ArrowLeft aria-hidden /> Recetas por liberar
+              </Button>
+            ) : null}
             {puedeAbrirLaOrden && idOrden !== undefined ? (
               <Button
                 variant="outline"

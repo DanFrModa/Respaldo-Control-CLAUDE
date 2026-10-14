@@ -2197,6 +2197,48 @@ describe('PanelRecetaOrden · el cableado de las fotos del arte (§Post-F9.177)'
     expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
   });
 
+  // ── ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — las fotos del arte con `modelos.arte` ─────────────────
+  it('⭐ 0.235: con sólo `modelos.arte` se ponen las FOTOS del arte, y NADA más de la receta', () => {
+    render(recetaConDosArtes(), false, ['ordenes.ver', 'modelos.arte']);
+
+    const vivo = within(filaDe('Logo pecho'));
+    expect(vivo.getAllByTestId('ocultar-foto-arte-orden')).toHaveLength(2);
+    expect(vivo.getByTestId('subir-foto-arte-orden')).toBeInTheDocument();
+    // El renglón excluido sigue sin botones (la regla del renglón no cambia con la llave).
+    const excluido = within(filaDe('Etiqueta vieja'));
+    expect(excluido.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(excluido.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+    // Y el resto de la receta de la orden sigue siendo de `desarrollo.administrar`.
+    expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`quitar-receta-arte-${VIVO}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`liberar-receta-arte-${VIVO}`)).not.toBeInTheDocument();
+  });
+
+  it('control: con `desarrollo.administrar` los botones de quitar/firmar del arte SÍ están', () => {
+    // La otra mitad de la de arriba: sin esto, unos testid equivocados la dejarían en verde.
+    render(recetaConDosArtes());
+    expect(screen.getByTestId(`quitar-receta-arte-${VIVO}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`liberar-receta-arte-${VIVO}`)).toBeInTheDocument();
+  });
+
+  it('🔴 0.235: `modelos.administrar` NO abre las fotos del arte de la ORDEN (nunca tocó la orden)', () => {
+    render(recetaConDosArtes(), false, ['ordenes.ver', 'modelos.administrar']);
+    expect(screen.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('🔴 0.235: con `modelos.arte` y la orden CANCELADA, tampoco (mismas condiciones que la receta)', () => {
+    render({ ...recetaConDosArtes(), estado: 'cancelada' }, false, ['ordenes.ver', 'modelos.arte']);
+    expect(screen.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
+  it('🔴 0.235: con `modelos.arte` y la orden CERRADA, tampoco (mismas condiciones que la receta)', () => {
+    render({ ...recetaConDosArtes(), estado: 'cerrada' }, false, ['ordenes.ver', 'modelos.arte']);
+    expect(screen.queryByTestId('ocultar-foto-arte-orden')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-arte-orden')).not.toBeInTheDocument();
+  });
+
   it('el botón de la fila viva quita la foto de ESE renglón (llega hasta la mutación)', async () => {
     const usuario = userEvent.setup();
     render(recetaConDosArtes());

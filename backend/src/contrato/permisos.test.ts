@@ -131,6 +131,8 @@ describe('catálogo de permisos', () => {
       // la versión con sufijo (V1-E7b).
       'modelos.administrar',
       'modelos.aprobar-receta',
+      // ⭐ Fila 0.235: el arte (del modelo y fotos de arte de la orden), partido de `administrar`.
+      'modelos.arte',
       'modelos.ver',
       // Notas de salida (Módulo 5, F4-E5, R4/R9): ver/administrar/cancelar (nuevos de v2).
       'notas.administrar',

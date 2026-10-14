@@ -64,12 +64,65 @@ describe('exigenciaDeRuta', () => {
    * puro, que es justamente quien viene a firmarla (§Post-F9.72). La prueba de deriva de abajo NO
    * lo vería: la ruta "tiene declaración", solo que la equivocada.
    */
-  it('⭐ la receta de la orden pide `desarrollo.ver`, NO el `ordenes.ver` de su padre', () => {
-    expect(exigenciaDeRuta('/produccion/ordenes/50/receta')).toEqual(['desarrollo.ver']);
+  it('⭐ la receta de la orden pide `desarrollo.ver` (o `modelos.arte`), NO el `ordenes.ver` de su padre', () => {
+    expect(exigenciaDeRuta('/produccion/ordenes/50/receta')).toEqual([
+      'desarrollo.ver',
+      'modelos.arte',
+    ]);
     expect(exigenciaDeRuta('/produccion/ordenes')).toEqual(['ordenes.ver']);
     // La pareja completa: Desarrollo puro entra; quien solo ve producción, no.
     expect(rutaPermitida('/produccion/ordenes/50/receta', permisosDe('desarrollo.ver'))).toBe(true);
     expect(rutaPermitida('/produccion/ordenes/50/receta', permisosDe('ordenes.ver'))).toBe(false);
+  });
+
+  /**
+   * ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — DISEÑO GRÁFICO LLEGA A LA RECETA DE LA ORDEN, que es la única
+   * pantalla donde se ponen las fotos del arte de la OP. Con las llaves REALES de su perfil sembrado
+   * (`PERFILES_DE_PUESTO`, slug `grafico`, en `backend/prisma/seed.ts`; su transcripción exacta la
+   * fija `backend/src/datos/roles-perfiles-puesto.test.ts`) —sin `desarrollo.ver`, que le abriría
+   * Pre-costeos—, con y sin el piso «Consulta general». Y la otra mitad: sin `modelos.arte`, no.
+   */
+  const PERFIL_DISENO_GRAFICO = [
+    'modelos.arte',
+    'modelos.ver',
+    'ordenes.ver',
+    'proveedores.modificar',
+    'proveedores.ver',
+    'tipos-proceso.ver',
+  ] as const;
+  const PISO_CONSULTA_GENERAL = [
+    'ordenes.habilitacion',
+    'pedidos.ver',
+    'rc.catalogo-ver',
+    'rc.ruta-ver',
+    'calidad.ver',
+    'indicadores.ver',
+    'almacenes.ver',
+    'temporadas.ver',
+    'etiquetas-marca.ver',
+    'colores.ver',
+    'tallas.ver',
+    'clientes.ver',
+    'tipos-proceso.ver',
+    'concepto-costo.ver',
+    'estado-lista.ver',
+    'produccion.wip-ver',
+  ] as const;
+
+  it('⭐ 0.235: Diseño Gráfico (su perfil real, con o sin el piso) entra a la receta de la orden', () => {
+    const receta = '/produccion/ordenes/50/receta';
+    expect(PERFIL_DISENO_GRAFICO).not.toContain('desarrollo.ver');
+    expect(rutaPermitida(receta, permisosDe(...PERFIL_DISENO_GRAFICO))).toBe(true);
+    expect(
+      rutaPermitida(receta, permisosDe(...PERFIL_DISENO_GRAFICO, ...PISO_CONSULTA_GENERAL)),
+    ).toBe(true);
+    // Sin la llave del arte, el mismo perfil se queda fuera (no entra por `ordenes.ver`).
+    const sinArte = PERFIL_DISENO_GRAFICO.filter((clave) => clave !== 'modelos.arte');
+    expect(rutaPermitida(receta, permisosDe(...sinArte, ...PISO_CONSULTA_GENERAL))).toBe(false);
+    // Y la llave del arte NO abre el resto de Desarrollo (proyectos, recetas por liberar).
+    for (const ruta of ['/desarrollo', '/desarrollo/recetas-por-liberar'] as const) {
+      expect(rutaPermitida(ruta, permisosDe(...PERFIL_DISENO_GRAFICO)), ruta).toBe(false);
+    }
   });
 
   it('gana la declaración MÁS específica, no la primera que coincide', () => {

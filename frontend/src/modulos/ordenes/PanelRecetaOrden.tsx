@@ -302,6 +302,12 @@ export function PanelRecetaOrden({
   // (ver `enCorreccion && puedeAdministrar` abajo).
   const cerrada = estaCerrada(d);
   const editable = puedeAdministrar && d.estado !== 'cancelada' && !cerrada;
+  // ⭐ Fila 0.235 (§Post-F9.247(c)) — LAS FOTOS DEL ARTE tienen su propia llave: las pone quien lleva
+  // `modelos.arte` (Diseño Gráfico) sin poder tocar el resto de la receta de la orden. Mismas
+  // condiciones de estado que `editable`; el servidor re-decide la reja (A1,
+  // `modelos/acceso-arte.ts`). ⚠️ NO `modelos.administrar`: esa llave nunca tocó la orden.
+  const editableFotosArte =
+    (puedeAdministrar || tienePermiso('modelos.arte')) && d.estado !== 'cancelada' && !cerrada;
   const ocupado =
     marcar.isPending ||
     liberar.isPending ||
@@ -549,6 +555,7 @@ export function PanelRecetaOrden({
         receta={d}
         idOrden={idOrden}
         editable={editable}
+        editableFotos={editableFotosArte}
         ocupado={ocupado}
         alResponder={alResponder}
         alLiberarRenglon={(id) => liberarRenglon('arte', id)}
@@ -2278,6 +2285,7 @@ function SeccionArtes({
   receta,
   idOrden,
   editable,
+  editableFotos,
   ocupado,
   alQuitar,
   alRestaurar,
@@ -2287,6 +2295,11 @@ function SeccionArtes({
   receta: RecetaOrden;
   idOrden: number;
   editable: boolean;
+  /**
+   * ⭐ 0.235: ¿se pueden tocar las FOTOS del arte de esta OP? `desarrollo.administrar` o
+   * `modelos.arte`, con la orden viva. Va aparte de `editable`, que gobierna el renglón entero.
+   */
+  editableFotos: boolean;
   ocupado: boolean;
   alQuitar: (id: number, nombre: string) => void;
   alRestaurar: (id: number) => void;
@@ -2340,7 +2353,7 @@ function SeccionArtes({
                 <FotosArteOrden
                   idOrden={idOrden}
                   arte={fotosDe.get(a.id)}
-                  puedeAdministrar={editable && !a.excluido}
+                  puedeAdministrar={editableFotos && !a.excluido}
                   ocupado={ocupado}
                 />
               </TablaDensaCelda>

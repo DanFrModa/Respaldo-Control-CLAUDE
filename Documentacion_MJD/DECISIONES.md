@@ -18855,3 +18855,26 @@ vista de la orden. Quien negocia también puede comentar.
    bitácora), **borrar una lista que no esté cerrada**, fijar el precio objetivo y editar los pendientes. ¿Se lo
    dejamos? *Default: sí, como hoy, hasta que digas; quitarlo le quitaría también crear listas, agregarles modelos y editar su
    encabezado y sus pendientes (precostear no: eso es otra llave, `desarrollo.precostear`).*
+
+#### (Post-F9.283) — EL ARTE CON PERMISO PROPIO (fila 0.235, v0.216) — preguntas para Daniel
+
+Daniel, §Post-F9.247(c), sobre Diseño Gráfico: *«desarrolla todos los artes, define quién es el proveedor y cotiza
+cuánto cuesta cada uno»*; y §Post-F9.250(b): *«abre los permisos en lo que se construye»*. 📐 El arte del modelo
+colgaba de «Administrar modelos» (`modelos.administrar`), que también abre la ficha, las telas, los avíos y las fotos;
+y las fotos de arte de la orden, de «Administrar desarrollo» (`desarrollo.administrar`), que abre los proyectos.
+**Construido:** un permiso nuevo, **«Arte de modelos» (`modelos.arte`)**, que sólo deja capturar el arte del modelo
+(incluido su proveedor, su costo y sus fotos) y las fotos de arte de una orden viva, y ver el costo del arte. Diseño
+Gráfico lo recibe solo al desplegar, junto con el de ver los tipos de proceso (`tipos-proceso.ver`), que el diálogo
+del arte necesita.
+
+❓ **Preguntas, con el default ya construido:**
+1. **¿Le quitamos a Diseño Gráfico los permisos amplios que le abriste mientras esto se construía** («Administrar
+   modelos» y «Administrar desarrollo», si los tiene en `prueba`)? *Default: se quedan hasta que digas — quitarlos le
+   quitaría también lo que hoy hace con ellos, y eso lo sabes tú.*
+2. **El arte dentro de la receta de una orden** (su descripción, proveedor y precio de referencia) se sigue
+   capturando con «Administrar desarrollo». ¿Lo captura también Diseño Gráfico? *Default: no, sigue como está.*
+3. **Cambiar el arte de un modelo invalida su revisión aprobada** (igual que cualquier cambio de receta), así que
+   Diseño Gráfico puede provocar que un modelo vuelva a pedir revisión. *Default: así, como hoy.*
+4. **Quitar un arte o una foto del modelo** hace que todas las órdenes que la heredan dejen de mostrar esa foto (también
+   las cerradas, y su impreso si se vuelve a sacar; lo ya capturado en la receta de la orden —descripción, precio, proveedor— se conserva). Era así con «Administrar
+   modelos»; ahora también lo puede hacer Diseño Gráfico. *Default: así.*

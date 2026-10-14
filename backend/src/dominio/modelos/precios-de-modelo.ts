@@ -14,6 +14,8 @@
  *    Totales y Precios»*). Es la misma con la que la parte B abre los precios de telas y avíos.
  *  • `modelos.administrar` — quien **teclea** esos precios: la maquila y el corte base (el alta y la
  *    edición del modelo), el precio del arte (`crearArte`/`actualizarArte`) y los amarres del BOM.
+ *  • `modelos.arte` (SÓLO el precio del ARTE, fila 0.235) — quien captura el arte sin administrar el
+ *    modelo (Diseño Gráfico: *«cotiza cuánto cuesta cada uno»*). Ver {@link LLAVES_PRECIO_ARTE}.
  *  • `ordenes.precio-maquila` (SÓLO la maquila de referencia) — Producción **captura el precio real
  *    de maquila** de la orden y la referencia es lo que tiene a la vista para negociarlo. Es el MISMO
  *    dato en dos sitios: `maquilaReferencia` de la orden ES `Modelo.maquilaBase` (lo lee
@@ -45,7 +47,10 @@ import type { ClavePermiso } from '../../contrato/index.js';
 
 import { tienePermiso, type SesionUsuario } from '../../comun/permisos.js';
 
-/** Llaves que dejan ver el DINERO PROPIO del modelo: corte base y precio del arte. */
+/**
+ * Llaves que dejan ver el DINERO PROPIO del modelo: corte base y precio del arte (el arte además
+ * con `modelos.arte`, ver {@link LLAVES_PRECIO_ARTE}).
+ */
 export const LLAVES_PRECIO_MODELO: readonly ClavePermiso[] = [
   'consultas.ver-importes',
   'modelos.administrar',
@@ -70,9 +75,32 @@ export const LLAVES_PRECIO_DE_ORDEN: readonly ClavePermiso[] = [
   'desarrollo.administrar',
 ];
 
-/** ¿La sesión recibe el corte base y el precio del arte? Ver {@link LLAVES_PRECIO_MODELO}. */
+/**
+ * ⭐ Fila 0.235 — Llaves que dejan ver el PRECIO DEL ARTE (`ModeloArte.precio`): las del dinero propio
+ * del modelo MÁS `modelos.arte`. Daniel describió a Diseño Gráfico: *«cotiza cuánto cuesta cada
+ * uno»* — quien captura el costo del arte tiene que verlo, o el formulario le llegaría con el precio
+ * tapado y no podría ni cotizar ni corregir lo que él mismo tecleó (la invariante de arriba: quien
+ * ESCRIBE un precio, lo LEE).
+ *
+ * ⚠️ Es una regla APARTE y no una llave más en {@link LLAVES_PRECIO_MODELO} a propósito: esa lista
+ * abre también el CORTE BASE del modelo, la MAQUILA de referencia y los precios congelados de la
+ * orden (las otras dos reglas la contienen), y `modelos.arte` no debe ver ninguno. Tampoco abre los
+ * precios de telas ni avíos del BOM, que van con su propia regla de catálogo
+ * (`catalogos/precios-de-catalogo.ts`).
+ */
+export const LLAVES_PRECIO_ARTE: readonly ClavePermiso[] = [
+  ...LLAVES_PRECIO_MODELO,
+  'modelos.arte',
+];
+
+/** ¿La sesión recibe el corte base del modelo? Ver {@link LLAVES_PRECIO_MODELO}. */
 export function puedeVerPreciosDeModelo(sesion: SesionUsuario): boolean {
   return LLAVES_PRECIO_MODELO.some((clave) => tienePermiso(sesion, clave));
+}
+
+/** ¿La sesión recibe el precio del ARTE del modelo? Ver {@link LLAVES_PRECIO_ARTE}. */
+export function puedeVerPrecioDeArte(sesion: SesionUsuario): boolean {
+  return LLAVES_PRECIO_ARTE.some((clave) => tienePermiso(sesion, clave));
 }
 
 /** ¿La sesión recibe la maquila de referencia? Ver {@link LLAVES_MAQUILA_DE_REFERENCIA}. */

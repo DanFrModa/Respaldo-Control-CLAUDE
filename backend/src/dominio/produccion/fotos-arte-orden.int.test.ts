@@ -223,6 +223,70 @@ describe('Fotos del arte de la OP — permisos y empresa (A4/A9)', () => {
   });
 });
 
+/**
+ * ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — las fotos del arte de la OP con la LLAVE DEL ARTE, de punta a
+ * punta contra la base: Diseño Gráfico (`modelos.arte` + `ordenes.ver`, SIN `desarrollo.administrar`)
+ * apaga, vuelve a enseñar, sube y quita; `modelos.administrar` a secas sigue sin poder (nunca tocó la
+ * orden).
+ */
+describe('⭐ 0.235 — las fotos del arte de la OP con sólo `modelos.arte`', () => {
+  const PERM_ARTE: ClavePermiso[] = ['ordenes.ver', 'modelos.ver', 'modelos.arte'];
+
+  it('⭐ el ciclo completo pasa: ocultar, mostrar, subir y quitar una propia (con su bitácora)', async () => {
+    const { idArte, fotos } = await crearArteModelo(modelo.id, 'Logo pecho', ['frente.jpg']);
+    const idOrden = await crearOrdenDePrueba(empresa.id);
+    const idRenglon = await renglonDe(idOrden, idArte);
+    const idFotoModelo = fotos[0]?.idFoto as number;
+    const s = sesion(PERM_ARTE);
+
+    await ocultarFotoArteEnOrden(s, idOrden, idRenglon, { idModeloArteFoto: idFotoModelo }, bd());
+    expect(await cliente.ordenArteFotoOculta.count()).toBe(1);
+    await mostrarFotoArteEnOrden(s, idOrden, idRenglon, idFotoModelo, bd());
+    expect(await cliente.ordenArteFotoOculta.count()).toBe(0);
+
+    const { servicio, eliminados } = archivosFalsos();
+    const subida = await solicitarSubidaFotoArteOrden(
+      s,
+      idOrden,
+      idRenglon,
+      { nombreOriginal: 'propia.png', tipoMime: 'image/png', tamanoBytes: 10 },
+      bd(),
+      servicio,
+    );
+    expect(await cliente.ordenArteFoto.count()).toBe(1);
+    await quitarFotoArteOrden(s, idOrden, idRenglon, subida.idFoto, bd(), servicio);
+    expect(await cliente.ordenArteFoto.count()).toBe(0);
+    expect(eliminados).toHaveLength(1);
+
+    // La foto del MODELO sigue viva (D3) y queda el rastro de los cuatro actos (A7).
+    expect(await cliente.modeloArteFoto.count({ where: { id: idFotoModelo } })).toBe(1);
+    const rastro = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: String(idOrden) },
+    });
+    const actos = rastro
+      .map((b) => (b.datos as { fotoArte?: string } | null)?.fotoArte)
+      .filter((acto): acto is string => acto !== undefined);
+    expect(actos.sort()).toEqual(['agregar', 'mostrar', 'ocultar', 'quitar'].sort());
+  });
+
+  it('🔴 `modelos.administrar` a secas NO alcanza: esa llave nunca tocó la orden', async () => {
+    const { idArte, fotos } = await crearArteModelo(modelo.id, 'Logo pecho', ['frente.jpg']);
+    const idOrden = await crearOrdenDePrueba(empresa.id);
+    const idRenglon = await renglonDe(idOrden, idArte);
+
+    await expect(
+      ocultarFotoArteEnOrden(
+        sesion(['ordenes.ver', 'modelos.ver', 'modelos.administrar']),
+        idOrden,
+        idRenglon,
+        { idModeloArteFoto: fotos[0]?.idFoto as number },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    expect(await cliente.ordenArteFotoOculta.count()).toBe(0);
+  });
+});
+
 describe('⭐ Apagar una heredada NO es borrar (D3)', () => {
   it('⭐ la foto del ARTE DEL MODELO sigue viva, con su Archivo, tras apagarla en la OP', async () => {
     const { idArte, fotos } = await crearArteModelo(modelo.id, 'Logo pecho', ['a.jpg', 'b.jpg']);

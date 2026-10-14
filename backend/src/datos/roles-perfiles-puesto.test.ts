@@ -3,12 +3,14 @@
  * y que el del dueño siga DERIVÁNDOSE del catálogo.
  *
  * Esto es la decisión de Daniel transcrita a código, y lo que se mide aquí es la transcripción, no
- * si la decisión es buena: **321 asignaciones** —las 137 del catálogo para `Director General` y 184
+ * si la decisión es buena: **324 asignaciones** —las 138 del catálogo para `Director General` y 186
  * repartidas entre los otros 15—, con sus nombres y su orden. *(Eran 306 = 134 + 172; las 11 de más
  * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final. Y 317 = 134 + 183
  * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño; 318 hasta la
- * fila 0.251, que sumó `ventas.ver` del mismo modo; y 319 hasta la fila 0.238, que sumó
- * `listas.comentar`: al dueño por derivación y a «Gerente de Ventas» por decisión de Daniel.)*
+ * fila 0.251, que sumó `ventas.ver` del mismo modo; 319 hasta la fila 0.238, que sumó
+ * `listas.comentar` (al dueño por derivación y a «Gerente de Ventas» por decisión de Daniel); y 321
+ * hasta la fila 0.235, que sumó `modelos.arte` (al dueño por derivación y a «Diseño Gráfico») y le
+ * dio además a «Diseño Gráfico» `tipos-proceso.ver`.)*
  *
  * ## ⚠️ POR QUÉ ESTE ARCHIVO EXISTE APARTE (hay otros tres que hablan de roles)
  *
@@ -333,7 +335,17 @@ const DECISION_DE_DANIEL: readonly {
   {
     slug: 'grafico',
     nombre: 'Diseño Gráfico',
-    llaves: ['modelos.ver', 'ordenes.ver', 'proveedores.modificar', 'proveedores.ver'],
+    // ⭐ 0.235: `modelos.arte` — *«desarrolla todos los artes, define quién es el proveedor y cotiza
+    // cuánto cuesta cada uno»* (§Post-F9.247(c)) — y `tipos-proceso.ver`, que llena el selector de
+    // tipo del diálogo de arte.
+    llaves: [
+      'modelos.arte',
+      'modelos.ver',
+      'ordenes.ver',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'tipos-proceso.ver',
+    ],
   },
   {
     slug: 'auxiliar',
@@ -386,7 +398,7 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     }
   });
 
-  it('⭐ y en total son 321 asignaciones: 137 del dueño + 184 de los otros 15', () => {
+  it('⭐ y en total son 324 asignaciones: 138 del dueño + 186 de los otros 15', () => {
     // El número que Daniel revisó. Partido en dos porque las dos mitades se rompen distinto: la
     // primera si alguien deja de derivar el catálogo, la segunda si alguien recorta un perfil.
     // ⭐ 0.228: el dueño pasó de 134 a 135 —`ordenes.reabrir` le llega SOLO, por derivación— y los
@@ -394,14 +406,16 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     // por el mismo camino; tampoco la recibe ningún otro puesto (darla a Administración es de Daniel).
     // ⭐ 0.238: 137 + 184 con `listas.comentar` — al dueño por derivación y a «Gerente de Ventas»
     // por §Post-F9.248(b) (Aurora comenta la negociación sin negociarla).
+    // ⭐ 0.235: 138 + 186 — `modelos.arte` al dueño por derivación y a «Diseño Gráfico», que además
+    // recibe `tipos-proceso.ver` (sin ella no se llena el selector de tipo del diálogo de arte).
     const delDueno = PERFIL_DIRECTOR_GENERAL.permisos.length;
     const deLosQuince = PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0);
-    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(137);
+    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(138);
     expect(
       deLosQuince,
-      'los otros 15 suman 184 asignaciones (172 + las 11 de §Post-F9.260 + `listas.comentar`)',
-    ).toBe(184);
-    expect(delDueno + deLosQuince).toBe(321);
+      'los otros 15 suman 186 asignaciones (172 + las 11 de §Post-F9.260 + `listas.comentar` + `modelos.arte` y `tipos-proceso.ver`)',
+    ).toBe(186);
+    expect(delDueno + deLosQuince).toBe(324);
   });
 
   it('ningún perfil repite una llave, y ningún slug ni nombre está duplicado', () => {
@@ -833,18 +847,20 @@ describe('⭐⭐ «Consulta general»: el piso de lectura', () => {
     // el comportamiento — y conservar las marcas del dueño literales es lo que hace que, si el piso
     // encoge, el puesto que de verdad necesitaba la llave la conserve.
     //
-    // Medido: 12 de las 16 ya las llevaba algún puesto. Se fija el número para que un "adelgazamiento"
-    // silencioso de los perfiles rompa esto.
+    // Medido: 12 de las 16 ya las llevaba algún puesto; 13 desde la fila 0.235, que le dio a «Diseño
+    // Gráfico» `tipos-proceso.ver` (la del selector de tipo del diálogo de arte: un puesto no puede
+    // depender de que además le den el piso para usar su propia llave). Se fija el número para que un
+    // "adelgazamiento" silencioso de los perfiles rompa esto.
     const enAlgunPuesto = PISO_DE_LECTURA.filter((clave) =>
       PERFILES_DE_PUESTO.some((p) => (p.permisos as string[]).includes(clave)),
     );
-    expect(enAlgunPuesto).toHaveLength(12);
-    // Y el total de los puestos sigue intacto: el piso NO entra en sus 321 asignaciones.
+    expect(enAlgunPuesto).toHaveLength(13);
+    // Y el total de los puestos sigue intacto: el piso NO entra en sus 324 asignaciones.
     expect(PERFILES_DE_PUESTO_TODOS.map((p) => p.nombre)).not.toContain('Consulta general');
     expect(
       PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0),
-      'el piso no puede haber recortado las 184 marcas de los puestos',
-    ).toBe(184);
+      'el piso no puede haber recortado las 186 marcas de los puestos',
+    ).toBe(186);
   });
 });
 

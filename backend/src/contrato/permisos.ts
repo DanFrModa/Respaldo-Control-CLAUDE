@@ -1058,7 +1058,21 @@ export const CATALOGO_PERMISOS = [
     clave: 'modelos.administrar',
     modulo: 'modelos',
     descripcion:
-      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación)',
+      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación). Incluye todo lo de `modelos.arte` sobre el arte del modelo',
+  },
+  // ⭐ Fila 0.235 (§Post-F9.247(c) + §Post-F9.250(b)) — LA LLAVE DEL ARTE, partida de
+  // `modelos.administrar`. Daniel describió a Diseño Gráfico: *«desarrolla todos los artes, define
+  // quién es el proveedor y cotiza cuánto cuesta cada uno»*. Hasta aquí el arte sólo se podía dar
+  // con `modelos.administrar`, que abre además la ficha, las telas y los avíos de cualquier modelo.
+  // La reja vive en `dominio/modelos/acceso-arte.ts`: `modelos.administrar` la IMPLICA para el arte
+  // del MODELO; para las fotos de arte de la ORDEN la par es `desarrollo.administrar` (la llave de
+  // la receta de la orden), no `modelos.administrar`. El precio del arte lo VE quien lo captura
+  // (`precios-de-modelo.ts::puedeVerPrecioDeArte`), sin destapar telas, avíos ni el corte base.
+  {
+    clave: 'modelos.arte',
+    modulo: 'modelos',
+    descripcion:
+      'Capturar y editar el arte de los modelos (estampado/bordado, proveedor, costo y fotos del arte) y las fotos de arte de la orden, sin tocar la ficha, las telas ni los avíos',
   },
   // ⭐ V1-E7b (§Post-F9.110) — APROBAR el cambio de receta: crear la VERSIÓN de un modelo
   // (`CYA-26-71-001` → `CYA-26-71-001-01`, receta heredada, el original intacto).

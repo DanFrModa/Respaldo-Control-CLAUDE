@@ -33,15 +33,19 @@ import {
 import { ocultarPreciosDeMedidasSiNoPuede, type MedidasAvio } from './medidas-avio-talla.js';
 import {
   LLAVES_MAQUILA_DE_REFERENCIA,
+  LLAVES_PRECIO_ARTE,
   LLAVES_PRECIO_DE_ORDEN,
   LLAVES_PRECIO_MODELO,
   ocultarPreciosDeModeloSiNoPuede,
   puedeVerMaquilaDeReferencia,
   puedeVerMetaConseguida,
   puedeVerMetaPrometida,
+  puedeVerPrecioDeArte,
   puedeVerPreciosDeModelo,
   puedeVerPreciosDeOrden,
 } from './precios-de-modelo.js';
+import { exigirEditarArteModelo } from './acceso-arte.js';
+import { CLAVES_PERMISO } from '../../contrato/index.js';
 
 const sesion = (permisos: ClavePermiso[]) => sesionDePrueba({ permisos });
 
@@ -82,14 +86,20 @@ function llaveDe(ruta: string, nombre: string): ClavePermiso {
   return llaveEnTexto(fuente(ruta), nombre, ruta) as ClavePermiso;
 }
 
-/** Escritores del DINERO PROPIO del modelo desde un formulario (maquila/corte base, arte). */
+/** Escritores del DINERO PROPIO del modelo desde un formulario (maquila/corte base). */
 const ESCRITORES_MODELO: readonly (readonly [string, string])[] = [
   ['modelos/modelos.ts', 'crearModelo'],
   ['modelos/modelos.ts', 'actualizarModelo'],
-  ['modelos/arte-modelo.ts', 'crearArte'],
-  ['modelos/arte-modelo.ts', 'actualizarArte'],
-  ['modelos/arte-modelo.ts', 'copiarArteDeOtroModelo'],
 ];
+
+/**
+ * ⭐ Fila 0.235 — escritores del PRECIO DEL ARTE. Ya no llaman a `verificarPermiso` con UNA llave:
+ * pasan por la reja `exigirEditarArteModelo` (`acceso-arte.ts`), que acepta `modelos.arte` o
+ * `modelos.administrar`. La invariante se mide igual —contra el código, no contra una lista
+ * copiada—: se comprueba que cada uno llame a la reja en SU cuerpo y se preguntan a la REJA REAL,
+ * llave por llave del catálogo, cuáles deja pasar; todas tienen que LEER el precio del arte.
+ */
+const ESCRITORES_ARTE = ['crearArte', 'actualizarArte', 'copiarArteDeOtroModelo'] as const;
 
 /**
  * Los AMARRES del BOM no llevan precio, pero DECIDEN cuál costea (el editor elige el proveedor por
@@ -127,6 +137,64 @@ describe('quién ve el dinero propio del MODELO (corte base, arte)', () => {
     const llave = llaveDe(r, f);
     expect(LLAVES_PRECIO_MODELO).toContain(llave);
     expect(LLAVES_MAQUILA_DE_REFERENCIA).toContain(llave);
+  });
+});
+
+describe('⭐ 0.235 — quién ve el precio del ARTE (`modelos.arte` lo ve; no destapa nada más)', () => {
+  /** Las llaves del catálogo que la REJA REAL del arte deja pasar, cada una sola. */
+  const llavesQueEditanArte = CLAVES_PERMISO.filter((clave) => {
+    try {
+      exigirEditarArteModelo(sesion([clave]));
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  it('la reja del arte deja pasar exactamente `modelos.arte` y `modelos.administrar`', () => {
+    expect([...llavesQueEditanArte].sort()).toEqual(['modelos.administrar', 'modelos.arte']);
+  });
+
+  it.each(ESCRITORES_ARTE)('%s escribe a través de la reja del arte, en SU cuerpo', (nombre) => {
+    const cuerpo = cuerpoDe(fuente('modelos/arte-modelo.ts'), nombre);
+    expect(cuerpo, `no existe ${nombre}`).not.toBeNull();
+    expect(cuerpo).toContain('exigirEditarArteModelo(sesion)');
+    expect(cuerpo).not.toMatch(/verificarPermiso\(sesion, '/);
+  });
+
+  it('toda llave que la reja deja ESCRIBIR el arte LEE su precio (el formulario nunca lo pisa)', () => {
+    for (const llave of llavesQueEditanArte) {
+      expect(LLAVES_PRECIO_ARTE).toContain(llave);
+      expect(puedeVerPrecioDeArte(sesion([llave])), llave).toBe(true);
+    }
+  });
+
+  it('con sólo `modelos.arte`: ve el precio del arte y NADA más (corte, maquila, orden, telas, avíos)', () => {
+    const s = sesion(['modelos.ver', 'modelos.arte']);
+    expect(puedeVerPrecioDeArte(s)).toBe(true);
+    expect(ocultarPrecioDeArteSiNoPuede(s, { precio: 12.5 })).toEqual({
+      precio: 12.5,
+      preciosOcultos: false,
+    });
+    expect(puedeVerPreciosDeModelo(s)).toBe(false);
+    expect(puedeVerMaquilaDeReferencia(s)).toBe(false);
+    expect(puedeVerPreciosDeOrden(s)).toBe(false);
+    expect(LLAVES_PRECIO_TELA).not.toContain('modelos.arte');
+    expect(LLAVES_PRECIO_AVIO).not.toContain('modelos.arte');
+    const m = ocultarPreciosDeModeloSiNoPuede(s, {
+      maquilaBase: new Prisma.Decimal('23.5'),
+      corteBase: new Prisma.Decimal('4.25'),
+      metaCostoPrometido: new Prisma.Decimal('81.5'),
+      metaCostoConseguido: new Prisma.Decimal('79.25'),
+    });
+    expect(m.corteBase).toBeNull();
+    expect(m.maquilaBase).toBeNull();
+    expect(m.preciosOcultos).toBe(true);
+  });
+
+  it('la regla del arte CONTIENE a la del modelo: nadie que vea el corte deja de ver el arte', () => {
+    for (const llave of LLAVES_PRECIO_MODELO) expect(LLAVES_PRECIO_ARTE).toContain(llave);
+    expect(LLAVES_PRECIO_ARTE).toHaveLength(LLAVES_PRECIO_MODELO.length + 1);
   });
 });
 
@@ -204,6 +272,7 @@ describe('ninguna llave de VOCABULARIO se coló en las reglas', () => {
       expect(LLAVES_PRECIO_MODELO).not.toContain(llave);
       expect(LLAVES_MAQUILA_DE_REFERENCIA).not.toContain(llave);
       expect(LLAVES_PRECIO_DE_ORDEN).not.toContain(llave);
+      expect(LLAVES_PRECIO_ARTE).not.toContain(llave);
     }
   });
 });
@@ -590,6 +659,7 @@ describe('🔒 contención: lo que la receta repite nunca se ve más que en su o
       ...LLAVES_PRECIO_DE_ORDEN,
       ...LLAVES_MAQUILA_DE_REFERENCIA,
       ...LLAVES_PRECIO_MODELO,
+      ...LLAVES_PRECIO_ARTE,
       ...LLAVES_PRECIO_TELA,
       ...LLAVES_PRECIO_AVIO,
     ]),

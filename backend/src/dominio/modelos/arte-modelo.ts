@@ -23,7 +23,9 @@
  *  5. **Fotos en PLURAL** (`ModeloArteFoto`), como la galería del modelo.
  *  6. Las **puntadas** no se borran: se muestran solo si `TipoProceso.usaPuntadas`.
  *
- * Qué vive aquí (todo bajo `modelos.ver` / `modelos.administrar` — SIN permisos nuevos):
+ * Qué vive aquí: se LEE con `modelos.ver` y se ESCRIBE con `modelos.arte` o `modelos.administrar`,
+ * que la implica (⭐ fila 0.235, la reja en `acceso-arte.ts`: el arte se puede dar SIN la ficha, las
+ * telas ni los avíos):
  *  • CRUD del arte renglón por renglón (a diferencia de telas/avíos, que se guardan como SET
  *    completo: el arte tiene FOTOS, y una foto no se puede mandar dentro de un PUT de conjunto).
  *  • «Copiar arte de otro modelo»: trae el arte ya lleno para ajustarlo — la conveniencia que
@@ -62,7 +64,7 @@ import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun
 import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { armarPagina, rangoPrisma, type Pagina } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { puedeVerPreciosDeModelo } from './precios-de-modelo.js';
+import { puedeVerPrecioDeArte } from './precios-de-modelo.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -71,6 +73,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { exigirEditarArteModelo } from './acceso-arte.js';
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
 import { exigirRecetaPropia, resolverIdRecetaDeModelo } from './receta-compartida.js';
@@ -247,14 +250,15 @@ export type ModeloArteVisible = ModeloArteDetalle & { preciosOcultos: boolean };
 /**
  * ⭐ Tapa EN EL SERVIDOR el precio de un ARTE del modelo para quien no puede verlo (fila 0.249 parte
  * C, §Post-F9.257(c); regla en `precios-de-modelo.ts`). Lo cumplen el renglón del arte y la celda
- * de la galería. Proyección pura: nunca escribe. Quien edita el arte lleva `modelos.administrar`,
- * que está en la regla, así que el formulario siempre parte del precio completo.
+ * de la galería. Proyección pura: nunca escribe. Quien edita el arte lleva `modelos.arte` o
+ * `modelos.administrar`, y las DOS están en la regla del precio del arte (`puedeVerPrecioDeArte`,
+ * fila 0.235), así que el formulario siempre parte del precio completo.
  */
 export function ocultarPrecioDeArteSiNoPuede<T extends { precio: number | null }>(
   sesion: SesionUsuario,
   arte: T,
 ): T & { preciosOcultos: boolean } {
-  if (puedeVerPreciosDeModelo(sesion)) return { ...arte, preciosOcultos: false };
+  if (puedeVerPrecioDeArte(sesion)) return { ...arte, preciosOcultos: false };
   return { ...arte, precio: null, preciosOcultos: true };
 }
 
@@ -376,14 +380,16 @@ export async function listarArtesModelo(
   if (existe === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  // ⭐ Fila 0.249 parte C: el precio del arte con la regla del MODELO.
+  // ⭐ Fila 0.249 parte C: el precio del arte se tapa con `puedeVerPrecioDeArte` (desde la 0.235
+  // la abre también `modelos.arte`, sin destapar el corte base ni la maquila del modelo).
   return (await leerArtesModelo(cliente, idModelo)).map((a) =>
     ocultarPrecioDeArteSiNoPuede(sesion, a),
   );
 }
 
 /**
- * Agrega un ARTE a un modelo en UNA transacción (A2). Reglas: permiso `modelos.administrar`;
+ * Agrega un ARTE a un modelo en UNA transacción (A2). Reglas: permiso `modelos.arte` (o
+ * `modelos.administrar`, que lo implica);
  * modelo existente; tipo del catálogo único válido y marcado `esArte`; proveedor (si viene)
  * existente y activo. El arte nuevo entra AL FINAL (no desbanca al principal) y SIN fotos (se
  * suben aparte, presigned).
@@ -401,7 +407,7 @@ export async function crearArte(
   entrada: EntradaCrearArte,
   bd?: ContextoBd,
 ): Promise<ModeloArteVisible> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
   const datos = validarEntrada(esquemaArteCrear, entrada);
 
   const arte = await enTransaccion(async (tx) => {
@@ -475,7 +481,7 @@ export async function actualizarArte(
   entrada: EntradaActualizarArte,
   bd?: ContextoBd,
 ): Promise<ModeloArteVisible> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
   const datos = validarEntrada(esquemaArteEditar, entrada);
 
   const arte = await enTransaccion(async (tx) => {
@@ -566,7 +572,7 @@ export async function eliminarArte(
   bd?: ContextoBd,
   archivos?: ServicioArchivos,
 ): Promise<void> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
 
   // Las keys de R2 de los `Archivo` que la tx REALMENTE borró (los compartidos no vienen).
   const keysR2 = await enTransaccion(async (tx) => {
@@ -614,7 +620,8 @@ export async function eliminarArte(
  * así que marcarlo = moverlo a la posición 0 y reindexar los demás 0..N-1 conservando su orden
  * relativo, en UNA transacción (A2).
  *
- * Requiere `modelos.administrar`. Si el arte no es de ese modelo → `ErrorNoEncontrado`.
+ * Requiere `modelos.arte` (o `modelos.administrar`). Si el arte no es de ese modelo →
+ * `ErrorNoEncontrado`.
  * IDEMPOTENTE: si ya era el principal (y el orden ya estaba compacto) no escribe nada.
  *
  * CONCURRENCIA: el reindexado es leer-calcular-escribir y bajo READ COMMITTED dos marcados
@@ -629,7 +636,7 @@ export async function marcarArtePrincipal(
   idArte: number,
   bd?: ContextoBd,
 ): Promise<ModeloArteVisible[]> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
 
   const artes = await enTransaccion(async (tx) => {
     // ANTES de leer: serializa el reordenamiento de ESTE modelo (ver nota de concurrencia arriba).
@@ -691,7 +698,7 @@ export async function copiarArteDeOtroModelo(
   entrada: EntradaCopiarArte,
   bd?: ContextoBd,
 ): Promise<ModeloArteVisible> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
   const datos = validarEntrada(esquemaArteCopiarCuerpo, entrada);
 
   const arte = await enTransaccion(async (tx) => {
@@ -828,8 +835,8 @@ export async function galeriaArte(
     nombreModelo: f.modelo.descripcion,
   }));
 
-  // ⭐ Fila 0.249 parte C: el precio del arte con la regla del MODELO (el diálogo «copiar arte»
-  // lo pinta: al copiar se copia SU precio).
+  // ⭐ Fila 0.249 parte C: el precio del arte se tapa con `puedeVerPrecioDeArte` (desde la 0.235 la
+  // abre también `modelos.arte`); el diálogo «copiar arte» lo pinta: al copiar se copia SU precio.
   return armarPagina(
     datos.map((a) => ocultarPrecioDeArteSiNoPuede(sesion, a)),
     total,
@@ -920,8 +927,8 @@ export async function borrarArchivoSiQuedoHuerfano(
 
 /**
  * Prepara la subida de UNA foto de un arte (R2) en UNA transacción (A2): exige el arte y el
- * permiso `modelos.administrar`, crea el registro `Archivo` vía el motor de R2 (carpeta
- * `modelo-arte/<id>` — llave ORDENADA por id, NO por nombre, A5), crea el renglón
+ * permiso `modelos.arte` (o `modelos.administrar`), crea el registro `Archivo` vía el motor de
+ * R2 (carpeta `modelo-arte/<id>` — llave ORDENADA por id, NO por nombre, A5), crea el renglón
  * `ModeloArteFoto` AL FINAL de las que ya hay y devuelve la URL PUT prefirmada para que el
  * navegador suba DIRECTO a R2.
  *
@@ -944,7 +951,7 @@ export async function solicitarSubidaFotoArte(
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<SubidaFotoArte> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
   const datos = validarEntrada(esquemaArteFotoCrear, entrada);
 
   return enTransaccion(async (tx) => {
@@ -1052,8 +1059,9 @@ export async function listarFotosArte(
 
 /**
  * Quita UNA foto de un arte (R2) en UNA transacción (A2): borra el renglón `ModeloArteFoto` y su
- * `Archivo` **si ninguna otra foto de arte lo comparte**. Requiere `modelos.administrar`. Si la
- * foto no pertenece a ese arte (o el arte no es de ese modelo) → `ErrorNoEncontrado`.
+ * `Archivo` **si ninguna otra foto de arte lo comparte**. Requiere `modelos.arte` (o
+ * `modelos.administrar`). Si la foto no pertenece a ese arte (o el arte no es de ese modelo) →
+ * `ErrorNoEncontrado`.
  *
  * Si el `Archivo` se llegó a borrar (nadie más lo comparte), su OBJETO de R2 se borra TRAS el
  * commit en modo BEST-EFFORT (0.081a). Si OTRO arte sigue usando la foto, el objeto NO se toca.
@@ -1071,7 +1079,7 @@ export async function quitarFotoArte(
   bd?: ContextoBd,
   archivos?: ServicioArchivos,
 ): Promise<void> {
-  verificarPermiso(sesion, 'modelos.administrar');
+  exigirEditarArteModelo(sesion);
 
   // `null` si la foto la COMPARTE otro arte: entonces el objeto de R2 NO se toca.
   const keyR2 = await enTransaccion(async (tx) => {
