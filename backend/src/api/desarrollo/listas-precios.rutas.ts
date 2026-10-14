@@ -13,6 +13,8 @@
  *  • APROBAR / teclear precio de un renglón    → `listas.aprobar` + `listas.ver`.
  *  • NEGOCIAR (rondas/acuerdos/cambiar estado) → `listas.negociar` + `listas.ver` (F8-E5).
  *  • Historial de eventos de un renglón        → `listas.ver` (F8-E5).
+ *  • COMENTAR la negociación (fila 0.238)      → `listas.comentar` O `listas.negociar` + `listas.ver`;
+ *    leer los comentarios → `listas.ver`.
  *  • PDF / Excel                              → `listas.ver` + `consultas.ver-importes` (el impreso ES
  *    la exportación de precios; sin ver-importes no tiene sentido → 403). ⚠️ Además el DOMINIO los
  *    rechaza (409) si algún renglón no tiene precio APROBADO (§Post-F9.125(c): *"si no está aprobado
@@ -47,6 +49,9 @@ import {
 import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
+  esquemaComentarioNegociacionCrear,
+  esquemaComentarioNegociacionSalida,
+  esquemaComentariosNegociacion,
   esquemaNegociacionEventos,
   esquemaRondaRegistrar,
   esquemaGuardarMesa,
@@ -82,6 +87,10 @@ import {
   simularMesa,
   simularNegociacion,
 } from '../../dominio/desarrollo/negociacion.js';
+import {
+  comentarNegociacion,
+  listarComentariosNegociacion,
+} from '../../dominio/desarrollo/comentarios-negociacion.js';
 import { crearModeloEnLista } from '../../dominio/desarrollo/modelo-en-la-mesa.js';
 import {
   crearPendienteDeRenglon,
@@ -378,6 +387,50 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const datos = await listarEventosDeLinea(sesion, request.params.idLinea);
       return { datos };
+    },
+  });
+
+  // ⭐ Fila 0.238 (§Post-F9.248(b)) — COMENTARIOS de la negociación de una lista. Leerlos es
+  // `listas.ver`; agregar uno es `listas.comentar` **o** `listas.negociar` (que lo implica), más
+  // `listas.ver` (mutar implica leer). Un comentario NO toca precios, estados, acuerdos, la mesa ni
+  // cotizaciones: las nueve rutas de `listas.negociar` siguen pidiendo esa llave a secas.
+  app.route({
+    method: 'GET',
+    url: '/listas-precios/:id/comentarios',
+    preHandler: app.conPermiso('listas.ver'),
+    schema: {
+      tags: ['listas'],
+      summary: 'Comentarios de la negociación de una lista (cronológico)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaComentariosNegociacion, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await listarComentariosNegociacion(sesion, request.params.id);
+      return { datos };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/:id/comentarios',
+    preHandler: [
+      app.conAlgunPermiso('listas.comentar', 'listas.negociar'),
+      app.conPermiso('listas.ver'),
+    ],
+    schema: {
+      tags: ['listas'],
+      summary: 'Agregar un comentario a la negociación de una lista (no modifica nada negociado)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaComentarioNegociacionCrear,
+      response: { 201: esquemaComentarioNegociacionSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const comentario = await comentarNegociacion(sesion, request.params.id, request.body);
+      return reply.code(201).send(comentario);
     },
   });
 

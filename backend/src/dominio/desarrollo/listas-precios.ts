@@ -1382,6 +1382,13 @@ export async function quitarLineaLista(
       where: { idListaLinea: idLinea },
       orderBy: { id: 'asc' },
     });
+    // ⭐ Fila 0.238 — los COMENTARIOS de la negociación que apuntan a este modelo también se van por
+    // cascada (misma trampa): se fotografían o desaparecen sin rastro. El lock de la lista que ya se
+    // tomó arriba es el mismo que toma `comentarNegociacion`, así que ninguno se cuela después.
+    const comentarios = await tx.negociacionComentario.findMany({
+      where: { idListaLinea: idLinea },
+      orderBy: { id: 'asc' },
+    });
 
     await tx.listaPreciosLinea.delete({ where: { id: idLinea } });
     await tx.listaPrecios.update({
@@ -1399,6 +1406,7 @@ export async function quitarLineaLista(
         antes: aJsonBitacora(antes),
         eventosNegociacion: eventos.map(aJsonBitacora),
         pendientes: pendientes.map(aJsonBitacora),
+        comentarios: comentarios.map(aJsonBitacora),
       },
     });
     return base.idLista;
@@ -1468,6 +1476,12 @@ export async function eliminarLista(
       where: { idListaLinea: { in: lineas.map((l) => l.id) } },
       orderBy: { id: 'asc' },
     });
+    // ⭐ Fila 0.238 — los COMENTARIOS de la negociación (de la lista y de sus renglones) también se
+    // van por cascada: se fotografían con todo lo demás.
+    const comentarios = await tx.negociacionComentario.findMany({
+      where: { idLista },
+      orderBy: { id: 'asc' },
+    });
 
     // V1-E7c: una lista que ya produjo cotizaciones SÍ se borra. El documento emitido no depende de
     // ella para nada —su encabezado (cliente, departamento, folio de la lista) y sus renglones están
@@ -1490,11 +1504,13 @@ export async function eliminarLista(
           lineas,
           eventosNegociacion: eventos,
           pendientes,
+          comentarios,
         }),
       },
     });
     // Cascade: `lista_precios_linea` y, desde ahí, `negociacion_evento` y
-    // `lista_precios_linea_pendiente` (los tres quedaron fotografiados arriba).
+    // `lista_precios_linea_pendiente`; y `negociacion_comentario` (fila 0.238). Todos quedaron
+    // fotografiados arriba.
     await tx.listaPrecios.delete({ where: { id: idLista } });
   }, bd);
 }

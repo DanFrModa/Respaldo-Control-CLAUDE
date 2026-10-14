@@ -1340,6 +1340,18 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Negociar por versiones (rondas + acuerdos) y mover el estado de la lista (dueño y gerente comercial, decisión (h)) (R20b)',
   },
+  // ⭐ Fila 0.238 (§Post-F9.248(b)) — Daniel, sobre Aurora: *«las listas negociar solo de lectura y
+  // poder agregar comentarios, pero no modificar lo que yo hice»*. Leer ya lo daba `listas.ver`;
+  // comentar no se podía expresar sin `listas.negociar`, que además gobierna rondas, acuerdos,
+  // estados, la mesa y EMITIR/CANCELAR cotizaciones. `listas.negociar` IMPLICA esta llave (lo resuelve
+  // `exigirComentarNegociacion` en el dominio y `conAlgunPermiso` en la ruta): nadie que ya negociaba
+  // pierde nada.
+  {
+    clave: 'listas.comentar',
+    modulo: 'listas',
+    descripcion:
+      'Agregar comentarios a la negociación de una lista (a la lista o a un modelo). No cambia precios, estados, acuerdos, la mesa ni cotizaciones; los comentarios no se editan ni se borran',
+  },
 
   // ── Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1, A4 — D12/D15/R10; doc
   //    PROPUESTA-Finanzas-y-Proveedores.md §3) — permisos NUEVOS de v2 (sin equivalente granular

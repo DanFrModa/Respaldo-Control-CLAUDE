@@ -3,11 +3,12 @@
  * y que el del dueño siga DERIVÁNDOSE del catálogo.
  *
  * Esto es la decisión de Daniel transcrita a código, y lo que se mide aquí es la transcripción, no
- * si la decisión es buena: **319 asignaciones** —las 136 del catálogo para `Director General` y 183
+ * si la decisión es buena: **321 asignaciones** —las 137 del catálogo para `Director General` y 184
  * repartidas entre los otros 15—, con sus nombres y su orden. *(Eran 306 = 134 + 172; las 11 de más
  * son las que Daniel aceptó en §Post-F9.260, fila 0.250 — batería 9, al final. Y 317 = 134 + 183
- * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño; y 318 hasta la
- * fila 0.251, que sumó `ventas.ver` del mismo modo.)*
+ * hasta la fila 0.228, que sumó `ordenes.reabrir` al catálogo: le llega sólo al dueño; 318 hasta la
+ * fila 0.251, que sumó `ventas.ver` del mismo modo; y 319 hasta la fila 0.238, que sumó
+ * `listas.comentar`: al dueño por derivación y a «Gerente de Ventas» por decisión de Daniel.)*
  *
  * ## ⚠️ POR QUÉ ESTE ARCHIVO EXISTE APARTE (hay otros tres que hablan de roles)
  *
@@ -89,6 +90,8 @@ const DECISION_DE_DANIEL: readonly {
       'etiquetas-marca.ver',
       'indicadores.ver',
       'listas.administrar',
+      // ⭐ Fila 0.238 (§Post-F9.248(b)): comentar la negociación sin negociarla.
+      'listas.comentar',
       'listas.ver',
       'modelos.ver',
       'ordenes.ver',
@@ -383,19 +386,22 @@ describe('⭐ los 16 perfiles de puesto están completos y en el orden que Danie
     }
   });
 
-  it('⭐ y en total son 319 asignaciones: 136 del dueño + 183 de los otros 15', () => {
+  it('⭐ y en total son 321 asignaciones: 137 del dueño + 184 de los otros 15', () => {
     // El número que Daniel revisó. Partido en dos porque las dos mitades se rompen distinto: la
     // primera si alguien deja de derivar el catálogo, la segunda si alguien recorta un perfil.
     // ⭐ 0.228: el dueño pasó de 134 a 135 —`ordenes.reabrir` le llega SOLO, por derivación— y los
     // otros 15 se quedan en 183: ningún puesto la recibe. ⭐ 0.251: y de 135 a 136 con `ventas.ver`,
     // por el mismo camino; tampoco la recibe ningún otro puesto (darla a Administración es de Daniel).
+    // ⭐ 0.238: 137 + 184 con `listas.comentar` — al dueño por derivación y a «Gerente de Ventas»
+    // por §Post-F9.248(b) (Aurora comenta la negociación sin negociarla).
     const delDueno = PERFIL_DIRECTOR_GENERAL.permisos.length;
     const deLosQuince = PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0);
-    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(136);
-    expect(deLosQuince, 'los otros 15 suman 183 asignaciones (172 + las 11 de §Post-F9.260)').toBe(
-      183,
-    );
-    expect(delDueno + deLosQuince).toBe(319);
+    expect(delDueno, 'el dueño tiene que llevar el catálogo entero').toBe(137);
+    expect(
+      deLosQuince,
+      'los otros 15 suman 184 asignaciones (172 + las 11 de §Post-F9.260 + `listas.comentar`)',
+    ).toBe(184);
+    expect(delDueno + deLosQuince).toBe(321);
   });
 
   it('ningún perfil repite una llave, y ningún slug ni nombre está duplicado', () => {
@@ -833,12 +839,12 @@ describe('⭐⭐ «Consulta general»: el piso de lectura', () => {
       PERFILES_DE_PUESTO.some((p) => (p.permisos as string[]).includes(clave)),
     );
     expect(enAlgunPuesto).toHaveLength(12);
-    // Y el total de los puestos sigue intacto: el piso NO entra en sus 319 asignaciones.
+    // Y el total de los puestos sigue intacto: el piso NO entra en sus 321 asignaciones.
     expect(PERFILES_DE_PUESTO_TODOS.map((p) => p.nombre)).not.toContain('Consulta general');
     expect(
       PERFILES_DE_PUESTO.reduce((suma, p) => suma + p.permisos.length, 0),
-      'el piso no puede haber recortado las 183 marcas de los puestos',
-    ).toBe(183);
+      'el piso no puede haber recortado las 184 marcas de los puestos',
+    ).toBe(184);
   });
 });
 
@@ -1010,8 +1016,8 @@ describe('🔴 el PISO y las cinco que FILTRAN PRECIO son disjuntos (decisión d
  *
  * Escanea los `*.rutas.ts` de `src/api` y mide, no supone. Es **una red, no un teorema**: reparte por
  * bloque `app.route({…})` y de ahí saca el `method:` y las claves de su `preHandler:`. Si el día de
- * mañana se declara una ruta de otra forma, esta red no la ve — pero cubre los **668** bloques
- * `app.route` que hay hoy (666 llevan reja de permiso; los 2 restantes no, y son de sesión).
+ * mañana se declara una ruta de otra forma, esta red no la ve — pero cubre los **670** bloques
+ * `app.route` que hay hoy (668 llevan reja de permiso; los 2 restantes no, y son de sesión).
  *
  * 🔴 **Y la red nació ANGOSTA: esto es la segunda versión.** La primera buscaba
  * `conPermiso\('clave'\)` con una regex de una línea, y por ahí se le escapaban DOS formas que el
@@ -1207,14 +1213,15 @@ describe('⭐⭐ guardián: el piso de lectura NO abre ninguna escritura', () =>
     ).toEqual([]);
   });
 
-  it('⭐⭐ la red ve TODAS las rutas: 668 bloques y 666 con reja de permiso', () => {
+  it('⭐⭐ la red ve TODAS las rutas: 670 bloques y 668 con reja de permiso', () => {
     // 🔴 **ESTO ES LO QUE CONVIERTE LA RED EN REJA.** Las pruebas de arriba miran sólo las rutas del
     // PISO: si la red dejara de reconocer una forma de declarar el guard, esas rutas desaparecerían
     // de su vista y el guardián se pondría **verde por ceguera** — exactamente lo que pasó con
     // `conAlgunPermiso`. Aquí se cuenta sobre el TOTAL: cualquier forma que la red no vea saca
-    // bloques de los 666 y esto se pone **rojo en vez de callarse**.
+    // bloques de los 668 y esto se pone **rojo en vez de callarse**.
+    // ⭐ 0.238: +2 rutas (GET y POST de los comentarios de la negociación), las dos con reja.
     //
-    // Medido: **668** bloques `app.route`, **666** con al menos una clave de permiso y **2** sin
+    // Medido: **670** bloques `app.route`, **668** con al menos una clave de permiso y **2** sin
     // ninguna (de sesión). Si el total cambia porque se agregaron rutas, se actualiza; si cambia la
     // PROPORCIÓN sin que nadie haya tocado rutas, es que la red dejó de ver algo.
     let bloques = 0;
@@ -1241,12 +1248,12 @@ describe('⭐⭐ guardián: el piso de lectura NO abre ninguna escritura', () =>
         if (tieneReja) conReja++;
       }
     }
-    expect(bloques, 'cambió el número de rutas del API').toBe(668);
+    expect(bloques, 'cambió el número de rutas del API').toBe(670);
     expect(
       conReja,
       'bajó el número de rutas con reja de permiso: o alguien le quitó el guard a una ruta, o la ' +
         'red dejó de reconocer una forma de declararlo (y entonces el guardián del piso está ciego)',
-    ).toBe(666);
+    ).toBe(668);
   });
 
   it('⭐ y lo que el dueño LEE tampoco promete escritura: la descripción de cada llave del piso', () => {

@@ -71,6 +71,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.215 · 14-oct-2026 · **en prueba** — **Comentar la negociación de una lista sin poder cambiar lo negociado**
+
+> **La v0.215 cierra la fila 0.238.** Daniel, sobre Aurora: *«las listas negociar solo de lectura y poder agregar
+> comentarios, pero no modificar lo que yo hice»*. Hasta hoy, para dejar un comentario hacía falta el permiso de
+> negociar, que también deja emitir y cancelar cotizaciones al cliente.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Cada lista de precios tiene una sección de comentarios**, debajo de las cotizaciones. Quien puede ver la lista los
+lee; quien tiene el permiso nuevo **«Comentar listas»** (`listas.comentar`; en la pantalla de Roles se lee *«Agregar comentarios a la negociación de una lista…»*) o el de negociar (`listas.negociar`) escribe uno, para toda la lista o para un
+modelo. Cada comentario queda con quién y cuándo, y **no se edita ni se borra**: si alguien se equivoca, escribe otro.
+
+**Un comentario no toca nada de lo negociado:** precios, rondas, acuerdos, estados y cotizaciones quedan igual, y no
+aparece como acuerdo en la vista de la orden.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**El perfil Gerente de Ventas recibe «Comentar listas» solo**, al desplegar esta versión (queda anotado en la
+bitácora). Los roles Directivo y Gerencial también lo traen.
+
+**Ojo con lo que Gerente de Ventas ya podía:** con «Administrar listas» (`listas.administrar`, *«Crear y editar listas de precios…»*) puede quitar un modelo de la lista —y con eso
+sus rondas y acuerdos—, borrar una lista que no esté cerrada, fijar el precio objetivo y editar los pendientes. Se le
+pregunta a Daniel si se queda así.
+
+### ⏳ Sigue pendiente o roto
+
+Preguntas para Daniel en §Post-F9.282.
+
 ## 0.214 · 14-oct-2026 · **en prueba** — **Meter compradores y departamentos ya no exige poder dar de alta clientes**
 
 > **La v0.214 cierra la fila 0.239.** Daniel: *«Administración o yo damos de alta al cliente. Ella puede meter
@@ -79,9 +107,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### ✅ Se puede hacer ahora lo que antes no
 
-**El permiso «Modificar clientes» ya sirve:** con él se agregan y editan las **personas (compradores)** de un cliente,
+**El permiso «Modificar clientes» (`clientes.modificar`) ya sirve:** con él se agregan y editan las **personas (compradores)** de un cliente,
 sus **departamentos** (agregar, editar, desactivar y reactivar) y sus **campos propios**. **Dar de alta un cliente,
-editar su ficha, desactivarlo y juntar departamentos duplicados** siguen siendo de «Administrar clientes», que además
+editar su ficha, desactivarlo y juntar departamentos duplicados** siguen siendo de «Administrar clientes» (`clientes.administrar`), que además
 puede todo lo anterior. Juntar duplicados se queda reservado porque mueve o borra los factores de precio del
 departamento, que son tuyos.
 

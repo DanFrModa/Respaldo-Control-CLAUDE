@@ -8,7 +8,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
-import { CLAVE_LISTAS, type ListaDetalle } from './listas-precios';
+import { CLAVE_COMENTARIOS, CLAVE_LISTAS, type ListaDetalle } from './listas-precios';
 import { CLAVE_PRECOSTOS } from './precostos';
 import { CLAVE_PROYECTOS } from './proyectos';
 import type { paths } from './esquema.gen';
@@ -62,6 +62,16 @@ export type GuardarMesaCuerpo =
 export type SimulacionMesa =
   paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['responses']['200']['content']['application/json'];
 
+/**
+ * ⭐ Fila 0.238 (§Post-F9.248(b)) — un COMENTARIO de la negociación de una lista (inmutable: no se
+ * edita ni se borra). Lo escribe quien tiene `listas.comentar` o `listas.negociar`.
+ */
+export type ComentarioNegociacion =
+  paths['/api/listas-precios/{id}/comentarios']['get']['responses']['200']['content']['application/json']['datos'][number];
+/** Cuerpo de un comentario nuevo: el texto y, opcional, el renglón al que se refiere. */
+export type ComentarioCuerpo =
+  paths['/api/listas-precios/{id}/comentarios']['post']['requestBody']['content']['application/json'];
+
 /** Clave raíz de la cache de eventos de negociación. */
 export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
 
@@ -83,6 +93,23 @@ async function listarEventos(idLinea: number): Promise<NegociacionEvento[]> {
   });
   if (!data) throw new ErrorDeApi(error);
   return data.datos;
+}
+
+async function listarComentarios(idLista: number): Promise<ComentarioNegociacion[]> {
+  const { data, error } = await api.GET('/api/listas-precios/{id}/comentarios', {
+    params: { path: { id: idLista } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data.datos;
+}
+
+async function comentar(idLista: number, cuerpo: ComentarioCuerpo): Promise<ComentarioNegociacion> {
+  const { data, error } = await api.POST('/api/listas-precios/{id}/comentarios', {
+    params: { path: { id: idLista } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
 }
 
 async function registrarRonda(idLinea: number, cuerpo: RondaCuerpo): Promise<ListaDetalle> {
@@ -168,6 +195,41 @@ async function guardarMesa(idLinea: number, cuerpo: GuardarMesaCuerpo): Promise<
 }
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
+
+/** ⭐ Fila 0.238 — los comentarios de la negociación de una lista (cronológico). */
+export function useComentariosLista(
+  idLista: number | null,
+): UseQueryResult<ComentarioNegociacion[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_COMENTARIOS, idLista ?? 0],
+    queryFn: () => listarComentarios(idLista as number),
+    enabled: idLista !== null,
+  });
+}
+
+/** Argumentos de un comentario nuevo. */
+interface ArgsComentario {
+  idLista: number;
+  cuerpo: ComentarioCuerpo;
+}
+
+/**
+ * ⭐ Fila 0.238 — agrega un comentario. Sólo invalida los COMENTARIOS: un comentario no mueve
+ * precios, eventos, precostos ni el estado de nada (lo garantiza el backend).
+ */
+export function useComentarNegociacion(): UseMutationResult<
+  ComentarioNegociacion,
+  ErrorDeApi,
+  ArgsComentario
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idLista, cuerpo }: ArgsComentario) => comentar(idLista, cuerpo),
+    onSuccess: (_comentario, { idLista }) => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_COMENTARIOS, idLista] });
+    },
+  });
+}
 
 /** Historial de eventos de negociación de un renglón; deshabilitada si no hay renglón. */
 export function useEventosLinea(

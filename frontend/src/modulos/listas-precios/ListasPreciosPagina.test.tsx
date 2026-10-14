@@ -92,6 +92,9 @@ vi.mock('@/api/negociacion', () => ({
   useCambiarEstadoLista: () => ({ mutate: vi.fn(), isPending: false }),
   // ⭐ V1-E8x (§Post-F9.151): el estado del MODELO dentro de la lista.
   useCambiarEstadoRenglon: () => ({ mutate: estadoRenglonMutate, isPending: false }),
+  // ⭐ Fila 0.238: los comentarios de la negociación (la sección vive en el detalle de la lista).
+  useComentariosLista: () => ({ data: [], isPending: false, isError: false }),
+  useComentarNegociacion: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/api/desarrollos', () => ({
   useDesarrollo: () => ({ data: undefined, isPending: false }),
@@ -1028,5 +1031,55 @@ describe('🔴 el ancho de la tabla: las filas que la cruzan abarcan TODAS las c
     const titulos = [...document.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(titulos).toContain('Último precio de la negociación');
     expect(titulos).toContain('Precio aprobado');
+  });
+});
+
+/**
+ * ⭐⭐ Fila 0.238 (§Post-F9.248(b)) — Aurora COMENTA la negociación sin negociarla. Daniel: *«las
+ * listas negociar solo de lectura y poder agregar comentarios, pero no modificar lo que yo hice»*.
+ *
+ * Lo que fija esta batería en la pantalla: con `listas.comentar` (sin `listas.negociar`) aparece el
+ * cuadro para comentar y NO aparece ningún control de negociar —estado de la lista, estado del
+ * modelo, emitir cotización, nueva ronda, acuerdo—; sin ninguna de las dos los comentarios se leen
+ * pero el cuadro no se pinta; y con `listas.negociar` el cuadro sale (lo implica).
+ */
+describe('⭐⭐ 0.238 — comentar la negociación sin poder negociarla', () => {
+  beforeEach(() => {
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  it('con `listas.comentar` sale el cuadro para comentar y NINGÚN control de negociar', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle([...PERM, 'listas.comentar']);
+
+    expect(screen.getByTestId('comentarios-negociacion')).toBeInTheDocument();
+    expect(screen.getByTestId('nuevo-comentario')).toBeInTheDocument();
+    expect(screen.queryByTestId('selector-estado-lista')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('estado-renglon')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('emitir-cotizacion')).not.toBeInTheDocument();
+
+    // El diálogo de la negociación del modelo se LEE, pero sin ronda, acuerdo ni mesa.
+    await usuario.click(screen.getByTestId('abrir-negociacion'));
+    expect(await screen.findByTestId('panel-negociacion')).toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-acuerdo')).not.toBeInTheDocument();
+  });
+
+  it('sin `listas.comentar` ni `listas.negociar` los comentarios se LEEN, pero no hay cuadro', async () => {
+    await abrirDetalle(PERM);
+
+    expect(screen.getByTestId('comentarios-negociacion')).toBeInTheDocument();
+    expect(screen.queryByTestId('nuevo-comentario')).not.toBeInTheDocument();
+  });
+
+  it('con `listas.negociar` también se comenta (lo implica)', async () => {
+    await abrirDetalle([...PERM, 'listas.negociar']);
+
+    expect(screen.getByTestId('nuevo-comentario')).toBeInTheDocument();
+    // Control: con `negociar` los controles de negociar SÍ están (si no, la prueba de arriba no
+    // probaría nada).
+    expect(screen.getByTestId('selector-estado-lista')).toBeInTheDocument();
+    expect(screen.getByTestId('estado-renglon')).toBeInTheDocument();
   });
 });

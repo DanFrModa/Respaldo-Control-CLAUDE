@@ -483,3 +483,67 @@ export const esquemaGuardarMesa = z.object({
 
 /** Datos validados del guardado de la mesa. */
 export type DatosGuardarMesa = z.infer<typeof esquemaGuardarMesa>;
+
+// ── Comentarios de la negociación (fila 0.238, §Post-F9.248(b)) ─────────────────────────────
+
+/**
+ * ⭐ AGREGAR UN COMENTARIO a la negociación de una lista. Lo escribe quien tiene `listas.comentar`
+ * (o `listas.negociar`, que lo implica). Va a la LISTA y, opcionalmente, a UNO de sus renglones.
+ *
+ * Es un registro NUEVO e INMUTABLE (D3): no edita el `acuerdo` de ningún evento ni toca precios,
+ * estados, la mesa ni cotizaciones. No hay edición ni borrado: si alguien se equivoca, escribe otro.
+ */
+export const esquemaComentarioNegociacionCrear = z.object({
+  texto: z
+    .string({ error: 'El comentario es obligatorio' })
+    .trim()
+    .min(1, { error: 'Escribe el comentario' })
+    .max(2000, { error: 'El comentario no puede tener más de 2000 caracteres' })
+    .describe('El comentario (texto libre).'),
+  idLinea: z
+    .number({ error: 'El renglón debe ser un número' })
+    .int({ error: 'El id del renglón debe ser entero' })
+    .positive({ error: 'El id del renglón debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe('Renglón (modelo) de ESTA lista al que se refiere; omitido = la lista entera.'),
+});
+
+/** Datos validados de un comentario nuevo. */
+export type DatosComentarioNegociacionCrear = z.infer<typeof esquemaComentarioNegociacionCrear>;
+
+/** Un comentario de la negociación (inmutable). */
+export const esquemaComentarioNegociacionSalida = z
+  .object({
+    id: z.number().int().describe('Id del comentario.'),
+    idLista: z.number().int().describe('Lista a la que pertenece.'),
+    idListaLinea: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Renglón al que se refiere, o null si es de la lista entera.'),
+    codigoModelo: z
+      .string()
+      .nullable()
+      .describe('Código del modelo del renglón (para leerlo sin cruzar), o null.'),
+    texto: z.string().describe('El comentario.'),
+    registradoPorId: z.string().nullable().describe('Quién lo escribió, o null.'),
+    nombreRegistradoPor: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien lo escribió (resuelto en el servidor), o null.'),
+    registradoEn: z.iso.datetime().describe('Cuándo se escribió (ISO 8601).'),
+  })
+  .describe('Comentario sobre la negociación de una lista (no edita nada de lo negociado).');
+
+/** Forma de un comentario de la negociación. */
+export type ComentarioNegociacionSalida = z.infer<typeof esquemaComentarioNegociacionSalida>;
+
+/** Respuesta de los comentarios de una lista (orden cronológico). */
+export const esquemaComentariosNegociacion = z
+  .object({
+    datos: z
+      .array(esquemaComentarioNegociacionSalida)
+      .describe('Comentarios de la lista, del más viejo al más nuevo.'),
+  })
+  .describe('Comentarios de la negociación de una lista.');

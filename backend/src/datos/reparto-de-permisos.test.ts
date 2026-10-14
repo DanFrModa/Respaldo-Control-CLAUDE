@@ -663,6 +663,18 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'NO se le da a «Administración y Finanzas»: darla es decisión de Daniel, la fila sólo la ' +
       'hace posible. Es DINERO (va en PERMISOS_DE_DINERO): nunca al piso.',
   },
+  // ── ⭐⭐ Comentar la negociación sin negociarla (fila 0.238), §Post-F9.248(b) ────────────────
+  {
+    clave: 'listas.comentar',
+    razon:
+      'Los tres de acceso total (por derivación), y EXACTAMENTE los roles de sistema que ya ' +
+      'llevan `listas.negociar` (Directivo y Gerencial): quien negocia ya podía escribir en el ' +
+      'hilo, así que nadie la gana ni la pierde. Además el perfil de puesto «Gerente de Ventas» ' +
+      '(Aurora): *«las listas negociar solo de lectura y poder agregar comentarios, pero no ' +
+      'modificar lo que yo hice»*. NO se le da al rol de sistema Ventas (nivel 45), que tampoco ' +
+      'negocia: darla es decisión de Daniel. `listas.negociar` la IMPLICA en el dominio, así que ' +
+      'el reparto explícito es para que la pantalla de Roles diga la verdad.',
+  },
 ];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {
