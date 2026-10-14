@@ -273,7 +273,7 @@ function aAvioBomSalida(
 
 /** Proyecta un ARTE del modelo a JSON (la `key` de cada foto es interna: NUNCA sale). */
 function aArteSalida(a: ModeloArteVisible): z.infer<typeof esquemaArteSalida> {
-  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla del MODELO).
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (`puedeVerPrecioDeArte`, fila 0.235).
   return {
     id: a.id,
     idModelo: a.idModelo,
@@ -301,7 +301,7 @@ function aArteSalida(a: ModeloArteVisible): z.infer<typeof esquemaArteSalida> {
 function aGaleriaArteSalida(
   a: GaleriaArteItem & { preciosOcultos: boolean },
 ): z.infer<typeof esquemaGaleriaArtePagina>['datos'][number] {
-  // Fila 0.249 parte C: llega YA TAPADO del dominio (regla del MODELO).
+  // Fila 0.249 parte C: llega YA TAPADO del dominio (`puedeVerPrecioDeArte`, fila 0.235).
   return {
     id: a.id,
     descripcion: a.descripcion,
@@ -1021,7 +1021,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'POST',
     url: '/modelos/:id/artes',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Agregar un arte al modelo',
@@ -1040,7 +1042,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'PATCH',
     url: '/modelos/:id/artes/:idArte',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Editar un arte del modelo',
@@ -1062,7 +1066,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'DELETE',
     url: '/modelos/:id/artes/:idArte',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Quitar un arte del modelo',
@@ -1081,7 +1087,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'POST',
     url: '/modelos/:id/artes/:idArte/principal',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Marcar un arte como el principal del modelo',
@@ -1100,7 +1108,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'POST',
     url: '/modelos/:id/artes/copiar',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Copiar a este modelo un arte de otro modelo',
@@ -1120,7 +1130,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'POST',
     url: '/modelos/:id/artes/:idArte/fotos',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Preparar la subida de una foto de un arte (URL prefirmada)',
@@ -1162,7 +1174,9 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
   app.route({
     method: 'DELETE',
     url: '/modelos/:id/artes/:idArte/fotos/:idFoto',
-    preHandler: app.conPermiso('modelos.administrar'),
+    // ⭐ Fila 0.235: el arte se da SIN la ficha, las telas ni los avíos (`modelos.arte`);
+    // `modelos.administrar` la implica. El dominio reaplica la reja (`acceso-arte.ts`, A1).
+    preHandler: app.conAlgunPermiso('modelos.administrar', 'modelos.arte'),
     schema: {
       tags: ['modelos'],
       summary: 'Quitar una foto de un arte',

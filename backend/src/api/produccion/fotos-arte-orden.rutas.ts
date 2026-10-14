@@ -139,7 +139,8 @@ export const rutasFotosArteOrden: FastifyPluginCallbackZod = (app, _opciones, do
   app.route({
     method: 'POST',
     url: '/ordenes/:idOrden/artes/:idOrdenArte/fotos-ocultas',
-    preHandler: app.conPermiso('desarrollo.administrar'),
+    // ⭐ Fila 0.235: o `modelos.arte` (Diseño Gráfico). El dominio reaplica la reja (A1).
+    preHandler: app.conAlgunPermiso('desarrollo.administrar', 'modelos.arte'),
     schema: {
       tags: ['ordenes'],
       summary: 'Quitar de este renglón una foto heredada del arte del modelo (no la borra)',
@@ -170,7 +171,8 @@ export const rutasFotosArteOrden: FastifyPluginCallbackZod = (app, _opciones, do
   app.route({
     method: 'DELETE',
     url: '/ordenes/:idOrden/artes/:idOrdenArte/fotos-ocultas/:idModeloArteFoto',
-    preHandler: app.conPermiso('desarrollo.administrar'),
+    // ⭐ Fila 0.235: o `modelos.arte` (Diseño Gráfico). El dominio reaplica la reja (A1).
+    preHandler: app.conAlgunPermiso('desarrollo.administrar', 'modelos.arte'),
     schema: {
       tags: ['ordenes'],
       summary: 'Volver a enseñar en este renglón una foto heredada que estaba oculta',
@@ -201,7 +203,8 @@ export const rutasFotosArteOrden: FastifyPluginCallbackZod = (app, _opciones, do
   app.route({
     method: 'POST',
     url: '/ordenes/:idOrden/artes/:idOrdenArte/fotos',
-    preHandler: app.conPermiso('desarrollo.administrar'),
+    // ⭐ Fila 0.235: o `modelos.arte` (Diseño Gráfico). El dominio reaplica la reja (A1).
+    preHandler: app.conAlgunPermiso('desarrollo.administrar', 'modelos.arte'),
     schema: {
       tags: ['ordenes'],
       summary: 'Preparar la subida de una foto de arte a este renglón de la orden (R2)',
@@ -228,7 +231,8 @@ export const rutasFotosArteOrden: FastifyPluginCallbackZod = (app, _opciones, do
   app.route({
     method: 'DELETE',
     url: '/ordenes/:idOrden/artes/:idOrdenArte/fotos/:idFoto',
-    preHandler: app.conPermiso('desarrollo.administrar'),
+    // ⭐ Fila 0.235: o `modelos.arte` (Diseño Gráfico). El dominio reaplica la reja (A1).
+    preHandler: app.conAlgunPermiso('desarrollo.administrar', 'modelos.arte'),
     schema: {
       tags: ['ordenes'],
       summary: 'Quitar una foto de arte subida a esta orden (borra el archivo y su objeto en R2)',

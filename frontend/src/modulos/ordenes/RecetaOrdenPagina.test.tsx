@@ -31,6 +31,16 @@ vi.mock('@/api/receta-orden', () => ({
   useCerrarReceta: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// ⭐ 0.235: las fotos del arte de la OP (la única acción que Diseño Gráfico tiene en esta pantalla).
+const fotosArteMock = vi.fn<(id: number | undefined) => unknown>(() => ({ data: undefined }));
+vi.mock('@/api/fotos-arte-orden', () => ({
+  useFotosArteOrden: (id: number | undefined) => fotosArteMock(id),
+  useOcultarFotoArteOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useMostrarFotoArteOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useSubirFotoArteOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarFotoArteOrden: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock('@/api/medidas-avio', () => ({
   useMedidasAvio: () => ({ data: { datos: [] } }),
 }));
@@ -244,5 +254,83 @@ describe('<RecetaOrdenPagina> (V1-E3j)', () => {
     // ⭐ V1-E3k (§Post-F9.80): la prueba de que la receta llegó OPERABLE es el botón de firmar DEL
     // RENGLÓN (antes se miraba `receta-liberar`, el botón de bloque, que ya no existe).
     expect(screen.getByTestId('liberar-receta-tela-1')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — DISEÑO GRÁFICO EN LA RECETA, con las llaves REALES de su
+   * perfil sembrado (`backend/prisma/seed.ts`, slug `grafico`; sin `desarrollo.ver` ni
+   * `desarrollo.administrar`). La pantalla carga, le ofrece las FOTOS del arte y NADA más de la
+   * receta: ni revisar, ni firmar, ni quitar, ni agregar; tampoco el atajo a la bandeja de
+   * Desarrollo, que le daría 403. Y los precios llegan como los manda el servidor (tapados).
+   */
+  it('⭐ 0.235: Diseño Gráfico ve la receta y sólo puede poner las fotos del arte', () => {
+    fotosArteMock.mockImplementation((id) => ({
+      data:
+        id === 50
+          ? [
+              {
+                idOrdenArte: 70,
+                descripcion: 'Logo pecho',
+                agregadoAMano: false,
+                fotos: [
+                  {
+                    origen: 'modelo',
+                    idModeloArteFoto: 100,
+                    idFoto: null,
+                    urlDescarga: 'https://r2/get/a.jpg',
+                    nombreOriginal: 'a.jpg',
+                    oculta: false,
+                    principal: true,
+                  },
+                ],
+              },
+            ]
+          : undefined,
+    }));
+    const arte = {
+      id: 70,
+      tipo: 'arte',
+      estado: 'sin_revisar',
+      agregadoAMano: false,
+      excluido: false,
+      notas: null,
+      liberadoEn: null,
+      liberadoPor: null,
+      precioModeloOculto: false,
+      enElModelo: true,
+      cambios: [],
+      idModeloArte: 500,
+      descripcion: 'Logo pecho',
+      tipoArte: 'Bordado',
+      posicion: null,
+      puntadas: null,
+      precio: null,
+      idProveedor: null,
+      proveedor: null,
+      precioModelo: 12.5,
+    } as unknown as RecetaOrden['artes'][number];
+    render(receta({ preciosOcultos: true, artes: [arte] }), [
+      'modelos.arte',
+      'modelos.ver',
+      'ordenes.ver',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'tipos-proceso.ver',
+    ]);
+
+    expect(screen.getByTestId('receta-orden')).toBeInTheDocument();
+    // La única acción: las fotos del arte.
+    expect(screen.getByTestId('ocultar-foto-arte-orden')).toBeInTheDocument();
+    expect(screen.getByTestId('subir-foto-arte-orden')).toBeInTheDocument();
+    // Nada más de la receta.
+    expect(screen.queryByTestId('receta-marcar-revisado')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('liberar-receta-tela-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('quitar-receta-tela-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('liberar-receta-arte-70')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('quitar-receta-arte-70')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-receta-tela')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('receta-ir-bandeja')).not.toBeInTheDocument();
+    // Y sí puede volver a la OP (lleva `ordenes.ver`).
+    expect(screen.getByTestId('receta-ir-orden')).toBeInTheDocument();
   });
 });

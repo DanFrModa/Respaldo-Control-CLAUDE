@@ -170,6 +170,11 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   // `pedidos.administrar` (hallazgo del reviewer: sin él, el constructor solo cosecharía 403s).
   const puedeCrearPedido = tienePermiso('pedidos.administrar');
   const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
+  // ⭐ Fila 0.235 (§Post-F9.247(c)) — la RECETA de la orden también se abre con `modelos.arte`:
+  // Diseño Gráfico pone ahí las fotos del arte de la OP. Sólo la receta: el expediente de Desarrollo
+  // de abajo sigue en `desarrollo.ver` (abre proyectos y pre-costeos). Misma pareja que la ruta
+  // (`catalogo.ts`) y que el backend, que lee la receta con `ordenes.ver` o `desarrollo.ver` (A1).
+  const puedeVerReceta = puedeVerDesarrollo || tienePermiso('modelos.arte');
   const puedeAdministrarDesarrollo = tienePermiso('desarrollo.administrar');
   const verImportes = tienePermiso('consultas.ver-importes');
   // Habilitación/surtido de avíos (R6, §4.6): el mosaico exige `ordenes.habilitacion` (mismo permiso
@@ -494,6 +499,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         idOrden={(filaSeleccionada?.id ?? idSeleccionada) as number}
         fila={filaSeleccionada}
         puedeVerDesarrollo={puedeVerDesarrollo}
+        puedeVerReceta={puedeVerReceta}
         puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
         puedeAdministrarOrden={puedeAdministrar}
         puedeVerHabilitacion={puedeVerHabilitacion}
@@ -1333,6 +1339,7 @@ function DetalleCentroOrden({
   idOrden,
   fila,
   puedeVerDesarrollo,
+  puedeVerReceta,
   puedeAdministrarDesarrollo,
   puedeAdministrarOrden,
   puedeVerHabilitacion,
@@ -1343,6 +1350,8 @@ function DetalleCentroOrden({
   idOrden: number;
   fila: OrdenCentro | undefined;
   puedeVerDesarrollo: boolean;
+  /** ⭐ 0.235: `desarrollo.ver` o `modelos.arte` — sólo el resumen de la receta y su entrada. */
+  puedeVerReceta: boolean;
   puedeAdministrarDesarrollo: boolean;
   puedeAdministrarOrden: boolean;
   puedeVerHabilitacion: boolean;
@@ -1642,8 +1651,10 @@ function DetalleCentroOrden({
             modelo trae algo que esta orden no tiene) y el botón a la pantalla completa, que es la
             MISMA a la que llega la bandeja «Recetas por liberar».
             Se ve con `desarrollo.ver` y se edita/libera con `desarrollo.administrar` — SIN exigir
-            `ordenes.administrar`. El backend re-decide (A1). */}
-        {puedeVerDesarrollo ? (
+            `ordenes.administrar`. El backend re-decide (A1).
+            ⭐ 0.235: también se ve con `modelos.arte` (Diseño Gráfico entra a poner las fotos del
+            arte de la OP); el expediente de Desarrollo de abajo NO. */}
+        {puedeVerReceta ? (
           <section>
             <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
               Receta de la orden

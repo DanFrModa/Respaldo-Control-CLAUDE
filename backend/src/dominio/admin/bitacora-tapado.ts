@@ -56,6 +56,7 @@ import {
   puedeVerMaquilaDeReferencia,
   puedeVerMetaConseguida,
   puedeVerMetaPrometida,
+  puedeVerPrecioDeArte,
   puedeVerPreciosDeModelo,
   puedeVerPreciosDeOrden,
 } from '../modelos/precios-de-modelo.js';
@@ -65,8 +66,13 @@ import { puedeVerCorrida } from '../pagos/acceso-corrida.js';
  * Las reglas con nombre → quién puede ver. TODAS reusan la regla de la pantalla que enseña ese dato.
  */
 export const REGLAS_BITACORA = {
-  /** Corte base, precio del arte (`modelos/precios-de-modelo.ts`). */
+  /** Corte base (y el arte que se fue al copiar una receta) (`modelos/precios-de-modelo.ts`). */
   precioModelo: puedeVerPreciosDeModelo,
+  /**
+   * El precio de un ARTE del modelo: la regla del modelo MÁS `modelos.arte` (fila 0.235), la misma
+   * con que la ficha y la galería lo tapan (`puedeVerPrecioDeArte`).
+   */
+  precioArte: puedeVerPrecioDeArte,
   /** Maquila base del modelo = maquila de referencia de la orden. */
   maquilaReferencia: puedeVerMaquilaDeReferencia,
   /** Precios congelados de la receta de la orden. */
@@ -190,7 +196,7 @@ export const MAPA_BITACORA: Readonly<Record<string, Readonly<Record<string, Regl
     metaCostoConseguidoAnterior: 'metaConseguida',
   },
   // modelos/arte-modelo.ts (`precio{de,a}` y el arte íntegro).
-  ModeloArte: { precio: 'precioModelo' },
+  ModeloArte: { precio: 'precioArte' },
   // produccion/receta-orden.ts (fotos íntegras de cada renglón, `cambios`, `antes`).
   RecetaOrden: { precio: 'precioOrden' },
   Orden: {

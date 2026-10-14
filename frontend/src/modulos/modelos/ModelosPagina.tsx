@@ -1198,6 +1198,10 @@ function DetalleModelo({
   // inventarios; si no, la consulta ni se dispara y las piezas de existencia no se muestran.
   // `agrupar=color-talla` pide además el rollup de la matriz YA sumado en servidor (A1).
   const puedeVerInventario = tienePermiso('inventario-pt.ver');
+  // ⭐ Fila 0.235 (§Post-F9.247(c)) — el ARTE tiene llave propia: `modelos.arte` lo captura SIN la
+  // ficha, las telas, los avíos ni las fotos del modelo; `modelos.administrar` la implica. Es la misma
+  // regla que la reja del servidor (`modelos/acceso-arte.ts`), que es la que decide (A1).
+  const puedeEditarArte = puedeAdministrar || tienePermiso('modelos.arte');
   const existencias = useExistenciasPt(
     { idModelo: modelo.id, agrupar: 'color-talla' },
     puedeVerInventario,
@@ -1270,7 +1274,11 @@ function DetalleModelo({
         ) : ficha.isError ? (
           <p className="text-sm text-destructive">{ficha.error.message}</p>
         ) : ficha.data ? (
-          <EditorBom ficha={ficha.data} puedeAdministrar={puedeAdministrar} />
+          <EditorBom
+            ficha={ficha.data}
+            puedeAdministrar={puedeAdministrar}
+            puedeEditarArte={puedeEditarArte}
+          />
         ) : null}
       </SeccionDetalle>
 

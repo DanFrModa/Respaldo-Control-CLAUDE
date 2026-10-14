@@ -64,12 +64,15 @@
  * borran jamás desde este módulo.
  *
  * ═════════════════════════════════════════════════════════════════════════════════════════════
- * PERMISOS — reusados, ninguno nuevo ⇒ el deploy **no** requiere `SEED_ON_START`
+ * PERMISOS
  * ═════════════════════════════════════════════════════════════════════════════════════════════
  * Los que ya gobiernan **la receta de la OP**, que es donde vive el arte:
  *  • **leer**: `ordenes.ver` **o** `desarrollo.ver` (`exigirVerLaReceta`, V1-E3j).
  *  • **mutar**: `desarrollo.administrar` (§Post-F9.72: las siete mutaciones de la receta bajaron
- *    ahí, *"nadie va a tener permiso de modificar la OP más que yo"*).
+ *    ahí, *"nadie va a tener permiso de modificar la OP más que yo"*) **o** `modelos.arte`
+ *    (⭐ fila 0.235: Diseño Gráfico pone las fotos del arte sin poder tocar la receta de la orden;
+ *    la reja es `modelos/acceso-arte.ts::exigirEditarFotosArteOrden`). ⚠️ NO `modelos.administrar`:
+ *    esa llave nunca tocó la orden.
  *
  * ⚠️ **Y NO `ordenes.administrar`**, que sería la copia literal de la prenda: reabriría el agujero
  * que V1-E3j vino a cerrar. Un usuario de Desarrollo puro puede cambiarle a ESTE MISMO renglón la
@@ -96,7 +99,7 @@ import {
 } from '../../comun/archivos.js';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { type SesionUsuario } from '../../comun/permisos.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -104,6 +107,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirEditarFotosArteOrden } from '../modelos/acceso-arte.js';
 import { exigirVerLaReceta } from './receta-orden.js';
 
 /** Carpeta R2 de las fotos de arte SUBIDAS A UNA OP (la key se ordena por id, no por nombre, A5). */
@@ -420,7 +424,7 @@ export async function listarFotosArteOrden(
 }
 
 /**
- * QUITA de este renglón una foto HEREDADA del arte del modelo (`desarrollo.administrar`), en UNA
+ * QUITA de este renglón una foto HEREDADA del arte del modelo (`desarrollo.administrar` o `modelos.arte`), en UNA
  * transacción (A2): exige el renglón (orden de la empresa activa y VIVA, A9), exige que la foto sea
  * de las que ese renglón hereda de verdad, inserta la marca y registra bitácora (A7).
  *
@@ -439,7 +443,7 @@ export async function ocultarFotoArteEnOrden(
   entrada: DatosOrdenArteFotoOcultar,
   bd?: ContextoBd,
 ): Promise<number[]> {
-  verificarPermiso(sesion, 'desarrollo.administrar');
+  exigirEditarFotosArteOrden(sesion);
   const datos = validarEntrada(esquemaOrdenArteFotoOcultar, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
 
@@ -481,7 +485,7 @@ export async function ocultarFotoArteEnOrden(
 }
 
 /**
- * VUELVE A ENSEÑAR en este renglón una foto heredada que estaba oculta (`desarrollo.administrar`),
+ * VUELVE A ENSEÑAR en este renglón una foto heredada que estaba oculta (`desarrollo.administrar` o `modelos.arte`),
  * en UNA transacción (A2). Es la vuelta atrás COMPLETA de {@link ocultarFotoArteEnOrden}: una foto
  * escondida sin retorno sería una trampa, no una función.
  *
@@ -508,7 +512,7 @@ export async function mostrarFotoArteEnOrden(
   idModeloArteFoto: number,
   bd?: ContextoBd,
 ): Promise<number[]> {
-  verificarPermiso(sesion, 'desarrollo.administrar');
+  exigirEditarFotosArteOrden(sesion);
   const idEmpresa = sesion.idEmpresaActiva;
 
   return enTransaccion(async (tx: Tx) => {
@@ -540,7 +544,7 @@ export interface SubidaFotoArteOrden {
 }
 
 /**
- * Prepara la subida de una foto PROPIA de este renglón de arte (`desarrollo.administrar`) en UNA
+ * Prepara la subida de una foto PROPIA de este renglón de arte (`desarrollo.administrar` o `modelos.arte`) en UNA
  * transacción (A2): exige el renglón (orden de la empresa activa y viva, A9), crea el `Archivo` vía
  * el motor de R2 (carpeta `orden-arte/<idOrdenArte>` — key ordenada por id, NO por nombre, A5), crea
  * el renglón `OrdenArteFoto` AL FINAL de los que ya hay y devuelve la URL PUT prefirmada para que el
@@ -561,7 +565,7 @@ export async function solicitarSubidaFotoArteOrden(
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<SubidaFotoArteOrden> {
-  verificarPermiso(sesion, 'desarrollo.administrar');
+  exigirEditarFotosArteOrden(sesion);
   const datos = validarEntrada(esquemaOrdenArteFotoCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
 
@@ -613,7 +617,7 @@ export async function solicitarSubidaFotoArteOrden(
 }
 
 /**
- * QUITA una foto PROPIA de este renglón (`desarrollo.administrar`): borra el `Archivo` —Cascade se
+ * QUITA una foto PROPIA de este renglón (`desarrollo.administrar` o `modelos.arte`): borra el `Archivo` —Cascade se
  * lleva el `OrdenArteFoto`— + bitácora en UNA transacción (A2) y, TRAS el commit, borra el OBJETO de
  * R2 en modo BEST-EFFORT (0.081a). Si R2 falla NO revierte el borrado del registro: se loguea y
  * sigue.
@@ -638,7 +642,7 @@ export async function quitarFotoArteOrden(
   bd?: ContextoBd,
   archivos?: ServicioArchivos,
 ): Promise<void> {
-  verificarPermiso(sesion, 'desarrollo.administrar');
+  exigirEditarFotosArteOrden(sesion);
   const idEmpresa = sesion.idEmpresaActiva;
 
   const keyR2 = await enTransaccion(async (tx: Tx) => {

@@ -1366,3 +1366,121 @@ describe('Renglón del BOM guardado con los precios TAPADOS (0.249 parte C)', ()
     expect(within(renglon).getByText('sin precio')).toBeInTheDocument();
   });
 });
+
+// ── ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — `modelos.arte` abre SÓLO la pestaña de Arte ──────────────
+//
+// Daniel, sobre Diseño Gráfico: *«desarrolla todos los artes, define quién es el proveedor y cotiza
+// cuánto cuesta cada uno»*. Con la llave del arte y SIN `modelos.administrar`, la receta de telas y
+// avíos (sus amarres, sus medidas, los favoritos) y «Copiar receta de…» se quedan de solo lectura;
+// el arte se captura. El servidor re-decide (`modelos/acceso-arte.ts`).
+describe('<EditorBom> — la llave del ARTE (0.235)', () => {
+  beforeEach(() => {
+    favoritosMock = {
+      sugeridos: [
+        {
+          idAvio: 7,
+          clave: 'ETQ-LAV',
+          descripcion: 'Etiqueta de lavado',
+          cantidadSugerida: 1,
+          unidad: 'pza',
+        },
+      ],
+      yaEnLaReceta: [],
+      sinCantidad: [],
+    };
+    curvasMock = { idModelo: 1, yaTieneCurva: false, sugerencias: [] };
+  });
+
+  const avioGuardado: ModeloFicha['avios'] = [
+    {
+      idAvio: 5,
+      clave: 'CIE-01',
+      descripcion: 'Cierre',
+      consumoPorPrenda: 1,
+      paraPreCosto: true,
+      paraProduccion: true,
+      paraCosto: true,
+      consumoPorTalla: true,
+      idAvioProveedor: null,
+      proveedorAmarrado: null,
+      precioCosteo: 4.2,
+      origenPrecio: 'referencia' as const,
+      proveedorPrecio: null,
+      amarreIgnorado: false,
+      precioReferencia: 4.2,
+      preciosOcultos: false,
+    },
+  ];
+
+  function pintarSoloArte(extra: Partial<ModeloFicha> = {}): void {
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], { avios: avioGuardado, ...extra })}
+        puedeAdministrar={false}
+        puedeEditarArte
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.arte']) },
+    );
+  }
+
+  it('⭐ el ARTE se captura: agregar y copiar de otro modelo', async () => {
+    const usuario = userEvent.setup();
+    pintarSoloArte();
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+    expect(screen.getByTestId('abrir-copiar-arte')).toBeInTheDocument();
+  });
+
+  it('🔴 las TELAS no: ni guardar, ni agregar, ni capturar, ni amarrar; tampoco «Copiar receta de…»', async () => {
+    const usuario = userEvent.setup();
+    pintarSoloArte();
+    expect(screen.queryByTestId('guardar-bom-telas')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-tela-bom')).not.toBeInTheDocument();
+    expect(screen.getByTestId('consumo-bom-9')).toBeDisabled();
+    expect(screen.queryByTestId('abrir-copiar-bom')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('expandir-bom-9'));
+    expect(screen.getByTestId('selector-amarre-tela-9')).toBeDisabled();
+  });
+
+  it('🔴 los AVÍOS no: ni guardar, ni agregar, ni favoritos, ni amarre, ni medidas por talla', async () => {
+    const usuario = userEvent.setup();
+    pintarSoloArte();
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    expect(screen.queryByTestId('guardar-bom-avios')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-avio-bom')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aceptar-avios-favoritos')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('expandir-bom-5'));
+    expect(screen.getByTestId('selector-amarre-avio-5')).toBeDisabled();
+    await usuario.click(screen.getByTestId('toggle-medidas-avio-5'));
+    expect(screen.queryByTestId('guardar-medidas-avio-5')).not.toBeInTheDocument();
+    expect(screen.getByTestId('consumo-talla-5-3')).toBeDisabled();
+  });
+
+  it('🔴 en una receta HEREDADA (linaje 1:N) el arte tampoco: se edita en el desarrollo', async () => {
+    const usuario = userEvent.setup();
+    pintarSoloArte({ idModeloDesarrollo: 7, codigoModeloDesarrollo: 'CYA-26-71-001' });
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-arte')).not.toBeInTheDocument();
+  });
+
+  it('control: con `modelos.administrar` pero SIN la llave del arte explícita, el arte sigue abierto (la implica)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+  });
+
+  it('control: sin ninguna de las dos, el arte se ve pero no se captura', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <EditorBom ficha={fichaBase()} puedeAdministrar={false} puedeEditarArte={false} />,
+      { sesion: estadoSesionDePrueba(['modelos.ver']) },
+    );
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-arte')).not.toBeInTheDocument();
+  });
+});

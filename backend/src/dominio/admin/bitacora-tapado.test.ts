@@ -127,6 +127,7 @@ describe('las decisiones, contra el seed real', () => {
   it('Ventas no ve el dinero del modelo ni los importes, pero sí la maquila de referencia', () => {
     const negadas = reglasNegadas(rol('Ventas'));
     expect(negadas).toContain('precioModelo');
+    expect(negadas).toContain('precioArte');
     expect(negadas).toContain('importes');
     expect(negadas).toContain('corrida');
     expect(negadas).not.toContain('maquilaReferencia');
@@ -139,6 +140,7 @@ describe('las decisiones, contra el seed real', () => {
       expect(reglasNegadas(rol(nombre)).sort()).toEqual(
         [
           'precioModelo',
+          'precioArte',
           'maquilaReferencia',
           'precioOrden',
           'maquilaReal',
@@ -371,7 +373,7 @@ const ESPERADO_POR_ENTIDAD: Readonly<Record<string, ReglaBitacora>> = {
   'Modelo.metaCostoPrometidoAnterior': 'metaPrometida',
   'Modelo.metaCostoConseguido': 'metaConseguida',
   'Modelo.metaCostoConseguidoAnterior': 'metaConseguida',
-  'ModeloArte.precio': 'precioModelo',
+  'ModeloArte.precio': 'precioArte',
   'RecetaOrden.precio': 'precioOrden',
   'Orden.precio': 'maquilaReal',
   'Orden.anterior': 'maquilaReal',
@@ -604,6 +606,7 @@ describe('H2 · la configuración de la empresa y las raíces nuevas de «suena 
 const IMP: ClavePermiso = 'consultas.ver-importes';
 const LLAVES_POR_REGLA: Readonly<Record<ReglaBitacora, readonly (readonly ClavePermiso[])[]>> = {
   precioModelo: [[IMP], ['modelos.administrar']],
+  precioArte: [[IMP], ['modelos.administrar'], ['modelos.arte']],
   maquilaReferencia: [
     [IMP],
     ['modelos.administrar'],

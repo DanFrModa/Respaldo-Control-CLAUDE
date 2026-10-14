@@ -675,6 +675,18 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       'negocia: darla es decisión de Daniel. `listas.negociar` la IMPLICA en el dominio, así que ' +
       'el reparto explícito es para que la pantalla de Roles diga la verdad.',
   },
+  // ── ⭐⭐ El arte con llave propia, partida de `modelos.administrar` (fila 0.235), §Post-F9.247(c) ──
+  {
+    clave: 'modelos.arte',
+    razon:
+      'Al perfil de puesto «Diseño Gráfico» (en `prueba` le llega por la migración ' +
+      '`20261014140000_la_llave_del_arte`: el seed salta los perfiles que ya existen) y, de los de ' +
+      'sistema, a los que ya llevan `modelos.administrar` Y `desarrollo.administrar` (Directivo, ' +
+      'Gerencial y los tres de acceso total, que la derivan): a ellos no les abre nada nuevo, sólo ' +
+      'hace que la pantalla de Roles la enseñe palomeada. NO se le da a «Gestión Técnica» (lleva ' +
+      '`modelos.administrar`, que ya le implica el arte del MODELO): dársela le abriría las fotos ' +
+      'de arte de la ORDEN, que hoy no toca. No se le quita nada a nadie.',
+  },
 ];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {

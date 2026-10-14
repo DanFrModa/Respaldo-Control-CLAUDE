@@ -71,6 +71,37 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.216 · 14-oct-2026 · **en prueba** — **El arte tiene su propio permiso: Diseño Gráfico ya no necesita poder cambiar telas y avíos**
+
+> **La v0.216 cierra la fila 0.235.** Daniel describió a Diseño Gráfico así: *«desarrolla todos los artes, define quién
+> es el proveedor y cotiza cuánto cuesta cada uno»*. Hasta hoy, quien metía el arte de un modelo podía cambiar también
+> sus telas, sus avíos y su ficha, porque todo colgaba del mismo permiso.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Permiso nuevo «Arte de modelos» (`modelos.arte`):** con él se captura el **arte de un modelo** (estampado o bordado,
+proveedor, costo y fotos; marcar el principal, copiarlo de otro modelo, quitarlo) y las **fotos de arte de una orden**
+que siga viva. **No** deja tocar la ficha del modelo, sus telas, sus avíos, sus medidas ni sus fotos. Quien lo tiene ve
+el **costo del arte**, y nada más de los precios del modelo. Con él también se entra a la **receta de la orden** desde
+el Centro de Órdenes, sólo para poner las fotos del arte.
+
+**Diseño Gráfico lo recibe solo** al desplegar esta versión, junto con el permiso de ver los tipos de proceso, que el
+diálogo del arte necesita para ofrecer estampado o bordado. Queda anotado en la bitácora.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Quien administra modelos sigue pudiendo todo lo del arte del modelo**, pero **no** gana las fotos de arte de la orden:
+ésas siguen siendo de quien administra desarrollo (o de quien tenga el permiso nuevo). Los roles Directivo y Gerencial
+llevan el permiso nuevo a la vista.
+
+**Si a Diseño Gráfico se le abrieron a mano permisos amplios** mientras esto se construía, los conserva: esta versión no
+le quita nada. Se le pregunta a Daniel si se los quitamos.
+
+### ⏳ Sigue pendiente o roto
+
+**El arte dentro de la receta de una orden** (su descripción, proveedor y precio) se sigue capturando con el permiso de
+desarrollo. Preguntas para Daniel en §Post-F9.283.
+
 ## 0.215 · 14-oct-2026 · **en prueba** — **Comentar la negociación de una lista sin poder cambiar lo negociado**
 
 > **La v0.215 cierra la fila 0.238.** Daniel, sobre Aurora: *«las listas negociar solo de lectura y poder agregar

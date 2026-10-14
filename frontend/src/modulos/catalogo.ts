@@ -2097,7 +2097,11 @@ const EXIGENCIA_RUTA_EXTRA: readonly (readonly [ruta: `/${string}`, exige: Exige
   // yo"*— y dejó la receta en manos de Desarrollo. Sin esta línea la pantalla se abriría con
   // `ordenes.ver` (de más para quien solo mira producción) y se CERRARÍA a un usuario de
   // Desarrollo puro (de menos para quien viene a firmar), que es justo al revés.
-  ['/produccion/ordenes/:id/receta', ['desarrollo.ver']],
+  // ⭐ Fila 0.235 (§Post-F9.247(c)): también `modelos.arte` — Diseño Gráfico entra aquí a poner las
+  // FOTOS del arte de la OP (es la única pantalla que las administra). NO `desarrollo.ver`, que le
+  // abriría Pre-costeos. El backend lee la receta con `ordenes.ver` o `desarrollo.ver`, y el panel
+  // sólo le ofrece las fotos del arte (el resto de las acciones exige `desarrollo.administrar`).
+  ['/produccion/ordenes/:id/receta', ['desarrollo.ver', 'modelos.arte']],
   // La RC de una orden: consultar es `rc.ruta-ver`; programarla, `rc.programar`.
   ['/ruta-critica/ordenes/:idOrden', ['rc.ruta-ver']],
   ['/ruta-critica/ordenes/:idOrden/programar', ['rc.programar']],

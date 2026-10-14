@@ -239,9 +239,16 @@ function difiereDeLaFicha(captura: RenglonComponente[], guardados: ModeloAvio[])
 export function EditorBom({
   ficha,
   puedeAdministrar,
+  puedeEditarArte = puedeAdministrar,
 }: {
   ficha: ModeloFicha;
   puedeAdministrar: boolean;
+  /**
+   * ⭐ 0.235: `modelos.arte` o `modelos.administrar`. Gobierna SÓLO la pestaña de Arte; telas, avíos,
+   * medidas, favoritos y «Copiar receta de…» siguen colgando de `puedeAdministrar`. Si no se pasa,
+   * vale lo que `puedeAdministrar` (que implica el arte): omitirlo nunca abre de más.
+   */
+  puedeEditarArte?: boolean;
 }): React.JSX.Element {
   const [seccion, setSeccion] = useState<SeccionBom>('telas');
   const [copiarAbierto, setCopiarAbierto] = useState(false);
@@ -253,6 +260,8 @@ export function EditorBom({
   // 🔑 El gate de la RECETA. `puedeAdministrar` sigue mandando en lo que es del modelo (su CURVA,
   // que NO es receta y sí es suya): por eso hay dos variables y no una.
   const puedeEditarReceta = puedeAdministrar && !heredada;
+  // El arte también es receta (vive en el desarrollo si se heredó), pero con su propia llave.
+  const puedeEditarArteReceta = puedeEditarArte && !heredada;
 
   const [telas, setTelas] = useState<RenglonComponente[]>([]);
   const [avios, setAvios] = useState<RenglonComponente[]>([]);
@@ -540,7 +549,11 @@ export function EditorBom({
           />
         </div>
       ) : (
-        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeEditarReceta} />
+        <SeccionArte
+          idModelo={ficha.id}
+          artes={ficha.artes}
+          puedeAdministrar={puedeEditarArteReceta}
+        />
       )}
 
       <CopiarBomDialogo

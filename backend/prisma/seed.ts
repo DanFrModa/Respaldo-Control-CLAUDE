@@ -446,6 +446,7 @@ const DIRECTIVO: readonly ClavePermiso[] = [
   'listas.ver',
   'modelos.administrar',
   'modelos.aprobar-receta',
+  'modelos.arte',
   'modelos.ver',
   'notas.administrar',
   'notas.cancelar',
@@ -572,6 +573,7 @@ const GERENCIAL: readonly ClavePermiso[] = [
   'listas.ver',
   'modelos.administrar',
   'modelos.aprobar-receta',
+  'modelos.arte',
   'modelos.ver',
   'notas.administrar',
   'notas.cancelar',
@@ -986,13 +988,17 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **321 asignaciones**: las 137 del catálogo para `Director General` y 184 repartidas entre los
+ * **324 asignaciones**: las 138 del catálogo para `Director General` y 186 repartidas entre los
  * otros 15 (eran 317 = 134 + 183 hasta la fila 0.228, que estrenó `ordenes.reabrir` en el catálogo:
  * el dueño la recibe por derivación y ninguno de los otros 15; 318 hasta la fila 0.251, que estrenó
  * `ventas.ver` del mismo modo —ningún puesto la recibe, ni siquiera Administración y Finanzas: darla
- * es decisión de Daniel—; y 319 = 136 + 183 hasta la fila 0.238, que estrenó `listas.comentar`: el
- * dueño la recibe por derivación y «Gerente de Ventas» por decisión de Daniel, §Post-F9.248(b)). Los nombres y las llaves son su decisión y NO se "mejoran" aquí: cambiarlas es cambiar
- * quién puede qué en la empresa, y eso se pide y se escribe, no se deduce.
+ * es decisión de Daniel—; 319 = 136 + 183 hasta la fila 0.238, que estrenó `listas.comentar`: el
+ * dueño la recibe por derivación y «Gerente de Ventas» por decisión de Daniel, §Post-F9.248(b); y
+ * 321 = 137 + 184 hasta la fila 0.235, que estrenó `modelos.arte` —el dueño por derivación y
+ * «Diseño Gráfico» por decisión— y le sumó además a «Diseño Gráfico» `tipos-proceso.ver`, sin la
+ * cual no se llena el selector de tipo de arte: 138 + 186). Los nombres y las llaves son su
+ * decisión y NO se "mejoran" aquí: cambiarlas es cambiar quién puede qué en la empresa, y eso se pide
+ * y se escribe, no se deduce.
  *
  * *(Eran 306 = 134 + 172 en su primera revisión. Las **11 llaves de más** las agregó él mismo al
  * contestar las 17 recomendaciones del lead — §Post-F9.260 de `DECISIONES.md`, fila 0.250—: 11 que
@@ -1073,7 +1079,7 @@ export type PerfilDePuesto = {
  *
  * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
  * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
- * llegarle solo. Una lista literal de 137 claves quedaría obsoleta en el siguiente `clave:` que
+ * llegarle solo. Una lista literal de 138 claves quedaría obsoleta en el siguiente `clave:` que
  * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
  *
  * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
@@ -1384,7 +1390,20 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
     slug: 'grafico',
     nombre: 'Diseño Gráfico',
     descripcion: 'Diseño gráfico: consulta de modelos y órdenes, y captura de datos de proveedores',
-    permisos: ['modelos.ver', 'ordenes.ver', 'proveedores.modificar', 'proveedores.ver'],
+    // ⭐ Fila 0.235: `modelos.arte` — *«desarrolla todos los artes, define quién es el proveedor y
+    // cotiza cuánto cuesta cada uno»* (§Post-F9.247(c)) — y `tipos-proceso.ver`, que es la que llena
+    // el selector de TIPO del diálogo de arte (`GET /tipos-proceso?soloArte`): sin ella el perfil
+    // tendría la llave y no podría usar el diálogo. Sólo LEE el catálogo de tipos (código, nombre,
+    // banderas; sin dinero). En `prueba` el perfil ya existe y el seed lo salta: las dos le llegan por
+    // la migración `20261014140000_la_llave_del_arte`.
+    permisos: [
+      'modelos.arte',
+      'modelos.ver',
+      'ordenes.ver',
+      'proveedores.modificar',
+      'proveedores.ver',
+      'tipos-proceso.ver',
+    ],
   },
   {
     slug: 'auxiliar',
@@ -1401,9 +1420,11 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 321 asignaciones de los 16 puestos (las 317 que él
+ * un puesto**, y meterlo aquí falsearía las 324 asignaciones de los 16 puestos (las 317 que él
  * revisó, más `ordenes.reabrir` y `ventas.ver`, que las filas 0.228 y 0.251 le sumaron al dueño por
- * derivación, y `listas.comentar`, que la fila 0.238 le sumó al dueño y a «Gerente de Ventas»).
+ * derivación, `listas.comentar`, que la fila 0.238 le sumó al dueño y a «Gerente de Ventas», y
+ * `modelos.arte` + `tipos-proceso.ver`, que la fila 0.235 le sumó al dueño la primera —por
+ * derivación— y a «Diseño Gráfico» las dos).
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1540,8 +1561,9 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * `conAlgunPermiso` y los guards declarados en variable) y con el criterio dicho, porque sin criterio
  * no se reproduce *(medido ANTES de la fila 0.228; esa fila sumó `ordenes.reabrir`, que guarda un
  * `POST` ⇒ eran 135 claves y una más que ESCRIBE; y la fila 0.251 sumó `ventas.ver`, de pura
- * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ 136; y la fila 0.238
- * sumó `listas.comentar`, que guarda un `POST` ⇒ hoy son 137)*: de las
+ * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ 136; la fila 0.238
+ * sumó `listas.comentar`, que guarda un `POST` ⇒ 137; y la fila 0.235 sumó `modelos.arte`, que
+ * ESCRIBE ⇒ hoy son 138)*: de las
  * **134** claves que tenía entonces el catálogo, **sólo 34 son de PURA LECTURA** —todas sus
  * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
  * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no
@@ -1597,10 +1619,11 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  *
  * ## Qué NO hace este rol
  *
- * **No adelgaza los 15 perfiles de puesto.** Siguen con las llaves que el dueño marcó aunque **12 de
- * las 16 del piso** estén también en algún puesto: los permisos efectivos son la **UNIÓN** de los
+ * **No adelgaza los 15 perfiles de puesto.** Siguen con las llaves que el dueño marcó aunque **13 de
+ * las 16 del piso** (12 hasta la fila 0.235, que le dio `tipos-proceso.ver` a «Diseño Gráfico») estén
+ * también en algún puesto: los permisos efectivos son la **UNIÓN** de los
  * roles del usuario (`comun/permisos.ts`), así que la redundancia no cambia el comportamiento, las
- * 184 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
+ * 186 marcas quedan literales, y si algún día el piso encoge, el puesto que de verdad necesitaba la
  * llave la conserva.
  *
  * 🔑 **Y eso es lo que hace inocuo recortar el piso.** Las cuatro llaves de saldos y movimientos que

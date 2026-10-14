@@ -68,7 +68,10 @@ vi.mock('@/api/ordenes-consulta', () => ({
 // Paneles pesados del detalle: no intervienen en estas pruebas.
 vi.mock('./PanelPreciosOrden', () => ({ PanelPreciosOrden: () => null }));
 // El expediente Desarrollo↔Producción (F8-E6) tampoco interviene aquí.
-vi.mock('./SeccionDesarrolloOrden', () => ({ SeccionDesarrolloOrden: () => null }));
+// Pinta sólo una marca: la 0.235 mide que la llave del arte abre la receta y NO este expediente.
+vi.mock('./SeccionDesarrolloOrden', () => ({
+  SeccionDesarrolloOrden: () => <div data-testid="seccion-desarrollo-orden" />,
+}));
 // ⭐ V1-E3h + V1-E3j: la RECETA se alcanza desde el panel de la OP. Desde V1-E3j lo que vive aquí
 // es el RESUMEN (el trabajo se hace en `/produccion/ordenes/:id/receta`, que no cabía en el cajón).
 // Aquí solo importa QUE ESTÉ y con qué permiso; su contenido lo prueban `ResumenRecetaOrden.test.tsx`
@@ -536,6 +539,29 @@ describe('<CentroOrdenesPagina>', () => {
       // Qué se puede TOCAR lo decide la pantalla de la receta (y el backend), no este resumen:
       // aquí no hay ninguna acción que esconder.
       expect(screen.getByTestId('panel-receta')).toBeInTheDocument();
+    });
+
+    /**
+     * ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — Diseño Gráfico pone las fotos del arte de la OP en la
+     * pantalla de la receta; con `modelos.arte` (y ver órdenes) el Centro le ofrece la ENTRADA —el
+     * resumen con su botón—, pero NO el expediente de Desarrollo, que sigue en `desarrollo.ver`.
+     */
+    it('⭐ 0.235: con sólo `modelos.arte` (más ver órdenes) aparece la entrada a la receta, y el expediente no', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['ordenes.ver', 'modelos.ver', 'modelos.arte']),
+      });
+
+      expect(screen.getByTestId('panel-receta')).toHaveAttribute('data-id-orden', '1');
+      expect(screen.queryByTestId('seccion-desarrollo-orden')).toBeNull();
+    });
+
+    it('control: con `desarrollo.ver` el expediente SÍ está (la marca de arriba no es un adorno)', () => {
+      useOrdenesCentro.mockReturnValue(conFilas([fila(1, 101)]));
+      renderConProveedores(<CentroOrdenesPagina />, {
+        sesion: estadoSesionDePrueba(['ordenes.ver', 'desarrollo.ver']),
+      });
+      expect(screen.getByTestId('seccion-desarrollo-orden')).toBeInTheDocument();
     });
 
     it('sin `desarrollo.ver` la receta NI SE PINTA (§Post-F9.68)', () => {

@@ -501,6 +501,59 @@ describe('<ModelosPagina>', () => {
     expect(screen.queryByTestId('guardar-bom-telas')).not.toBeInTheDocument();
   });
 
+  // ── ⭐⭐ Fila 0.235 (§Post-F9.247(c)) — `modelos.arte`: el arte SÍ, la ficha/telas/avíos/fotos NO ──
+  it('⭐ con sólo `modelos.arte`: el ARTE se captura; la ficha, las telas y las fotos no', async () => {
+    const usuario = userEvent.setup();
+    const m = modelo(1, '501');
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.arte']),
+    });
+    await usuario.click(screen.getByTestId('fila-modelo'));
+
+    // La ficha del modelo y sus fotos: de `modelos.administrar`.
+    expect(screen.queryByTestId('nuevo-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('subir-foto-modelo-bloque')).not.toBeInTheDocument();
+    // Telas y «Copiar receta de…» (trae telas y avíos): cerrados.
+    expect(screen.queryByTestId('guardar-bom-telas')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-tela-bom')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-copiar-bom')).not.toBeInTheDocument();
+    // (Los avíos, uno por uno, los mide `EditorBom.test.tsx`: aquí se mide que la PÁGINA reparta las
+    // dos llaves por separado.)
+
+    // El arte: abierto.
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+    expect(screen.getByTestId('abrir-copiar-arte')).toBeInTheDocument();
+  });
+
+  it('control: con `modelos.administrar` (sin la llave del arte explícita) el arte se captura: la implica', async () => {
+    const usuario = userEvent.setup();
+    const m = modelo(1, '501');
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+    await usuario.click(screen.getByTestId('fila-modelo'));
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('agregar-arte')).toBeInTheDocument();
+  });
+
+  it('control: con sólo `modelos.ver` el arte tampoco se captura (la llave es la que abre)', async () => {
+    const usuario = userEvent.setup();
+    const m = modelo(1, '501');
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    await usuario.click(screen.getByTestId('fila-modelo'));
+    await usuario.click(screen.getByTestId('tab-bom-artes'));
+    expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
+    expect(screen.queryByTestId('agregar-arte')).not.toBeInTheDocument();
+  });
+
   it('pide confirmación antes de descontinuar y llama a la mutación al confirmar', async () => {
     const usuario = userEvent.setup();
     const m = modelo(7, 'VIEJO');

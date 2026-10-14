@@ -172,6 +172,7 @@ export interface paths {
                 | 'avios.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
+                | 'modelos.arte'
                 | 'modelos.aprobar-receta'
                 | 'tipos-proceso.ver'
                 | 'tipos-proceso.administrar'

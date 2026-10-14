@@ -123,7 +123,7 @@ import {
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerMedidasAvioBom, leerTelasBom } from '../modelos/bom-modelo.js';
 import { resolverIdRecetaDeModelo } from '../modelos/receta-compartida.js';
-import { puedeVerPreciosDeOrden, puedeVerPreciosDeModelo } from '../modelos/precios-de-modelo.js';
+import { puedeVerPreciosDeOrden, puedeVerPrecioDeArte } from '../modelos/precios-de-modelo.js';
 import { puedeVerPreciosDeAvio, puedeVerPreciosDeTela } from '../catalogos/precios-de-catalogo.js';
 // ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
 // junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
@@ -848,7 +848,9 @@ export function detalleCambioDePrecio(
  *  • lo que la tela REPITE del catálogo/BOM (`precioModelo`, `precioComplemento`) →
  *    `puedeVerPreciosDeTela`;
  *  • lo que el avío REPITE (`precioModelo`, el `precioMedida` de cada talla) → `puedeVerPreciosDeAvio`;
- *  • lo que el arte REPITE del modelo (`precioModelo` = `ModeloArte.precio`) → `puedeVerPreciosDeModelo`.
+ *  • lo que el arte REPITE del modelo (`precioModelo` = `ModeloArte.precio`) → `puedeVerPrecioDeArte`
+ *    (la MISMA regla con que la ficha del modelo tapa ese precio; desde la 0.235 la abre también
+ *    `modelos.arte`).
  *
  * Y **las cifras dentro del TEXTO** de los avisos de cambio de precio —un número escrito en una frase
  * llega igual que en un campo—: el aviso compara lo congelado contra lo del origen, así que sólo
@@ -863,10 +865,10 @@ export function ocultarPreciosDeRecetaSiNoPuede(
   const verOrden = puedeVerPreciosDeOrden(sesion);
   const verTela = puedeVerPreciosDeTela(sesion);
   const verAvio = puedeVerPreciosDeAvio(sesion);
-  const verModelo = puedeVerPreciosDeModelo(sesion);
+  const verArte = puedeVerPrecioDeArte(sesion);
   /** ¿La sesión ve el ORIGEN del renglón de este tipo? */
   const veOrigen = (tipo: TipoRenglonRecetaClave): boolean =>
-    tipo === 'tela' ? verTela : tipo === 'avio' ? verAvio : verModelo;
+    tipo === 'tela' ? verTela : tipo === 'avio' ? verAvio : verArte;
   return {
     ...receta,
     preciosOcultos: !verOrden,
@@ -887,8 +889,8 @@ export function ocultarPreciosDeRecetaSiNoPuede(
     artes: receta.artes.map((ar) => ({
       ...ar,
       precio: verOrden ? ar.precio : null,
-      precioModelo: verModelo ? ar.precioModelo : null,
-      precioModeloOculto: !verModelo,
+      precioModelo: verArte ? ar.precioModelo : null,
+      precioModeloOculto: !verArte,
     })),
     desalineacion: {
       ...receta.desalineacion,

@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  *
  * A diferencia de las fotos del MODELO, aquí no hay tipo (frente/espalda) ni "marcar principal":
  * el orden es el de captura y la primera es la que se usa como miniatura. El backend gobierna
- * `modelos.administrar`; esta pantalla solo refleja.
+ * `modelos.arte` (o `modelos.administrar`, que la implica — fila 0.235); esta pantalla solo refleja.
  */
 export function FotosArte({
   arte,
