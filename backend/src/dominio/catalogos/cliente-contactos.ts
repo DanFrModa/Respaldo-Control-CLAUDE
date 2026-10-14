@@ -21,9 +21,10 @@
  *  • Se acepta un departamento **archivado** al LEER (los contactos viejos se siguen viendo), pero
  *    no al asignarlo: mismo criterio que las demás puertas de este catálogo.
  *
- * 🔴 **SIN permisos nuevos**: se gobiernan con `clientes.ver` / `clientes.administrar`, que ya
- * existen. Y **nada se borra** (D3): quien se fue se archiva con `activo = false`, porque su nombre
- * puede seguir apareciendo en documentos viejos.
+ * 🔴 **SIN permisos nuevos**: se leen con `clientes.ver` y se escriben con `clientes.modificar` (o
+ * `clientes.administrar`, que lo implica — {@link exigirModificarCliente}, fila 0.239). Y **nada
+ * se borra** (D3): quien se fue se archiva con `activo = false`, porque su nombre puede seguir
+ * apareciendo en documentos viejos.
  *
  * 🔴 **La tabla NACE VACÍA y así se queda** (REGLA 0-B, §Post-F9.163): los `Cliente.contacto` que
  * hoy existen **no se migran** aquí. Los datos de hoy son basura y se van a limpiar; esta función
@@ -46,6 +47,8 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { exigirModificarCliente } from './acceso-clientes.js';
 
 /** Un contacto con el NOMBRE de su departamento resuelto (la forma que proyecta la ruta). */
 export type ContactoCliente = ClienteContacto & {
@@ -147,7 +150,7 @@ export async function crearContactoCliente(
   entrada: unknown,
   bd?: ContextoBd,
 ): Promise<ContactoCliente> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteContactoCrear, entrada);
 
   return enTransaccion(async (tx) => {
@@ -206,7 +209,7 @@ export async function actualizarContactoCliente(
   entrada: unknown,
   bd?: ContextoBd,
 ): Promise<ContactoCliente> {
-  verificarPermiso(sesion, 'clientes.administrar');
+  exigirModificarCliente(sesion);
   const datos = validarEntrada(esquemaClienteContactoEditarCuerpo, entrada);
 
   return enTransaccion(async (tx) => {

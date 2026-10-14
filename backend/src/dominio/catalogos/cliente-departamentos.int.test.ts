@@ -38,13 +38,42 @@ beforeEach(async () => {
 
 describe('Departamentos del cliente (F8-E1a D13/R16 — sub-recurso del Cliente)', () => {
   describe('permisos en servidor (PLANMAESTRO §9.2)', () => {
-    it('agregar un departamento exige permiso de administrar', async () => {
+    it('agregar un departamento exige `clientes.modificar` o `.administrar` (con sólo ver, no)', async () => {
       const admin = sesionAdmin();
       const c = await crearCliente(admin, { nombre: 'C&A' }, bd());
       const soloVer = sesionDePrueba({ permisos: ['clientes.ver'] });
       await expect(
         agregarDepartamentoCliente(soloVer, c.id, { nombre: 'NIÑOS' }, bd()),
       ).rejects.toBeInstanceOf(ErrorPermiso);
+    });
+
+    // ⭐⭐ Fila 0.239 (§Post-F9.248(b)): Daniel, sobre Aurora — *«Administración o yo damos de alta al
+    // cliente. Ella puede meter información de compradores, departamentos…»*. Contra la base de
+    // verdad: con SÓLO `clientes.modificar` el ciclo completo del departamento se ESCRIBE (agregar,
+    // editar, desactivar, reactivar), y el alta del cliente se le NIEGA.
+    it('⭐ 0.239: con SÓLO `clientes.modificar` escribe el departamento entero, pero NO da de alta clientes', async () => {
+      const c = await crearCliente(sesionAdmin(), { nombre: 'C&A' }, bd());
+      const aurora = sesionDePrueba({ permisos: ['clientes.ver', 'clientes.modificar'] });
+
+      const ninos = await agregarDepartamentoCliente(aurora, c.id, { nombre: 'NIÑOS' }, bd());
+      expect(ninos).toMatchObject({ nombre: 'NIÑOS', activo: true, idCliente: c.id });
+      const renombrado = await actualizarDepartamentoCliente(
+        aurora,
+        c.id,
+        { id: ninos.id, nombre: 'NIÑAS' },
+        bd(),
+      );
+      expect(renombrado.nombre).toBe('NIÑAS');
+      expect((await desactivarDepartamentoCliente(aurora, c.id, ninos.id, bd())).activo).toBe(
+        false,
+      );
+      expect((await reactivarDepartamentoCliente(aurora, c.id, ninos.id, bd())).activo).toBe(true);
+
+      await expect(crearCliente(aurora, { nombre: 'Liverpool' }, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+      await expect(desactivarCliente(aurora, c.id, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+      expect(await cliente.cliente.count()).toBe(1);
     });
 
     it('listar departamentos exige al menos lectura', async () => {

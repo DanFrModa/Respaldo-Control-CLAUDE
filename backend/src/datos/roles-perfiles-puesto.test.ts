@@ -1371,11 +1371,14 @@ describe('⭐⭐ las 17 decisiones de Daniel sobre el reparto (§Post-F9.260)', 
     },
   );
 
-  it('las llaves muertas que Ventas y Compras ya tenían siguen ahí (quitarlas es la fila 0.244)', () => {
-    // `clientes.modificar` y `proveedores.modificar` no gobiernan nada —por eso Daniel les dio la
-    // `.administrar`—, pero retirarlas es OTRA fila y OTRA decisión. Esta prueba mide SÓLO esas dos
-    // llaves; que agregar las 11 no le quitó NADA a ningún puesto lo mide la foto completa de la
-    // batería 1 (`DECISION_DE_DANIEL`), llave por llave.
+  it('las `.modificar` que Ventas y Compras ya tenían siguen ahí (quitar las muertas es la fila 0.244)', () => {
+    // Cuando Daniel les dio la `.administrar` (§Post-F9.260), `clientes.modificar` y
+    // `proveedores.modificar` no gobernaban nada; retirarlas era OTRA fila y OTRA decisión.
+    // ⭐ Desde la fila 0.239 `clientes.modificar` YA NO está muerta: gobierna personas, departamentos
+    // y campos de referencia del cliente (§Post-F9.248(b)), y es la llave que le toca a Aurora
+    // —por eso aquí se exige que «Gerente de Ventas» la conserve—. `proveedores.modificar` sigue
+    // muerta. Esta prueba mide SÓLO esas dos llaves; que agregar las 11 no le quitó NADA a ningún
+    // puesto lo mide la foto completa de la batería 1 (`DECISION_DE_DANIEL`), llave por llave.
     expect(perfilDe('Gerente de Ventas')).toContain('clientes.modificar');
     expect(perfilDe('Compras')).toContain('proveedores.modificar');
   });

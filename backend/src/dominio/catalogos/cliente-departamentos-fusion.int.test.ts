@@ -351,7 +351,7 @@ describe('fusionarDepartamentosCliente', () => {
     expect(sigue?.activo).toBe(true);
   });
 
-  it('exige el permiso `clientes.administrar` (RBAC en el SERVIDOR, A4)', async () => {
+  it('exige `clientes.administrar` (RBAC en el SERVIDOR, A4) —la fusión NO se abrió a `modificar` en la 0.239—', async () => {
     await expect(
       fusionarDepartamentosCliente(
         sesionSinPermiso(),
@@ -360,6 +360,39 @@ describe('fusionarDepartamentosCliente', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  // ⭐⭐ Fila 0.239 (hallazgo del reviewer): la fusión MUEVE o BORRA los factores de precio del
+  // absorbido, que son del dueño (§Post-F9.125: sólo `listas.aprobar` los guarda). Por eso NO se abrió
+  // a `clientes.modificar` aunque el resto de los departamentos sí. Medido contra la base: con sólo
+  // `modificar` la fusión y su previa se niegan, y los factores de los DOS departamentos siguen ahí,
+  // intactos y donde estaban.
+  it('⭐ 0.239: con SÓLO `clientes.modificar` la fusión se NIEGA y los factores del dueño siguen intactos', async () => {
+    const idFactoresCanonico = await crearFactores(idCaballeros, 30);
+    const idFactoresAbsorbido = await crearFactores(idHombre, 77);
+    const conModificar = sesionDePrueba({
+      permisos: ['clientes.ver', 'clientes.modificar'],
+      idEmpresaActiva: idEmpresa,
+    });
+    const entrada = { idDestino: idCaballeros, origenes: [idHombre] };
+
+    await expect(
+      previsualizarFusionDepartamentos(conModificar, idCliente, entrada, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(
+      fusionarDepartamentosCliente(conModificar, idCliente, entrada, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+
+    const factores = await cliente.clienteFactores.findMany({ orderBy: { id: 'asc' } });
+    expect(factores.map((f) => [f.id, f.idClienteDepartamento, Number(f.margenPct)])).toEqual([
+      [idFactoresCanonico, idCaballeros, 30],
+      [idFactoresAbsorbido, idHombre, 77],
+    ]);
+    const absorbido = await cliente.clienteDepartamento.findUniqueOrThrow({
+      where: { id: idHombre },
+    });
+    expect(absorbido.activo).toBe(true);
+    expect(absorbido.idFusionadoEn).toBeNull();
   });
 
   it('no fusiona departamentos de un cliente DESACTIVADO', async () => {

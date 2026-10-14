@@ -5,7 +5,11 @@
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
- *     `clientes.ver` para leer, `clientes.administrar` para mutar.
+ *     `clientes.ver` para leer; `clientes.administrar` para el cliente MISMO (alta, ficha,
+ *     desactivar/reactivar); `clientes.modificar` **o** `clientes.administrar` para lo que cuelga
+ *     de él —campos de referencia y personas— (fila 0.239, §Post-F9.248(b): quien captura
+ *     compradores y departamentos no da de alta clientes). El dominio re-exige lo mismo
+ *     (`dominio/catalogos/acceso-clientes.ts`).
  *  3. **Delega** al servicio de dominio `dominio/catalogos/clientes`.
  *
  * Endpoints: CRUD `/clientes` (+ `:id`) y la gestión de campos de referencia
@@ -313,7 +317,7 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   app.route({
     method: 'POST',
     url: '/clientes/:id/campos',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Agregar un campo de referencia a un cliente (D7)',
@@ -333,7 +337,7 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   app.route({
     method: 'PATCH',
     url: '/clientes/:id/campos/:idCampo',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Actualizar un campo de referencia de un cliente (D7)',
@@ -356,7 +360,7 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   app.route({
     method: 'DELETE',
     url: '/clientes/:id/campos/:idCampo',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Desactivar un campo de referencia de un cliente (D7)',
@@ -372,7 +376,8 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   });
 
   // ── ⭐ Contactos del cliente (V1-E8y, §Post-F9.152) ─────────────────────────
-  // SIN permisos nuevos: se gobiernan con `clientes.ver`/`.administrar`. Mismo sub-recurso que los
+  // SIN permisos nuevos: se leen con `clientes.ver` y se escriben con `clientes.modificar` o
+  // `.administrar` (fila 0.239). Mismo sub-recurso que los
   // contactos del proveedor, con el DEPARTAMENTO opcional (decisión de Daniel). No hay DELETE: un
   // contacto que se fue se ARCHIVA con `activo: false` (D3).
 
@@ -402,7 +407,7 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   app.route({
     method: 'POST',
     url: '/clientes/:id/contactos',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Agregar un contacto al cliente (departamento OPCIONAL)',
@@ -422,7 +427,7 @@ export const rutasClientes: FastifyPluginCallbackZod = (app, _opciones, done) =>
   app.route({
     method: 'PATCH',
     url: '/clientes/:id/contactos/:idContacto',
-    preHandler: app.conPermiso('clientes.administrar'),
+    preHandler: app.conAlgunPermiso('clientes.modificar', 'clientes.administrar'),
     schema: {
       tags: ['clientes'],
       summary: 'Editar (o archivar con activo=false) un contacto del cliente',
