@@ -91,6 +91,12 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { piezasDeAviosDeOrden } from './base-de-materiales.js';
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
+// ⭐ Fila 0.242: la referencia del proceso y su tope.
+import {
+  bloquearPreciosDeOrden,
+  exigirPrecioDentroDelTope,
+  exigirReferenciaParaEnvio,
+} from './referencias-maquila.js';
 import { claveCeldaPack, esSinPack, normalizarPack, ordenManejaPacks } from './packs.js';
 import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
 // `metaPara`/`MetaCelda` viven en `wip.ts` (una sola copia, §Post-F9.10). Sin ciclo: el cierre
@@ -947,7 +953,14 @@ export async function registrarEnvioMaquila(
     // Tipo de proceso activo + su código (para el mapeo a rol).
     const proceso = await tx.tipoProceso.findUnique({
       where: { id: datos.idTipoProceso },
-      select: { codigo: true, nombre: true, activo: true, generaEntradaPt: true },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        activo: true,
+        generaEntradaPt: true,
+        esArte: true,
+      },
     });
     if (proceso === null) {
       throw new ErrorNoEncontrado('TipoProceso', datos.idTipoProceso);
@@ -999,6 +1012,24 @@ export async function registrarEnvioMaquila(
     // Concurrencia (g): serializa los envíos de ESTA orden y suma DIRECTO el cortado y lo ya
     // enviado a ESTE proceso (etapas vivas), dentro de la misma transacción.
     await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+
+    // ⭐ Fila 0.242 (§Post-F9.253(2)/.255) — SIN REFERENCIA NO SALE, y el precio pactado no pasa del
+    // tope sin la llave de Daniel. Daniel: *«es indispensable tener el precio de referencia para poder
+    // generar la salida a maquila»*. La referencia es la del PROCESO de esta salida (costura: su fila
+    // de la orden; arte: la suma de sus artes). El candado de precios va DESPUÉS del de etapas (es
+    // siempre el último): nadie mueve la referencia mientras este envío la compara.
+    await bloquearPreciosDeOrden(tx, orden.idEmpresa, datos.idOrden);
+    const referencia = await exigirReferenciaParaEnvio(tx, datos.idOrden, proceso);
+    if (datos.precioPactado != null) {
+      await exigirPrecioDentroDelTope(tx, sesion, {
+        idOrden: datos.idOrden,
+        idTipoProceso: proceso.id,
+        nombre: proceso.nombre,
+        precio: datos.precioPactado,
+        referencia,
+        punto: 'envio',
+      });
+    }
 
     // Coherencia de la bandera dentro de orden+proceso (bajo el mismo lock que la valida): el
     // recibo deriva de aquí si tiene que devolver mercancía del tránsito, y con envíos mezclados

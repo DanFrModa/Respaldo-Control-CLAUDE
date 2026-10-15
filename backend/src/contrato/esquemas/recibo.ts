@@ -149,9 +149,11 @@ export const esquemaReciboCrear = z
       .positive({ error: 'El id del almacén de segundas debe ser positivo' })
       .optional()
       .describe('Almacén destino de las segundas (solo si el proceso mete a PT — costura).'),
+    // ⭐ Fila 0.242: dos decimales (ver el envío): un tercero saltaba el tope al redondearse.
     precioPactado: z
       .number({ error: 'El precio pactado debe ser un número' })
       .min(0, { error: 'El precio pactado no puede ser negativo' })
+      .multipleOf(0.01, { error: 'El precio pactado no puede tener más de 2 decimales' })
       .nullish()
       .describe(
         'Precio de maquila (base del cargo EsMa). OPCIONAL: si se omite, se hereda del envío ' +

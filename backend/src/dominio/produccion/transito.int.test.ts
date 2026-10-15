@@ -50,6 +50,7 @@ import {
   registrarMovimientoPt,
 } from '../inventarios/movimientos-pt.js';
 import { esperarMotivoEnLosInversos } from '../../pruebas/motivo-cancelacion.js';
+import { abrirReferenciasDeMaquila } from '../../pruebas/referencias.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -123,6 +124,9 @@ async function crearOrden100(): Promise<number> {
       },
     },
   });
+  // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+  // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+  await abrirReferenciasDeMaquila(cliente, orden.id);
   return orden.id;
 }
 

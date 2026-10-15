@@ -88,6 +88,7 @@ import { NotasSalidaPagina } from '@/modulos/notas-salida/NotasSalidaPagina';
 import { CentroOrdenesPagina } from '@/modulos/ordenes/CentroOrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
+import { ReferenciasCambiadasPagina } from '@/modulos/produccion/ReferenciasCambiadasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
@@ -245,6 +246,8 @@ const router = createBrowserRouter([
           { path: 'produccion/corte-semanal', element: <CorteSemanalPagina /> },
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
+          // ⭐ Fila 0.242: referencias de maquila cambiadas y sobreprecios autorizados.
+          { path: 'produccion/referencias-cambiadas', element: <ReferenciasCambiadasPagina /> },
           { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },
           // Órdenes de compra (Módulo 4 · Compras, F4-E2).
           { path: 'compras/ordenes', element: <OrdenesCompraPagina /> },

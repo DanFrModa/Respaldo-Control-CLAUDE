@@ -443,6 +443,19 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['ordenes.ver'],
             subVista: true,
           },
+          // ⭐ Fila 0.242 (§Post-F9.255): la consulta de Daniel — referencias de maquila cambiadas y
+          // sobreprecios autorizados. Con su llave reservada: nadie más la ve.
+          {
+            clave: 'referencias-maquila-cambiadas',
+            titulo: 'Referencias de maquila cambiadas',
+            descripcion:
+              'Qué orden, qué proceso, de cuánto a cuánto, quién y cuándo — y los sobreprecios ' +
+              'autorizados por encima del tope',
+            ruta: '/produccion/referencias-cambiadas',
+            icono: 'billete',
+            permisos: ['ordenes.autorizar-sobreprecio'],
+            subVista: true,
+          },
           {
             clave: 'pedidos-por-mes',
             titulo: 'Pedidos por mes',

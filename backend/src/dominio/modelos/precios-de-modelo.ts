@@ -114,6 +114,31 @@ export function puedeVerPreciosDeOrden(sesion: SesionUsuario): boolean {
 }
 
 /**
+ * ⭐ Fila 0.242 (§Post-F9.255) — Llaves que dejan ver las REFERENCIAS DE PRECIO DE MAQUILA de la orden
+ * (el tope de lo que se le paga al taller, por proceso): la de costura (`OrdenReferenciaProceso`) y la
+ * de cada proceso de arte, que es la suma de sus `OrdenArte.precio`.
+ *
+ * Es la unión de las dos reglas de las que salen esos dos datos —{@link LLAVES_MAQUILA_DE_REFERENCIA}
+ * (quien captura o ve el precio de maquila) y {@link LLAVES_PRECIO_DE_ORDEN} (quien edita la receta)—
+ * más la llave reservada de Daniel. Decisión de la fila: producción CAPTURA estas referencias con
+ * `ordenes.precio-maquila`, y quien escribe un precio lo lee. ⚠️ Eso le abre el precio de los artes de
+ * la orden a quien lleva `ordenes.precio-maquila`, pero SÓLO en el panel de referencias: la receta de
+ * la orden sigue tapándolo con {@link LLAVES_PRECIO_DE_ORDEN}.
+ */
+export const LLAVES_REFERENCIA_DE_MAQUILA: readonly ClavePermiso[] = [
+  ...new Set<ClavePermiso>([
+    ...LLAVES_MAQUILA_DE_REFERENCIA,
+    ...LLAVES_PRECIO_DE_ORDEN,
+    'ordenes.autorizar-sobreprecio',
+  ]),
+];
+
+/** ¿La sesión ve las referencias de maquila de la orden? Ver {@link LLAVES_REFERENCIA_DE_MAQUILA}. */
+export function puedeVerReferenciasDeMaquila(sesion: SesionUsuario): boolean {
+  return LLAVES_REFERENCIA_DE_MAQUILA.some((clave) => tienePermiso(sesion, clave));
+}
+
+/**
  * ⭐ LA META DE COSTO DEL MODELO (fila 0.249 parte D) — lo que el modelo congela al firmar su revisión:
  * lo PROMETIDO en la mesa (`metaCostoPrometido`) y lo que SÍ se consiguió (`metaCostoConseguido`).
  * Son costos por prenda, o sea dinero, y van partidas:

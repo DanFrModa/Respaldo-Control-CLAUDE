@@ -42,8 +42,8 @@ import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js'
 import {
   clienteLectura,
   enTransaccion,
+  type ClienteLectura,
   type ContextoBd,
-  type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
@@ -172,7 +172,7 @@ export async function actualizarReactivoFicha(
 
 /** Carga la orden (de la empresa activa, A9) o lanza. */
 async function exigirOrdenDeEmpresa(
-  cliente: Tx | ReturnType<typeof clienteLectura>,
+  cliente: ClienteLectura,
   idOrden: number,
   idEmpresa: number,
 ): Promise<{ id: number; folio: bigint; idModelo: number; codigoModelo: string | null }> {
@@ -199,7 +199,7 @@ async function exigirOrdenDeEmpresa(
 
 /** Arma el checklist de una orden (reactivos activos + estado de sus verificaciones). */
 async function armarFichaOrden(
-  cliente: Tx | ReturnType<typeof clienteLectura>,
+  cliente: ClienteLectura,
   idOrden: number,
   idEmpresa: number,
 ): Promise<FichaOrdenSalida> {

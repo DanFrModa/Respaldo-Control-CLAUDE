@@ -22,10 +22,14 @@ import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 import { AvisoOrdenCerrada } from '@/components/dominio/AvisoOrdenCerrada';
 
+import { BloqueReferenciasMaquila } from './BloqueReferenciasMaquila';
+
 /**
  * PANEL DE PRECIOS de la orden (rediseño R2, §4.4.3 — proto `precioEditable`): venta / maquila /
  * aplicación / costo 🔒. El precio REAL capturado se pinta VERDE con el tag "real"; sin captura se
- * muestra la REFERENCIA (heredada del modelo) en gris con el tag "referencia". Debajo, el rastro
+ * muestra el precio BASE del modelo (lo que metió desarrollo) en gris con el tag "base del modelo"
+ * — fila 0.242: ya NO se le llama «referencia», porque la referencia del tope es otra (el bloque
+ * «Referencias de maquila», {@link BloqueReferenciasMaquila}). Debajo, el rastro
  * "capturó [usuario] · fecha · proveedor" del último evento (historial inmutable D3/A7).
  *
  * Permisos (la pantalla esconde; el servidor decide, A1):
@@ -138,6 +142,9 @@ export function PanelPreciosOrden({
           {historialAbierto ? <HistorialPrecios idOrden={idOrden} /> : null}
         </div>
       ) : null}
+
+      {/* ⭐ Fila 0.242: el tope por proceso (referencia + 5 %) y su captura. */}
+      <BloqueReferenciasMaquila idOrden={idOrden} ordenCerrada={ordenCerrada} />
 
       {editando !== null ? (
         <DialogoEditarPrecio
@@ -296,7 +303,9 @@ function CampoPrecioEditable({
             hayReal ? 'bg-ok-soft text-ok' : 'bg-muted text-muted-foreground',
           )}
         >
-          {hayReal ? 'real' : 'referencia'}
+          {/* ⭐ Fila 0.242: `maquilaBase` es lo que metió DESARROLLO en el modelo, no la referencia
+              del tope (ésa vive en el bloque «Referencias de maquila», abajo). */}
+          {hayReal ? 'real' : 'base del modelo'}
         </span>
       </p>
       {evento !== null ? (
@@ -389,20 +398,21 @@ function DialogoEditarPrecio({
             Precio de {esMaquila ? 'maquila' : 'aplicación'} · OP {datos.folioOrden}
           </DialogTitle>
           <DialogDescription>
-            El precio real negociado sustituye a la referencia y deja rastro de quién lo capturó.
+            El precio real negociado deja rastro de quién lo capturó. No puede pasar del tope de la
+            referencia de maquila (+5 %) sin la autorización de Daniel.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-1">
           <Field>
-            <FieldLabel htmlFor="precio-referencia">Precio de referencia (del modelo)</FieldLabel>
+            <FieldLabel htmlFor="precio-referencia">Precio base del modelo (desarrollo)</FieldLabel>
             <Input
               id="precio-referencia"
               value={
                 esMaquila && datos.maquilaReferenciaOculta
                   ? '•••••'
                   : referencia === null
-                    ? 'Sin referencia'
+                    ? 'Sin precio base'
                     : `$${referencia.toFixed(2)}`
               }
               disabled

@@ -147,6 +147,12 @@ import {
 // caso que lo justifica — ver el encabezado de `hermanas-de-la-op.ts`.
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA.
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
+// ⭐ Fila 0.242: el precio de un arte es la referencia de su proceso (rastro de sus cambios).
+import {
+  bloquearPreciosDeOrden,
+  fotoReferenciasDeArte,
+  registrarCambiosDeReferenciaDeArte,
+} from './referencias-maquila.js';
 import { frenteAlGrupoDeOrdenes, sinHermanas } from './hermanas-de-la-op.js';
 import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 // ⭐⭐ fila 0.232 (H5): los AVÍOS de la receta se miden con la MISMA base que la explosión.
@@ -1960,6 +1966,12 @@ async function enRecetaEditable<T>(
     await bloquearVersionReceta(tx, [idOrden]);
     const orden = await exigirOrdenDeLaEmpresa(tx, idOrden, sesion.idEmpresaActiva);
     if (opciones.permitirOrdenNoViva !== true) exigirOrdenViva(orden);
+    // ⭐ Fila 0.242 — el precio de un arte ES la referencia de su proceso (el tope de lo que se le
+    // paga al taller). Se toma el candado de precios (el ÚLTIMO, después del de la versión) y una foto
+    // de las referencias de arte ANTES de mutar; al final, cada proceso cuya referencia cambió deja su
+    // `OrdenReferenciaEvento`. Así la consulta de Daniel ve también lo que se movió desde la receta.
+    await bloquearPreciosDeOrden(tx, sesion.idEmpresaActiva, orden.id);
+    const referenciasAntes = await fotoReferenciasDeArte(tx, orden.id);
     let sobreLapida = false;
     let cambioLoQueSeCompra = false;
     const tocados: { tipo: TipoRenglonRecetaClave; idRenglon: number }[] = [];
@@ -1977,6 +1989,14 @@ async function enRecetaEditable<T>(
     // ⭐⭐ fila 0.257 — el snapshot de la explosión deja de corresponder a esta receta. Una sola vez
     // por acto (A2: dentro de la MISMA transacción que el cambio).
     if (cambioLoQueSeCompra) await marcarRecetaCambiada(tx, orden.id);
+    await registrarCambiosDeReferenciaDeArte(
+      tx,
+      sesion,
+      orden.id,
+      referenciasAntes,
+      await fotoReferenciasDeArte(tx, orden.id),
+      'Desde la receta de la orden.',
+    );
 
     // ⭐ TOCAR EL CONTENIDO DE UN RENGLÓN YA LIBERADO LO VUELVE A CERRAR (hallazgo del reviewer,
     // ahora POR RENGLÓN — V1-E3h/§Post-F9.72).

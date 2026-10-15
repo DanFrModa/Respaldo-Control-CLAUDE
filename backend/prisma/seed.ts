@@ -358,6 +358,15 @@ export const SOLO_ADMINISTRADOR: readonly { clave: ClavePermiso; razon: string }
       'Cerrar sí se reparte (`ordenes.cerrar`, que conserva `Directivo`); reabrir no — es la ' +
       'misma asimetría que autorizar / des-autorizar una compra.',
   },
+  // ── ⭐ Pasarse del tope del precio de maquila (fila 0.242) ──
+  {
+    clave: 'ordenes.autorizar-sobreprecio',
+    razon:
+      'Daniel la pidió para él (§Post-F9.250(d)/§Post-F9.255, 30-sep-2026): *"validar que no ' +
+      'pueda ponerlo más caro que el que está en la cotización a menos que se le autorice. Yo ' +
+      'autorizo"*. Capturar el precio y su referencia sí se reparte (`ordenes.precio-maquila`, que ' +
+      'lleva Producción); pasarse de la referencia + 5 % no.',
+  },
 ];
 
 /**
@@ -988,7 +997,7 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * de sus 23 usuarios»*: éstos son esos perfiles, con los nombres con los que él los revisó y las
  * llaves que él palomeó, puesto por puesto.
  *
- * **324 asignaciones**: las 138 del catálogo para `Director General` y 186 repartidas entre los
+ * **325 asignaciones**: las 139 del catálogo para `Director General` y 186 repartidas entre los
  * otros 15 (eran 317 = 134 + 183 hasta la fila 0.228, que estrenó `ordenes.reabrir` en el catálogo:
  * el dueño la recibe por derivación y ninguno de los otros 15; 318 hasta la fila 0.251, que estrenó
  * `ventas.ver` del mismo modo —ningún puesto la recibe, ni siquiera Administración y Finanzas: darla
@@ -996,7 +1005,8 @@ const SECRETARIAL: readonly ClavePermiso[] = [
  * dueño la recibe por derivación y «Gerente de Ventas» por decisión de Daniel, §Post-F9.248(b); y
  * 321 = 137 + 184 hasta la fila 0.235, que estrenó `modelos.arte` —el dueño por derivación y
  * «Diseño Gráfico» por decisión— y le sumó además a «Diseño Gráfico» `tipos-proceso.ver`, sin la
- * cual no se llena el selector de tipo de arte: 138 + 186). Los nombres y las llaves son su
+ * cual no se llena el selector de tipo de arte: 138 + 186; y 325 = 139 + 186 desde la fila 0.242,
+ * que estrenó `ordenes.autorizar-sobreprecio`: el dueño por derivación y ningún otro puesto). Los nombres y las llaves son su
  * decisión y NO se "mejoran" aquí: cambiarlas es cambiar quién puede qué en la empresa, y eso se pide
  * y se escribe, no se deduce.
  *
@@ -1079,7 +1089,7 @@ export type PerfilDePuesto = {
  *
  * Daniel lo definió con *«todos los permisos»*, así que se **DERIVA de {@link CLAVES_PERMISO}** y
  * nunca se escribe a mano: un permiso que nazca mañana en `src/contrato/permisos.ts` tiene que
- * llegarle solo. Una lista literal de 138 claves quedaría obsoleta en el siguiente `clave:` que
+ * llegarle solo. Una lista literal de 139 claves quedaría obsoleta en el siguiente `clave:` que
  * alguien agregue — y nadie se enteraría, porque el seed no se queja de lo que NO reparte.
  *
  * Va por {@link definirRoles} (`esSistema: true`, re-sincronizado en cada arranque) a propósito: es
@@ -1420,11 +1430,12 @@ export const PERFILES_DE_PUESTO: readonly PerfilDePuesto[] = [
  * Existe para las pruebas y para poder leer su decisión de un tirón; el seed NO itera esto, porque
  * los dos grupos se siembran por caminos distintos (ver la tabla de {@link PERFIL_DIRECTOR_GENERAL}
  * y el bloque de arriba). ⚠️ NO incluye {@link PERFIL_CONSULTA_GENERAL}: el piso de lectura **no es
- * un puesto**, y meterlo aquí falsearía las 324 asignaciones de los 16 puestos (las 317 que él
+ * un puesto**, y meterlo aquí falsearía las 325 asignaciones de los 16 puestos (las 317 que él
  * revisó, más `ordenes.reabrir` y `ventas.ver`, que las filas 0.228 y 0.251 le sumaron al dueño por
  * derivación, `listas.comentar`, que la fila 0.238 le sumó al dueño y a «Gerente de Ventas», y
  * `modelos.arte` + `tipos-proceso.ver`, que la fila 0.235 le sumó al dueño la primera —por
- * derivación— y a «Diseño Gráfico» las dos).
+ * derivación— y a «Diseño Gráfico» las dos, y `ordenes.autorizar-sobreprecio`, que la fila 0.242 le
+ * sumó al dueño por derivación).
  */
 export const PERFILES_DE_PUESTO_TODOS: readonly PerfilDePuesto[] = [
   PERFIL_DIRECTOR_GENERAL,
@@ -1562,8 +1573,9 @@ export const PERMISOS_QUE_FILTRAN_PRECIO: readonly ClavePermiso[] = [
  * no se reproduce *(medido ANTES de la fila 0.228; esa fila sumó `ordenes.reabrir`, que guarda un
  * `POST` ⇒ eran 135 claves y una más que ESCRIBE; y la fila 0.251 sumó `ventas.ver`, de pura
  * lectura pero de DINERO —fuera del piso por {@link PERMISOS_DE_DINERO}— ⇒ 136; la fila 0.238
- * sumó `listas.comentar`, que guarda un `POST` ⇒ 137; y la fila 0.235 sumó `modelos.arte`, que
- * ESCRIBE ⇒ hoy son 138)*: de las
+ * sumó `listas.comentar`, que guarda un `POST` ⇒ 137; la fila 0.235 sumó `modelos.arte`, que
+ * ESCRIBE ⇒ 138; y la fila 0.242 sumó `ordenes.autorizar-sobreprecio`, reservada al dueño, que deja
+ * fijar precios por encima del tope ⇒ hoy son 139)*: de las
  * **134** claves que tenía entonces el catálogo, **sólo 34 son de PURA LECTURA** —todas sus
  * rutas son `GET`—, **76 ESCRIBEN** (al menos una ruta no-`GET`; **24 de ésas son MIXTAS**, guardan
  * `GET` *y* no-`GET`, y **cuentan como escritura** porque tener la llave deja escribir) y **24 no

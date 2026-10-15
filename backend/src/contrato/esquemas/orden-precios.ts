@@ -28,9 +28,12 @@ export type CampoPrecioOrdenApi = z.infer<typeof esquemaCampoPrecioOrden>;
 export const esquemaOrdenPreciosPatchCuerpo = z
   .object({
     campo: esquemaCampoPrecioOrden,
+    // ⭐ Fila 0.242: dos decimales, como la columna. Un tercero se redondearía al guardar y podía
+    // saltarse el tope de la referencia (34.996 pasaba el tope de 34.99 y se guardaba 35.00).
     precio: z
       .number({ error: 'El precio debe ser un número' })
       .min(0, { error: 'El precio no puede ser negativo' })
+      .multipleOf(0.01, { error: 'El precio no puede tener más de 2 decimales' })
       .describe('Precio real negociado por prenda.'),
     idProveedor: z
       .number()

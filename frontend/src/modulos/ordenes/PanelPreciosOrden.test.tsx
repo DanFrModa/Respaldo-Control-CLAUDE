@@ -32,6 +32,16 @@ vi.mock('@/api/ordenes-centro', () => ({
   useEventosPrecioOrden: () => ({ data: { eventos: [] }, isPending: false, isError: false }),
   useCapturarPrecio: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+// Fila 0.242: el bloque de referencias de maquila vive dentro del panel; aquí va vacío (tiene su
+// propia prueba, `BloqueReferenciasMaquila.test.tsx`).
+vi.mock('@/api/referencias-maquila', () => ({
+  useReferenciasMaquila: () => ({
+    data: { idOrden: 50, folioOrden: 1515, ocultas: false, procesos: [] },
+    isPending: false,
+    isError: false,
+  }),
+  useCapturarReferencia: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [] }, isPending: false, isError: false }),
   useRolesProveedor: () => ({ data: [], isError: false, refetch: vi.fn() }),
@@ -95,6 +105,19 @@ describe('PanelPreciosOrden — la maquila de REFERENCIA tapada (fila 0.249 part
     );
     expect(screen.queryByTestId('precio-maquila-oculto')).not.toBeInTheDocument();
     expect(screen.getByTestId('precio-maquila')).toHaveTextContent('$20.00');
+    precios.actual = null;
+  });
+
+  // ⭐ Fila 0.242: `maquilaBase` es lo que metió desarrollo; la referencia del TOPE es otra.
+  it('el precio del modelo ya NO se llama «referencia»: se lee «base del modelo»', () => {
+    precios.actual = { ...precios.base, maquilaReal: null, puedeVerReales: false };
+    renderConProveedores(
+      <PanelPreciosOrden idOrden={50} folioOrden={1515} ordenCerrada={false} />,
+      { sesion: estadoSesionDePrueba(['ordenes.ver']) },
+    );
+    expect(screen.getByTestId('precio-maquila')).toHaveTextContent('base del modelo');
+    expect(screen.getByTestId('precio-maquila')).not.toHaveTextContent('referencia');
+    expect(screen.getByTestId('referencias-maquila')).toBeInTheDocument();
     precios.actual = null;
   });
 });

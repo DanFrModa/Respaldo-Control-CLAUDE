@@ -53,6 +53,7 @@ import {
   obtenerPreciosOrden,
   proyectarPreciosOrden,
 } from './produccion/precios-orden.js';
+import { abrirReferenciasDeMaquila } from '../pruebas/referencias.js';
 
 /**
  * ⭐ Integración de «ESCRIBIR Y LUEGO NEGAR» en LO IDEMPOTENTE DE VERDAD (fila 0.198).
@@ -268,6 +269,12 @@ beforeEach(async () => {
       idCliente: clienteNegocio.id,
     },
   });
+  // ⭐ Fila 0.242: sin referencia de costura no se captura el precio (esta base no siembra el
+  // catálogo de procesos: se crea costura aquí).
+  await cliente.tipoProceso.create({
+    data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+  });
+  await abrirReferenciasDeMaquila(cliente, orden.id, undefined, ['costura']);
   // Segunda orden: es de la que `copiarDetalleOrden` copia la matriz.
   const ordenOrigen = await cliente.orden.create({
     data: {

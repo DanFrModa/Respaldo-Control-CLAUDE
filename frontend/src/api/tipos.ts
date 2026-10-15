@@ -548,6 +548,26 @@ export type OrdenesCentroQuery = NonNullable<
   paths['/api/ordenes/centro']['get']['parameters']['query']
 >;
 
+// ── Referencias de precio de maquila: el tope por proceso (fila 0.242) ─────────
+
+/** Referencias de la orden, una por proceso (`GET /api/ordenes/{id}/referencias-maquila`). */
+export type ReferenciasMaquilaOrden =
+  paths['/api/ordenes/{id}/referencias-maquila']['get']['responses']['200']['content']['application/json'];
+/** La referencia de UN proceso de la orden. */
+export type ReferenciaProcesoMaquila = ReferenciasMaquilaOrden['procesos'][number];
+/** Cuerpo de captura de una referencia (`PATCH /api/ordenes/{id}/referencias-maquila`). */
+export type ReferenciaMaquilaPatch =
+  paths['/api/ordenes/{id}/referencias-maquila']['patch']['requestBody']['content']['application/json'];
+/** Filtros de la consulta de referencias cambiadas. */
+export type ReferenciasCambiosQuery = NonNullable<
+  paths['/api/ordenes/referencias-maquila/cambios']['get']['parameters']['query']
+>;
+/** La consulta de referencias cambiadas y sobreprecios autorizados. */
+export type ReferenciasCambiosLista =
+  paths['/api/ordenes/referencias-maquila/cambios']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la consulta. */
+export type ReferenciaCambio = ReferenciasCambiosLista['eventos'][number];
+
 // ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3) ─────────────
 
 /** Resumen de precios de la orden (`GET /api/ordenes/{id}/precios`). */

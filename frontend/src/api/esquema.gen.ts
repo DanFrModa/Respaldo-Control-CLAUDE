@@ -97,6 +97,7 @@ export interface paths {
                 | 'ordenes.cancelar'
                 | 'ordenes.cerrar'
                 | 'ordenes.reabrir'
+                | 'ordenes.autorizar-sobreprecio'
                 | 'clientes.modificar'
                 | 'proveedores.modificar'
                 | 'etiquetas.modificar'
@@ -29391,6 +29392,470 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/referencias-maquila/cambios': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Referencias de maquila cambiadas y sobreprecios autorizados */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Desde este día del negocio (incluido). */
+          desde?: string;
+          /** @description Hasta este día del negocio (incluido). */
+          hasta?: string;
+          /** @description Folio de la orden. */
+          folio?: number;
+          /** @description Sólo los sobreprecios autorizados ("true"/"false"). */
+          soloSobreprecios?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Referencias cambiadas y sobreprecios autorizados. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              eventos: {
+                id: number;
+                idOrden: number;
+                folioOrden: number;
+                idTipoProceso: number | null;
+                /** @description Nombre del proceso; null = todos los de arte (aplicación de la orden). */
+                proceso: string | null;
+                /** @enum {string} */
+                accion: 'prellenado' | 'captura' | 'arte' | 'sobreprecio';
+                referenciaAnterior: number | null;
+                referenciaNueva: number | null;
+                /** @description Sólo en sobreprecio. */
+                precioAutorizado: number | null;
+                /** @description Sólo en sobreprecio: dónde se fijó el precio. */
+                punto:
+                  | ('orden_maquila' | 'orden_aplicacion' | 'envio' | 'recibo' | 'cargo_esma')
+                  | null;
+                nota: string | null;
+                capturadoPor: string | null;
+                /** Format: date-time */
+                capturadoEn: string;
+              }[];
+              /** @description true = hubo más eventos que el tope; afina los filtros. */
+              truncado: boolean;
+              limite: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/referencias-maquila': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Referencias de precio de maquila de la orden (el tope por proceso) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Referencias de precio de maquila de la orden, una por proceso. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folioOrden: number;
+              /** @description true = la sesión no ve los montos de referencia (van null). */
+              ocultas: boolean;
+              procesos: {
+                idTipoProceso: number;
+                codigo: string;
+                nombre: string;
+                esArte: boolean;
+                /**
+                 * @description lista = hay referencia; sin-referencia = el proceso no la tiene (el envío no sale); arte-sin-precio = algún renglón de arte del proceso no tiene precio (el envío no sale).
+                 * @enum {string}
+                 */
+                estado: 'lista' | 'sin-referencia' | 'arte-sin-precio';
+                /** @description Referencia por prenda; null si falta o tapada. */
+                referencia: number | null;
+                /** @description Tope sin autorización (referencia × 1.05); null si falta o tapada. */
+                tope: number | null;
+                /** @description De dónde salió la referencia de un proceso que no es arte; null en arte. */
+                origen: ('precosto' | 'manual') | null;
+                /** @description Sólo en arte: sus renglones. */
+                renglones: {
+                  idOrdenArte: number;
+                  descripcion: string;
+                  posicion: string | null;
+                  /** @description Precio del renglón; null sin precio o tapado. */
+                  precio: number | null;
+                }[];
+                ultimoCambio: {
+                  capturadoPor: string | null;
+                  /** Format: date-time */
+                  capturadoEn: string;
+                } | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Capturar una referencia de precio de maquila de la orden (deja rastro) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Captura de una referencia de precio de maquila de la orden (deja rastro). */
+      requestBody: {
+        content: {
+          'application/json':
+            | {
+                /** @description Tipo de proceso que NO es arte. */
+                idTipoProceso: number;
+                /** @description Precio de referencia por prenda. */
+                precio: number;
+                /** @description Nota libre del cambio (por qué se movió la referencia), opcional. */
+                nota?: string | null;
+              }
+            | {
+                /** @description Renglón de arte de la orden. */
+                idOrdenArte: number;
+                /** @description Precio de referencia por prenda. */
+                precio: number;
+                /** @description Nota libre del cambio (por qué se movió la referencia), opcional. */
+                nota?: string | null;
+              };
+        };
+      };
+      responses: {
+        /** @description Referencias de precio de maquila de la orden, una por proceso. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folioOrden: number;
+              /** @description true = la sesión no ve los montos de referencia (van null). */
+              ocultas: boolean;
+              procesos: {
+                idTipoProceso: number;
+                codigo: string;
+                nombre: string;
+                esArte: boolean;
+                /**
+                 * @description lista = hay referencia; sin-referencia = el proceso no la tiene (el envío no sale); arte-sin-precio = algún renglón de arte del proceso no tiene precio (el envío no sale).
+                 * @enum {string}
+                 */
+                estado: 'lista' | 'sin-referencia' | 'arte-sin-precio';
+                /** @description Referencia por prenda; null si falta o tapada. */
+                referencia: number | null;
+                /** @description Tope sin autorización (referencia × 1.05); null si falta o tapada. */
+                tope: number | null;
+                /** @description De dónde salió la referencia de un proceso que no es arte; null en arte. */
+                origen: ('precosto' | 'manual') | null;
+                /** @description Sólo en arte: sus renglones. */
+                renglones: {
+                  idOrdenArte: number;
+                  descripcion: string;
+                  posicion: string | null;
+                  /** @description Precio del renglón; null sin precio o tapado. */
+                  precio: number | null;
+                }[];
+                ultimoCambio: {
+                  capturadoPor: string | null;
+                  /** Format: date-time */
+                  capturadoEn: string;
+                } | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
   '/api/ordenes/{id}/receta': {

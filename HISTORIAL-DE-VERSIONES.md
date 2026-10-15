@@ -71,6 +71,43 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.218 · 15-oct-2026 · **en prueba** — **El precio de maquila ya no puede pasar de lo cotizado sin que Daniel lo autorice**
+
+> **La v0.218 cierra la fila 0.242.** Daniel: *«el precio de maquila sí lo debe capturar producción… validar que no
+> pueda ponerlo más caro que el que está en la cotización a menos que se le autorice. Yo autorizo»*. Hasta hoy
+> cualquiera con permiso de capturar precios podía pagarle a un taller lo que quisiera y nadie se enteraba.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**Cada orden tiene un precio de referencia por proceso**, en el panel de precios de la orden («Referencias»):
+- **Costura:** cuando la orden se liga a su desarrollo, se llena sola con el costo de maquila **negociado con el
+  cliente** (el precosto vigente de la lista de precios); si ese desarrollo no tiene lista, con el **último precosto
+  congelado**, que es el de Desarrollo. Las órdenes que no vienen de un desarrollo no se llenan solas. Producción la
+  puede capturar o corregir siempre.
+- **Estampado, bordado, aplicación y lavado:** es el precio de cada arte de la receta de la orden; si son dos del mismo
+  tipo, se suman.
+
+**El tope:** ningún precio que se le pague a un taller por un proceso puede pasar de **la referencia + 5 %**. Se revisa
+al capturar el precio de la orden, al **enviar** a maquila, en el **recibo** (si se teclea otro precio) y al **validar
+el cargo de EsMa**. Más barato, siempre se puede.
+
+**Sin referencia, la orden no sale a maquila** para ese proceso.
+
+**Pasarse del 5 % lo autoriza sólo Daniel** (permiso nuevo «Autorizar sobreprecio», reservado). Y la pantalla nueva
+**«Referencias cambiadas»** (en Producción) le enseña cada cambio de referencia y cada vez que se autorizó pasarse: qué
+orden, qué proceso, de cuánto a cuánto, quién y cuándo.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Los precios a pagar sólo aceptan centavos** (nada de $34.996). **En el panel, el «precio base del modelo»** ya no se
+llama «referencia»: la referencia del tope es la nueva. **Ninguna orden sale a maquila sin referencia del
+proceso**, tampoco las que ya están en curso al desplegar esta versión: su siguiente envío se frena hasta que alguien
+capture la referencia. Si el arte de ese proceso no está en la receta, Desarrollo tiene que agregarlo primero.
+
+### ⏳ Sigue pendiente o roto
+
+Las preguntas para Daniel están en §Post-F9.285.
+
 ## 0.217 · 15-oct-2026 · **en prueba** — **El PDF que quedó fuera de una tanda entra al mismo pedido**
 
 > **La v0.217 cierra la fila 0.147.** Daniel: *«prefiero siempre hacer una OP de la misma manera para tener toda la

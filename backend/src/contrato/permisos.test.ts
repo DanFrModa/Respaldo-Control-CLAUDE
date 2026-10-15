@@ -143,6 +143,9 @@ describe('catálogo de permisos', () => {
       // costo unitario CONGELADO). ⭐ `ordenes.reabrir` es de la fila 0.228 (§Post-F9.244(4)):
       // REABRIRLA dejó de ir con la misma llave — es de Daniel («solo yo, o el que yo autorice»).
       'ordenes.administrar',
+      // ⭐ `ordenes.autorizar-sobreprecio` es de la fila 0.242 (§Post-F9.255): pasarse del tope del
+      // precio de maquila (referencia + 5 %) es de Daniel.
+      'ordenes.autorizar-sobreprecio',
       'ordenes.cancelar',
       'ordenes.cerrar',
       'ordenes.reabrir',

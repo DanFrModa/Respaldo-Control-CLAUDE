@@ -47,6 +47,7 @@ import { registrarAuth } from '../auth/plugin.js';
 import type { PrismaClient } from '../datos/index.js';
 import { clientePruebas, limpiarBaseDatos } from '../pruebas/contexto.js';
 import { sembrar } from '../../prisma/seed.js';
+import { abrirReferenciasDeMaquila } from '../pruebas/referencias.js';
 
 let cliente: PrismaClient;
 let app: FastifyInstance;
@@ -134,6 +135,8 @@ async function crearEscenario(): Promise<Escenario> {
       idCliente: clienteNeg.id,
     },
   });
+  // ⭐ Fila 0.242: sin referencia de costura no se captura el precio ni sale a maquila.
+  await abrirReferenciasDeMaquila(cliente, orden.id, undefined, ['costura']);
   // La matriz color × talla (D4) no la siembra el seed.
   const color = await cliente.color.create({
     data: { nombre: `Negro 0.198 ${String(Date.now())}` },

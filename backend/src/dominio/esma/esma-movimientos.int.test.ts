@@ -36,6 +36,7 @@ import { conciliarEsMa } from './conciliacion.js';
 import { forzarOrdenPagada, obtenerOrdenPagada } from './orden-pagada.js';
 import { crearCargoEsMaMigrado } from './migracion.js';
 import { registrarMovimientoTercero } from '../terceros/cuenta-terceros.js';
+import { abrirReferenciasDeMaquila } from '../../pruebas/referencias.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -124,6 +125,9 @@ async function crearOrdenConMatriz(): Promise<number> {
       },
     },
   });
+  // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+  // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+  await abrirReferenciasDeMaquila(cliente, orden.id);
   return orden.id;
 }
 

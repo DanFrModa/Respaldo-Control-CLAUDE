@@ -1382,6 +1382,10 @@ model TipoProceso {
   artesModelo    ModeloArte[]
   /// Artes congelados en ÓRDENES de este tipo (V1-E3f, Restrict).
   artesOrden     OrdenArte[]
+  /// ⭐ Fila 0.242: referencias de precio de maquila de los procesos que NO son arte (Restrict).
+  referenciasOrden  OrdenReferenciaProceso[]
+  /// ⭐ Fila 0.242: rastro de las referencias y de los sobreprecios autorizados (Restrict).
+  referenciaEventos OrdenReferenciaEvento[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3754,6 +3758,10 @@ model Orden {
   fotosOcultas         OrdenFotoOculta[]
   /// Historial INMUTABLE de cambios de precio maquila/aplicación (rediseño R2, §4.4.3). Cascade.
   precioEventos        OrdenPrecioEvento[]
+  /// ⭐ Fila 0.242: la REFERENCIA de precio de cada proceso que no es arte (costura). Cascade.
+  referenciasProceso   OrdenReferenciaProceso[]
+  /// ⭐ Fila 0.242: rastro INMUTABLE de las referencias y de los sobreprecios autorizados. Cascade.
+  referenciaEventos    OrdenReferenciaEvento[]
   /// Hitos capturados a mano de esta orden (post-F9): revisión OP, fit, tono, avíos, empaque, arte.
   /// Cada hito vivo auto-completa su proceso RC vía el auto-avance. Restrict (nunca se borra, D3).
   hitos                HitoOrden[]
@@ -3836,6 +3844,99 @@ model OrdenFotoOculta {
   @@index([idOrden])
   @@index([idModeloFoto])
   @@map("orden_foto_oculta")
+}
+
+/// ⭐ Fila 0.242 (§Post-F9.255) — de dónde salió la referencia de un proceso que no es arte.
+enum OrigenReferenciaProceso {
+  /// Pre-llenada desde el concepto `maquila` del precosto vigente al ligar la orden a su desarrollo.
+  precosto
+  /// Capturada (o corregida) a mano por producción o por Daniel.
+  manual
+
+  @@map("origen_referencia_proceso")
+}
+
+/// ⭐ Fila 0.242 — qué pasó en un evento del rastro de referencias.
+enum AccionReferenciaEvento {
+  /// La referencia nació pre-llenada del precosto (anterior = null).
+  prellenado
+  /// Alguien capturó o cambió a mano la referencia de un proceso que no es arte.
+  captura
+  /// Cambió la referencia de un proceso de ARTE (la suma de sus `OrdenArte.precio`).
+  arte
+  /// Alguien con `ordenes.autorizar-sobreprecio` fijó un precio por encima del tope.
+  sobreprecio
+
+  @@map("accion_referencia_evento")
+}
+
+/// ⭐ Fila 0.242 — en qué punto se fijó un precio por encima del tope.
+enum PuntoPrecioMaquila {
+  orden_maquila
+  orden_aplicacion
+  envio
+  recibo
+  cargo_esma
+
+  @@map("punto_precio_maquila")
+}
+
+/// ⭐ Fila 0.242 (§Post-F9.255) — LA REFERENCIA DE PRECIO de un proceso que NO es arte en una orden
+/// (hoy, costura). Es el tope del precio que se le paga al taller: se rechaza `precio > referencia ×
+/// 1.05` salvo con `ordenes.autorizar-sobreprecio`, y sin ella no sale el envío de ese proceso. Los
+/// procesos de ARTE no viven aquí: su referencia es la suma de sus `OrdenArte.precio` (§Post-F9.254).
+/// Cada cambio deja su `OrdenReferenciaEvento` (D3/A7).
+model OrdenReferenciaProceso {
+  id            Int         @id @default(autoincrement())
+  idOrden       Int         @map("id_orden")
+  orden         Orden       @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idTipoProceso Int         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  /// Precio de referencia por prenda.
+  precio Decimal                 @db.Decimal(12, 2)
+  origen OrigenReferenciaProceso
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idTipoProceso])
+  @@index([idTipoProceso])
+  @@map("orden_referencia_proceso")
+}
+
+/// ⭐ Fila 0.242 — RASTRO INMUTABLE de las referencias de maquila de una orden y de los sobreprecios
+/// autorizados (sólo se inserta; nunca update/delete, D3/A7). Lo lee la consulta «Referencias
+/// cambiadas». `idTipoProceso` NULL sólo en un sobreprecio sobre `aplicacionOrd`, que vale para
+/// todos los procesos de arte a la vez.
+model OrdenReferenciaEvento {
+  id            Int          @id @default(autoincrement())
+  idOrden       Int          @map("id_orden")
+  orden         Orden        @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idTipoProceso Int?         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso? @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  accion             AccionReferenciaEvento
+  /// Referencia ANTES del cambio (null si no había). En un sobreprecio, null.
+  referenciaAnterior Decimal?               @map("referencia_anterior") @db.Decimal(12, 2)
+  /// Referencia DESPUÉS del cambio (null si quedó sin referencia). En un sobreprecio, la vigente.
+  referenciaNueva    Decimal?               @map("referencia_nueva") @db.Decimal(12, 2)
+  /// Sólo en un sobreprecio: el precio que se fijó por encima del tope.
+  precioAutorizado   Decimal?               @map("precio_autorizado") @db.Decimal(12, 2)
+  /// Sólo en un sobreprecio: dónde se fijó.
+  punto              PuntoPrecioMaquila?
+  nota               String?                @db.Text
+
+  /// Quién (id de `Usuario`, sin FK física — patrón de auditoría del proyecto).
+  capturadoPorId String?  @map("capturado_por_id")
+  capturadoEn    DateTime @default(now()) @map("capturado_en")
+
+  @@index([idOrden])
+  @@index([idTipoProceso])
+  @@index([capturadoEn])
+  @@map("orden_referencia_evento")
 }
 
 /// Qué precio de la orden cambió un evento: maquila (costura) o aplicación (estampado/bordado).

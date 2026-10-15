@@ -23,9 +23,11 @@ export const esquemaCargoEsMaValidarCuerpo = z
       .number({ error: 'La cantidad es obligatoria' })
       .min(0, { error: 'La cantidad no puede ser negativa' })
       .describe('Cantidad real de piezas a pagar (la confirmada/ajustada por el admin).'),
+    // ⭐ Fila 0.242: dos decimales, como la columna: un tercero saltaba el tope al redondearse.
     precioReal: z
       .number({ error: 'El precio es obligatorio' })
       .min(0, { error: 'El precio no puede ser negativo' })
+      .multipleOf(0.01, { error: 'El precio no puede tener más de 2 decimales' })
       .describe('Precio unitario real de maquila (el confirmado/ajustado por el admin).'),
     sinCosto: z
       .boolean()

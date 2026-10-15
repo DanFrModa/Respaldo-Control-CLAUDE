@@ -85,6 +85,7 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import {
   clienteLectura,
   enTransaccion,
+  type ClienteLectura,
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
@@ -504,10 +505,7 @@ type RegistroConRelaciones = Prisma.RegistroProductividadGetPayload<{
 }>;
 
 /** Jornada base del almacén de la empresa activa (default 9 si no hay configuración). */
-async function jornadaAlmacen(
-  cliente: Tx | ReturnType<typeof clienteLectura>,
-  idEmpresa: number,
-): Promise<number> {
+async function jornadaAlmacen(cliente: ClienteLectura, idEmpresa: number): Promise<number> {
   const config = await cliente.configuracionEmpresa.findUnique({
     where: { idEmpresa },
     select: { jornadaBaseAlmacen: true },

@@ -35,8 +35,18 @@ export type Tx = Prisma.TransactionClient;
  * Lo que devuelve {@link clienteLectura}: un cliente que sirve para CONSULTAR, esté o no dentro de
  * una transacción. Los lectores puros lo piden en vez de `Tx` para no obligar a abrir una
  * transacción sólo para leer.
+ *
+ * ⚠️ Es `Tx` A SECAS, no `Tx | PrismaClient` (fila 0.242, memoria del typecheck). El cliente
+ * completo YA cabe aquí: `Tx` es `Omit<PrismaClient, '$transaction' | '$connect' | …>`, así que
+ * `clienteLectura` devuelve el singleton o el cliente de pruebas sin conversión ninguna, y a un
+ * lector no le falta nada (lo que `Tx` quita son los métodos de abrir/cerrar, no los de consultar).
+ * La UNIÓN, en cambio, le cuesta caro a `tsc`: cada `cliente.modelo.metodo(...)` sobre una unión
+ * resuelve la firma en LOS DOS miembros (cuyos delegados no son el mismo tipo: llevan su propio
+ * `GlobalOmitOptions`) y los compara. Medido con `--extendedDiagnostics` sobre la 0.242: de
+ * 5,492,891 tipos y 30,462,644 instanciaciones a 3,783,901 y 19,231,700, y el typecheck dejó de
+ * morir por memoria con el techo del CI (6144). No la vuelvas a convertir en unión.
  */
-export type ClienteLectura = Tx | PrismaClient;
+export type ClienteLectura = Tx;
 
 /**
  * Contexto de base de datos que aceptan los servicios de dominio como último

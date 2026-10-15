@@ -272,6 +272,11 @@ const ESCRITORES: Record<string, Record<string, Declarada>> = {
     generarEdrMes: FIN('El EDR sigue vivo con la orden cerrada.'),
     agregarLineaManual: FIN('Ajuste manual del EDR.'),
   },
+  // ⭐ Fila 0.242: desde que topa el precio real contra la referencia de la orden, el barrido la VE
+  // (habla de `idOrden`); hasta ahí vivía en EXCEPCIONES_SIN_ORDEN_A_LA_VISTA. Sigue siendo Finanzas.
+  [`${D}esma/cargos.ts`]: {
+    validarCargoEsMa: FIN('El dinero del maquilero se fija al VALIDAR; nunca carga la orden.'),
+  },
   [`${D}esma/migracion.ts`]: { crearCargoEsMaMigrado: MIG },
   [`${D}esma/orden-pagada.ts`]: {
     recalcularOrdenPagada: FIN(
@@ -451,6 +456,36 @@ const ESCRITORES: Record<string, Record<string, Declarada>> = {
     registrarReciboMaquila: G('Vía `resolverOrden` (0.061).'),
     cancelarReciboMaquila: G('Cancelar mueve inventario y divisor (0.061).'),
   },
+  // ⭐ Fila 0.242 — las referencias de precio de maquila y su tope.
+  [`${D}produccion/referencias-maquila.ts`]: {
+    capturarReferenciaMaquila: G('Capturar una referencia es captura sobre la orden.'),
+    exigirPrecioDentroDelTope: {
+      disciplina: 'la-bloquea-su-puerta',
+      puertas: [
+        `${D}produccion/precios-orden.ts::actualizarPreciosOrden`,
+        `${D}produccion/etapas.ts::registrarEnvioMaquila`,
+        `${D}produccion/recibos.ts::registrarReciboMaquila`,
+      ],
+      otrosLlamadores: {
+        [`${D}esma/cargos.ts::validarCargoEsMa`]:
+          'Finanzas (decisión 2): validar el cargo de una orden cerrada tiene que poder hacerse; el ' +
+          'sobreprecio autorizado deja su rastro igual.',
+      },
+      razon:
+        'Escribe el rastro de un sobreprecio autorizado dentro del acto que fija el precio; la ' +
+        'guarda la toma ese acto.',
+    },
+    prellenarReferenciaDeCostura: {
+      disciplina: 'la-bloquea-su-puerta',
+      puertas: [`${D}desarrollo/liga-orden.ts::ligarOrdenNucleo`],
+      razon: 'Sólo la llama la liga con el desarrollo, ya guardada (C5).',
+    },
+    registrarCambiosDeReferenciaDeArte: {
+      disciplina: 'la-bloquea-su-puerta',
+      puertas: [`${D}produccion/receta-orden.ts::enRecetaEditable`, 'capturarReferenciaMaquila'],
+      razon: 'El rastro de los artes lo deja la mutación de la receta o la captura, ya guardadas.',
+    },
+  },
   [`${D}produccion/requisitos-orden.ts`]: {
     recalcularEstadoOrden: {
       disciplina: 'derivado',
@@ -574,9 +609,6 @@ const DUDAS_SIN_ORDEN_A_LA_VISTA: Record<string, Record<string, Declarada>> = {
  * que se AMARRAN igual: NO pueden llamar la guarda (decisiones 2 y 3).
  */
 const EXCEPCIONES_SIN_ORDEN_A_LA_VISTA: Record<string, Record<string, Declarada>> = {
-  [`${D}esma/cargos.ts`]: {
-    validarCargoEsMa: FIN('El dinero del maquilero se fija al VALIDAR; nunca carga la orden.'),
-  },
   [`${D}esma/movimientos.ts`]: {
     crearAbonoMaquilero: FIN('Cuenta del maquilero.'),
     crearDescuentoMaquilero: FIN('Cuenta del maquilero.'),

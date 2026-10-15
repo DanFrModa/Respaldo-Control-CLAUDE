@@ -318,6 +318,18 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'REABRIR una orden de producción cerrada: vuelve a admitir captura y su costo deja de estar congelado. Acto de excepción, con motivo obligatorio y auditado (0.228)',
   },
+  // ⭐ Fila 0.242 (§Post-F9.255) — PASARSE DEL TOPE ES DE DANIEL. Producción captura el precio de
+  // maquila y también su referencia, pero *«no puede ponerlo más caro que el que está en la
+  // cotización a menos que se le autorice. Yo autorizo»*. El tope es `referencia × 1.05`; esta llave
+  // deja fijar un precio por encima (en la orden, el envío, el recibo o la validación del cargo
+  // EsMa), y cada vez queda en el rastro. Gobierna también la consulta «Referencias cambiadas»: es la
+  // señal que Daniel necesita para que la (b) no sea bajar la guardia. Nace en `SOLO_ADMINISTRADOR`.
+  {
+    clave: 'ordenes.autorizar-sobreprecio',
+    modulo: 'ordenes',
+    descripcion:
+      'Fijar un precio de maquila por ENCIMA del tope (referencia del proceso + 5 %) y consultar las referencias cambiadas y los sobreprecios autorizados (0.242)',
+  },
 
   // ── Clientes / Proveedores ───────────────────────────────────────────────────
   {

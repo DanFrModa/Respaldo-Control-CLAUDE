@@ -42,6 +42,12 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
 // ⭐ Fila 0.249 parte C: la maquila de referencia ES `Modelo.maquilaBase` — misma regla en los dos.
 import { puedeVerMaquilaDeReferencia } from '../modelos/precios-de-modelo.js';
+// ⭐ Fila 0.242: el candado de precios vive con el tope (lo comparten envío, recibo, receta y EsMa).
+import {
+  bloquearPreciosDeOrden,
+  exigirPrecioDentroDelTope,
+  referenciaParaPrecioDeOrden,
+} from './referencias-maquila.js';
 
 /** Fila cruda de un evento con sus nombres (proveedor incluido). */
 interface EventoCrudo {
@@ -68,21 +74,6 @@ const seleccionEvento = {
   capturadoPorId: true,
   capturadoEn: true,
 } as const;
-
-/**
- * Bloqueo de los PRECIOS de una orden dentro de la transacción (concurrencia): advisory lock
- * transaccional por empresa+orden, PRIMERA instrucción de la tx — dos capturas simultáneas del
- * mismo campo se serializan y el `precioAnterior` del segundo evento encadena de verdad con el
- * `precioNuevo` del primero (sin el lock, ambos leerían el MISMO anterior bajo READ COMMITTED y
- * el historial mentiría: A→B, A→C en vez de A→B→C — rompería D3/A7). Mismo criterio que
- * `bloquearEtapasDeOrden` de etapas.ts, con NAMESPACE PROPIO (0x50 = 'P' de Precios) para no
- * chocar con la familia de locks de etapas (0x4F). El lock se libera al terminar la transacción.
- */
-async function bloquearPreciosDeOrden(tx: Tx, idEmpresa: number, idOrden: number): Promise<void> {
-  const clave1 = ((idEmpresa * 1_000_003) ^ 0x50000000) | 0;
-  const clave2 = idOrden | 0;
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
-}
 
 /** Proyecta un evento al resumen "quién · cuándo · proveedor" (sin montos). */
 function aUltimoEvento(
@@ -244,6 +235,22 @@ export async function actualizarPreciosOrden(
     }
 
     const anterior = datos.campo === 'maquila' ? orden.maquilaOrd : orden.aplicacionOrd;
+
+    // ⭐ Fila 0.242 (§Post-F9.255) — EL TOPE. `maquilaOrd` se topa contra la referencia de costura y
+    // `aplicacionOrd` contra la suma de TODOS los artes vivos (el campo es uno solo; ver el hueco en
+    // `referencias-maquila.ts`). Sin referencia no se captura. Volver a teclear el MISMO precio no se
+    // re-topa: si ya estaba por encima, fue porque alguien con la llave lo autorizó.
+    if (anterior === null || !anterior.equals(datos.precio)) {
+      const ref = await referenciaParaPrecioDeOrden(tx, idOrden, datos.campo);
+      await exigirPrecioDentroDelTope(tx, sesion, {
+        idOrden,
+        idTipoProceso: ref.idTipoProceso,
+        nombre: ref.nombre,
+        precio: datos.precio,
+        referencia: ref.referencia,
+        punto: datos.campo === 'maquila' ? 'orden_maquila' : 'orden_aplicacion',
+      });
+    }
 
     await tx.orden.update({
       where: { id: idOrden },

@@ -18895,3 +18895,35 @@ pedido no se toca.
 agregarle una tanda, en un orden fijo (cliente → pedido → modelo / nº de producción → secuencia → orden). Sin eso, una
 cancelación podía dejar órdenes vivas bajo un pedido cancelado — la carrera ya existía con «Generar OP» y se cerró de
 paso.
+
+#### (Post-F9.285) — EL TOPE AL PRECIO DE MAQUILA, CONSTRUIDO (fila 0.242, v0.218) — preguntas para Daniel
+
+Construida la salida (b) de §Post-F9.255 tal cual: referencia por proceso (la de costura, pre-llenada al ligar la orden
+a su desarrollo con el costo de maquila **negociado** —o, si el desarrollo no tiene lista, con el último precosto
+congelado, que es de Desarrollo—; la del arte, el precio de la receta de la orden), la captura también producción, sin referencia
+no sale a maquila, tope del **5 %** sin freno hacia abajo, y pasarse lo autoriza sólo Daniel. La consulta de
+**referencias cambiadas** (tu OK pendiente en §Post-F9.255) se construyó con el default: enseña también los
+sobreprecios autorizados. El tope se revisa en el precio de la orden, el envío, el recibo **y la validación de EsMa**
+(ésta la agregó el lead: valida también Directivo, no sólo tú).
+
+❓ **Preguntas, con el default ya construido:**
+1. **La referencia del ARTE es lo que puso Desarrollo**, no lo negociado: `OrdenArte.precio` se copia del precio del
+   arte del modelo y no se vuelve a sincronizar con el precosto que se negoció (tú dijiste en §Post-F9.251 que el tope
+   va contra lo último negociado). La de costura sí sale de lo negociado. *Default: así; producción o tú lo corrigen
+   a mano en el panel y queda rastro.* ¿Lo sincronizamos con lo negociado?
+2. **El precio de «aplicación» de la orden es uno solo para todos los artes** (herencia del sistema viejo) y se topa
+   contra la **suma** de todos. Con estampado de $5 y bordado de $8, se puede capturar hasta $13.65; **pero el cargo
+   de cada proceso se frena al validarlo en EsMa** contra la referencia de ESE proceso. *Default: así.*
+3. **Tu autorización de un sobreprecio** vale para esa orden y ese proceso, a ese precio exacto, y: **no vence** aunque
+   después baje la referencia, **no se gasta** (sirve para varios cargos al mismo precio) y **no queda atada al taller**.
+   Si se paga menos de lo autorizado pero más del tope, pide autorización otra vez. *Default: así.* ¿La quieres más
+   estrecha (atada al envío o al maquilero)?
+4. **Si el arte de un proceso no está en la receta de la orden**, ese envío se frena hasta que Desarrollo lo agregue
+   (tu regla: «se debe definir antes qué procesos lleva la OP»). Producción no puede resolverlo sola. *Default: así.*
+5. **¿Quién más ve «Referencias cambiadas»?** *Default: sólo quien tiene «Autorizar sobreprecio» (tú).*
+6. **Si el desarrollo no tiene lista de precios** (no hubo negociación), la referencia de costura se pre-llena con el
+   **último precosto congelado**, que es información de Desarrollo —justo lo que dijiste en §Post-F9.251 que no debía
+   mandar—. *Default del lead: así, porque sin negociación es la única cifra de costo que hay, y producción la puede
+   corregir con rastro.* ¿O prefieres que en ese caso quede vacía y producción la capture? **Y ojo:** las órdenes que no
+   vienen de un desarrollo (capturadas a mano o migradas) no se pre-llenan nunca, y las que ya estaban en curso al
+   desplegar se frenan en su siguiente envío hasta tener referencia.

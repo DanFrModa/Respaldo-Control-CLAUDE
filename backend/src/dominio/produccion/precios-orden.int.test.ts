@@ -12,6 +12,7 @@ import type {
   Proveedor,
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { abrirReferenciasDeMaquila } from '../../pruebas/referencias.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   actualizarPreciosOrden,
@@ -76,6 +77,15 @@ beforeEach(async () => {
       idCliente: clienteNegocio.id,
     },
   });
+  // ⭐ Fila 0.242: sin referencia no se captura el precio (el tope tiene sus pruebas propias en
+  // `referencias-maquila.int.test.ts`). Costura + un arte, con referencia alta.
+  await cliente.tipoProceso.create({
+    data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+  });
+  await cliente.tipoProceso.create({
+    data: { codigo: 'estampado', nombre: 'Estampado', esArte: true },
+  });
+  await abrirReferenciasDeMaquila(cliente, orden.id);
   // El usuario de la sesión de prueba, para resolver `capturadoPor` por nombre.
   await cliente.usuario.create({
     data: {
