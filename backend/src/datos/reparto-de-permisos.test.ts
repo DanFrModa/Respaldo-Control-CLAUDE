@@ -687,6 +687,17 @@ const NUEVOS_DESDE_LA_FOTO: readonly { clave: ClavePermiso; razon: string }[] = 
       '`modelos.administrar`, que ya le implica el arte del MODELO): dársela le abriría las fotos ' +
       'de arte de la ORDEN, que hoy no toca. No se le quita nada a nadie.',
   },
+  // ── ⭐⭐ Pasarse del tope del precio de maquila es de Daniel (fila 0.242), §Post-F9.255 ───────
+  {
+    clave: 'ordenes.autorizar-sobreprecio',
+    razon:
+      'SÓLO los perfiles de acceso total (va también en SOLO_ADMINISTRADOR del seed). DANIEL: ' +
+      '*«validar que no pueda ponerlo más caro que el que está en la cotización a menos que se le ' +
+      'autorice. Yo autorizo»*. Producción captura el precio y su referencia con ' +
+      '`ordenes.precio-maquila`; pasarse de la referencia + 5 % y ver la consulta de referencias ' +
+      'cambiadas no baja a nadie. `Directivo`, que valida cargos EsMa, NO la recibe: validar por ' +
+      'encima del tope también le pide la llave.',
+  },
 ];
 
 describe('🆕 lo nacido DESPUÉS de la foto también se decide por escrito', () => {
@@ -857,5 +868,40 @@ describe('🔒 fila 0.228: REABRIR una orden es de Daniel, CERRAR no', () => {
     const declarado = SOLO_ADMINISTRADOR.find((entrada) => entrada.clave === 'ordenes.reabrir');
     expect(declarado, '`ordenes.reabrir` no está en SOLO_ADMINISTRADOR').toBeDefined();
     expect(declarado?.razon).toContain('solo yo');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. LA FILA 0.242 — pasarse del tope del precio de maquila
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐⭐ §Post-F9.255: el precio de maquila no puede pasarse de su referencia + 5 % sin la autorización
+ * de Daniel. La llave nace reservada: la fijan el seed y esta batería, nombre por nombre.
+ */
+describe('🔒 fila 0.242: pasarse del tope de maquila es de Daniel', () => {
+  it('⭐ `ordenes.autorizar-sobreprecio` la llevan SÓLO los tres perfiles de acceso total', () => {
+    expect(perfilesQueOtorgan('ordenes.autorizar-sobreprecio')).toEqual(
+      ['Administrador', 'AdministracionDireccion', 'Director General'].sort(),
+    );
+  });
+
+  it('`Directivo` (que valida cargos EsMa) NO la recibe', () => {
+    const directivo = definirRoles().find((rol) => rol.nombre === 'Directivo');
+    expect(directivo, 'no existe el perfil "Directivo"').toBeDefined();
+    const suyas = new Set<string>(directivo?.permisos ?? []);
+    expect(suyas.has('esma.cargo-validar'), 'Directivo perdió `esma.cargo-validar`').toBe(true);
+    expect(suyas.has('ordenes.autorizar-sobreprecio')).toBe(false);
+  });
+
+  it('…y la reserva está ESCRITA: vive en SOLO_ADMINISTRADOR con la cita de Daniel', () => {
+    const declarado = SOLO_ADMINISTRADOR.find(
+      (entrada) => entrada.clave === 'ordenes.autorizar-sobreprecio',
+    );
+    expect(
+      declarado,
+      '`ordenes.autorizar-sobreprecio` no está en SOLO_ADMINISTRADOR',
+    ).toBeDefined();
+    expect(declarado?.razon).toContain('Yo autorizo');
   });
 });

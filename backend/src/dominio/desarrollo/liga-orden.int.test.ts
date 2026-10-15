@@ -596,3 +596,105 @@ describe('A9 — aislamiento cross-empresa', () => {
     expect(sug.candidato?.idListaLinea).toBeNull();
   });
 });
+
+// ── ⭐ Fila 0.242 — al ligar, la orden PRE-LLENA su referencia de costura del precosto vigente ──
+
+describe('⭐ fila 0.242: ligar pre-llena la referencia de costura (lo último negociado)', () => {
+  let idCostura: number;
+  let idConceptoMaquila: number;
+
+  beforeEach(async () => {
+    idCostura = (
+      await cliente.tipoProceso.create({
+        data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+      })
+    ).id;
+    idConceptoMaquila = (
+      await cliente.conceptoCosto.create({ data: { codigo: 'maquila', nombre: 'Maquila' } })
+    ).id;
+  });
+
+  async function precostoConMaquila(
+    idDesarrollo: number,
+    version: number,
+    maquila: number,
+  ): Promise<number> {
+    const p = await cliente.precosto.create({
+      data: {
+        idDesarrollo,
+        version,
+        estado: 'congelado',
+        congeladoEn: new Date(),
+        costoTotal: 100,
+        lineas: {
+          create: {
+            idConceptoCosto: idConceptoMaquila,
+            origen: 'manual',
+            descripcion: 'Maquila',
+            precioUnit: maquila,
+            importe: maquila,
+          },
+        },
+      },
+    });
+    return p.id;
+  }
+
+  const referencia = (idOrden: number) =>
+    cliente.ordenReferenciaProceso.findUnique({
+      where: { idOrden_idTipoProceso: { idOrden, idTipoProceso: idCostura } },
+    });
+
+  it('toma la maquila del precosto del RENGLÓN DE LISTA (lo negociado), no la versión más nueva', async () => {
+    const idDesarrollo = await nuevoDesarrollo(modeloA.id);
+    const v1 = await precostoConMaquila(idDesarrollo, 1, 12.5);
+    await precostoConMaquila(idDesarrollo, 2, 15);
+    await crearListaLinea(idDesarrollo, v1, { costoUnit: 100, precioCalculado: 150 });
+    // M5 (reviewer 0.242): el modelo trae una maquila BASE distinta — Daniel la descartó como
+    // referencia («NO a la información que metió originalmente desarrollo»): no debe usarse.
+    await cliente.modelo.update({ where: { id: modeloA.id }, data: { maquilaBase: 99 } });
+    const idOrden = await nuevaOrden(modeloA.id, clienteNegocio.id);
+    await ligarOrden(sesion(), idOrden, { idDesarrollo }, bd());
+    const ref = await referencia(idOrden);
+    expect([ref?.precio.toNumber(), ref?.origen]).toEqual([12.5, 'precosto']);
+    const ev = await cliente.ordenReferenciaEvento.findMany({ where: { idOrden } });
+    expect(ev.map((e) => [e.accion, e.referenciaAnterior, e.referenciaNueva?.toNumber()])).toEqual([
+      ['prellenado', null, 12.5],
+    ]);
+  });
+
+  it('sin renglón de lista, cae a la última versión CONGELADA del desarrollo', async () => {
+    await cliente.modelo.update({ where: { id: modeloA.id }, data: { maquilaBase: 99 } });
+    const idDesarrollo = await nuevoDesarrollo(modeloA.id);
+    await precostoConMaquila(idDesarrollo, 1, 12.5);
+    await precostoConMaquila(idDesarrollo, 2, 15);
+    const idOrden = await nuevaOrden(modeloA.id, clienteNegocio.id);
+    await ligarOrden(sesion(), idOrden, { idDesarrollo }, bd());
+    expect((await referencia(idOrden))?.precio.toNumber()).toBe(15);
+  });
+
+  it('NO pisa una referencia que la orden ya tenía', async () => {
+    const idDesarrollo = await nuevoDesarrollo(modeloA.id);
+    await precostoConMaquila(idDesarrollo, 1, 12.5);
+    const idOrden = await nuevaOrden(modeloA.id, clienteNegocio.id);
+    await cliente.ordenReferenciaProceso.create({
+      data: { idOrden, idTipoProceso: idCostura, precio: 9, origen: 'manual' },
+    });
+    await ligarOrden(sesion(), idOrden, { idDesarrollo }, bd());
+    expect((await referencia(idOrden))?.precio.toNumber()).toBe(9);
+    expect(await cliente.ordenReferenciaEvento.count({ where: { idOrden } })).toBe(0);
+  });
+
+  it('sin precosto (o con la maquila en $0) no pre-llena nada: la captura producción', async () => {
+    const sinPrecosto = await nuevoDesarrollo(modeloA.id);
+    const o1 = await nuevaOrden(modeloA.id, clienteNegocio.id);
+    await ligarOrden(sesion(), o1, { idDesarrollo: sinPrecosto }, bd());
+    expect(await referencia(o1)).toBeNull();
+
+    const enCero = await nuevoDesarrollo(modeloA.id);
+    await precostoConMaquila(enCero, 1, 0);
+    const o2 = await nuevaOrden(modeloA.id, clienteNegocio.id);
+    await ligarOrden(sesion(), o2, { idDesarrollo: enCero }, bd());
+    expect(await referencia(o2)).toBeNull();
+  });
+});

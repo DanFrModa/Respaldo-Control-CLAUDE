@@ -54,6 +54,7 @@ import { calcularEstadoDesarrollo, incluirEstadoDesarrollo } from './desarrollos
 import { conteosDesarrollos } from './proyectos.js';
 import { idModeloDeLaReceta, SELECT_LINAJE_RECETA } from '../modelos/receta-compartida.js';
 import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
+import { prellenarReferenciaDeCostura } from '../produccion/referencias-maquila.js';
 
 /** Cliente de lectura (tx o Prisma), para los helpers de proyección. */
 type ClienteBd = ReturnType<typeof clienteLectura>;
@@ -212,6 +213,11 @@ export async function ligarOrdenNucleo(
       folioOrden: Number(orden.folio),
     },
   });
+
+  // ⭐ Fila 0.242 (§Post-F9.252/.255) — al ligar, la orden ya sabe de qué negociación sale: se
+  // PRE-LLENA la referencia de costura con la maquila del precosto vigente (si no la tenía). Una vez
+  // puesta se queda; producción o Daniel la confirman o la cambian en el panel de precios.
+  await prellenarReferenciaDeCostura(tx, sesion, idOrden, idDesarrollo, idEmpresa);
 }
 
 /**

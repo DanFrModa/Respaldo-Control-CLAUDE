@@ -730,6 +730,27 @@ export {
   type OrdenPrecioEventosLista,
 } from './esquemas/orden-precios.js';
 
+// ── Referencias de precio de maquila y su tope (fila 0.242, §Post-F9.255) ──
+export {
+  esquemaEstadoReferencia,
+  esquemaReferenciaArteCaptura,
+  esquemaReferenciaCambioSalida,
+  esquemaReferenciaMaquilaPatchCuerpo,
+  esquemaReferenciaProcesoCaptura,
+  esquemaReferenciaProcesoSalida,
+  esquemaReferenciaRenglonArte,
+  esquemaReferenciaUltimoCambio,
+  esquemaReferenciasCambiosLista,
+  esquemaReferenciasCambiosFiltros,
+  esquemaReferenciasCambiosQuery,
+  esquemaReferenciasOrdenSalida,
+  type DatosReferenciaMaquilaPatch,
+  type ReferenciaProcesoSalida,
+  type ReferenciasCambiosLista,
+  type ReferenciasCambiosFiltros,
+  type ReferenciasOrdenSalida,
+} from './esquemas/referencias-maquila.js';
+
 // ── Centro de comando de Órdenes (rediseño R2, §4.2; brecha B2) ───────────────
 export {
   esquemaOrdenCentroFila,

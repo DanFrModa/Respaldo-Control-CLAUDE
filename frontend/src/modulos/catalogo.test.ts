@@ -6,6 +6,7 @@ import {
   buscarModuloPorClave,
   esEntradaVisible,
   esModuloVisible,
+  exigenciaDeRuta,
   filtrarCatalogoVisible,
   filtrarGruposVisibles,
   filtrarModulosVisibles,
@@ -58,7 +59,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 109 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 110 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
     // (106 hojas + 15 padres; +4 en A2: ajuste/traspaso por color y las vistas legadas por lote
     // de existencias y salida a orden; +1 en B1: entradas de tela por factura; +1 en §Post-F9.26:
@@ -76,8 +77,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // de existencias vigente no los enseña, así que descontaba tela que nadie veía moverse; su
     // ruta quedó como redirección a la salida por color. Lo que cambia es SOLO qué se ve en el riel;
     // +1 en la fila 0.117: «Cotejo de facturas», la factura del proveedor contra el documento que le
-    // emitimos (§Post-F9.232).
-    expect(MODULOS_MENU).toHaveLength(110);
+    // emitimos (§Post-F9.232); +1 en la fila 0.242: «Referencias de maquila cambiadas», la consulta
+    // de Daniel de los cambios de referencia y los sobreprecios autorizados (§Post-F9.255).
+    expect(MODULOS_MENU).toHaveLength(111);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -875,5 +877,28 @@ describe('tituloPorRuta (breadcrumb de la topbar)', () => {
     expect(tituloPorRuta('/inventarios/existencias')).not.toBe('Inventarios');
     // Una sub-ruta del hub SIN hoja propia hereda el título de la portada.
     expect(tituloPorRuta('/costos/orden/123')).toBeDefined();
+  });
+});
+
+// ⭐ Fila 0.242 (F1 del reviewer): la consulta de referencias de maquila cambiadas es de DANIEL. Si
+// alguien le cambia o le suma una llave a la pantalla, esto se pone rojo.
+describe('🔒 fila 0.242: «Referencias de maquila cambiadas» sólo con la llave reservada', () => {
+  it('la RUTA exige exactamente `ordenes.autorizar-sobreprecio`', () => {
+    expect(exigenciaDeRuta('/produccion/referencias-cambiadas')).toEqual([
+      'ordenes.autorizar-sobreprecio',
+    ]);
+  });
+
+  it('la hoja sólo es visible con esa llave (no con capturar ni ver el precio de maquila)', () => {
+    const hoja = MODULOS_MENU.find((m) => m.ruta === '/produccion/referencias-cambiadas');
+    expect(hoja).toBeDefined();
+    if (hoja === undefined) return;
+    expect(
+      esModuloVisible(
+        hoja,
+        permisos('ordenes.ver', 'ordenes.precio-maquila', 'ordenes.ver-precio-real-maquila'),
+      ),
+    ).toBe(false);
+    expect(esModuloVisible(hoja, permisos('ordenes.autorizar-sobreprecio'))).toBe(true);
   });
 });

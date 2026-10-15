@@ -106,6 +106,12 @@ import {
   ordenManejaPacks,
 } from './packs.js';
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
+// ⭐ Fila 0.242: el tope del precio escrito a mano en el recibo.
+import {
+  bloquearPreciosDeOrden,
+  exigirPrecioDentroDelTope,
+  referenciaSiExiste,
+} from './referencias-maquila.js';
 import {
   darSalidaMermaIncompletas,
   devolverPrendasDeTransito,
@@ -668,7 +674,14 @@ export async function registrarReciboMaquila(
     // Tipo de proceso activo + su código (mapeo a rol) + bandera de entrada a PT.
     const proceso = await tx.tipoProceso.findUnique({
       where: { id: datos.idTipoProceso },
-      select: { codigo: true, nombre: true, activo: true, generaEntradaPt: true },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        activo: true,
+        generaEntradaPt: true,
+        esArte: true,
+      },
     });
     if (proceso === null) {
       throw new ErrorNoEncontrado('TipoProceso', datos.idTipoProceso);
@@ -878,14 +891,36 @@ export async function registrarReciboMaquila(
     // del cierre). Lo leen el cargo EsMa propuesto, los semanales y el pago a beneficiarios, así que
     // dejarlo vacío porque la pantalla ya no lo pide los pondría en $0 en silencio. Si el llamador lo
     // manda, manda él (sobrescritura opcional del contrato). Sin envío con precio → `null` (tolerado).
-    const precioPactado =
-      datos.precioPactado ??
-      (await precioDelEnvio(tx, {
-        idOrden: datos.idOrden,
-        idTipoProceso: datos.idTipoProceso,
-        idMaquilero: datos.idMaquilero,
-        idEtapaEnvio: datos.idEtapaEnvio,
-      }));
+    const precioHeredado = await precioDelEnvio(tx, {
+      idOrden: datos.idOrden,
+      idTipoProceso: datos.idTipoProceso,
+      idMaquilero: datos.idMaquilero,
+      idEtapaEnvio: datos.idEtapaEnvio,
+    });
+    const precioPactado = datos.precioPactado ?? precioHeredado;
+
+    // ⭐ Fila 0.242 — un precio ESCRITO A MANO en el recibo (el contrato todavía lo admite) se topa
+    // contra la referencia del proceso, con la misma excepción reservada. El heredado del envío no se
+    // re-topa: ya pasó por el tope al salir (y si lo rebasó, lo autorizó quien lleva la llave). Si la
+    // orden no tiene referencia (de antes de esta versión) se tolera: el recibo no exige referencia,
+    // la salida sí (REGLA 0-B).
+    if (
+      datos.precioPactado != null &&
+      (precioHeredado === null || precioHeredado !== datos.precioPactado)
+    ) {
+      await bloquearPreciosDeOrden(tx, orden.idEmpresa, datos.idOrden);
+      const referencia = await referenciaSiExiste(tx, datos.idOrden, proceso);
+      if (referencia !== null) {
+        await exigirPrecioDentroDelTope(tx, sesion, {
+          idOrden: datos.idOrden,
+          idTipoProceso: proceso.id,
+          nombre: proceso.nombre,
+          precio: datos.precioPactado,
+          referencia,
+          punto: 'recibo',
+        });
+      }
+    }
 
     const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
     const recibo = await tx.etapaMovimiento.create({

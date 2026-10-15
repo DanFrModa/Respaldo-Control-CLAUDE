@@ -143,6 +143,8 @@ describe('las decisiones, contra el seed real', () => {
           'precioArte',
           'maquilaReferencia',
           'precioOrden',
+          // ⭐ Fila 0.242: tampoco las referencias de maquila (no capturan ni ven maquila).
+          'referenciaMaquila',
           'maquilaReal',
           'importes',
           'costos',
@@ -381,6 +383,12 @@ const ESPERADO_POR_ENTIDAD: Readonly<Record<string, ReglaBitacora>> = {
   'Orden.precioAnterior': 'precioCompra',
   'Orden.precioNuevo': 'precioCompra',
   'Orden.costoUnitarioCongelado': 'costos',
+  // ⭐ Fila 0.242: las referencias de maquila y el precio autorizado por encima del tope.
+  'Orden.referencia': 'referenciaMaquila',
+  'Orden.referenciaAnterior': 'referenciaMaquila',
+  'Orden.referenciaNueva': 'referenciaMaquila',
+  'Orden.tope': 'referenciaMaquila',
+  'Orden.precioAutorizado': 'referenciaMaquila',
   'TelaColor.precioAnterior': 'precioTela',
   'TelaColor.precioNuevo': 'precioTela',
   'TelaColor.precioComplementoAnterior': 'precioTela',
@@ -614,6 +622,16 @@ const LLAVES_POR_REGLA: Readonly<Record<ReglaBitacora, readonly (readonly ClaveP
     ['ordenes.ver-precio-real-maquila'],
   ],
   precioOrden: [[IMP], ['modelos.administrar'], ['desarrollo.administrar']],
+  // ⭐ Fila 0.242: las referencias de maquila (quien captura/ve la maquila, quien edita la receta y
+  // la llave reservada de Daniel).
+  referenciaMaquila: [
+    [IMP],
+    ['modelos.administrar'],
+    ['ordenes.precio-maquila'],
+    ['ordenes.ver-precio-real-maquila'],
+    ['desarrollo.administrar'],
+    ['ordenes.autorizar-sobreprecio'],
+  ],
   maquilaReal: [['ordenes.ver-precio-real-maquila']],
   precioTela: [[IMP], ['telas.administrar'], ['compras.administrar'], ['modelos.administrar']],
   precioAvio: [

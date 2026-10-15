@@ -40,6 +40,7 @@ import {
 import { registrarCorte, registrarEnvioMaquila } from './etapas.js';
 import { registrarReciboMaquila } from './recibos.js';
 import { consultarExistenciasPt } from '../inventarios/movimientos-pt.js';
+import { abrirReferenciasDeMaquila } from '../../pruebas/referencias.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -112,6 +113,9 @@ async function crearOrdenConMatriz(folio = 1n): Promise<number> {
       },
     },
   });
+  // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+  // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+  await abrirReferenciasDeMaquila(cliente, orden.id);
   return orden.id;
 }
 
@@ -590,6 +594,9 @@ describe('Entrega a cliente de una orden CON packs (§Post-F9.10)', () => {
         },
       },
     });
+    // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+    // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+    await abrirReferenciasDeMaquila(cliente, orden.id);
     const lineasPorPack = [
       { idColor: colorRojo.id, pack: 'A', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },
       { idColor: colorRojo.id, pack: 'B', tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] },

@@ -80,6 +80,7 @@ import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
 import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasReferenciasMaquila } from './api/produccion/referencias-maquila.rutas.js';
 import { rutasRecetaOrden } from './api/produccion/receta-orden.rutas.js';
 import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
 import { rutasFotosArteOrden } from './api/produccion/fotos-arte-orden.rutas.js';
@@ -225,6 +226,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.
   await app.register(rutasOrdenes, { prefix: '/api' });
+  // ⭐ Fila 0.242: referencias de precio de maquila (el tope por proceso) y su consulta.
+  await app.register(rutasReferenciasMaquila, { prefix: '/api' });
   await app.register(rutasRecetaOrden, { prefix: '/api' });
   // Órdenes — ADJUNTOS de apoyo en R2 (F8-E6, R6): sube/lista/borra archivos (Excel/PDF/imágenes)
   // ligados a una orden vía presigned. Permisos `ordenes.ver` (listar/descargar) / `ordenes.administrar`

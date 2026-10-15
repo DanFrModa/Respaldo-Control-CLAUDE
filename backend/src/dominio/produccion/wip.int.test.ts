@@ -33,6 +33,7 @@ import type { ClavePermiso } from '../../contrato/index.js';
 import { registrarCorte, registrarEnvioMaquila } from './etapas.js';
 import { registrarReciboMaquila } from './recibos.js';
 import { consultarExistenciaMaquilero, consultarWip, wipDeOrden } from './wip.js';
+import { abrirReferenciasDeMaquila } from '../../pruebas/referencias.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -121,6 +122,9 @@ async function crearOrdenConMatriz(): Promise<number> {
       },
     },
   });
+  // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+  // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+  await abrirReferenciasDeMaquila(cliente, orden.id);
   return orden.id;
 }
 
@@ -437,6 +441,8 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
     await cliente.proveedorRol.create({
       data: { idProveedor: maquileroCostura.id, idRolProveedor: rol2.id },
     });
+    // ⭐ Fila 0.242: el proceso nuevo también necesita su referencia de maquila para poder salir.
+    await abrirReferenciasDeMaquila(cliente, idOrden);
     await cortar30();
     // 10 a costura y 10 a costura-2 (los dos meten a PT) + 10 a estampado (no mete).
     // Cada proceso va con el maquilero que TIENE su rol, como en producción.
@@ -531,6 +537,9 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
         },
       },
     });
+    // ⭐ Fila 0.242: sin referencia de maquila no hay salida a maquila (la guarda tiene sus
+    // pruebas propias en `referencias-maquila.int.test.ts`); aquí se abre alta para todos.
+    await abrirReferenciasDeMaquila(cliente, orden2.id);
     // Avanza la orden 2 a cerrada por completo.
     const corte2 = await registrarCorte(
       sesion(),

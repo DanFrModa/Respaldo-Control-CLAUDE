@@ -59,6 +59,7 @@ import {
   puedeVerPrecioDeArte,
   puedeVerPreciosDeModelo,
   puedeVerPreciosDeOrden,
+  puedeVerReferenciasDeMaquila,
 } from '../modelos/precios-de-modelo.js';
 import { puedeVerCorrida } from '../pagos/acceso-corrida.js';
 
@@ -77,6 +78,8 @@ export const REGLAS_BITACORA = {
   maquilaReferencia: puedeVerMaquilaDeReferencia,
   /** Precios congelados de la receta de la orden. */
   precioOrden: puedeVerPreciosDeOrden,
+  /** ⭐ Fila 0.242: las referencias de precio de maquila de la orden (el tope por proceso). */
+  referenciaMaquila: puedeVerReferenciasDeMaquila,
   /** Maquila/aplicación REAL de la orden, precio pactado del envío y del cierre de maquila. */
   maquilaReal: (s: SesionUsuario): boolean => tienePermiso(s, 'ordenes.ver-precio-real-maquila'),
   /** Precios del catálogo de telas (parte B). */
@@ -210,6 +213,14 @@ export const MAPA_BITACORA: Readonly<Record<string, Readonly<Record<string, Regl
     precioNuevo: 'precioCompra',
     // produccion/cierre-orden.ts: el costo unitario congelado al cerrar.
     costoUnitarioCongelado: 'costos',
+    // ⭐ produccion/referencias-maquila.ts (fila 0.242): las referencias por proceso, su tope y el
+    // precio autorizado por encima de él — los cuatro con la MISMA regla, la de su panel y su
+    // consulta (`referenciaMaquila`, que incluye la llave reservada de Daniel).
+    referencia: 'referenciaMaquila',
+    referenciaAnterior: 'referenciaMaquila',
+    referenciaNueva: 'referenciaMaquila',
+    tope: 'referenciaMaquila',
+    precioAutorizado: 'referenciaMaquila',
   },
   // compras/color-de-la-tela.ts
   TelaColor: {

@@ -180,9 +180,12 @@ export const esquemaEnvioCrear = z
       .date({ error: 'La fecha compromiso debe ser YYYY-MM-DD' })
       .nullish()
       .describe('Fecha compromiso del maquilero (YYYY-MM-DD), opcional.'),
+    // ⭐ Fila 0.242: dos decimales, como corte y empaque (`esquemaPrecioServicio`): un tercero se
+    // redondearía al guardar y podía saltarse el tope de la referencia.
     precioPactado: z
       .number({ error: 'El precio pactado debe ser un número' })
       .min(0, { error: 'El precio pactado no puede ser negativo' })
+      .multipleOf(0.01, { error: 'El precio pactado no puede tener más de 2 decimales' })
       .nullish()
       .describe('Precio de maquila pactado (base del cargo EsMa), opcional.'),
     prendaTerminada: z

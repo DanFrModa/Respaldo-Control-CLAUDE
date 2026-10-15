@@ -51,6 +51,12 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { importePropuestoDelCargo, precioDeReferenciaDelCargo } from './cargo-propuesto.js';
 import { etiquetaProcesoDelCargo } from './etiqueta-cargo.js';
 import { resolverConFactura } from './facturacion.js';
+import {
+  bloquearPreciosDeOrden,
+  exigirPrecioDentroDelTope,
+  referenciaSiExiste,
+  sobreprecioYaAutorizado,
+} from '../produccion/referencias-maquila.js';
 
 /** `include` para proyectar un cargo con sus nombres legibles, la cantidad recibida y los precios. */
 const incluirCargo = {
@@ -230,7 +236,10 @@ export async function validarCargoEsMa(
       select: {
         id: true,
         estado: true,
+        idOrden: true,
         maquilero: { select: { modalidadFacturacion: true } },
+        // ⭐ Fila 0.242: el proceso del cargo, para toparlo contra SU referencia.
+        tipoProceso: { select: { id: true, nombre: true, esArte: true } },
       },
     });
     if (cargo === null) {
@@ -241,6 +250,41 @@ export async function validarCargoEsMa(
     }
     if (cargo.estado === 'validado') {
       throw new ErrorConflicto('Ese cargo ya fue validado.');
+    }
+
+    // ⭐ Fila 0.242 (§Post-F9.255) — EL TOPE TAMBIÉN AL VALIDAR, Y SIEMPRE. Validar no lo hace sólo
+    // Daniel (también `Directivo`) y es el acto que FIJA el dinero: el `precioReal` se topa contra la
+    // referencia VIGENTE del PROCESO de este cargo (referencia × 1.05), sea igual o no al propuesto.
+    //
+    // 🔴 Por qué «siempre» y no «sólo si se teclea otro precio» (lo cazó el reviewer de la 0.242): el
+    // propuesto de un arte sale de `aplicacionOrd`, que es UN precio para todos los artes y se topa
+    // contra su SUMA. Con estampado $5 y bordado $8, `aplicacionOrd = 13` es legal y el cargo del
+    // ESTAMPADO se proponía a $13; validarlo «tal cual» lo pagaba sin tope ni rastro.
+    //
+    // La excepción: la llave reservada en quien valida (deja su `sobreprecio`), o una autorización
+    // PREVIA de Daniel por ESE precio en ESTA orden y ESTE proceso (el envío que él dejó salir por
+    // encima del tope no le pide autorizarlo dos veces). Un cargo de SERVICIO (corte/empaque) no es
+    // maquila y no se topa; sin referencia (orden de antes de esta versión) se tolera (REGLA 0-B).
+    if (cargo.tipoProceso !== null) {
+      await bloquearPreciosDeOrden(tx, sesion.idEmpresaActiva, cargo.idOrden);
+      const referencia = await referenciaSiExiste(tx, cargo.idOrden, cargo.tipoProceso);
+      if (
+        referencia !== null &&
+        !(await sobreprecioYaAutorizado(tx, {
+          idOrden: cargo.idOrden,
+          idTipoProceso: cargo.tipoProceso.id,
+          precio: datos.precioReal,
+        }))
+      ) {
+        await exigirPrecioDentroDelTope(tx, sesion, {
+          idOrden: cargo.idOrden,
+          idTipoProceso: cargo.tipoProceso.id,
+          nombre: cargo.tipoProceso.nombre,
+          precio: datos.precioReal,
+          referencia,
+          punto: 'cargo_esma',
+        });
+      }
     }
 
     const conFactura = resolverConFactura(cargo.maquilero.modalidadFacturacion, datos.conFactura);

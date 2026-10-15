@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { Prisma } from '../../datos/index.js';
+
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -180,6 +182,13 @@ describe('precios de la orden — captura con rastro (A2/A7, D3)', () => {
       },
       proveedor: {
         findUnique: vi.fn(() => Promise.resolve({ activo: true, nombre: 'Óscar Jiménez' })),
+      },
+      // ⭐ Fila 0.242: el tope necesita la referencia de costura (aquí $30: 27.50 queda debajo).
+      tipoProceso: {
+        findUnique: vi.fn(() => Promise.resolve({ id: 1, nombre: 'Costura', esArte: false })),
+      },
+      ordenReferenciaProceso: {
+        findUnique: vi.fn(() => Promise.resolve({ precio: new Prisma.Decimal(30) })),
       },
       ordenPrecioEvento: {
         create: vi.fn((args: unknown) => {

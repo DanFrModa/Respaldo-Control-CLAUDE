@@ -351,6 +351,9 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
         'sostiene esta excepción.)',
       'src/dominio/produccion/migracion.ts':
         'Sólo firma renglones ya existentes por `idOrden` (`liberadoEn`): no toca la traza.',
+      'src/dominio/produccion/referencias-maquila.ts':
+        'Fila 0.242: sólo cambia el PRECIO (y la marca `ajustado`) de un renglón YA existente, ' +
+        'buscado por su id y su `idOrden`: no toca la traza.',
     };
     const escritores = fuentes.filter((f) => ESCRIBE_ORDEN_ARTE.test(codigo.get(f) ?? ''));
     expect(escritores.filter((f) => !(f in PUEDEN_ESCRIBIR))).toEqual([]);
@@ -373,6 +376,10 @@ describe('El guardián de las lecturas de receta (V1-E9b)', () => {
     }
     // …y el del ETL, tal como dice su razón, ni menciona la traza.
     expect(codigo.get('src/dominio/produccion/migracion.ts') ?? '').not.toMatch(/idModeloArte/);
+    // …ni el de las referencias de maquila (fila 0.242).
+    expect(codigo.get('src/dominio/produccion/referencias-maquila.ts') ?? '').not.toMatch(
+      /idModeloArte/,
+    );
   });
 
   it('🔴 quien trae la receta por `include` TIENE que injertarla, no sólo importar el resolver', () => {
