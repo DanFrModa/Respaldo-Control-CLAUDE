@@ -18878,3 +18878,20 @@ del arte necesita.
 4. **Quitar un arte o una foto del modelo** hace que todas las órdenes que la heredan dejen de mostrar esa foto (también
    las cerradas, y su impreso si se vuelve a sacar; lo ya capturado en la receta de la orden —descripción, precio, proveedor— se conserva). Era así con «Administrar
    modelos»; ahora también lo puede hacer Diseño Gráfico. *Default: así.*
+
+#### (Post-F9.284) — EL PDF QUE QUEDÓ FUERA DE UNA TANDA ENTRA AL MISMO PEDIDO (fila 0.147, v0.217)
+
+Construido el **CAMINO A** recomendado en la fila: el importador de PDF puede **añadir a un pedido existente** del
+mismo cliente, y cuando deja PDF fuera ofrece terminar la tanda en el pedido que acaba de crear. De las tres preguntas
+de §Post-F9.242, las dos primeras deciden si los márgenes y la conciliación de facturas agrupan bien, no esto; la
+tercera —*¿tu caso del 7-sep era la tanda que quedó a medias porque un PDF no se reconoció?*— **confirma** que lo
+construido es su caso. Se construyó sin esperarla (REGLA 0) y **esa confirmación sigue pendiente**.
+
+**Defaults del lead, sin pregunta nueva:** agregar a un pedido existente no pide llave propia (la captura manual ya
+lo permite); no se puede a un pedido cancelado, marcado «no producir» ni de otro cliente; la referencia general del
+pedido no se toca.
+
+🔒 **Decisión técnica que sale de aquí:** el pedido ahora se **bloquea** al cancelarlo, al generar sus órdenes y al
+agregarle una tanda, en un orden fijo (cliente → pedido → modelo / nº de producción → secuencia → orden). Sin eso, una
+cancelación podía dejar órdenes vivas bajo un pedido cancelado — la carrera ya existía con «Generar OP» y se cerró de
+paso.

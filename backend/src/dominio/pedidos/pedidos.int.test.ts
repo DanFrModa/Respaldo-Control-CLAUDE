@@ -714,6 +714,180 @@ describe('⭐ cancelar un pedido dice la verdad sobre sus OPs (V1-E4)', () => {
 });
 
 /**
+ * ⭐ Fila 0.147 (b) — quitar un renglón dice la causa REAL. A ese borrado lo frenan dos llaves
+ * `Restrict` (la OP y el renglón del pedido real); antes un `catch` genérico decía «seguimiento de
+ * pedidos reales» para las dos, y quien quitaba un renglón con OP se iba a buscar un pedido real que
+ * no existía.
+ */
+describe('⭐ quitar un renglón nombra lo que lo frena (fila 0.147)', () => {
+  const PERM_OP: ClavePermiso[] = [...PERM_TODOS, 'ordenes.ver', 'ordenes.administrar'];
+
+  /** Pedido con DOS renglones; al primero se le genera su OP. */
+  async function pedidoConOpEnElPrimero(): Promise<{
+    idPedido: number;
+    idLineaConOp: number;
+    idLineaLibre: number;
+    folioOrden: number;
+    idOrden: number;
+  }> {
+    const s = sesion([...PERM_OP]);
+    const pedido = await crearPedido(
+      s,
+      {
+        idCliente: clienteNegocio.id,
+        lineas: [
+          { idModelo: modeloA.id, cantidadPedida: 10, precio: 1 },
+          { idModelo: modeloB.id, cantidadPedida: 5, precio: 1 },
+        ],
+      },
+      bd(),
+      archivos,
+    );
+    const color = await cliente.color.create({ data: { nombre: 'Color 0147' } });
+    const talla = await cliente.talla.create({ data: { etiqueta: 'T0147', orden: 1 } });
+    const salida = await salidaAProduccion(
+      s,
+      pedido.lineas[0]!.id,
+      { lineas: [{ idColor: color.id, tallas: [{ idTalla: talla.id, cantidad: 10 }] }] },
+      bd(),
+    );
+    return {
+      idPedido: pedido.id,
+      idLineaConOp: pedido.lineas[0]!.id,
+      idLineaLibre: pedido.lineas[1]!.id,
+      folioOrden: salida.orden.folio,
+      idOrden: salida.orden.id,
+    };
+  }
+
+  /** Edita el pedido dejando SÓLO el renglón `idLineaQueQueda` (o sea, quita el otro). */
+  async function quedarseCon(idPedido: number, idLineaQueQueda: number, idModelo: number) {
+    return actualizarPedido(
+      sesion([...PERM_OP]),
+      { id: idPedido, lineas: [{ id: idLineaQueQueda, idModelo, cantidadPedida: 5, precio: 1 }] },
+      bd(),
+      archivos,
+    );
+  }
+
+  it('un renglón con OP: el mensaje dice que tiene la ORDEN DE PRODUCCIÓN, con su folio', async () => {
+    const p = await pedidoConOpEnElPrimero();
+
+    const error = await quedarseCon(p.idPedido, p.idLineaLibre, modeloB.id).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toContain(
+      `ya tiene la orden de producción ${String(p.folioOrden)}. Cancela la OP o ajusta su cantidad en lugar de quitar el renglón.`,
+    );
+    expect(mensaje).not.toContain('pedidos reales');
+    // Nada se borró.
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: p.idPedido } })).toBe(2);
+  });
+
+  it('una OP CANCELADA también lo frena, y el mensaje explica por qué (sigue colgada)', async () => {
+    const p = await pedidoConOpEnElPrimero();
+    await cliente.orden.update({
+      where: { id: p.idOrden },
+      data: { estado: 'cancelada', motivoCancelada: 'prueba' },
+    });
+
+    await expect(quedarseCon(p.idPedido, p.idLineaLibre, modeloB.id)).rejects.toThrow(
+      `ya tiene la orden de producción ${String(p.folioOrden)} (está cancelada, pero sigue colgada del renglón y conserva su historia).`,
+    );
+  });
+
+  /** Le genera al renglón con OP una SEGUNDA orden (N órdenes por renglón) y la devuelve. */
+  async function segundaOp(p: { idLineaConOp: number }): Promise<{ id: number; folio: number }> {
+    const color = await cliente.color.create({ data: { nombre: 'Color 0147 bis' } });
+    const talla = await cliente.talla.findFirstOrThrow({ where: { etiqueta: 'T0147' } });
+    const salida = await salidaAProduccion(
+      sesion([...PERM_OP]),
+      p.idLineaConOp,
+      { lineas: [{ idColor: color.id, tallas: [{ idTalla: talla.id, cantidad: 5 }] }] },
+      bd(),
+    );
+    return { id: salida.orden.id, folio: salida.orden.folio };
+  }
+
+  it('VARIAS OP canceladas: el mensaje va en plural', async () => {
+    const p = await pedidoConOpEnElPrimero();
+    const otra = await segundaOp(p);
+    await cliente.orden.updateMany({
+      where: { id: { in: [p.idOrden, otra.id] } },
+      data: { estado: 'cancelada', motivoCancelada: 'prueba' },
+    });
+
+    await expect(quedarseCon(p.idPedido, p.idLineaLibre, modeloB.id)).rejects.toThrow(
+      `ya tiene las órdenes de producción ${String(p.folioOrden)}, ${String(otra.folio)} (están canceladas, pero siguen colgadas del renglón y conservan su historia).`,
+    );
+  });
+
+  it('una VIVA y una cancelada en el mismo renglón: dice qué hacer, sin la nota de «cancelada»', async () => {
+    const p = await pedidoConOpEnElPrimero();
+    const otra = await segundaOp(p);
+    await cliente.orden.update({
+      where: { id: otra.id },
+      data: { estado: 'cancelada', motivoCancelada: 'prueba' },
+    });
+
+    const error = await quedarseCon(p.idPedido, p.idLineaLibre, modeloB.id).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toContain(
+      `ya tiene las órdenes de producción ${String(p.folioOrden)}, ${String(otra.folio)}. Cancela las OP vivas o ajusta sus cantidades en lugar de quitar el renglón.`,
+    );
+    expect(mensaje).not.toContain('cancelada');
+  });
+
+  it('un renglón con PEDIDO REAL (y sin OP) conserva el mensaje de los pedidos reales', async () => {
+    const p = await pedidoConOpEnElPrimero();
+    // El pedido real replica un renglón por renglón: el LIBRE (sin OP) queda con seguimiento.
+    await crearPedidoReal(sesion([...PERM_OP]), p.idPedido, { cedis: 'CEDIS' }, bd());
+
+    // Se quita el renglón libre (el que NO tiene OP): lo frena SÓLO el pedido real.
+    await expect(quedarseCon(p.idPedido, p.idLineaConOp, modeloA.id)).rejects.toThrow(
+      'No se puede quitar un renglón que ya tiene seguimiento de pedidos reales. Cancela o ajusta el pedido real primero.',
+    );
+  });
+
+  it('un renglón sin nada colgado SÍ se quita (la guarda no se pasa de lista)', async () => {
+    const p = await pedidoConOpEnElPrimero();
+    const editado = await quedarseCon(p.idPedido, p.idLineaConOp, modeloA.id);
+    expect(editado.lineas.map((l) => l.id)).toEqual([p.idLineaConOp]);
+  });
+});
+
+describe('⭐ listar sólo los pedidos PRODUCIBLES (fila 0.147, selector de destino)', () => {
+  it('`soloProducibles` quita los «no producir» y los cancelados; sin él, todo igual', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const alta = (): ReturnType<typeof crearPedido> =>
+      crearPedido(s, { idCliente: clienteNegocio.id, lineas: [] }, bd(), archivos);
+    const vivo = await alta();
+    const noProducir = await alta();
+    const cancelado = await alta();
+    await cliente.pedido.update({ where: { id: noProducir.id }, data: { noProducir: true } });
+    await cliente.pedido.update({ where: { id: cancelado.id }, data: { pedCancelado: true } });
+
+    const ids = async (p: Parameters<typeof listarPedidos>[1]): Promise<number[]> =>
+      (await listarPedidos(s, p, bd(), archivos)).datos.map((x) => x.id).sort((a, b) => a - b);
+
+    expect(await ids({ soloProducibles: true })).toEqual([vivo.id]);
+    // Aunque pida los cancelados: «producible» manda.
+    expect(await ids({ soloProducibles: true, incluirCancelados: true })).toEqual([vivo.id]);
+    // Sin el filtro, la conducta de antes: el «no producir» sale; el cancelado sólo si se pide.
+    expect(await ids({})).toEqual([vivo.id, noProducir.id].sort((a, b) => a - b));
+    expect(await ids({ incluirCancelados: true })).toEqual(
+      [vivo.id, noProducir.id, cancelado.id].sort((a, b) => a - b),
+    );
+  });
+});
+
+/**
  * ⭐ V1-E4 punto 6 — CANCELAR EL PEDIDO REAL. Lo decidió Daniel en §Post-F9.37 punto 9 (*"Sí."*),
  * cerrando el TODO que llevaba abierto desde F2-E1. Suave y con motivo (D3).
  */

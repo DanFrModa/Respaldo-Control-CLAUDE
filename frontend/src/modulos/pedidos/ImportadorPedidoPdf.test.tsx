@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AnalizarPdf, ClavePermiso } from '@/api/tipos';
+import type { AnalizarPdf, ClavePermiso, ConfirmarPdf } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ImportadorPedidoPdf } from './ImportadorPedidoPdf';
@@ -23,6 +23,11 @@ const confirmarMock = vi.fn();
  */
 const plantillaMock = vi.fn();
 const toastErrorMock = vi.fn();
+const toastSuccessMock = vi.fn();
+/** Fila 0.147 — la consulta de pedidos del selector de destino (query recibida + página devuelta). */
+const usePedidosMock = vi.fn();
+/** Fila 0.147 — el detalle del pedido de destino (para el aviso de «modelo ya en el pedido»). */
+const usePedidoMock = vi.fn((_id: number | null): unknown => ({ data: undefined }));
 
 /**
  * Configura la plantilla vigente POR CLIENTE (`{ idCliente: porcentaje }`). Que dependa del
@@ -61,7 +66,9 @@ vi.mock('sonner', () => ({
     error: (...a: unknown[]) => {
       toastErrorMock(...a);
     },
-    success: vi.fn(),
+    success: (...a: unknown[]) => {
+      toastSuccessMock(...a);
+    },
     warning: vi.fn(),
   },
 }));
@@ -85,6 +92,10 @@ vi.mock('@/api/modelos', () => ({
       isFetching: false,
     };
   },
+}));
+vi.mock('@/api/pedidos', () => ({
+  usePedidos: (query: unknown) => usePedidosMock(query) as unknown,
+  usePedido: (id: number | null) => usePedidoMock(id),
 }));
 vi.mock('@/api/importacion-pedido', () => ({
   archivoABase64: vi.fn(() => Promise.resolve('QkFTRTY0')),
@@ -1217,5 +1228,328 @@ describe('ImportadorPedidoPdf — abierto desde el constructor con el PDF ya ele
       };
       expect(cuerpo.archivos[1]?.numeroProduccion).toBe(71_055);
     });
+  });
+});
+
+// ── ⭐ Fila 0.147 — terminar la tanda en el mismo pedido + el toast con la causa real ──────────────
+
+/** Resultado de un confirm (pedido 15, una OP) con los PDF fuera que se le pasen. */
+function resultadoConfirm(
+  noReconocidos: ConfirmarPdf['noReconocidos'],
+  extra: Partial<ConfirmarPdf> = {},
+): ConfirmarPdf {
+  return {
+    idPedido: 77,
+    folioPedido: 15,
+    pedidoExistente: false,
+    ordenes: [],
+    noReconocidos,
+    ligasAprendidas: 0,
+    ...extra,
+  };
+}
+
+/** Un PDF fuera con la causa indicada. */
+function fuera(
+  nombreArchivo: string,
+  causa: ConfirmarPdf['noReconocidos'][number]['causa'],
+): ConfirmarPdf['noReconocidos'][number] {
+  return { nombreArchivo, modeloCliente: '3138277', causa, motivo: `motivo de ${nombreArchivo}` };
+}
+
+/**
+ * Lo que contesta el SERVIDOR al selector de destino. Ya viene filtrado (`soloProducibles`): la
+ * pantalla no vuelve a filtrar, así que la prueba vigila que se PIDA así.
+ */
+const PEDIDOS_DEL_CLIENTE = {
+  datos: [
+    {
+      id: 90,
+      folio: 12,
+      fechaPedido: '2026-10-01',
+      ocCliente: 'REMESA 46',
+      lineas: [{}, {}],
+      noProducir: false,
+      pedCancelado: false,
+    },
+    {
+      id: 92,
+      folio: 14,
+      fechaPedido: null,
+      ocCliente: null,
+      lineas: [{}],
+      noProducir: false,
+      pedCancelado: false,
+    },
+  ],
+};
+
+describe('ImportadorPedidoPdf — destino y PDF que quedaron fuera (fila 0.147)', () => {
+  beforeEach(() => {
+    analizarMock.mockReset();
+    confirmarMock.mockReset();
+    toastErrorMock.mockReset();
+    toastSuccessMock.mockReset();
+    usePedidosMock.mockReset();
+    usePedidosMock.mockReturnValue({ data: PEDIDOS_DEL_CLIENTE, isFetching: false });
+    usePedidoMock.mockReset();
+    usePedidoMock.mockReturnValue({ data: undefined });
+    plantillaMock.mockReset();
+    plantillaMock.mockReturnValue({ data: undefined, isFetching: false });
+  });
+
+  /** Como `irAVistaPrevia`, pero devuelve el `alImportado` para poder vigilarlo. */
+  async function abrirEnVistaPrevia(): Promise<ReturnType<typeof vi.fn>> {
+    const alImportado = vi.fn();
+    analizarMock.mockImplementation((_body, opciones: { onSuccess: (r: AnalizarPdf) => void }) => {
+      opciones.onSuccess(PREVIEW);
+    });
+    renderConProveedores(<ImportadorPedidoPdf alCerrar={vi.fn()} alImportado={alImportado} />, {
+      sesion: estadoSesionDePrueba([]),
+    });
+    fireEvent.change(screen.getByTestId('importador-pdf-cliente-input'), {
+      target: { value: 'C' },
+    });
+    fireEvent.mouseDown(
+      (await screen.findAllByTestId('importador-pdf-cliente-opcion'))[0] as HTMLElement,
+    );
+    fireEvent.change(screen.getByTestId('importador-pdf-referencia'), {
+      target: { value: 'REF-TANDA' },
+    });
+    cargarPdfs(['oc-620884.pdf']);
+    fireEvent.click(screen.getByTestId('importador-pdf-continuar-origen'));
+    await screen.findAllByTestId('importador-pdf-fila');
+    return alImportado;
+  }
+
+  function cargarPdfs(nombres: string[]): void {
+    fireEvent.change(screen.getByTestId('importador-pdf-archivos'), {
+      target: { files: nombres.map((n) => new File(['x'], n, { type: 'application/pdf' })) },
+    });
+  }
+
+  /** Cuerpo del confirm número `n` (0-based). */
+  function cuerpoConfirm(n = 0): Record<string, unknown> {
+    return confirmarMock.mock.calls[n]?.[0] as Record<string, unknown>;
+  }
+
+  /** Confirma con el resultado dado y devuelve el texto del toast de éxito. */
+  async function toastAlConfirmar(res: ConfirmarPdf): Promise<string> {
+    confirmarMock.mockImplementation((_b, op: { onSuccess: (r: ConfirmarPdf) => void }) => {
+      op.onSuccess(res);
+    });
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalled());
+    return String(toastSuccessMock.mock.calls.at(-1)?.[0]);
+  }
+
+  it('el toast NOMBRA la causa de cada PDF fuera (ya no dice «sin ligar» para todo)', async () => {
+    await abrirEnVistaPrevia();
+    const mensaje = await toastAlConfirmar(
+      resultadoConfirm([
+        fuera('a.pdf', 'ilegible'),
+        fuera('b.pdf', 'oc-ya-importada'),
+        fuera('c.pdf', 'sin-liga'),
+        fuera('d.pdf', 'sin-tallas'),
+        fuera('e.pdf', 'ilegible'),
+      ]),
+    );
+    expect(mensaje).toBe(
+      'Pedido 15-F importado · 0 OP(s) con su matriz + RC · 5 PDF quedaron fuera (1 sin liga a un modelo, 1 sin tallas con piezas, 2 ilegibles, 1 con su OC ya importada)',
+    );
+    expect(mensaje).not.toContain('sin ligar');
+  });
+
+  it('una tanda con sólo OC ya importadas NO manda a religar modelos', async () => {
+    await abrirEnVistaPrevia();
+    expect(await toastAlConfirmar(resultadoConfirm([fuera('x.pdf', 'oc-ya-importada')]))).toBe(
+      'Pedido 15-F importado · 0 OP(s) con su matriz + RC · 1 PDF quedó fuera (1 con su OC ya importada)',
+    );
+  });
+
+  it('al AGREGAR a un pedido existente, el toast lo dice así', async () => {
+    await abrirEnVistaPrevia();
+    expect(await toastAlConfirmar(resultadoConfirm([], { pedidoExistente: true }))).toBe(
+      'Se agregaron 0 OP(s) al pedido 15-F',
+    );
+  });
+
+  it('sin PDF fuera: se cierra como siempre, pedido NUEVO y con su referencia', async () => {
+    const alImportado = await abrirEnVistaPrevia();
+    confirmarMock.mockImplementation((_b, op: { onSuccess: (r: ConfirmarPdf) => void }) => {
+      op.onSuccess(resultadoConfirm([]));
+    });
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+    await waitFor(() => expect(alImportado).toHaveBeenCalled());
+    expect(cuerpoConfirm()).not.toHaveProperty('idPedidoDestino');
+    expect(cuerpoConfirm().referenciaGeneral).toBe('REF-TANDA');
+    expect(screen.queryByTestId('importador-pdf-resultado')).not.toBeInTheDocument();
+    // Por default es «pedido nuevo»: ni siquiera se consulta la lista de pedidos.
+    expect(usePedidosMock).not.toHaveBeenCalled();
+  });
+
+  it('con PDF fuera: NO se cierra, enseña cada uno con su causa y ofrece terminar la tanda en ESE pedido', async () => {
+    const alImportado = await abrirEnVistaPrevia();
+    confirmarMock.mockImplementation((_b, op: { onSuccess: (r: ConfirmarPdf) => void }) => {
+      op.onSuccess(resultadoConfirm([fuera('roto.pdf', 'ilegible'), fuera('b.pdf', 'sin-liga')]));
+    });
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+
+    const panel = await screen.findByTestId('importador-pdf-resultado');
+    expect(alImportado).not.toHaveBeenCalled();
+    expect(panel).toHaveTextContent('2 PDF quedaron fuera');
+    const filas = within(panel).getAllByTestId('importador-pdf-fuera');
+    expect(filas).toHaveLength(2);
+    expect(filas[0]).toHaveTextContent('roto.pdf');
+    expect(filas[0]).toHaveTextContent('ilegible');
+    expect(filas[1]).toHaveTextContent('sin liga a un modelo');
+
+    // «Importar los corregidos» vuelve al paso 1 con ESE pedido ya puesto como destino.
+    fireEvent.click(screen.getByTestId('importador-pdf-completar-tanda'));
+    expect(await screen.findByTestId('importador-pdf-aviso-destino')).toHaveTextContent(
+      'Pedido 15-F (el de esta tanda)',
+    );
+    // La referencia no viaja con destino: el campo se apaga.
+    expect(screen.getByTestId('importador-pdf-referencia')).toBeDisabled();
+
+    cargarPdfs(['oc-corregida.pdf']);
+    fireEvent.click(screen.getByTestId('importador-pdf-continuar-origen'));
+    await screen.findAllByTestId('importador-pdf-fila');
+    expect(screen.getByTestId('importador-pdf-destino-existente')).toBeChecked();
+
+    confirmarMock.mockReset();
+    confirmarMock.mockImplementation(() => {});
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+    expect(cuerpoConfirm().idPedidoDestino).toBe(77);
+    expect(cuerpoConfirm()).not.toHaveProperty('referenciaGeneral');
+  });
+
+  it('«Terminar» en el resultado cierra refrescando (ya hay pedido), no como un cancelar', async () => {
+    const alImportado = await abrirEnVistaPrevia();
+    confirmarMock.mockImplementation((_b, op: { onSuccess: (r: ConfirmarPdf) => void }) => {
+      op.onSuccess(resultadoConfirm([fuera('roto.pdf', 'ilegible')]));
+    });
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    fireEvent.click(await screen.findByTestId('importador-pdf-terminar'));
+    expect(alImportado).toHaveBeenCalled();
+  });
+
+  it('el selector ofrece los pedidos DEL CLIENTE que se pueden usar, y manda el elegido', async () => {
+    await abrirEnVistaPrevia();
+    fireEvent.click(screen.getByTestId('importador-pdf-destino-existente'));
+
+    // Busca entre los pedidos del cliente elegido (C&A = 1), del más nuevo al más viejo.
+    // Y los cancelados y «no producir» los quita el SERVIDOR (no una página de 20 filtrada aquí).
+    expect(usePedidosMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        idCliente: 1,
+        ordenarPor: 'folio',
+        direccion: 'desc',
+        soloProducibles: 'true',
+      }),
+    );
+    // Elegido «agregar» y sin pedido todavía: confirmar está apagado y dice por qué.
+    expect(screen.getByTestId('importador-pdf-confirmar')).toBeDisabled();
+    expect(screen.getByTestId('importador-pdf-motivo-bloqueo')).toHaveTextContent(
+      'Elige el pedido al que se agregan las OPs',
+    );
+
+    fireEvent.focus(screen.getByTestId('importador-pdf-pedido-destino-input'));
+    const opciones = await screen.findAllByTestId('importador-pdf-pedido-destino-opcion');
+    expect(opciones).toHaveLength(2);
+    expect(opciones[0]).toHaveTextContent('Pedido 12-F · 2 renglones · 2026-10-01 · REMESA 46');
+    expect(opciones[1]).toHaveTextContent('Pedido 14-F · 1 renglón');
+    fireEvent.mouseDown(opciones[0] as HTMLElement);
+
+    confirmarMock.mockImplementation(() => {});
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+    expect(cuerpoConfirm().idPedidoDestino).toBe(90);
+    expect(cuerpoConfirm()).not.toHaveProperty('referenciaGeneral');
+  });
+
+  it('volver a «pedido nuevo» suelta el destino: el confirm ya no lo manda', async () => {
+    await abrirEnVistaPrevia();
+    fireEvent.click(screen.getByTestId('importador-pdf-destino-existente'));
+    fireEvent.focus(screen.getByTestId('importador-pdf-pedido-destino-input'));
+    fireEvent.mouseDown(
+      (await screen.findAllByTestId('importador-pdf-pedido-destino-opcion'))[0] as HTMLElement,
+    );
+    fireEvent.click(screen.getByTestId('importador-pdf-destino-nuevo'));
+
+    confirmarMock.mockImplementation(() => {});
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+    expect(cuerpoConfirm()).not.toHaveProperty('idPedidoDestino');
+    expect(cuerpoConfirm().referenciaGeneral).toBe('REF-TANDA');
+  });
+
+  it('con destino, avisa por cada PDF cuyo modelo YA tiene renglón en ese pedido (§Post-F9.241)', async () => {
+    // El pedido 90 ya tiene un renglón del modelo 42, que es la liga aprendida del PDF.
+    usePedidoMock.mockImplementation((id: number | null) => ({
+      data: id === 90 ? { id: 90, folio: 12, lineas: [{ idModelo: 42 }] } : undefined,
+    }));
+    await abrirEnVistaPrevia();
+    // Sin destino no hay nada que avisar.
+    expect(screen.queryByTestId('importador-pdf-modelo-en-destino')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('importador-pdf-destino-existente'));
+    fireEvent.focus(screen.getByTestId('importador-pdf-pedido-destino-input'));
+    fireEvent.mouseDown(
+      (await screen.findAllByTestId('importador-pdf-pedido-destino-opcion'))[0] as HTMLElement,
+    );
+
+    expect(await screen.findByTestId('importador-pdf-modelo-en-destino')).toHaveTextContent(
+      'Este modelo ya tiene renglón en el pedido 12-F: esta OC entra como un renglón aparte',
+    );
+    expect(usePedidoMock).toHaveBeenLastCalledWith(90);
+  });
+
+  it('⚠️ la gemela: si el pedido de destino NO tiene ese modelo, no aparece el aviso', async () => {
+    usePedidoMock.mockImplementation((id: number | null) => ({
+      data: id === 90 ? { id: 90, folio: 12, lineas: [{ idModelo: 7 }] } : undefined,
+    }));
+    await abrirEnVistaPrevia();
+    fireEvent.click(screen.getByTestId('importador-pdf-destino-existente'));
+    fireEvent.focus(screen.getByTestId('importador-pdf-pedido-destino-input'));
+    fireEvent.mouseDown(
+      (await screen.findAllByTestId('importador-pdf-pedido-destino-opcion'))[0] as HTMLElement,
+    );
+    await waitFor(() => expect(usePedidoMock).toHaveBeenLastCalledWith(90));
+    expect(screen.queryByTestId('importador-pdf-modelo-en-destino')).not.toBeInTheDocument();
+  });
+
+  it('al terminar la tanda, CAMBIAR DE CLIENTE suelta el destino: vuelve a «pedido nuevo»', async () => {
+    await abrirEnVistaPrevia();
+    confirmarMock.mockImplementation((_b, op: { onSuccess: (r: ConfirmarPdf) => void }) => {
+      op.onSuccess(resultadoConfirm([fuera('roto.pdf', 'ilegible')]));
+    });
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    fireEvent.click(await screen.findByTestId('importador-pdf-completar-tanda'));
+    expect(await screen.findByTestId('importador-pdf-aviso-destino')).toBeInTheDocument();
+
+    // El pedido 77 es de C&A: elegir OTRO cliente no puede arrastrarlo.
+    fireEvent.change(screen.getByTestId('importador-pdf-cliente-input'), {
+      target: { value: 'Zap' },
+    });
+    fireEvent.mouseDown(
+      (await screen.findAllByTestId('importador-pdf-cliente-opcion'))[0] as HTMLElement,
+    );
+    expect(screen.queryByTestId('importador-pdf-aviso-destino')).not.toBeInTheDocument();
+    expect(screen.getByTestId('importador-pdf-referencia')).not.toBeDisabled();
+
+    cargarPdfs(['oc-otra.pdf']);
+    fireEvent.click(screen.getByTestId('importador-pdf-continuar-origen'));
+    await screen.findAllByTestId('importador-pdf-fila');
+    expect(screen.getByTestId('importador-pdf-destino-nuevo')).toBeChecked();
+
+    confirmarMock.mockReset();
+    confirmarMock.mockImplementation(() => {});
+    fireEvent.click(screen.getByTestId('importador-pdf-confirmar'));
+    await waitFor(() => expect(confirmarMock).toHaveBeenCalled());
+    expect(cuerpoConfirm().idCliente).toBe(2);
+    expect(cuerpoConfirm()).not.toHaveProperty('idPedidoDestino');
   });
 });

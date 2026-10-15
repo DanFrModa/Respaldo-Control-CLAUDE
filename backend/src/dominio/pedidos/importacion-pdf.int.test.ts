@@ -21,7 +21,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import pg from 'pg';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { ServicioArchivos } from '../../comun/archivos.js';
@@ -31,8 +32,12 @@ import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearColor, fusionarColores } from '../catalogos/colores.js';
-import { obtenerOrden } from '../produccion/ordenes.js';
+import { NAMESPACE_LOCK_MODELO_POR_COLOR } from '../modelos/nomenclatura.js';
+import { crearOrden, obtenerOrden } from '../produccion/ordenes.js';
+import { salidaAProduccion } from '../produccion/salida-produccion.js';
 import { analizarImportacionPdf, confirmarImportacionPdf } from './importacion-pdf.js';
+import { bloquearPedido } from './bloqueo-pedido.js';
+import { cancelarPedido } from './pedidos.js';
 
 const PDF_BASE64 = readFileSync(
   fileURLToPath(new URL('./__fixtures__/cya-620884.pdf', import.meta.url)),
@@ -94,13 +99,16 @@ const sesionColores = (): SesionUsuario =>
 let secuenciaKeyFake = 0;
 
 /** Servicio de archivos FALSO: `subirContenido` devuelve metadatos (key única), sin tocar R2. */
-function archivosFalsos(): ServicioArchivos {
+function archivosFalsos(alSubir?: () => Promise<unknown>): ServicioArchivos {
   return {
     solicitarSubida() {
       throw new Error('Este flujo usa subirContenido (server-side), no solicitarSubida.');
     },
-    subirContenido(solicitud) {
+    async subirContenido(solicitud) {
       secuenciaKeyFake += 1;
+      // Fila 0.147: lo que corre AQUÍ corre entre la revisión previa del destino y la transacción
+      // (la subida a R2 va justo en medio) — el hueco por donde otro usuario cambia el pedido.
+      if (alSubir !== undefined) await alSubir();
       return Promise.resolve({
         bucket: 'control-v2-prueba',
         key: `ordenes/fake/${secuenciaKeyFake}/${solicitud.nombreOriginal}`,
@@ -173,6 +181,73 @@ beforeEach(async () => {
   });
   idGenero = genero.id;
 });
+
+// ── Concurrencia (fila 0.147): otra conexión que sostiene un candado ─────────────
+
+/**
+ * Las conexiones que una prueba de concurrencia dejó con la transacción ABIERTA. Si una prueba
+ * falla antes de soltarlas (que es justo lo que pasa cuando se le quita el candado al dominio), el
+ * `afterEach` las confirma: si no, la operación que las esperaba se queda colgada y arrastra en
+ * cascada a todas las pruebas siguientes (la limpieza de la base también esperaría).
+ */
+const conexionesSostenidas = new Set<pg.Client>();
+
+afterEach(async () => {
+  for (const otra of conexionesSostenidas) {
+    conexionesSostenidas.delete(otra);
+    await otra.query('COMMIT').catch(() => undefined);
+    await otra.end().catch(() => undefined);
+  }
+  // Las operaciones que esperaban ese candado terminan ahora; se les da un respiro para soltar
+  // las suyas antes de que el siguiente `beforeEach` limpie la base.
+  for (let i = 0; i < 200 && (await esperasDeCandado()) > 0; i += 1) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+});
+
+/** Cuántas esperas de candado hay en la base ahora mismo. */
+async function esperasDeCandado(): Promise<number> {
+  const filas = await cliente.$queryRaw<{ n: bigint }[]>`
+    SELECT count(*) AS n FROM pg_locks WHERE NOT granted
+  `;
+  return Number(filas[0]?.n ?? 0);
+}
+
+/**
+ * Espera a que haya al menos `n` esperas de candado, o a que `promesa` termine (lo que pase
+ * primero). Devuelve true si se llegó a las `n` esperas. NO lanza: que la segunda operación NO
+ * espere es justo lo que una mutación sin candado produce, y la prueba lo tiene que poder decir.
+ */
+async function llegarAEsperas(n: number, promesa: Promise<unknown>): Promise<boolean> {
+  let termino = false;
+  void promesa.finally(() => {
+    termino = true;
+  });
+  for (let intento = 0; intento < 200; intento += 1) {
+    if ((await esperasDeCandado()) >= n) return true;
+    if (termino) return false;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error(`nunca hubo ${String(n)} esperas de candado`);
+}
+
+/** Otra conexión con una transacción ABIERTA en la que corre `tomar`; devuelve cómo confirmarla. */
+async function sostener(
+  tomar: (c: pg.Client) => Promise<unknown>,
+): Promise<{ confirmar: () => Promise<void> }> {
+  const otra = new pg.Client({ connectionString: inject('urlBaseDatosPruebas') });
+  await otra.connect();
+  conexionesSostenidas.add(otra);
+  await otra.query('BEGIN');
+  await tomar(otra);
+  return {
+    confirmar: async () => {
+      conexionesSostenidas.delete(otra);
+      await otra.query('COMMIT');
+      await otra.end();
+    },
+  };
+}
 
 describe('confirmar importación por PDF (1 PDF)', () => {
   it('crea el pedido + la OP con matriz/adjunto/referencias/departamento + aprende la liga', async () => {
@@ -1376,6 +1451,563 @@ describe('⭐ el linaje del modelo viaja en la orden (fila 0.151)', () => {
     expect(orden.codigoModelo).toBe('51783');
     expect(orden.idModeloDesarrollo).toBeNull();
     expect(orden.codigoModeloDesarrollo).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ Fila 0.147 (§Post-F9.242) — TERMINAR UNA TANDA QUE EL IMPORTADOR DEJÓ A MEDIAS.
+ *
+ * El confirm OMITE los PDF que no reconoce (los devuelve en `noReconocidos`) y crea el pedido con el
+ * resto. Antes, al corregir el PDF y reimportarlo, no había destino: nacía un pedido NUEVO y la
+ * tanda quedaba partida en dos. Con `idPedidoDestino`, el reimporte se cuelga del MISMO pedido.
+ *
+ * El escenario es el real: una tanda de dos papeles donde uno no se puede leer (queda fuera), y
+ * luego el segundo papel —ya bueno— se añade al pedido que nació de la primera.
+ */
+describe('⭐ agregar una tanda a un pedido EXISTENTE (fila 0.147)', () => {
+  /** Un PDF que no es PDF: el confirm lo omite como `ilegible`. */
+  function archivoIlegible(): { nombreArchivo: string; archivoBase64: string } {
+    return {
+      nombreArchivo: 'OC-roto.pdf',
+      archivoBase64: Buffer.from('esto no es un pdf', 'utf8').toString('base64'),
+    };
+  }
+
+  /** Primera tanda: OC 620884 + un PDF roto. Nace el pedido con UNA OP y el roto queda fuera. */
+  async function primeraTanda(
+    idModelo: number,
+  ): Promise<Awaited<ReturnType<typeof confirmarImportacionPdf>>> {
+    return confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        referenciaGeneral: 'REMESA-SEMANA-46',
+        archivos: [archivoPdf(1), archivoIlegible()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+  }
+
+  /** Reimporte de la OC 620885 al pedido `idPedidoDestino`. */
+  async function agregar(
+    idModelo: number,
+    idPedidoDestino: number,
+    sesionUsada: SesionUsuario = sesion(),
+    idCliente: number = idClienteNegocio,
+  ): Promise<Awaited<ReturnType<typeof confirmarImportacionPdf>>> {
+    return confirmarImportacionPdf(
+      sesionUsada,
+      {
+        idCliente,
+        // Viene una referencia distinta A PROPÓSITO: el pedido existente debe conservar la suya.
+        referenciaGeneral: 'OTRA-REFERENCIA',
+        idPedidoDestino,
+        archivos: [archivoPdf2()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+  }
+
+  it('la tanda partida se TERMINA en el mismo pedido: renglón y OP nuevos, los viejos intactos', async () => {
+    const idModelo = await crearModelo('DEV-CYA-TANDA');
+    const primera = await primeraTanda(idModelo);
+    expect(primera.pedidoExistente).toBe(false);
+    expect(primera.ordenes).toHaveLength(1);
+    expect(primera.noReconocidos.map((n) => n.causa)).toEqual(['ilegible']);
+
+    const lineaVieja = await cliente.pedidoLinea.findFirstOrThrow({
+      where: { idPedido: primera.idPedido },
+    });
+    const opVieja = await cliente.orden.findUniqueOrThrow({
+      where: { id: primera.ordenes[0]!.idOrden },
+    });
+    const pedidoAntes = await cliente.pedido.findUniqueOrThrow({
+      where: { id: primera.idPedido },
+    });
+
+    const segunda = await agregar(idModelo, primera.idPedido);
+
+    // El MISMO pedido (mismo id y folio), y lo dice.
+    expect(segunda.pedidoExistente).toBe(true);
+    expect(segunda.idPedido).toBe(primera.idPedido);
+    expect(segunda.folioPedido).toBe(primera.folioPedido);
+    expect(await cliente.pedido.count()).toBe(1);
+
+    // Dos renglones, dos OPs, cada una con la OC DE SU PROPIO PDF.
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: primera.idPedido } })).toBe(2);
+    const ops = await cliente.orden.findMany({
+      where: { pedidoLinea: { idPedido: primera.idPedido } },
+      select: { id: true, ocCliente: true, folio: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(ops.map((o) => o.ocCliente)).toEqual(['620884', '620885']);
+    // Folios de OP distintos y consecutivos por la secuencia (A3), no repetidos.
+    expect(new Set(ops.map((o) => o.folio)).size).toBe(2);
+
+    // Lo viejo NO se tocó (D3): ni el renglón, ni la OP, ni la referencia general del pedido.
+    const lineaDespues = await cliente.pedidoLinea.findUniqueOrThrow({
+      where: { id: lineaVieja.id },
+    });
+    expect(lineaDespues).toEqual(lineaVieja);
+    const opDespues = await cliente.orden.findUniqueOrThrow({ where: { id: opVieja.id } });
+    expect(opDespues).toEqual(opVieja);
+    const pedidoDespues = await cliente.pedido.findUniqueOrThrow({
+      where: { id: primera.idPedido },
+    });
+    expect(pedidoDespues.ocCliente).toBe('REMESA-SEMANA-46');
+    expect(pedidoDespues.folio).toBe(pedidoAntes.folio);
+
+    // La bitácora dice que se MODIFICÓ un pedido existente, no que nació otro.
+    const bitacora = await cliente.bitacora.findMany({
+      where: { entidad: 'Pedido', idEntidad: String(primera.idPedido) },
+      select: { accion: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(bitacora.map((b) => b.accion)).toEqual(['CREAR', 'MODIFICAR']);
+  });
+
+  it('un pedido con OPs YA hechas admite la tanda (la vía manual ya lo permitía)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-CON-OP');
+    const primera = await primeraTanda(idModelo);
+    // La OP de la primera tanda existe y está viva: es exactamente el caso «aunque ya estén hechas
+    // algunas OP» de Daniel (§Post-F9.207).
+    expect(await cliente.orden.count({ where: { estado: { not: 'cancelada' } } })).toBe(1);
+
+    const segunda = await agregar(idModelo, primera.idPedido);
+    expect(segunda.ordenes).toHaveLength(1);
+    expect(await cliente.orden.count({ where: { estado: { not: 'cancelada' } } })).toBe(2);
+  });
+
+  it('el aviso de OC DUPLICADA sigue funcionando con destino: la misma OC no entra dos veces', async () => {
+    const idModelo = await crearModelo('DEV-CYA-DUP-DESTINO');
+    const primera = await primeraTanda(idModelo);
+
+    // Reimportar al MISMO pedido el papel que ya parió su OP: no crea nada y explica por qué.
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          idPedidoDestino: primera.idPedido,
+          archivos: [archivoPdf(1)],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(),
+      ),
+    ).rejects.toThrow(/ya se importaron/);
+    expect(await cliente.pedidoLinea.count()).toBe(1);
+
+    // Y mezclado con uno bueno: entra el bueno; el repetido queda fuera con SU causa.
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        idPedidoDestino: primera.idPedido,
+        archivos: [archivoPdf(1), archivoPdf2()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    expect(res.ordenes.map((o) => o.numeroOrden)).toEqual(['620885']);
+    expect(res.noReconocidos.map((n) => n.causa)).toEqual(['oc-ya-importada']);
+  });
+
+  it('un destino de OTRA EMPRESA no existe para esta sesión: ni se nombra, ni se sube nada', async () => {
+    const idModelo = await crearModelo('DEV-CYA-OTRA-EMP');
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa');
+    const sesionOtra = sesionDePrueba({
+      idEmpresaActiva: otraEmpresa.id,
+      permisos: [...PERMISOS],
+    });
+    // El pedido nace en la OTRA empresa y además de OTRO cliente: si la búsqueda no filtrara por
+    // empresa, la respuesta sería «es de otro cliente» —que delata que el pedido existe— en vez de
+    // «no se encontró».
+    const otroCliente = await cliente.cliente.create({
+      data: { nombre: 'Cliente de otra empresa' },
+    });
+    const ajeno = await confirmarImportacionPdf(
+      sesionOtra,
+      {
+        idCliente: otroCliente.id,
+        archivos: [archivoPdf(1)],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    const subidasAntes = secuenciaKeyFake;
+
+    await expect(agregar(idModelo, ajeno.idPedido)).rejects.toThrow(
+      `No se encontró Pedido con id ${String(ajeno.idPedido)}.`,
+    );
+    // Y ni un PDF subido a R2: lo paró la revisión previa.
+    expect(secuenciaKeyFake).toBe(subidasAntes);
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: ajeno.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+
+  it('`bloquearPedido` no ve un pedido de OTRA empresa (devuelve null) y sí el propio', async () => {
+    const idModelo = await crearModelo('DEV-CYA-BLOQUEO-EMP');
+    const propio = await primeraTanda(idModelo);
+    const otraEmpresa = await crearEmpresaPrueba(cliente, 'Otra Empresa B');
+    const ajeno = await cliente.pedido.create({
+      data: { folio: 1n, idEmpresa: otraEmpresa.id, idCliente: idClienteNegocio },
+    });
+
+    const [visto, noVisto] = await cliente.$transaction(async (tx) => [
+      await bloquearPedido(tx, propio.idPedido, idEmpresa),
+      await bloquearPedido(tx, ajeno.id, idEmpresa),
+    ]);
+    expect(visto).toEqual({
+      id: propio.idPedido,
+      folio: BigInt(propio.folioPedido),
+      idCliente: idClienteNegocio,
+    });
+    expect(noVisto).toBeNull();
+  });
+
+  it('si el pedido CAMBIA de cliente entre la revisión previa y la transacción, se rechaza dentro', async () => {
+    const idModelo = await crearModelo('DEV-CYA-CAMBIA-CLI');
+    const primera = await primeraTanda(idModelo);
+    const otroCliente = await cliente.cliente.create({ data: { nombre: 'Cliente nuevo' } });
+
+    // Mientras se suben los PDF (ya pasada la revisión previa), alguien le cambia el cliente al
+    // pedido —`actualizarPedido` lo permite—. La revisión BAJO EL CANDADO tiene que verlo.
+    await expect(
+      confirmarImportacionPdf(
+        sesion(),
+        {
+          idCliente: idClienteNegocio,
+          idPedidoDestino: primera.idPedido,
+          archivos: [archivoPdf2()],
+          ligas: [{ modeloCliente: '3138277', idModelo }],
+        },
+        bd(),
+        archivosFalsos(() =>
+          cliente.pedido.update({
+            where: { id: primera.idPedido },
+            data: { idCliente: otroCliente.id },
+          }),
+        ),
+      ),
+    ).rejects.toThrow(/es de otro cliente/);
+    // No nació nada.
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: primera.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+
+  it('un destino de OTRO CLIENTE se rechaza: la tanda sólo va a un pedido de su cliente', async () => {
+    const idModelo = await crearModelo('DEV-CYA-OTRO-CLI');
+    const otroCliente = await cliente.cliente.create({ data: { nombre: 'Otro cliente' } });
+    const ajeno = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: otroCliente.id,
+        archivos: [archivoPdf(1)],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    await expect(agregar(idModelo, ajeno.idPedido)).rejects.toThrow(/es de otro cliente/);
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: ajeno.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+
+  it('un destino CANCELADO se rechaza (la regla de `resolverOrigenPedido`, sin duplicarla)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-CANCELADO');
+    const primera = await primeraTanda(idModelo);
+    await cliente.pedido.update({ where: { id: primera.idPedido }, data: { pedCancelado: true } });
+
+    await expect(agregar(idModelo, primera.idPedido)).rejects.toThrow(/está cancelado/);
+    // A2: ni renglón, ni OP, ni nada a medias.
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: primera.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+
+  it('un destino marcado «NO PRODUCIR» se rechaza igual', async () => {
+    const idModelo = await crearModelo('DEV-CYA-NO-PRODUCIR');
+    const primera = await primeraTanda(idModelo);
+    await cliente.pedido.update({ where: { id: primera.idPedido }, data: { noProducir: true } });
+
+    await expect(agregar(idModelo, primera.idPedido)).rejects.toThrow(/no producir/);
+    expect(await cliente.pedidoLinea.count({ where: { idPedido: primera.idPedido } })).toBe(1);
+    expect(await cliente.orden.count()).toBe(1);
+  });
+
+  it('un destino ya inválido se rechaza ANTES de subir los PDF a R2 (no deja huérfanos)', async () => {
+    const idModelo = await crearModelo('DEV-CYA-PRE-R2');
+    const primera = await primeraTanda(idModelo);
+    await cliente.pedido.update({ where: { id: primera.idPedido }, data: { pedCancelado: true } });
+    const subidasAntes = secuenciaKeyFake;
+
+    await expect(agregar(idModelo, primera.idPedido)).rejects.toThrow(/está cancelado/);
+    // Ni una subida: la revisión previa paró la tanda antes de tocar R2.
+    expect(secuenciaKeyFake).toBe(subidasAntes);
+
+    // Lo mismo con un destino de otro cliente.
+    const otroCliente = await cliente.cliente.create({ data: { nombre: 'Otro cliente R2' } });
+    await expect(agregar(idModelo, primera.idPedido, sesion(), otroCliente.id)).rejects.toThrow(
+      /es de otro cliente/,
+    );
+    expect(secuenciaKeyFake).toBe(subidasAntes);
+  });
+
+  it('SIN destino, todo igual que antes: cada confirm hace nacer SU pedido', async () => {
+    const idModelo = await crearModelo('DEV-CYA-SIN-DESTINO');
+    const primera = await primeraTanda(idModelo);
+    const segunda = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf2()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    expect(segunda.pedidoExistente).toBe(false);
+    expect(segunda.idPedido).not.toBe(primera.idPedido);
+    expect(segunda.folioPedido).toBe(primera.folioPedido + 1);
+    expect(await cliente.pedido.count()).toBe(2);
+  });
+});
+
+/**
+ * ⭐⭐ Fila 0.147 — CONCURRENCIA: añadir OPs a un pedido mientras alguien lo cancela.
+ *
+ * Las puertas que hacen nacer una OP (el importador con destino, «Generar OP») y `cancelarPedido`
+ * toman el MISMO candado de la fila del pedido (`bloqueo-pedido.ts`). Para ver la carrera de verdad,
+ * OTRA conexión (un `pg.Client` fuera del pool de Prisma) sostiene un candado que una de las dos
+ * necesita DESPUÉS de haber tomado el del pedido: así esa queda a medio camino, con el pedido
+ * bloqueado, y la otra tiene que esperarla. La prueba sondea `pg_locks WHERE NOT granted` para saber
+ * que de verdad está esperando, y entonces suelta.
+ *
+ * Lo que se protege: que NUNCA quede una OP viva debajo de un pedido cancelado.
+ */
+describe('⭐ concurrencia: agregar OPs a un pedido mientras se cancela (fila 0.147)', () => {
+  const sesionCancelar = (): SesionUsuario => sesion([...PERMISOS, 'ordenes.cancelar']);
+
+  /** Sostiene la fila de la secuencia de folios de OP: quien vaya a crear una OP espera ahí. */
+  function sostenerFolioDeOrden(): Promise<{ confirmar: () => Promise<void> }> {
+    return sostener((c) =>
+      c.query(
+        `SELECT 1 FROM "secuencias" WHERE "id_empresa" = $1 AND "clave" = 'orden' FOR UPDATE`,
+        [idEmpresa],
+      ),
+    );
+  }
+
+  /** OPs vivas colgadas del pedido. */
+  async function opsVivas(idPedido: number): Promise<number> {
+    return cliente.orden.count({
+      where: { estado: { not: 'cancelada' }, pedidoLinea: { idPedido } },
+    });
+  }
+
+  /** La primera tanda: pedido con UNA OP viva (OC 620884). */
+  async function pedidoConUnaOp(codigo: string): Promise<{ idModelo: number; idPedido: number }> {
+    const idModelo = await crearModelo(codigo);
+    const res = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf(1)],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    return { idModelo, idPedido: res.idPedido };
+  }
+
+  /** Importa la OC 620885 al pedido `idPedido` (sin esperar). */
+  function agregarTanda(idModelo: number, idPedido: number): Promise<unknown> {
+    return confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        idPedidoDestino: idPedido,
+        archivos: [archivoPdf2()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+  }
+
+  /** Cancela el pedido arrastrando sus OPs (sin esperar). */
+  function cancelar(idPedido: number): ReturnType<typeof cancelarPedido> {
+    return cancelarPedido(
+      sesionCancelar(),
+      idPedido,
+      { cancelarOrdenes: true, motivo: 'el cliente canceló la OC' },
+      bd(),
+      archivosFalsos(),
+    );
+  }
+
+  it('el importador VA PRIMERO: la cancelación lo espera, ve las OPs nuevas y las cancela', async () => {
+    const { idModelo, idPedido } = await pedidoConUnaOp('DEV-CYA-CONC-1');
+    // El importador se queda a medio camino: ya tiene el pedido bloqueado y espera el folio de OP.
+    const folio = await sostenerFolioDeOrden();
+    const importando = agregarTanda(idModelo, idPedido).catch((e: unknown) => e);
+    expect(await llegarAEsperas(1, importando)).toBe(true);
+
+    const cancelando = cancelar(idPedido).catch((e: unknown) => e);
+    // La cancelación ESPERA al importador (dos esperas en la base: el folio y el pedido).
+    expect(await llegarAEsperas(2, cancelando)).toBe(true);
+    await folio.confirmar();
+
+    const importado = await importando;
+    expect(importado).not.toBeInstanceOf(Error);
+    const cancelado = await cancelando;
+    expect(cancelado).not.toBeInstanceOf(Error);
+    // La cascada vio las DOS OPs (la vieja y la que acababa de nacer) y las canceló.
+    expect(
+      (cancelado as Awaited<ReturnType<typeof cancelarPedido>>).foliosOrdenesCanceladas,
+    ).toHaveLength(2);
+    expect(await opsVivas(idPedido)).toBe(0);
+    expect((await cliente.pedido.findUniqueOrThrow({ where: { id: idPedido } })).pedCancelado).toBe(
+      true,
+    );
+  });
+
+  it('la cancelación VA PRIMERO: el importador la espera y recibe «pedido cancelado»', async () => {
+    const { idModelo, idPedido } = await pedidoConUnaOp('DEV-CYA-CONC-2');
+    const op = await cliente.orden.findFirstOrThrow({ where: { pedidoLinea: { idPedido } } });
+    // La cancelación se queda a medio camino: ya tiene el pedido bloqueado y espera el candado de
+    // etapas de la OP que va a cancelar (el MISMO advisory de `bloquearEtapasDeOrden`).
+    const clave1 = ((idEmpresa * 1_000_003) ^ 0x4f000000) | 0;
+    const etapas = await sostener((c) =>
+      c.query('SELECT pg_advisory_xact_lock($1::int, $2::int)', [clave1, op.id]),
+    );
+    const cancelando = cancelar(idPedido).catch((e: unknown) => e);
+    expect(await llegarAEsperas(1, cancelando)).toBe(true);
+
+    const importando = agregarTanda(idModelo, idPedido).catch((e: unknown) => e);
+    // El importador ESPERA a la cancelación (no la adelanta).
+    expect(await llegarAEsperas(2, importando)).toBe(true);
+    await etapas.confirmar();
+
+    expect(await cancelando).not.toBeInstanceOf(Error);
+    const importado = await importando;
+    expect(importado).toBeInstanceOf(ErrorConflicto);
+    expect((importado as Error).message).toMatch(/está cancelado/);
+    expect(await opsVivas(idPedido)).toBe(0);
+    expect(await cliente.pedidoLinea.count({ where: { idPedido } })).toBe(1);
+  });
+
+  it('«Generar OP» manual toma el candado del pedido ANTES que el del modelo: la cancelación la espera', async () => {
+    const { idModelo, idPedido } = await pedidoConUnaOp('DEV-CYA-CONC-3');
+    const op = await cliente.orden.findFirstOrThrow({ where: { pedidoLinea: { idPedido } } });
+    const lineaOp = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: op.id } });
+    const talla = await cliente.talla.findFirstOrThrow({ where: { etiqueta: '5-6' } });
+    // Un renglón nuevo del MISMO modelo de desarrollo, todavía sin OP.
+    const renglon = await cliente.pedidoLinea.create({
+      data: { idPedido, idModelo, cantidadPedida: 10, precio: 1 },
+    });
+
+    // «Generar OP» se queda a medio camino: espera el candado del modelo por color (el que toma al
+    // resolver el modelo de producción). Si tomó el del pedido ANTES —lo que pide el orden de
+    // candados—, la cancelación tiene que esperarla.
+    const modelo = await sostener((c) =>
+      c.query('SELECT pg_advisory_xact_lock($1::int, $2::int)', [
+        NAMESPACE_LOCK_MODELO_POR_COLOR,
+        idModelo,
+      ]),
+    );
+    const generando = salidaAProduccion(
+      sesion(),
+      renglon.id,
+      { lineas: [{ idColor: lineaOp.idColor, tallas: [{ idTalla: talla.id, cantidad: 10 }] }] },
+      bd(),
+    ).catch((e: unknown) => e);
+    expect(await llegarAEsperas(1, generando)).toBe(true);
+
+    const cancelando = cancelar(idPedido).catch((e: unknown) => e);
+    expect(await llegarAEsperas(2, cancelando)).toBe(true);
+    await modelo.confirmar();
+
+    expect(await generando).not.toBeInstanceOf(Error);
+    const cancelado = await cancelando;
+    expect(cancelado).not.toBeInstanceOf(Error);
+    expect(
+      (cancelado as Awaited<ReturnType<typeof cancelarPedido>>).foliosOrdenesCanceladas,
+    ).toHaveLength(2);
+    expect(await opsVivas(idPedido)).toBe(0);
+  });
+});
+
+describe('⭐ concurrencia: la captura DIRECTA de una OP también respeta el candado (fila 0.147)', () => {
+  it('`crearOrden` (POST /api/ordenes) lee el pedido bajo su candado: la cancelación la espera', async () => {
+    const idModelo = await crearModelo('DEV-CYA-CONC-4');
+    const primera = await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf(1)],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+    const idPedido = primera.idPedido;
+    const op = await cliente.orden.findFirstOrThrow({ where: { pedidoLinea: { idPedido } } });
+    const lineaOp = await cliente.ordenLinea.findFirstOrThrow({ where: { idOrden: op.id } });
+    const talla = await cliente.talla.findFirstOrThrow({ where: { etiqueta: '5-6' } });
+    // La captura directa sólo admite modelos de PRODUCCIÓN: el renglón nuevo apunta al hijo.
+    const renglon = await cliente.pedidoLinea.create({
+      data: { idPedido, idModelo: op.idModelo, cantidadPedida: 10, precio: 1 },
+    });
+
+    // La captura se queda a medio camino esperando el folio de OP, con el pedido ya bloqueado.
+    const folio = await sostener((c) =>
+      c.query(
+        `SELECT 1 FROM "secuencias" WHERE "id_empresa" = $1 AND "clave" = 'orden' FOR UPDATE`,
+        [idEmpresa],
+      ),
+    );
+    const creando = crearOrden(
+      sesion(),
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: lineaOp.idColor, tallas: [{ idTalla: talla.id, cantidad: 10 }] }],
+      },
+      bd(),
+    ).catch((e: unknown) => e);
+    expect(await llegarAEsperas(1, creando)).toBe(true);
+
+    const cancelando = cancelarPedido(
+      sesion([...PERMISOS, 'ordenes.cancelar']),
+      idPedido,
+      { cancelarOrdenes: true, motivo: 'el cliente canceló la OC' },
+      bd(),
+      archivosFalsos(),
+    ).catch((e: unknown) => e);
+    // La cancelación NO termina por su cuenta: espera el candado del pedido.
+    expect(await llegarAEsperas(2, cancelando)).toBe(true);
+    await folio.confirmar();
+
+    expect(await creando).not.toBeInstanceOf(Error);
+    const cancelado = await cancelando;
+    expect(cancelado).not.toBeInstanceOf(Error);
+    expect(
+      (cancelado as Awaited<ReturnType<typeof cancelarPedido>>).foliosOrdenesCanceladas,
+    ).toHaveLength(2);
+    expect(
+      await cliente.orden.count({
+        where: { estado: { not: 'cancelada' }, pedidoLinea: { idPedido } },
+      }),
+    ).toBe(0);
   });
 });
 

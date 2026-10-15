@@ -73,6 +73,7 @@ import { ligarOrdenNucleo } from '../desarrollo/liga-orden.js';
 import { obtenerODerivarModeloDeProduccion } from '../modelos/nomenclatura.js';
 import { colorCanonico } from '../catalogos/colores-canonicos.js';
 
+import { bloquearPedido } from '../pedidos/bloqueo-pedido.js';
 import { crearOrden, obtenerOrden, sincronizarReferencias, validarReferencias } from './ordenes.js';
 
 /** Qué pasó con el modelo de producción de la OP (el `describe` del contrato lo explica). */
@@ -187,6 +188,12 @@ export async function salidaAProduccion(
     if (linea === null) {
       throw new ErrorNoEncontrado('Renglón de pedido', idPedidoLinea);
     }
+
+    // ⭐ Fila 0.147 — el candado del PEDIDO, lo PRIMERO que se toma: antes de los advisory del modelo
+    // y del nº de producción que toma el paso 1 (ver el ORDEN DE CANDADOS en `bloqueo-pedido.ts`).
+    // Con él, una cancelación del pedido en vuelo espera a que esta OP exista (y la ve), o esta salida
+    // espera a la cancelación y la rechaza `resolverOrigenPedido`, que lee bajo el candado.
+    await bloquearPedido(tx, linea.pedido.id, sesion.idEmpresaActiva);
 
     // 1) EL MODELO DE LA OP (V1-E3). Ver `resolverModeloDeLaOp`: derivar/reusar por color, o —si el
     //    renglón ya apunta a producción— heredarlo tal cual (rama legado, los 4,987 del Access).

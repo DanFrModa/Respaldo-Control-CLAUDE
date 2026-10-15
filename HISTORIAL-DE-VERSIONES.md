@@ -71,6 +71,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 > (§Post-F9.154), así que se retoma sin volver a discutir nada. ⚠️ **El número 0.061 NO queda
 > reservado**: cuando se retome tomará el siguiente libre, por la regla de arriba. El hueco se queda.
 
+## 0.217 · 15-oct-2026 · **en prueba** — **El PDF que quedó fuera de una tanda entra al mismo pedido**
+
+> **La v0.217 cierra la fila 0.147.** Daniel: *«prefiero siempre hacer una OP de la misma manera para tener toda la
+> info completa de la OC del cliente»*. Cuando el importador de PDF dejaba fuera algún PDF (sin liga, sin tallas,
+> ilegible o con la OC ya importada) y se volvía a importar ya corregido, nacía un pedido nuevo y la tanda quedaba
+> partida en dos.
+
+### ✅ Se puede hacer ahora lo que antes no
+
+**El importador de PDF puede agregar a un pedido existente**, del mismo cliente: en la vista previa eliges «Pedido
+nuevo» o «Agregar a un pedido existente». Lo que ya tiene el pedido no se toca, y cada orden nueva lleva la OC de su
+propio PDF.
+
+**Si el pedido ya tiene un renglón del mismo modelo, la vista previa te lo avisa**: la tanda nueva entra como renglón
+aparte.
+
+**Si al importar quedan PDF fuera, el asistente ya no se cierra:** te enseña cada uno con su causa y te ofrece
+**«Importar los PDF corregidos a este pedido»**, con el pedido recién creado ya elegido.
+
+### ⚠️ Cambió esto y te puede sorprender
+
+**Los avisos dicen la causa de verdad:** el aviso del importador ya no dice «sin ligar» para todo (distingue ilegible,
+OC ya importada, sin liga y sin tallas), y al quitar un renglón de un pedido que ya tiene órdenes, el mensaje nombra
+esas órdenes en vez de hablar de «pedidos reales».
+
+**No se puede agregar a un pedido cancelado o marcado «no producir»**, ni a uno de otro cliente. Y si alguien cancela
+un pedido justo mientras otro le agrega órdenes, una espera a la otra: ninguna orden queda viva bajo un pedido
+cancelado.
+
+### ⏳ Sigue pendiente o roto
+
+Siguen abiertas las tres preguntas de §Post-F9.242: dos sobre informes (márgenes por tanda y facturas que cruzan
+pedidos) y una para que Daniel **confirme** que su caso del 7-sep era justo éste, la tanda que quedó a medias.
+
 ## 0.216 · 14-oct-2026 · **en prueba** — **El arte tiene su propio permiso: Diseño Gráfico ya no necesita poder cambiar telas y avíos**
 
 > **La v0.216 cierra la fila 0.235.** Daniel describió a Diseño Gráfico así: *«desarrolla todos los artes, define quién
