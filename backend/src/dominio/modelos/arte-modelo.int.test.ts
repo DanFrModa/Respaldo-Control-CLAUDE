@@ -649,9 +649,12 @@ describe('⭐ 0.235 — el arte con sólo `modelos.arte`', () => {
     await eliminarArte(s, idModelo, segundo.id, bd(), archivosFalsos());
     expect((await listarArtesModelo(s, idModelo, bd())).map((a) => a.id)).toEqual([arte.id]);
 
-    // El rastro (A7) lleva el precio que tecleó.
+    // El rastro (A7) lleva el precio que tecleó. El arte acumula VARIOS `MODIFICAR` (el precio, agregar y
+    // quitar la foto): sin `orderBy` el «primero» lo elige Postgres y la prueba se vuelve una moneda al aire.
+    // El cambio de precio es el primero en el tiempo ⇒ `id` ascendente.
     const rastro = await cliente.bitacora.findFirst({
       where: { entidad: 'ModeloArte', idEntidad: String(arte.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'asc' },
     });
     expect(rastro?.datos).toMatchObject({ precio: { de: 12.5, a: 14 } });
   });

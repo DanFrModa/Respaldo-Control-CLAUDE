@@ -57,6 +57,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
+import { exigirPedidoProducible } from '../produccion/ordenes.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 import {
@@ -79,6 +80,7 @@ import {
   mensajeDuplicado,
   NAMESPACE_LOCK_IMPORTACION,
 } from './oc-duplicada.js';
+import { bloquearPedido } from './bloqueo-pedido.js';
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
 import { parsearPdfCya, type RenglonPdfCyaParseado } from './parseo-pdf-cya.js';
 // La config de fábrica de C&A vive aparte porque también la siembra `prisma/seed.ts`
@@ -890,6 +892,11 @@ interface PdfAImportar {
  * sin tallas o corruptos se OMITEN y se devuelven en `noReconocidos`. Requiere `pedidos.administrar` Y
  * `ordenes.administrar`. El servicio de archivos se INYECTA (default lazy) para tests sin R2.
  *
+ * ⭐ Fila 0.147 (§Post-F9.242) — con `idPedidoDestino` la tanda NO crea pedido: se AÑADE al que ya
+ * existe. Es lo que permite TERMINAR una tanda que un confirm anterior dejó a medias (el PDF sin liga
+ * que quedó en `noReconocidos` se religa y se reimporta al MISMO pedido, en vez de partirla en dos).
+ * Ver `exigirPedidoDestino` para qué se valida y dónde vive cada regla.
+ *
  * Orden seguro (A2 + sin I/O en la tx): se PARSEA y se SUBE cada PDF a R2 ANTES de abrir la transacción
  * (subida server-side, F9-E3); dentro de la tx sólo se escribe BD. Si la tx aborta, los objetos R2
  * quedan huérfanos (inocuo). Cada OP recibe SU objeto ya subido como `Archivo` + `OrdenArchivo`.
@@ -927,6 +934,14 @@ export async function confirmarImportacionPdf(
   // Defensa V1-E4 (punto 1): los papeles que YA parieron su OP (o que vienen repetidos en esta
   // misma tanda) se OMITEN aquí, ANTES de subir nada a R2. La verdad final la dicta la
   // re-verificación bajo candado dentro de la tx; ésta es la que da el mensaje bueno al usuario.
+  if (datos.idPedidoDestino !== undefined && datos.idPedidoDestino !== null) {
+    await prevalidarPedidoDestino(
+      cliente,
+      datos.idPedidoDestino,
+      sesion.idEmpresaActiva,
+      datos.idCliente,
+    );
+  }
   const yaImportadas = await cargarOcYaImportadas(
     cliente,
     datos.idCliente,
@@ -950,6 +965,7 @@ export async function confirmarImportacionPdf(
       noReconocidos.push({
         nombreArchivo: p.nombreArchivo,
         modeloCliente: '',
+        causa: 'ilegible',
         motivo: p.error ?? 'No se pudo leer el PDF.',
       });
       continue;
@@ -963,6 +979,7 @@ export async function confirmarImportacionPdf(
       noReconocidos.push({
         nombreArchivo: p.nombreArchivo,
         modeloCliente: r.modeloCliente,
+        causa: 'oc-ya-importada',
         motivo: mensajeDuplicado(duplicado, r.numeroOrden),
       });
       continue;
@@ -979,6 +996,7 @@ export async function confirmarImportacionPdf(
       noReconocidos.push({
         nombreArchivo: p.nombreArchivo,
         modeloCliente: r.modeloCliente,
+        causa: 'sin-liga',
         motivo:
           aprendida !== undefined && !aprendida.activo
             ? `El modelo antes ligado (#${aprendida.codigo}) quedó inactivo; lígalo a otro en la vista previa.`
@@ -990,6 +1008,7 @@ export async function confirmarImportacionPdf(
       noReconocidos.push({
         nombreArchivo: p.nombreArchivo,
         modeloCliente: r.modeloCliente,
+        causa: 'sin-tallas',
         motivo: 'El PDF no trae tallas con piezas.',
       });
       continue;
@@ -1079,16 +1098,29 @@ export async function confirmarImportacionPdf(
         ? null
         : datos.referenciaGeneral;
 
-    const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_PEDIDO);
-    const pedido = await tx.pedido.create({
-      data: {
-        folio,
-        idEmpresa: sesion.idEmpresaActiva,
-        idCliente: datos.idCliente,
-        ocCliente: referenciaGeneral,
-        ...datosCreacion(sesion),
-      },
-    });
+    // ⭐ Fila 0.147 — destino EXISTENTE o pedido NUEVO. Con destino NO se toca el encabezado: ni la
+    // referencia general (`Pedido.ocCliente` es la de la TANDA original y la conserva — la
+    // `referenciaGeneral` que venga se ignora), ni los renglones ni las OPs que ya tiene (D3): sólo
+    // se le CUELGAN renglones y OPs nuevos. El folio del pedido no se pide a la secuencia (ya tiene
+    // el suyo); los de las OPs, sí, cada uno por `crearOrden` (A3).
+    const pedidoExistente = datos.idPedidoDestino !== undefined && datos.idPedidoDestino !== null;
+    const pedido = pedidoExistente
+      ? await exigirPedidoDestino(
+          tx,
+          datos.idPedidoDestino as number,
+          sesion.idEmpresaActiva,
+          datos.idCliente,
+        )
+      : await tx.pedido.create({
+          data: {
+            folio: await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_PEDIDO),
+            idEmpresa: sesion.idEmpresaActiva,
+            idCliente: datos.idCliente,
+            ocCliente: referenciaGeneral,
+            ...datosCreacion(sesion),
+          },
+        });
+    const folio = pedido.folio;
 
     const ordenes: OrdenPdfImportada[] = [];
     let ligasContador = 0;
@@ -1119,9 +1151,9 @@ export async function confirmarImportacionPdf(
     await registrarBitacora(tx, sesion, {
       entidad: 'Pedido',
       idEntidad: pedido.id,
-      accion: 'CREAR',
+      accion: pedidoExistente ? 'MODIFICAR' : 'CREAR',
       datos: {
-        operacion: 'importar-pedido-pdf',
+        operacion: pedidoExistente ? 'importar-pdf-a-pedido-existente' : 'importar-pedido-pdf',
         folio: Number(folio),
         idCliente: datos.idCliente,
         pdfs: aImportar.length,
@@ -1133,6 +1165,7 @@ export async function confirmarImportacionPdf(
     return {
       idPedido: pedido.id,
       folioPedido: Number(folio),
+      pedidoExistente,
       ordenes,
       noReconocidos,
       ligasAprendidas: ligasContador,
@@ -1396,6 +1429,73 @@ async function crearOrdenDesdePdf(
 }
 
 // ── Helpers compartidos ──────────────────────────────────────────────────────
+
+/**
+ * ⭐ Fila 0.147 — el pedido EXISTENTE al que se añade la tanda: lo BLOQUEA (`bloquearPedido`, el
+ * mismo candado que toma `cancelarPedido`) y exige lo que es propio de ESTA puerta:
+ *  • que exista en la EMPRESA ACTIVA (A9: el de otra empresa, para esta sesión, no existe);
+ *  • que sea del MISMO cliente que la tanda (mezclarlos rompería la lista de precios, la referencia
+ *    D7 y el EDR — §Post-F9.241). El pedido no tiene departamento propio (cada OP resuelve el suyo
+ *    de su PDF), así que no hay departamento que comparar.
+ *
+ * ⚠️ Lo que NO valida aquí, a propósito: que no esté CANCELADO ni marcado «NO PRODUCIR». Esa regla
+ * ya la impone `resolverOrigenPedido` (vía `salidaAProduccion` → `crearOrden`) para CADA OP que nace,
+ * por cualquier puerta; repetirla aquí sería tener dos frases para la misma regla, que es como se
+ * separan dos caminos que deben decidir igual. Como el candado se tomó antes, esa comprobación lee
+ * el estado ya asentado del pedido. Y no existe un estado «cerrado» del pedido (medido en
+ * `schema.prisma`: sólo `pedCancelado`, `noProducir` y `entregadoTienda`, que es una marca, no un
+ * cierre — la vía manual tampoco lo frena).
+ */
+async function exigirPedidoDestino(
+  tx: Tx,
+  idPedido: number,
+  idEmpresa: number,
+  idCliente: number,
+): Promise<{ id: number; folio: bigint }> {
+  const pedido = validarPedidoDestino(
+    await bloquearPedido(tx, idPedido, idEmpresa),
+    idPedido,
+    idCliente,
+  );
+  return { id: pedido.id, folio: pedido.folio };
+}
+
+/** Las dos reglas propias del destino (existe en la empresa · mismo cliente), sobre lo ya leído. */
+function validarPedidoDestino<P extends { id: number; folio: bigint; idCliente: number }>(
+  pedido: P | null,
+  idPedido: number,
+  idCliente: number,
+): P {
+  if (pedido === null) {
+    throw new ErrorNoEncontrado('Pedido', idPedido);
+  }
+  if (pedido.idCliente !== idCliente) {
+    throw new ErrorValidacion(
+      `El pedido ${Number(pedido.folio)} es de otro cliente; la tanda sólo se puede agregar a un pedido del mismo cliente.`,
+    );
+  }
+  return pedido;
+}
+
+/**
+ * ⭐ Fila 0.147 — el destino se revisa TAMBIÉN antes de subir nada a R2: una lectura SIN candado con
+ * las MISMAS reglas (las dos del destino + `exigirPedidoProducible`, la de `resolverOrigenPedido`).
+ * No es la que manda —entre esta lectura y la transacción el pedido puede cancelarse, y para eso está
+ * la revisión bajo el candado—, sólo evita que un destino ya inválido deje los PDF de la tanda
+ * subidos y huérfanos en R2.
+ */
+async function prevalidarPedidoDestino(
+  cliente: ReturnType<typeof clienteLectura>,
+  idPedido: number,
+  idEmpresa: number,
+  idCliente: number,
+): Promise<void> {
+  const pedido = await cliente.pedido.findFirst({
+    where: { id: idPedido, idEmpresa },
+    select: { id: true, folio: true, idCliente: true, pedCancelado: true, noProducir: true },
+  });
+  exigirPedidoProducible(validarPedidoDestino(pedido, idPedido, idCliente));
+}
 
 /** Exige que el cliente exista y esté ACTIVO (no se importan pedidos a un cliente desactivado). */
 async function exigirClienteActivo(tx: Tx, idCliente: number): Promise<void> {

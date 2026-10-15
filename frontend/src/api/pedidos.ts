@@ -108,6 +108,25 @@ async function cancelarPedido({
   return data;
 }
 
+/** Pide un pedido con su detalle (`GET /api/pedidos/{id}`). */
+async function obtenerPedido(id: number): Promise<Pedido> {
+  const { data, error } = await api.GET('/api/pedidos/{id}', { params: { path: { id } } });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * Un pedido con sus renglones (fila 0.147: el importador de PDF lo lee para avisar qué modelos YA
+ * tiene el pedido de destino). Sólo corre con un id; `null` = no hay pedido que leer.
+ */
+export function usePedido(id: number | null): UseQueryResult<Pedido, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_PEDIDOS, 'detalle', id],
+    queryFn: () => obtenerPedido(id as number),
+    enabled: id !== null,
+  });
+}
+
 /** Lista pedidos con los filtros dados (mantiene la página previa al paginar/buscar). */
 export function usePedidos(query: PedidosQuery): UseQueryResult<PedidosPagina, ErrorDeApi> {
   return useQuery({

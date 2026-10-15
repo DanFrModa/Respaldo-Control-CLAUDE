@@ -399,6 +399,12 @@ export const esquemaListarPedidos = z
       .stringbool()
       .default(false)
       .describe('Incluye los pedidos cancelados (cancelación suave).'),
+    soloProducibles: z
+      .stringbool()
+      .default(false)
+      .describe(
+        'Fila 0.147 — sólo los pedidos a los que se les pueden crear órdenes: excluye los marcados «no producir» (y los cancelados, aunque venga `incluirCancelados`). Lo usa el selector de destino del importador de PDF.',
+      ),
     ordenarPor: z
       .enum(['folio', 'fechaPedido', 'creadoEn'])
       .default('folio')

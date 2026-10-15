@@ -20771,6 +20771,8 @@ export interface paths {
           idCliente?: number;
           /** @description Incluye los pedidos cancelados (cancelación suave). */
           incluirCancelados?: string;
+          /** @description Fila 0.147 — sólo los pedidos a los que se les pueden crear órdenes: excluye los marcados «no producir» (y los cancelados, aunque venga `incluirCancelados`). Lo usa el selector de destino del importador de PDF. */
+          soloProducibles?: string;
           /** @description Columna de orden. */
           ordenarPor?: 'folio' | 'fechaPedido' | 'creadoEn';
           /** @description Dirección del orden. */
@@ -25193,8 +25195,10 @@ export interface paths {
           'application/json': {
             /** @description Cliente del pedido (empresa activa de la sesión, A9). */
             idCliente: number;
-            /** @description Referencia general del pedido (opcional; cada OP guarda su propio nº de orden). */
+            /** @description Referencia general del pedido (opcional; cada OP guarda su propio nº de orden). Con `idPedidoDestino` se IGNORA: el pedido existente conserva la suya. */
             referenciaGeneral?: string | null;
+            /** @description Fila 0.147 — pedido YA EXISTENTE al que se AÑADE la tanda (omitido/null = se crea un pedido nuevo, como siempre). Debe ser de la empresa activa y del MISMO cliente, y no estar cancelado ni marcado «no producir». Los renglones y OPs que ya tiene no se tocan. */
+            idPedidoDestino?: number | null;
             /** @description PDFs de las órdenes de compra del cliente (con ajuste manual opcional). */
             archivos: {
               /** @description Nombre del PDF del cliente (para mostrar y adjuntar). */
@@ -25241,10 +25245,12 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** @description Id del pedido interno creado. */
+              /** @description Id del pedido interno: el creado, o el existente al que se añadió la tanda. */
               idPedido: number;
               /** @description Folio del pedido (por empresa). */
               folioPedido: number;
+              /** @description Fila 0.147 — true si la tanda se AÑADIÓ a un pedido que ya existía (`idPedidoDestino`); false si nació un pedido nuevo. */
+              pedidoExistente: boolean;
               /** @description OPs creadas (una por PDF ligado). */
               ordenes: {
                 /** @description Id de la OP creada. */
@@ -25277,9 +25283,14 @@ export interface paths {
               noReconocidos: {
                 /** @description Nombre del PDF que no se importó. */
                 nombreArchivo: string;
-                /** @description Modelo ID del cliente sin ligar. */
+                /** @description Modelo ID del cliente del PDF (vacío si el PDF ni se pudo leer). */
                 modeloCliente: string;
-                /** @description Por qué quedó fuera (sin liga / error de parseo). */
+                /**
+                 * @description Por qué quedó fuera: `ilegible` (no se pudo leer el PDF), `oc-ya-importada` (esa OC ya tiene OP, o venía repetida en la tanda), `sin-liga` (sin modelo nuestro ligado, o el ligado quedó inactivo) o `sin-tallas` (el PDF no trae piezas).
+                 * @enum {string}
+                 */
+                causa: 'ilegible' | 'oc-ya-importada' | 'sin-liga' | 'sin-tallas';
+                /** @description Por qué quedó fuera, en prosa (para enseñarlo tal cual). */
                 motivo: string;
               }[];
               /** @description Cuántas ligas modelo-del-cliente se aprendieron/actualizaron. */

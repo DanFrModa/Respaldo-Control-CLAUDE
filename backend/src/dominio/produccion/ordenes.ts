@@ -143,6 +143,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { sinonimosDeDepartamentos } from '../catalogos/cliente-departamentos-sinonimos.js';
+import { bloquearPedido } from '../pedidos/bloqueo-pedido.js';
 
 // ⭐ 0.061: la guarda ÚNICA de la orden CERRADA (`dominio/produccion/cierre-orden.ts`).
 import { exigirOrdenAbiertaPorId } from './cierre-orden.js';
@@ -302,6 +303,29 @@ interface OrigenPedidoLinea {
 }
 
 /**
+ * La regla ÚNICA de «a este pedido se le pueden crear órdenes»: ni cancelado ni marcado «no producir».
+ * Vive aparte (fila 0.147) para que el importador de PDF la pueda aplicar ANTES de subir nada a R2
+ * sin escribir una segunda copia; la que manda sigue siendo la de `resolverOrigenPedido`, bajo el
+ * candado del pedido.
+ */
+export function exigirPedidoProducible(pedido: {
+  folio: bigint;
+  pedCancelado: boolean;
+  noProducir: boolean;
+}): void {
+  if (pedido.pedCancelado) {
+    throw new ErrorConflicto(
+      `El pedido ${Number(pedido.folio)} está cancelado; no se le pueden crear órdenes.`,
+    );
+  }
+  if (pedido.noProducir) {
+    throw new ErrorConflicto(
+      `El pedido ${Number(pedido.folio)} está marcado como "no producir"; no se le pueden crear órdenes.`,
+    );
+  }
+}
+
+/**
  * Resuelve y VALIDA el renglón de pedido del que sale la orden (autorrelleno + reglas, paridad con
  * `IdPedidosDet_AfterUpdate`). Exige (decisión Gabriel 16-jun-2026: orden sin pedido = solo
  * histórico, jamás captura nueva):
@@ -332,6 +356,19 @@ async function resolverOrigenPedido(
   idEmpresa: number,
   idModeloDeLaOrden?: number,
 ): Promise<OrigenPedidoLinea> {
+  // ⭐ Fila 0.147 — el estado del pedido (cancelado / «no producir») se lee BAJO el candado de su
+  // fila: si una cancelación va en vuelo, esta alta la espera y la ve; si esta alta va primero, la
+  // cancelación espera y ve la OP nueva (ver `bloqueo-pedido.ts`). Primero se averigua el pedido
+  // (lectura sin candado, sólo el id), luego se bloquea y DESPUÉS se lee el estado. Las puertas que
+  // ya lo tienen (`salidaAProduccion`, el importador) lo re-toman sin costo: es el mismo candado de la
+  // misma transacción. El de otra empresa no se bloquea (no se ve) y cae abajo como «no encontrado».
+  const delRenglon = await tx.pedidoLinea.findUnique({
+    where: { id: idPedidoLinea },
+    select: { idPedido: true },
+  });
+  if (delRenglon !== null) {
+    await bloquearPedido(tx, delRenglon.idPedido, idEmpresa);
+  }
   const linea = await tx.pedidoLinea.findUnique({
     where: { id: idPedidoLinea },
     select: {
@@ -356,16 +393,7 @@ async function resolverOrigenPedido(
     // El pedido es de otra empresa: para esta sesión, ese renglón no existe (A9).
     throw new ErrorNoEncontrado('Renglón de pedido', idPedidoLinea);
   }
-  if (linea.pedido.pedCancelado) {
-    throw new ErrorConflicto(
-      `El pedido ${Number(linea.pedido.folio)} está cancelado; no se le pueden crear órdenes.`,
-    );
-  }
-  if (linea.pedido.noProducir) {
-    throw new ErrorConflicto(
-      `El pedido ${Number(linea.pedido.folio)} está marcado como "no producir"; no se le pueden crear órdenes.`,
-    );
-  }
+  exigirPedidoProducible(linea.pedido);
   if (!linea.modelo.activo) {
     throw new ErrorConflicto(
       `El modelo "${linea.modelo.codigo}" está descontinuado; no se puede producir.`,

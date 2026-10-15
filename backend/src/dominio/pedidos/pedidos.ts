@@ -59,6 +59,7 @@ import { exigirOrdenAbiertaPorId } from '../produccion/cierre-orden.js';
 import { senalesDeActividadOrden, textoSenalesActividad } from '../produccion/actividad-orden.js';
 import { bloquearEtapasDeOrden } from '../produccion/recibos.js';
 
+import { bloquearPedido } from './bloqueo-pedido.js';
 import {
   filtroOrdenesVivasDeLineas,
   numerosProduccionPorLinea,
@@ -82,6 +83,7 @@ const esquemaListarPedidosDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   idCliente: z.number().int().positive().optional(),
   incluirCancelados: z.boolean().default(false),
+  soloProducibles: z.boolean().default(false),
   ordenarPor: z.enum(['folio', 'fechaPedido', 'creadoEn']).default('folio'),
   direccion: z.enum(['asc', 'desc']).default('desc'),
 });
@@ -303,11 +305,15 @@ async function sincronizarLineas(
   // Renglones a borrar: están en BD pero no en el set deseado.
   const aBorrar = [...idsActuales].filter((id) => !idsDeseados.has(id));
   if (aBorrar.length > 0) {
+    await exigirRenglonesBorrables(tx, aBorrar);
     try {
       await tx.pedidoLinea.deleteMany({ where: { id: { in: aBorrar }, idPedido } });
     } catch (error) {
+      // Cinturón: las dos causas conocidas ya se nombraron arriba. Si aun así revienta (otra
+      // transacción colgó algo del renglón entre la comprobación y el borrado), se dicen las DOS
+      // posibles — afirmar una sola sería volver a mentir sobre la causa.
       throw new ErrorConflicto(
-        'No se puede quitar un renglón que ya tiene seguimiento de pedidos reales. Cancela o ajusta el pedido real primero.',
+        'No se puede quitar el renglón: ya tiene órdenes de producción o seguimiento de pedidos reales colgados de él.',
         { causa: error },
       );
     }
@@ -344,6 +350,50 @@ async function sincronizarLineas(
         },
       });
     }
+  }
+}
+
+/**
+ * ⭐ Fila 0.147 (b) — dice POR QUÉ no se puede quitar un renglón, ANTES de intentarlo.
+ *
+ * Al `deleteMany` de un renglón lo frenan exactamente DOS llaves `Restrict` (medido en
+ * `schema.prisma`): `Orden.idPedidoLinea` y `PedidoRealLinea.idPedidoLinea`. Antes un `catch`
+ * genérico las traducía a las dos como «ya tiene seguimiento de pedidos reales», así que quien
+ * intentaba quitar un renglón con OP recibía la causa equivocada y se iba a buscar un pedido real que
+ * no existía. La orden se mira SIN filtrar por estado: una OP cancelada sigue colgada del renglón (la
+ * cancelación es suave, D3) y la llave la frena igual.
+ */
+async function exigirRenglonesBorrables(tx: Tx, idsRenglon: number[]): Promise<void> {
+  const conOrdenes = await tx.orden.findMany({
+    where: { idPedidoLinea: { in: idsRenglon } },
+    select: { folio: true, estado: true },
+    orderBy: { folio: 'asc' },
+  });
+  if (conOrdenes.length > 0) {
+    const folios = conOrdenes.map((o) => String(Number(o.folio))).join(', ');
+    const una = conOrdenes.length === 1;
+    const todasCanceladas = conOrdenes.every((o) => o.estado === 'cancelada');
+    // El texto concuerda en número con cuántas órdenes hay (una / varias), y sólo explica «está
+    // cancelada pero sigue colgada» cuando TODAS lo están: con una sola viva, lo que hay que decir es
+    // qué hacer con ella.
+    const nota = todasCanceladas
+      ? una
+        ? ' (está cancelada, pero sigue colgada del renglón y conserva su historia).'
+        : ' (están canceladas, pero siguen colgadas del renglón y conservan su historia).'
+      : una
+        ? '. Cancela la OP o ajusta su cantidad en lugar de quitar el renglón.'
+        : '. Cancela las OP vivas o ajusta sus cantidades en lugar de quitar el renglón.';
+    throw new ErrorConflicto(
+      `No se puede quitar el renglón: ya tiene ${una ? 'la orden de producción' : 'las órdenes de producción'} ${folios}${nota}`,
+    );
+  }
+  const conReales = await tx.pedidoRealLinea.count({
+    where: { idPedidoLinea: { in: idsRenglon } },
+  });
+  if (conReales > 0) {
+    throw new ErrorConflicto(
+      'No se puede quitar un renglón que ya tiene seguimiento de pedidos reales. Cancela o ajusta el pedido real primero.',
+    );
   }
 }
 
@@ -810,6 +860,10 @@ export async function cancelarPedido(
   }
 
   const desenlace = await enTransaccion(async (tx) => {
+    // ⭐ Fila 0.147 — el candado del pedido ANTES de leer sus OPs vivas: el importador de PDF puede
+    // estar colgándole una tanda en este momento, y la cascada tiene que ver esas OPs (o esperar a
+    // que existan). Ver `bloquearPedido`.
+    await bloquearPedido(tx, id, sesion.idEmpresaActiva);
     const actual = await exigirPedido(tx, id, sesion.idEmpresaActiva);
     if (actual.pedCancelado) {
       throw new ErrorConflicto(`El pedido ${Number(actual.folio)} ya está cancelado.`);
@@ -1040,7 +1094,11 @@ export async function listarPedidos(
   const idsClienteBuscado = await idsSiHayBusqueda(clienteLectura(bd), 'cliente', filtros.busqueda);
   const where: Prisma.PedidoWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
-    ...(filtros.incluirCancelados ? {} : { pedCancelado: false }),
+    ...(filtros.incluirCancelados && !filtros.soloProducibles ? {} : { pedCancelado: false }),
+    // Fila 0.147: «a este pedido se le pueden crear órdenes» es la regla de `exigirPedidoProducible`
+    // (ni cancelado ni «no producir»); filtrarla aquí y no en la pantalla hace que la página que pide
+    // el selector traiga sólo pedidos usables, en vez de 20 de los que quizá se tiren todos.
+    ...(filtros.soloProducibles ? { noProducir: false } : {}),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...(idsClienteBuscado === undefined
       ? {}

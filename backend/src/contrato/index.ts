@@ -594,6 +594,7 @@ export {
   esquemaConfirmarPdfCyaCuerpo,
   esquemaOrdenPdfImportada,
   esquemaPdfNoReconocido,
+  CAUSAS_PDF_NO_RECONOCIDO,
   esquemaConfirmarPdfCyaSalida,
   MAX_ARCHIVOS_PDF,
   type ArchivoPdf,
@@ -611,6 +612,7 @@ export {
   type DatosConfirmarPdfCya,
   type OrdenPdfImportada,
   type PdfNoReconocido,
+  type CausaPdfNoReconocido,
   type ConfirmarPdfCyaSalida,
 } from './esquemas/importacion-pdf.js';
 

@@ -15,7 +15,8 @@ import { archivoABase64 } from '@/api/importacion-pedido';
 import { useAnalizarPdf, useConfirmarPdf, usePlantillaVigente } from '@/api/importacion-pdf';
 import { useClientes } from '@/api/clientes';
 import { useModelos, type Modelo } from '@/api/modelos';
-import type { AnalizarPdf, RenglonPdfPreview } from '@/api/tipos';
+import { usePedido, usePedidos } from '@/api/pedidos';
+import type { AnalizarPdf, ConfirmarPdf, RenglonPdfPreview } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
@@ -177,6 +178,56 @@ function numeracionVigente(
   return !(r.modeloDeProduccion === 'reusado' && hayLigaCambiada(renglones, ligas));
 }
 
+// ── ⭐ Fila 0.147 — LOS PDF QUE QUEDARON FUERA, CON SU CAUSA ─────────────────────────────
+
+/** Un PDF que el confirm dejó fuera (con su causa, desde la fila 0.147). */
+type PdfFuera = ConfirmarPdf['noReconocidos'][number];
+
+/**
+ * Cómo se nombra cada causa en pantalla, en singular y en plural. Antes el toast llamaba «sin ligar»
+ * a los CUATRO casos, así que a quien se le quedaba fuera un PDF ilegible o una OC ya importada se
+ * le mandaba a religar un modelo que estaba bien.
+ */
+const ETIQUETA_CAUSA: Record<PdfFuera['causa'], { una: string; varias: string }> = {
+  ilegible: { una: 'ilegible', varias: 'ilegibles' },
+  'oc-ya-importada': { una: 'con su OC ya importada', varias: 'con su OC ya importada' },
+  'sin-liga': { una: 'sin liga a un modelo', varias: 'sin liga a un modelo' },
+  'sin-tallas': { una: 'sin tallas con piezas', varias: 'sin tallas con piezas' },
+};
+
+/** Orden fijo de las causas en el resumen (el mensaje no cambia de forma según el orden de los PDF). */
+const ORDEN_CAUSAS: PdfFuera['causa'][] = ['sin-liga', 'sin-tallas', 'ilegible', 'oc-ya-importada'];
+
+/** «1 sin liga a un modelo, 2 ilegibles» — el desglose por causa de los PDF que quedaron fuera. */
+function desgloseCausas(fuera: PdfFuera[]): string {
+  return ORDEN_CAUSAS.map(
+    (causa) => [causa, fuera.filter((f) => f.causa === causa).length] as const,
+  )
+    .filter(([, n]) => n > 0)
+    .map(
+      ([causa, n]) =>
+        `${String(n)} ${n === 1 ? ETIQUETA_CAUSA[causa].una : ETIQUETA_CAUSA[causa].varias}`,
+    )
+    .join(', ');
+}
+
+/** «1 PDF quedó fuera» / «3 PDF quedaron fuera» — concuerda en número. */
+function cuantosQuedaronFuera(n: number): string {
+  return n === 1 ? '1 PDF quedó fuera' : `${String(n)} PDF quedaron fuera`;
+}
+
+/** Texto del toast de éxito del confirm: qué nació (o a qué pedido se agregó) y qué quedó fuera. */
+function mensajeImportado(res: ConfirmarPdf): string {
+  const nOp = res.ordenes.length;
+  const base = res.pedidoExistente
+    ? `Se agregaron ${String(nOp)} OP(s) al pedido ${String(res.folioPedido)}-F`
+    : `Pedido ${String(res.folioPedido)}-F importado · ${String(nOp)} OP(s) con su matriz + RC`;
+  const fuera = res.noReconocidos.length;
+  return fuera > 0
+    ? `${base} · ${cuantosQuedaronFuera(fuera)} (${desgloseCausas(res.noReconocidos)})`
+    : base;
+}
+
 /** Texto con el que se precarga la casilla de un renglón cuya numeración SÍ está vigente. */
 function propuestaDe(r: RenglonPdfPreview): string {
   return r.numeroProduccionPropuesto === null ? '' : String(r.numeroProduccionPropuesto);
@@ -245,6 +296,33 @@ export function ImportadorPedidoPdf({
    * del PDF → texto del campo (texto, no número: el input se puede vaciar mientras se escribe).
    */
   const [numeros, setNumeros] = useState<Record<number, string>>({});
+  /**
+   * ⭐ Fila 0.147 — A QUÉ PEDIDO VA LA TANDA: `null` = pedido NUEVO (como siempre); un id = se AÑADE a
+   * ese pedido existente (del mismo cliente). El backend valida todo (empresa, cliente, cancelado,
+   * «no producir»); la pantalla sólo ofrece los que tiene sentido elegir.
+   */
+  const [idPedidoDestino, setIdPedidoDestino] = useState<number | null>(null);
+  /**
+   * §Post-F9.241 — los modelos que el pedido de DESTINO ya tiene en sus renglones. Un PDF de uno de
+   * ellos NO se funde con su renglón: entra como renglón APARTE (dos OC pueden pedir el mismo modelo),
+   * y la vista previa lo avisa. Se compara contra la liga VIVA de la previa (la que el usuario puede
+   * cambiar después de analizar), por eso se calcula aquí y no en el análisis.
+   */
+  const pedidoDestino = usePedido(idPedidoDestino);
+  const modelosEnDestino = useMemo(
+    () => new Set((pedidoDestino.data?.lineas ?? []).map((l) => l.idModelo)),
+    [pedidoDestino.data],
+  );
+  const folioDestino = pedidoDestino.data?.folio ?? null;
+  /** «Agregar a un pedido existente» elegido (puede estarlo sin pedido todavía: entonces no se confirma). */
+  const [agregarAExistente, setAgregarAExistente] = useState(false);
+  /** Etiqueta del destino elegido (el combobox puede no traerlo en la página que tiene cargada). */
+  const [etiquetaDestino, setEtiquetaDestino] = useState<string | undefined>(undefined);
+  /**
+   * El resultado de un confirm que dejó PDF FUERA. Mientras exista, el asistente NO se cierra: enseña
+   * qué quedó fuera y por qué, y ofrece terminar la tanda en ESE mismo pedido (§Post-F9.242).
+   */
+  const [resultado, setResultado] = useState<ConfirmarPdf | null>(null);
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const busquedaModeloDeb = useDebounce(busquedaModelo.trim(), 250);
 
@@ -284,9 +362,36 @@ export function ImportadorPedidoPdf({
    * Se limpia sólo cuando el cliente CAMBIA de verdad: volver a elegir al mismo no borra lo tecleado.
    */
   function elegirCliente(id: number | null): void {
-    if (id !== idCliente) setPct(null);
+    if (id !== idCliente) {
+      setPct(null);
+      // Fila 0.147: el destino es de UN cliente; cambiar de cliente lo devuelve a «pedido nuevo».
+      elegirDestino(null);
+      setAgregarAExistente(false);
+    }
     setIdCliente(id);
   }
+
+  /** Fija el pedido de destino (null = pedido nuevo) con la etiqueta con la que se enseña. */
+  function elegirDestino(id: number | null, etiqueta?: string): void {
+    setIdPedidoDestino(id);
+    setEtiquetaDestino(id === null ? undefined : etiqueta);
+  }
+
+  /**
+   * ⭐ Fila 0.147 — TERMINAR LA TANDA. Vuelve al paso 1 con el MISMO cliente y el pedido que se acaba
+   * de crear (o completar) ya puesto como destino: el usuario sólo carga los PDF corregidos.
+   */
+  function terminarTandaEn(res: ConfirmarPdf): void {
+    elegirDestino(res.idPedido, `Pedido ${String(res.folioPedido)}-F (el de esta tanda)`);
+    setAgregarAExistente(true);
+    setResultado(null);
+    setAnalisis(null);
+    setArchivos([]);
+    setPaso(1);
+  }
+
+  /** Mientras se enseña el resultado ya HAY pedido: cerrar refresca la consulta del padre. */
+  const cerrar = resultado !== null ? alImportado : alCerrar;
 
   const analizar = useAnalizarPdf();
   const confirmar = useConfirmarPdf();
@@ -331,6 +436,11 @@ export function ImportadorPedidoPdf({
    * falta y CUÁNTOS renglones. `null` = no hay nada que explicar (el botón sí abre).
    */
   const motivoBloqueo: string | null = (() => {
+    // Fila 0.147: con «agregar a un pedido existente» elegido y sin pedido, confirmar abriría uno
+    // NUEVO a espaldas de lo que la pantalla dice.
+    if (cuantosImportan > 0 && agregarAExistente && idPedidoDestino === null) {
+      return 'Elige el pedido al que se agregan las OPs (o marca «Pedido nuevo»).';
+    }
     if (cuantosImportan > 0) return null;
     if (renglones.length === 0) return 'Todavía no hay ningún PDF analizado.';
     const conError = renglones.filter((r) => r.error !== null).length;
@@ -487,7 +597,10 @@ export function ImportadorPedidoPdf({
       confirmar.mutate(
         {
           idCliente,
-          referenciaGeneral: referencia.trim() === '' ? null : referencia.trim(),
+          // Fila 0.147: con destino, la referencia NO viaja — el pedido existente conserva la suya.
+          ...(idPedidoDestino === null
+            ? { referenciaGeneral: referencia.trim() === '' ? null : referencia.trim() }
+            : { idPedidoDestino }),
           archivos: archivosConAjuste,
           ligas: resoluciones,
           // Igual que al analizar: sin opinión, no se manda — el backend RECUERDA el % que reciba,
@@ -496,12 +609,8 @@ export function ImportadorPedidoPdf({
         },
         {
           onSuccess: (res) => {
-            const nOp = res.ordenes.length;
-            const fuera = res.noReconocidos.length;
-            toast.success(
-              `Pedido ${res.folioPedido}-F importado · ${nOp} OP(s) con su matriz + RC` +
-                (fuera > 0 ? ` · ${fuera} PDF(s) sin ligar quedaron fuera` : ''),
-            );
+            // Fila 0.147 (a): el toast nombra la CAUSA de cada PDF que quedó fuera.
+            toast.success(mensajeImportado(res));
             // ⭐ Fila 0.151 — los avisos de la numeración NO se tiran. Son la única señal de que un
             // número tecleado no se aplicó (el color ya tenía modelo entre la previa y el confirm):
             // callarlos sería exactamente lo que Daniel pidió que dejara de pasar.
@@ -509,6 +618,12 @@ export function ImportadorPedidoPdf({
               for (const aviso of orden.avisosNumeroProduccion) {
                 toast.warning(`OC ${orden.numeroOrden}: ${aviso}`);
               }
+            }
+            // ⭐ Fila 0.147 — si quedaron PDF fuera, el asistente se queda abierto para terminar la
+            // tanda en ESTE pedido; si entró todo, se cierra como siempre.
+            if (res.noReconocidos.length > 0) {
+              setResultado(res);
+              return;
             }
             alImportado();
           },
@@ -528,7 +643,7 @@ export function ImportadorPedidoPdf({
       aria-label="Importar OC del cliente por PDF"
       data-testid="importador-pdf"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !ocupado) alCerrar();
+        if (e.target === e.currentTarget && !ocupado) cerrar();
       }}
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-background shadow-xl">
@@ -546,7 +661,7 @@ export function ImportadorPedidoPdf({
           <Button
             variant="ghost"
             size="icon"
-            onClick={alCerrar}
+            onClick={cerrar}
             disabled={ocupado}
             aria-label="Cerrar"
             data-testid="importador-pdf-cerrar"
@@ -583,8 +698,15 @@ export function ImportadorPedidoPdf({
 
         {/* Cuerpo con scroll */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-          {paso === 1 ? (
+          {resultado !== null ? (
+            <ResultadoConFuera resultado={resultado} />
+          ) : paso === 1 ? (
             <PasoOrigen
+              destino={idPedidoDestino === null ? null : (etiquetaDestino ?? null)}
+              onQuitarDestino={() => {
+                elegirDestino(null);
+                setAgregarAExistente(false);
+              }}
               opcionesCliente={opcionesCliente}
               cargandoClientes={clientes.isFetching}
               idCliente={idCliente}
@@ -598,53 +720,70 @@ export function ImportadorPedidoPdf({
               onArchivos={alElegirArchivos}
             />
           ) : (
-            <PasoVistaPrevia
-              renglones={renglones}
-              porcentajeAdicional={analisis?.porcentajeAdicional ?? 0}
-              matrices={matrices}
-              pantones={pantones}
-              onCelda={(i, filaIdx, talla, cantidad) =>
-                setMatrices((prev) => {
-                  const filas = prev[i] ?? [];
-                  const nuevas = filas.map((f, fi) =>
-                    fi === filaIdx ? { ...f, tallas: { ...f.tallas, [talla]: cantidad } } : f,
-                  );
-                  return { ...prev, [i]: nuevas };
-                })
-              }
-              onPantone={(i, valor) => setPantones((prev) => ({ ...prev, [i]: valor }))}
-              numeros={numeros}
-              onNumero={(i, valor) => setNumeros((prev) => ({ ...prev, [i]: valor }))}
-              ligas={ligas}
-              idModeloDe={idModeloDe}
-              opcionesModelo={opcionesModelo}
-              cargandoModelos={modelos.isFetching}
-              onLigar={(modeloCliente, id) => {
-                const siguientesLigas = { ...ligas };
-                if (id === null) delete siguientesLigas[modeloCliente];
-                else siguientesLigas[modeloCliente] = id;
-                setLigas(siguientesLigas);
-                // ⭐ Fila 0.151 — CAMBIAR UNA LIGA TIRA LOS NÚMEROS QUE YA NO VALEN. El nº propuesto
-                // se calculó para el modelo SUGERIDO y mirando la tanda entera; dejarlo precargado
-                // mandaría al confirm un número pensado para otro modelo (o para un reuso que ya no
-                // va a ocurrir). Se re-evalúan TODOS los renglones con el MISMO predicado que usa la
-                // pantalla —no sólo los de este `modeloCliente`—, porque un `reusado` puede depender
-                // de un renglón ajeno. Al volver al modelo sugerido, la propuesta se re-precarga.
-                setNumeros((prev) => {
-                  const siguiente = { ...prev };
-                  renglones.forEach((r, i) => {
-                    const antes = numeracionVigente(r, renglones, ligas);
-                    const ahora = numeracionVigente(r, renglones, siguientesLigas);
-                    // Sólo se tocan los que CAMBIARON de estado: un número que el usuario tecleó en
-                    // otro renglón no se le borra por ligar éste.
-                    if (antes === ahora) return;
-                    siguiente[i] = ahora ? propuestaDe(r) : '';
+            <>
+              {idCliente !== null ? (
+                <DestinoPedido
+                  idCliente={idCliente}
+                  agregar={agregarAExistente}
+                  onAgregar={(si) => {
+                    setAgregarAExistente(si);
+                    if (!si) elegirDestino(null);
+                  }}
+                  idPedidoDestino={idPedidoDestino}
+                  etiquetaDestino={etiquetaDestino}
+                  onDestino={elegirDestino}
+                />
+              ) : null}
+              <PasoVistaPrevia
+                renglones={renglones}
+                modelosEnDestino={idPedidoDestino === null ? null : modelosEnDestino}
+                folioDestino={folioDestino}
+                porcentajeAdicional={analisis?.porcentajeAdicional ?? 0}
+                matrices={matrices}
+                pantones={pantones}
+                onCelda={(i, filaIdx, talla, cantidad) =>
+                  setMatrices((prev) => {
+                    const filas = prev[i] ?? [];
+                    const nuevas = filas.map((f, fi) =>
+                      fi === filaIdx ? { ...f, tallas: { ...f.tallas, [talla]: cantidad } } : f,
+                    );
+                    return { ...prev, [i]: nuevas };
+                  })
+                }
+                onPantone={(i, valor) => setPantones((prev) => ({ ...prev, [i]: valor }))}
+                numeros={numeros}
+                onNumero={(i, valor) => setNumeros((prev) => ({ ...prev, [i]: valor }))}
+                ligas={ligas}
+                idModeloDe={idModeloDe}
+                opcionesModelo={opcionesModelo}
+                cargandoModelos={modelos.isFetching}
+                onLigar={(modeloCliente, id) => {
+                  const siguientesLigas = { ...ligas };
+                  if (id === null) delete siguientesLigas[modeloCliente];
+                  else siguientesLigas[modeloCliente] = id;
+                  setLigas(siguientesLigas);
+                  // ⭐ Fila 0.151 — CAMBIAR UNA LIGA TIRA LOS NÚMEROS QUE YA NO VALEN. El nº propuesto
+                  // se calculó para el modelo SUGERIDO y mirando la tanda entera; dejarlo precargado
+                  // mandaría al confirm un número pensado para otro modelo (o para un reuso que ya no
+                  // va a ocurrir). Se re-evalúan TODOS los renglones con el MISMO predicado que usa la
+                  // pantalla —no sólo los de este `modeloCliente`—, porque un `reusado` puede depender
+                  // de un renglón ajeno. Al volver al modelo sugerido, la propuesta se re-precarga.
+                  setNumeros((prev) => {
+                    const siguiente = { ...prev };
+                    renglones.forEach((r, i) => {
+                      const antes = numeracionVigente(r, renglones, ligas);
+                      const ahora = numeracionVigente(r, renglones, siguientesLigas);
+                      // Sólo se tocan los que CAMBIARON de estado: un número que el usuario tecleó en
+                      // otro renglón no se le borra por ligar éste.
+                      if (antes === ahora) return;
+                      siguiente[i] = ahora ? propuestaDe(r) : '';
+                    });
+                    return siguiente;
                   });
-                  return siguiente;
-                });
-              }}
-              onBuscarModelo={setBusquedaModelo}
-            />
+                }}
+                onBuscarModelo={setBusquedaModelo}
+              />
+            </>
           )}
         </div>
 
@@ -652,7 +791,7 @@ export function ImportadorPedidoPdf({
         <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
           {/* §Post-F9.70 punto 3: el porqué del botón apagado va A LA VISTA, no escondido en un
               tooltip que en móvil ni existe. */}
-          {paso === 2 && motivoBloqueo !== null ? (
+          {resultado === null && paso === 2 && motivoBloqueo !== null ? (
             <p
               className="mr-auto max-w-xl rounded-md border border-warn/30 bg-warn-soft px-2 py-1.5 text-xs text-warn"
               data-testid="importador-pdf-motivo-bloqueo"
@@ -660,10 +799,25 @@ export function ImportadorPedidoPdf({
               {motivoBloqueo}
             </p>
           ) : null}
-          <Button variant="outline" onClick={alCerrar} disabled={ocupado}>
-            Cancelar
-          </Button>
-          {paso === 1 ? (
+          {resultado !== null ? (
+            <>
+              <Button variant="outline" onClick={cerrar} data-testid="importador-pdf-terminar">
+                Terminar
+              </Button>
+              <Button
+                onClick={() => terminarTandaEn(resultado)}
+                data-testid="importador-pdf-completar-tanda"
+              >
+                <Plus aria-hidden />
+                Importar los PDF corregidos a este pedido
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={cerrar} disabled={ocupado}>
+              Cancelar
+            </Button>
+          )}
+          {resultado !== null ? null : paso === 1 ? (
             <Button
               onClick={continuarDesdeOrigen}
               disabled={ocupado || idCliente === null || archivos.length === 0}
@@ -676,7 +830,7 @@ export function ImportadorPedidoPdf({
           ) : (
             <Button
               onClick={confirmarImportacion}
-              disabled={ocupado || cuantosImportan === 0}
+              disabled={ocupado || motivoBloqueo !== null}
               {...(motivoBloqueo === null ? {} : { title: motivoBloqueo })}
               data-testid="importador-pdf-confirmar"
             >
@@ -685,7 +839,9 @@ export function ImportadorPedidoPdf({
               ) : (
                 <CheckIcon aria-hidden />
               )}
-              Generar pedido interno + OPs
+              {idPedidoDestino === null
+                ? 'Generar pedido interno + OPs'
+                : 'Agregar las OPs al pedido elegido'}
             </Button>
           )}
         </footer>
@@ -696,6 +852,8 @@ export function ImportadorPedidoPdf({
 
 /** Paso 1 · Origen: cliente + referencia general + los PDFs (varios). */
 function PasoOrigen({
+  destino,
+  onQuitarDestino,
   opcionesCliente,
   cargandoClientes,
   idCliente,
@@ -708,6 +866,12 @@ function PasoOrigen({
   archivos,
   onArchivos,
 }: {
+  /**
+   * Fila 0.147 — etiqueta del pedido existente al que se van a AGREGAR los PDF (`null` = pedido
+   * nuevo). Llega puesta cuando se vuelve a importar para terminar una tanda.
+   */
+  destino: string | null;
+  onQuitarDestino: () => void;
   opcionesCliente: { id: number; nombre: string }[];
   cargandoClientes: boolean;
   idCliente: number | null;
@@ -723,6 +887,21 @@ function PasoOrigen({
 }): React.JSX.Element {
   return (
     <div className="space-y-4">
+      {destino !== null ? (
+        <p
+          className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-xs text-primary-soft-foreground"
+          data-testid="importador-pdf-aviso-destino"
+        >
+          <InfoIcon className="size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">
+            Estos PDF se van a <b>agregar a {destino}</b>: carga los que quedaron fuera, ya
+            corregidos. Lo puedes cambiar en la vista previa.
+          </span>
+          <Button variant="ghost" size="sm" onClick={onQuitarDestino}>
+            Mejor un pedido nuevo
+          </Button>
+        </p>
+      ) : null}
       <section className="space-y-2">
         <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           ¿De qué cliente es el pedido?
@@ -744,9 +923,10 @@ function PasoOrigen({
           <label className="space-y-1 text-xs">
             <span className="font-medium text-muted-foreground">Referencia general (opcional)</span>
             <Input
-              value={referencia}
+              value={destino !== null ? '' : referencia}
               onChange={(e) => onReferencia(e.target.value)}
-              placeholder="Ej. remesa / semana"
+              placeholder={destino !== null ? 'El pedido conserva la suya' : 'Ej. remesa / semana'}
+              disabled={destino !== null}
               data-testid="importador-pdf-referencia"
             />
           </label>
@@ -816,9 +996,178 @@ function PasoOrigen({
   );
 }
 
+/**
+ * ⭐ Fila 0.147 — ¿PEDIDO NUEVO O AGREGAR A UNO QUE YA EXISTE? Por default, nuevo (como siempre). La
+ * opción «agregar» busca entre los pedidos DEL MISMO CLIENTE (buscando por folio en el servidor: un
+ * cliente acumula más pedidos de los que caben en una página) y sólo ofrece los que se pueden usar
+ * —el listado ya excluye los cancelados; aquí se quitan los marcados «no producir»—. Es la guarda
+ * de ARRIBA (§Post-F9.241): la que manda sigue siendo la del backend.
+ */
+function DestinoPedido({
+  idCliente,
+  agregar,
+  onAgregar,
+  idPedidoDestino,
+  etiquetaDestino,
+  onDestino,
+}: {
+  idCliente: number;
+  /** «Agregar a un pedido existente» elegido (el modo va aparte del id: se elige antes que el pedido). */
+  agregar: boolean;
+  onAgregar: (si: boolean) => void;
+  idPedidoDestino: number | null;
+  etiquetaDestino: string | undefined;
+  onDestino: (id: number | null, etiqueta?: string) => void;
+}): React.JSX.Element {
+  return (
+    <section
+      className="space-y-2 rounded-lg border bg-card px-3 py-2.5"
+      data-testid="importador-pdf-destino"
+    >
+      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        ¿A qué pedido van estas OPs?
+      </h3>
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="importador-pdf-destino"
+            checked={!agregar}
+            onChange={() => onAgregar(false)}
+            data-testid="importador-pdf-destino-nuevo"
+          />
+          Pedido nuevo
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="importador-pdf-destino"
+            checked={agregar}
+            onChange={() => onAgregar(true)}
+            data-testid="importador-pdf-destino-existente"
+          />
+          Agregar a un pedido existente
+        </label>
+      </div>
+      {agregar ? (
+        <SelectorPedidoDestino
+          idCliente={idCliente}
+          valor={idPedidoDestino}
+          etiquetaSeleccion={etiquetaDestino}
+          onChange={onDestino}
+        />
+      ) : null}
+      {agregar ? (
+        <p className="text-[11px] text-faint">
+          Los renglones y las OPs que el pedido ya tiene no se tocan, y conserva su referencia
+          general. Cada OP nueva lleva la OC de su propio PDF.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/** Combobox de los pedidos del cliente que se pueden usar como destino (búsqueda por folio). */
+function SelectorPedidoDestino({
+  idCliente,
+  valor,
+  etiquetaSeleccion,
+  onChange,
+}: {
+  idCliente: number;
+  valor: number | null;
+  etiquetaSeleccion: string | undefined;
+  onChange: (id: number | null, etiqueta?: string) => void;
+}): React.JSX.Element {
+  const [texto, setTexto] = useState('');
+  const busqueda = useDebounce(texto.trim(), 250);
+  const pedidos = usePedidos({
+    idCliente,
+    pagina: 1,
+    porPagina: 20,
+    ordenarPor: 'folio',
+    direccion: 'desc',
+    // Los cancelados y los «no producir» los quita el SERVIDOR (fila 0.147): filtrarlos aquí,
+    // sobre una página de 20, podía dejar la lista vacía con pedidos usables más abajo.
+    soloProducibles: 'true',
+    ...(busqueda === '' ? {} : { busqueda }),
+  });
+  const opciones = useMemo(
+    () =>
+      (pedidos.data?.datos ?? []).map((p) => ({
+        id: p.id,
+        nombre:
+          `Pedido ${String(p.folio)}-F · ${String(p.lineas.length)} ${p.lineas.length === 1 ? 'renglón' : 'renglones'}` +
+          (p.fechaPedido !== null ? ` · ${p.fechaPedido}` : '') +
+          (p.ocCliente !== null && p.ocCliente !== '' ? ` · ${p.ocCliente}` : ''),
+      })),
+    [pedidos.data],
+  );
+  return (
+    <ComboboxBuscable
+      opciones={opciones}
+      valor={valor}
+      etiquetaSeleccion={etiquetaSeleccion}
+      onChange={(id) => onChange(id, opciones.find((o) => o.id === id)?.nombre)}
+      alCambiarTexto={setTexto}
+      busquedaServidor
+      cargando={pedidos.isFetching}
+      placeholder="Busca el pedido por folio"
+      textoVacio="Este cliente no tiene pedidos a los que se pueda agregar."
+      etiqueta="Pedido al que se agregan las OPs"
+      testid="importador-pdf-pedido-destino"
+    />
+  );
+}
+
+/**
+ * ⭐ Fila 0.147 — EL RESULTADO CUANDO QUEDARON PDF FUERA. En vez de cerrarse con un toast, el
+ * asistente enseña cada PDF que no entró y POR QUÉ, para que el usuario corrija y termine la tanda en
+ * el mismo pedido (el botón del pie).
+ */
+function ResultadoConFuera({ resultado }: { resultado: ConfirmarPdf }): React.JSX.Element {
+  return (
+    <div className="space-y-3" data-testid="importador-pdf-resultado">
+      <p className="rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm text-primary-soft-foreground">
+        {resultado.pedidoExistente ? 'Se agregaron' : 'Se creó el pedido con'}{' '}
+        <b>{resultado.ordenes.length} OP(s)</b>
+        {resultado.pedidoExistente ? ' al pedido ' : ': '}
+        <b>{resultado.folioPedido}-F</b>.
+      </p>
+      <section className="space-y-2">
+        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          {cuantosQuedaronFuera(resultado.noReconocidos.length)}
+        </h3>
+        <ul className="space-y-1.5">
+          {resultado.noReconocidos.map((f, i) => (
+            <li
+              key={`${f.nombreArchivo}-${String(i)}`}
+              className="rounded-md border px-3 py-2 text-xs"
+              data-testid="importador-pdf-fuera"
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <FileText className="size-3.5 shrink-0 text-primary" aria-hidden />
+                <b className="truncate">{f.nombreArchivo}</b>
+                <ChipEstado tono="warn">{ETIQUETA_CAUSA[f.causa].una}</ChipEstado>
+              </span>
+              <span className="mt-1 block text-muted-foreground">{f.motivo}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <p className="text-xs text-muted-foreground">
+        Corrige lo que haga falta (por ejemplo, liga el modelo) y vuelve a importar esos PDF con el
+        botón de abajo: se agregan a <b>este mismo pedido</b> en lugar de abrir otro.
+      </p>
+    </div>
+  );
+}
+
 /** Paso 2 · Vista previa: un renglón por PDF (liga a modelo + matriz EDITABLE por packs + advertencias). */
 function PasoVistaPrevia({
   renglones,
+  modelosEnDestino,
+  folioDestino,
   porcentajeAdicional,
   matrices,
   pantones,
@@ -834,6 +1183,9 @@ function PasoVistaPrevia({
   onBuscarModelo,
 }: {
   renglones: RenglonPdfPreview[];
+  /** Fila 0.147 — modelos que el pedido de destino ya tiene (`null` = pedido nuevo, no aplica). */
+  modelosEnDestino: ReadonlySet<number> | null;
+  folioDestino: number | null;
   porcentajeAdicional: number;
   matrices: Record<number, RenglonPackEditable[]>;
   pantones: Record<number, string>;
@@ -934,6 +1286,12 @@ function PasoVistaPrevia({
               onPantone={(valor) => onPantone(i, valor)}
               onNumero={(valor) => onNumero(i, valor)}
               valorLiga={idModeloDe(r)}
+              modeloYaEnDestino={
+                modelosEnDestino !== null &&
+                idModeloDe(r) !== null &&
+                modelosEnDestino.has(idModeloDe(r) as number)
+              }
+              folioDestino={folioDestino}
               usaSugerencia={ligas[r.modeloCliente] === undefined && r.idModeloSugerido !== null}
               etiquetaModeloCreado={etiquetaModeloCreado}
               opcionesModelo={opcionesModelo}
@@ -1014,6 +1372,8 @@ function FilaPdf({
   onPantone,
   onNumero,
   valorLiga,
+  modeloYaEnDestino,
+  folioDestino,
   usaSugerencia,
   etiquetaModeloCreado,
   opcionesModelo,
@@ -1035,6 +1395,9 @@ function FilaPdf({
   onPantone: (valor: string) => void;
   onNumero: (valor: string) => void;
   valorLiga: number | null;
+  /** §Post-F9.241 — el modelo ligado ya tiene renglón en el pedido de destino. */
+  modeloYaEnDestino: boolean;
+  folioDestino: number | null;
   usaSugerencia: boolean;
   /** Etiqueta del modelo recién creado desde el preview (aún no está en la búsqueda paginada). */
   etiquetaModeloCreado: string | undefined;
@@ -1194,6 +1557,19 @@ function FilaPdf({
             />
           </label>
         </div>
+      ) : null}
+
+      {/* §Post-F9.241: el modelo ya está en el pedido de destino. No se funde ni se suma en
+          silencio: entra como renglón APARTE (dos OC pueden pedir el mismo modelo). */}
+      {modeloYaEnDestino ? (
+        <p
+          className="border-t px-3 py-2 text-[11px] text-warn"
+          data-testid="importador-pdf-modelo-en-destino"
+        >
+          Este modelo ya tiene renglón en el pedido
+          {folioDestino !== null ? ` ${String(folioDestino)}-F` : ''}: esta OC entra como un renglón
+          aparte, con su propia OP.
+        </p>
       ) : null}
 
       {r.advertencias.length > 0 ? (

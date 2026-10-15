@@ -49515,6 +49515,15 @@
           },
           {
             "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "soloProducibles",
+            "required": false,
+            "description": "Fila 0.147 — sólo los pedidos a los que se les pueden crear órdenes: excluye los marcados «no producir» (y los cancelados, aunque venga `incluirCancelados`). Lo usa el selector de destino del importador de PDF."
+          },
+          {
+            "schema": {
               "default": "folio",
               "type": "string",
               "enum": [
@@ -60983,11 +60992,24 @@
                     "description": "Cliente del pedido (empresa activa de la sesión, A9)."
                   },
                   "referenciaGeneral": {
-                    "description": "Referencia general del pedido (opcional; cada OP guarda su propio nº de orden).",
+                    "description": "Referencia general del pedido (opcional; cada OP guarda su propio nº de orden). Con `idPedidoDestino` se IGNORA: el pedido existente conserva la suya.",
                     "anyOf": [
                       {
                         "type": "string",
                         "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idPedidoDestino": {
+                    "description": "Fila 0.147 — pedido YA EXISTENTE al que se AÑADE la tanda (omitido/null = se crea un pedido nuevo, como siempre). Debe ser de la empresa activa y del MISMO cliente, y no estar cancelado ni marcado «no producir». Los renglones y OPs que ya tiene no se tocan.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
                       },
                       {
                         "type": "null"
@@ -61144,13 +61166,17 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Id del pedido interno creado."
+                      "description": "Id del pedido interno: el creado, o el existente al que se añadió la tanda."
                     },
                     "folioPedido": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
                       "description": "Folio del pedido (por empresa)."
+                    },
+                    "pedidoExistente": {
+                      "type": "boolean",
+                      "description": "Fila 0.147 — true si la tanda se AÑADIÓ a un pedido que ya existía (`idPedidoDestino`); false si nació un pedido nuevo."
                     },
                     "ordenes": {
                       "type": "array",
@@ -61254,16 +61280,27 @@
                           },
                           "modeloCliente": {
                             "type": "string",
-                            "description": "Modelo ID del cliente sin ligar."
+                            "description": "Modelo ID del cliente del PDF (vacío si el PDF ni se pudo leer)."
+                          },
+                          "causa": {
+                            "type": "string",
+                            "enum": [
+                              "ilegible",
+                              "oc-ya-importada",
+                              "sin-liga",
+                              "sin-tallas"
+                            ],
+                            "description": "Por qué quedó fuera: `ilegible` (no se pudo leer el PDF), `oc-ya-importada` (esa OC ya tiene OP, o venía repetida en la tanda), `sin-liga` (sin modelo nuestro ligado, o el ligado quedó inactivo) o `sin-tallas` (el PDF no trae piezas)."
                           },
                           "motivo": {
                             "type": "string",
-                            "description": "Por qué quedó fuera (sin liga / error de parseo)."
+                            "description": "Por qué quedó fuera, en prosa (para enseñarlo tal cual)."
                           }
                         },
                         "required": [
                           "nombreArchivo",
                           "modeloCliente",
+                          "causa",
                           "motivo"
                         ],
                         "additionalProperties": false,
@@ -61281,6 +61318,7 @@
                   "required": [
                     "idPedido",
                     "folioPedido",
+                    "pedidoExistente",
                     "ordenes",
                     "noReconocidos",
                     "ligasAprendidas"

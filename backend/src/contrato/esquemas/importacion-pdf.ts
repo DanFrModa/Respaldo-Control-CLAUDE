@@ -478,6 +478,9 @@ export type DatosLigaModeloPdf = z.infer<typeof esquemaLigaModeloPdf>;
  * (modelo del cliente → nuestro modelo). Crea el pedido interno + una OP por PDF (con su matriz + su RC
  * + su adjunto) + aprende las ligas, en UNA transacción. Los PDFs cuyo modelo del cliente NO se resolvió
  * (ni aprendido ni en `ligas`) se OMITEN y se devuelven en `noReconocidos`.
+ *
+ * ⭐ Fila 0.147 (§Post-F9.242) — con `idPedidoDestino` la tanda NO crea pedido: se AÑADE a uno que ya
+ * existe (el caso típico: terminar la tanda que un confirm anterior dejó a medias por un PDF sin liga).
  */
 export const esquemaConfirmarPdfCyaCuerpo = z
   .object({
@@ -492,7 +495,18 @@ export const esquemaConfirmarPdfCyaCuerpo = z
       .max(100)
       .nullable()
       .optional()
-      .describe('Referencia general del pedido (opcional; cada OP guarda su propio nº de orden).'),
+      .describe(
+        'Referencia general del pedido (opcional; cada OP guarda su propio nº de orden). Con `idPedidoDestino` se IGNORA: el pedido existente conserva la suya.',
+      ),
+    idPedidoDestino: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional()
+      .describe(
+        'Fila 0.147 — pedido YA EXISTENTE al que se AÑADE la tanda (omitido/null = se crea un pedido nuevo, como siempre). Debe ser de la empresa activa y del MISMO cliente, y no estar cancelado ni marcado «no producir». Los renglones y OPs que ya tiene no se tocan.',
+      ),
     archivos: campoArchivosPdfConfirmar,
     ligas: z
       .array(esquemaLigaModeloPdf)
@@ -545,12 +559,34 @@ export const esquemaOrdenPdfImportada = z
 /** Forma de una OP importada. */
 export type OrdenPdfImportada = z.infer<typeof esquemaOrdenPdfImportada>;
 
-/** Un PDF que quedó FUERA (su modelo del cliente no se ligó). */
+/**
+ * Por qué un PDF quedó FUERA de la tanda (fila 0.147): las CUATRO ramas que lo omiten. Viaja como
+ * código —además del `motivo` en prosa— para que la pantalla diga la causa real de cada uno en vez de
+ * llamarlos a todos «sin ligar».
+ */
+export const CAUSAS_PDF_NO_RECONOCIDO = [
+  'ilegible',
+  'oc-ya-importada',
+  'sin-liga',
+  'sin-tallas',
+] as const;
+
+/** Causa de un PDF que quedó fuera. */
+export type CausaPdfNoReconocido = (typeof CAUSAS_PDF_NO_RECONOCIDO)[number];
+
+/** Un PDF que quedó FUERA (ilegible, OC ya importada, sin liga o sin tallas). */
 export const esquemaPdfNoReconocido = z
   .object({
     nombreArchivo: z.string().describe('Nombre del PDF que no se importó.'),
-    modeloCliente: z.string().describe('Modelo ID del cliente sin ligar.'),
-    motivo: z.string().describe('Por qué quedó fuera (sin liga / error de parseo).'),
+    modeloCliente: z
+      .string()
+      .describe('Modelo ID del cliente del PDF (vacío si el PDF ni se pudo leer).'),
+    causa: z
+      .enum(CAUSAS_PDF_NO_RECONOCIDO)
+      .describe(
+        'Por qué quedó fuera: `ilegible` (no se pudo leer el PDF), `oc-ya-importada` (esa OC ya tiene OP, o venía repetida en la tanda), `sin-liga` (sin modelo nuestro ligado, o el ligado quedó inactivo) o `sin-tallas` (el PDF no trae piezas).',
+      ),
+    motivo: z.string().describe('Por qué quedó fuera, en prosa (para enseñarlo tal cual).'),
   })
   .describe('Un PDF que no se importó.');
 
@@ -560,8 +596,16 @@ export type PdfNoReconocido = z.infer<typeof esquemaPdfNoReconocido>;
 /** Respuesta de confirmar: el pedido nacido + las OPs + los PDFs que quedaron fuera. */
 export const esquemaConfirmarPdfCyaSalida = z
   .object({
-    idPedido: z.number().int().describe('Id del pedido interno creado.'),
+    idPedido: z
+      .number()
+      .int()
+      .describe('Id del pedido interno: el creado, o el existente al que se añadió la tanda.'),
     folioPedido: z.number().int().describe('Folio del pedido (por empresa).'),
+    pedidoExistente: z
+      .boolean()
+      .describe(
+        'Fila 0.147 — true si la tanda se AÑADIÓ a un pedido que ya existía (`idPedidoDestino`); false si nació un pedido nuevo.',
+      ),
     ordenes: z.array(esquemaOrdenPdfImportada).describe('OPs creadas (una por PDF ligado).'),
     noReconocidos: z.array(esquemaPdfNoReconocido).describe('PDFs que quedaron sin importar.'),
     ligasAprendidas: z
