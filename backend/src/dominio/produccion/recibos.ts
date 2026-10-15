@@ -88,6 +88,7 @@ import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
   enTransaccion,
+  type ClienteLectura,
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
@@ -430,7 +431,7 @@ export interface SumaCeldas {
  * el MISMO número). En envíos `cantidadIncompletas` es NULL y la suma no cambia.
  */
 export async function sumarCeldas(
-  tx: Tx | ReturnType<typeof clienteLectura>,
+  tx: ClienteLectura,
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso: number,
